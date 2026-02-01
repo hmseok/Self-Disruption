@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/app/utils/supabase'
 
-export default function JiipTab({ carId }: { carId: number }) {
+export default function JiipTab({ carId }: { carId: string }) {
   const [loading, setLoading] = useState(false)
 
   // 1. 지입(차주) 계약 데이터

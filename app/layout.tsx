@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Sidebar from './components/Sidebar' // 👈 방금 만든 메뉴 불러오기
+import ClientLayout from './components/ClientLayout' // 👈 새로 만든 컴포넌트
 
 export const metadata: Metadata = {
   title: '세컨드라이프 ERP',
@@ -14,16 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-50 flex min-h-screen text-gray-900">
-
-        {/* 1. 왼쪽 고정 사이드바 */}
-        <Sidebar />
-
-        {/* 2. 오른쪽 메인 컨텐츠 영역 (메뉴 너비만큼 띄우기) */}
-        <main className="flex-1 ml-64 min-h-screen transition-all">
+      <body>
+        {/* 모든 클라이언트 UI 로직(사이드바 상태 등)을 여기서 처리 */}
+        <ClientLayout>
           {children}
-        </main>
-
+        </ClientLayout>
       </body>
     </html>
   )

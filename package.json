@@ -9,9 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.93.3",
     "next": "16.1.6",
+    "openai": "^6.17.0",
     "react": "19.2.3",
+    "react-daum-postcode": "^3.2.0",
     "react-dom": "19.2.3"
   },
   "devDependencies": {

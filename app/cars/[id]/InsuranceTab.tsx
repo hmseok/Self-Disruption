@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/app/utils/supabase'
 
-export default function InsuranceTab({ carId }: { carId: number }) {
+export default function InsuranceTab({ carId }: { carId : string }) {
   const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
