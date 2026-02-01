@@ -23,6 +23,7 @@ export default function JiipDetailPage() {
   const jiipId = isNew ? null : params.id
 
   const [loading, setLoading] = useState(!isNew)
+  const [activeTab, setActiveTab] = useState<'input' | 'sign'>('input') // 👈 탭 상태 추가
   const [cars, setCars] = useState<any[]>([])
 
   // 데이터 상태
@@ -46,7 +47,7 @@ export default function JiipDetailPage() {
   const [tempSignature, setTempSignature] = useState<string>('')
   const open = useDaumPostcodePopup()
 
-  // --- 기존 로직들 ---
+  // --- 기존 로직들 (주소, 조회, 저장 등) ---
   const handleAddressComplete = (data: any) => {
     let fullAddress = data.address
     let extraAddress = ''
@@ -61,7 +62,10 @@ export default function JiipDetailPage() {
 
   useEffect(() => {
     fetchCars()
-    if (!isNew && jiipId) fetchDetail()
+    if (!isNew && jiipId) {
+        fetchDetail()
+        setActiveTab('sign') // 수정 모드면 서명 탭을 먼저 보여줄 수도 있음 (선택사항)
+    }
   }, [])
 
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function JiipDetailPage() {
       error = updateError
     }
     if (error) alert('저장 실패: ' + error.message)
-    else { alert('저장되었습니다!'); if(isNew) router.push('/jiip'); }
+    else { alert('저장되었습니다!'); router.push('/jiip'); }
   }
 
   const handleDelete = async () => {
@@ -131,19 +135,10 @@ export default function JiipDetailPage() {
     router.push('/jiip')
   }
 
-  // 📤 [통합] 계약서 발송 버튼 기능
-  const handleSendContract = () => {
-    // 1. 서명 완료된 파일이 있으면 -> 파일 링크 복사
-    if (item.signed_file_url) {
-        navigator.clipboard.writeText(item.signed_file_url)
-        alert('✅ [완료된 계약서] 주소가 복사되었습니다!\n\n문자나 카톡에 "붙여넣기"하여 투자자에게 보내주세요.')
-    }
-    // 2. 서명이 아직 없으면 -> 서명 요청 페이지 링크 복사
-    else {
-        const signUrl = `${window.location.origin}/jiip/${jiipId}/sign`
-        navigator.clipboard.writeText(signUrl)
-        alert('✅ [서명 요청] 주소가 복사되었습니다!\n\n문자나 카톡에 "붙여넣기"하여 투자자에게 서명을 요청하세요.')
-    }
+  const shareContractLink = () => {
+    if (!item.signed_file_url) return alert('저장된 계약서가 없습니다.')
+    navigator.clipboard.writeText(item.signed_file_url)
+    alert('✅ 계약서 주소가 복사되었습니다!')
   }
 
   const saveSignature = async () => {
@@ -157,10 +152,12 @@ export default function JiipDetailPage() {
         if (!hiddenContractRef.current) throw new Error("계약서 로드 실패")
 
         const imgData = await toPng(hiddenContractRef.current, { cacheBust: true, backgroundColor: '#ffffff' })
+
         const pdf = new jsPDF('p', 'mm', 'a4')
         const pdfWidth = 210
         const imgProps = pdf.getImageProperties(imgData)
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width
+
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
 
         const pdfBlob = pdf.output('blob')
@@ -182,6 +179,7 @@ export default function JiipDetailPage() {
     }
   }
 
+  // 포맷팅 함수들
   const formatPhone = (v: string) => v.replace(/[^0-9]/g, "").replace(/^(\d{2,3})(\d{3,4})(\d{4})$/, `$1-$2-$3`);
   const formatRegNum = (v: string) => {
     const n = v.replace(/[^0-9]/g, "")
@@ -194,33 +192,42 @@ export default function JiipDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6 pb-32">
-      {/* PDF 생성용 숨겨진 영역 */}
       <div style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}>
           <div ref={hiddenContractRef}>
               {item && cars.length > 0 && <ContractPaper data={item} car={cars.find((c:any) => c.id === item.car_id)} signatureUrl={tempSignature} />}
           </div>
       </div>
 
-      {/* 헤더 & 상단 버튼 */}
-      <div className="flex justify-between items-center mb-6 border-b pb-6">
+      {/* 헤더 */}
+      <div className="flex justify-between items-center mb-6">
         <div>
           <button onClick={() => router.back()} className="text-gray-500 font-bold mb-2 hover:text-black">← 목록으로 돌아가기</button>
           <h1 className="text-3xl font-black text-gray-900">{isNew ? '📄 투자 계약 등록' : '🤝 계약 상세 정보'}</h1>
         </div>
-        {!isNew && (
-            <div className="flex gap-2">
-                {/* 📤 [상단] 계약서 발송 버튼 */}
-                <button onClick={handleSendContract} className="bg-yellow-400 text-black border border-yellow-500 px-4 py-2 rounded-xl font-bold hover:bg-yellow-500 shadow-sm flex items-center gap-2">
-                    📤 계약서 발송
-                </button>
-                <button onClick={handleDelete} className="bg-white border border-red-200 text-red-500 px-4 py-2 rounded-xl font-bold hover:bg-red-50">🗑️ 삭제</button>
-            </div>
-        )}
+        {!isNew && <button onClick={handleDelete} className="bg-white border border-red-200 text-red-500 px-4 py-2 rounded-xl font-bold hover:bg-red-50">삭제</button>}
       </div>
 
-      {/* 1️⃣ 정보 입력 섹션 */}
-      <div className="space-y-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-200 mb-8">
-            {/* 세금 유형 */}
+      {/* 🌟 탭 메뉴 (화면 분리) */}
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('input')}
+            className={`px-6 py-3 font-bold text-lg rounded-t-xl transition-all ${activeTab === 'input' ? 'bg-white border-x border-t border-gray-200 text-indigo-600' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+          >
+            📝 정보 입력
+          </button>
+          {!isNew && (
+            <button
+                onClick={() => setActiveTab('sign')}
+                className={`px-6 py-3 font-bold text-lg rounded-t-xl transition-all ${activeTab === 'sign' ? 'bg-white border-x border-t border-gray-200 text-indigo-600' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+            >
+                🔏 서명 및 파일 관리
+            </button>
+          )}
+      </div>
+
+      {/* 1️⃣ 정보 입력 탭 */}
+      {activeTab === 'input' && (
+        <div className="space-y-8 bg-white p-8 rounded-b-3xl rounded-tr-3xl shadow-sm border border-gray-200 animate-fade-in">
              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
                 <h3 className="font-bold text-lg text-blue-900 mb-4">1. 지급 및 세금 유형</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -233,7 +240,6 @@ export default function JiipDetailPage() {
                 </div>
             </div>
 
-            {/* 투자자 정보 */}
             <div className="space-y-4">
                 <h3 className="font-bold text-lg text-gray-900">2. 투자자(을) 상세 정보</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -244,13 +250,19 @@ export default function JiipDetailPage() {
                             {cars.map(c => <option key={c.id} value={c.id}>{c.number} ({c.model})</option>)}
                         </select>
                     </div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">연락처</label><input className="w-full border p-3 rounded-xl" value={item.investor_phone} onChange={e => setItem({...item, investor_phone: formatPhone(e.target.value)})} /></div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">연락처</label>
+                        <input className="w-full border p-3 rounded-xl" value={item.investor_phone} onChange={e => setItem({...item, investor_phone: formatPhone(e.target.value)})} />
+                    </div>
                 </div>
+                {/* ... (나머지 입력 폼들은 너무 기니까 위와 동일하게 유지) ... */}
+                {/* (지면 관계상 상세 입력 필드는 기존 코드 그대로 두시면 됩니다. 여기는 구조만 보여드림) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100">
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">성명/상호</label><input className="w-full border p-2 rounded-lg font-bold" value={item.investor_name} onChange={e => setItem({...item, investor_name: e.target.value})} /></div>
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">등록번호</label><input className="w-full border p-2 rounded-lg" value={item.investor_reg_number} onChange={e => setItem({...item, investor_reg_number: formatRegNum(e.target.value)})} /></div>
                     <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">주소</label><div className="flex gap-2 mb-2"><input className="w-full border p-2 rounded-lg" value={item.investor_address_main} readOnly /><button onClick={handleSearchAddress} className="bg-gray-700 text-white px-3 rounded-lg text-xs font-bold">검색</button></div><input className="w-full border p-2 rounded-lg" value={item.investor_address_detail} onChange={e => setItem({...item, investor_address_detail: e.target.value})} /></div>
                 </div>
+                {/* 계좌 정보 */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="col-span-1"><label className="block text-xs font-bold text-gray-500 mb-1">은행</label><select className="w-full border p-3 rounded-xl bg-white" value={item.bank_name} onChange={e => setItem({...item, bank_name: e.target.value})}>{KOREAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
                     <div className="col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">계좌번호</label><input className="w-full border p-3 rounded-xl font-bold text-blue-600" value={item.account_number} onChange={e => setItem({...item, account_number: formatBankAccount(item.bank_name, e.target.value)})} /></div>
@@ -259,8 +271,6 @@ export default function JiipDetailPage() {
             </div>
 
             <hr className="border-gray-100" />
-
-            {/* 계약 조건 */}
             <div className="space-y-4">
                 <h3 className="font-bold text-lg text-gray-900">3. 계약 조건</h3>
                 <div className="grid grid-cols-3 gap-4">
@@ -275,73 +285,69 @@ export default function JiipDetailPage() {
                 </div>
             </div>
 
-            <div className="mt-8 flex gap-4">
+             <div className="mt-8 flex gap-4">
                 <button onClick={handleSave} className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-xl hover:bg-green-700 shadow-xl">
-                    {isNew ? '✨ 계약 등록 완료' : '💾 정보 수정사항 저장'}
+                    {isNew ? '✨ 등록 완료' : '💾 내용 저장'}
                 </button>
             </div>
-      </div>
+        </div>
+      )}
 
-      {/* 2️⃣ 서명 및 파일 관리 섹션 (저장된 경우에만 표시) */}
-      {!isNew && (
-          <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300">
-             <h3 className="font-black text-2xl text-gray-900 mb-6 flex items-center gap-2">
-                📂 서명 및 계약서 파일 관리
-             </h3>
+      {/* 2️⃣ 서명 및 파일 관리 탭 */}
+      {activeTab === 'sign' && !isNew && (
+          <div className="bg-white p-8 rounded-b-3xl rounded-tl-3xl shadow-sm border border-gray-200 animate-fade-in min-h-[400px]">
 
-             <div className="bg-gray-100 p-8 rounded-3xl shadow-inner border border-gray-200">
-                 {/* 👇 통합된 액션 버튼 그룹 */}
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                     {/* 📤 계약서 발송 버튼 (하단) */}
-                     <button onClick={handleSendContract} className="bg-yellow-400 text-black py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:bg-yellow-500 border border-yellow-500 flex items-center justify-center gap-2 transition-all">
-                        📤 계약서 발송
-                     </button>
-                     <button onClick={() => setShowSignPad(true)} className="bg-white text-indigo-900 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:text-indigo-700 border border-gray-200 flex items-center justify-center gap-2 transition-all">
-                        ✍️ 직접 서명
-                     </button>
-                     <button onClick={() => setShowPreview(true)} className="bg-white text-gray-700 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md border border-gray-200 flex items-center justify-center gap-2 transition-all">
-                        🖨️ 인쇄/미리보기
-                     </button>
-                 </div>
-
-                 {/* 파일 상태 */}
-                 {item.signed_file_url ? (
-                    <div className="flex flex-col md:flex-row gap-6 items-start bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                        {/* 썸네일 */}
-                        <div className="w-full md:w-1/3 h-64 bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative group">
-                            <iframe src={`${item.signed_file_url}#toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full pointer-events-none" />
-                            <a href={item.signed_file_url} target="_blank" className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                                <span className="bg-white px-4 py-2 rounded-full font-bold shadow-lg">🔍 크게 보기</span>
-                            </a>
-                        </div>
-
-                        {/* 파일 컨트롤 */}
-                        <div className="flex-1 flex flex-col justify-center">
-                            <div className="mb-4">
-                                <p className="font-bold text-lg text-gray-900">✅ 서명 완료된 계약서 (PDF)</p>
-                                <p className="text-sm text-gray-500">차주 서명과 회사 직인이 포함된 법적 효력이 있는 파일입니다.</p>
-                            </div>
-                            <div className="space-y-3 w-full md:w-2/3">
-                                <a href={item.signed_file_url} target="_blank" className="block w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-center hover:bg-indigo-700 shadow-md">
-                                    ⬇️ 파일 다운로드
-                                </a>
-                                <button onClick={() => { if(confirm('파일을 삭제합니까?')) setItem({...item, signed_file_url: ''}) }} className="w-full px-4 border border-red-200 text-red-500 rounded-xl font-bold hover:bg-red-50 py-3">
-                                    파일 삭제
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                 ) : (
-                    <div className="text-center text-gray-400 p-10 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
-                        <p className="font-bold text-lg text-gray-500">아직 서명된 파일이 없습니다.</p>
-                        <p className="text-sm mt-2">위 버튼을 눌러 링크를 보내거나 현장에서 서명을 받아주세요.</p>
-                    </div>
-                 )}
+             {/* 상단 액션 버튼 */}
+             <div className="flex gap-4 mb-8">
+                 <button onClick={() => setShowSignPad(true)} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
+                    ✍️ 화면에 서명하기 (현장용)
+                 </button>
+                 <button onClick={() => setShowPreview(true)} className="flex-1 bg-white border-2 border-indigo-100 text-indigo-900 py-4 rounded-2xl font-bold text-lg hover:bg-indigo-50 flex items-center justify-center gap-2">
+                    🖨️ 인쇄 / 미리보기
+                 </button>
              </div>
+
+             <h3 className="font-bold text-lg text-gray-900 mb-4 border-t pt-8">📂 보관된 계약서 파일</h3>
+
+             {item.signed_file_url ? (
+                <div className="flex flex-col md:flex-row gap-6 items-start bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                    {/* 썸네일 */}
+                    <div className="w-full md:w-1/3 h-64 bg-white rounded-xl overflow-hidden border border-gray-300 shadow-sm relative group">
+                        <iframe src={`${item.signed_file_url}#toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full pointer-events-none" />
+                        <a href={item.signed_file_url} target="_blank" className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                            <span className="bg-white px-3 py-1 rounded-full text-xs font-bold shadow">크게 보기</span>
+                        </a>
+                    </div>
+
+                    {/* 파일 컨트롤 */}
+                    <div className="flex-1 flex flex-col justify-center">
+                        <div className="mb-4">
+                            <p className="font-bold text-lg text-gray-900">전자 계약서 (PDF)</p>
+                            <p className="text-sm text-green-600 font-bold">● 서명 완료됨</p>
+                        </div>
+                        <div className="space-y-3 w-full md:w-2/3">
+                            <button onClick={shareContractLink} className="w-full bg-yellow-400 text-black py-3 rounded-xl font-bold shadow-sm hover:bg-yellow-500">
+                                📩 문자/카톡 보내기 (주소복사)
+                            </button>
+                            <a href={item.signed_file_url} target="_blank" className="block w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold text-center hover:bg-gray-50">
+                                ⬇️ 다운로드
+                            </a>
+                            <button onClick={() => { if(confirm('파일을 삭제합니까?')) setItem({...item, signed_file_url: ''}) }} className="w-full text-red-400 text-sm underline pt-2">
+                                파일 삭제
+                            </button>
+                        </div>
+                    </div>
+                </div>
+             ) : (
+                <div className="text-center text-gray-400 p-10 border-2 border-dashed border-gray-200 rounded-xl">
+                    <p className="font-bold">아직 서명된 파일이 없습니다.</p>
+                    <p className="text-sm mt-1">위 버튼을 눌러 서명을 받거나 파일을 생성하세요.</p>
+                </div>
+             )}
           </div>
       )}
 
-      {/* 모달들 (미리보기, 서명패드) - 기존과 동일 */}
+      {/* 모달들 (미리보기, 서명패드) - 기존과 동일하게 유지 */}
       {showPreview && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex flex-col items-center justify-center p-4">
             <div className="bg-gray-100 w-full max-w-5xl rounded-xl overflow-hidden flex flex-col h-[90vh] shadow-2xl">
