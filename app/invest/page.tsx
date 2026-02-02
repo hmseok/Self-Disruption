@@ -1,136 +1,163 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '../utils/supabase'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
-export default function InvestPage() {
-  const [items, setItems] = useState<any[]>([])
-  const [cars, setCars] = useState<any[]>([])
+// 금액 포맷
+const f = (n: number) => n ? n.toLocaleString() : '0'
+const formatSimpleMoney = (num: number) => {
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '억'
+  if (num >= 10000) return (num / 10000).toLocaleString() + '만'
+  return num.toLocaleString()
+}
+
+export default function GeneralInvestDashboard() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
+  const [list, setList] = useState<any[]>([])
 
-  // 신규 등록 데이터
-  const [newItem, setNewItem] = useState({
-    car_id: '', investor_name: '', invest_amount: 0,
-    share_ratio: 0, payout_cycle: '매월', expected_roi: 0
+  // 📊 일반 투자 전용 통계
+  const [stats, setStats] = useState({
+    totalAmount: 0,      // 총 투자 원금
+    totalMonthlyInterest: 0, // 월 예상 이자 지출액
+    avgInterestRate: 0,  // 평균 이자율
+    activeCount: 0       // 진행 중 건수
   })
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   const fetchData = async () => {
     setLoading(true)
-    const { data: mainData } = await supabase.from('investments').select('*, cars(number, model)').order('created_at', { ascending: false })
-    const { data: carData } = await supabase.from('cars').select('id, number, model').order('number', { ascending: true })
-    setItems(mainData || [])
-    setCars(carData || [])
+
+    // 오직 'general_investments' 테이블만 조회
+    const { data } = await supabase
+      .from('general_investments')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    const investments = data || []
+    setList(investments)
+
+    // 통계 계산
+    const totalAmount = investments.reduce((acc, cur) => acc + (cur.invest_amount || 0), 0)
+
+    // 월 이자 지출액 추산 (원금 * 연이율 / 12)
+    const totalMonthlyInterest = investments.reduce((acc, cur) => {
+        return acc + ((cur.invest_amount || 0) * (cur.interest_rate || 0) / 100 / 12)
+    }, 0)
+
+    const avgInterestRate = investments.length > 0
+        ? investments.reduce((acc, cur) => acc + (cur.interest_rate || 0), 0) / investments.length
+        : 0
+
+    setStats({
+        totalAmount,
+        totalMonthlyInterest,
+        avgInterestRate,
+        activeCount: investments.length
+    })
+
     setLoading(false)
   }
 
-  const handleSave = async () => {
-    if (!newItem.car_id || !newItem.investor_name) return alert('차량과 투자자명은 필수입니다.')
-    const { error } = await supabase.from('investments').insert(newItem)
-    if (error) alert('등록 실패: ' + error.message)
-    else { alert('투자 정보가 등록되었습니다.'); setShowModal(false); fetchData(); setNewItem({ car_id: '', investor_name: '', invest_amount: 0, share_ratio: 0, payout_cycle: '매월', expected_roi: 0 }) }
-  }
-
-  const handleDelete = async (id: number) => {
-    if(!confirm('삭제하시겠습니까?')) return
-    await supabase.from('investments').delete().eq('id', id)
-    fetchData()
-  }
-
-  // 합계
-  const totalInvest = items.reduce((acc, cur) => acc + (cur.invest_amount || 0), 0)
-
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in-up">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in pb-32">
+
+      {/* 상단 헤더 (제목 변경됨) */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">📈 투자/펀딩 관리</h1>
-          <p className="text-gray-500 mt-2">차량별 투자 유치 내역과 지분율을 관리합니다.</p>
+          <h1 className="text-3xl font-black text-gray-900">💰 일반 투자 관리</h1>
+          <p className="text-gray-500 mt-2">법인 운영 자금 및 순수 투자 계약 현황입니다.</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg">+ 투자자 등록</button>
+
+        <Link href="/invest/general/new" className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg flex items-center gap-2 transition-all">
+          + 신규 투자 등록
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <p className="text-gray-500 text-xs font-bold mb-1">총 투자 유치금</p>
-          <p className="text-3xl font-black text-blue-900">{totalInvest.toLocaleString()}원</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <p className="text-gray-500 text-xs font-bold mb-1">총 투자자 수</p>
-          <p className="text-3xl font-black text-gray-700">{items.length}명</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="p-4 text-xs font-bold text-gray-500">투자 대상 차량</th>
-              <th className="p-4 text-xs font-bold text-gray-500">투자자</th>
-              <th className="p-4 text-xs font-bold text-gray-500">투자 금액</th>
-              <th className="p-4 text-xs font-bold text-gray-500">지분율</th>
-              <th className="p-4 text-xs font-bold text-gray-500">정산 주기</th>
-              <th className="p-4 text-xs font-bold text-gray-500 text-right">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <tr><td colSpan={6} className="p-10 text-center">로딩 중...</td></tr> :
-             items.map((item) => (
-              <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td className="p-4">
-                  <div className="font-bold text-gray-900">{item.cars?.number}</div>
-                  <div className="text-xs text-gray-500">{item.cars?.model}</div>
-                </td>
-                <td className="p-4 font-bold">{item.investor_name}</td>
-                <td className="p-4">{item.invest_amount?.toLocaleString()}원</td>
-                <td className="p-4 font-bold text-blue-600">{item.share_ratio}%</td>
-                <td className="p-4 text-sm bg-gray-50 rounded"><span className="bg-gray-200 px-2 py-1 rounded text-xs">{item.payout_cycle}</span></td>
-                <td className="p-4 text-right">
-                  <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-sm underline">삭제</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg p-8 rounded-3xl shadow-2xl animate-fade-in-up">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">📈 투자자 등록</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">투자 대상 차량</label>
-                <select className="w-full border p-3 rounded-xl font-bold" value={newItem.car_id} onChange={e => setNewItem({...newItem, car_id: e.target.value})}>
-                  <option value="">차량을 선택하세요</option>
-                  {cars.map(c => <option key={c.id} value={c.id}>{c.number} ({c.model})</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <input className="w-full border p-3 rounded-xl" placeholder="투자자 이름" value={newItem.investor_name} onChange={e => setNewItem({...newItem, investor_name: e.target.value})} />
-                <input className="w-full border p-3 rounded-xl" type="number" placeholder="투자 금액" value={newItem.invest_amount} onChange={e => setNewItem({...newItem, invest_amount: Number(e.target.value)})} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 mb-1">지분율 (%)</label>
-                   <input type="number" className="w-full border p-3 rounded-xl" value={newItem.share_ratio} onChange={e => setNewItem({...newItem, share_ratio: Number(e.target.value)})} />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-gray-500 mb-1">정산 주기</label>
-                   <select className="w-full border p-3 rounded-xl" value={newItem.payout_cycle} onChange={e => setNewItem({...newItem, payout_cycle: e.target.value})}>
-                      <option>매월</option><option>분기</option><option>년말</option>
-                   </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-8">
-              <button onClick={handleSave} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">투자 등록</button>
-              <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200">취소</button>
-            </div>
+      {/* 📊 KPI 요약 카드 (일반 투자 전용) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100">
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Total Principal</p>
+              <h3 className="text-3xl font-black text-gray-900">{formatSimpleMoney(stats.totalAmount)}원</h3>
+              <p className="text-xs text-gray-500 mt-2">총 투자 원금 (부채)</p>
           </div>
-        </div>
-      )}
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Monthly Interest</p>
+              <h3 className="text-3xl font-black text-red-600">{formatSimpleMoney(Math.round(stats.totalMonthlyInterest))}원</h3>
+              <p className="text-xs text-gray-500 mt-2">월 예상 이자 지출</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Avg. Rate</p>
+              <h3 className="text-3xl font-black text-blue-600">{stats.avgInterestRate.toFixed(1)}%</h3>
+              <p className="text-xs text-gray-500 mt-2">평균 조달 금리 (연)</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Active Contracts</p>
+              <h3 className="text-3xl font-black text-gray-900">{stats.activeCount}건</h3>
+              <p className="text-xs text-gray-500 mt-2">운용 중인 계약</p>
+          </div>
+      </div>
+
+      {/* 📋 일반 투자 리스트 (단독 표출) */}
+      <div className="bg-white shadow-sm border rounded-2xl overflow-hidden min-h-[300px]">
+          {loading ? (
+              <div className="p-20 text-center text-gray-400">데이터 로딩 중...</div>
+          ) : (
+            <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-600 font-bold border-b text-xs uppercase">
+                    <tr>
+                        <th className="p-4">투자자 정보</th>
+                        <th className="p-4 text-right">투자 원금</th>
+                        <th className="p-4 text-center">이자율 (연)</th>
+                        <th className="p-4 text-center">이자 지급일</th>
+                        <th className="p-4 text-center">계약 기간</th>
+                        <th className="p-4 text-center">상태</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {list.length === 0 ? (
+                        <tr><td colSpan={6} className="p-20 text-center text-gray-400">
+                            아직 등록된 일반 투자가 없습니다.<br/>
+                            우측 상단 버튼을 눌러 등록해주세요.
+                        </td></tr>
+                    ) : (
+                        list.map(item => (
+                            <tr key={item.id} onClick={() => router.push(`/invest/general/${item.id}`)} className="hover:bg-indigo-50 cursor-pointer group transition-colors">
+                                <td className="p-4">
+                                    <div className="font-bold text-gray-900 text-base">{item.investor_name}</div>
+                                    <div className="text-xs text-gray-400">{item.investor_phone}</div>
+                                </td>
+                                <td className="p-4 text-right font-black text-gray-900 text-base">
+                                    {f(item.invest_amount)}원
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold">{item.interest_rate}%</span>
+                                </td>
+                                <td className="p-4 text-center font-bold text-gray-600">
+                                    매월 <span className="text-black">{item.payment_day}일</span>
+                                </td>
+                                <td className="p-4 text-center text-xs text-gray-500">
+                                    {item.contract_start_date} <br/> ~ {item.contract_end_date}
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        {item.status === 'active' ? '운용중' : '종료됨'}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+          )}
+      </div>
     </div>
   )
 }

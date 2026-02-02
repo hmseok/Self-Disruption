@@ -29,8 +29,7 @@ export default function JiipDetailPage() {
   const [item, setItem] = useState<any>({
     car_id: '', tax_type: '세금계산서',
     investor_name: '', investor_phone: '', investor_reg_number: '', investor_email: '',
-    investor_address: '',           // 🏠 기본 주소 (DB 컬럼명 일치)
-    investor_address_detail: '',    // 🏢 상세 주소 (DB 컬럼명 일치)
+    investor_address_main: '', investor_address_detail: '',
     bank_name: 'KB국민은행', account_number: '', account_holder: '',
     contract_start_date: '', contract_end_date: '',
     invest_amount: 0, admin_fee: 200000, share_ratio: 70, payout_day: 10,
@@ -47,7 +46,7 @@ export default function JiipDetailPage() {
   const [tempSignature, setTempSignature] = useState<string>('')
   const open = useDaumPostcodePopup()
 
-  // --- 주소 검색 ---
+  // --- 기존 로직들 ---
   const handleAddressComplete = (data: any) => {
     let fullAddress = data.address
     let extraAddress = ''
@@ -56,8 +55,7 @@ export default function JiipDetailPage() {
         if (data.buildingName !== '') extraAddress += (extraAddress !== '' ? `, ${data.buildingName}` : data.buildingName)
         fullAddress += (extraAddress !== '' ? ` (${extraAddress})` : '')
     }
-    // 상세 주소는 건드리지 않고 기본 주소만 업데이트
-    setItem((prev: any) => ({ ...prev, investor_address: fullAddress }))
+    setItem((prev: any) => ({ ...prev, investor_address_main: fullAddress }))
   }
   const handleSearchAddress = () => { open({ onComplete: handleAddressComplete }) }
 
@@ -66,17 +64,13 @@ export default function JiipDetailPage() {
     if (!isNew && jiipId) fetchDetail()
   }, [])
 
-  // 1년 자동 연장 (종료일 자동 계산)
   useEffect(() => {
     if (item.contract_start_date) {
       const start = new Date(item.contract_start_date)
-      start.setFullYear(start.getFullYear() + 3) // 지입은 보통 3년
+      start.setFullYear(start.getFullYear() + 3)
       start.setDate(start.getDate() - 1)
       const endDateStr = start.toISOString().split('T')[0]
-
-      if(!item.contract_end_date) {
-          setItem((prev: any) => ({ ...prev, contract_end_date: endDateStr }))
-      }
+      setItem((prev: any) => ({ ...prev, contract_end_date: endDateStr }))
     }
   }, [item.contract_start_date])
 
@@ -91,10 +85,8 @@ export default function JiipDetailPage() {
     else {
       setItem({
         ...data,
-        // DB에 분리되어 저장된 값을 그대로 가져옴
-        investor_address: data.investor_address || '',
-        investor_address_detail: data.investor_address_detail || '',
-
+        investor_address_main: data.investor_address || '',
+        investor_address_detail: '',
         investor_email: data.investor_email || '',
         account_holder: data.account_holder || '',
         invest_amount: data.invest_amount || 0,
@@ -110,23 +102,17 @@ export default function JiipDetailPage() {
 
   const handleSave = async () => {
     if (!item.car_id || !item.investor_name) return alert('차량과 투자자 정보는 필수입니다.')
-
-    // 👇 저장할 때 합치지 않고 그대로 보냄 (DB 컬럼 분리됨)
+    const fullAddress = `${item.investor_address_main} ${item.investor_address_detail}`.trim()
     const payload = {
       car_id: item.car_id, investor_name: item.investor_name, investor_phone: item.investor_phone,
       investor_reg_number: item.investor_reg_number, investor_email: item.investor_email,
-
-      investor_address: item.investor_address,              // 기본 주소
-      investor_address_detail: item.investor_address_detail,// 상세 주소
-
-      bank_name: item.bank_name, account_number: item.account_number,
+      investor_address: fullAddress, bank_name: item.bank_name, account_number: item.account_number,
       account_holder: item.account_holder, contract_start_date: item.contract_start_date || null,
       contract_end_date: item.contract_end_date || null, invest_amount: item.invest_amount,
       admin_fee: item.admin_fee, share_ratio: item.share_ratio, payout_day: item.payout_day,
       tax_type: item.tax_type, mortgage_setup: item.mortgage_setup, memo: item.memo,
       signed_file_url: item.signed_file_url
     }
-
     let error
     if (isNew) {
       const { error: insertError } = await supabase.from('jiip_contracts').insert(payload)
@@ -145,15 +131,18 @@ export default function JiipDetailPage() {
     router.push('/jiip')
   }
 
-  // 📤 계약서 발송 버튼
+  // 📤 [통합] 계약서 발송 버튼 기능
   const handleSendContract = () => {
+    // 1. 서명 완료된 파일이 있으면 -> 파일 링크 복사
     if (item.signed_file_url) {
         navigator.clipboard.writeText(item.signed_file_url)
-        alert('✅ [완료된 계약서] 주소가 복사되었습니다!\n\n문자나 카톡에 붙여넣기하세요.')
-    } else {
+        alert('✅ [완료된 계약서] 주소가 복사되었습니다!\n\n문자나 카톡에 "붙여넣기"하여 투자자에게 보내주세요.')
+    }
+    // 2. 서명이 아직 없으면 -> 서명 요청 페이지 링크 복사
+    else {
         const signUrl = `${window.location.origin}/jiip/${jiipId}/sign`
         navigator.clipboard.writeText(signUrl)
-        alert('✅ [서명 요청] 주소가 복사되었습니다!\n\n문자나 카톡에 붙여넣기하세요.')
+        alert('✅ [서명 요청] 주소가 복사되었습니다!\n\n문자나 카톡에 "붙여넣기"하여 투자자에게 서명을 요청하세요.')
     }
   }
 
@@ -201,13 +190,6 @@ export default function JiipDetailPage() {
   const formatBankAccount = (b: string, v: string) => b === 'KB국민은행' && v ? (v.replace(/[^0-9]/g, "").length > 8 ? `${v.slice(0, 6)}-${v.slice(6, 8)}-${v.slice(8, 14)}` : v) : v.replace(/[^0-9]/g, "")
   const handleMoneyChange = (f: string, v: string) => { const n = Number(v.replace(/,/g, '')); if (!isNaN(n)) setItem((p: any) => ({ ...p, [f]: n })) }
 
-  // 🌟 미리보기용 임시 데이터 (화면엔 분리되어 있지만, 계약서엔 합쳐서 보여줌)
-  const previewData = {
-      ...item,
-      // 계약서 컴포넌트는 'investor_address' 하나만 쓰므로 여기서 합쳐서 전달
-      investor_address: `${item.investor_address} ${item.investor_address_detail}`.trim()
-  }
-
   if (loading) return <div className="p-20 text-center font-bold text-gray-500">데이터 불러오는 중... ⏳</div>
 
   return (
@@ -215,7 +197,7 @@ export default function JiipDetailPage() {
       {/* PDF 생성용 숨겨진 영역 */}
       <div style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}>
           <div ref={hiddenContractRef}>
-              {item && cars.length > 0 && <ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} signatureUrl={tempSignature} />}
+              {item && cars.length > 0 && <ContractPaper data={item} car={cars.find((c:any) => c.id === item.car_id)} signatureUrl={tempSignature} />}
           </div>
       </div>
 
@@ -227,6 +209,7 @@ export default function JiipDetailPage() {
         </div>
         {!isNew && (
             <div className="flex gap-2">
+                {/* 📤 [상단] 계약서 발송 버튼 */}
                 <button onClick={handleSendContract} className="bg-yellow-400 text-black border border-yellow-500 px-4 py-2 rounded-xl font-bold hover:bg-yellow-500 shadow-sm flex items-center gap-2">
                     📤 계약서 발송
                 </button>
@@ -261,24 +244,13 @@ export default function JiipDetailPage() {
                             {cars.map(c => <option key={c.id} value={c.id}>{c.number} ({c.model})</option>)}
                         </select>
                     </div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">연락처</label><input className="w-full border p-3 rounded-xl" value={item.investor_phone} onChange={e => setItem({...item, investor_phone: formatPhone(e.target.value)})} maxLength={13} /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 mb-1">연락처</label><input className="w-full border p-3 rounded-xl" value={item.investor_phone} onChange={e => setItem({...item, investor_phone: formatPhone(e.target.value)})} /></div>
                 </div>
-
-                {/* 🏠 주소 입력 (DB 컬럼 분리 적용) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100">
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">성명/상호</label><input className="w-full border p-2 rounded-lg font-bold" value={item.investor_name} onChange={e => setItem({...item, investor_name: e.target.value})} /></div>
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">등록번호</label><input className="w-full border p-2 rounded-lg" value={item.investor_reg_number} onChange={e => setItem({...item, investor_reg_number: formatRegNum(e.target.value)})} /></div>
-
-                    <div className="md:col-span-2">
-                        <label className="block text-xs font-bold text-gray-500 mb-1">주소</label>
-                        <div className="flex gap-2 mb-2">
-                            <input className="w-full border p-2 rounded-lg bg-white" value={item.investor_address} readOnly placeholder="주소 검색 버튼을 눌러주세요" />
-                            <button onClick={handleSearchAddress} className="bg-gray-700 text-white px-3 rounded-lg text-xs font-bold whitespace-nowrap">검색</button>
-                        </div>
-                        <input className="w-full border p-2 rounded-lg" placeholder="상세 주소 입력" value={item.investor_address_detail} onChange={e => setItem({...item, investor_address_detail: e.target.value})} />
-                    </div>
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">주소</label><div className="flex gap-2 mb-2"><input className="w-full border p-2 rounded-lg" value={item.investor_address_main} readOnly /><button onClick={handleSearchAddress} className="bg-gray-700 text-white px-3 rounded-lg text-xs font-bold">검색</button></div><input className="w-full border p-2 rounded-lg" value={item.investor_address_detail} onChange={e => setItem({...item, investor_address_detail: e.target.value})} /></div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="col-span-1"><label className="block text-xs font-bold text-gray-500 mb-1">은행</label><select className="w-full border p-3 rounded-xl bg-white" value={item.bank_name} onChange={e => setItem({...item, bank_name: e.target.value})}>{KOREAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
                     <div className="col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">계좌번호</label><input className="w-full border p-3 rounded-xl font-bold text-blue-600" value={item.account_number} onChange={e => setItem({...item, account_number: formatBankAccount(item.bank_name, e.target.value)})} /></div>
@@ -310,7 +282,7 @@ export default function JiipDetailPage() {
             </div>
       </div>
 
-      {/* 2️⃣ 서명 및 파일 관리 섹션 */}
+      {/* 2️⃣ 서명 및 파일 관리 섹션 (저장된 경우에만 표시) */}
       {!isNew && (
           <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300">
              <h3 className="font-black text-2xl text-gray-900 mb-6 flex items-center gap-2">
@@ -318,7 +290,9 @@ export default function JiipDetailPage() {
              </h3>
 
              <div className="bg-gray-100 p-8 rounded-3xl shadow-inner border border-gray-200">
+                 {/* 👇 통합된 액션 버튼 그룹 */}
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                     {/* 📤 계약서 발송 버튼 (하단) */}
                      <button onClick={handleSendContract} className="bg-yellow-400 text-black py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:bg-yellow-500 border border-yellow-500 flex items-center justify-center gap-2 transition-all">
                         📤 계약서 발송
                      </button>
@@ -330,14 +304,18 @@ export default function JiipDetailPage() {
                      </button>
                  </div>
 
+                 {/* 파일 상태 */}
                  {item.signed_file_url ? (
                     <div className="flex flex-col md:flex-row gap-6 items-start bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                        {/* 썸네일 */}
                         <div className="w-full md:w-1/3 h-64 bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative group">
                             <iframe src={`${item.signed_file_url}#toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full pointer-events-none" />
                             <a href={item.signed_file_url} target="_blank" className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
                                 <span className="bg-white px-4 py-2 rounded-full font-bold shadow-lg">🔍 크게 보기</span>
                             </a>
                         </div>
+
+                        {/* 파일 컨트롤 */}
                         <div className="flex-1 flex flex-col justify-center">
                             <div className="mb-4">
                                 <p className="font-bold text-lg text-gray-900">✅ 서명 완료된 계약서 (PDF)</p>
@@ -363,6 +341,7 @@ export default function JiipDetailPage() {
           </div>
       )}
 
+      {/* 모달들 (미리보기, 서명패드) - 기존과 동일 */}
       {showPreview && (
         <div className="fixed inset-0 bg-black/80 z-[9999] flex flex-col items-center justify-center p-4">
             <div className="bg-gray-100 w-full max-w-5xl rounded-xl overflow-hidden flex flex-col h-[90vh] shadow-2xl">
@@ -371,7 +350,7 @@ export default function JiipDetailPage() {
                     <div className="flex gap-2"><button onClick={() => window.print()} className="bg-black text-white px-3 rounded font-bold">인쇄</button><button onClick={() => setShowPreview(false)} className="bg-gray-200 px-3 rounded font-bold">닫기</button></div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-8 bg-gray-500 flex justify-center">
-                    <ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} />
+                    <ContractPaper data={item} car={cars.find((c:any) => c.id === item.car_id)} />
                 </div>
             </div>
         </div>
@@ -385,7 +364,7 @@ export default function JiipDetailPage() {
                     <button onClick={() => setShowSignPad(false)} className="bg-gray-600 text-white px-4 py-2 rounded-lg font-bold">닫기</button>
                 </div>
                 <div className="flex-1 overflow-y-auto bg-gray-600 p-8 flex justify-center relative scroll-smooth">
-                    <div className="shadow-2xl origin-top"><ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} /></div>
+                    <div className="shadow-2xl origin-top"><ContractPaper data={item} car={cars.find((c:any) => c.id === item.car_id)} /></div>
                 </div>
                 <div className="bg-white border-t p-4 z-30 flex-none">
                     <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-6">
