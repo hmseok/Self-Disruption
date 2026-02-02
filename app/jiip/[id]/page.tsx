@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-// 👇 [경로 유지] 지입 폴더 깊이(2단계)에 맞춘 점 2개
+// 👇 [경로 유지] 기존 파일과 동일하게 설정
 import { supabase } from '../../utils/supabase'
 import ContractPaper from '../../components/ContractPaper'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
@@ -26,6 +26,9 @@ export default function JiipDetailPage() {
   const [loading, setLoading] = useState(!isNew)
   const [cars, setCars] = useState<any[]>([])
 
+  // 💰 [NEW] 실제 통장에서 입금된 총액 (지입 관련)
+  const [realDepositTotal, setRealDepositTotal] = useState(0)
+
   // 데이터 상태
   const [item, setItem] = useState<any>({
     car_id: '', tax_type: '세금계산서',
@@ -37,8 +40,6 @@ export default function JiipDetailPage() {
     invest_amount: 0, admin_fee: 200000, share_ratio: 70, payout_day: 10,
     mortgage_setup: false, memo: '', signed_file_url: ''
   })
-
-  const [car, setCar] = useState<any>(null)
 
   // UI 상태
   const [showPreview, setShowPreview] = useState(false)
@@ -76,7 +77,10 @@ export default function JiipDetailPage() {
 
   useEffect(() => {
     fetchCars()
-    if (!isNew && jiipId) fetchDetail()
+    if (!isNew && jiipId) {
+        fetchDetail()
+        fetchRealDeposit() // 👈 [NEW] 실제 입금액 조회 함수 호출
+    }
   }, [])
 
   // 1년 자동 연장
@@ -94,8 +98,24 @@ export default function JiipDetailPage() {
   }, [item.contract_start_date])
 
   const fetchCars = async () => {
-    const { data } = await supabase.from('cars').select('id, number, brand, model, owner_name').order('number', { ascending: true })
+    const { data } = await supabase.from('cars').select('id, number, brand, model').order('number', { ascending: true })
     setCars(data || [])
+  }
+
+  // 🏦 [NEW] 실제 통장 입금액 합산 함수
+  const fetchRealDeposit = async () => {
+      // transactions 테이블에서 이 지입 계약(jiip)과 연결된 '입금(income)' 내역만 가져옴
+      const { data, error } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('related_type', 'jiip') // 지입 계약 관련
+          .eq('related_id', jiipId)   // 현재 계약 ID
+          .eq('type', 'income')       // 입금(Income)만 합산
+
+      if (data) {
+          const total = data.reduce((acc, cur) => acc + (cur.amount || 0), 0)
+          setRealDepositTotal(total)
+      }
   }
 
   const fetchDetail = async () => {
@@ -115,26 +135,12 @@ export default function JiipDetailPage() {
         tax_type: data.tax_type || '세금계산서',
         signed_file_url: data.signed_file_url || ''
       })
-      if(data.car_id) {
-          const { data: carData } = await supabase.from('cars').select('*').eq('id', data.car_id).single()
-          if(carData) setCar(carData)
-      }
       setLoading(false)
     }
   }
 
-  const handleCarChange = async (e: any) => {
-      const newCarId = e.target.value
-      setItem({...item, car_id: newCarId})
-      if(newCarId) {
-          const { data } = await supabase.from('cars').select('*').eq('id', newCarId).single()
-          if(data) setCar(data)
-      } else {
-          setCar(null)
-      }
-  }
-
   const handleSave = async () => {
+    // 🚨 [수정] 투자금(invest_amount)은 필수값 아님. 차량과 투자자 이름만 있으면 저장 가능.
     if (!item.car_id || !item.investor_name) return alert('차량과 투자자 정보는 필수입니다.')
 
     const payload = {
@@ -144,7 +150,8 @@ export default function JiipDetailPage() {
       investor_address_detail: item.investor_address_detail,
       bank_name: item.bank_name, account_number: item.account_number,
       account_holder: item.account_holder, contract_start_date: item.contract_start_date || null,
-      contract_end_date: item.contract_end_date || null, invest_amount: item.invest_amount,
+      contract_end_date: item.contract_end_date || null,
+      invest_amount: item.invest_amount, // 약정금액으로 저장
       admin_fee: item.admin_fee, share_ratio: item.share_ratio, payout_day: item.payout_day,
       tax_type: item.tax_type, mortgage_setup: item.mortgage_setup, memo: item.memo,
       signed_file_url: item.signed_file_url
@@ -238,7 +245,7 @@ export default function JiipDetailPage() {
       {/* PDF 생성용 숨겨진 영역 */}
       <div style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}>
           <div ref={hiddenContractRef}>
-              {item && car && <ContractPaper data={previewData} car={car} signatureUrl={tempSignature} />}
+              {item && cars.length > 0 && <ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} signatureUrl={tempSignature} />}
           </div>
       </div>
 
@@ -285,7 +292,7 @@ export default function JiipDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">대상 차량</label>
-                        <select className="w-full border p-3 rounded-xl font-bold bg-gray-50" value={item.car_id} onChange={handleCarChange}>
+                        <select className="w-full border p-3 rounded-xl font-bold bg-gray-50" value={item.car_id} onChange={e => setItem({...item, car_id: e.target.value})}>
                             <option value="">선택하세요</option>
                             {cars.map(c => <option key={c.id} value={c.id}>{c.number} ({c.model})</option>)}
                         </select>
@@ -316,13 +323,63 @@ export default function JiipDetailPage() {
 
             <hr className="border-gray-100" />
 
+            {/* 💰 [핵심 수정] 3. 계약 및 자금 현황 (원 위치 수정됨) */}
             <div className="space-y-4">
-                <h3 className="font-bold text-lg text-gray-900">3. 계약 조건</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                    3. 계약 조건 및 자금 현황
+                    {!isNew && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">통장 연동됨</span>}
+                </h3>
+
+                <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">시작일</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_start_date} onChange={e => setItem({...item, contract_start_date: e.target.value})} /></div>
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">종료일</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_end_date} onChange={e => setItem({...item, contract_end_date: e.target.value})} /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">투자금</label><input type="text" className="w-full border p-3 rounded-xl text-right font-bold" value={item.invest_amount.toLocaleString()} onChange={e => handleMoneyChange('invest_amount', e.target.value)} /></div>
                 </div>
+
+                {/* 📊 자금 비교 카드 UI */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+
+                    {/* 왼쪽: 계약서상 금액 (목표) - [UI FIX] "원" 위치 조정 */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">📝 계약서상 약정금액 (목표)</label>
+                        <div className="relative">
+                            {/* pr-10 추가하여 숫자와 글자 겹침 방지 */}
+                            <input
+                                type="text"
+                                className="w-full border-2 border-gray-300 p-3 pr-10 rounded-xl text-right font-black text-lg focus:border-indigo-500 outline-none text-gray-700"
+                                value={item.invest_amount.toLocaleString()}
+                                onChange={e => handleMoneyChange('invest_amount', e.target.value)}
+                                placeholder="0"
+                            />
+                            {/* right-4 와 수직 중앙 정렬 적용 */}
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">원</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1 pl-1">* 계약서에 명시된 금액입니다.</p>
+                    </div>
+
+                    {/* 오른쪽: 실제 통장 입금액 (현황) */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">🏦 실제 통장 입금 총액 (현황)</label>
+                        <div className={`w-full border-2 p-3 rounded-xl text-right font-black text-lg flex justify-end items-center gap-1 ${
+                            realDepositTotal >= item.invest_amount && item.invest_amount > 0
+                                ? 'border-green-400 bg-green-50 text-green-700' // 완납 시 초록색
+                                : 'border-red-200 bg-white text-red-600'        // 미납 시 빨간색
+                        }`}>
+                            {realDepositTotal.toLocaleString()} <span className="text-sm">원</span>
+                        </div>
+
+                        {/* 차액 계산 표시 */}
+                        <div className="flex justify-end mt-1 px-1">
+                            {realDepositTotal >= item.invest_amount && item.invest_amount > 0 ? (
+                                <span className="text-xs font-bold text-green-600">✅ 완납 확인</span>
+                            ) : (
+                                <span className="text-xs font-bold text-red-500">
+                                    🚨 미수금: {(item.invest_amount - realDepositTotal).toLocaleString()}원
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-green-50 p-6 rounded-2xl border border-green-100 grid grid-cols-3 gap-6">
                     <div><label className="block text-xs font-bold text-green-800 mb-1">관리비</label><input type="text" className="w-full border border-green-200 p-2 rounded-lg text-right font-bold bg-white text-green-800" value={item.admin_fee.toLocaleString()} onChange={e => handleMoneyChange('admin_fee', e.target.value)} /></div>
                     <div><label className="block text-xs font-bold text-blue-800 mb-1">배분율(%)</label><input type="number" className="w-full border border-blue-200 p-2 rounded-lg text-right font-bold bg-white text-blue-800" value={item.share_ratio} onChange={e => setItem({...item, share_ratio: Number(e.target.value)})} /></div>
@@ -414,7 +471,7 @@ export default function JiipDetailPage() {
                 <div className="flex justify-center items-start">
                     {/* 👇 shrink-0와 mb-40으로 하단 여백 확보하여 잘림 방지 */}
                     <div className="bg-white shadow-xl rounded-sm overflow-hidden min-h-[500px] mb-40 shrink-0" style={{ width: '100%', maxWidth: '210mm' }}>
-                         {car && <ContractPaper data={previewData} car={car} />}
+                         {item && cars.length > 0 && <ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} />}
                     </div>
                 </div>
             </div>
@@ -451,7 +508,7 @@ export default function JiipDetailPage() {
                 <div className="flex-1 overflow-y-auto p-8 bg-gray-500 flex justify-center items-start">
                     {/* 👇 mb-20과 shrink-0 추가 */}
                     <div className="bg-white shadow-lg mb-20 shrink-0">
-                        {car && <ContractPaper data={previewData} car={car} />}
+                        {item && cars.length > 0 && <ContractPaper data={previewData} car={cars.find((c:any) => c.id === item.car_id)} />}
                     </div>
                 </div>
             </div>

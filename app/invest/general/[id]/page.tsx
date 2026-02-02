@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-// 👇 [경로 유지]
+// 👇 [경로 유지] 기존 파일과 동일하게 설정
 import { supabase } from '../../../utils/supabase'
 import GeneralContract from '../../../components/GeneralContract'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
@@ -25,6 +25,9 @@ export default function GeneralInvestDetail() {
 
   const [loading, setLoading] = useState(!isNew)
 
+  // 💰 [NEW] 실제 통장에서 입금된 총액 (투자 관련)
+  const [realDepositTotal, setRealDepositTotal] = useState(0)
+
   // 📝 데이터 상태
   const [item, setItem] = useState<any>({
     investor_name: '', investor_phone: '',
@@ -39,7 +42,7 @@ export default function GeneralInvestDetail() {
 
   // UI 상태
   const [showPreview, setShowPreview] = useState(false)
-  const [showSignPad, setShowSignPad] = useState(false) // 직접 서명 (전체화면)
+  const [showSignPad, setShowSignPad] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   // Refs
@@ -52,7 +55,10 @@ export default function GeneralInvestDetail() {
 
   // 1. 데이터 로드
   useEffect(() => {
-    if (!isNew && id) fetchDetail()
+    if (!isNew && id) {
+        fetchDetail()
+        fetchRealDeposit() // 👈 [NEW] 실제 입금액 조회
+    }
   }, [id])
 
   // 직접 서명용 캔버스 크기 조절
@@ -92,6 +98,22 @@ export default function GeneralInvestDetail() {
     }
   }
 
+  // 🏦 [NEW] 실제 통장 입금액 합산 함수 (투자 관련)
+  const fetchRealDeposit = async () => {
+      // transactions 테이블에서 이 투자 건(invest)과 연결된 '입금(income)' 내역만 합산
+      const { data } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('related_type', 'invest') // 투자 관련
+          .eq('related_id', id)         // 현재 투자 ID
+          .eq('type', 'income')         // 입금만 합산
+
+      if (data) {
+          const total = data.reduce((acc, cur) => acc + (cur.amount || 0), 0)
+          setRealDepositTotal(total)
+      }
+  }
+
   const handleAddress = (data: any) => {
     let full = data.address
     if(data.buildingName) full += ` (${data.buildingName})`
@@ -99,7 +121,8 @@ export default function GeneralInvestDetail() {
   }
 
   const handleSave = async () => {
-    if (!item.investor_name || !item.invest_amount) return alert('투자자명과 투자금은 필수입니다.')
+    // 🚨 [수정] 투자금(invest_amount) 필수 해제 -> 투자자 이름만 있으면 저장 가능
+    if (!item.investor_name) return alert('투자자 성명은 필수입니다.')
 
     const payload = {
         ...item,
@@ -107,6 +130,7 @@ export default function GeneralInvestDetail() {
         investor_address_detail: item.investor_address_detail
     }
 
+    // 숫자로 변환
     payload.invest_amount = Number(payload.invest_amount)
     payload.interest_rate = Number(payload.interest_rate)
     payload.payment_day = Number(payload.payment_day)
@@ -130,7 +154,7 @@ export default function GeneralInvestDetail() {
       }
   }
 
-  // 🔗 스마트 링크 발송 (상태에 따라 멘트 변경)
+  // 🔗 스마트 링크 발송
   const handleSmartLink = () => {
     const url = `${window.location.origin}/invest/general/${id}/sign`
     navigator.clipboard.writeText(url)
@@ -142,7 +166,7 @@ export default function GeneralInvestDetail() {
     }
   }
 
-  // ✍️ 서명 저장 (관리자용)
+  // ✍️ 서명 저장
   const saveSignature = async () => {
     if (sigCanvas.current.isEmpty()) return alert("서명을 해주세요")
     setUploading(true)
@@ -171,7 +195,7 @@ export default function GeneralInvestDetail() {
 
         alert("✅ 서명 완료! PDF가 저장되었습니다.")
         setItem((prev: any) => ({ ...prev, signed_file_url: publicUrl }))
-        setShowSignPad(false) // 서명창 닫기
+        setShowSignPad(false)
     } catch (e: any) {
         alert('오류: ' + e.message)
     } finally {
@@ -181,6 +205,11 @@ export default function GeneralInvestDetail() {
 
   const formatPhone = (v: string) => v.replace(/[^0-9]/g, "").replace(/^(\d{2,3})(\d{3,4})(\d{4})$/, `$1-$2-$3`)
   const formatAccount = (v: string) => v.replace(/[^0-9-]/g, "")
+  // 금액 입력 핸들러
+  const handleMoneyChange = (val: string) => {
+      const n = Number(val.replace(/,/g, ''))
+      if (!isNaN(n)) setItem((prev: any) => ({ ...prev, invest_amount: n }))
+  }
 
   if (loading) return <div className="p-20 text-center font-bold text-gray-500">데이터 불러오는 중... ⏳</div>
 
@@ -207,7 +236,6 @@ export default function GeneralInvestDetail() {
             </div>
             {!isNew && (
                  <div className="flex gap-2">
-                    {/* 상단에도 빠른 링크 버튼 배치 */}
                     <button onClick={handleSmartLink} className={`px-4 py-2 rounded-xl font-bold shadow-sm flex items-center gap-2 text-white ${item.signed_file_url ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
                         {item.signed_file_url ? '📩 다운로드 링크' : '🔗 서명 링크'}
                     </button>
@@ -218,7 +246,6 @@ export default function GeneralInvestDetail() {
 
         {/* 1️⃣ 정보 입력 섹션 */}
         <div className="space-y-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-200 mb-8">
-            {/* ... 기존 입력 필드들 (변화 없음) ... */}
             <div className="space-y-4">
                 <h3 className="font-bold text-lg text-gray-900 border-b pb-2">1. 투자자 정보</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -235,21 +262,66 @@ export default function GeneralInvestDetail() {
                 </div>
             </div>
 
-            <div className="space-y-4">
-                <h3 className="font-bold text-lg text-gray-900 border-b pb-2 pt-2">2. 투자 조건</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><label className="block text-xs font-bold text-blue-600 mb-1">투자 원금 (KRW)</label><input className="w-full border-2 border-blue-100 p-3 rounded-xl text-right font-black text-xl text-gray-900" value={item.invest_amount ? Number(item.invest_amount).toLocaleString() : ''} onChange={e=>setItem({...item, invest_amount: Number(e.target.value.replace(/,/g,''))})} placeholder="0" /></div>
-                    <div><label className="block text-xs font-bold text-green-600 mb-1">연 수익률(%)</label><input type="number" className="w-full border p-3 rounded-xl text-right font-bold" value={item.interest_rate} onChange={e=>setItem({...item, interest_rate:e.target.value})} /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">이자 지급일</label><input type="number" className="w-full border p-3 rounded-xl text-right" placeholder="10" value={item.payment_day} onChange={e=>setItem({...item, payment_day:e.target.value})} /></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">계약 시작일</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_start_date} onChange={e=>setItem({...item, contract_start_date:e.target.value})} /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">계약 종료일 (자동)</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_end_date} onChange={e=>setItem({...item, contract_end_date:e.target.value})} /></div>
-                </div>
-            </div>
+            {/* 💰 [UI 수정] 2. 투자 조건 및 자금 현황 */}
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-lg text-gray-900 border-b pb-2 pt-2 flex items-center gap-2">
+                                2. 투자 조건 및 자금 현황
+                                {!isNew && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">통장 연동됨</span>}
+                            </h3>
+
+                            {/* 📊 자금 비교 카드 UI */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                                {/* 왼쪽: 약정금 (목표) - [수정됨] "원" 위치 조정 */}
+                                <div>
+                                    <label className="block text-xs font-bold text-blue-600 mb-1">📝 투자 약정금 (Target)</label>
+                                    <div className="relative">
+                                        <input
+                                            className="w-full border-2 border-blue-100 p-3 pr-10 rounded-xl text-right font-black text-xl text-gray-900 focus:border-blue-500 outline-none"
+                                            value={item.invest_amount ? Number(item.invest_amount).toLocaleString() : ''}
+                                            onChange={e => handleMoneyChange(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                        {/* 👇 위치를 right-4로 끝에 붙이고, 수직 중앙 정렬 */}
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">원</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1 pl-1">* 계약서에 명시된 금액입니다.</p>
+                                </div>
+
+                                {/* 오른쪽: 실제 입금액 (현황) */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">🏦 실제 통장 입금 총액 (Current)</label>
+                                    <div className={`w-full border-2 p-3 rounded-xl text-right font-black text-xl flex justify-end items-center gap-1 ${
+                                        realDepositTotal >= item.invest_amount && item.invest_amount > 0
+                                            ? 'border-green-400 bg-green-50 text-green-700'
+                                            : 'border-red-200 bg-white text-red-600'
+                                    }`}>
+                                        {realDepositTotal.toLocaleString()} <span className="text-sm">원</span>
+                                    </div>
+
+                                    {/* 차액 표시 */}
+                                    <div className="flex justify-end mt-1 px-1">
+                                        {realDepositTotal >= item.invest_amount && item.invest_amount > 0 ? (
+                                            <span className="text-xs font-bold text-green-600">✅ 완납 (입금 완료)</span>
+                                        ) : (
+                                            <span className="text-xs font-bold text-red-500">
+                                                🚨 미수금: {(item.invest_amount - realDepositTotal).toLocaleString()}원
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                                <div><label className="block text-xs font-bold text-green-600 mb-1">연 수익률(%)</label><input type="number" className="w-full border p-3 rounded-xl text-right font-bold" value={item.interest_rate} onChange={e=>setItem({...item, interest_rate:e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">이자 지급일</label><input type="number" className="w-full border p-3 rounded-xl text-right" placeholder="10" value={item.payment_day} onChange={e=>setItem({...item, payment_day:e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">계약 시작일</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_start_date} onChange={e=>setItem({...item, contract_start_date:e.target.value})} /></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">종료일 (자동)</label><input type="date" className="w-full border p-3 rounded-xl" value={item.contract_end_date} onChange={e=>setItem({...item, contract_end_date:e.target.value})} /></div>
+                            </div>
+                        </div>
+
 
             <div className="space-y-4">
-                <h3 className="font-bold text-lg text-gray-900 border-b pb-2 pt-2">3. 입금 계좌</h3>
+                <h3 className="font-bold text-lg text-gray-900 border-b pb-2 pt-2">3. 입금 계좌 정보</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">은행명</label><select className="w-full border p-3 rounded-xl bg-white" value={item.bank_name} onChange={e => setItem({...item, bank_name: e.target.value})}>{KOREAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
                     <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">계좌번호</label><input className="w-full border p-3 rounded-xl" value={item.account_number} onChange={e=>setItem({...item, account_number:formatAccount(e.target.value)})} /></div>
@@ -263,7 +335,7 @@ export default function GeneralInvestDetail() {
             </div>
         </div>
 
-        {/* 2️⃣ 하단: 서명 및 파일 관리 (지입 스타일 완벽 구현) */}
+        {/* 2️⃣ 하단: 서명 및 파일 관리 */}
         {!isNew && (
             <div className="mt-12 pt-10 border-t-2 border-dashed border-gray-300">
                 <h3 className="font-black text-2xl text-gray-900 mb-6 flex items-center gap-2">
@@ -272,7 +344,6 @@ export default function GeneralInvestDetail() {
 
                 <div className="bg-gray-100 p-8 rounded-3xl shadow-inner border border-gray-200">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                        {/* 🌟 스마트 버튼: 서명 여부에 따라 색상/텍스트 변경 */}
                         <button
                             onClick={handleSmartLink}
                             className={`py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md border flex items-center justify-center gap-2 transition-all ${
@@ -329,10 +400,9 @@ export default function GeneralInvestDetail() {
             </div>
         )}
 
-        {/* 🌟 수정된 직접 서명 화면 (지입 스타일: 전체화면 + 계약서 표시 + 하단 서명판) */}
+        {/* 직접 서명 화면 (전체화면) */}
         {showSignPad && (
             <div className="fixed inset-0 z-[9999] bg-gray-100 flex flex-col">
-                {/* 헤더 */}
                 <div className="bg-indigo-900 text-white p-4 flex justify-between items-center shadow-md z-10">
                     <div>
                         <h3 className="font-bold text-lg">관리자 직접 서명</h3>
@@ -341,17 +411,14 @@ export default function GeneralInvestDetail() {
                     <button onClick={() => setShowSignPad(false)} className="text-white bg-indigo-800 hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold">닫기 ✕</button>
                 </div>
 
-                {/* 계약서 뷰어 (스크롤 가능) */}
                 <div className="flex-1 overflow-y-auto bg-gray-500 p-4">
                     <div className="flex justify-center">
                         <div className="bg-white shadow-xl rounded-sm overflow-hidden min-h-[500px]" style={{ width: '100%', maxWidth: '210mm' }}>
-                             {/* 모바일 모드로 렌더링하여 가독성 확보 */}
                              <GeneralContract data={previewData} mode="mobile" />
                         </div>
                     </div>
                 </div>
 
-                {/* 하단 고정 서명 패드 */}
                 <div className="bg-white p-4 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] z-20 pb-8 rounded-t-2xl">
                     <p className="text-center text-xs text-gray-500 mb-2 font-bold">👇 아래 박스에 서명해 주세요</p>
                     <div className="border-2 border-gray-300 rounded-xl bg-gray-50 mb-3 overflow-hidden flex justify-center relative h-40">
@@ -372,7 +439,7 @@ export default function GeneralInvestDetail() {
             </div>
         )}
 
-        {/* 단순 미리보기 모달 */}
+        {/* 미리보기 모달 */}
         {showPreview && (
             <div className="fixed inset-0 bg-black/80 z-[9999] flex flex-col items-center justify-center p-4">
                 <div className="bg-gray-100 w-full max-w-5xl rounded-xl overflow-hidden flex flex-col h-[90vh] shadow-2xl">

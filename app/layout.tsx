@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import ClientLayout from './components/ClientLayout' // 👈 새로 만든 컴포넌트
+import ClientLayout from './components/ClientLayout' // 👈 기존 사이드바 레이아웃 (유지!)
+import SupabaseProvider from './supabase-provider' // 👈 로그인 관리
+import { UploadProvider } from './context/UploadContext' // 👈 업로드 기능
+import UploadWidget from './components/UploadWidget' // 👈 업로드 위젯
 
 export const metadata: Metadata = {
   title: '세컨드라이프 ERP',
@@ -15,10 +18,21 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        {/* 모든 클라이언트 UI 로직(사이드바 상태 등)을 여기서 처리 */}
-        <ClientLayout>
-          {children}
-        </ClientLayout>
+        {/* 1. 로그인 세션 관리 */}
+        <SupabaseProvider>
+          {/* 2. 업로드 상태 관리 */}
+          <UploadProvider>
+
+            {/* 3. 기존 레이아웃 (사이드바 포함) */}
+            <ClientLayout>
+              {children}
+            </ClientLayout>
+
+            {/* 4. 화면 우측 하단에 뜨는 업로드 위젯 */}
+            <UploadWidget />
+
+          </UploadProvider>
+        </SupabaseProvider>
       </body>
     </html>
   )

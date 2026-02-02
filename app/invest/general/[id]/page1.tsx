@@ -11,35 +11,38 @@ import jsPDF from 'jspdf'
 export default function GeneralInvestDetail() {
   const router = useRouter()
   const params = useParams()
-  // URL이 /invest/general/new 면 신규 등록 모드
   const isNew = params.id === 'new'
   const id = isNew ? null : params.id
 
   const [loading, setLoading] = useState(!isNew)
+
   const [item, setItem] = useState<any>({
-    investor_name: '', investor_phone: '', investor_address: '',
+    investor_name: '', investor_phone: '',
+    investor_address: '',         // 기본 주소
+    investor_address_detail: '',  // 상세 주소 (DB 저장)
     bank_name: 'KB국민은행', account_number: '', account_holder: '',
-    invest_amount: 0, interest_rate: 12, payment_day: 10, // 기본값: 연 12%, 매월 10일
+    invest_amount: 0, interest_rate: 12, payment_day: 10,
     contract_start_date: new Date().toISOString().split('T')[0],
     contract_end_date: '',
     memo: '', signed_file_url: '', status: 'active'
   })
 
-  // PDF 저장 관련
+  // PDF 저장 관련 refs
   const hiddenContractRef = useRef<HTMLDivElement>(null)
   const sigCanvas = useRef<any>({})
   const [showSignPad, setShowSignPad] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [tempSignature, setTempSignature] = useState('')
   const [uploading, setUploading] = useState(false)
 
   const open = useDaumPostcodePopup()
 
-  // 1. 데이터 로드 (수정 모드일 때)
+  // 1. 데이터 로드
   useEffect(() => {
     if (!isNew && id) fetchDetail()
   }, [id])
 
-  // 시작일이 바뀌면 종료일 자동 세팅 (기본 1년)
+  // 시작일 변경 시 종료일 자동 설정 (+1년)
   useEffect(() => {
     if (item.contract_start_date && !item.contract_end_date) {
         const start = new Date(item.contract_start_date)
@@ -52,9 +55,17 @@ export default function GeneralInvestDetail() {
   const fetchDetail = async () => {
     const { data, error } = await supabase.from('general_investments').select('*').eq('id', id).single()
     if (error) { alert('데이터 로드 실패'); router.back(); }
-    else { setItem(data); setLoading(false); }
+    else {
+        setItem({
+            ...data,
+            investor_address: data.investor_address || '',
+            investor_address_detail: data.investor_address_detail || '' // 분리된 상세주소 불러옴
+        });
+        setLoading(false);
+    }
   }
 
+  // 주소 검색
   const handleAddress = (data: any) => {
     let full = data.address
     if(data.buildingName) full += ` (${data.buildingName})`
@@ -65,8 +76,13 @@ export default function GeneralInvestDetail() {
   const handleSave = async () => {
     if (!item.investor_name || !item.invest_amount) return alert('투자자명과 투자금은 필수입니다.')
 
-    const payload = { ...item }
-    // 숫자형 변환 안전장치
+    // 분리된 상태 그대로 저장 (DB 컬럼 존재)
+    const payload = {
+        ...item,
+        investor_address: item.investor_address,
+        investor_address_detail: item.investor_address_detail
+    }
+
     payload.invest_amount = Number(payload.invest_amount)
     payload.interest_rate = Number(payload.interest_rate)
     payload.payment_day = Number(payload.payment_day)
@@ -79,7 +95,7 @@ export default function GeneralInvestDetail() {
     if (error) alert('저장 실패: ' + error.message)
     else {
         alert('저장되었습니다!')
-        router.push('/invest') // 목록으로 이동
+        router.push('/invest')
     }
   }
 
@@ -90,7 +106,13 @@ export default function GeneralInvestDetail() {
       }
   }
 
-  // 3. 서명 및 PDF 저장 (지입 계약과 동일 로직)
+  // ... (서명 및 PDF 로직은 기존과 동일) ...
+  const copySignLink = () => {
+    const url = `${window.location.origin}/invest/general/${id}/sign`
+    navigator.clipboard.writeText(url)
+    alert('✅ 서명 페이지 주소가 복사되었습니다!\n\n' + url)
+  }
+
   const saveSignature = async () => {
     if (sigCanvas.current.isEmpty()) return alert("서명을 해주세요")
     setUploading(true)
@@ -127,39 +149,77 @@ export default function GeneralInvestDetail() {
     }
   }
 
+  const formatPhone = (val: string) => {
+    const v = val.replace(/[^0-9]/g, '')
+    if(v.length < 4) return v;
+    if(v.length < 7) return v.replace(/(\d{3})(\d{1})/, '$1-$2');
+    if(v.length < 11) return v.replace(/(\d{3})(\d{3})(\d{1})/, '$1-$2-$3');
+    return v.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+
+  const formatAccount = (val: string) => val.replace(/[^0-9-]/g, '')
+
   if (loading) return <div className="p-20 text-center">로딩 중...</div>
+
+  // 계약서 미리보기용 (주소 합침)
+  const previewData = {
+      ...item,
+      investor_address: `${item.investor_address} ${item.investor_address_detail}`.trim()
+  }
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6 pb-32">
-
         {/* PDF 생성용 숨겨진 영역 */}
         <div style={{position:'absolute', top:'-10000px', left:'-10000px'}}>
             <div ref={hiddenContractRef}>
-                <GeneralContract data={item} signatureUrl={tempSignature} />
+                <GeneralContract data={previewData} signatureUrl={tempSignature} />
             </div>
         </div>
 
+        {/* 헤더 */}
         <div className="flex justify-between items-center mb-8 border-b pb-4">
-            <h1 className="text-3xl font-black text-gray-900">{isNew ? '💰 일반 투자 등록' : '💰 투자 상세 정보'}</h1>
-            {!isNew && <button onClick={handleDelete} className="text-red-500 font-bold border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50">삭제</button>}
+            <div>
+                <button onClick={() => router.back()} className="text-gray-500 font-bold mb-2 hover:text-black">← 목록으로 돌아가기</button>
+                <h1 className="text-3xl font-black text-gray-900">{isNew ? '💰 일반 투자 등록' : '💰 투자 상세 정보'}</h1>
+            </div>
+            {!isNew && (
+                 <div className="flex gap-2">
+                    <button onClick={copySignLink} className="bg-yellow-400 text-black border border-yellow-500 px-4 py-2 rounded-xl font-bold hover:bg-yellow-500 shadow-sm flex items-center gap-2">
+                        🔗 서명 링크 복사
+                    </button>
+                    <button onClick={handleDelete} className="bg-white border border-red-200 text-red-500 px-4 py-2 rounded-xl font-bold hover:bg-red-50">🗑️ 삭제</button>
+                </div>
+            )}
         </div>
 
         <div className="flex gap-6 flex-col md:flex-row">
-
-            {/* 왼쪽: 입력 폼 */}
+            {/* 입력 폼 */}
             <div className="flex-1 space-y-6">
+                {/* 1. 투자자 정보 */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
                     <h3 className="font-bold text-gray-800 border-b pb-2">1. 투자자 정보</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div><label className="text-xs font-bold text-gray-500">성명/법인명</label><input className="w-full border p-3 rounded-xl font-bold" value={item.investor_name} onChange={e=>setItem({...item, investor_name:e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-gray-500">연락처</label><input className="w-full border p-3 rounded-xl" value={item.investor_phone} onChange={e=>setItem({...item, investor_phone:e.target.value})} /></div>
-                        <div className="col-span-2 flex gap-2">
-                            <input className="w-full border p-3 rounded-xl" value={item.investor_address} readOnly placeholder="주소" />
-                            <button onClick={() => open({onComplete: handleAddress})} className="bg-gray-800 text-white px-4 rounded-xl font-bold whitespace-nowrap">주소검색</button>
+                        <div><label className="text-xs font-bold text-gray-500">연락처</label><input className="w-full border p-3 rounded-xl" placeholder="010-0000-0000" value={item.investor_phone} onChange={e=>setItem({...item, investor_phone:formatPhone(e.target.value)})} maxLength={13} /></div>
+
+                        {/* 🏠 주소 입력 (분리됨) */}
+                        <div className="col-span-2">
+                            <label className="text-xs font-bold text-gray-500 mb-1 block">주소</label>
+                            <div className="flex gap-2 mb-2">
+                                <input className="w-full border p-3 rounded-xl bg-gray-50" value={item.investor_address} readOnly placeholder="주소 검색 버튼을 눌러주세요" />
+                                <button onClick={() => open({onComplete: handleAddress})} className="bg-gray-800 text-white px-4 rounded-xl font-bold whitespace-nowrap">주소검색</button>
+                            </div>
+                            <input
+                                className="w-full border p-3 rounded-xl"
+                                placeholder="상세 주소 입력 (예: 101동 102호)"
+                                value={item.investor_address_detail}
+                                onChange={e=>setItem({...item, investor_address_detail:e.target.value})}
+                            />
                         </div>
                     </div>
                 </div>
 
+                {/* 2. 투자 조건 */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
                     <h3 className="font-bold text-gray-800 border-b pb-2">2. 투자 조건 (핵심)</h3>
                     <div>
@@ -186,11 +246,12 @@ export default function GeneralInvestDetail() {
                     </div>
                 </div>
 
+                {/* 3. 입금 계좌 */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
                     <h3 className="font-bold text-gray-800 border-b pb-2">3. 입금 계좌 (이자 수령용)</h3>
                     <div className="grid grid-cols-3 gap-4">
                         <div><label className="text-xs font-bold text-gray-500">은행명</label><input className="w-full border p-3 rounded-xl" value={item.bank_name} onChange={e=>setItem({...item, bank_name:e.target.value})} /></div>
-                        <div className="col-span-2"><label className="text-xs font-bold text-gray-500">계좌번호</label><input className="w-full border p-3 rounded-xl" value={item.account_number} onChange={e=>setItem({...item, account_number:e.target.value})} /></div>
+                        <div className="col-span-2"><label className="text-xs font-bold text-gray-500">계좌번호</label><input className="w-full border p-3 rounded-xl" value={item.account_number} onChange={e=>setItem({...item, account_number:formatAccount(e.target.value)})} /></div>
                     </div>
                 </div>
 
@@ -199,7 +260,7 @@ export default function GeneralInvestDetail() {
                 </button>
             </div>
 
-            {/* 오른쪽: 계약서 미리보기 & 서명 (수정 모드일 때만) */}
+            {/* 오른쪽: 계약서 미리보기 (수정 모드일 때만) */}
             {!isNew && (
                 <div className="w-full md:w-[350px] flex flex-col gap-4">
                     <div className="bg-gray-100 p-4 rounded-2xl border border-gray-200 text-center">
@@ -221,7 +282,7 @@ export default function GeneralInvestDetail() {
                     {/* 미니 미리보기 */}
                     <div className="bg-white border rounded-xl overflow-hidden shadow-sm h-[400px] relative group">
                          <div className="origin-top-left transform scale-[0.45] w-[210mm]">
-                            <GeneralContract data={item} />
+                            <GeneralContract data={previewData} />
                          </div>
                          <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors pointer-events-none"></div>
                     </div>
@@ -229,7 +290,7 @@ export default function GeneralInvestDetail() {
             )}
         </div>
 
-        {/* 서명 모달 */}
+        {/* 서명 모달 (생략) - 기존과 동일 */}
         {showSignPad && (
             <div className="fixed inset-0 bg-black/90 z-[9999] flex flex-col items-center justify-center p-4">
                 <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
@@ -245,6 +306,21 @@ export default function GeneralInvestDetail() {
                         </button>
                     </div>
                     <button onClick={()=>setShowSignPad(false)} className="mt-4 text-sm text-gray-400 underline w-full text-center">닫기</button>
+                </div>
+            </div>
+        )}
+
+        {/* 미리보기 모달 */}
+        {showPreview && (
+            <div className="fixed inset-0 bg-black/80 z-[9999] flex flex-col items-center justify-center p-4">
+                <div className="bg-gray-100 w-full max-w-5xl rounded-xl overflow-hidden flex flex-col h-[90vh] shadow-2xl">
+                    <div className="p-4 bg-white border-b flex justify-between">
+                        <h3 className="font-bold">미리보기</h3>
+                        <div className="flex gap-2"><button onClick={() => window.print()} className="bg-black text-white px-3 rounded font-bold">인쇄</button><button onClick={() => setShowPreview(false)} className="bg-gray-200 px-3 rounded font-bold">닫기</button></div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-8 bg-gray-500 flex justify-center">
+                        <GeneralContract data={previewData} />
+                    </div>
                 </div>
             </div>
         )}

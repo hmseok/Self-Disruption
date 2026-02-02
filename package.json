@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.93.3",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
@@ -19,7 +20,8 @@
     "react": "19.2.3",
     "react-daum-postcode": "^3.2.0",
     "react-dom": "19.2.3",
-    "react-signature-canvas": "^1.1.0-alpha.2"
+    "react-signature-canvas": "^1.1.0-alpha.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
