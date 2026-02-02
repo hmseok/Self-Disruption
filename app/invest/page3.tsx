@@ -4,12 +4,11 @@ import { supabase } from '../utils/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-// 금액 포맷 (소수점 1자리 강제 통일)
+// 금액 포맷
 const f = (n: number) => n ? n.toLocaleString() : '0'
-
 const formatSimpleMoney = (num: number) => {
-  if (num >= 100000000) return (num / 100000000).toFixed(1) + '억' // 예: 1.5억
-  if (num >= 10000) return (num / 10000).toFixed(1) + '만'       // 예: 5,250.5만 (수정됨)
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '억'
+  if (num >= 10000) return (num / 10000).toLocaleString() + '만'
   return num.toLocaleString()
 }
 
@@ -67,7 +66,7 @@ export default function GeneralInvestDashboard() {
   return (
     <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in pb-32">
 
-      {/* 상단 헤더 */}
+      {/* 상단 헤더 (제목 변경됨) */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-black text-gray-900">💰 일반 투자 관리</h1>
@@ -79,39 +78,34 @@ export default function GeneralInvestDashboard() {
         </Link>
       </div>
 
-      {/* 📊 KPI 요약 카드 (소수점 1자리 적용) */}
+      {/* 📊 KPI 요약 카드 (일반 투자 전용) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
-          {/* 카드 1 */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100">
-              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">총 투자 원금 (Principal)</p>
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Total Principal</p>
               <h3 className="text-3xl font-black text-gray-900">{formatSimpleMoney(stats.totalAmount)}원</h3>
-              <p className="text-xs text-gray-500 mt-2">현재 운용중인 원금 합계</p>
+              <p className="text-xs text-gray-500 mt-2">총 투자 원금 (부채)</p>
           </div>
 
-          {/* 카드 2 */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
-              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">월 예상 이자 (Monthly Interest)</p>
-              {/* 반올림 제거하고 formatSimpleMoney에 그대로 전달하여 소수점 표현 */}
-              <h3 className="text-3xl font-black text-red-600">{formatSimpleMoney(stats.totalMonthlyInterest)}원</h3>
-              <p className="text-xs text-gray-500 mt-2">매월 지급해야 할 이자 총액</p>
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Monthly Interest</p>
+              <h3 className="text-3xl font-black text-red-600">{formatSimpleMoney(Math.round(stats.totalMonthlyInterest))}원</h3>
+              <p className="text-xs text-gray-500 mt-2">월 예상 이자 지출</p>
           </div>
 
-          {/* 카드 3 */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
-              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">평균 연 수익률 (Avg Rate)</p>
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Avg. Rate</p>
               <h3 className="text-3xl font-black text-blue-600">{stats.avgInterestRate.toFixed(1)}%</h3>
-              <p className="text-xs text-gray-500 mt-2">투자자 약정 평균 금리</p>
+              <p className="text-xs text-gray-500 mt-2">평균 조달 금리 (연)</p>
           </div>
 
-          {/* 카드 4 */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">운용 중인 계약 (Active)</p>
+              <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Active Contracts</p>
               <h3 className="text-3xl font-black text-gray-900">{stats.activeCount}건</h3>
-              <p className="text-xs text-gray-500 mt-2">현재 진행 중인 투자 건수</p>
+              <p className="text-xs text-gray-500 mt-2">운용 중인 계약</p>
           </div>
       </div>
 
-      {/* 📋 일반 투자 리스트 */}
+      {/* 📋 일반 투자 리스트 (단독 표출) */}
       <div className="bg-white shadow-sm border rounded-2xl overflow-hidden min-h-[300px]">
           {loading ? (
               <div className="p-20 text-center text-gray-400">데이터 로딩 중...</div>
@@ -144,8 +138,7 @@ export default function GeneralInvestDashboard() {
                                     {f(item.invest_amount)}원
                                 </td>
                                 <td className="p-4 text-center">
-                                    {/* 이자율도 소수점 1자리로 통일 */}
-                                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold">{Number(item.interest_rate).toFixed(1)}%</span>
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold">{item.interest_rate}%</span>
                                 </td>
                                 <td className="p-4 text-center font-bold text-gray-600">
                                     매월 <span className="text-black">{item.payment_day}일</span>
