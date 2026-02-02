@@ -1,11 +1,10 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-// 👇 경로가 깊으니 점 개수 확인 필수 (5단계 상위)
-import { supabase } from '../../../../utils/supabase'
+// 👇 [중요] 점(..) 대신 @를 사용하여 경로 에러를 원천 차단했습니다.
+import { supabase } from '@/utils/supabase'
 import SignatureCanvas from 'react-signature-canvas'
-// 👇 컴포넌트 경로도 확인 (5단계 상위)
-import GeneralContract from '../../../../ㄴcomponents/GeneralContract'
+import GeneralContract from '@/components/GeneralContract'
 import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
 
@@ -27,12 +26,12 @@ export default function GeneralGuestSignPage() {
 
   // 1. 화면 강제 설정 (사이드바 숨김 & 전체화면)
   useEffect(() => {
-    // 사이드바, 네비게이션 강제 숨김
+    // 사이드바, 네비게이션, 헤더 등 공통 레이아웃 숨기기
     const sidebar = document.querySelector('aside'); if (sidebar) sidebar.style.display = 'none'
     const nav = document.querySelector('nav'); if (nav) nav.style.display = 'none'
     const header = document.querySelector('header'); if (header) header.style.display = 'none'
 
-    // 메인 컨텐츠 영역 여백 제거
+    // 메인 컨텐츠 영역 여백 제거 (전체화면)
     const main = document.querySelector('main')
     if (main) {
         main.style.padding = '0'
@@ -41,7 +40,7 @@ export default function GeneralGuestSignPage() {
         main.style.maxWidth = '100vw'
     }
 
-    // 언마운트 시(페이지 나갈 때) 복구
+    // 페이지 나갈 때 복구
     return () => {
         if (sidebar) sidebar.style.display = ''
         if (nav) nav.style.display = ''
@@ -64,7 +63,7 @@ export default function GeneralGuestSignPage() {
   // 창 닫기 핸들러
   const handleCloseWindow = () => {
     window.close()
-    try { window.open('','_self').close() } catch (e) {}
+    try { window.open('','_self')?.close() } catch (e) {}
     try { if(document.referrer && document.referrer.indexOf('kakao') !== -1) location.href = 'kakaotalk://inappbrowser/close' } catch(e) {}
   }
 
@@ -149,7 +148,7 @@ export default function GeneralGuestSignPage() {
               </h2>
           </div>
 
-          {/* 계약서 뷰어 */}
+          {/* 계약서 뷰어 (모바일 모드) */}
           <div className="m-4">
               <div className="flex justify-between items-end mb-2 ml-1">
                   <p className="text-xs font-bold text-gray-500">📄 계약서 전체 내용</p>
