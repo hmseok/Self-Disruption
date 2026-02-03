@@ -92,7 +92,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
   return (
     <aside className={`bg-gray-950 text-gray-300 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r border-gray-800 ${isCollapsed ? 'w-20 overflow-visible' : 'w-64 overflow-y-auto'}`}>
-      
+
       {/* 1. 로고 */}
       <div className="p-4 flex items-center justify-between border-b border-gray-800 h-16 bg-gray-950 sticky top-0 z-20">
         {!isCollapsed && <h1 className="text-xl font-black text-white tracking-tighter">SECOND<span className="text-blue-500">.</span></h1>}

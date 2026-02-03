@@ -3,25 +3,21 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-// 🚨 [수정] 동일한 클라이언트 사용
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '../utils/supabase'
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  // 🚨 [수정] 여기도 같은 방식(useState)으로 통일
-  const [supabase] = useState(() => createClientComponentClient())
-
-  const { user, currentCompany, companies, switchCompany, isLoading: appLoading } = useApp()
+  const { user, currentCompany, companies, switchCompany, isLoading } = useApp()
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false)
 
-  const [isAuthInitializing, setIsAuthInitializing] = useState(true)
-
+  // 🚫 사이드바를 숨겨야 하는 페이지 목록 (로그인 + 인증 관련 모든 페이지)
   const isAuthPage = pathname === '/login' || pathname?.startsWith('/auth')
 
+  // 1. 로그아웃 로직
   const handleLogout = async () => {
     if (confirm('정말 로그아웃 하시겠습니까?')) {
         await supabase.auth.signOut()
@@ -30,35 +26,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }
 
-  // 🔎 [인증 체크]
+  // 2. 로그인 체크 (비로그인 유저 튕겨내기)
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session && !isAuthPage) {
-        // 세션 없으면 바로 로그인으로
-        router.replace('/login')
-      } else {
-        // 있으면 로딩 해제
-        setIsAuthInitializing(false)
-      }
+    // 로딩 끝났고 + 유저 없고 + 지금 로그인페이지도 아니고 + "인증처리페이지도 아닐 때"만 튕겨냄
+    if (!isLoading && !user && !isAuthPage) {
+      router.replace('/login')
     }
+  }, [user, isLoading, pathname, router, isAuthPage])
 
-    checkAuth()
-
-    // 상태 변화 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-            router.replace('/login')
-        } else if (event === 'SIGNED_IN') {
-            setIsAuthInitializing(false)
-        }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [pathname, isAuthPage, router, supabase])
-
-  // ... (메뉴 데이터 및 렌더링 부분은 그대로 유지) ...
+  // 3. 메뉴 데이터
   const MENU_ITEMS = [
     { name: '대시보드', path: '/', icon: '🏠', roles: ['all'] },
     { name: '자금 관리', path: '/finance', icon: '💰', roles: ['admin', 'manager', 'staff'] },
@@ -79,25 +55,26 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }, [currentCompany]);
 
+
+  // 🔴 [CASE 1] 인증 관련 페이지면 사이드바 없이 본문만 표시 (전체 화면)
   if (isAuthPage) {
       return <div className="bg-white min-h-screen w-full">{children}</div>
   }
 
-  // 로딩 화면
-  if (isAuthInitializing || appLoading) {
+  // [CASE 2] 로딩 중
+  if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-400 font-bold text-sm animate-pulse">
-            {isAuthInitializing ? '보안 연결 확인 중...' : '데이터 불러오는 중...'}
-        </p>
+        <p className="text-gray-400 font-bold text-sm animate-pulse">Sideline 로딩 중...</p>
       </div>
     )
   }
 
-  // 메인 화면
+  // [CASE 3] 정상 접속 (사이드바 표시)
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* 모바일 헤더 */}
       <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 z-40 h-16 shadow-sm">
         <h1 className="text-xl font-black text-indigo-950 tracking-tight flex items-center gap-2">
             SIDE<span className="text-indigo-600">LINE</span>
@@ -107,22 +84,26 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </button>
       </header>
 
+      {/* 모바일 오버레이 */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
+      {/* 사이드바 본체 */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 shadow-2xl md:shadow-none
         transform transition-transform duration-300 ease-in-out flex flex-col
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:h-screen md:sticky md:top-0
       `}>
+        {/* 로고 */}
         <div className="h-16 flex items-center px-6 border-b border-gray-100 bg-white md:bg-gray-50/50">
             <h1 className="text-2xl font-black text-indigo-950 tracking-tighter cursor-pointer" onClick={()=>window.location.href='/'}>
                 SIDE<span className="text-indigo-600">LINE</span><span className="text-xs text-gray-400 font-normal ml-1">beta</span>
             </h1>
         </div>
 
+        {/* 회사 선택 메뉴 */}
         <div className="p-5 border-b border-gray-100 relative">
             <button
               onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
@@ -164,6 +145,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             )}
         </div>
 
+        {/* 메뉴 아이템 */}
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
             <p className="px-3 mb-2 text-xs font-extrabold text-gray-400 tracking-wider">MENU</p>
             {visibleMenus.map((item) => {
@@ -190,6 +172,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             })}
         </div>
 
+        {/* 하단 프로필 */}
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
              <div onClick={handleLogout} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-red-100 transition-all cursor-pointer group">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-sm text-indigo-700 font-bold shadow-inner overflow-hidden">

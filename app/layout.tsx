@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import ClientLayout from './components/ClientLayout' // 👈 기존 사이드바 레이아웃 (유지!)
-import SupabaseProvider from './supabase-provider' // 👈 로그인 관리
-import { UploadProvider } from './context/UploadContext' // 👈 업로드 기능
-import UploadWidget from './components/UploadWidget' // 👈 업로드 위젯
+import ClientLayout from './components/ClientLayout'
+import SupabaseProvider from './supabase-provider'
+import { UploadProvider } from './context/UploadContext'
+import UploadWidget from './components/UploadWidget'
+import { AppProvider } from './context/AppContext' // 👈 [중요] 회사 관리 기능 추가
 
 export const metadata: Metadata = {
-  title: '세컨드라이프 ERP',
-  description: '차량 렌탈 관리 시스템',
+  title: 'Sideline', // 👈 이름 변경 완료
+  description: 'Smart Business Management System',
 }
 
 export default function RootLayout({
@@ -18,20 +19,19 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        {/* 1. 로그인 세션 관리 */}
         <SupabaseProvider>
-          {/* 2. 업로드 상태 관리 */}
-          <UploadProvider>
+          {/* 👇 AppProvider로 감싸야 회사/권한 관리가 작동합니다 */}
+          <AppProvider>
+            <UploadProvider>
 
-            {/* 3. 기존 레이아웃 (사이드바 포함) */}
-            <ClientLayout>
-              {children}
-            </ClientLayout>
+              <ClientLayout>
+                {children}
+              </ClientLayout>
 
-            {/* 4. 화면 우측 하단에 뜨는 업로드 위젯 */}
-            <UploadWidget />
+              <UploadWidget />
 
-          </UploadProvider>
+            </UploadProvider>
+          </AppProvider>
         </SupabaseProvider>
       </body>
     </html>

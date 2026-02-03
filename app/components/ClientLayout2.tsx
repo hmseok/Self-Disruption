@@ -1,64 +1,30 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react' // 👈 useEffect 추가
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation' // 👈 useRouter 추가
 import { useApp } from '../context/AppContext'
-// 🚨 [수정] 동일한 클라이언트 사용
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router = useRouter()
+  const router = useRouter() // 👈 라우터 사용
+  const { user, currentCompany, companies, switchCompany, isLoading } = useApp() // 👈 user 추가
 
-  // 🚨 [수정] 여기도 같은 방식(useState)으로 통일
-  const [supabase] = useState(() => createClientComponentClient())
+  // 🚀 [보안] 로그인이 안 된 상태면 무조건 로그인 페이지로 보냄
+  useEffect(() => {
+    if (!isLoading && !user && pathname !== '/login') {
+      router.replace('/login')
+    }
+  }, [user, isLoading, pathname, router])
 
-  const { user, currentCompany, companies, switchCompany, isLoading: appLoading } = useApp()
+  // 로그인 페이지면 사이드바 숨김
+  if (pathname === '/login') {
+      return <div className="bg-gray-50 min-h-screen">{children}</div>
+  }
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false)
 
-  const [isAuthInitializing, setIsAuthInitializing] = useState(true)
-
-  const isAuthPage = pathname === '/login' || pathname?.startsWith('/auth')
-
-  const handleLogout = async () => {
-    if (confirm('정말 로그아웃 하시겠습니까?')) {
-        await supabase.auth.signOut()
-        localStorage.removeItem('last_company_id')
-        window.location.href = '/login'
-    }
-  }
-
-  // 🔎 [인증 체크]
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session && !isAuthPage) {
-        // 세션 없으면 바로 로그인으로
-        router.replace('/login')
-      } else {
-        // 있으면 로딩 해제
-        setIsAuthInitializing(false)
-      }
-    }
-
-    checkAuth()
-
-    // 상태 변화 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-            router.replace('/login')
-        } else if (event === 'SIGNED_IN') {
-            setIsAuthInitializing(false)
-        }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [pathname, isAuthPage, router, supabase])
-
-  // ... (메뉴 데이터 및 렌더링 부분은 그대로 유지) ...
+  // ... (아래는 기존 메뉴 코드와 동일) ...
   const MENU_ITEMS = [
     { name: '대시보드', path: '/', icon: '🏠', roles: ['all'] },
     { name: '자금 관리', path: '/finance', icon: '💰', roles: ['admin', 'manager', 'staff'] },
@@ -79,50 +45,46 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }, [currentCompany]);
 
-  if (isAuthPage) {
-      return <div className="bg-white min-h-screen w-full">{children}</div>
-  }
+  // 로딩 중이면 하얀 화면 유지 (깜빡임 방지)
+  if (isLoading) return <div className="min-h-screen bg-gray-50" />;
 
-  // 로딩 화면
-  if (isAuthInitializing || appLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-400 font-bold text-sm animate-pulse">
-            {isAuthInitializing ? '보안 연결 확인 중...' : '데이터 불러오는 중...'}
-        </p>
-      </div>
-    )
-  }
-
-  // 메인 화면
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+
+      {/* 📱 모바일 헤더 */}
       <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 z-40 h-16 shadow-sm">
         <h1 className="text-xl font-black text-indigo-950 tracking-tight flex items-center gap-2">
             SIDE<span className="text-indigo-600">LINE</span>
         </h1>
-        <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        >
           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
       </header>
 
+      {/* 🌑 모바일 오버레이 */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
+      {/* 🚚 사이드바 */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 shadow-2xl md:shadow-none
         transform transition-transform duration-300 ease-in-out flex flex-col
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         md:translate-x-0 md:static md:h-screen md:sticky md:top-0
       `}>
+
+        {/* PC 사이드바 로고 */}
         <div className="h-16 flex items-center px-6 border-b border-gray-100 bg-white md:bg-gray-50/50">
             <h1 className="text-2xl font-black text-indigo-950 tracking-tighter cursor-pointer" onClick={()=>window.location.href='/'}>
                 SIDE<span className="text-indigo-600">LINE</span><span className="text-xs text-gray-400 font-normal ml-1">beta</span>
             </h1>
         </div>
 
+        {/* 회사 선택 영역 */}
         <div className="p-5 border-b border-gray-100 relative">
             <button
               onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
@@ -133,7 +95,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         {currentCompany?.name.substring(0,1) || 'S'}
                     </div>
                     <div className="text-left overflow-hidden">
-                        <p className="font-bold text-indigo-950 text-sm truncate w-32">{currentCompany?.name || '내 회사'}</p>
+                        <p className="font-bold text-indigo-950 text-sm truncate w-32">{currentCompany?.name || '로딩 중...'}</p>
                         <p className="text-xs text-indigo-500 font-medium">{currentCompany?.role === 'admin' ? '관리자' : '직원'}</p>
                     </div>
                 </div>
@@ -164,6 +126,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             )}
         </div>
 
+        {/* 메뉴 리스트 */}
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
             <p className="px-3 mb-2 text-xs font-extrabold text-gray-400 tracking-wider">MENU</p>
             {visibleMenus.map((item) => {
@@ -190,24 +153,30 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             })}
         </div>
 
+        {/* 하단 프로필 */}
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-             <div onClick={handleLogout} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-red-100 transition-all cursor-pointer group">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-sm text-indigo-700 font-bold shadow-inner overflow-hidden">
-                    {user?.user_metadata?.avatar_url ? (
-                        <img src={user.user_metadata.avatar_url} alt="profile" className="w-full h-full object-cover" />
-                    ) : '👤'}
-                </div>
-                <div className="overflow-hidden flex-1">
-                    <p className="text-sm font-bold text-gray-700 truncate">{user?.user_metadata?.name || '사용자'}님</p>
-                    <p className="text-[10px] text-gray-400 truncate group-hover:text-red-500 font-medium">로그아웃 하기 🚪</p>
+             <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-sm text-indigo-700 font-bold shadow-inner">👤</div>
+                <div className="overflow-hidden">
+                    <p className="text-sm font-bold text-gray-700 truncate">{currentCompany?.role === 'admin' ? '관리자님' : '직원님'}</p>
+                    <p className="text-[10px] text-gray-400 truncate">로그아웃</p>
                 </div>
              </div>
         </div>
       </aside>
 
+      {/* 메인 콘텐츠 */}
       <main className="flex-1 min-w-0 bg-gray-50 min-h-[calc(100vh-64px)] md:min-h-screen transition-all">
-        {children}
+        {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                <p className="text-gray-400 font-bold text-sm animate-pulse">Sideline 로딩 중...</p>
+            </div>
+        ) : (
+            children
+        )}
       </main>
+
     </div>
   )
 }
