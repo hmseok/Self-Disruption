@@ -23,6 +23,7 @@ export default function RootLayout({
         <AppProvider>
         <UploadProvider>
           {children}
+        </UploadProvider>
         </AppProvider>
       </body>
     </html>
