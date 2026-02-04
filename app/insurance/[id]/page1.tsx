@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase' // 점 2개 확인!
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 점 2개 확인!
 
 export default function InsurancePage() {
   const { id } = useParams()

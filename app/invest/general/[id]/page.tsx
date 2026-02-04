@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 // 👇 [경로 유지] 기존 파일과 동일하게 설정
-import { supabase } from '../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import GeneralContract from '../../../components/GeneralContract'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'

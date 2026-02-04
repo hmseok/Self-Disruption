@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/app/utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function InsuranceTab({ carId }: { carId : string }) {
   const [contracts, setContracts] = useState<any[]>([])

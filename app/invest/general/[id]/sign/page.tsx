@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 // 👇 [경로 유지] 안전한 상대 경로
-import { supabase } from '../../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import SignatureCanvas from 'react-signature-canvas'
 import GeneralContract from '../../../../components/GeneralContract'
 import { toPng } from 'html-to-image'

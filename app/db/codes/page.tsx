@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function CarCodePage() {
   // 상태값들 (기존 유지)

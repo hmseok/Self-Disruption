@@ -1,149 +1,119 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { supabase } from '../utils/supabase'
+
+import { useEffect, useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+// DB에서 가져올 데이터 타입 정의
+type Module = {
+  id: string
+  name: string
+  icon_key: string
+  path: string
+}
 
 export default function AdminPage() {
-  const [companies, setCompanies] = useState<any[]>([])
-  const [newCompanyName, setNewCompanyName] = useState('')
-  const [loading, setLoading] = useState(false)
+  const supabase = createClientComponentClient()
+  const [modules, setModules] = useState<Module[]>([])
+  const [loading, setLoading] = useState(true)
 
+  // 1. DB에서 시스템 모듈 목록 가져오기
   useEffect(() => {
-    fetchCompanies()
-  }, [])
+    const fetchModules = async () => {
+      const { data, error } = await supabase
+        .from('system_modules')
+        .select('*')
+        .order('name', { ascending: true })
 
-  const fetchCompanies = async () => {
-    // 내가 소속된 회사 목록 가져오기
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // company_members 테이블을 통해 회사 정보 조회
-    const { data, error } = await supabase
-      .from('company_members')
-      .select('role, company:companies(*)')
-      .eq('user_id', user.id);
-
-    if (data) {
-        // 데이터 구조 평탄화
-        const myCompanies = data.map((item: any) => ({
-            ...item.company,
-            my_role: item.role
-        }));
-        setCompanies(myCompanies);
+      if (data) setModules(data)
+      if (error) console.error('모듈 로딩 실패:', error)
+      setLoading(false)
     }
-  }
 
-  const createCompany = async () => {
-    if (!newCompanyName) return alert('회사 이름을 입력해주세요.');
-    setLoading(true);
-
-    try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('로그인이 필요합니다.');
-
-        // 1. 회사 생성
-        const { data: company, error: compError } = await supabase
-            .from('companies')
-            .insert({ name: newCompanyName })
-            .select()
-            .single();
-
-        if (compError) throw compError;
-
-        // 2. 나를 그 회사의 관리자(admin)로 등록
-        const { error: memberError } = await supabase
-            .from('company_members')
-            .insert({
-                company_id: company.id,
-                user_id: user.id,
-                role: 'admin'
-            });
-
-        if (memberError) throw memberError;
-
-        alert('회사가 생성되었습니다!');
-        setNewCompanyName('');
-        fetchCompanies(); // 목록 갱신
-
-        // 페이지 새로고침하여 사이드바에도 반영
-        window.location.reload();
-
-    } catch (e: any) {
-        alert('오류 발생: ' + e.message);
-    } finally {
-        setLoading(false);
-    }
-  }
+    fetchModules()
+  }, [supabase])
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6 animate-fade-in-up">
-      <h1 className="text-3xl font-black text-gray-900 mb-8">⚙️ 환경 설정 (Admin)</h1>
+    <div className="max-w-7xl mx-auto p-6 space-y-8">
+      {/* 헤더 섹션 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">시스템 환경설정</h1>
+          <p className="text-gray-500 mt-2">
+            회사에서 사용할 기능을 선택하고 관리 권한을 설정합니다.
+          </p>
+        </div>
+        <button className="mt-4 md:mt-0 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition shadow-sm">
+          변경사항 저장
+        </button>
+      </div>
 
-      {/* 회사 생성 카드 */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">🏢 새 사업장 추가</h2>
-        <div className="flex gap-3">
-            <input
-                type="text"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-                placeholder="(주)새로운회사 이름 입력"
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-colors"
-            />
-            <button
-                onClick={createCompany}
-                disabled={loading}
-                className="bg-indigo-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:bg-gray-400"
-            >
-                {loading ? '생성 중...' : '+ 추가하기'}
+      {/* 2. 모듈 관리 섹션 (DB 데이터 연동) */}
+      <section>
+        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          📦 기능 모듈 관리
+          <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+            {modules.length}개 발견됨
+          </span>
+        </h2>
+
+        {loading ? (
+          <div className="text-gray-400 py-10 text-center">데이터를 불러오는 중...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {modules.map((mod) => (
+              <div
+                key={mod.id}
+                className="group relative bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 hover:border-indigo-300"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  {/* 아이콘 영역 (단순화를 위해 텍스트 이모지로 대체하거나 매핑 가능) */}
+                  <div className={`p-3 rounded-lg ${
+                    mod.icon_key === 'Car' ? 'bg-blue-100 text-blue-600' :
+                    mod.icon_key === 'Truck' ? 'bg-green-100 text-green-600' :
+                    mod.icon_key === 'Doc' ? 'bg-yellow-100 text-yellow-600' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                     {/* 아이콘 매핑 로직 */}
+                     {mod.icon_key === 'Car' ? '🚗' :
+                      mod.icon_key === 'Truck' ? '🚚' :
+                      mod.icon_key === 'Doc' ? '📄' : '⚙️'}
+                  </div>
+
+                  {/* 토글 스위치 UI (모양만 구현) */}
+                  <div className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" defaultChecked />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold text-gray-900 mb-1">{mod.name}</h3>
+                <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                  {mod.path} 경로에 연결된 {mod.name} 관리 모듈입니다.
+                  활성화 시 직원 메뉴에 즉시 반영됩니다.
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-gray-400 mt-auto pt-4 border-t border-gray-100">
+                  <span>ID: {mod.id.slice(0, 8)}...</span>
+                  <span className="text-indigo-500 font-medium group-hover:underline cursor-pointer">
+                    상세 설정 &rarr;
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 3. 예시: 직원 관리 섹션 (아직 데이터 없으므로 UI만) */}
+      <section className="pt-8 border-t">
+         <h2 className="text-xl font-bold text-gray-800 mb-4">👥 관리자 현황</h2>
+         <div className="bg-gray-50 rounded-lg p-8 text-center border border-dashed border-gray-300">
+            <p className="text-gray-500">아직 등록된 추가 관리자가 없습니다.</p>
+            <button className="mt-2 text-indigo-600 font-medium hover:underline">
+              + 새 관리자 초대하기
             </button>
-        </div>
-        <p className="text-sm text-gray-500 mt-3">
-            * 회사를 생성하면 자동으로 해당 회사의 <strong>관리자(Admin)</strong>가 됩니다.<br/>
-            * 사이드바 상단에서 회사를 전환하여 업무를 분리할 수 있습니다.
-        </p>
-      </div>
-
-      {/* 내 회사 목록 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800">📋 내 사업장 목록</h2>
-        </div>
-        <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-500 font-bold text-sm">
-                <tr>
-                    <th className="p-4">회사명</th>
-                    <th className="p-4">내 권한</th>
-                    <th className="p-4">생성일</th>
-                    <th className="p-4 text-right">관리</th>
-                </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-                {companies.map((comp) => (
-                    <tr key={comp.id} className="hover:bg-gray-50">
-                        <td className="p-4 font-bold text-gray-800">{comp.name}</td>
-                        <td className="p-4">
-                            <span className={`px-2 py-1 rounded text-xs font-bold ${comp.my_role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
-                                {comp.my_role.toUpperCase()}
-                            </span>
-                        </td>
-                        <td className="p-4 text-gray-500 text-sm">{new Date(comp.created_at).toLocaleDateString()}</td>
-                        <td className="p-4 text-right">
-                            {comp.my_role === 'admin' && (
-                                <button className="text-xs font-bold text-gray-400 hover:text-indigo-600 border border-gray-200 px-3 py-1.5 rounded-lg">
-                                    설정
-                                </button>
-                            )}
-                        </td>
-                    </tr>
-                ))}
-                {companies.length === 0 && (
-                    <tr>
-                        <td colSpan={4} className="p-8 text-center text-gray-400">소속된 회사가 없습니다.</td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
-      </div>
+         </div>
+      </section>
     </div>
   )
 }

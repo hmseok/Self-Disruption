@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import SignatureCanvas from 'react-signature-canvas'
 import ContractPaper from '../../../components/ContractPaper' // A4 양식 불러오기
 import html2canvas from 'html2canvas' // 📸 화면 캡처 도구

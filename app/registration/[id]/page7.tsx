@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 
 // 🛠️ 유틸리티 함수: 정규화 (공백/특수문자 제거) - 파일 내부에 포함시킴

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useUpload } from '../../context/UploadContext' // 👈 Context Hook import
 
 // 🏷️ 자금 성격별 분류 체계 (유지)

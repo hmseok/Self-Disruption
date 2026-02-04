@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 // 👇 [수정] 대표님 말씀대로 점 4개가 정답입니다! (invest 폴더와 utils가 같은 레벨)
-import { supabase } from '../../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import SignatureCanvas from 'react-signature-canvas'
 // 👇 [수정] 점 4개로 수정
 import GeneralContract from '../../../../components/GeneralContract'

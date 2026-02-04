@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase' // 경로 점 2개
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 경로 점 2개
 
 export default function ContractDetailPage() {
   const { id } = useParams()

@@ -1,8 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase' // 점 2개 확인
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 점 2개 확인
 
 export default function ModelDbPage() {
+
+// ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
+  const supabase = createClientComponentClient()
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')

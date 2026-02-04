@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase' // 경로가 맞는지 확인 (../../)
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 경로가 맞는지 확인 (../../)
 import { useRouter } from 'next/navigation'
 
 export default function QuoteCalculatorPage() {

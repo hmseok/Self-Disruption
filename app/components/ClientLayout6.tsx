@@ -3,14 +3,14 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+// 🚨 [수정] 동일한 클라이언트 사용
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  // 🚨 [핵심 수정] 클라이언트가 리렌더링 될 때마다 재생성되지 않도록 useState로 고정합니다.
-  // 이렇게 하면 'Multiple GoTrueClient instances' 경고가 사라지고 연결이 안정됩니다.
+  // 🚨 [수정] 여기도 같은 방식(useState)으로 통일
   const [supabase] = useState(() => createClientComponentClient())
 
   const { user, currentCompany, companies, switchCompany, isLoading: appLoading } = useApp()
@@ -18,7 +18,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isCompanyMenuOpen, setIsCompanyMenuOpen] = useState(false)
 
-  // 인증 확인 상태
   const [isAuthInitializing, setIsAuthInitializing] = useState(true)
 
   const isAuthPage = pathname === '/login' || pathname?.startsWith('/auth')
@@ -31,49 +30,35 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }
 
-  // 🔎 [인증 상태 감지 로직]
+  // 🔎 [인증 체크]
   useEffect(() => {
-    let mounted = true;
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
 
-    const checkCurrentSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-
-        if (!mounted) return;
-
-        if (!session && !isAuthPage) {
-          // 세션이 없고 + 로그인 페이지가 아니면 -> 쫓아냄
-          router.replace('/login')
-        } else {
-          // 세션이 있거나 인증 페이지면 -> 통과
-          setIsAuthInitializing(false)
-        }
-      } catch (error) {
-        console.error(error)
-        if (mounted) setIsAuthInitializing(false) // 에러 나도 무한 로딩 방지
-      }
-    }
-
-    checkCurrentSession()
-
-    // 실시간 상태 변화 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-
-      if (event === 'SIGNED_OUT') {
+      if (!session && !isAuthPage) {
+        // 세션 없으면 바로 로그인으로
         router.replace('/login')
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      } else {
+        // 있으면 로딩 해제
         setIsAuthInitializing(false)
       }
+    }
+
+    checkAuth()
+
+    // 상태 변화 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+            router.replace('/login')
+        } else if (event === 'SIGNED_IN') {
+            setIsAuthInitializing(false)
+        }
     })
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [pathname, isAuthPage, router, supabase])
 
-  // 메뉴 데이터
+  // ... (메뉴 데이터 및 렌더링 부분은 그대로 유지) ...
   const MENU_ITEMS = [
     { name: '대시보드', path: '/', icon: '🏠', roles: ['all'] },
     { name: '자금 관리', path: '/finance', icon: '💰', roles: ['admin', 'manager', 'staff'] },
@@ -94,12 +79,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }, [currentCompany]);
 
-  // [CASE 1] 인증 페이지면 사이드바 없이 본문만
   if (isAuthPage) {
       return <div className="bg-white min-h-screen w-full">{children}</div>
   }
 
-  // [CASE 2] 로딩 중 (인증 확인 중 or 데이터 로딩 중)
+  // 로딩 화면
   if (isAuthInitializing || appLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -111,7 +95,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     )
   }
 
-  // [CASE 3] 정상 접속
+  // 메인 화면
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 z-40 h-16 shadow-sm">

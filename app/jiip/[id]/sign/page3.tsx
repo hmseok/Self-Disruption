@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import SignatureCanvas from 'react-signature-canvas'
 
 const nf = (num: number) => num ? num.toLocaleString() : '0'

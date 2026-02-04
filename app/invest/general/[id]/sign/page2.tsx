@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 // 👇 [경로 수정] app/invest/general/[id] 위치이므로 3단계 상위(../)가 맞습니다.
-import { supabase } from '../../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import GeneralContract from '../../../components/GeneralContract'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'

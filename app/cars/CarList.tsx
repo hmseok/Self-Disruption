@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/app/utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function CarListPage() {
+  const supabase = createClientComponentClient()
   const router = useRouter()
   const [cars, setCars] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

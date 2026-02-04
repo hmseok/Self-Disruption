@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase' // 경로 확인 필요
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 경로 확인 필요
 
 // 아이콘
 const ChevronDown = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

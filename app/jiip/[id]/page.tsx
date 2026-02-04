@@ -1,8 +1,9 @@
 'use client'
+// 1. 맨 위에 이 import 문을 추가하세요
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 // 👇 [경로 유지] 기존 파일과 동일하게 설정
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import ContractPaper from '../../components/ContractPaper'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'
@@ -18,6 +19,8 @@ const KOREAN_BANKS = [
 ]
 
 export default function JiipDetailPage() {
+
+  const supabase = createClientComponentClient()
   const router = useRouter()
   const params = useParams()
   const isNew = params.id === 'new'
@@ -98,9 +101,27 @@ export default function JiipDetailPage() {
   }, [item.contract_start_date])
 
   const fetchCars = async () => {
-    const { data } = await supabase.from('cars').select('id, number, brand, model').order('number', { ascending: true })
-    setCars(data || [])
-  }
+      console.log('🚗 차량 데이터 로딩 시작...')
+
+      // supabase 변수가 잘 있는지 확인
+      if (!supabase) {
+        console.error('❌ Supabase 클라이언트가 없습니다!')
+        return
+      }
+
+      const { data, error } = await supabase
+            .from('cars')
+            // 👇 [수정] company_id를 꼭 추가해야 합니다!
+            .select('id, number, brand, model, company_id')
+            .order('number', { ascending: true })
+
+      if (error) {
+              console.error('❌ 차량 불러오기 에러:', error.message)
+            } else {
+              console.log('✅ 불러온 차량 데이터:', data)
+              setCars(data || [])
+            }
+        } // 👈 ✅ 여기에 중괄호를 하나 꼭 넣어주세요! (fetchCars 끝)
 
   // 🏦 [NEW] 실제 통장 입금액 합산 함수
   const fetchRealDeposit = async () => {
@@ -143,11 +164,25 @@ export default function JiipDetailPage() {
     // 🚨 [수정] 투자금(invest_amount)은 필수값 아님. 차량과 투자자 이름만 있으면 저장 가능.
     if (!item.car_id || !item.investor_name) return alert('차량과 투자자 정보는 필수입니다.')
 
+    // 🌟 [추가] 선택된 차량 정보에서 company_id 찾기
+        // (item.car_id와 타입이 다를 수 있으니 == 로 비교하거나 Number() 변환 권장)
+        const selectedCar = cars.find(c => c.id == item.car_id)
+        const companyIdToSave = selectedCar?.company_id
+
+        // 회사 ID가 없으면 경고 (데이터 무결성 위해)
+        if (!companyIdToSave) {
+            return alert('오류: 선택된 차량의 회사 정보(company_id)를 찾을 수 없습니다.')
+        }
+
     const payload = {
+      // 👇 [추가] 여기에 company_id를 꼭 넣어주세요!
+      company_id: companyIdToSave,
       car_id: item.car_id, investor_name: item.investor_name, investor_phone: item.investor_phone,
       investor_reg_number: item.investor_reg_number, investor_email: item.investor_email,
       investor_address: item.investor_address,
       investor_address_detail: item.investor_address_detail,
+      investor_phone: item.investor_phone,
+      investor_reg_number: item.investor_reg_number,
       bank_name: item.bank_name, account_number: item.account_number,
       account_holder: item.account_holder, contract_start_date: item.contract_start_date || null,
       contract_end_date: item.contract_end_date || null,
@@ -155,7 +190,7 @@ export default function JiipDetailPage() {
       admin_fee: item.admin_fee, share_ratio: item.share_ratio, payout_day: item.payout_day,
       tax_type: item.tax_type, mortgage_setup: item.mortgage_setup, memo: item.memo,
       signed_file_url: item.signed_file_url
-    }
+      }
 
     let error
     if (isNew) {

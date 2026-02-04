@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { CommonCode } from '@/types/database' // 타입 경로 확인해주세요
 
 export default function CarRegisterForm() {

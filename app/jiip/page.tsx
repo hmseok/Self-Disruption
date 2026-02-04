@@ -1,106 +1,150 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useApp } from '../context/AppContext'
 
 export default function JiipListPage() {
+  const supabase = createClientComponentClient()
   const router = useRouter()
-  const [items, setItems] = useState<any[]>([])
+
+  // ✅ [핵심 1] 전역 상태에서 '현재 선택된 회사' 가져오기
+  const { currentCompany } = useApp()
+
+  const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { fetchData() }, [])
+  // 데이터 불러오기
+  const fetchContracts = async () => {
+    // 회사가 선택되지 않았으면 로딩 안 함 (또는 빈 배열)
+    if (!currentCompany?.id) return
 
-  const fetchData = async () => {
     setLoading(true)
+
+    // ✅ [핵심 2] '내 회사(currentCompany.id)'의 계약서만 가져오기
+    // + 차량 정보(cars)도 같이 가져오기 (Join)
     const { data, error } = await supabase
       .from('jiip_contracts')
-      .select('*, cars(number, brand, model)')
+      .select(`
+        *,
+        car:cars ( number, model )
+      `)
+      .eq('company_id', currentCompany.id) // 👈 가장 중요한 데이터 칸막이!
       .order('created_at', { ascending: false })
 
-    if (!error) setItems(data || [])
+    // app/jiip/page.tsx 파일의 36번째 줄 수정
+
+        if (error) {
+          // 기존: console.error('데이터 로딩 실패:', error)
+          // 변경: 아래와 같이 .message를 붙여서 저장하세요
+          console.error('데이터 로딩 실패 원인:', error.message)
+        } else {
+          setContracts(data || [])
+        }
     setLoading(false)
   }
 
-  // 합계 계산
-  const totalInvest = items.reduce((acc, cur) => acc + (cur.invest_amount || 0), 0)
+  // 회사가 바뀌면 데이터를 다시 불러옵니다.
+  useEffect(() => {
+    fetchContracts()
+  }, [currentCompany])
+
+  // (편의기능) 총 투자금 합계 계산
+  const totalInvest = contracts.reduce((sum, item) => sum + (item.invest_amount || 0), 0)
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in-up">
+      {/* 상단 헤더 */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">🤝 지입/투자 계약 관리</h1>
-          <p className="text-gray-500 mt-2">차량 투자 계약 및 수익 배분율을 리스트로 관리합니다.</p>
+          <h1 className="text-3xl font-black text-gray-900">
+             🤝 {currentCompany?.name} 지입/위수탁 관리
+          </h1>
+          <p className="text-gray-500 mt-2">차주 및 투자자와의 계약 현황을 관리합니다.</p>
         </div>
-        {/* 👇 [핵심 변경] 버튼 누르면 팝업 대신 '/new' 페이지로 이동 */}
         <button
-          onClick={() => router.push('/jiip/new')}
-          className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg"
+          onClick={() => router.push('/jiip/new')} // (나중에 등록 페이지 만들 예정)
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
         >
-          + 투자 계약 등록
+          + 신규 계약 등록
         </button>
       </div>
 
-      {/* 요약 카드 */}
+      {/* 요약 대시보드 (간단) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <p className="text-gray-500 text-xs font-bold mb-1">총 투자 유치금</p>
-          <p className="text-3xl font-black text-green-700">{totalInvest.toLocaleString()}원</p>
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-400 font-bold">총 운영 차량</p>
+            <p className="text-3xl font-black text-gray-800">{contracts.length}대</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <p className="text-gray-500 text-xs font-bold mb-1">평균 배분율 (투자자)</p>
-          <p className="text-3xl font-black text-blue-600">
-            {items.length > 0 ? (items.reduce((acc, cur) => acc + (cur.share_ratio || 0), 0) / items.length).toFixed(0) : 0}%
-          </p>
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-400 font-bold">총 투자 유치금</p>
+            <p className="text-3xl font-black text-indigo-600">{totalInvest.toLocaleString()}원</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <p className="text-gray-500 text-xs font-bold mb-1">운영 중인 계약</p>
-          <p className="text-3xl font-black text-gray-800">{items.length}건</p>
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-400 font-bold">이번 달 지급 예정액</p>
+            <p className="text-3xl font-black text-gray-400">-</p> {/* 추후 구현 */}
         </div>
       </div>
 
       {/* 리스트 테이블 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="p-4 text-xs font-bold text-gray-500">대상 차량</th>
-              <th className="p-4 text-xs font-bold text-gray-500">투자자 (을)</th>
-              <th className="p-4 text-xs font-bold text-gray-500">투자금 / 기간</th>
-              <th className="p-4 text-xs font-bold text-gray-500">수익 배분 조건</th>
-              <th className="p-4 text-xs font-bold text-gray-500 text-right">상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <tr><td colSpan={5} className="p-10 text-center">로딩 중...</td></tr> :
-             items.map((item) => (
-              // 👇 [핵심 변경] 클릭하면 상세 페이지([id])로 이동
-              <tr key={item.id} onClick={() => router.push(`/jiip/${item.id}`)} className="border-b border-gray-50 hover:bg-green-50 transition-colors cursor-pointer group">
-                <td className="p-4">
-                  <div className="font-bold text-gray-900 group-hover:text-green-700">{item.cars?.number}</div>
-                  <div className="text-xs text-gray-500">{item.cars?.brand} {item.cars?.model}</div>
-                </td>
-                <td className="p-4">
-                  <div className="font-bold">{item.investor_name}</div>
-                  <div className="text-xs text-gray-400">{item.investor_phone}</div>
-                </td>
-                <td className="p-4">
-                   <div className="font-bold">{item.invest_amount?.toLocaleString()}원</div>
-                   <div className="text-xs text-gray-400">{item.contract_start_date} ~</div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">배분 {item.share_ratio}%</span>
-                    <span className="text-xs text-gray-500">관리비 -{(item.admin_fee / 10000)}만</span>
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">매월 {item.payout_day}일 지급</div>
-                </td>
-                <td className="p-4 text-right">
-                  <span className="text-gray-400 text-xs font-bold group-hover:text-green-600">상세보기 &gt;</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+        {loading ? (
+           <div className="p-20 text-center text-gray-400 font-bold animate-pulse">데이터를 불러오는 중...</div>
+        ) : contracts.length === 0 ? (
+           <div className="p-20 text-center flex flex-col items-center justify-center">
+             <div className="text-5xl mb-4">🚛</div>
+             <p className="text-gray-900 font-bold text-lg">등록된 지입 계약이 없습니다.</p>
+             <p className="text-gray-500 text-sm mt-2">우측 상단 버튼을 눌러 첫 번째 계약을 등록해보세요.</p>
+           </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider">
+                  <th className="p-5 font-bold">계약 차량</th>
+                  <th className="p-5 font-bold">투자자(차주)</th>
+                  <th className="p-5 font-bold">투자금 / 수익률</th>
+                  <th className="p-5 font-bold">월 관리비</th>
+                  <th className="p-5 font-bold">지급일</th>
+                  <th className="p-5 font-bold text-center">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {contracts.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => router.push(`/jiip/${item.id}`)}>
+                    <td className="p-5">
+                      <div className="font-bold text-gray-900">{item.car?.number || '차량 미지정'}</div>
+                      <div className="text-xs text-gray-400">{item.car?.model}</div>
+                    </td>
+                    <td className="p-5">
+                      <div className="font-bold text-gray-700">{item.investor_name}</div>
+                      <div className="text-xs text-gray-400">{item.investor_phone}</div>
+                    </td>
+                    <td className="p-5">
+                      <div className="font-bold text-indigo-600">{item.invest_amount.toLocaleString()}원</div>
+                      <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold">
+                        {item.share_ratio}% 배분
+                      </span>
+                    </td>
+                    <td className="p-5 text-sm font-bold text-gray-600">
+                      {item.admin_fee.toLocaleString()}원
+                    </td>
+                    <td className="p-5 text-sm font-bold text-gray-500">
+                      매월 {item.payout_day}일
+                    </td>
+                    <td className="p-5 text-center">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        item.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {item.status === 'active' ? '운영 중' : '종료'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

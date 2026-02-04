@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 // 👇 [경로 유지] 지입 폴더 깊이(2단계)에 맞춘 점 2개
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import ContractPaper from '../../components/ContractPaper'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'

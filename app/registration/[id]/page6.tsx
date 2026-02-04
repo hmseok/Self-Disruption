@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import { normalizeModelName } from '../../utils/stringUtils' // 2단계에서 만든 함수
 

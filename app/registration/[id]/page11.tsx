@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 // 👇 경로가 빨간줄이면 ../utils/supabase 로 바꿔주세요
-import { supabase } from '../../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 
 // 🛠️ [유틸리티] 데이터 정제

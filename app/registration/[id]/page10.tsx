@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 // 👇 [중요] 경로를 두 단계 위로 수정했습니다. (폴더 구조에 따라 ../../ 가 맞습니다)
-import { supabase } from '../../utils/supabase' 
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 
 // 🛠️ [유틸리티] 데이터 정제

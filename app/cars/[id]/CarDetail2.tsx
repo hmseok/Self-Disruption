@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase' // 혹시 경로 에러나면 ../../utils/supabase 로 바꿔보세요
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 혹시 경로 에러나면 ../../utils/supabase 로 바꿔보세요
 import InsuranceTab from './InsuranceTab'
 import FinanceTab from './FinanceTab'
 import JiipTab from './JiipTab'

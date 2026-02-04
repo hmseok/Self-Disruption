@@ -1,102 +1,59 @@
 'use client'
-import React, { createContext, useContext, useState, useEffect } from 'react'
-// 🚨 [수정] 여기서 직접 생성하지 않고, auth-helpers를 씁니다.
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
+import { createContext, useContext, useState, useEffect } from 'react'
 
+// 회사 데이터 타입 정의
 type Company = {
-  id: string;
-  name: string;
-  role: string;
+  id: string
+  name: string
+  role: string
 }
 
-interface AppContextType {
-  user: any;
-  companies: Company[];
-  currentCompany: Company | null;
-  switchCompany: (companyId: string) => void;
-  isLoading: boolean;
+// Context에서 사용할 데이터와 함수 모양 정의
+type AppContextType = {
+  currentCompany: Company | null
+  setCurrentCompany: (company: Company) => void // 👈 이게 빠져있어서 에러가 났던 겁니다!
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  // 🚨 [수정] 쿠키를 공유하는 클라이언트 생성
-  const [supabase] = useState(() => createClientComponentClient())
+  const [currentCompany, setCurrentCompanyState] = useState<Company | null>(null)
 
-  const [user, setUser] = useState<any>(null)
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [currentCompany, setCurrentCompany] = useState<Company | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
-
+  // 1. [초기화] 새로고침 해도 선택한 회사가 유지되도록 LocalStorage에서 불러오기
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      // 1. 쿠키에 저장된 세션 가져오기
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        setIsLoading(false);
-        return; // 로그인 안됐으면 조용히 종료 (ClientLayout이 처리함)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selected_company')
+      if (saved) {
+        try {
+          setCurrentCompanyState(JSON.parse(saved))
+        } catch (e) {
+          console.error('회사 정보 로드 실패', e)
+        }
       }
-
-      const currentUser = session.user;
-      setUser(currentUser);
-
-      // 2. 회사 데이터 조회
-      const { data: members, error } = await supabase
-        .from('company_members')
-        .select(`
-          role,
-          company:companies ( id, name )
-        `)
-        .eq('user_id', currentUser.id);
-
-      if (members && members.length > 0) {
-        const myCompanies = members.map((m: any) => ({
-          id: m.company.id,
-          name: m.company.name,
-          role: m.role
-        }));
-        setCompanies(myCompanies);
-
-        const savedCompanyId = localStorage.getItem('last_company_id');
-        const target = myCompanies.find(c => c.id === savedCompanyId) || myCompanies[0];
-        setCurrentCompany(target);
-      } else {
-        setCompanies([]);
-        setCurrentCompany(null);
-      }
-    } catch (e) {
-      console.error('Profile Fetch Error:', e);
-    } finally {
-      setIsLoading(false);
     }
-  }
+  }, [])
 
-  const switchCompany = (companyId: string) => {
-    const target = companies.find(c => c.id === companyId);
-    if (target) {
-      setCurrentCompany(target);
-      localStorage.setItem('last_company_id', target.id);
-      router.push('/');
-      router.refresh();
-    }
+  // 2. [함수] 회사를 변경할 때 LocalStorage에도 같이 저장하기
+  const setCurrentCompany = (company: Company) => {
+    setCurrentCompanyState(company)
+    localStorage.setItem('selected_company', JSON.stringify(company))
   }
 
   return (
-    <AppContext.Provider value={{ user, companies, currentCompany, switchCompany, isLoading }}>
+    <AppContext.Provider value={{
+      currentCompany,
+      setCurrentCompany // 👈 이제 이 함수를 모든 페이지에서 쓸 수 있습니다.
+    }}>
       {children}
     </AppContext.Provider>
   )
 }
 
+// 커스텀 훅 (다른 파일에서 useApp()으로 쉽게 불러오기 위함)
 export const useApp = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
-  return context;
+  const context = useContext(AppContext)
+  if (context === undefined) {
+    throw new Error('useApp must be used within an AppProvider')
+  }
+  return context
 }

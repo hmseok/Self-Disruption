@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../utils/supabase' // 경로 ../utils
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 경로 ../utils
 import { useRouter } from 'next/navigation'
 
 // 🛠️ [유틸리티]

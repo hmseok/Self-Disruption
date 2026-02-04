@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../utils/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 
 // --- [아이콘] ---
@@ -49,6 +49,9 @@ const compressImage = async (file: File): Promise<File> => {
 };
 
 export default function RegistrationListPage() {
+
+// ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
+  const supabase = createClientComponentClient()
   const router = useRouter()
   const [cars, setCars] = useState<any[]>([])
 

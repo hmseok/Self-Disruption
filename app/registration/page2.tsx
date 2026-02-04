@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../utils/supabase' // 점 2개
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 점 2개
 import { useRouter } from 'next/navigation'
 
 export default function RegistrationListPage() {

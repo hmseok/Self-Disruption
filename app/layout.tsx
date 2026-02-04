@@ -19,20 +19,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <SupabaseProvider>
-          {/* 👇 AppProvider로 감싸야 회사/권한 관리가 작동합니다 */}
-          <AppProvider>
-            <UploadProvider>
-
-              <ClientLayout>
-                {children}
-              </ClientLayout>
-
-              <UploadWidget />
-
-            </UploadProvider>
-          </AppProvider>
-        </SupabaseProvider>
+        {/* 👇 2. children을 AppProvider로 감싸주세요 */}
+        <AppProvider>
+          {children}
+        </AppProvider>
       </body>
     </html>
   )

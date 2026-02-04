@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase' // 경로 확인! (../../utils/supabase 일 수도 있습니다)
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs' // 경로 확인! (../../utils/supabase 일 수도 있습니다)
 import { CommonCode } from '../../types/database' // 아까 만든 타입 (없으면 any로 하셔도 됩니다)
 
 export default function CodeManager() {
