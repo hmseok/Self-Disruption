@@ -14,36 +14,39 @@ export default function AdminLayout({
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
+  // ... (위쪽 import 생략)
 
-        if (!session) {
-          router.replace('/')
-          return
-        }
+  // useEffect 안쪽 로직 수정
+  const checkAdmin = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.replace('/'); return }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .maybeSingle()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, status') // status(승인상태)도 같이 조회
+        .eq('id', session.user.id)
+        .maybeSingle()
 
-        if (profile?.role === 'god_admin') {
-          setIsAuthorized(true)
-        } else {
-          alert('⛔️ 접근 권한이 없습니다. (최고 관리자 전용)')
-          router.replace('/')
-        }
-      } catch (e) {
-        console.error('관리자 체크 에러:', e)
+      // 👑 프리패스 대상: God Admin 또는 회사 대표(Master) 또는 승인된(approved) 유저
+      const isGod = profile?.role === 'god_admin'
+      const isMaster = profile?.role === 'master'
+      const isApproved = profile?.status === 'approved'
+
+      if (isGod || isMaster || isApproved) {
+        setIsAuthorized(true)
+      } else {
+        // 🚫 승인 대기 중일 때
+        alert('⏳ 관리자의 승인을 기다리고 있습니다. 승인 후 이용 가능합니다.')
+        await supabase.auth.signOut() // 로그아웃 시키기
         router.replace('/')
-      } finally {
-        setLoading(false)
       }
+    } catch (e) {
+      // ... (에러 처리 생략)
+    } finally {
+      setLoading(false)
     }
-
+  }
     checkAdmin()
   }, [])
 
