@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/utils/supabase';
+import { supabase } from '../../utils/supabase';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function CompanyDetail() {
