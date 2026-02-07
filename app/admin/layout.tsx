@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-// 👇 경로 수정: utils가 루트에 있다면 점 두 개(../..)가 맞습니다.
-import { supabase } from '../utils/supabase'
+// 👇 [핵심] 구형 utils 대신 신형 클라이언트 사용 (쿠키 인식)
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 
 export default function AdminLayout({
@@ -12,89 +12,73 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
+  const supabase = createClientComponentClient() // 신형 열쇠 생성
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
 
         if (!session) {
+          // 로그인이 안 되어 있으면 대문으로 보냄
           router.replace('/')
           return
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, status')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        // 👑 권한 체크 로직
-        const isGod = profile?.role === 'god_admin'
-        const isMaster = profile?.role === 'master'
-        const isApproved = profile?.status === 'approved'
-
-        if (isGod || isMaster || isApproved) {
-          setIsAuthorized(true)
-        } else {
-          alert('⏳ 관리자의 승인을 기다리고 있습니다. 승인 후 이용 가능합니다.')
-          await supabase.auth.signOut()
-          router.replace('/')
-        }
-      } catch (e) {
-        console.error('관리자 체크 에러:', e)
-        router.replace('/')
-      } finally {
+        // 로그인 되어 있으면 통과! (여기서 추가 권한 체크를 할 수도 있음)
         setLoading(false)
+
+      } catch (e) {
+        console.error('세션 체크 에러:', e)
+        router.replace('/')
       }
     }
 
-    checkAdmin()
-  }, []) // 👈 에러가 났던 부분 (이제 해결됨)
+    checkSession()
+  }, [])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.replace('/')
-  }
-
+  // ⏳ 로딩 중일 때 흰 화면 대신 "로딩 중" 표시
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-xl font-bold text-gray-800 mb-2">👑 관리자 권한 확인 중...</div>
-          <div className="text-sm text-gray-500">잠시만 기다려주세요.</div>
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-bold">Sideline 접속 중...</p>
         </div>
       </div>
     )
   }
 
-  if (!isAuthorized) return null
-
+  // ✅ 접속 성공 시 보여줄 레이아웃 (사이드바 포함)
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10">
+    <div className="flex min-h-screen bg-slate-50">
+      {/* 사이드바 */}
+      <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-20 shadow-xl">
         <div className="p-6 border-b border-slate-800">
-          <h1 className="text-xl font-bold">Sideline <span className="text-blue-500">ADMIN</span></h1>
+          <h1 className="text-xl font-extrabold tracking-tight">
+            Sideline <span className="text-blue-500">ERP</span>
+          </h1>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-2">
-          <Link href="/admin" className="block px-4 py-3 rounded-lg bg-blue-600 text-white font-medium">
-            대시보드
+          <Link href="/admin" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600/10 text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition-all">
+            <span>📊</span> 대시보드
           </Link>
+          {/* 메뉴 추가 가능 */}
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-red-600/90 text-slate-300 hover:text-white transition-all font-medium text-sm group"
+          <button
+            onClick={async () => { await supabase.auth.signOut(); router.replace('/'); }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-600/90 text-slate-300 hover:text-white font-bold transition-all"
           >
-            <span>🚪</span> 로그아웃
+            로그아웃
           </button>
         </div>
       </aside>
 
+      {/* 메인 콘텐츠 (사이드바만큼 띄워줌) */}
       <main className="flex-1 ml-64 p-8">
         {children}
       </main>

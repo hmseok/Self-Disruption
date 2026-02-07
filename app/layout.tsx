@@ -1,13 +1,13 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { AppProvider } from './context/AppContext' // (혹시 경로 다르면 ../context/AppContext)
+import { AppProvider } from '@/app/context/AppContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'SECONDLIFE ERP',
-  description: '모빌리티 비즈니스 통합 솔루션',
+  title: 'Sideline ERP',
+  description: 'Smart Mobility Business Solution',
 }
 
 export default function RootLayout({
@@ -18,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={inter.className}>
-        {/* 사이드바는 여기서 빼고, AppProvider로 감싸기만 합니다 */}
+        {/* 👇 여기에 Sidebar가 있으면 절대 안 됩니다. 오직 Provider와 children만! */}
         <AppProvider>
           {children}
         </AppProvider>

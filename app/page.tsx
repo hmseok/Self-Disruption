@@ -1,304 +1,372 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-// 👇 경로 에러 방지용 안전한 import
+import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-function LoginForm() {
+function AuthPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClientComponentClient()
-
-  // 💻 개발 환경인지 확인 (로컬에서만 true)
   const isLocal = process.env.NODE_ENV === 'development'
 
-  // 폼 상태
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [passwordConfirm, setPasswordConfirm] = useState('')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-
-  // 회사 정보 (대표 가입용)
-  const [companyName, setCompanyName] = useState('')
-  const [businessNumber, setBusinessNumber] = useState('')
-  const [isFounder, setIsFounder] = useState(true)
-
+  // 상태 관리: 'verify' 상태 추가 (인증 대기 화면)
+  const [view, setView] = useState<'login' | 'signup' | 'verify'>('login')
+  const [roleType, setRoleType] = useState<'founder' | 'employee'>('founder')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null)
+  const [message, setMessage] = useState<{ text: string, type: 'error' | 'success' } | null>(null)
 
-  // 뷰 상태
-  const [view, setView] = useState<'login' | 'signup-select' | 'signup-email' | 'reset-password'>('login')
+  // 입력 데이터
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    passwordConfirm: '',
+    name: '',
+    phone: '',
+    companyName: '',
+    businessNumber: '',
+  })
 
-  const [isMailSent, setIsMailSent] = useState(false)
-  const [isVerified, setIsVerified] = useState(false)
-  const [isValidPwd, setIsValidPwd] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [guides, setGuides] = useState({
+    email: '업무용 이메일을 입력해주세요.',
+    password: '영문, 숫자 포함 8자 이상 입력해주세요.',
+    passwordConfirm: '비밀번호를 한 번 더 입력해주세요.',
+    phone: '숫자만 입력 (예: 01012345678)',
+    companyName: '재직 중이거나 설립할 회사명',
+  })
 
-  // 1. 이미 로그인 되어 있으면 통과
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) router.replace('/admin')
+  const [validity, setValidity] = useState({
+    email: false,
+    password: false,
+    passwordConfirm: false,
+    phone: false,
+    companyName: false,
+  })
+
+ // app/page.tsx 수정
+
+ // ... 기존 코드 ...
+
+   // app/page.tsx 내부의 AuthPage 컴포넌트 안쪽
+
+     // ... (상태 변수들 아래에 위치)
+
+     // ✅ [수정됨] 강력한 인증 감지 로직 (리스너 + 폴링 이중 체크)
+     useEffect(() => {
+       // 1. 이벤트 리스너 (수동적 감지)
+       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+         if (event === 'SIGNED_IN' || session) {
+           // 인증 확인되면 바로 이동
+           router.replace('/admin')
+         }
+       })
+
+       // 2. 인터벌 체크 (능동적 감지) - 2초마다 세션 강제 확인
+       // 브라우저 탭 간 통신이 늦을 경우를 대비한 안전장치입니다.
+       const interval = setInterval(async () => {
+         const { data: { session } } = await supabase.auth.getSession()
+         if (session) {
+           router.replace('/admin')
+         }
+       }, 2000)
+
+       return () => {
+         subscription.unsubscribe()
+         clearInterval(interval)
+       }
+     }, [supabase, router])
+
+     // ... (나머지 코드 동일)
+
+ // ... 나머지 코드 ...
+  // 입력 핸들러
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+
+    if (name === 'email') {
+      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+      setValidity(prev => ({ ...prev, email: isValid }))
+      setGuides(prev => ({ ...prev, email: isValid ? '✅ 유효한 이메일 형식입니다.' : '올바른 이메일 형식을 입력해주세요.' }))
     }
-    checkSession()
-  }, [])
+    if (name === 'password') {
+      const isValid = value.length >= 8
+      setValidity(prev => ({ ...prev, password: isValid }))
+      setGuides(prev => ({ ...prev, password: isValid ? '✅ 안전한 비밀번호입니다.' : '최소 8자 이상 입력해야 합니다.' }))
+    }
+    if (name === 'passwordConfirm') {
+      const isValid = value === formData.password && value.length > 0
+      setValidity(prev => ({ ...prev, passwordConfirm: isValid }))
+      setGuides(prev => ({ ...prev, passwordConfirm: isValid ? '✅ 비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.' }))
+    }
+    if (name === 'phone') {
+      const onlyNums = value.replace(/[^0-9]/g, '')
+      const isValid = onlyNums.length >= 10
+      setValidity(prev => ({ ...prev, phone: isValid }))
+      setGuides(prev => ({ ...prev, phone: isValid ? '✅ 확인되었습니다.' : '연락처 숫자를 정확히 입력해주세요.' }))
+    }
+    if (name === 'companyName') {
+      const isValid = value.trim().length > 1
+      setValidity(prev => ({ ...prev, companyName: isValid }))
+      setGuides(prev => ({ ...prev, companyName: isValid ? '✅ 입력되었습니다.' : '회사명을 정확히 입력해주세요.' }))
+    }
+  }
 
-  // ⚡ [개발자용] 원클릭 로그인 함수
+  // ⚡ 개발자 로그인
   const handleDevLogin = async () => {
     setLoading(true)
-    // 👇 여기에 대표님이 자주 쓰시는 테스트 계정을 적어주세요!
-    const devEmail = "sukhomin87@gmail.com"
-    const devPassword = "!homin1019"
+    const { error } = await supabase.auth.signInWithPassword({
+      email: "admin@sideline.com",
+      password: "password1234!!"
+    })
+    if (error) {
+       setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
+       setLoading(false)
+    }
+  }
+
+  // 로그인 처리
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setMessage(null)
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: devEmail,
-      password: devPassword
+      email: formData.email,
+      password: formData.password
     })
 
     if (error) {
-      alert('개발용 계정 로그인 실패! 코드에 적힌 ID/PW를 확인해주세요.')
+      setMessage({ text: '계정 정보를 찾을 수 없습니다.', type: 'error' })
       setLoading(false)
     } else {
+      router.refresh()
       router.replace('/admin')
     }
   }
 
-  // ... (기존 로직 유지)
-  useEffect(() => {
-    const verifiedParam = searchParams.get('verified')
-    if (verifiedParam === 'true') {
-      setMessage({ text: '🎉 인증 완료! 로그인해주세요.', type: 'success' })
-      setView('login')
+  // ✅ 2. 회원가입 함수 수정 (Redirect URL 변경)
+    const handleSignUp = async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      // ... 유효성 검사 등 기존 코드 유지
+
+    if (!validity.email || !validity.password || !validity.passwordConfirm || !validity.companyName) {
+      setMessage({ text: '입력 항목을 확인해주세요.', type: 'error' })
+      return
     }
-  }, [searchParams])
 
-  const validatePassword = (pwd: string) => /^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,}$/.test(pwd);
-  useEffect(() => { setIsValidPwd(validatePassword(password)) }, [password])
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/[^0-9]/g, '');
-    let formatted = raw.length > 3 && raw.length <= 7 ? `${raw.slice(0, 3)}-${raw.slice(3)}` :
-                    raw.length > 7 ? `${raw.slice(0, 3)}-${raw.slice(3, 7)}-${raw.slice(7, 11)}` : raw;
-    setPhone(formatted);
-  }
-
-  const translateError = (errorMsg: string) => {
-    if (errorMsg.includes('Invalid login credentials')) return '🚨 아이디 또는 비밀번호가 틀렸습니다.';
-    if (errorMsg.includes('Email not confirmed')) return '📧 이메일 인증이 필요합니다.';
-    if (errorMsg.includes('registered')) return '⚠️ 이미 가입된 이메일입니다.';
-    if (errorMsg.includes('등록된 회사가 없습니다')) return '🏢 등록되지 않은 사업자번호입니다.';
-    return '오류: ' + errorMsg;
-  }
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
+    setLoading(true)
     setMessage(null)
 
-    if (view === 'signup-email') {
-        if (!name || !phone || !businessNumber) return setMessage({ text: '필수 정보를 입력해주세요.', type: 'error' })
-        if (isFounder && !companyName) return setMessage({ text: '회사명을 입력해주세요.', type: 'error' })
-        if (!isValidPwd) return setMessage({ text: '비밀번호 규칙을 확인해주세요.', type: 'error' })
-        if (password !== passwordConfirm) return setMessage({ text: '비밀번호가 일치하지 않습니다.', type: 'error' })
-    }
+   const { error } = await supabase.auth.signUp({
+         email: formData.email,
+         password: formData.password,
+         options: {
+           // ✨ 여기가 핵심! 인증 후 'callback' 라우트로 보냄
+           emailRedirectTo: `${window.location.origin}/auth/callback`,
+           data: {
+             full_name: formData.name,
+             phone: formData.phone,
+             role: roleType === 'founder' ? 'master' : 'user',
+             company_name: formData.companyName,
+             business_number: roleType === 'founder' ? formData.businessNumber : null,
+           }
+         }
+       })
 
-    setLoading(true)
-
-    try {
-      if (view === 'signup-email') {
-        const { data, error } = await supabase.auth.signUp({
-          email, password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: {
-              full_name: name,
-              phone,
-              is_founder: isFounder,
-              company_name: isFounder ? companyName : null,
-              business_number: businessNumber,
-            }
-          },
-        })
-        if (error) throw error
-        if (data.session) {
-             // 자동 로그인 성공 시
-            router.replace('/admin');
-        } else {
-            setIsMailSent(true)
-            setMessage({ text: '✅ 인증 메일이 발송되었습니다.', type: 'success' })
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        router.replace('/admin');
-      }
-    } catch (error: any) {
-      setMessage({ text: translateError(error.message), type: 'error' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/admin` },
-    })
-  }
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email) return setMessage({ text: '이메일을 입력해주세요.', type: 'error' })
-    setLoading(true)
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/admin`,
-      })
-      if (error) throw error
-      setMessage({ text: '✅ 재설정 메일 발송 완료!', type: 'success' })
-      setIsMailSent(true)
-    } catch (error: any) {
+       // ... 성공 처리 코드 유지
+    if (error) {
       setMessage({ text: error.message, type: 'error' })
-    } finally {
       setLoading(false)
+      return
     }
+
+    // 성공 시 'verify' 화면으로 전환 (로그인 화면으로 안 보냄)
+    setLoading(false)
+    setView('verify')
   }
 
-  const resetSignup = () => { setIsMailSent(false); setIsVerified(false); setMessage(null); }
+  // 🔄 [수동] 인증 확인 버튼 핸들러 (자동 감지 실패 시 대비용)
+  const checkVerification = async () => {
+    setLoading(true)
+    // 세션 새로고침 시도
+    const { data: { session }, error } = await supabase.auth.refreshSession()
 
-  const EyeIcon = () => (<svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>)
-  const EyeOffIcon = () => (<svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>)
+    if (session) {
+       router.replace('/admin')
+    } else {
+       // 단순히 로그인 시도 (비번 입력 없이 이메일만으로 체크 불가하므로, 사용자에게 로그인 유도)
+       setMessage({ text: '아직 인증이 완료되지 않았습니다. 메일의 링크를 클릭하셨나요?', type: 'error' })
+       setLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen w-full flex bg-slate-50 font-sans text-gray-900">
+    <div className="flex min-h-screen w-full font-sans bg-slate-50 text-slate-900">
 
-      {/* 🖼️ 왼쪽: Sideline 브랜딩 (Sideline으로 교체됨) */}
-      <div className="hidden lg:flex w-1/2 relative items-center justify-center overflow-hidden bg-white">
-        <div className="absolute inset-0 z-0 bg-cover bg-center opacity-90" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2301&auto=format&fit=crop')" }}></div>
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/95 via-white/50 to-blue-100/30 z-10"></div>
-
-        <div className="relative z-20 max-w-lg p-12">
-          <div className="mb-6">
-            <span className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg shadow-blue-200">
-              Sideline ERP
-            </span>
-          </div>
-          <h1 className="text-5xl font-extrabold tracking-tight mb-6 leading-tight text-slate-900">
-            Work Smart,<br/>
-            Play <span className="text-blue-600">Sideline.</span>
+      {/* ⬛ Left Panel */}
+      <div className="hidden lg:flex w-5/12 bg-slate-900 text-white flex-col justify-between p-16 relative">
+        <div className="z-10">
+          <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-xs font-bold tracking-widest uppercase mb-6 border border-white/20">
+            Enterprise Standard
+          </span>
+          <h1 className="text-5xl font-extrabold leading-tight tracking-tight">
+            Sideline <br/>
+            <span className="text-slate-400">ERP Solution.</span>
           </h1>
-          <p className="text-xl text-slate-600 font-medium leading-relaxed">
-            복잡한 업무는 사이드라인에 맡기고,<br/>
-            비즈니스의 핵심에 집중하세요.
-          </p>
+          <div className="w-16 h-1.5 bg-blue-600 mt-8"></div>
         </div>
+        <div className="z-10 space-y-8">
+           <div className="space-y-2">
+             <h3 className="text-lg font-bold text-white">Always Connected</h3>
+             <p className="text-sm text-slate-400 leading-relaxed">
+               어디서든 안전하게 접속하세요.<br/>실시간 데이터 동기화로 업무의 연속성을 보장합니다.
+             </p>
+           </div>
+        </div>
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 5% 10%, rgba(255,255,255,0.15) 0%, transparent 20%)' }}></div>
       </div>
 
-      {/* 📝 오른쪽: 로그인 폼 */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 bg-white overflow-y-auto">
-        <div className="w-full max-w-[420px]">
+      {/* ⬜ Right Panel */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 overflow-y-auto">
+        <div className="w-full max-w-[480px]">
 
-          {/* 👇 [핵심] 로컬에서만 보이는 프리패스 버튼 */}
-          {isLocal && view === 'login' && (
-             <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-xl animate-bounce-slow">
-                <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-yellow-800 uppercase">⚡️ Dev Mode</span>
+          {/* ✨ [Verify View] 인증 대기 화면 ✨ */}
+          {view === 'verify' ? (
+            <div className="text-center animate-fade-in-up">
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+                📩
+              </div>
+              <h2 className="text-3xl font-extrabold text-slate-900 mb-3">
+                인증 메일 발송 완료!
+              </h2>
+              <p className="text-slate-500 mb-8 leading-relaxed">
+                <span className="font-bold text-slate-900">{formData.email}</span> 으로<br/>
+                인증 메일을 보냈습니다.<br/>
+                메일함의 링크를 클릭하면 <span className="text-blue-600 font-bold">자동으로 로그인</span>됩니다.
+              </p>
+
+              <div className="space-y-3">
+                <div className="p-4 bg-slate-100 rounded-xl text-sm text-slate-600 mb-6 flex items-center justify-center gap-2">
+                   <span className="animate-spin">⏳</span> 인증 확인 중... (링크를 클릭해주세요)
                 </div>
+
                 <button
-                  onClick={handleDevLogin}
-                  className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 rounded-lg text-sm transition-colors shadow-sm"
+                  onClick={() => window.open('https://mail.google.com', '_blank')}
+                  className="w-full py-4 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all"
                 >
-                  🚀 개발자 계정으로 바로 입장
+                  지메일(Gmail) 열기
                 </button>
-             </div>
-          )}
 
-          {/* 헤더 */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 mb-2">
-              {view === 'login' && '환영합니다! 👋'}
-              {view === 'signup-select' && '새로운 시작 🚀'}
-              {view === 'signup-email' && '회원가입'}
-              {view === 'reset-password' && '비밀번호 재설정'}
-            </h2>
-          </div>
-
-          {/* 로그인 뷰 */}
-          {view === 'login' && (
-             <form onSubmit={handleAuth} className="space-y-4">
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl" placeholder="이메일" />
-                <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={e=>setPassword(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl pr-10" placeholder="비밀번호" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
-                </div>
-                {message && <div className={`p-3 rounded-lg text-sm font-bold ${message.type==='error'?'bg-red-50 text-red-600':'bg-blue-50 text-blue-700'}`}>{message.text}</div>}
-
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 hover:-translate-y-0.5 transition-all">
-                  {loading ? '로그인 중...' : '로그인'}
+                <button
+                  onClick={() => setView('login')}
+                  className="text-sm text-slate-400 font-medium hover:text-slate-600 underline decoration-slate-300 underline-offset-4"
+                >
+                  로그인 화면으로 돌아가기
                 </button>
-                <div className="mt-8 text-center">
-                   <button type="button" onClick={() => setView('signup-select')} className="text-blue-600 font-bold hover:underline">회원가입</button>
-                   <span className="mx-3 text-gray-300">|</span>
-                   <button type="button" onClick={() => setView('reset-password')} className="text-gray-400 font-bold hover:text-gray-600">비밀번호 찾기</button>
-                </div>
-             </form>
-          )}
-
-          {/* 회원가입 뷰 (라디오 버튼 + Sideline 로직) */}
-          {view === 'signup-email' && (
-            <form onSubmit={handleAuth} className="space-y-4">
-              <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
-                <button type="button" onClick={()=>setIsFounder(true)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isFounder ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>🏢 회사 설립 (대표)</button>
-                <button type="button" onClick={()=>setIsFounder(false)} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isFounder ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>👤 직원 합류</button>
               </div>
-
-              <input type="text" value={name} onChange={e=>setName(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="이름" />
-              <input type="tel" value={phone} onChange={handlePhoneChange} className="w-full px-4 py-3 border rounded-xl" placeholder="연락처" />
-
-              <div className={`p-4 rounded-xl border space-y-3 ${isFounder ? 'bg-blue-50/50 border-blue-100' : 'bg-slate-50 border-slate-200'}`}>
-                {isFounder && <input type="text" value={companyName} onChange={e=>setCompanyName(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="설립할 회사명" />}
-                <input type="text" value={businessNumber} onChange={e=>setBusinessNumber(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder={isFounder ? "사업자번호 (회사 생성용)" : "입사할 회사 사업자번호"} />
-              </div>
-
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="이메일" />
-              <div className="relative">
-                 <input type={showPassword ? "text" : "password"} value={password} onChange={e=>setPassword(e.target.value)} className="w-full px-4 py-3 border rounded-xl pr-10" placeholder="비밀번호" />
-                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
-              </div>
-              <input type="password" value={passwordConfirm} onChange={e=>setPasswordConfirm(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="비밀번호 확인" />
-
-              {message && <div className={`p-3 rounded-lg text-sm font-bold ${message.type==='error'?'bg-red-50 text-red-600':'bg-green-50 text-green-700'}`}>{message.text}</div>}
-
-              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg mt-2">
-                {loading ? '처리 중...' : isFounder ? '가입하기' : '입사 신청'}
-              </button>
-              <button type="button" onClick={() => setView('login')} className="w-full text-sm font-bold text-slate-400 mt-2">취소</button>
-            </form>
-          )}
-
-          {/* 가입 선택 */}
-          {view === 'signup-select' && (
-            <div className="space-y-3">
-              <button onClick={handleGoogleLogin} className="w-full py-3.5 border rounded-xl font-bold text-gray-600 hover:bg-gray-50">Google로 시작</button>
-              <button onClick={() => setView('signup-email')} className="w-full py-3.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl font-bold hover:bg-blue-100">✉️ 이메일로 시작하기</button>
-              <div className="text-center mt-4"><button onClick={() => setView('login')} className="text-sm font-bold text-slate-400 underline">돌아가기</button></div>
             </div>
+          ) : (
+            // 기존 Login / Signup 화면
+            <>
+              <div className="mb-10">
+                <h2 className="text-3xl font-extrabold text-slate-900">
+                  {view === 'login' ? 'Sign In' : 'Create Account'}
+                </h2>
+                <p className="text-slate-500 mt-2 font-medium text-sm">
+                  {view === 'login' ? '등록된 비즈니스 계정으로 접속하세요.' : '기업 및 팀 관리를 위한 계정을 생성합니다.'}
+                </p>
+              </div>
+
+              <form onSubmit={view === 'login' ? handleLogin : handleSignUp} className="space-y-5">
+
+                {/* 탭 버튼들 (Signup only) */}
+                {view === 'signup' && (
+                   <div className="p-1.5 bg-slate-100 rounded-xl flex gap-1 mb-6">
+                     <button type="button" onClick={() => setRoleType('founder')} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${roleType === 'founder' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>기업 대표</button>
+                     <button type="button" onClick={() => setRoleType('employee')} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${roleType === 'employee' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>직원</button>
+                   </div>
+                )}
+
+                {/* 이메일 */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide ml-1">Email</label>
+                  <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="name@company.com" className={`w-full px-4 py-3.5 bg-white border rounded-xl outline-none font-medium text-slate-900 ${validity.email ? 'border-slate-300 focus:border-slate-900' : 'border-slate-200'}`}/>
+                  {view === 'signup' && <p className={`text-xs ml-1 ${validity.email ? 'text-blue-600' : 'text-slate-400'}`}>{guides.email}</p>}
+                </div>
+
+                {/* 비밀번호 */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wide ml-1">Password</label>
+                  <input name="password" type="password" value={formData.password} onChange={handleChange} placeholder="••••••••" className={`w-full px-4 py-3.5 bg-white border rounded-xl outline-none font-medium text-slate-900 ${validity.password ? 'border-slate-300 focus:border-slate-900' : 'border-slate-200'}`}/>
+                  {view === 'signup' && <p className={`text-xs ml-1 ${validity.password ? 'text-blue-600' : 'text-slate-400'}`}>{guides.password}</p>}
+                </div>
+
+                {/* Signup 추가 필드들 */}
+                {view === 'signup' && (
+                  <div className="animate-fade-in-down space-y-5">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-600 uppercase ml-1">Confirm PW</label>
+                      <input name="passwordConfirm" type="password" value={formData.passwordConfirm} onChange={handleChange} placeholder="••••••••" className={`w-full px-4 py-3.5 bg-white border rounded-xl outline-none font-medium text-slate-900 ${validity.passwordConfirm ? 'border-slate-300 focus:border-slate-900' : 'border-slate-200'}`}/>
+                    </div>
+                    <div className="w-full h-px bg-slate-100 my-2"></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                         <label className="text-xs font-bold text-slate-600 uppercase ml-1">Name</label>
+                         <input name="name" type="text" onChange={handleChange} placeholder="실명" className="w-full px-4 py-3.5 bg-white border border-slate-300 rounded-xl outline-none font-medium"/>
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-xs font-bold text-slate-600 uppercase ml-1">Phone</label>
+                         <input name="phone" type="tel" onChange={handleChange} placeholder="01012345678" className={`w-full px-4 py-3.5 bg-white border rounded-xl outline-none font-medium ${validity.phone ? 'border-slate-300 focus:border-slate-900' : 'border-slate-200'}`}/>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-xs font-bold text-slate-600 uppercase ml-1">{roleType === 'founder' ? 'Corporate Name' : 'Company Name'}</label>
+                       <input name="companyName" type="text" onChange={handleChange} placeholder={roleType === 'founder' ? "(주)법인명" : "재직 회사명"} className={`w-full px-4 py-3.5 bg-white border rounded-xl outline-none font-medium text-slate-900 ${validity.companyName ? 'border-slate-300 focus:border-slate-900' : 'border-slate-200'}`}/>
+                    </div>
+                    {roleType === 'founder' && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-600 uppercase ml-1">Business No.</label>
+                        <input name="businessNumber" type="text" onChange={handleChange} placeholder="000-00-00000" className="w-full px-4 py-3.5 bg-white border border-slate-300 rounded-xl outline-none font-medium"/>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 메시지 & 버튼 */}
+                {message && (
+                  <div className={`p-4 rounded-xl text-sm font-bold flex items-center gap-2 border ${message.type === 'error' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-green-50 border-green-100 text-green-800'}`}>
+                    <span>{message.type === 'error' ? '🛑' : '✅'}</span>
+                    {message.text}
+                  </div>
+                )}
+
+                <button disabled={loading} className="w-full py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-base shadow-lg transition-all disabled:opacity-50 mt-4">
+                  {loading ? 'Processing...' : (view === 'login' ? '로그인 (Sign In)' : '계정 생성 (Create Account)')}
+                </button>
+
+                {isLocal && view === 'login' && (
+                   <div className="pt-2">
+                     <button type="button" onClick={handleDevLogin} className="w-full py-2 bg-yellow-50 text-yellow-700 text-xs font-bold rounded hover:bg-yellow-100 border border-yellow-200 border-dashed">🛠️ Local Dev Pass</button>
+                   </div>
+                )}
+              </form>
+
+              <div className="pt-8 border-t border-slate-200 text-center">
+                <button
+                  onClick={() => {
+                     setView(view === 'login' ? 'signup' : 'login')
+                     setMessage(null)
+                     setFormData({ email:'', password:'', passwordConfirm:'', name:'', phone:'', companyName:'', businessNumber:'' })
+                  }}
+                  className="text-sm font-extrabold text-slate-900 hover:text-blue-600 transition-colors"
+                >
+                  {view === 'login' ? '엔터프라이즈 계정 생성하기 →' : '로그인 화면으로 돌아가기'}
+                </button>
+              </div>
+            </>
           )}
 
-          {/* 비번 찾기 */}
-          {view === 'reset-password' && (
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border rounded-xl" placeholder="가입한 이메일" />
-              {message && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-bold">{message.text}</div>}
-              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl">링크 보내기</button>
-              <button type="button" onClick={() => setView('login')} className="w-full text-sm font-bold text-slate-400">취소</button>
-            </form>
-          )}
-
-          <div className="mt-12 text-center">
-            <p className="text-xs text-slate-300 font-bold">© 2026 Sideline ERP. All rights reserved.</p>
-          </div>
         </div>
       </div>
     </div>
@@ -306,9 +374,5 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <LoginForm />
-    </Suspense>
-  )
+  return <Suspense><AuthPage /></Suspense>
 }
