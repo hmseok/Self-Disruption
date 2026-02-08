@@ -113,7 +113,7 @@ export default function CarDetailPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={handleDelete} className="px-4 py-2 border border-red-100 text-red-500 font-bold rounded-xl hover:bg-red-50">삭제</button>
-          <button onClick={handleUpdate} disabled={saving} className="px-6 py-2 bg-indigo-900 text-white font-bold rounded-xl shadow-lg hover:bg-black transition-all">
+          <button onClick={handleUpdate} disabled={saving} className="px-6 py-2 bg-steel-900 text-white font-bold rounded-xl shadow-lg hover:bg-black transition-all">
             {saving ? '저장 중...' : '💾 저장'}
           </button>
         </div>
@@ -147,7 +147,7 @@ export default function CarDetailPage() {
            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
              <div>
                 <label className="text-xs font-bold text-gray-400">현재 차고지</label>
-                <input className="w-full font-bold border-b py-2 mt-1 focus:outline-none focus:border-indigo-500 text-sm"
+                <input className="w-full font-bold border-b py-2 mt-1 focus:outline-none focus:border-steel-500 text-sm"
                   value={car.location || ''}
                   onChange={e => handleChange('location', e.target.value)}
                   placeholder="위치 정보 입력"
@@ -162,7 +162,7 @@ export default function CarDetailPage() {
             {['basic', 'insurance', 'finance', 'jiip', 'invest'].map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-5 font-bold capitalize transition-all border-b-2 whitespace-nowrap px-4 ${
-                  activeTab === tab ? 'text-indigo-600 border-indigo-600 bg-indigo-50/30' : 'text-gray-400 border-transparent hover:text-gray-600'
+                  activeTab === tab ? 'text-steel-600 border-steel-600 bg-steel-50/30' : 'text-gray-400 border-transparent hover:text-gray-600'
                 }`}
               >
                 {tab === 'basic' && '📋 기본 정보'}
@@ -239,9 +239,9 @@ export default function CarDetailPage() {
                       <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400">등록된 금융 정보가 없습니다.</div>
                     ) : (
                       loans.map((loan) => (
-                        <div key={loan.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 hover:border-indigo-200 transition-all group">
+                        <div key={loan.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 hover:border-steel-200 transition-all group">
                           <div className="flex items-center gap-4 w-full">
-                            <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">￦</div>
+                            <div className="w-12 h-12 rounded-full bg-steel-50 text-steel-600 flex items-center justify-center font-bold text-lg">￦</div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-gray-800 text-lg">{loan.finance_name}</span>

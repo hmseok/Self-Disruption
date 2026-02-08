@@ -154,7 +154,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
       </div>
     )
   }
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
             {role === 'god_admin' && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-indigo-700"
+                className="px-3 md:px-4 py-2 bg-steel-600 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-steel-700"
               >
                 + 회사 등록
               </button>
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
               <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
-                    !comp.is_active ? 'bg-yellow-500' : 'bg-indigo-600'
+                    !comp.is_active ? 'bg-yellow-500' : 'bg-steel-600'
                   }`}>
                     {comp.name[0]}
                   </div>
@@ -258,10 +258,10 @@ export default function AdminDashboard() {
                         {comp.plan.toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className="text-xs text-slate-400">{comp.business_number || '사업자번호 없음'}</span>
-                      <span className="text-xs text-slate-400">가입: {formatDate(comp.created_at)}</span>
-                      <span className="text-xs text-slate-400">직원 {comp.users.length}명</span>
+                    <div className="flex items-center gap-2 md:gap-3 mt-0.5 flex-wrap">
+                      <span className="text-[10px] md:text-xs text-slate-400">{comp.business_number || '사업자번호 없음'}</span>
+                      <span className="text-[10px] md:text-xs text-slate-400">가입: {formatDate(comp.created_at)}</span>
+                      <span className="text-[10px] md:text-xs text-slate-400">직원 {comp.users.length}명</span>
                       {comp.business_registration_url && (
                         <a
                           href={comp.business_registration_url}
@@ -325,46 +325,76 @@ export default function AdminDashboard() {
 
               {/* 소속 유저 목록 */}
               {comp.users.length > 0 && (
-                <div className="border-t border-slate-100 overflow-x-auto">
-                  <table className="w-full text-left min-w-[500px]">
-                    <thead>
-                      <tr className="bg-slate-50/50">
-                        <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이름</th>
-                        <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이메일</th>
-                        <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">역할</th>
-                        <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">상태</th>
-                        <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase text-right">액션</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {comp.users.map(u => (
-                        <tr key={u.id} className="border-t border-slate-50 hover:bg-slate-50/30">
-                          <td className="px-5 py-3 text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</td>
-                          <td className="px-5 py-3 text-sm text-slate-500">{u.email}</td>
-                          <td className="px-5 py-3">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                <div className="border-t border-slate-100">
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-slate-50/50">
+                          <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이름</th>
+                          <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이메일</th>
+                          <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">역할</th>
+                          <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">상태</th>
+                          <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase text-right">액션</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comp.users.map(u => (
+                          <tr key={u.id} className="border-t border-slate-50 hover:bg-slate-50/30">
+                            <td className="px-5 py-3 text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</td>
+                            <td className="px-5 py-3 text-sm text-slate-500">{u.email}</td>
+                            <td className="px-5 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                u.role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                              }`}>{u.role === 'master' ? '관리자' : '직원'}</span>
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                u.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                              }`}>{u.is_active ? '활성' : '대기중'}</span>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              {role === 'god_admin' && (
+                                <button
+                                  onClick={() => toggleUserActive(u.id, u.is_active)}
+                                  className={`text-xs font-bold hover:underline ${u.is_active ? 'text-red-500' : 'text-green-600'}`}
+                                >
+                                  {u.is_active ? '비활성화' : '활성화'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Mobile Cards */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {comp.users.map(u => (
+                      <div key={u.id} className="p-3 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                               u.role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
                             }`}>{u.role === 'master' ? '관리자' : '직원'}</span>
-                          </td>
-                          <td className="px-5 py-3">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                               u.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                            }`}>{u.is_active ? '활성' : '대기중'}</span>
-                          </td>
-                          <td className="px-5 py-3 text-right">
-                            {role === 'god_admin' && (
-                              <button
-                                onClick={() => toggleUserActive(u.id, u.is_active)}
-                                className={`text-xs font-bold hover:underline ${u.is_active ? 'text-red-500' : 'text-green-600'}`}
-                              >
-                                {u.is_active ? '비활성화' : '활성화'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            }`}>{u.is_active ? '활성' : '대기'}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">{u.email}</div>
+                        </div>
+                        {role === 'god_admin' && (
+                          <button
+                            onClick={() => toggleUserActive(u.id, u.is_active)}
+                            className={`text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 ${u.is_active ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}
+                          >
+                            {u.is_active ? '비활성화' : '활성화'}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

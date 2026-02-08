@@ -47,7 +47,8 @@ const compressImage = async (file: File): Promise<File> => {
 export default function InsuranceListPage() {
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
-const { company, role } = useApp()
+const { company, role, adminSelectedCompanyId } = useApp()
+const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const [list, setList] = useState<any[]>([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
@@ -56,14 +57,16 @@ const { company, role } = useApp()
   const [allCars, setAllCars] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => { fetchList() }, [company, role])
+  useEffect(() => { fetchList() }, [company, role, adminSelectedCompanyId])
 
   const fetchList = async () => {
     let query = supabase
       .from('cars')
       .select(`id, number, model, brand, vin, insurance_contracts (id, company, end_date, premium, status)`)
 
-    if (role !== 'god_admin' && company) {
+    if (role === 'god_admin') {
+      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
+    } else if (company) {
       query = query.eq('company_id', company.id)
     }
 
@@ -250,62 +253,119 @@ const { company, role } = useApp()
        )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm min-w-[700px]">
-          <thead className="bg-gray-50/50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs tracking-wider">
-            <tr>
-                <th className="p-3 md:p-5 pl-4 md:pl-8">차량번호</th>
-                <th className="p-3 md:p-5 hidden sm:table-cell">차대번호 (VIN)</th>
-                <th className="p-3 md:p-5 hidden md:table-cell">브랜드/모델</th>
-                <th className="p-3 md:p-5">보험사</th>
-                <th className="p-3 md:p-5">만기일</th>
-                <th className="p-3 md:p-5 text-right">보험료</th>
-                <th className="p-3 md:p-5 text-center">상태</th>
-                <th className="p-3 md:p-5 text-center">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {list.map((item) => (
-              <tr key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="hover:bg-blue-50/30 cursor-pointer transition-colors group">
-                <td className="p-3 md:p-5 pl-4 md:pl-8 font-black text-lg text-gray-900">{item.number}</td>
-                <td className="p-3 md:p-5 hidden sm:table-cell">
-                     <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono text-xs font-bold border border-gray-200 select-all">
+        {list.length === 0 ? (
+            <div className="p-12 md:p-20 text-center text-gray-400">등록된 차량이 없습니다.</div>
+        ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[700px]">
+                  <thead className="bg-gray-50/50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs tracking-wider">
+                    <tr>
+                        <th className="p-3 md:p-5 pl-4 md:pl-8">차량번호</th>
+                        <th className="p-3 md:p-5">차대번호 (VIN)</th>
+                        <th className="p-3 md:p-5">브랜드/모델</th>
+                        <th className="p-3 md:p-5">보험사</th>
+                        <th className="p-3 md:p-5">만기일</th>
+                        <th className="p-3 md:p-5 text-right">보험료</th>
+                        <th className="p-3 md:p-5 text-center">상태</th>
+                        <th className="p-3 md:p-5 text-center">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {list.map((item) => (
+                      <tr key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="hover:bg-blue-50/30 cursor-pointer transition-colors group">
+                        <td className="p-3 md:p-5 pl-4 md:pl-8 font-black text-lg text-gray-900">{item.number}</td>
+                        <td className="p-3 md:p-5">
+                             <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono text-xs font-bold border border-gray-200 select-all">
+                                {item.vin || '-'}
+                             </span>
+                        </td>
+                        <td className="p-3 md:p-5 text-gray-700 font-medium">
+                            <span className="text-blue-600 font-bold mr-1">{item.brand}</span>
+                            {item.model}
+                        </td>
+                        <td className="p-3 md:p-5 font-bold text-gray-700">{item.insurance?.company || '-'}</td>
+                        <td className="p-3 md:p-5 font-mono text-gray-600">{item.insurance?.end_date || '-'}</td>
+                        <td className="p-3 md:p-5 text-right font-medium text-blue-600">{item.insurance?.premium ? `${f(item.insurance.premium)}원` : '-'}</td>
+                        <td className="p-3 md:p-5 text-center">
+                          {item.insurance ? (
+                              new Date(item.insurance.end_date) < new Date() ?
+                              <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">만료됨</span> :
+                              <span className="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center gap-1 mx-auto w-fit"><Icons.Shield /> 가입중</span>
+                          ) : (
+                              <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full text-xs font-bold">미가입</span>
+                          )}
+                        </td>
+                        <td className="p-3 md:p-5 text-center">
+                            {item.insurance && (
+                                <button
+                                    onClick={(e) => handleDeleteInsurance(e, item.insurance.id)}
+                                    className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all"
+                                    title="보험 내역 삭제"
+                                >
+                                    <Icons.Trash />
+                                </button>
+                            )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {list.map((item) => (
+                  <div key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="p-4 hover:bg-blue-50/30 transition-colors cursor-pointer">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-black text-lg text-gray-900">{item.number}</div>
+                        <div className="text-xs text-gray-500 mt-1"><span className="text-blue-600 font-bold">{item.brand}</span> {item.model}</div>
+                      </div>
+                      {item.insurance && (
+                          <button
+                              onClick={(e) => handleDeleteInsurance(e, item.insurance.id)}
+                              className="text-gray-300 hover:text-red-500 p-1 rounded transition-all"
+                              title="보험 내역 삭제"
+                          >
+                              <Icons.Trash />
+                          </button>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-2">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono text-xs font-bold border border-gray-200">
                         {item.vin || '-'}
-                     </span>
-                </td>
-                <td className="p-3 md:p-5 text-gray-700 font-medium hidden md:table-cell">
-                    <span className="text-blue-600 font-bold mr-1">{item.brand}</span>
-                    {item.model}
-                </td>
-                <td className="p-3 md:p-5 font-bold text-gray-700">{item.insurance?.company || '-'}</td>
-                <td className="p-3 md:p-5 font-mono text-gray-600">{item.insurance?.end_date || '-'}</td>
-                <td className="p-3 md:p-5 text-right font-medium text-blue-600">{item.insurance?.premium ? `${f(item.insurance.premium)}원` : '-'}</td>
-                <td className="p-3 md:p-5 text-center">
-                  {item.insurance ? (
-                      new Date(item.insurance.end_date) < new Date() ?
-                      <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">만료됨</span> :
-                      <span className="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-bold flex items-center justify-center gap-1 mx-auto w-fit"><Icons.Shield /> 가입중</span>
-                  ) : (
-                      <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full text-xs font-bold">미가입</span>
-                  )}
-                </td>
-                <td className="p-3 md:p-5 text-center">
-                    {item.insurance && (
-                        <button
-                            onClick={(e) => handleDeleteInsurance(e, item.insurance.id)}
-                            className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all"
-                            title="보험 내역 삭제"
-                        >
-                            <Icons.Trash />
-                        </button>
-                    )}
-                </td>
-              </tr>
-            ))}
-            {list.length === 0 && <tr><td colSpan={8} className="p-12 md:p-20 text-center text-gray-400">등록된 차량이 없습니다.</td></tr>}
-          </tbody>
-        </table>
-        </div>
+                      </span>
+                    </div>
+                    <div className="mb-3 pb-3 border-b border-gray-200">
+                      <div className="text-xs text-gray-600 font-bold mb-1">보험사</div>
+                      <div className="font-bold text-gray-900">{item.insurance?.company || '-'}</div>
+                    </div>
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-600 font-bold mb-1">보험료</div>
+                      <div className="text-lg font-black text-blue-600">{item.insurance?.premium ? `${f(item.insurance.premium)}원` : '-'}</div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-gray-600 font-bold mb-1">만기일</div>
+                        <div className="font-mono text-gray-600 text-sm">{item.insurance?.end_date || '-'}</div>
+                      </div>
+                      <div>
+                        {item.insurance ? (
+                            new Date(item.insurance.end_date) < new Date() ?
+                            <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold">만료됨</span> :
+                            <span className="bg-green-100 text-green-600 px-2 py-1 rounded text-xs font-bold flex items-center gap-1"><Icons.Shield /> 가입중</span>
+                        ) : (
+                            <span className="bg-gray-100 text-gray-400 px-2 py-1 rounded text-xs font-bold">미가입</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+        )}
       </div>
 
       {isModalOpen && (

@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 export default function FinancePage() {
-  const { company, role } = useApp()
+  const { company, role, adminSelectedCompanyId } = useApp()
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
@@ -28,7 +28,7 @@ const router = useRouter()
     payment_method: '통장'
   })
 
-  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company])
+  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, adminSelectedCompanyId])
 
   const fetchTransactions = async () => {
     if (!company && role !== 'god_admin') return
@@ -40,7 +40,9 @@ const router = useRouter()
       .from('transactions')
       .select('*')
 
-    if (role !== 'god_admin' && company) {
+    if (role === 'god_admin') {
+      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
+    } else if (company) {
       query = query.eq('company_id', company.id)
     }
 
@@ -72,10 +74,14 @@ const router = useRouter()
       setSummary({ income: inc, expense: exp, profit: inc - exp, pendingExpense: pending })
   }
 
+  // 현재 사용할 company_id 결정
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+
   const handleSave = async () => {
+      if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if (!form.amount || !form.client_name) return alert('필수 항목을 입력해주세요.')
       const { error } = await supabase.from('transactions').insert({
-          ...form, amount: Number(form.amount.replace(/,/g, ''))
+          ...form, amount: Number(form.amount.replace(/,/g, '')), company_id: effectiveCompanyId
       })
       if (error) alert('저장 실패: ' + error.message)
       else {
@@ -99,6 +105,7 @@ const router = useRouter()
   }
 
   const generateMonthlySchedule = async () => {
+      if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if(!confirm(`${filterDate}월 정기 지출을 일괄 생성하시겠습니까?`)) return;
       setLoading(true)
       try {
@@ -158,7 +165,8 @@ const router = useRouter()
           }
 
           if(newTxs.length > 0) {
-              const { error } = await supabase.from('transactions').insert(newTxs)
+              const txsWithCompany = newTxs.map(tx => ({ ...tx, company_id: effectiveCompanyId }))
+              const { error } = await supabase.from('transactions').insert(txsWithCompany)
               if(error) throw error
               alert(`✅ 신규 ${newTxs.length}건 생성 완료!`)
               setActiveTab('schedule')
@@ -188,7 +196,7 @@ const router = useRouter()
               <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-2xl md:text-3xl font-black text-gray-900">💰 자금 관리</h1>
                   <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-                         className="border-2 border-gray-200 rounded-lg px-3 py-1 font-bold text-lg bg-gray-50 hover:bg-white focus:border-indigo-500 transition-colors cursor-pointer text-gray-700" />
+                         className="border-2 border-gray-200 rounded-lg px-3 py-1 font-bold text-lg bg-gray-50 hover:bg-white focus:border-steel-500 transition-colors cursor-pointer text-gray-700" />
               </div>
               <p className="text-gray-500 text-sm">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
           </div>
@@ -227,10 +235,10 @@ const router = useRouter()
       <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-1.5 rounded-2xl mb-6 gap-2">
           {/* 좌측: 탭 스위처 */}
           <div className="flex bg-white rounded-xl shadow-sm p-1 w-full md:w-auto">
-              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-indigo-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
                   📊 확정된 장부
               </button>
-              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-indigo-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
                   🗓️ 예정 스케줄
               </button>
           </div>
@@ -245,7 +253,7 @@ const router = useRouter()
               <button onClick={() => router.push('/finance/upload')} className="whitespace-nowrap px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-sm hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 shadow-sm">
                   📂 엑셀 등록
               </button>
-              <button onClick={scrollToForm} className="whitespace-nowrap px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-indigo-700 flex items-center gap-2">
+              <button onClick={scrollToForm} className="whitespace-nowrap px-4 py-2 bg-steel-600 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-steel-700 flex items-center gap-2">
                   ✏️ 직접 입력
               </button>
           </div>
@@ -290,7 +298,7 @@ const router = useRouter()
                   <input type="text" placeholder="0" className="w-full border border-gray-200 p-2.5 rounded-xl text-right font-black text-gray-900" value={form.amount ? Number(form.amount).toLocaleString() : ''} onChange={e=>setForm({...form, amount: e.target.value.replace(/,/g, '')})} />
               </div>
               <div className="md:col-span-1">
-                  <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-900 hover:bg-black'}`}>
+                  <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-green-600 hover:bg-green-700' : 'bg-steel-900 hover:bg-black'}`}>
                       등록
                   </button>
               </div>
@@ -306,62 +314,103 @@ const router = useRouter()
               </h3>
               <span className="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full font-bold text-gray-500">Total: {filteredList.length}</span>
           </div>
-          <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[600px]">
-                  <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
-                      <tr>
-                          <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">Date</th>
-                          <th className="p-3 md:p-4 font-bold hidden sm:table-cell">Type</th>
-                          <th className="p-3 md:p-4 font-bold hidden sm:table-cell">Category</th>
-                          <th className="p-3 md:p-4 font-bold">Description</th>
-                          <th className="p-3 md:p-4 font-bold text-right">Amount</th>
-                          <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">Action</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 text-sm">
-                      {loading ? (
-                          <tr><td colSpan={6} className="p-10 text-center text-gray-400">데이터를 불러오는 중입니다...</td></tr>
-                      ) : filteredList.length === 0 ? (
-                          <tr><td colSpan={6} className="p-20 text-center text-gray-400 bg-gray-50/30">
-                              {activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}
-                          </td></tr>
-                      ) : (
-                          filteredList.map((item) => (
-                              <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                                  <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
-                                  <td className="p-3 md:p-4 hidden sm:table-cell">
-                                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                                          {item.type === 'income' ? '수입' : '지출'}
-                                      </span>
-                                  </td>
-                                  <td className="p-3 md:p-4 font-bold text-gray-700 hidden sm:table-cell">{item.category}</td>
-                                  <td className="p-3 md:p-4">
-                                      <div className="font-bold text-gray-900">{item.client_name}</div>
-                                      <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>
-                                  </td>
-                                  <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
-                                      {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
-                                  </td>
-                                  <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
-                                      {item.status === 'pending' ? (
-                                          <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <button onClick={() => handleConfirm(item.id)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm">
-                                                  승인
-                                              </button>
-                                              <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5">🗑️</button>
-                                          </div>
-                                      ) : (
-                                          <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity px-2">
-                                              삭제
-                                          </button>
-                                      )}
-                                  </td>
+
+          {/* Empty State */}
+          {loading ? (
+              <div className="p-10 text-center text-gray-400">데이터를 불러오는 중입니다...</div>
+          ) : filteredList.length === 0 ? (
+              <div className="p-20 text-center text-gray-400 bg-gray-50/30">
+                  {activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}
+              </div>
+          ) : (
+              <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left min-w-[600px]">
+                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
+                              <tr>
+                                  <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">Date</th>
+                                  <th className="p-3 md:p-4 font-bold">Type</th>
+                                  <th className="p-3 md:p-4 font-bold">Category</th>
+                                  <th className="p-3 md:p-4 font-bold">Description</th>
+                                  <th className="p-3 md:p-4 font-bold text-right">Amount</th>
+                                  <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">Action</th>
                               </tr>
-                          ))
-                      )}
-                  </tbody>
-              </table>
-          </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50 text-sm">
+                              {filteredList.map((item) => (
+                                  <tr key={item.id} className="hover:bg-steel-50/30 transition-colors group">
+                                      <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
+                                      <td className="p-3 md:p-4">
+                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                              {item.type === 'income' ? '수입' : '지출'}
+                                          </span>
+                                      </td>
+                                      <td className="p-3 md:p-4 font-bold text-gray-700">{item.category}</td>
+                                      <td className="p-3 md:p-4">
+                                          <div className="font-bold text-gray-900">{item.client_name}</div>
+                                          <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>
+                                      </td>
+                                      <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
+                                          {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
+                                      </td>
+                                      <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
+                                          {item.status === 'pending' ? (
+                                              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-steel-700 shadow-sm">
+                                                      승인
+                                                  </button>
+                                                  <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5">🗑️</button>
+                                              </div>
+                                          ) : (
+                                              <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity px-2">
+                                                  삭제
+                                              </button>
+                                          )}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y divide-gray-100">
+                      {filteredList.map((item) => (
+                          <div key={item.id} className="p-4 hover:bg-steel-50/30 transition-colors">
+                              <div className="flex justify-between items-start mb-3">
+                                  <div>
+                                      <div className="text-sm font-bold text-gray-600 mb-1">{item.transaction_date.slice(5)}</div>
+                                      <div className="font-bold text-gray-900">{item.client_name}</div>
+                                  </div>
+                                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                      {item.type === 'income' ? '수입' : '지출'}
+                                  </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mb-2">{item.category}</div>
+                              <div className="text-xs text-gray-400 mb-3">{item.description}</div>
+                              <div className="flex justify-between items-center">
+                                  <div className={`text-lg font-black ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
+                                  </div>
+                                  {item.status === 'pending' ? (
+                                      <div className="flex gap-2">
+                                          <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-steel-700">
+                                              승인
+                                          </button>
+                                          <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-lg">🗑️</button>
+                                      </div>
+                                  ) : (
+                                      <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-sm font-bold">
+                                          삭제
+                                      </button>
+                                  )}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </>
+          )}
       </div>
     </div>
   )

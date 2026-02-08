@@ -2,10 +2,13 @@
 import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useApp } from '../../context/AppContext'
 // 👇 [경로 체크] app/loans/[id] 위치이므로 3단계 상위(../..)가 맞습니다.
 export default function LoanDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const { company, role, adminSelectedCompanyId } = useApp()
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const isNew = params.id === 'new'
   const loanId = isNew ? null : params.id
 
@@ -111,6 +114,7 @@ export default function LoanDetailPage() {
   }
 
   const handleSave = async () => {
+    if (isNew && role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
     if (!loan.car_id || !loan.finance_name) return alert('필수 입력 항목을 확인하세요.')
 
     const payload = {
@@ -120,6 +124,7 @@ export default function LoanDetailPage() {
       first_payment_date: loan.first_payment_date || null
     }
 
+    if (isNew) payload.company_id = effectiveCompanyId
     const query = isNew
         ? supabase.from('loans').insert(payload)
         : supabase.from('loans').update(payload).eq('id', loanId)
@@ -249,7 +254,7 @@ export default function LoanDetailPage() {
              <div className="flex justify-between items-end">
                 <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
                     3. 상환 현황 및 일정
-                    {!isNew && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">통장 연동됨</span>}
+                    {!isNew && <span className="text-xs bg-steel-100 text-steel-700 px-2 py-1 rounded-md">통장 연동됨</span>}
                 </h3>
              </div>
 
@@ -258,10 +263,10 @@ export default function LoanDetailPage() {
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 mb-4">
                     <div className="flex justify-between items-end mb-2">
                         <span className="text-xs font-bold text-gray-500">상환 진행률</span>
-                        <span className="text-2xl font-black text-indigo-900">{progressRate.toFixed(1)}%</span>
+                        <span className="text-2xl font-black text-steel-900">{progressRate.toFixed(1)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-                        <div className="bg-indigo-600 h-3 rounded-full transition-all duration-1000" style={{ width: `${progressRate}%` }}></div>
+                        <div className="bg-steel-600 h-3 rounded-full transition-all duration-1000" style={{ width: `${progressRate}%` }}></div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 border-t pt-4">
@@ -271,7 +276,7 @@ export default function LoanDetailPage() {
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-gray-400 font-bold mb-1">실제 상환된 금액 (통장)</p>
-                            <p className="text-xl font-black text-indigo-700">{realRepaidTotal.toLocaleString()}원</p>
+                            <p className="text-xl font-black text-steel-700">{realRepaidTotal.toLocaleString()}원</p>
                         </div>
                     </div>
 
@@ -293,9 +298,9 @@ export default function LoanDetailPage() {
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">금리 (%)</label><input type="number" className="w-full border p-3 rounded-xl text-right" placeholder="0.0" value={loan.interest_rate || ''} onChange={e => setLoan({...loan, interest_rate: Number(e.target.value)})} /></div>
                     <div><label className="block text-xs font-bold text-gray-500 mb-1">계약 기간</label><select className="w-full border p-3 rounded-xl" value={loan.months} onChange={e => setLoan({...loan, months: Number(e.target.value)})}>{[12,24,36,48,60].map(m=><option key={m} value={m}>{m}개월</option>)}</select></div>
                 </div>
-                <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 grid grid-cols-2 gap-3">
-                    <div><label className="block text-xs font-bold text-indigo-800 mb-1">1회차 납입일</label><input type="date" className="w-full border border-indigo-200 p-2 rounded-lg text-sm bg-white" value={loan.first_payment_date} onChange={e => setLoan({...loan, first_payment_date: e.target.value})} /></div>
-                    <div><label className="block text-xs font-bold text-indigo-800 mb-1">1회차 금액</label><input type="text" className="w-full border border-indigo-200 p-2 rounded-lg text-right bg-white font-bold" value={loan.first_payment.toLocaleString()} onChange={e => handleMoneyChange('first_payment', e.target.value)} /></div>
+                <div className="bg-steel-50 p-3 rounded-xl border border-steel-100 grid grid-cols-2 gap-3">
+                    <div><label className="block text-xs font-bold text-steel-800 mb-1">1회차 납입일</label><input type="date" className="w-full border border-steel-200 p-2 rounded-lg text-sm bg-white" value={loan.first_payment_date} onChange={e => setLoan({...loan, first_payment_date: e.target.value})} /></div>
+                    <div><label className="block text-xs font-bold text-steel-800 mb-1">1회차 금액</label><input type="text" className="w-full border border-steel-200 p-2 rounded-lg text-right bg-white font-bold" value={loan.first_payment.toLocaleString()} onChange={e => handleMoneyChange('first_payment', e.target.value)} /></div>
                     <div className="col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">월 납입금 (고정)</label><input type="text" className="w-full border p-2 rounded-lg font-bold text-red-500 text-right bg-white" value={loan.monthly_payment.toLocaleString()} onChange={e => handleMoneyChange('monthly_payment', e.target.value)} /></div>
                 </div>
              </div>
@@ -306,7 +311,7 @@ export default function LoanDetailPage() {
           {/* 4. 보증인 정보 */}
           <div className="space-y-4">
               <h3 className="font-bold text-lg text-gray-900">4. 연대보증인 정보</h3>
-              <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 grid grid-cols-2 gap-4">
+              <div className="bg-steel-50 p-6 rounded-2xl border border-steel-100 grid grid-cols-2 gap-4">
                 <div><label className="block text-xs font-bold text-gray-500 mb-1">보증인 성명</label><input className="w-full border p-3 rounded-xl bg-white" placeholder="성명 입력" value={loan.guarantor_name} onChange={e => setLoan({...loan, guarantor_name: e.target.value})} /></div>
                 <div><label className="block text-xs font-bold text-gray-500 mb-1">보증 한도액</label><input type="text" className="w-full border p-3 rounded-xl text-right bg-white" placeholder="금액 입력" value={loan.guarantor_limit.toLocaleString()} onChange={e => handleMoneyChange('guarantor_limit', e.target.value)} /></div>
               </div>
@@ -323,18 +328,18 @@ export default function LoanDetailPage() {
                   <div
                       onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
                       className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 mb-8 ${
-                          isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-gray-400'
+                          isDragging ? 'border-steel-500 bg-steel-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
                   >
                       <div className="pointer-events-none">
                           <p className="text-3xl mb-2">{isDragging ? '📂' : '☁️'}</p>
-                          <p className={`font-bold ${isDragging ? 'text-indigo-600' : 'text-gray-500'}`}>
+                          <p className={`font-bold ${isDragging ? 'text-steel-600' : 'text-gray-500'}`}>
                               {isDragging ? '여기에 놓으세요!' : '클릭 또는 파일을 드래그하여 업로드'}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">여러 개 동시 업로드 가능 (PDF, 이미지)</p>
                       </div>
                       <input type="file" multiple className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileChange} disabled={uploading} />
-                      {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl"><span className="font-bold text-indigo-600 animate-pulse">업로드 중... 🚀</span></div>}
+                      {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl"><span className="font-bold text-steel-600 animate-pulse">업로드 중... 🚀</span></div>}
                   </div>
 
                   {loan.attachments && loan.attachments.length > 0 ? (
@@ -383,7 +388,7 @@ export default function LoanDetailPage() {
 
       {/* 하단 저장 버튼 */}
       <div className="mt-8 flex gap-4">
-         <button onClick={handleSave} className="flex-1 bg-indigo-900 text-white py-4 rounded-2xl font-black text-xl hover:bg-black transition-all shadow-xl">
+         <button onClick={handleSave} className="flex-1 bg-steel-900 text-white py-4 rounded-2xl font-black text-xl hover:bg-black transition-all shadow-xl">
             {isNew ? '✨ 금융 정보 등록 완료' : '💾 수정 내용 저장'}
          </button>
       </div>
@@ -396,7 +401,7 @@ export default function LoanDetailPage() {
             <div className="w-full max-w-5xl h-[85vh] bg-white rounded-xl overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="p-4 bg-gray-100 border-b flex justify-between items-center">
                     <span className="font-bold text-gray-700 truncate">{previewFile.name}</span>
-                    <a href={previewFile.url} download className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-bold">
+                    <a href={previewFile.url} download className="text-xs bg-steel-600 text-white px-3 py-1.5 rounded-lg hover:bg-steel-700 font-bold">
                         다운로드
                     </a>
                 </div>

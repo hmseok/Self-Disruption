@@ -149,7 +149,7 @@ export default function JiipGuestSignPage() {
                       href={alreadySignedUrl!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-colors"
+                      className="block w-full bg-steel-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-steel-700 transition-colors"
                   >
                       📄 계약서 다운로드 (PDF)
                   </a>
@@ -178,9 +178,9 @@ export default function JiipGuestSignPage() {
           </div>
       </div>
 
-      <div className="bg-indigo-900 text-white p-4 text-center flex-none shadow-md z-10">
+      <div className="bg-steel-900 text-white p-4 text-center flex-none shadow-md z-10">
           <h1 className="font-bold text-lg">지입 계약 서명</h1>
-          <p className="text-xs text-indigo-200 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
+          <p className="text-xs text-steel-200 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-gray-500 p-4 pb-10">
@@ -193,7 +193,7 @@ export default function JiipGuestSignPage() {
 
           <div className="flex justify-between items-center mb-4">
              <p className="text-xs text-white/80">👆 위 문서를 확인해주세요.</p>
-             <button onClick={() => setShowZoomModal(true)} className="text-xs font-bold text-indigo-900 bg-white px-3 py-1.5 rounded-full shadow-sm">
+             <button onClick={() => setShowZoomModal(true)} className="text-xs font-bold text-steel-900 bg-white px-3 py-1.5 rounded-full shadow-sm">
                   🔍 크게 보기
              </button>
           </div>
@@ -232,7 +232,7 @@ export default function JiipGuestSignPage() {
 
           <div className="flex gap-3">
               <button onClick={() => sigCanvas.current.clear()} className="flex-1 bg-gray-200 py-4 rounded-xl font-bold text-gray-700">지우기</button>
-              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-indigo-600 py-4 rounded-xl font-bold text-white shadow-lg">
+              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-steel-600 py-4 rounded-xl font-bold text-white shadow-lg">
                   서명 제출하기
               </button>
           </div>

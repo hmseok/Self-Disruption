@@ -53,7 +53,7 @@ export default function RegistrationListPage() {
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
-const { company, role } = useApp()
+const { company, role, adminSelectedCompanyId } = useApp()
   const [cars, setCars] = useState<any[]>([])
 
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -65,6 +65,7 @@ const { company, role } = useApp()
   const [standardCodes, setStandardCodes] = useState<any[]>([])
   const [uniqueModels, setUniqueModels] = useState<string[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [carNum, setCarNum] = useState('')
   const [vin, setVin] = useState('')
   const [selectedModelName, setSelectedModelName] = useState('')
@@ -74,7 +75,7 @@ const { company, role } = useApp()
   useEffect(() => {
     fetchList()
     fetchStandardCodes()
-  }, [company, role])
+  }, [company, role, adminSelectedCompanyId])
 
   useEffect(() => {
     if (selectedTrim) setFinalPrice(selectedTrim.price)
@@ -83,7 +84,9 @@ const { company, role } = useApp()
   const fetchList = async () => {
     let query = supabase.from('cars').select('*')
 
-    if (role !== 'god_admin' && company) {
+    if (role === 'god_admin') {
+      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
+    } else if (company) {
       query = query.eq('company_id', company.id)
     }
 
@@ -108,9 +111,17 @@ const { company, role } = useApp()
   }
 
   // 🚀 [업그레이드] PDF 지원 + 브랜드 분석 로직
+  // 현재 사용할 company_id 결정
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files
       if (!files?.length) return
+      if (role === 'god_admin' && !adminSelectedCompanyId) {
+        alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
+        e.target.value = ''
+        return
+      }
       if (!confirm(`총 ${files.length}건을 분석합니다.\n(PDF, JPG, PNG 지원)`)) return
 
       setBulkProcessing(true)
@@ -207,7 +218,8 @@ const { company, role } = useApp()
                   year: detectedYear,
                   registration_image_url: urlData.publicUrl,
                   status: 'available',
-                  notes: result.notes || ''
+                  notes: result.notes || '',
+                  company_id: effectiveCompanyId || null
               }])
 
               setProgress(prev => ({ ...prev, success: prev.success + 1 }))
@@ -226,6 +238,7 @@ const { company, role } = useApp()
   }
 
   const handleRegister = async () => {
+    if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
     if (!carNum) return alert('차량번호 입력')
     if (!vin) return alert('차대번호 입력')
 
@@ -243,7 +256,8 @@ const { company, role } = useApp()
         purchase_price: finalPrice,
         fuel_type: selectedTrim?.fuel_type,
         vin: vin,
-        status: 'available'
+        status: 'available',
+        company_id: effectiveCompanyId || null
     }])
 
     if (error) alert('실패: ' + error.message)
@@ -293,61 +307,102 @@ const { company, role } = useApp()
 
        {/* 리스트 테이블 */}
        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[650px]">
-                <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs font-bold tracking-wider">
-                    <tr>
-                        <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
-                        <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
-                        <th className="p-3 md:p-5 hidden sm:table-cell">소유자 / 차대번호</th>
-                        <th className="p-3 md:p-5 hidden md:table-cell">연식 / 연료</th>
-                        <th className="p-3 md:p-5 text-right">취득가액</th>
-                        <th className="p-3 md:p-5 text-center">관리</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {cars.map((car) => (
-                        <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-blue-50/30 transition-colors cursor-pointer">
-                            <td className="p-3 md:p-5 pl-4 md:pl-8">
-                                <div className="w-14 h-10 bg-gray-100 rounded border overflow-hidden">
-                                    {car.registration_image_url ?
-                                        (car.registration_image_url.endsWith('.pdf') ?
-                                            <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-xs">PDF</div> :
-                                            <img src={car.registration_image_url} className="w-full h-full object-cover" />
-                                        ) :
-                                        <div className="flex items-center justify-center h-full text-gray-300"><Icons.File /></div>
-                                    }
-                                </div>
-                            </td>
-                            <td className="p-3 md:p-5">
-                                <div className="font-black text-gray-900 text-lg">{car.number}</div>
-                                <div className="text-gray-500 text-sm font-medium">
-                                    <span className="text-blue-600 font-bold mr-1">{car.brand}</span>
-                                    {car.model}
-                                </div>
-                            </td>
-                            <td className="p-3 md:p-5 hidden sm:table-cell">
-                                <div className="text-gray-900 font-bold">{car.owner_name || '-'}</div>
-                                <div className="text-xs text-gray-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-gray-100 select-all">
-                                    {car.vin || '-'}
-                                </div>
-                            </td>
-                            <td className="p-3 md:p-5 hidden md:table-cell">
-                                <div className="flex flex-wrap gap-1">
-                                    <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.fuel_type === '전기' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type || '기타'}</span>
-                                </div>
-                            </td>
-                            <td className="p-3 md:p-5 text-right font-bold text-gray-700">{f(car.purchase_price)}원</td>
-                            <td className="p-3 md:p-5 text-center">
-                                <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
-                            </td>
-                        </tr>
-                    ))}
-                    {cars.length === 0 && <tr><td colSpan={6} className="p-20 text-center text-gray-400"><div className="flex flex-col items-center gap-3"><Icons.Search /><p>등록된 차량이 없습니다.</p></div></td></tr>}
-                </tbody>
-            </table>
-         </div>
+         {cars.length === 0 ? (
+           <div className="p-20 text-center text-gray-400">
+             <div className="flex flex-col items-center gap-3"><Icons.Search /><p>등록된 차량이 없습니다.</p></div>
+           </div>
+         ) : (
+           <>
+             {/* Desktop Table View */}
+             <div className="hidden md:block">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse min-w-[650px]">
+                     <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs font-bold tracking-wider">
+                         <tr>
+                             <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
+                             <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
+                             <th className="p-3 md:p-5">소유자 / 차대번호</th>
+                             <th className="p-3 md:p-5">연식 / 연료</th>
+                             <th className="p-3 md:p-5 text-right">취득가액</th>
+                             <th className="p-3 md:p-5 text-center">관리</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y divide-gray-100">
+                         {cars.map((car) => (
+                             <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-blue-50/30 transition-colors cursor-pointer">
+                                 <td className="p-3 md:p-5 pl-4 md:pl-8">
+                                     <div className="w-14 h-10 bg-gray-100 rounded border overflow-hidden">
+                                         {car.registration_image_url ?
+                                             (car.registration_image_url.endsWith('.pdf') ?
+                                                 <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-xs">PDF</div> :
+                                                 <img src={car.registration_image_url} className="w-full h-full object-cover" />
+                                             ) :
+                                             <div className="flex items-center justify-center h-full text-gray-300"><Icons.File /></div>
+                                         }
+                                     </div>
+                                 </td>
+                                 <td className="p-3 md:p-5">
+                                     <div className="font-black text-gray-900 text-lg">{car.number}</div>
+                                     <div className="text-gray-500 text-sm font-medium">
+                                         <span className="text-blue-600 font-bold mr-1">{car.brand}</span>
+                                         {car.model}
+                                     </div>
+                                 </td>
+                                 <td className="p-3 md:p-5">
+                                     <div className="text-gray-900 font-bold">{car.owner_name || '-'}</div>
+                                     <div className="text-xs text-gray-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-gray-100 select-all">
+                                         {car.vin || '-'}
+                                     </div>
+                                 </td>
+                                 <td className="p-3 md:p-5">
+                                     <div className="flex flex-wrap gap-1">
+                                         <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
+                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.fuel_type === '전기' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type || '기타'}</span>
+                                     </div>
+                                 </td>
+                                 <td className="p-3 md:p-5 text-right font-bold text-gray-700">{f(car.purchase_price)}원</td>
+                                 <td className="p-3 md:p-5 text-center">
+                                     <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
+                                 </td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+               </div>
+             </div>
+
+             {/* Mobile Card View */}
+             <div className="md:hidden divide-y divide-gray-100">
+               {cars.map((car) => (
+                 <div key={car.id} className="p-4 flex items-center gap-3">
+                   <div className="w-12 h-10 bg-gray-100 rounded border overflow-hidden flex-shrink-0" onClick={() => router.push(`/registration/${car.id}`)}>
+                     {car.registration_image_url ?
+                       (car.registration_image_url.endsWith('.pdf') ?
+                         <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-[10px]">PDF</div> :
+                         <img src={car.registration_image_url} className="w-full h-full object-cover" />
+                       ) :
+                       <div className="flex items-center justify-center h-full text-gray-300"><Icons.File /></div>
+                     }
+                   </div>
+                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/registration/${car.id}`)}>
+                     <div className="font-black text-gray-900">{car.number}</div>
+                     <div className="text-xs text-gray-500 truncate">
+                       <span className="text-blue-600 font-bold">{car.brand}</span> {car.model}
+                     </div>
+                     <div className="flex gap-1 mt-1">
+                       {car.year && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold">{car.year}년</span>}
+                       {car.fuel_type && <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.fuel_type === '전기' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type}</span>}
+                     </div>
+                   </div>
+                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                     <span className="font-bold text-gray-700 text-sm">{f(car.purchase_price)}원</span>
+                     <button onClick={(e) => handleDelete(car.id, e)} className="p-1.5 text-gray-300 hover:text-red-500 rounded"><Icons.Trash /></button>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           </>
+         )}
        </div>
 
        {/* 결과 모달 */}

@@ -134,7 +134,7 @@ export default function QuoteDetailPage() {
             <button
                 onClick={handleCreateContract}
                 disabled={creating}
-                className="bg-indigo-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black shadow-lg"
+                className="bg-steel-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black shadow-lg"
             >
                 {creating ? '처리 중...' : '🚀 이 견적으로 계약 확정'}
             </button>

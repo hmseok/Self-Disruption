@@ -51,10 +51,10 @@ const [email, setEmail] = useState('')
 
         {/* 헤더 */}
         <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-2xl mb-4">📩</div>
+            <div className="mx-auto w-16 h-16 bg-steel-50 rounded-full flex items-center justify-center text-2xl mb-4">📩</div>
             <h3 className="text-2xl font-black text-gray-900">새로운 멤버 초대</h3>
             <p className="text-sm text-gray-500 mt-2">
-                <span className="font-bold text-indigo-600">{companyName}</span>의 가족이 될 분을 초대합니다.
+                <span className="font-bold text-steel-600">{companyName}</span>의 가족이 될 분을 초대합니다.
             </p>
         </div>
 
@@ -66,7 +66,7 @@ const [email, setEmail] = useState('')
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold focus:bg-white transition-colors"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-steel-500 font-bold focus:bg-white transition-colors"
               placeholder="member@company.com"
             />
           </div>
@@ -79,7 +79,7 @@ const [email, setEmail] = useState('')
                 type="text"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold focus:bg-white transition-colors"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-steel-500 font-bold focus:bg-white transition-colors"
                 placeholder="예: 영업1팀"
                 />
             </div>
@@ -90,7 +90,7 @@ const [email, setEmail] = useState('')
                 type="text"
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold focus:bg-white transition-colors"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-steel-500 font-bold focus:bg-white transition-colors"
                 placeholder="예: 대리"
                 />
             </div>
@@ -103,7 +103,7 @@ const [email, setEmail] = useState('')
                 <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold cursor-pointer appearance-none"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-steel-500 font-bold cursor-pointer appearance-none"
                 >
                 <option value="manager">🛠️ 매니저 (자금/인사 외 모든 권한)</option>
                 <option value="staff">👤 일반 직원 (본인 업무만)</option>
@@ -128,7 +128,7 @@ const [email, setEmail] = useState('')
           <button
             onClick={handleInvite}
             disabled={loading}
-            className="flex-1 py-3.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:bg-gray-300 flex items-center justify-center gap-2"
+            className="flex-1 py-3.5 rounded-xl font-bold text-white bg-steel-600 hover:bg-steel-700 shadow-lg shadow-steel-200 transition-all disabled:bg-gray-300 flex items-center justify-center gap-2"
           >
             {loading ? '처리 중...' : '🚀 초대장 보내기'}
           </button>

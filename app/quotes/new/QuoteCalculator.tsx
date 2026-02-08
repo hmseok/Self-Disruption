@@ -2,9 +2,12 @@
 import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '../../context/AppContext'
 
 export default function QuoteCalculatorPage() {
   const router = useRouter()
+  const { company, role, adminSelectedCompanyId } = useApp()
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const [loading, setLoading] = useState(false)
 
   // --- 공통 코드 (연료, 색상 등) ---
@@ -116,6 +119,7 @@ export default function QuoteCalculatorPage() {
 
   // --- 견적 저장 ---
   const handleSaveQuote = async () => {
+    if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
     if (!selectedCar) return alert('차량을 선택해주세요.')
     if (!selectedCustomerName) return alert('고객을 선택해주세요.')
 
@@ -127,7 +131,8 @@ export default function QuoteCalculatorPage() {
         end_date: new Date(new Date().setMonth(new Date().getMonth() + term)).toISOString().split('T')[0],
         deposit: deposit,
         rent_fee: final_rent_fee,
-        status: 'active'
+        status: 'active',
+        company_id: effectiveCompanyId
     }])
 
     if (error) alert('저장 실패: ' + error.message)
@@ -167,7 +172,7 @@ export default function QuoteCalculatorPage() {
           <div className="bg-white p-6 rounded-3xl border shadow-sm">
             <label className="block text-sm font-bold text-gray-500 mb-2">대상 차량 선택</label>
             <select
-                className="w-full p-4 border-2 border-indigo-100 rounded-xl font-bold text-lg bg-indigo-50 focus:border-indigo-500 outline-none"
+                className="w-full p-4 border-2 border-steel-100 rounded-xl font-bold text-lg bg-steel-50 focus:border-steel-500 outline-none"
                 onChange={(e) => handleCarSelect(e.target.value)}
             >
                 <option value="">차량을 선택하세요</option>

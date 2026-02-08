@@ -3,7 +3,7 @@ import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState } from 'react'
 export default function CustomerPage() {
-  const { company, role } = useApp()
+  const { company, role, adminSelectedCompanyId } = useApp()
 const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -21,7 +21,9 @@ const [customers, setCustomers] = useState<any[]>([])
 
     let query = supabase.from('customers').select('*')
 
-    if (role !== 'god_admin' && company) {
+    if (role === 'god_admin') {
+      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
+    } else if (company) {
       query = query.eq('company_id', company.id)
     }
 
@@ -30,13 +32,17 @@ const [customers, setCustomers] = useState<any[]>([])
     setLoading(false)
   }
 
-  useEffect(() => { fetchCustomers() }, [company, role])
+  useEffect(() => { fetchCustomers() }, [company, role, adminSelectedCompanyId])
+
+  // 현재 사용할 company_id 결정
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   // 고객 저장
   const handleSave = async () => {
+    if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
     if (!form.name) return alert('고객 이름은 필수입니다.')
 
-    const { error } = await supabase.from('customers').insert([form])
+    const { error } = await supabase.from('customers').insert([{ ...form, company_id: effectiveCompanyId }])
 
     if (error) alert('저장 실패: ' + error.message)
     else {
@@ -107,7 +113,7 @@ const [customers, setCustomers] = useState<any[]>([])
                     {customers.map(cust => (
                         <li key={cust.id} className="p-5 hover:bg-gray-50 flex justify-between items-center group">
                             <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${cust.type === '법인' ? 'bg-indigo-500' : 'bg-green-500'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${cust.type === '법인' ? 'bg-steel-500' : 'bg-green-500'}`}>
                                     {cust.name.substring(0,1)}
                                 </div>
                                 <div>

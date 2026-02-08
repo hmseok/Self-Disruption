@@ -18,6 +18,13 @@ type AppContextType = {
   permissions: PagePermission[]
   loading: boolean
   refreshAuth: () => Promise<void>     // 외부에서 새로고침 호출용
+  // god_admin 회사 선택 기능
+  allCompanies: any[]
+  adminSelectedCompanyId: string | null  // null = 전체, string = 특정 회사
+  setAdminSelectedCompanyId: (id: string | null) => void
+  // 사이드바 메뉴 새로고침 트리거
+  menuRefreshKey: number
+  triggerMenuRefresh: () => void
 }
 
 const AppContext = createContext<AppContextType>({
@@ -30,6 +37,11 @@ const AppContext = createContext<AppContextType>({
   permissions: [],
   loading: true,
   refreshAuth: async () => {},
+  allCompanies: [],
+  adminSelectedCompanyId: null,
+  setAdminSelectedCompanyId: () => {},
+  menuRefreshKey: 0,
+  triggerMenuRefresh: () => {},
 })
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -42,6 +54,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [permissions, setPermissions] = useState<PagePermission[]>([])
   const [loading, setLoading] = useState(true)
 
+  // god_admin 회사 선택 상태
+  const [allCompanies, setAllCompanies] = useState<any[]>([])
+  const [adminSelectedCompanyId, setAdminSelectedCompanyId] = useState<string | null>(null)
+
+  // 사이드바 메뉴 새로고침 키
+  const [menuRefreshKey, setMenuRefreshKey] = useState(0)
+  const triggerMenuRefresh = () => setMenuRefreshKey(prev => prev + 1)
+
   // 세션 없을 때 상태 초기화
   const clearState = () => {
     setUser(null)
@@ -51,6 +71,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPosition(null)
     setDepartment(null)
     setPermissions([])
+    setAllCompanies([])
+    setAdminSelectedCompanyId(null)
   }
 
   const fetchSession = async () => {
@@ -96,6 +118,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPermissions(permsData || [])
         }
         // god_admin이나 master는 권한 테이블 없어도 전체 허용 (usePermission에서 처리)
+
+        // god_admin: 전체 회사 목록 로드
+        if (profileData.role === 'god_admin') {
+          const { data: companiesData } = await supabase
+            .from('companies')
+            .select('id, name, plan, is_active')
+            .eq('is_active', true)
+            .order('name')
+          setAllCompanies(companiesData || [])
+        }
       } else {
         setRole('user')
       }
@@ -142,6 +174,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       permissions,
       loading,
       refreshAuth: fetchSession,
+      allCompanies,
+      adminSelectedCompanyId,
+      setAdminSelectedCompanyId,
+      menuRefreshKey,
+      triggerMenuRefresh,
     }}>
       {children}
     </AppContext.Provider>

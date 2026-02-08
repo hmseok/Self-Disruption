@@ -21,7 +21,7 @@ type Car = {
 
 export default function CarListPage() {
 const router = useRouter()
-const { company, role } = useApp()
+const { company, role, adminSelectedCompanyId } = useApp()
 
   const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +37,9 @@ const { company, role } = useApp()
         .from('cars') // 👈 여기가 핵심! vehicles -> cars 로 수정
         .select('*')
 
-      if (role !== 'god_admin' && company) {
+      if (role === 'god_admin') {
+        if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
+      } else if (company) {
         query = query.eq('company_id', company.id)
       }
 
@@ -51,7 +53,7 @@ const { company, role } = useApp()
       setLoading(false)
     }
     fetchCars()
-  }, [company, role])
+  }, [company, role, adminSelectedCompanyId])
 
   // 🔥 필터링 + 검색 로직
   const filteredCars = cars.filter(car => {
@@ -79,7 +81,7 @@ const { company, role } = useApp()
         <div>
           <h1 className="text-xl md:text-3xl font-black text-gray-900">🚙 차량 관리 대장</h1>
           <p className="text-gray-500 mt-1 md:mt-2 text-sm">
-            총 보유: <span className="font-bold text-indigo-600">{cars.length}</span>대 /
+            총 보유: <span className="font-bold text-steel-600">{cars.length}</span>대 /
             검색됨: {filteredCars.length}대
           </p>
         </div>
@@ -89,7 +91,7 @@ const { company, role } = useApp()
             <input
                 type="text"
                 placeholder="🔍 검색..."
-                className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl flex-1 md:flex-none md:min-w-[250px] focus:outline-none focus:border-indigo-500 shadow-sm text-sm"
+                className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl flex-1 md:flex-none md:min-w-[250px] focus:outline-none focus:border-steel-500 shadow-sm text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -115,7 +117,7 @@ const { company, role } = useApp()
                 onClick={()=>setFilter(t.key)}
                 className={`px-3 md:px-6 py-2.5 md:py-3 font-bold text-xs md:text-sm border-b-2 transition-colors whitespace-nowrap ${
                     filter === t.key
-                    ? 'border-indigo-600 text-indigo-600'
+                    ? 'border-steel-600 text-steel-600'
                     : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}
             >
@@ -125,70 +127,98 @@ const { company, role } = useApp()
       </div>
 
       {/* 📋 리스트형 테이블 */}
-      <div className="bg-white shadow-sm border border-t-0 border-gray-200 rounded-b-xl overflow-x-auto">
+      <div className="bg-white shadow-sm border border-t-0 border-gray-200 rounded-b-xl overflow-hidden">
         {loading ? (
             <div className="p-20 text-center text-gray-400 flex flex-col items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
                 차량 데이터를 불러오는 중...
             </div>
+        ) : filteredCars.length === 0 ? (
+            <div className="p-12 md:p-20 text-center text-gray-400 text-sm">
+                {searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
+            </div>
         ) : (
-          <table className="w-full text-left border-collapse min-w-[560px]">
-            <thead className="bg-gray-50 text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-wider border-b border-gray-100">
-                <tr>
-                    <th className="p-3 md:p-4">차량번호</th>
-                    <th className="p-3 md:p-4">차종</th>
-                    <th className="p-3 md:p-4 hidden sm:table-cell">연식</th>
-                    <th className="p-3 md:p-4 text-center">상태</th>
-                    <th className="p-3 md:p-4 text-right hidden sm:table-cell">취득가액</th>
-                    <th className="p-3 md:p-4 text-center hidden md:table-cell">등록일</th>
-                </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-                {filteredCars.map((car) => (
-                    <tr
-                        key={car.id}
-                        className="hover:bg-indigo-50 cursor-pointer transition-colors group"
-                    >
-                        <td className="p-3 md:p-4 font-black text-gray-900 text-sm md:text-lg group-hover:text-indigo-600">
-                            {car.number}
-                        </td>
-                        <td className="p-3 md:p-4">
-                            <div className="font-bold text-gray-800 text-xs md:text-sm">{car.brand}</div>
-                            <div className="text-[10px] md:text-xs text-gray-500">{car.model}</div>
-                        </td>
-                        <td className="p-3 md:p-4 text-xs md:text-sm font-medium text-gray-600 hidden sm:table-cell">
-                            {car.year}년
-                            <span className="text-[10px] text-gray-400 block">{car.fuel}</span>
-                        </td>
-                        <td className="p-3 md:p-4 text-center">
-                            <span className={`px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
-                                car.status === 'available' ? 'bg-green-100 text-green-700' :
-                                car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
-                                'bg-red-100 text-red-600'
-                            }`}>
-                                {car.status === 'available' ? '대기' :
-                                 car.status === 'rented' ? '대여' :
-                                 car.status}
-                            </span>
-                        </td>
-                        <td className="p-3 md:p-4 text-right font-bold text-gray-700 text-xs md:text-sm hidden sm:table-cell">
-                            {formatMoney(car.purchase_price)}원
-                        </td>
-                        <td className="p-3 md:p-4 text-center text-xs text-gray-400 hidden md:table-cell">
-                            {car.created_at.split('T')[0]}
-                        </td>
-                    </tr>
-                ))}
-
-                {filteredCars.length === 0 && (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[560px]">
+                <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                     <tr>
-                        <td colSpan={6} className="p-12 md:p-20 text-center text-gray-400 text-sm">
-                            {searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
-                        </td>
+                        <th className="p-3 md:p-4">차량번호</th>
+                        <th className="p-3 md:p-4">차종</th>
+                        <th className="p-3 md:p-4">연식</th>
+                        <th className="p-3 md:p-4 text-center">상태</th>
+                        <th className="p-3 md:p-4 text-right">취득가액</th>
+                        <th className="p-3 md:p-4 text-center">등록일</th>
                     </tr>
-                )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {filteredCars.map((car) => (
+                        <tr
+                            key={car.id}
+                            className="hover:bg-steel-50 cursor-pointer transition-colors group"
+                        >
+                            <td className="p-3 md:p-4 font-black text-gray-900 text-sm md:text-lg group-hover:text-steel-600">
+                                {car.number}
+                            </td>
+                            <td className="p-3 md:p-4">
+                                <div className="font-bold text-gray-800 text-xs md:text-sm">{car.brand}</div>
+                                <div className="text-[10px] md:text-xs text-gray-500">{car.model}</div>
+                            </td>
+                            <td className="p-3 md:p-4 text-xs md:text-sm font-medium text-gray-600">
+                                {car.year}년
+                                <span className="text-[10px] text-gray-400 block">{car.fuel}</span>
+                            </td>
+                            <td className="p-3 md:p-4 text-center">
+                                <span className={`px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
+                                    car.status === 'available' ? 'bg-green-100 text-green-700' :
+                                    car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-red-100 text-red-600'
+                                }`}>
+                                    {car.status === 'available' ? '대기' :
+                                     car.status === 'rented' ? '대여' :
+                                     car.status}
+                                </span>
+                            </td>
+                            <td className="p-3 md:p-4 text-right font-bold text-gray-700 text-xs md:text-sm">
+                                {formatMoney(car.purchase_price)}원
+                            </td>
+                            <td className="p-3 md:p-4 text-center text-xs text-gray-400">
+                                {car.created_at.split('T')[0]}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {filteredCars.map((car) => (
+                <div key={car.id} className="p-4 active:bg-steel-50 cursor-pointer">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-black text-gray-900 text-base">{car.number}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        <span className="font-bold text-steel-600">{car.brand}</span> {car.model}
+                      </div>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      car.status === 'available' ? 'bg-green-100 text-green-700' :
+                      car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
+                      'bg-red-100 text-red-600'
+                    }`}>
+                      {car.status === 'available' ? '대기' : car.status === 'rented' ? '대여' : car.status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2 text-xs">
+                    <span className="text-gray-400">{car.year}년 · {car.fuel}</span>
+                    <span className="font-bold text-gray-700">{formatMoney(car.purchase_price)}원</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

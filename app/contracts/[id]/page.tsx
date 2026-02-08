@@ -51,7 +51,7 @@ export default function ContractDetailPage() {
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-8 pb-6 border-b">
         <div>
-          <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">계약 관리</span>
+          <span className="text-sm font-bold text-steel-600 bg-steel-50 px-2 py-1 rounded">계약 관리</span>
           <h1 className="text-3xl font-black mt-2">{contract.customer_name}님 계약 현황</h1>
           <p className="text-gray-500 mt-1">{contract.car?.number} ({contract.car?.model})</p>
         </div>

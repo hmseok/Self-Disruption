@@ -130,7 +130,7 @@ function UploadContent() {
       </div>
 
       <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-          className={`max-w-6xl mx-auto relative border-2 border-dashed rounded-3xl p-10 text-center mb-8 transition-all duration-300 group ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-indigo-300'}`}>
+          className={`max-w-6xl mx-auto relative border-2 border-dashed rounded-3xl p-10 text-center mb-8 transition-all duration-300 group ${isDragging ? 'border-steel-500 bg-steel-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-steel-300'}`}>
           <input type="file" multiple accept=".xlsx, .xls, .csv, image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           <div className="pointer-events-none">
               <span className="text-4xl mb-2 block">📂</span>
@@ -154,13 +154,13 @@ function UploadContent() {
                   <div className="flex items-center gap-4">
                       <h3 className="font-bold text-lg text-gray-800">✅ 분석 결과 ({results.length}건)</h3>
                       <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50">
-                          <input type="checkbox" checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" />
+                          <input type="checkbox" checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} className="w-4 h-4 text-steel-600 rounded focus:ring-steel-500" />
                           <span className="text-sm font-bold text-gray-700">⚡️ 동일 내역 일괄 변경</span>
                       </label>
                   </div>
                   <div className="flex gap-2">
                       <button onClick={clearResults} className="text-red-500 font-bold px-4 hover:text-red-700 text-sm">전체 취소</button>
-                      <button onClick={handleBulkSave} className="bg-indigo-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-black shadow-md">💾 전체 저장</button>
+                      <button onClick={handleBulkSave} className="bg-steel-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-black shadow-md">💾 전체 저장</button>
                   </div>
               </div>
 
@@ -181,7 +181,7 @@ function UploadContent() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {results.map((item) => (
-                            <tr key={item.id} className="hover:bg-indigo-50/50 transition-colors">
+                            <tr key={item.id} className="hover:bg-steel-50/50 transition-colors">
                                 <td className="p-3 text-center"><button onClick={() => saveRuleToDb(item)} className="text-gray-300 hover:text-yellow-500 text-lg">⭐</button></td>
                                 <td className="p-3"><input value={item.transaction_date} onChange={e=>handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} className="bg-transparent w-24 outline-none text-gray-700"/></td>
                                 <td className="p-3">
@@ -194,7 +194,7 @@ function UploadContent() {
                                     )}
                                 </td>
                                 <td className="p-3"><input value={item.client_name} onChange={e=>handleUpdateItem(item.id, 'client_name', e.target.value, item)} className="w-full bg-transparent outline-none font-bold text-gray-800"/></td>
-                                <td className="p-3"><input value={item.description} onChange={e=>handleUpdateItem(item.id, 'description', e.target.value, item)} className="w-full bg-white border border-gray-100 rounded px-2 py-1 outline-none text-xs text-gray-600 focus:border-indigo-300"/></td>
+                                <td className="p-3"><input value={item.description} onChange={e=>handleUpdateItem(item.id, 'description', e.target.value, item)} className="w-full bg-white border border-gray-100 rounded px-2 py-1 outline-none text-xs text-gray-600 focus:border-steel-300"/></td>
                                 <td className="p-3">
                                     <select value={item.category} onChange={e=>handleUpdateItem(item.id, 'category', e.target.value, item)} className="bg-white border border-gray-200 px-2 py-1.5 rounded text-gray-700 font-bold w-32 text-xs outline-none">
                                         <option value="기타">기타</option>

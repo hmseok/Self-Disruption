@@ -2,6 +2,7 @@
 import { supabase } from '../../../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useApp } from '../../../context/AppContext'
 // 👇 [경로 유지] 기존 파일과 동일하게 설정
 import GeneralContract from '../../../components/GeneralContract'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
@@ -20,6 +21,8 @@ const KOREAN_BANKS = [
 export default function GeneralInvestDetail() {
   const router = useRouter()
   const params = useParams()
+  const { company, role, adminSelectedCompanyId } = useApp()
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const isNew = params.id === 'new'
   const id = isNew ? null : params.id
 
@@ -121,6 +124,7 @@ export default function GeneralInvestDetail() {
   }
 
   const handleSave = async () => {
+    if (isNew && role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
     // 🚨 [수정] 투자금(invest_amount) 필수 해제 -> 투자자 이름만 있으면 저장 가능
     if (!item.investor_name) return alert('투자자 성명은 필수입니다.')
 
@@ -135,6 +139,7 @@ export default function GeneralInvestDetail() {
     payload.interest_rate = Number(payload.interest_rate)
     payload.payment_day = Number(payload.payment_day)
 
+    if (isNew) payload.company_id = effectiveCompanyId
     const query = isNew
         ? supabase.from('general_investments').insert(payload)
         : supabase.from('general_investments').update(payload).eq('id', id)
@@ -266,7 +271,7 @@ export default function GeneralInvestDetail() {
                         <div className="space-y-4">
                             <h3 className="font-bold text-lg text-gray-900 border-b pb-2 pt-2 flex items-center gap-2">
                                 2. 투자 조건 및 자금 현황
-                                {!isNew && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">통장 연동됨</span>}
+                                {!isNew && <span className="text-xs bg-steel-100 text-steel-700 px-2 py-1 rounded-md">통장 연동됨</span>}
                             </h3>
 
                             {/* 📊 자금 비교 카드 UI */}
@@ -329,7 +334,7 @@ export default function GeneralInvestDetail() {
             </div>
 
             <div className="pt-4">
-                <button onClick={handleSave} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 transition-all">
+                <button onClick={handleSave} className="w-full bg-steel-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-steel-700 transition-all">
                     {isNew ? '✨ 투자 등록 완료' : '💾 정보 수정 저장'}
                 </button>
             </div>
@@ -355,7 +360,7 @@ export default function GeneralInvestDetail() {
                             {item.signed_file_url ? '📩 다운로드 링크 발송' : '🔗 계약서 발송'}
                         </button>
 
-                        <button onClick={() => setShowSignPad(true)} className="bg-white text-indigo-900 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:text-indigo-700 border border-gray-200 flex items-center justify-center gap-2 transition-all">
+                        <button onClick={() => setShowSignPad(true)} className="bg-white text-steel-900 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:text-steel-700 border border-gray-200 flex items-center justify-center gap-2 transition-all">
                             ✍️ 직접 서명
                         </button>
                         <button onClick={() => setShowPreview(true)} className="bg-white text-gray-700 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md border border-gray-200 flex items-center justify-center gap-2 transition-all">
@@ -381,7 +386,7 @@ export default function GeneralInvestDetail() {
                                     <p className="text-sm text-gray-500">법적 효력이 있는 전자 계약서입니다.</p>
                                 </div>
                                 <div className="space-y-3 w-full md:w-2/3">
-                                    <a href={item.signed_file_url} target="_blank" className="block w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-center hover:bg-indigo-700 shadow-md transition-all">
+                                    <a href={item.signed_file_url} target="_blank" className="block w-full bg-steel-600 text-white py-3 rounded-xl font-bold text-center hover:bg-steel-700 shadow-md transition-all">
                                         ⬇️ 파일 다운로드
                                     </a>
                                     <button onClick={() => { if(confirm('파일을 삭제합니까?')) setItem({...item, signed_file_url: ''}) }} className="w-full px-4 border border-red-200 text-red-500 rounded-xl font-bold hover:bg-red-50 py-3 transition-all">
@@ -403,12 +408,12 @@ export default function GeneralInvestDetail() {
         {/* 직접 서명 화면 (전체화면) */}
         {showSignPad && (
             <div className="fixed inset-0 z-[9999] bg-gray-100 flex flex-col">
-                <div className="bg-indigo-900 text-white p-4 flex justify-between items-center shadow-md z-10">
+                <div className="bg-steel-900 text-white p-4 flex justify-between items-center shadow-md z-10">
                     <div>
                         <h3 className="font-bold text-lg">관리자 직접 서명</h3>
-                        <p className="text-xs text-indigo-200">내용을 확인하고 서명해주세요.</p>
+                        <p className="text-xs text-steel-200">내용을 확인하고 서명해주세요.</p>
                     </div>
-                    <button onClick={() => setShowSignPad(false)} className="text-white bg-indigo-800 hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold">닫기 ✕</button>
+                    <button onClick={() => setShowSignPad(false)} className="text-white bg-steel-800 hover:bg-steel-700 px-4 py-2 rounded-lg font-bold">닫기 ✕</button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto bg-gray-500 p-4">
@@ -431,7 +436,7 @@ export default function GeneralInvestDetail() {
                     </div>
                     <div className="flex gap-3">
                         <button onClick={() => sigCanvas.current.clear()} className="flex-1 bg-gray-200 py-4 rounded-xl font-bold text-gray-700">지우기</button>
-                        <button onClick={saveSignature} disabled={uploading} className="flex-[2] bg-indigo-600 py-4 rounded-xl font-bold text-white shadow-lg">
+                        <button onClick={saveSignature} disabled={uploading} className="flex-[2] bg-steel-600 py-4 rounded-xl font-bold text-white shadow-lg">
                             {uploading ? '처리 중...' : '서명 완료'}
                         </button>
                     </div>

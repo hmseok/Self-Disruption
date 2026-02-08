@@ -158,13 +158,21 @@ function AuthPage() {
     }
   }
 
-  // 이미 로그인된 사용자 → 바로 이동
+  // 이미 로그인된 사용자 → 바로 이동 + 로그인 이벤트 자동 감지
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) router.replace('/dashboard')
     }
     checkSession()
+
+    // 로그인 이벤트 감지 → 자동 리다이렉트 (dev login 등 모든 방식 대응)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        router.replace('/dashboard')
+      }
+    })
+    return () => { subscription.unsubscribe() }
   }, [router])
 
   // 인증 대기 화면: 폴링으로 인증 완료 감지 → verified 뷰로 전환
@@ -423,8 +431,8 @@ function AuthPage() {
       'outlook.com': { name: 'Outlook', url: 'https://outlook.live.com', color: 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100' },
       'hotmail.com': { name: 'Outlook', url: 'https://outlook.live.com', color: 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100' },
       'live.com': { name: 'Outlook', url: 'https://outlook.live.com', color: 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100' },
-      'yahoo.com': { name: 'Yahoo Mail', url: 'https://mail.yahoo.com', color: 'bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100' },
-      'yahoo.co.kr': { name: 'Yahoo Mail', url: 'https://mail.yahoo.com', color: 'bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100' },
+      'yahoo.com': { name: 'Yahoo Mail', url: 'https://mail.yahoo.com', color: 'bg-sky-50 text-sky-600 border-sky-100 hover:bg-sky-100' },
+      'yahoo.co.kr': { name: 'Yahoo Mail', url: 'https://mail.yahoo.com', color: 'bg-sky-50 text-sky-600 border-sky-100 hover:bg-sky-100' },
     }
 
     return mailServices[domain] || null
@@ -493,8 +501,8 @@ function AuthPage() {
       <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white flex-col justify-between p-14 relative overflow-hidden">
 
         {/* 배경 장식 */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-steel-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-steel-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
         <div className="absolute inset-0 shimmer-bg"></div>
 
         {/* 상단 */}
@@ -508,14 +516,14 @@ function AuthPage() {
 
           <div className="space-y-6">
             <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/20 rounded-full text-[11px] font-bold tracking-wider uppercase text-blue-300 border border-blue-500/20">
-                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse-slow"></span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-steel-500/20 rounded-full text-[11px] font-bold tracking-wider uppercase text-steel-300 border border-steel-500/20">
+                <span className="w-1.5 h-1.5 bg-steel-400 rounded-full animate-pulse-slow"></span>
                 Enterprise Platform
               </span>
             </div>
             <h1 className="text-4xl font-black leading-[1.15] tracking-tight">
               Smart Mobility<br/>
-              Business Solution<span className="text-blue-400">.</span>
+              Business Solution<span className="text-steel-400">.</span>
             </h1>
             <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
               중고차 렌터카 운영에 필요한 모든 것을 하나의 플랫폼에서.<br/>
@@ -566,7 +574,7 @@ function AuthPage() {
                   <div className="absolute -top-2 -right-2 w-5 h-5 text-amber-400 animate-pulse-slow" style={{ animationDelay: '0.2s' }}>
                     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.5 5.5L17 9l-5.5 1.5L10 16l-1.5-5.5L3 9l5.5-1.5L10 2z"/></svg>
                   </div>
-                  <div className="absolute -bottom-1 -left-1 w-4 h-4 text-blue-400 animate-pulse-slow" style={{ animationDelay: '0.5s' }}>
+                  <div className="absolute -bottom-1 -left-1 w-4 h-4 text-steel-400 animate-pulse-slow" style={{ animationDelay: '0.5s' }}>
                     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.5 5.5L17 9l-5.5 1.5L10 16l-1.5-5.5L3 9l5.5-1.5L10 2z"/></svg>
                   </div>
                 </div>
@@ -632,12 +640,12 @@ function AuthPage() {
               {/* 상단 아이콘 */}
               <div className="flex justify-center mb-8">
                 <div className="relative">
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-3xl flex items-center justify-center animate-float">
-                    <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <div className="w-24 h-24 bg-gradient-to-br from-steel-50 to-steel-100 rounded-3xl flex items-center justify-center animate-float">
+                    <svg className="w-12 h-12 text-steel-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                     </svg>
                   </div>
-                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center animate-ring-pulse">
+                  <div className="absolute -top-1 -right-1 w-7 h-7 bg-steel-600 rounded-full flex items-center justify-center animate-ring-pulse">
                     <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"/>
                     </svg>
@@ -655,8 +663,8 @@ function AuthPage() {
 
               {/* 실시간 감지 상태 표시 */}
               <div className="flex items-center justify-center gap-2 mb-8">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-blue-600 font-medium">인증 완료를 자동으로 감지 중...</span>
+                <div className="w-2 h-2 bg-steel-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-steel-600 font-medium">인증 완료를 자동으로 감지 중...</span>
               </div>
 
               {/* 안내 Steps */}
@@ -690,7 +698,7 @@ function AuthPage() {
                 <button
                   onClick={handleVerifyAndLogin}
                   disabled={loading}
-                  className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-steel-700 text-white font-bold rounded-xl hover:bg-steel-800 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75"/></svg> 확인 중...</>
@@ -989,7 +997,7 @@ function AuthPage() {
                 {/* 제출 버튼 */}
                 <button
                   disabled={loading}
-                  className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-900/20 hover:shadow-slate-900/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
+                  className="w-full py-4 bg-gradient-to-r from-steel-700 to-steel-800 hover:from-steel-800 hover:to-steel-900 text-white font-bold rounded-xl text-sm shadow-lg shadow-steel-700/25 hover:shadow-steel-800/35 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
                 >
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75"/></svg> 처리 중...</>
@@ -1021,7 +1029,7 @@ function AuthPage() {
                     setDupCheck({ email: null, phone: null, companyName: null, businessNumber: null })
                     handleFileRemove()
                   }}
-                  className="ml-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                  className="ml-2 text-sm font-bold text-steel-600 hover:text-steel-800 transition-colors"
                 >
                   {view === 'login' ? '계정 생성하기' : '로그인'}
                 </button>

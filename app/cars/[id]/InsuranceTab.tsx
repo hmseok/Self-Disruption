@@ -105,7 +105,7 @@ export default function InsuranceTab({ carId }: { carId : string }) {
             </div>
           </div>
 
-          <button onClick={handleSave} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md">
+          <button onClick={handleSave} className="w-full py-3 bg-steel-600 text-white font-bold rounded-xl hover:bg-steel-700 transition-colors shadow-md">
             보험 정보 저장하기
           </button>
         </div>
@@ -120,11 +120,11 @@ export default function InsuranceTab({ carId }: { carId : string }) {
           </div>
         ) : (
           contracts.map(contract => (
-            <div key={contract.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:border-indigo-300 transition-colors relative group">
+            <div key={contract.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:border-steel-300 transition-colors relative group">
               <button onClick={() => handleDelete(contract.id)} className="absolute top-4 right-4 text-gray-300 hover:text-red-500 font-bold text-xs border px-2 py-1 rounded">삭제</button>
 
               <div className="flex items-center gap-2 mb-2">
-                <span className="font-bold text-lg text-indigo-900">{contract.company}</span>
+                <span className="font-bold text-lg text-steel-900">{contract.company}</span>
                 <span className={`text-xs px-2 py-0.5 rounded ${new Date(contract.end_date) < new Date() ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600 font-bold'}`}>
                   {new Date(contract.end_date) < new Date() ? '만료됨' : '진행중'}
                 </span>

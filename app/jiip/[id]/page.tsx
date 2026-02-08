@@ -356,7 +356,7 @@ const router = useRouter()
             <div className="space-y-4">
                 <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
                     3. 계약 조건 및 자금 현황
-                    {!isNew && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md">통장 연동됨</span>}
+                    {!isNew && <span className="text-xs bg-steel-100 text-steel-700 px-2 py-1 rounded-md">통장 연동됨</span>}
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -374,7 +374,7 @@ const router = useRouter()
                             {/* pr-10 추가하여 숫자와 글자 겹침 방지 */}
                             <input
                                 type="text"
-                                className="w-full border-2 border-gray-300 p-3 pr-10 rounded-xl text-right font-black text-lg focus:border-indigo-500 outline-none text-gray-700"
+                                className="w-full border-2 border-gray-300 p-3 pr-10 rounded-xl text-right font-black text-lg focus:border-steel-500 outline-none text-gray-700"
                                 value={item.invest_amount.toLocaleString()}
                                 onChange={e => handleMoneyChange('invest_amount', e.target.value)}
                                 placeholder="0"
@@ -444,7 +444,7 @@ const router = useRouter()
                         {item.signed_file_url ? '📩 다운로드 링크 발송' : '🔗 계약서 발송'}
                      </button>
 
-                     <button onClick={() => setShowSignPad(true)} className="bg-white text-indigo-900 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:text-indigo-700 border border-gray-200 flex items-center justify-center gap-2 transition-all">
+                     <button onClick={() => setShowSignPad(true)} className="bg-white text-steel-900 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md hover:text-steel-700 border border-gray-200 flex items-center justify-center gap-2 transition-all">
                         ✍️ 직접 서명
                      </button>
                      <button onClick={() => setShowPreview(true)} className="bg-white text-gray-700 py-4 rounded-2xl font-bold text-lg shadow-sm hover:shadow-md border border-gray-200 flex items-center justify-center gap-2 transition-all">
@@ -466,7 +466,7 @@ const router = useRouter()
                                 <p className="text-sm text-gray-500">차주 서명과 회사 직인이 포함된 법적 효력이 있는 파일입니다.</p>
                             </div>
                             <div className="space-y-3 w-full md:w-2/3">
-                                <a href={item.signed_file_url} target="_blank" className="block w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-center hover:bg-indigo-700 shadow-md">
+                                <a href={item.signed_file_url} target="_blank" className="block w-full bg-steel-600 text-white py-3 rounded-xl font-bold text-center hover:bg-steel-700 shadow-md">
                                     ⬇️ 파일 다운로드
                                 </a>
                                 <button onClick={() => { if(confirm('파일을 삭제합니까?')) setItem({...item, signed_file_url: ''}) }} className="w-full px-4 border border-red-200 text-red-500 rounded-xl font-bold hover:bg-red-50 py-3">
@@ -488,12 +488,12 @@ const router = useRouter()
       {/* 🌟 직접 서명 화면 (하단 잘림 방지 적용) */}
       {showSignPad && (
         <div className="fixed inset-0 z-[9999] bg-gray-100 flex flex-col">
-            <div className="bg-indigo-900 text-white p-4 flex justify-between items-center shadow-md z-10">
+            <div className="bg-steel-900 text-white p-4 flex justify-between items-center shadow-md z-10">
                 <div>
                     <h3 className="font-bold text-lg">관리자 직접 서명</h3>
-                    <p className="text-xs text-indigo-200">내용을 확인하고 서명해주세요.</p>
+                    <p className="text-xs text-steel-200">내용을 확인하고 서명해주세요.</p>
                 </div>
-                <button onClick={() => setShowSignPad(false)} className="text-white bg-indigo-800 hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold">닫기 ✕</button>
+                <button onClick={() => setShowSignPad(false)} className="text-white bg-steel-800 hover:bg-steel-700 px-4 py-2 rounded-lg font-bold">닫기 ✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto bg-gray-500 p-4">
@@ -517,7 +517,7 @@ const router = useRouter()
                 </div>
                 <div className="flex gap-3">
                     <button onClick={() => sigCanvas.current.clear()} className="flex-1 bg-gray-200 py-4 rounded-xl font-bold text-gray-700">지우기</button>
-                    <button onClick={saveSignature} disabled={uploading} className="flex-[2] bg-indigo-600 py-4 rounded-xl font-bold text-white shadow-lg">
+                    <button onClick={saveSignature} disabled={uploading} className="flex-[2] bg-steel-600 py-4 rounded-xl font-bold text-white shadow-lg">
                         {uploading ? '처리 중...' : '서명 완료'}
                     </button>
                 </div>

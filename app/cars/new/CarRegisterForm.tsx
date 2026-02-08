@@ -2,10 +2,13 @@
 import { supabase } from '../../utils/supabase'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '../../context/AppContext'
 import { CommonCode } from '@/types/database' // 타입 경로 확인해주세요
 
 export default function CarRegisterForm() {
   const router = useRouter()
+  const { company, role, adminSelectedCompanyId } = useApp()
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const [loading, setLoading] = useState(false)
 
   // 1. 공통 코드 담을 그릇
@@ -42,12 +45,14 @@ export default function CarRegisterForm() {
   const getCodes = (category: string) => commonCodes.filter(c => c.category === category)
 
   const handleSave = async () => {
+    if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
     if (!car.number || !car.model || !car.fuel) return alert('필수 정보를 입력해주세요.')
 
     setLoading(true)
     const { error } = await supabase.from('cars').insert([{
       ...car,
-      status: 'available' // 등록하면 바로 '대기중' 상태
+      status: 'available',
+      company_id: effectiveCompanyId
     }])
 
     if (error) {

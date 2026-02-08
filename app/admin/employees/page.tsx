@@ -20,7 +20,7 @@ type ActiveModule = { path: string; name: string; group: string }
 
 // 모듈 path → 그룹 매핑
 const MODULE_GROUPS: Record<string, string> = {
-  '/cars': '차량 자산', '/registration': '차량 자산', '/insurance': '차량 자산',
+  '/registration': '차량 자산', '/insurance': '차량 자산',
   '/quotes': '대고객 영업', '/customers': '대고객 영업', '/contracts': '대고객 영업',
   '/jiip': '파트너 자금', '/invest': '파트너 자금', '/loans': '파트너 자금',
   '/finance': '경영 지원', '/finance/upload': '경영 지원',
@@ -34,7 +34,7 @@ type PermMatrix = {
 }
 
 export default function OrgManagementPage() {
-  const { company, role } = useApp()
+  const { company, role, adminSelectedCompanyId } = useApp()
 
   const [employees, setEmployees] = useState<any[]>([])
   const [positions, setPositions] = useState<Position[]>([])
@@ -57,32 +57,26 @@ export default function OrgManagementPage() {
   const [selectedPosition, setSelectedPosition] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
-  // god_admin 전용: 회사 선택
-  const [allCompanies, setAllCompanies] = useState<any[]>([])
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
-
-  const activeCompanyId = role === 'god_admin' ? selectedCompanyId : company?.id
+  // 사이드바 회사 선택 기준으로 activeCompanyId 결정
+  const activeCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   useEffect(() => {
-    const init = async () => {
-      if (role === 'god_admin') {
-        const { data } = await supabase.from('companies').select('*').eq('is_active', true).order('name')
-        setAllCompanies(data || [])
-        if (data && data.length > 0) setSelectedCompanyId(data[0].id)
-        else setLoading(false)
-      } else if (company) {
+    if (role === 'god_admin') {
+      if (adminSelectedCompanyId) {
+        setSelectedPosition('')
         loadAll()
+      } else {
+        // 회사 미선택 시 초기화
+        setEmployees([])
+        setPositions([])
+        setDepartments([])
+        setActiveModules([])
+        setLoading(false)
       }
-    }
-    init()
-  }, [company, role])
-
-  useEffect(() => {
-    if (role === 'god_admin' && selectedCompanyId) {
-      setSelectedPosition('')
+    } else if (company) {
       loadAll()
     }
-  }, [selectedCompanyId])
+  }, [company, role, adminSelectedCompanyId])
 
   const loadAll = async () => {
     setLoading(true)
@@ -262,7 +256,7 @@ export default function OrgManagementPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
       </div>
     )
   }
@@ -278,26 +272,19 @@ export default function OrgManagementPage() {
       <div className="max-w-7xl mx-auto">
 
         {/* 헤더 */}
-        <div className="mb-6 flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
-            <p className="text-slate-500 mt-1">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
-          </div>
-          {role === 'god_admin' && allCompanies.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-bold text-slate-500">회사:</label>
-              <select
-                value={selectedCompanyId}
-                onChange={e => setSelectedCompanyId(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold bg-white min-w-[200px]"
-              >
-                {allCompanies.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+        <div className="mb-6">
+          <h1 className="text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
+          <p className="text-slate-500 mt-1">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
+          {role === 'god_admin' && !adminSelectedCompanyId && (
+            <div className="mt-4 p-4 bg-sky-50 border border-sky-200 rounded-xl">
+              <p className="text-sm font-bold text-sky-700">사이드바에서 회사를 선택해주세요.</p>
+              <p className="text-xs text-sky-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
             </div>
           )}
         </div>
+
+        {/* god_admin 회사 미선택 시 여기서 멈춤 */}
+        {role === 'god_admin' && !adminSelectedCompanyId ? null : (<>
 
         {/* 탭 */}
         <div className="flex gap-2 mb-6">
@@ -389,7 +376,7 @@ export default function OrgManagementPage() {
                           </td>
                           <td className="p-4">
                             <span className={`text-xs font-bold px-2 py-1 rounded ${
-                              emp.role === 'god_admin' ? 'bg-purple-100 text-purple-700' :
+                              emp.role === 'god_admin' ? 'bg-sky-100 text-sky-700' :
                               emp.role === 'master' ? 'bg-blue-100 text-blue-700' :
                               'bg-slate-100 text-slate-600'
                             }`}>{emp.role === 'god_admin' ? 'GOD ADMIN' : emp.role === 'master' ? '관리자' : '직원'}</span>
@@ -639,6 +626,7 @@ export default function OrgManagementPage() {
           </div>
         )}
 
+        </>)}
       </div>
     </div>
   )

@@ -38,7 +38,7 @@ type PlatformStats = {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, company, role, position, loading: appLoading } = useApp()
+  const { user, company, role, position, loading: appLoading, adminSelectedCompanyId, allCompanies } = useApp()
   const [stats, setStats] = useState<DashboardStats>({
     totalCars: 0, availableCars: 0, rentedCars: 0, maintenanceCars: 0,
     totalCustomers: 0, activeInvestments: 0, totalInvestAmount: 0, jiipContracts: 0,
@@ -65,18 +65,26 @@ export default function DashboardPage() {
     if (appLoading) return
     if (!user) return
     fetchDashboardData()
-  }, [appLoading, user, company, role])
+  }, [appLoading, user, company, role, adminSelectedCompanyId])
 
   // 모듈 활성화 체크 헬퍼
-  const hasModule = (path: string) => role === 'god_admin' || activeModules.has(path)
+  // god_admin이 회사를 선택한 경우 → 해당 회사의 활성 모듈 기준
+  // god_admin이 회사 미선택 → 플랫폼 대시보드(이 함수 사용 안함)
+  // 일반 사용자 → 자기 회사 활성 모듈 기준
+  const hasModule = (path: string) => {
+    if (role === 'god_admin' && !adminSelectedCompanyId) return true
+    return activeModules.has(path)
+  }
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
       const isGodAdmin = role === 'god_admin'
-      const companyId = company?.id
+      // god_admin이 특정 회사를 선택하면 해당 회사의 비즈니스 데이터 표시
+      const companyId = isGodAdmin ? adminSelectedCompanyId : company?.id
+      const showPlatformView = isGodAdmin && !adminSelectedCompanyId
 
-      if (isGodAdmin) {
+      if (showPlatformView) {
         // ========================================
         // god_admin: 플랫폼 통계만 로드
         // ========================================
@@ -136,6 +144,7 @@ export default function DashboardPage() {
         // ========================================
 
         // 활성 모듈 목록
+        setActiveModules(new Set()) // 초기화
         if (companyId) {
           const { data: companyModules } = await supabase
             .from('company_modules')
@@ -256,7 +265,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-steel-600 mx-auto mb-4"></div>
           <p className="text-gray-500 font-medium">로딩 중...</p>
         </div>
       </div>
@@ -272,7 +281,7 @@ export default function DashboardPage() {
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-            {getGreeting()}, <span className="text-indigo-600">{user?.email?.split('@')[0]}</span>
+            {getGreeting()}, <span className="text-steel-600">{user?.email?.split('@')[0]}</span>
           </h1>
         </div>
         <div className="bg-white rounded-2xl p-8 border border-yellow-200 shadow-sm text-center">
@@ -294,7 +303,7 @@ export default function DashboardPage() {
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-            {getGreeting()}, <span className="text-indigo-600">{company.name}</span>
+            {getGreeting()}, <span className="text-steel-600">{company.name}</span>
           </h1>
         </div>
         <div className="bg-white rounded-2xl p-10 border border-yellow-200 shadow-sm text-center">
@@ -318,9 +327,9 @@ export default function DashboardPage() {
   // ============================================
   // GOD ADMIN 대시보드
   // ============================================
-  if (role === 'god_admin') {
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
     const adminActions = [
-      { label: '회사/가입 관리', desc: '가입 승인 및 회사 관리', href: '/admin', icon: '🏢', color: 'from-purple-600 to-indigo-600' },
+      { label: '회사/가입 관리', desc: '가입 승인 및 회사 관리', href: '/admin', icon: '🏢', color: 'from-steel-600 to-steel-800' },
       { label: '모듈 구독관리', desc: '회사별 기능 ON/OFF', href: '/system-admin', icon: '⚡', color: 'from-yellow-500 to-orange-500' },
       { label: '조직/권한 관리', desc: '직원 및 권한 설정', href: '/admin/employees', icon: '👥', color: 'from-teal-500 to-cyan-500' },
     ]
@@ -336,11 +345,11 @@ export default function DashboardPage() {
                 {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
               </p>
               <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-                {getGreeting()}, <span className="text-purple-600">Platform Admin</span>
+                {getGreeting()}, <span className="text-sky-600">Platform Admin</span>
               </h1>
               <p className="text-gray-400 mt-1 text-sm">플랫폼 전체 현황을 확인하세요</p>
             </div>
-            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 self-start sm:self-auto">
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-sky-100 text-sky-700 self-start sm:self-auto">
               GOD ADMIN
             </span>
           </div>
@@ -348,22 +357,22 @@ export default function DashboardPage() {
 
         {/* 플랫폼 KPI 카드 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-          <div className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-purple-200 uppercase">등록 회사</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">등록 회사</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">🏢</span>
             </div>
-            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : platformStats.totalCompanies}<span className="text-sm md:text-base font-bold text-purple-200 ml-1">개</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-purple-200">활성 {platformStats.activeCompanies}개</p>
+            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : platformStats.totalCompanies}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">개</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">활성 {platformStats.activeCompanies}개</p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-steel-700 to-steel-900 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-blue-200 uppercase">전체 사용자</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">전체 사용자</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">👤</span>
             </div>
-            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : platformStats.totalUsers}<span className="text-sm md:text-base font-bold text-blue-200 ml-1">명</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-blue-200">가입된 전체 사용자</p>
+            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : platformStats.totalUsers}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">명</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">가입된 전체 사용자</p>
           </div>
 
           <div className={`rounded-2xl p-4 md:p-5 shadow-lg ${
@@ -447,7 +456,7 @@ export default function DashboardPage() {
 
         {/* 플랫폼 관리 바로가기 */}
         <div className="mb-8">
-          <h2 className="text-sm font-bold text-purple-500 uppercase tracking-wider mb-3">플랫폼 관리</h2>
+          <h2 className="text-sm font-bold text-sky-500 uppercase tracking-wider mb-3">플랫폼 관리</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {adminActions.map(action => (
               <Link
@@ -468,7 +477,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">활성 회사 현황</h2>
-              <Link href="/admin" className="text-xs text-indigo-500 hover:text-indigo-700 font-bold">
+              <Link href="/admin" className="text-xs text-steel-500 hover:text-steel-700 font-bold">
                 전체 관리 →
               </Link>
             </div>
@@ -534,17 +543,23 @@ export default function DashboardPage() {
   // ============================================
   // 회사 사용자 대시보드 (기존)
   // ============================================
+  // god_admin이 선택한 회사명 찾기
+  const selectedCompanyName = adminSelectedCompanyId
+    ? allCompanies.find((c: any) => c.id === adminSelectedCompanyId)?.name
+    : null
+
   const allQuickActions = [
-    { label: '차량 관리', desc: '차량 등록/조회', href: '/cars', icon: '🚗', color: 'from-blue-500 to-blue-600', modulePath: '/cars' },
+    { label: '등록/이전', desc: '차량 등록증 관리', href: '/registration', icon: '📄', color: 'from-blue-500 to-blue-600', modulePath: '/registration' },
+    { label: '보험/가입', desc: '보험 계약 관리', href: '/insurance', icon: '🛡️', color: 'from-teal-500 to-teal-600', modulePath: '/insurance' },
     { label: '고객 관리', desc: '고객 정보 관리', href: '/customers', icon: '👥', color: 'from-emerald-500 to-emerald-600', modulePath: '/customers' },
     { label: '견적/계약', desc: '견적서 작성', href: '/quotes', icon: '📋', color: 'from-amber-500 to-amber-600', modulePath: '/quotes' },
-    { label: '일반투자', desc: '투자 현황 관리', href: '/invest', icon: '💰', color: 'from-purple-500 to-purple-600', modulePath: '/invest' },
+    { label: '일반투자', desc: '투자 현황 관리', href: '/invest', icon: '💰', color: 'from-sky-500 to-sky-600', modulePath: '/invest' },
     { label: '지입투자', desc: '지입 계약 관리', href: '/jiip', icon: '🚛', color: 'from-rose-500 to-rose-600', modulePath: '/jiip' },
     { label: '재무관리', desc: '수입/지출 관리', href: '/finance', icon: '📊', color: 'from-cyan-500 to-cyan-600', modulePath: '/finance' },
   ]
   const quickActions = allQuickActions.filter(a => hasModule(a.modulePath))
 
-  const showCars = hasModule('/cars')
+  const showCars = hasModule('/registration') || hasModule('/insurance')
   const showCustomers = hasModule('/customers')
   const showInvest = hasModule('/invest') || hasModule('/jiip')
   const showFinance = hasModule('/finance') || hasModule('/quotes')
@@ -560,21 +575,28 @@ export default function DashboardPage() {
               {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
             </p>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-              {getGreeting()}, <span className="text-indigo-600">{company?.name || user?.email?.split('@')[0] || '사용자'}</span>
+              {getGreeting()}, <span className="text-steel-600">{selectedCompanyName || company?.name || user?.email?.split('@')[0] || '사용자'}</span>
             </h1>
-            <p className="text-gray-400 mt-1 text-sm">오늘의 업무 현황을 확인하세요</p>
+            <p className="text-gray-400 mt-1 text-sm">
+              {role === 'god_admin' && adminSelectedCompanyId ? '선택된 회사의 업무 현황입니다' : '오늘의 업무 현황을 확인하세요'}
+            </p>
           </div>
           <div className="flex gap-2 items-center">
-            {company?.plan && (
+            {role === 'god_admin' && (
+              <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">GOD ADMIN</span>
+            )}
+            {company?.plan && role !== 'god_admin' && (
               <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
                 company.plan === 'master' ? 'bg-yellow-100 text-yellow-700' :
                 company.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
                 'bg-gray-100 text-gray-500'
               }`}>{company.plan.toUpperCase()}</span>
             )}
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-              role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-            }`}>{role === 'master' ? '관리자' : '직원'}</span>
+            {role !== 'god_admin' && (
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+              }`}>{role === 'master' ? '관리자' : '직원'}</span>
+            )}
             {position && (
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{position.name}</span>
             )}
@@ -613,7 +635,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-2 md:mb-3">
                 <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">투자 유치</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-purple-50 flex items-center justify-center text-sm">💰</span>
+                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sm">💰</span>
               </div>
               <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : formatMoney(stats.totalInvestAmount)}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">원</span></p>
               <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">일반투자 {stats.activeInvestments}건 / 지입 {stats.jiipContracts}건</p>
@@ -694,12 +716,12 @@ export default function DashboardPage() {
           <div className={quickActions.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">최근 등록 차량</h2>
-              <Link href="/cars" className="text-xs text-indigo-500 hover:text-indigo-700 font-bold">전체 보기 →</Link>
+              <Link href="/registration" className="text-xs text-steel-500 hover:text-steel-700 font-bold">전체 보기 →</Link>
             </div>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
               {loading ? (
                 <div className="p-12 text-center text-gray-400">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-steel-600 mx-auto mb-2"></div>
                   로딩 중...
                 </div>
               ) : recentCars.length === 0 ? (
@@ -707,7 +729,7 @@ export default function DashboardPage() {
                   <p className="text-4xl mb-3">🚗</p>
                   <p className="text-gray-500 font-bold">등록된 차량이 없습니다</p>
                   <p className="text-gray-400 text-sm mt-1">차량 관리에서 첫 번째 차량을 등록해보세요</p>
-                  <Link href="/cars" className="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700">
+                  <Link href="/registration" className="inline-block mt-4 px-4 py-2 bg-steel-600 text-white text-sm font-bold rounded-lg hover:bg-steel-700">
                     차량 등록하기
                   </Link>
                 </div>
@@ -723,7 +745,7 @@ export default function DashboardPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {recentCars.map(car => (
-                      <tr key={car.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push(`/cars/${car.id}`)}>
+                      <tr key={car.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push(`/registration/${car.id}`)}>
                         <td className="p-3 md:p-4 font-black text-gray-900 text-sm">{car.number}</td>
                         <td className="p-3 md:p-4">
                           <span className="font-bold text-gray-700 text-xs md:text-sm">{car.brand}</span>

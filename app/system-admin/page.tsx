@@ -11,7 +11,7 @@ import { useApp } from '../context/AppContext'
 
 export default function SystemAdminPage() {
   const router = useRouter()
-  const { role, loading: appLoading } = useApp()
+  const { role, loading: appLoading, triggerMenuRefresh } = useApp()
 
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState<any[]>([])
@@ -70,6 +70,8 @@ export default function SystemAdminPage() {
     } else if (data && !data.success) {
       alert('설정 저장 실패: ' + (data.error || '알 수 없는 오류'))
       setMatrix((prev: any) => ({ ...prev, [key]: currentStatus }))
+    } else {
+      triggerMenuRefresh()
     }
   }
 
@@ -92,6 +94,8 @@ export default function SystemAdminPage() {
     } else if (data && !data.success) {
       alert('일괄 설정 실패: ' + (data.error || '알 수 없는 오류'))
       loadData()
+    } else {
+      triggerMenuRefresh()
     }
   }
 
@@ -106,7 +110,7 @@ export default function SystemAdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
       </div>
     )
   }
@@ -164,7 +168,7 @@ export default function SystemAdminPage() {
                 <div className="p-3 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
-                      comp.is_active ? 'bg-indigo-600' : 'bg-yellow-500'
+                      comp.is_active ? 'bg-steel-600' : 'bg-yellow-500'
                     }`}>
                       {comp.name[0]}
                     </div>

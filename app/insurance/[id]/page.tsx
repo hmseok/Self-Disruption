@@ -157,7 +157,7 @@ export default function InsuranceDetailPage() {
             <div className="lg:col-span-7 space-y-6">
 
                 {/* A. 계약 요약 카드 */}
-                <div className="bg-gradient-to-br from-blue-900 to-indigo-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="bg-gradient-to-br from-blue-900 to-steel-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10"><Icons.Money /></div>
                     <div className="grid grid-cols-2 gap-8 relative z-10">
                         <div>

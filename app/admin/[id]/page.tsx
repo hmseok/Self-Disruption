@@ -12,7 +12,7 @@ const [loading, setLoading] = useState(true)
   const stats = [
     { label: '총 보유 차량', value: '48대', change: '+2대 (전월 대비)', color: 'bg-blue-500' },
     { label: '현재 가동률', value: '82.5%', change: '-1.2% (전월 대비)', color: 'bg-green-500' },
-    { label: '이번 달 매출', value: '₩ 42,500,000', change: '+12% (전월 대비)', color: 'bg-purple-500' },
+    { label: '이번 달 매출', value: '₩ 42,500,000', change: '+12% (전월 대비)', color: 'bg-sky-500' },
     { label: '정비/사고', value: '3건', change: '조치 필요', color: 'bg-red-500' },
   ]
 

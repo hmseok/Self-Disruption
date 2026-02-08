@@ -37,11 +37,11 @@ export default function VerifiedPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/30 p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-steel-50/30 p-6">
       {/* 배경 장식 */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-100/30 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-steel-100/40 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-steel-100/30 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative z-10 bg-white p-10 rounded-3xl shadow-xl shadow-slate-200/50 max-w-md w-full border border-slate-100 animate-fade-in-up">
@@ -77,7 +77,7 @@ export default function VerifiedPage() {
         {/* 닫기 버튼 */}
         <button
           onClick={handleClose}
-          className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all text-sm flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gradient-to-r from-steel-700 to-steel-800 hover:from-steel-800 hover:to-steel-900 text-white font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-steel-700/25"
         >
           {closed ? '이 탭을 수동으로 닫아주세요' : '이 탭 닫기'}
         </button>

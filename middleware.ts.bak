@@ -1,0 +1,18 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+
+  // 세션 리프레시만 수행 (리다이렉트 하지 않음)
+  // 인증 체크는 클라이언트 사이드에서 처리 (AppContext, admin/layout.tsx)
+  await supabase.auth.getSession()
+
+  return res
+}
+
+export const config = {
+  matcher: ['/((?!_next|favicon|api|auth/callback).*)'],
+}

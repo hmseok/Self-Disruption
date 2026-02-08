@@ -62,7 +62,7 @@ export default function LoginModal({ isOpen, onClose }: Props) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder:text-gray-400"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-steel-500 focus:border-steel-500 outline-none transition-all text-gray-900 placeholder:text-gray-400"
               placeholder="admin@example.com"
               required
             />
@@ -74,7 +74,7 @@ export default function LoginModal({ isOpen, onClose }: Props) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-900 placeholder:text-gray-400"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-steel-500 focus:border-steel-500 outline-none transition-all text-gray-900 placeholder:text-gray-400"
               placeholder="••••••••"
               required
             />
@@ -83,7 +83,7 @@ export default function LoginModal({ isOpen, onClose }: Props) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            className="w-full bg-steel-600 hover:bg-steel-700 text-white font-bold py-3.5 rounded-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
             {loading ? '로그인 중...' : '로그인하기'}
           </button>

@@ -33,7 +33,7 @@ const Icons: any = {
 
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
-  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
+  '/insurance': 'vehicle', '/registration': 'vehicle',
   '/quotes': 'sales', '/customers': 'sales',
   '/finance': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
@@ -43,6 +43,7 @@ const PATH_TO_GROUP: Record<string, string> = {
 const NAME_OVERRIDES: Record<string, string> = {
   '/invest': '일반투자',
   '/jiip': '지입투자',
+  '/insurance': '보험/가입',
 }
 
 // 비즈니스 그룹 (표시 순서)
@@ -67,7 +68,7 @@ const SETTINGS_MENUS = [
 // ============================================
 // 메뉴 아이템 렌더링 헬퍼
 // ============================================
-function MenuItem({ item, pathname, purple }: { item: { name: string; path: string; iconKey: string }; pathname: string; purple?: boolean }) {
+function MenuItem({ item, pathname, accent }: { item: { name: string; path: string; iconKey: string }; pathname: string; accent?: boolean }) {
   const Icon = Icons[item.iconKey] || Icons.Doc
   const isActive = pathname === item.path ||
     (item.path !== '/admin' && pathname.startsWith(item.path + '/')) ||
@@ -78,12 +79,12 @@ function MenuItem({ item, pathname, purple }: { item: { name: string; path: stri
       href={item.path}
       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
         isActive
-          ? purple
-            ? 'bg-purple-600/20 text-purple-200'
-            : 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'
-          : purple
-            ? 'text-purple-300/60 hover:bg-purple-900/10 hover:text-purple-200'
-            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+          ? accent
+            ? 'bg-sky-600/20 text-sky-200'
+            : 'bg-steel-600 text-white shadow-sm shadow-steel-900/30'
+          : accent
+            ? 'text-sky-300/60 hover:bg-sky-900/10 hover:text-sky-200'
+            : 'text-steel-400 hover:bg-steel-900 hover:text-steel-200'
       }`}
     >
       <Icon />
@@ -98,7 +99,7 @@ function MenuItem({ item, pathname, purple }: { item: { name: string; path: stri
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, company, role, position, loading } = useApp()
+  const { user, company, role, position, loading, allCompanies, adminSelectedCompanyId, setAdminSelectedCompanyId, menuRefreshKey } = useApp()
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
@@ -121,21 +122,49 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     const fetchMenus = async () => {
       if (role === 'god_admin') {
-        const { data, error } = await supabase
-          .from('system_modules').select('*').order('path')
-        if (!error && data) {
-          const seen = new Set<string>()
-          const unique = data.filter((item: any) => {
-            if (seen.has(item.path)) return false
-            seen.add(item.path)
-            return true
-          })
-          setDynamicMenus(unique.map((item: any) => ({
-            id: item.id,
-            name: NAME_OVERRIDES[item.path] || item.name,
-            path: item.path,
-            iconKey: item.icon_key,
-          })))
+        if (adminSelectedCompanyId) {
+          // god_admin이 특정 회사 선택 → 해당 회사의 활성 모듈만 표시
+          const { data, error } = await supabase
+            .from('company_modules')
+            .select(`is_active, module:system_modules ( id, name, path, icon_key )`)
+            .eq('company_id', adminSelectedCompanyId)
+            .eq('is_active', true)
+
+          if (!error && data) {
+            const seen = new Set<string>()
+            setDynamicMenus(
+              data
+                .filter((item: any) => {
+                  if (seen.has(item.module.path)) return false
+                  seen.add(item.module.path)
+                  return true
+                })
+                .map((item: any) => ({
+                  id: item.module.id,
+                  name: NAME_OVERRIDES[item.module.path] || item.module.name,
+                  path: item.module.path,
+                  iconKey: item.module.icon_key,
+                }))
+            )
+          }
+        } else {
+          // god_admin 전체 보기 → 모든 모듈 표시
+          const { data, error } = await supabase
+            .from('system_modules').select('*').order('path')
+          if (!error && data) {
+            const seen = new Set<string>()
+            const unique = data.filter((item: any) => {
+              if (seen.has(item.path)) return false
+              seen.add(item.path)
+              return true
+            })
+            setDynamicMenus(unique.map((item: any) => ({
+              id: item.id,
+              name: NAME_OVERRIDES[item.path] || item.name,
+              path: item.path,
+              iconKey: item.icon_key,
+            })))
+          }
         }
         return
       }
@@ -167,7 +196,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       }
     }
     if (!loading && (company || role === 'god_admin')) fetchMenus()
-  }, [company, loading, role])
+  }, [company, loading, role, adminSelectedCompanyId, menuRefreshKey])
 
   // 로그인/인증 페이지 제외
   if (pathname === '/' || pathname.startsWith('/auth')) return <>{children}</>
@@ -196,7 +225,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* 모바일 토글 */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed top-4 left-4 z-30 lg:hidden bg-gray-900 text-white p-2 rounded-lg shadow-lg"
+        className="fixed top-4 left-4 z-30 lg:hidden bg-steel-950 text-white p-2 rounded-lg shadow-lg"
       >
         <Icons.Menu />
       </button>
@@ -208,22 +237,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       />
 
       {/* 사이드바 */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 bg-gray-900 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 bg-steel-950 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
-          <div className="px-5 py-4 flex items-center justify-between border-b border-gray-800">
+          <div className="px-5 py-4 flex items-center justify-between border-b border-steel-900">
             <span className="text-lg font-black text-white tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')}>
               Sideline
             </span>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 hover:text-white lg:hidden">
+            <button onClick={() => setIsSidebarOpen(false)} className="text-steel-500 hover:text-white lg:hidden">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
 
           {/* 워크스페이스 */}
           <div className="px-3 py-3">
-            <div className="bg-gray-800/60 rounded-lg px-3 py-3 border border-gray-700/40">
+            <div className="bg-steel-900/60 rounded-lg px-3 py-3 border border-steel-800/40">
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
                 <div className="text-white font-bold text-sm truncate">
@@ -233,13 +262,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0 ${
                     company.plan === 'master' ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white' :
                     company.plan === 'pro' ? 'bg-blue-500 text-white' :
-                    'bg-gray-600 text-gray-300'
+                    'bg-steel-700 text-steel-200'
                   }`}>
                     {company.plan === 'master' ? 'MASTER' : company.plan === 'pro' ? 'PRO' : 'FREE'}
                   </span>
                 )}
                 {role === 'god_admin' && (
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-600 text-white flex-shrink-0">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-600 text-white flex-shrink-0">
                     ADMIN
                   </span>
                 )}
@@ -247,9 +276,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               {/* 역할 + 직급 */}
               <div className="mt-2 flex gap-1 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                  role === 'god_admin' ? 'bg-purple-900/80 text-purple-300' :
+                  role === 'god_admin' ? 'bg-sky-900/80 text-sky-300' :
                   role === 'master' ? 'bg-blue-900/80 text-blue-300' :
-                  'bg-gray-700 text-gray-400'
+                  'bg-steel-800 text-steel-400'
                 }`}>
                   {role === 'god_admin' ? 'GOD ADMIN' : role === 'master' ? '관리자' : '직원'}
                 </span>
@@ -273,6 +302,25 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             </div>
           </div>
 
+          {/* god_admin 회사 선택 */}
+          {role === 'god_admin' && allCompanies.length > 0 && (
+            <div className="px-3 pb-3">
+              <div className="bg-sky-900/30 rounded-lg px-3 py-2.5 border border-sky-700/30">
+                <label className="text-[9px] font-bold text-sky-400 uppercase tracking-wider block mb-1.5">회사 선택</label>
+                <select
+                  value={adminSelectedCompanyId || ''}
+                  onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
+                  className="w-full bg-steel-900 text-white text-xs font-bold rounded-md px-2 py-1.5 border border-steel-700 focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  <option value="">전체 보기</option>
+                  {allCompanies.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* 메뉴 영역 */}
           <nav className="flex-1 px-3 overflow-y-auto">
 
@@ -282,8 +330,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 href="/dashboard"
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
                   pathname === '/dashboard'
-                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                    ? 'bg-steel-600 text-white shadow-sm shadow-steel-900/30'
+                    : 'text-steel-400 hover:bg-steel-900 hover:text-steel-200'
                 }`}
               >
                 <Icons.Home />
@@ -295,7 +343,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             {businessGroups.map(group => (
               <div key={group.id} className="mb-3">
                 <div className="px-3 mb-1">
-                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{group.label}</span>
+                  <span className="text-[10px] font-bold text-steel-500 uppercase tracking-wider">{group.label}</span>
                 </div>
                 <div className="space-y-0.5">
                   {group.items.map(item => (
@@ -307,17 +355,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
             {/* 구분선 + 관리 영역 */}
             {(showPlatform || showSettings) && (
-              <div className="border-t border-gray-800 mt-3 pt-3">
+              <div className="border-t border-steel-900 mt-3 pt-3">
 
                 {/* 플랫폼 관리 (god_admin) */}
                 {showPlatform && (
                   <div className="mb-3">
                     <div className="px-3 mb-1">
-                      <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">플랫폼</span>
+                      <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">플랫폼</span>
                     </div>
                     <div className="space-y-0.5">
                       {PLATFORM_MENUS.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} purple />
+                        <MenuItem key={item.path} item={item} pathname={pathname} accent />
                       ))}
                     </div>
                   </div>
@@ -327,7 +375,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 {showSettings && (
                   <div className="mb-3">
                     <div className="px-3 mb-1">
-                      <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">설정</span>
+                      <span className="text-[10px] font-bold text-steel-500 uppercase tracking-wider">설정</span>
                     </div>
                     <div className="space-y-0.5">
                       {SETTINGS_MENUS.map(item => (
@@ -341,16 +389,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </nav>
 
           {/* 유저 정보 */}
-          <div className="p-3 border-t border-gray-800">
+          <div className="p-3 border-t border-steel-900">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-steel-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
                 {user?.email?.[0]?.toUpperCase()}
               </div>
               <div className="overflow-hidden flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-gray-300">{user?.email}</p>
+                <p className="text-xs font-medium truncate text-steel-300">{user?.email}</p>
                 <button
                   onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
-                  className="text-[10px] text-gray-500 hover:text-red-400 transition-colors"
+                  className="text-[10px] text-steel-500 hover:text-red-400 transition-colors"
                 >
                   로그아웃
                 </button>

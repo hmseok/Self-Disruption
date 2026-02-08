@@ -53,7 +53,7 @@ export default function AdminDashboard() {
         <button
           // 👇 [추가 3] 버튼 누르면 모달 열기
           onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors"
+          className="bg-steel-600 hover:bg-steel-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors"
         >
           + 회사 강제 등록
         </button>
@@ -67,7 +67,7 @@ export default function AdminDashboard() {
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="text-gray-500 text-sm">활성 구독 (유료)</div>
-          <div className="text-3xl font-bold mt-2 text-indigo-600">
+          <div className="text-3xl font-bold mt-2 text-steel-600">
             {companies.filter(c => c.plan !== 'free').length}개
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function AdminDashboard() {
                   <td className="px-6 py-4">{company.business_number || '-'}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium
-                      ${company.plan === 'master' ? 'bg-purple-100 text-purple-700' :
+                      ${company.plan === 'master' ? 'bg-sky-100 text-sky-700' :
                         company.plan === 'pro' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                       {(company.plan || 'free').toUpperCase()}
                     </span>
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
                     {new Date(company.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-indigo-600 hover:text-indigo-900 font-medium text-xs hover:underline">
+                    <button className="text-steel-600 hover:text-steel-900 font-medium text-xs hover:underline">
                       상세보기
                     </button>
                   </td>

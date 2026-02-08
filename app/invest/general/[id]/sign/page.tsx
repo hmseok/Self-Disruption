@@ -134,7 +134,7 @@ export default function GeneralGuestSignPage() {
                     서명이 포함된 계약서를<br/>확인하고 다운로드하세요.
                 </p>
                 <div className="space-y-3">
-                    <a href={alreadySignedUrl!} target="_blank" rel="noopener noreferrer" className="block w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700">
+                    <a href={alreadySignedUrl!} target="_blank" rel="noopener noreferrer" className="block w-full bg-steel-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-steel-700">
                         📄 계약서 다운로드
                     </a>
                     <button onClick={handleCloseWindow} className="w-full bg-gray-100 text-gray-600 py-4 rounded-xl font-bold hover:bg-gray-200">
@@ -158,9 +158,9 @@ export default function GeneralGuestSignPage() {
       </div>
 
       {/* 헤더 */}
-      <div className="bg-indigo-900 text-white p-4 text-center flex-none shadow-md z-10">
+      <div className="bg-steel-900 text-white p-4 text-center flex-none shadow-md z-10">
           <h1 className="font-bold text-lg">투자 계약 서명</h1>
-          <p className="text-xs text-indigo-200 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
+          <p className="text-xs text-steel-200 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
       </div>
 
       {/* 계약서 미리보기 (스크롤 영역) */}
@@ -204,7 +204,7 @@ export default function GeneralGuestSignPage() {
 
           <div className="flex gap-3">
               <button onClick={() => sigCanvas.current.clear()} className="flex-1 bg-gray-200 py-4 rounded-xl font-bold text-gray-700">지우기</button>
-              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-indigo-600 py-4 rounded-xl font-bold text-white shadow-lg">
+              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-steel-600 py-4 rounded-xl font-bold text-white shadow-lg">
                   서명 제출하기
               </button>
           </div>

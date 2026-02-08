@@ -48,7 +48,7 @@ export default function UploadWidget() {
               <div className="flex items-center gap-3">
                 <div className={`
                   w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-sm border border-black/5
-                  ${status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-indigo-50 text-indigo-600'}
+                  ${status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-steel-50 text-steel-600'}
                 `}>
                   {status === 'processing' && <span className="animate-spin">⚡️</span>}
                   {status === 'paused' && '⏸️'}
@@ -74,13 +74,13 @@ export default function UploadWidget() {
                   <span className="text-[10px] font-black tracking-wider text-gray-500 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-100">
                     FILE {currentFileIndex + 1}/{totalFiles || 1}
                   </span>
-                  <span className="text-sm font-black text-indigo-600">{Math.round(progress)}%</span>
+                  <span className="text-sm font-black text-steel-600">{Math.round(progress)}%</span>
                </div>
                <p className="text-sm font-bold text-gray-800 truncate">{currentFileName || '준비 중...'}</p>
             </div>
 
             <div className="relative w-full bg-gray-100 rounded-full h-2 mb-4 overflow-hidden border border-gray-100">
-              <div className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
+              <div className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-steel-500 via-steel-500 to-steel-600 transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:gap-3">
@@ -96,7 +96,7 @@ export default function UploadWidget() {
               {status === 'completed' && (
                 <>
                   <button onClick={closeWidget} className="py-2.5 rounded-xl text-sm font-bold text-gray-500 bg-gray-100">닫기</button>
-                  <button onClick={() => router.push('/finance/upload')} className="py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white shadow-lg">결과 보기 ➔</button>
+                  <button onClick={() => router.push('/finance/upload')} className="py-2.5 rounded-xl text-sm font-bold bg-steel-600 text-white shadow-lg">결과 보기 ➔</button>
                 </>
               )}
             </div>
