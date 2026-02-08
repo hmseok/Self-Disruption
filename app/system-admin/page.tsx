@@ -33,7 +33,7 @@ export default function SystemAdminPage() {
     // 1. 보안 검사: god_admin만 접근 가능
     if (role !== 'god_admin') {
       alert('접근 권한이 없습니다. (시스템 총괄 전용)')
-      router.replace('/cars')
+      router.replace('/dashboard')
       return
     }
 

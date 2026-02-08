@@ -6,26 +6,56 @@ import { supabase } from '../../utils/supabase'
 type Props = {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void // 등록 성공하면 목록 새로고침 하라고 알려줌
+  onSuccess: () => void
 }
 
 export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false)
+  const [statusMsg, setStatusMsg] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     business_number: '',
-    plan: 'free', // 기본값
+    plan: 'free',
   })
 
   if (!isOpen) return null
 
+  // 모듈 자동 활성화
+  const activateModules = async (companyId: string) => {
+    setStatusMsg('모듈 활성화 중...')
+
+    // 전체 system_modules 가져오기
+    const { data: modules, error } = await supabase
+      .from('system_modules').select('id, path')
+
+    if (error || !modules) {
+      console.error('모듈 로드 실패:', error)
+      return
+    }
+
+    // 모든 플랜에서 전체 모듈 활성화 (플랜별 제한은 추후 구독 관리에서)
+    const records = modules.map(m => ({
+      company_id: companyId,
+      module_id: m.id,
+      is_active: true,
+    }))
+
+    const { error: insertError } = await supabase
+      .from('company_modules').insert(records)
+
+    if (insertError) {
+      console.error('모듈 활성화 실패:', insertError)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setStatusMsg('회사 등록 중...')
 
     try {
-      // 1. 회사 정보 insert
-      const { error } = await supabase
+      // 1. 회사 정보 insert (.select()로 생성된 ID 받아오기)
+      const { data: newCompany, error } = await supabase
         .from('companies')
         .insert({
           name: formData.name,
@@ -33,20 +63,27 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
           plan: formData.plan,
           is_active: true
         })
+        .select('id')
+        .single()
 
       if (error) throw error
 
-      alert('회사가 성공적으로 등록되었습니다!')
-      onSuccess() // 부모 컴포넌트(대시보드)에게 "새로고침해!" 신호 보냄
-      onClose()   // 모달 닫기
+      // 2. 모듈 자동 활성화
+      if (newCompany?.id) {
+        await activateModules(newCompany.id)
+      }
 
-      // 폼 초기화
+      alert('회사가 등록되고 모듈이 자동 활성화되었습니다!')
+      onSuccess()
+      onClose()
+
       setFormData({ name: '', business_number: '', plan: 'free' })
 
     } catch (error: any) {
       alert('등록 실패: ' + error.message)
     } finally {
       setLoading(false)
+      setStatusMsg('')
     }
   }
 
@@ -111,7 +148,7 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
               disabled={loading}
               className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
             >
-              {loading ? '등록 중...' : '등록하기'}
+              {loading ? (statusMsg || '등록 중...') : '등록하기'}
             </button>
           </div>
         </form>

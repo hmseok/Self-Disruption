@@ -29,7 +29,7 @@ export default function AdminLayout({
 
     // god_admin 또는 master만 접근 가능
     if (role !== 'god_admin' && role !== 'master') {
-      router.replace('/cars')
+      router.replace('/dashboard')
       return
     }
 

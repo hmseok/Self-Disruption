@@ -1,0 +1,82 @@
+## 구현 계획: 신규 가입 회사 자동 설정 + 워크스페이스 카드 개선 + 대시보드 개선
+
+### 문제 현황
+1. 신규 가입 회사에 모듈이 자동 활성화 안 됨 → god_admin이 수동으로 켜줘야 함
+2. 사이드바 워크스페이스 카드에 "로딩 중..." 표시, 구독 플랜 정보 없음
+3. 대시보드가 god_admin과 회사 사용자 구분이 약함
+
+---
+
+### 1단계: 신규 회사 가입 시 모듈 자동 활성화 (AddCompanyModal.tsx)
+
+**파일:** `app/components/admin/AddCompanyModal.tsx`
+
+회사 INSERT 성공 후, 기본 모듈(차량, 영업, 재무 등)을 자동으로 company_modules에 INSERT:
+- free 플랜: 기본 모듈만 (cars, customers, quotes, finance)
+- pro 플랜: 기본 + 투자/지입/보험/대출/DB
+- master 플랜: 전체 모듈
+
+**파일:** `migration_auto_modules.sql` (Supabase 트리거)
+
+Supabase에 DB 트리거를 만들어서, 프론트엔드를 거치지 않는 가입(이메일 인증 후 자동 생성)에서도 모듈이 자동 활성화되도록 함.
+
+---
+
+### 2단계: 사이드바 워크스페이스 카드 개선 (ClientLayout.tsx)
+
+**파일:** `app/components/auth/ClientLayout.tsx`
+
+현재:
+```
+Platform Admin
+[GOD ADMIN]
+```
+또는:
+```
+로딩 중...
+[USER] [FREE]
+```
+
+개선:
+```
+(주)라이드모빌리티          ← 회사명
+Master · 대표이사           ← 역할 + 직급
+[PRO] 구독 중               ← 플랜 배지
+```
+
+- AppContext에서 company.plan 정보를 가져와서 표시
+- 플랜별 색상: free(회색), pro(파란), master(금색)
+- 역할 + 직급명 한 줄에 표시
+
+---
+
+### 3단계: 대시보드 역할별 분리 (dashboard/page.tsx)
+
+**파일:** `app/dashboard/page.tsx`
+
+**회사 사용자 대시보드 개선:**
+- 상단에 회사명 크게 + 구독 플랜 배지
+- 이미 있는 KPI 카드 + 경영 현황판 유지
+- 빠른 이동에 활성화된 모듈만 표시 (비활성 모듈은 숨김)
+
+**god_admin 대시보드 개선:**
+- 전체 회사 수, 전체 사용자 수 KPI 추가
+- 최근 가입 회사 리스트 표시
+- 기존 플랫폼 관리 액션 유지
+
+---
+
+### 4단계: AppContext에 plan 정보 추가
+
+**파일:** `app/context/AppContext.tsx`
+
+company 객체에 `plan` 필드가 이미 포함되어 있는지 확인하고, 없으면 select에 추가.
+
+---
+
+### 수정 파일 목록
+1. `app/components/admin/AddCompanyModal.tsx` — 모듈 자동 활성화 로직 추가
+2. `app/components/auth/ClientLayout.tsx` — 워크스페이스 카드 개선
+3. `app/dashboard/page.tsx` — 역할별 대시보드 개선
+4. `app/context/AppContext.tsx` — plan 정보 확인/추가
+5. `migration_auto_modules.sql` — (선택) DB 트리거로 자동 모듈 활성화

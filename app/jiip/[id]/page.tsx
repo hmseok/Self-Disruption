@@ -1,9 +1,8 @@
 'use client'
 import { supabase } from '../../utils/supabase'
-// 1. 맨 위에 이 import 문을 추가하세요
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-// 👇 [경로 유지] 기존 파일과 동일하게 설정
+import { useApp } from '../../context/AppContext'
 import ContractPaper from '../../components/ContractPaper'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'
@@ -21,6 +20,7 @@ const KOREAN_BANKS = [
 export default function JiipDetailPage() {
 const router = useRouter()
   const params = useParams()
+  const { company, role } = useApp()
   const isNew = params.id === 'new'
   const jiipId = isNew ? null : params.id
 
@@ -99,27 +99,23 @@ const router = useRouter()
   }, [item.contract_start_date])
 
   const fetchCars = async () => {
-      console.log('🚗 차량 데이터 로딩 시작...')
+      let query = supabase
+            .from('cars')
+            .select('id, number, brand, model, company_id')
 
-      // supabase 변수가 잘 있는지 확인
-      if (!supabase) {
-        console.error('❌ Supabase 클라이언트가 없습니다!')
-        return
+      // god_admin은 전체, 일반 사용자는 본인 회사 차량만
+      if (role !== 'god_admin' && company?.id) {
+        query = query.eq('company_id', company.id)
       }
 
-      const { data, error } = await supabase
-            .from('cars')
-            // 👇 [수정] company_id를 꼭 추가해야 합니다!
-            .select('id, number, brand, model, company_id')
-            .order('number', { ascending: true })
+      const { data, error } = await query.order('number', { ascending: true })
 
       if (error) {
-              console.error('❌ 차량 불러오기 에러:', error.message)
-            } else {
-              console.log('✅ 불러온 차량 데이터:', data)
-              setCars(data || [])
-            }
-        } // 👈 ✅ 여기에 중괄호를 하나 꼭 넣어주세요! (fetchCars 끝)
+        console.error('차량 불러오기 에러:', error.message)
+      } else {
+        setCars(data || [])
+      }
+  }
 
   // 🏦 [NEW] 실제 통장 입금액 합산 함수
   const fetchRealDeposit = async () => {

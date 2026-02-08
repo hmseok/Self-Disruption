@@ -92,7 +92,7 @@ function AuthPage() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) router.replace('/cars')
+      if (session) router.replace('/dashboard')
     }
     checkSession()
   }, [router])
@@ -194,7 +194,7 @@ function AuthPage() {
       setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
       setLoading(false)
     } else {
-      router.replace('/cars')
+      router.replace('/dashboard')
     }
   }
 
@@ -358,7 +358,7 @@ function AuthPage() {
     // 이미 세션이 있을 수 있으므로 세션 확인 후 이동
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
-      router.replace('/cars')
+      router.replace('/dashboard')
       return
     }
     // 세션이 없으면 다시 로그인 시도
@@ -370,7 +370,7 @@ function AuthPage() {
       setMessage({ text: '로그인 중 오류가 발생했습니다. 로그인 페이지에서 다시 시도해주세요.', type: 'error' })
       setLoading(false)
     } else {
-      router.replace('/cars')
+      router.replace('/dashboard')
     }
   }
 

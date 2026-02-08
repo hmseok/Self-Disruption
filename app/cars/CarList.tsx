@@ -30,13 +30,6 @@ const { company, role } = useApp()
   const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // 👋 로그아웃 함수
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.replace('/login')
-    router.refresh()
-  }
-
   // 1. DB에서 차량 목록 가져오기 (테이블명: cars)
   useEffect(() => {
     const fetchCars = async () => {
@@ -106,13 +99,6 @@ const { company, role } = useApp()
               + 차량 등록
             </button>
 
-            {/* 🚪 로그아웃 버튼 */}
-            <button
-                onClick={handleLogout}
-                className="bg-white border border-gray-300 text-gray-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 px-5 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm"
-            >
-                로그아웃
-            </button>
         </div>
       </div>
 

@@ -8,45 +8,45 @@ export default function JiipListPage() {
 const router = useRouter()
 
   // ✅ [핵심 1] 전역 상태에서 '현재 선택된 회사' 가져오기
-  const { currentCompany } = useApp()
+  const { company: currentCompany, role } = useApp()
 
   const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // 데이터 불러오기
   const fetchContracts = async () => {
-    // 회사가 선택되지 않았으면 로딩 안 함 (또는 빈 배열)
-    if (!currentCompany?.id) return
+    // god_admin이 아닌데 회사가 없으면 로딩 안 함
+    if (!currentCompany?.id && role !== 'god_admin') return
 
     setLoading(true)
 
-    // ✅ [핵심 2] '내 회사(currentCompany.id)'의 계약서만 가져오기
-    // + 차량 정보(cars)도 같이 가져오기 (Join)
-    const { data, error } = await supabase
+    // 차량 정보(cars)도 같이 가져오기 (Join)
+    let query = supabase
       .from('jiip_contracts')
       .select(`
         *,
         car:cars ( number, model )
       `)
-      .eq('company_id', currentCompany.id) // 👈 가장 중요한 데이터 칸막이!
-      .order('created_at', { ascending: false })
 
-    // app/jiip/page.tsx 파일의 36번째 줄 수정
+    // god_admin은 전체 데이터 조회, 일반 사용자는 본인 회사만
+    if (role !== 'god_admin' && currentCompany?.id) {
+      query = query.eq('company_id', currentCompany.id)
+    }
 
-        if (error) {
-          // 기존: console.error('데이터 로딩 실패:', error)
-          // 변경: 아래와 같이 .message를 붙여서 저장하세요
-          console.error('데이터 로딩 실패 원인:', error.message)
-        } else {
-          setContracts(data || [])
-        }
+    const { data, error } = await query.order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('데이터 로딩 실패 원인:', error.message)
+    } else {
+      setContracts(data || [])
+    }
     setLoading(false)
   }
 
-  // 회사가 바뀌면 데이터를 다시 불러옵니다.
+  // 회사 또는 역할이 바뀌면 데이터를 다시 불러옵니다.
   useEffect(() => {
     fetchContracts()
-  }, [currentCompany])
+  }, [currentCompany, role])
 
   // (편의기능) 총 투자금 합계 계산
   const totalInvest = contracts.reduce((sum, item) => sum + (item.invest_amount || 0), 0)
