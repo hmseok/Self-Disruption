@@ -179,9 +179,6 @@ export default function AdminDashboard() {
                 + 회사 등록
               </button>
             )}
-            <button onClick={fetchData} className="px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs md:text-sm font-bold text-slate-600 hover:bg-slate-100">
-              새로고침
-            </button>
           </div>
         </div>
 

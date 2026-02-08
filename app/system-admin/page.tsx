@@ -125,9 +125,6 @@ export default function SystemAdminPage() {
             <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">구독/모듈 관리</h1>
             <p className="text-slate-500 mt-1 text-xs sm:text-sm md:text-base">회사별 기능 모듈을 ON/OFF 제어합니다.</p>
           </div>
-          <button onClick={loadData} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 self-start sm:self-auto flex-shrink-0">
-            새로고침
-          </button>
         </div>
 
         {/* 필터 + 통계 */}

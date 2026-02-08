@@ -1,0 +1,22 @@
+{
+  "name": "Sideline ERP",
+  "short_name": "Sideline",
+  "description": "Smart Mobility Business Solution",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#111f3c",
+  "theme_color": "#111f3c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

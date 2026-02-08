@@ -221,11 +221,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showSettings = role === 'god_admin' || role === 'master'
 
   return (
-    <div className="flex min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="flex h-[100dvh] bg-gray-50 overflow-hidden">
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-950/95 backdrop-blur-sm border-b border-steel-900/50">
-          <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-950/95 backdrop-blur-sm border-b border-steel-900/50 safe-top">
+          <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -438,9 +438,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-x-hidden w-full min-w-0">
-        <div className="min-h-screen pt-14 lg:pt-0 overflow-x-hidden max-w-full">
+      {/* 메인 콘텐츠 — 앱 셸: 내부 스크롤 */}
+      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-hidden w-full min-w-0 h-[100dvh]">
+        <div className="h-full pt-12 lg:pt-0 overflow-y-auto overflow-x-hidden overscroll-none max-w-full">
           {children}
         </div>
       </main>
