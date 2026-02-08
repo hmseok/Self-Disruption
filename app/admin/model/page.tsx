@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '../../utils/supabase'
 
 // 아이콘
@@ -111,9 +111,8 @@ export default function VehicleCodeManager() {
           <tbody className="divide-y divide-gray-100">
             {loading ? <tr><td colSpan={6} className="p-10 text-center">로딩 중...</td></tr> :
              models.map((m) => (
-              <>
+              <React.Fragment key={m.id}>
                 <tr
-                    key={m.id}
                     onClick={() => setExpandedRow(expandedRow === m.id ? null : m.id)}
                     className={`cursor-pointer transition-colors ${expandedRow === m.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                 >
@@ -162,7 +161,7 @@ export default function VehicleCodeManager() {
                         </td>
                     </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
