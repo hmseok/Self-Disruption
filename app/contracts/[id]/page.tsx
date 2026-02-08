@@ -69,7 +69,7 @@ export default function ContractDetailPage() {
                 <div className="space-y-3">
                     <div className="flex justify-between"><span>보증금</span><b>{f(contract.deposit)}원</b></div>
                     <div className="flex justify-between"><span>월 렌트료</span><b>{f(contract.monthly_rent)}원</b></div>
-                    <div className="flex justify-between text-blue-600"><span>납입금(VAT포함)</span><b className="text-xl">{f(contract.monthly_rent * 1.1)}원</b></div>
+                    <div className="flex justify-between text-steel-600"><span>납입금(VAT포함)</span><b className="text-xl">{f(contract.monthly_rent * 1.1)}원</b></div>
                 </div>
             </div>
 
@@ -114,7 +114,7 @@ export default function ContractDetailPage() {
                             {schedules.map((item) => (
                                 <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${item.status === 'paid' ? 'bg-green-50/30' : ''}`}>
                                     <td className="p-4 font-bold text-gray-600">
-                                        {item.round_number === 0 ? <span className="text-blue-600">보증금</span> : `${item.round_number}회차`}
+                                        {item.round_number === 0 ? <span className="text-steel-600">보증금</span> : `${item.round_number}회차`}
                                     </td>
                                     <td className={`p-4 ${new Date(item.due_date) < new Date() && item.status === 'unpaid' ? 'text-red-500 font-bold' : ''}`}>
                                         {item.due_date}

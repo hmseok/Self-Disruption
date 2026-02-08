@@ -237,8 +237,8 @@ export default function LoanDetailPage() {
                     <input type="text" className="w-full border p-2 rounded-lg text-right font-bold text-lg bg-white" placeholder="0" value={loan.acquisition_tax.toLocaleString()} onChange={e => handleMoneyChange('acquisition_tax', e.target.value)} />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-blue-600 mb-1">(-) 선수금/보증금</label>
-                    <input type="text" className="w-full border p-2 rounded-lg border-blue-200 text-right text-blue-600 font-bold text-lg bg-white" placeholder="0" value={loan.deposit.toLocaleString()} onChange={e => handleMoneyChange('deposit', e.target.value)} />
+                    <label className="block text-xs font-bold text-steel-600 mb-1">(-) 선수금/보증금</label>
+                    <input type="text" className="w-full border p-2 rounded-lg border-steel-200 text-right text-steel-600 font-bold text-lg bg-white focus:border-steel-400 focus:ring-steel-400" placeholder="0" value={loan.deposit.toLocaleString()} onChange={e => handleMoneyChange('deposit', e.target.value)} />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-red-600 mb-1">(=) 대출 원금</label>

@@ -477,13 +477,13 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">활성 회사 현황</h2>
-              <Link href="/admin" className="text-xs text-steel-500 hover:text-steel-700 font-bold">
+              <Link href="/admin" className="text-xs text-steel-600 hover:text-steel-800 font-bold">
                 전체 관리 →
               </Link>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+            <div className="bg-white rounded-xl border border-steel-100 shadow-sm overflow-x-auto">
               <table className="w-full text-left min-w-[560px]">
-                <thead className="bg-gray-50 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                <thead className="bg-steel-50 text-steel-800 text-xs font-bold uppercase tracking-wider">
                   <tr>
                     <th className="p-3 md:p-4">회사명</th>
                     <th className="p-3 md:p-4 text-center">플랜</th>
@@ -492,9 +492,9 @@ export default function DashboardPage() {
                     <th className="p-3 md:p-4 text-right">가입일</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-steel-100">
                   {platformStats.companyList.map(c => (
-                    <tr key={c.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push('/system-admin')}>
+                    <tr key={c.id} className="hover:bg-steel-50 cursor-pointer transition-colors" onClick={() => router.push('/system-admin')}>
                       <td className="p-3 md:p-4">
                         <span className="font-bold text-gray-900 text-sm">{c.name}</span>
                       </td>
@@ -608,10 +608,10 @@ export default function DashboardPage() {
       {(showCars || showCustomers || showInvest) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
           {showCars && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
               <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">보유 차량</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-50 flex items-center justify-center text-sm">🚗</span>
+                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">보유 차량</span>
+                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">🚗</span>
               </div>
               <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : stats.totalCars}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">대</span></p>
               <div className="mt-1 md:mt-2 flex flex-wrap gap-1.5 md:gap-2 text-[10px] md:text-[11px] font-medium">
@@ -622,30 +622,30 @@ export default function DashboardPage() {
             </div>
           )}
           {showCustomers && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
               <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">고객 수</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-sm">👥</span>
+                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">고객 수</span>
+                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">👥</span>
               </div>
               <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : stats.totalCustomers}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">명</span></p>
               <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">등록된 전체 고객</p>
             </div>
           )}
           {showInvest && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
               <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">투자 유치</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sm">💰</span>
+                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">투자 유치</span>
+                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💰</span>
               </div>
               <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : formatMoney(stats.totalInvestAmount)}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">원</span></p>
               <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">일반투자 {stats.activeInvestments}건 / 지입 {stats.jiipContracts}건</p>
             </div>
           )}
           {showCars && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
               <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">가동률</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-50 flex items-center justify-center text-sm">📊</span>
+                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">가동률</span>
+                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">📊</span>
               </div>
               <p className="text-2xl md:text-3xl font-black text-gray-900">
                 {loading || stats.totalCars === 0 ? '-' : Math.round((stats.rentedCars / stats.totalCars) * 100)}
@@ -660,18 +660,18 @@ export default function DashboardPage() {
       {/* 경영 현황판 */}
       {showFinance && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-          <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm bg-gradient-to-br from-white to-steel-50">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">월 예상 매출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-50 flex items-center justify-center text-sm">💵</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">월 예상 매출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💵</span>
             </div>
             <p className="text-xl md:text-2xl font-black text-blue-600">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
             <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">활성 렌트 계약 기준</p>
           </div>
-          <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm bg-gradient-to-br from-white to-steel-50">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">월 고정 지출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-red-50 flex items-center justify-center text-sm">💸</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">월 고정 지출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💸</span>
             </div>
             <p className="text-xl md:text-2xl font-black text-red-500">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
             <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">할부금 + 보험료 (월 환산)</p>
@@ -699,7 +699,7 @@ export default function DashboardPage() {
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="group bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]"
+                  className="group bg-white rounded-xl p-4 border border-steel-100 shadow-sm hover:shadow-md transition-all hover:scale-[1.02] hover:border-steel-200 bg-gradient-to-br from-white to-steel-50"
                 >
                   <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center text-lg shadow-sm mb-3`}>
                     {action.icon}
@@ -716,11 +716,11 @@ export default function DashboardPage() {
           <div className={quickActions.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">최근 등록 차량</h2>
-              <Link href="/registration" className="text-xs text-steel-500 hover:text-steel-700 font-bold">전체 보기 →</Link>
+              <Link href="/registration" className="text-xs text-steel-600 hover:text-steel-800 font-bold">전체 보기 →</Link>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+            <div className="bg-white rounded-xl border border-steel-100 shadow-sm overflow-x-auto">
               {loading ? (
-                <div className="p-12 text-center text-gray-400">
+                <div className="p-12 text-center text-steel-600">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-steel-600 mx-auto mb-2"></div>
                   로딩 중...
                 </div>
@@ -735,7 +735,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <table className="w-full text-left min-w-[400px]">
-                  <thead className="bg-gray-50 text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                  <thead className="bg-steel-50 text-steel-800 text-[10px] md:text-xs font-bold uppercase tracking-wider">
                     <tr>
                       <th className="p-3 md:p-4">차량번호</th>
                       <th className="p-3 md:p-4">차종</th>
@@ -743,9 +743,9 @@ export default function DashboardPage() {
                       <th className="p-3 md:p-4 text-right">등록일</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-steel-100">
                     {recentCars.map(car => (
-                      <tr key={car.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push(`/registration/${car.id}`)}>
+                      <tr key={car.id} className="hover:bg-steel-50 cursor-pointer transition-colors" onClick={() => router.push(`/registration/${car.id}`)}>
                         <td className="p-3 md:p-4 font-black text-gray-900 text-sm">{car.number}</td>
                         <td className="p-3 md:p-4">
                           <span className="font-bold text-gray-700 text-xs md:text-sm">{car.brand}</span>

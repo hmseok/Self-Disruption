@@ -194,16 +194,16 @@ export default function QuoteCalculatorPage() {
                     </div>
 
                     {/* 👇 [AI] 시스템 분석 결과 */}
-                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex justify-between items-center animate-pulse">
-                      <div className="text-blue-800 text-sm">
+                    <div className="p-4 bg-steel-50 border border-steel-100 rounded-xl flex justify-between items-center animate-pulse">
+                      <div className="text-steel-800 text-sm">
                         <span className="font-bold">🤖 AI 시세 분석</span>
-                        <span className="block text-xs text-blue-600 opacity-80">
+                        <span className="block text-xs text-steel-600 opacity-80">
                           연식감가 {(rules.DEP_YEAR * 100)}% + 주행감가 {(rules.DEP_MILEAGE_10K * 100)}% 적용
                         </span>
                       </div>
                       <div className="text-right">
                         <span className="block text-xs text-gray-500">적정 기준가</span>
-                        <span className="font-black text-xl text-blue-600">{f(estimatedPrice)}원</span>
+                        <span className="font-black text-xl text-steel-600">{f(estimatedPrice)}원</span>
                       </div>
                     </div>
                 </div>
@@ -220,15 +220,15 @@ export default function QuoteCalculatorPage() {
           </div>
 
           {/* 4. 마진 설정 */}
-          <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-200">
-            <h3 className="font-bold text-blue-900 mb-4">💰 마진 설정</h3>
+          <div className="bg-steel-50/50 p-6 rounded-3xl border border-steel-200">
+            <h3 className="font-bold text-steel-900 mb-4">💰 마진 설정</h3>
             <div className="flex items-center gap-4">
-                <input type="text" className="w-full p-4 border-2 border-blue-200 rounded-xl text-right font-black text-2xl text-blue-600 outline-none" value={f(margin)} onChange={(e) => setMargin(p(e.target.value))}/>
+                <input type="text" className="w-full p-4 border-2 border-steel-200 rounded-xl text-right font-black text-2xl text-steel-600 outline-none" value={f(margin)} onChange={(e) => setMargin(p(e.target.value))}/>
                 <span className="font-bold text-gray-500 whitespace-nowrap">원 남기기</span>
             </div>
             <div className="mt-4 flex gap-2">
                 {[50000, 100000, 200000, 300000].map(m => (
-                    <button key={m} onClick={()=>setMargin(m)} className="flex-1 py-2 bg-white border border-blue-200 rounded-lg text-blue-600 font-bold hover:bg-blue-100">+{m/10000}만</button>
+                    <button key={m} onClick={()=>setMargin(m)} className="flex-1 py-2 bg-white border border-steel-200 rounded-lg text-steel-600 font-bold hover:bg-steel-100">+{m/10000}만</button>
                 ))}
             </div>
           </div>
@@ -236,7 +236,7 @@ export default function QuoteCalculatorPage() {
 
         {/* --- 오른쪽: 영수증 --- */}
         <div className="lg:col-span-5">
-            <div className="bg-gray-900 text-white p-8 rounded-3xl shadow-2xl sticky top-10">
+            <div className="bg-steel-950 text-white p-8 rounded-3xl shadow-2xl sticky top-10">
                 <div className="text-center border-b border-gray-700 pb-6 mb-6">
                     <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Quotation</p>
                     <h2 className="text-3xl font-black mt-2">최종 견적서</h2>

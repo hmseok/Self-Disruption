@@ -106,7 +106,7 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
               required
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-lg focus:border-steel-400 focus:ring-steel-400 outline-none"
               placeholder="(주)라이드"
             />
           </div>
@@ -117,7 +117,7 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
               type="text"
               value={formData.business_number}
               onChange={(e) => setFormData({...formData, business_number: e.target.value})}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border rounded-lg focus:border-steel-400 focus:ring-steel-400 outline-none"
               placeholder="000-00-00000"
             />
           </div>
@@ -127,7 +127,7 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
             <select
               value={formData.plan}
               onChange={(e) => setFormData({...formData, plan: e.target.value})}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              className="w-full px-3 py-2 border rounded-lg focus:border-steel-400 focus:ring-steel-400 outline-none bg-white"
             >
               <option value="free">Free (무료)</option>
               <option value="pro">Pro (유료)</option>
@@ -146,7 +146,7 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
+              className="flex-1 py-2.5 bg-steel-600 text-white rounded-lg hover:bg-steel-700 font-medium disabled:opacity-50"
             >
               {loading ? (statusMsg || '등록 중...') : '등록하기'}
             </button>

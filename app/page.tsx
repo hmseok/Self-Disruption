@@ -498,7 +498,7 @@ function AuthPage() {
     <div className="flex min-h-screen w-full font-sans overflow-x-hidden">
 
       {/* ========== LEFT PANEL - Brand ========== */}
-      <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white flex-col justify-between p-14 relative overflow-hidden">
+      <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-steel-900 to-steel-800 text-white flex-col justify-between p-14 relative overflow-hidden">
 
         {/* 배경 장식 */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-steel-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
@@ -516,8 +516,8 @@ function AuthPage() {
 
           <div className="space-y-6">
             <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-steel-500/20 rounded-full text-[11px] font-bold tracking-wider uppercase text-steel-300 border border-steel-500/20">
-                <span className="w-1.5 h-1.5 bg-steel-400 rounded-full animate-pulse-slow"></span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-steel-100 rounded-full text-[11px] font-bold tracking-wider uppercase text-steel-700 border border-steel-200">
+                <span className="w-1.5 h-1.5 bg-steel-600 rounded-full animate-pulse-slow"></span>
                 Enterprise Platform
               </span>
             </div>
@@ -627,7 +627,7 @@ function AuthPage() {
 
                 <button
                   onClick={() => { setView('login'); setMessage(null) }}
-                  className="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all text-sm"
+                  className="w-full py-3 bg-steel-100 text-steel-700 font-bold rounded-xl hover:bg-steel-200 transition-all text-sm"
                 >
                   로그인 페이지로 이동
                 </button>
@@ -663,22 +663,22 @@ function AuthPage() {
 
               {/* 실시간 감지 상태 표시 */}
               <div className="flex items-center justify-center gap-2 mb-8">
-                <div className="w-2 h-2 bg-steel-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-steel-600 font-medium">인증 완료를 자동으로 감지 중...</span>
+                <div className="w-2 h-2 bg-steel-600 rounded-full animate-pulse"></div>
+                <span className="text-xs text-steel-700 font-medium">인증 완료를 자동으로 감지 중...</span>
               </div>
 
               {/* 안내 Steps */}
-              <div className="bg-slate-50 rounded-2xl p-5 mb-6 space-y-4">
+              <div className="bg-steel-50 rounded-2xl p-5 mb-6 space-y-4 border border-steel-100">
                 {[
                   { step: 1, text: '이메일 수신함(또는 스팸함)을 확인해주세요' },
                   { step: 2, text: '"이메일 인증하기" 버튼을 클릭해주세요' },
                   { step: 3, text: '이 화면이 자동으로 인증완료로 바뀝니다' },
                 ].map((item) => (
                   <div key={item.step} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                    <div className="w-6 h-6 rounded-full bg-steel-200 text-steel-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                       {item.step}
                     </div>
-                    <span className="text-sm text-slate-600">{item.text}</span>
+                    <span className="text-sm text-steel-700">{item.text}</span>
                   </div>
                 ))}
               </div>
@@ -698,7 +698,7 @@ function AuthPage() {
                 <button
                   onClick={handleVerifyAndLogin}
                   disabled={loading}
-                  className="w-full py-4 bg-steel-700 text-white font-bold rounded-xl hover:bg-steel-800 transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-steel-600 to-steel-700 hover:from-steel-700 hover:to-steel-800 text-white font-bold rounded-xl transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-lg shadow-steel-600/25"
                 >
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75"/></svg> 확인 중...</>
@@ -711,7 +711,7 @@ function AuthPage() {
                   <button
                     onClick={handleResendEmail}
                     disabled={verifyCountdown > 0}
-                    className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all text-sm disabled:opacity-50"
+                    className="flex-1 py-3 bg-steel-100 text-steel-700 font-bold rounded-xl hover:bg-steel-200 transition-all text-sm disabled:opacity-50"
                   >
                     {verifyCountdown > 0 ? `재발송 (${verifyCountdown}s)` : '인증메일 재발송'}
                   </button>
@@ -732,7 +732,7 @@ function AuthPage() {
 
                 <button
                   onClick={() => { setView('login'); setMessage(null) }}
-                  className="w-full text-xs text-slate-400 hover:text-slate-600 py-2 transition-colors"
+                  className="w-full text-xs text-steel-400 hover:text-steel-600 py-2 transition-colors"
                 >
                   로그인 화면으로 돌아가기
                 </button>
@@ -754,7 +754,7 @@ function AuthPage() {
                 <h2 className="text-2xl font-black text-slate-900 mb-1">
                   {view === 'login' ? 'Welcome Back' : 'Create Account'}
                 </h2>
-                <p className="text-slate-400 text-sm">
+                <p className="text-steel-600 text-sm">
                   {view === 'login'
                     ? '등록된 비즈니스 계정으로 로그인하세요.'
                     : '기업 관리를 위한 새 계정을 생성합니다.'
@@ -766,7 +766,7 @@ function AuthPage() {
 
                 {/* 가입 유형 탭 (Signup only) */}
                 {view === 'signup' && (
-                  <div className="p-1 bg-slate-100 rounded-xl flex gap-1 mb-2">
+                  <div className="p-1 bg-steel-100 rounded-xl flex gap-1 mb-2">
                     {[
                       { key: 'founder', label: '기업 대표', desc: '회사를 등록합니다' },
                       { key: 'employee', label: '직원', desc: '기존 회사에 합류합니다' },
@@ -778,7 +778,7 @@ function AuthPage() {
                         className={`flex-1 py-3 px-2 rounded-lg text-center transition-all ${
                           roleType === tab.key
                             ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-slate-400 hover:text-slate-600'
+                            : 'text-steel-400 hover:text-steel-600'
                         }`}
                       >
                         <div className="text-sm font-bold">{tab.label}</div>
@@ -798,12 +798,12 @@ function AuthPage() {
                     <input
                       name="email" type="email" value={formData.email} onChange={handleChange}
                       placeholder="name@company.com"
-                      className={`w-full px-4 py-3.5 bg-slate-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white ${
+                      className={`w-full px-4 py-3.5 bg-steel-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white ${
                         formData.email && validity.email && dupCheck.email === true ? 'border-emerald-300 focus:border-emerald-400' :
                         formData.email && validity.email && dupCheck.email === false ? 'border-red-300 focus:border-red-400' :
                         formData.email && validity.email ? 'border-emerald-300 focus:border-emerald-400' :
                         formData.email && !validity.email ? 'border-red-200 focus:border-red-300' :
-                        'border-transparent focus:border-slate-300'
+                        'border-transparent focus:border-steel-500'
                       }`}
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2"><ValidIcon valid={validity.email} /></div>
@@ -817,10 +817,10 @@ function AuthPage() {
                     <input
                       name="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={handleChange}
                       placeholder={view === 'signup' ? '영문+숫자 포함 8자 이상' : '비밀번호 입력'}
-                      className={`w-full px-4 py-3.5 bg-slate-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white pr-20 ${
+                      className={`w-full px-4 py-3.5 bg-steel-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white pr-20 ${
                         formData.password && validity.password ? 'border-emerald-300 focus:border-emerald-400' :
                         formData.password && !validity.password && view === 'signup' ? 'border-red-200 focus:border-red-300' :
-                        'border-transparent focus:border-slate-300'
+                        'border-transparent focus:border-steel-500'
                       }`}
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -851,10 +851,10 @@ function AuthPage() {
                         <input
                           name="passwordConfirm" type="password" value={formData.passwordConfirm} onChange={handleChange}
                           placeholder="비밀번호 재입력"
-                          className={`w-full px-4 py-3.5 bg-slate-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white ${
+                          className={`w-full px-4 py-3.5 bg-steel-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 transition-all focus:bg-white ${
                             formData.passwordConfirm && validity.passwordConfirm ? 'border-emerald-300' :
                             formData.passwordConfirm && !validity.passwordConfirm ? 'border-red-200' :
-                            'border-transparent focus:border-slate-300'
+                            'border-transparent focus:border-steel-500'
                           }`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2"><ValidIcon valid={validity.passwordConfirm} /></div>
@@ -868,7 +868,7 @@ function AuthPage() {
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Full Name</label>
                         <input name="name" type="text" value={formData.name} onChange={handleChange} placeholder="실명"
-                          className="w-full px-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white focus:border-slate-300 transition-all"/>
+                          className="w-full px-4 py-3.5 bg-steel-50 border-2 border-transparent rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white focus:border-steel-500 transition-all"/>
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
@@ -877,10 +877,10 @@ function AuthPage() {
                         </div>
                         <div className="relative">
                           <input name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="01012345678"
-                            className={`w-full px-4 py-3.5 bg-slate-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white transition-all ${
+                            className={`w-full px-4 py-3.5 bg-steel-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white transition-all ${
                               formData.phone && validity.phone ? 'border-emerald-300' :
                               formData.phone && !validity.phone ? 'border-red-200' :
-                              'border-transparent focus:border-slate-300'
+                              'border-transparent focus:border-steel-500'
                             }`}
                           />
                           <div className="absolute right-3 top-1/2 -translate-y-1/2"><ValidIcon valid={validity.phone} /></div>
@@ -899,10 +899,10 @@ function AuthPage() {
                       <div className="relative">
                         <input name="companyName" type="text" value={formData.companyName} onChange={handleChange}
                           placeholder={roleType === 'founder' ? '(주)법인명 또는 상호명' : '재직 중인 회사명'}
-                          className={`w-full px-4 py-3.5 bg-slate-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white transition-all ${
+                          className={`w-full px-4 py-3.5 bg-steel-50 border-2 rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white transition-all ${
                             formData.companyName && validity.companyName ? 'border-emerald-300' :
                             formData.companyName && !validity.companyName ? 'border-red-200' :
-                            'border-transparent focus:border-slate-300'
+                            'border-transparent focus:border-steel-500'
                           }`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2"><ValidIcon valid={validity.companyName} /></div>
@@ -918,7 +918,7 @@ function AuthPage() {
                         </div>
                         <input name="businessNumber" type="text" value={formData.businessNumber} onChange={handleChange}
                           placeholder="000-00-00000 (선택사항)"
-                          className="w-full px-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white focus:border-slate-300 transition-all"/>
+                          className="w-full px-4 py-3.5 bg-steel-50 border-2 border-transparent rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white focus:border-steel-500 transition-all"/>
                       </div>
                     )}
 
@@ -931,13 +931,13 @@ function AuthPage() {
 
                         {!bizFile ? (
                           <label
-                            className="flex flex-col items-center justify-center w-full h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all group"
+                            className="flex flex-col items-center justify-center w-full h-28 bg-steel-50 border-2 border-dashed border-steel-200 rounded-xl cursor-pointer hover:border-steel-400 hover:bg-steel-50/50 transition-all group"
                           >
                             <div className="flex flex-col items-center gap-1.5">
-                              <svg className="w-7 h-7 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                              <svg className="w-7 h-7 text-steel-300 group-hover:text-steel-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
                               </svg>
-                              <span className="text-xs text-slate-400 group-hover:text-blue-500 font-medium">사업자등록증 업로드</span>
+                              <span className="text-xs text-steel-400 group-hover:text-steel-600 font-medium">사업자등록증 업로드</span>
                               <span className="text-[10px] text-slate-300">JPG, PNG, PDF (10MB 이하)</span>
                             </div>
                             <input
@@ -1016,8 +1016,8 @@ function AuthPage() {
               </form>
 
               {/* 전환 링크 */}
-              <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                <span className="text-sm text-slate-400">
+              <div className="mt-8 pt-6 border-t border-steel-100 text-center">
+                <span className="text-sm text-steel-500">
                   {view === 'login' ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}
                 </span>
                 <button

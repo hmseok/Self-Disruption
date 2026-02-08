@@ -222,13 +222,42 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* 모바일 토글 */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed top-4 left-4 z-30 lg:hidden bg-steel-950 text-white p-2 rounded-lg shadow-lg"
-      >
-        <Icons.Menu />
-      </button>
+      {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
+      {!isSidebarOpen && (
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-950/95 backdrop-blur-sm border-b border-steel-900/50">
+          <div className="flex items-center gap-3 px-4 py-2.5">
+            {/* 햄버거 */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="text-white p-1.5 rounded-lg hover:bg-steel-900 transition-colors flex-shrink-0"
+            >
+              <Icons.Menu />
+            </button>
+
+            {/* 로고 */}
+            <span className="text-sm font-bold text-white tracking-tight flex-shrink-0">Sideline</span>
+
+            {/* god_admin 업체 선택 */}
+            {role === 'god_admin' && allCompanies.length > 0 && (
+              <select
+                value={adminSelectedCompanyId || ''}
+                onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
+                className="ml-auto flex-1 min-w-0 max-w-48 bg-steel-900/80 text-white text-xs font-medium rounded-md px-2 py-1.5 border border-steel-800 focus:outline-none focus:border-sky-500 cursor-pointer truncate"
+              >
+                <option value="">전체 보기</option>
+                {allCompanies.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+
+            {/* 일반 사용자: 회사명 표시 */}
+            {role !== 'god_admin' && company?.name && (
+              <span className="ml-auto text-xs text-steel-300 truncate">{company.name}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 모바일 오버레이 (사이드바 열릴 때) */}
       <div

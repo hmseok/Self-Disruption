@@ -104,7 +104,7 @@ const router = useRouter()
                     <tr
                       key={loan.id}
                       onClick={() => router.push(`/loans/${loan.id}`)}
-                      className="border-b border-gray-50 hover:bg-steel-50/50 transition-colors cursor-pointer group"
+                      className="border-b border-gray-50 hover:bg-steel-50 transition-colors cursor-pointer group"
                     >
                       <td className="p-3 md:p-4">
                         <div className="font-bold text-gray-900">{loan.cars?.number || '차량 정보 없음'}</div>
@@ -144,7 +144,7 @@ const router = useRouter()
                 <div
                   key={loan.id}
                   onClick={() => router.push(`/loans/${loan.id}`)}
-                  className="p-4 hover:bg-steel-50/50 transition-colors cursor-pointer"
+                  className="p-4 hover:bg-steel-50 transition-colors cursor-pointer"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>

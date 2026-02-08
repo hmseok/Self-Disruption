@@ -199,11 +199,11 @@ export default function AdminDashboard() {
           )}
           <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">전체 사용자</div>
-            <div className="text-2xl md:text-3xl font-black text-blue-600">{companies.reduce((sum, c) => sum + c.users.length, 0)}</div>
+            <div className="text-2xl md:text-3xl font-black text-steel-600">{companies.reduce((sum, c) => sum + c.users.length, 0)}</div>
           </div>
-          <Link href="/admin/employees" className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
+          <Link href="/admin/employees" className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-steel-300 hover:shadow-md transition-all group">
             <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">바로가기</div>
-            <div className="text-sm md:text-lg font-bold text-slate-700 group-hover:text-blue-600">조직/권한 →</div>
+            <div className="text-sm md:text-lg font-bold text-slate-700 group-hover:text-steel-600">조직/권한 →</div>
           </Link>
         </div>
 
@@ -267,7 +267,7 @@ export default function AdminDashboard() {
                           href={comp.business_registration_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-steel-50 text-steel-600 hover:bg-steel-100 transition-colors"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
@@ -345,7 +345,7 @@ export default function AdminDashboard() {
                             <td className="px-5 py-3 text-sm text-slate-500">{u.email}</td>
                             <td className="px-5 py-3">
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                u.role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                                u.role === 'master' ? 'bg-steel-100 text-steel-700' : 'bg-slate-100 text-slate-600'
                               }`}>{u.role === 'master' ? '관리자' : '직원'}</span>
                             </td>
                             <td className="px-5 py-3">
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</span>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                              u.role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                              u.role === 'master' ? 'bg-steel-100 text-steel-700' : 'bg-slate-100 text-slate-600'
                             }`}>{u.role === 'master' ? '관리자' : '직원'}</span>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                               u.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'

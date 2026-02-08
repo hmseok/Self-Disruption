@@ -211,7 +211,7 @@ export default function JiipGuestSignPage() {
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-50">
                       <span className="text-gray-500">월 관리비</span>
-                      <span className="font-bold text-blue-600">{nf(item?.admin_fee)}원</span>
+                      <span className="font-bold text-steel-600">{nf(item?.admin_fee)}원</span>
                   </div>
               </div>
           </section>

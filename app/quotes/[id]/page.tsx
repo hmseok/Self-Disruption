@@ -111,14 +111,14 @@ export default function QuoteDetailPage() {
     <div className="max-w-4xl mx-auto py-10 px-6">
 
       {linkedContract && (
-        <div className="bg-blue-600 text-white p-6 rounded-2xl shadow-lg mb-8 flex justify-between items-center animate-fade-in no-print">
+        <div className="bg-steel-600 text-white p-6 rounded-2xl shadow-lg mb-8 flex justify-between items-center animate-fade-in no-print">
             <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">✅ 계약 확정된 건입니다</h2>
-                <p className="text-blue-100 text-sm mt-1">계약번호: {String(linkedContract.id).slice(0,8)}</p>
+                <p className="text-steel-100 text-sm mt-1">계약번호: {String(linkedContract.id).slice(0,8)}</p>
             </div>
             <button
                 onClick={() => router.push(`/contracts/${linkedContract.id}`)}
-                className="bg-white text-blue-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-100 shadow-md"
+                className="bg-white text-steel-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-100 shadow-md"
             >
                 계약서 상세 보기 →
             </button>
@@ -142,10 +142,10 @@ export default function QuoteDetailPage() {
         </div>
       </div>
 
-      <div className={`bg-white p-10 rounded-xl shadow-2xl border ${linkedContract ? 'border-blue-200' : 'border-gray-200'} relative overflow-hidden print:shadow-none print:border-none`}>
+      <div className={`bg-white p-10 rounded-xl shadow-2xl border ${linkedContract ? 'border-steel-200' : 'border-gray-200'} relative overflow-hidden print:shadow-none print:border-none`}>
 
         {linkedContract && (
-            <div className="absolute top-10 right-10 border-4 border-blue-600 text-blue-600 font-black text-4xl p-4 rounded-xl rotate-12 opacity-30 select-none print:opacity-100">
+            <div className="absolute top-10 right-10 border-4 border-steel-600 text-steel-600 font-black text-4xl p-4 rounded-xl rotate-12 opacity-30 select-none print:opacity-100">
                 CONTRACTED
             </div>
         )}
@@ -167,7 +167,7 @@ export default function QuoteDetailPage() {
             <div className="space-y-1">
               <p className="flex justify-between"><span className="text-gray-500">고객명</span><b>{quote.customer_name}</b></p>
               <p className="flex justify-between"><span className="text-gray-500">계약기간</span><span>{quote.start_date} ~ {quote.end_date}</span></p>
-              <p className="flex justify-between"><span className="text-gray-500">유형</span><span className="text-blue-600 font-bold">{quote.rental_type}</span></p>
+              <p className="flex justify-between"><span className="text-gray-500">유형</span><span className="text-steel-600 font-bold">{quote.rental_type}</span></p>
             </div>
           </div>
           <div><h3 className="font-bold text-lg border-b pb-2 mb-4">🚗 차량 정보</h3>
@@ -185,7 +185,7 @@ export default function QuoteDetailPage() {
             <div className="border-b my-2"></div>
             <div className="flex justify-between"><span>월 렌트료 (VAT 별도)</span><b>{f(quote.rent_fee)}원</b></div>
             <div className="flex justify-between text-gray-500 text-sm"><span>부가세 (10%)</span><span>{f(Math.round(quote.rent_fee * 0.1))}원</span></div>
-            <div className="border-t border-black pt-4 mt-4 flex justify-between text-2xl font-black text-blue-600">
+            <div className="border-t border-black pt-4 mt-4 flex justify-between text-2xl font-black text-steel-600">
                 <span>월 납입금 (VAT 포함)</span><span>{f(quote.rent_fee * 1.1)}원</span>
             </div>
         </div>

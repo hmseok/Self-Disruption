@@ -140,10 +140,10 @@ function UploadContent() {
       </div>
 
       {status === 'processing' && (
-        <div className="max-w-6xl mx-auto mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between animate-pulse">
+        <div className="max-w-6xl mx-auto mb-6 bg-steel-50 border border-steel-200 rounded-xl p-4 flex items-center justify-between animate-pulse">
             <div className="flex items-center gap-3">
                 <span className="text-2xl">🔄</span>
-                <span className="font-bold text-blue-800">AI가 데이터를 분석하고 있습니다...</span>
+                <span className="font-bold text-steel-800">AI가 데이터를 분석하고 있습니다...</span>
             </div>
         </div>
       )}
@@ -188,13 +188,13 @@ function UploadContent() {
                                     {item.payment_method === 'Card' ? (
                                         <span className="px-2 py-1 rounded text-xs font-bold bg-yellow-100 text-yellow-800">💳 카드</span>
                                     ) : (
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${item.type==='income'?'bg-blue-100 text-blue-700':'bg-red-100 text-red-700'}`}>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${item.type==='income'?'bg-steel-100 text-steel-700':'bg-red-100 text-red-700'}`}>
                                             {item.type==='income' ? '🔵 통장입금' : '🔴 통장출금'}
                                         </span>
                                     )}
                                 </td>
                                 <td className="p-3"><input value={item.client_name} onChange={e=>handleUpdateItem(item.id, 'client_name', e.target.value, item)} className="w-full bg-transparent outline-none font-bold text-gray-800"/></td>
-                                <td className="p-3"><input value={item.description} onChange={e=>handleUpdateItem(item.id, 'description', e.target.value, item)} className="w-full bg-white border border-gray-100 rounded px-2 py-1 outline-none text-xs text-gray-600 focus:border-steel-300"/></td>
+                                <td className="p-3"><input value={item.description} onChange={e=>handleUpdateItem(item.id, 'description', e.target.value, item)} className="w-full bg-white border border-gray-100 rounded px-2 py-1 outline-none text-xs text-gray-600 focus:border-steel-400 focus:ring-steel-400"/></td>
                                 <td className="p-3">
                                     <select value={item.category} onChange={e=>handleUpdateItem(item.id, 'category', e.target.value, item)} className="bg-white border border-gray-200 px-2 py-1.5 rounded text-gray-700 font-bold w-32 text-xs outline-none">
                                         <option value="기타">기타</option>

@@ -276,7 +276,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
             <p className="text-gray-500 mt-2 text-sm">등록증(PDF/이미지) 업로드 시 AI가 브랜드/모델을 자동 분석합니다.</p>
          </div>
          <div className="flex gap-3">
-            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
                 {/* 🔥 .pdf 추가 */}
@@ -290,12 +290,12 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
        {/* 진행 상태창 */}
        {bulkProcessing && (
-         <div className="mb-10 bg-gray-900 rounded-2xl p-6 shadow-2xl ring-4 ring-blue-500/10 overflow-hidden relative">
+         <div className="mb-10 bg-gray-900 rounded-2xl p-6 shadow-2xl ring-4 ring-steel-500/10 overflow-hidden relative">
             <div className="flex justify-between items-end mb-4 relative z-10 text-white">
                 <div className="flex items-center gap-3"><span className="animate-spin text-xl">⚙️</span><span className="font-bold">AI 분석 진행 중...</span></div>
                 <span className="font-mono font-bold">{progress.current} / {progress.total}</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2 mb-4"><div className="bg-gradient-to-r from-blue-500 to-cyan-400 h-2 rounded-full transition-all" style={{ width: `${(progress.current / progress.total) * 100}%` }}></div></div>
+            <div className="w-full bg-gray-700 rounded-full h-2 mb-4"><div className="bg-gradient-to-r from-steel-500 to-steel-600 h-2 rounded-full transition-all" style={{ width: `${(progress.current / progress.total) * 100}%` }}></div></div>
             <div className="flex gap-6 text-xs font-bold mb-4 font-mono">
                 <span className="text-green-400">✅ 성공: {progress.success}</span>
                 <span className="text-yellow-400">⚠️ 중복: {progress.skipped}</span>
@@ -317,7 +317,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
              <div className="hidden md:block">
                <div className="overflow-x-auto">
                  <table className="w-full text-left border-collapse min-w-[650px]">
-                     <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs font-bold tracking-wider">
+                     <thead className="bg-steel-50 border-b border-gray-100 text-steel-900 uppercase text-xs font-bold tracking-wider">
                          <tr>
                              <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
                              <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
@@ -329,7 +329,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                      </thead>
                      <tbody className="divide-y divide-gray-100">
                          {cars.map((car) => (
-                             <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-blue-50/30 transition-colors cursor-pointer">
+                             <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-steel-50/30 transition-colors cursor-pointer">
                                  <td className="p-3 md:p-5 pl-4 md:pl-8">
                                      <div className="w-14 h-10 bg-gray-100 rounded border overflow-hidden">
                                          {car.registration_image_url ?

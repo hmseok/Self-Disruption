@@ -183,7 +183,7 @@ export default function GeneralGuestSignPage() {
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-50">
                       <span className="text-gray-500">이자 지급일</span>
-                      <span className="font-bold text-blue-600">매월 {item?.payment_day}일</span>
+                      <span className="font-bold text-steel-600">매월 {item?.payment_day}일</span>
                   </div>
               </div>
           </section>

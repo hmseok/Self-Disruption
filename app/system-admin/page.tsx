@@ -219,13 +219,13 @@ export default function SystemAdminPage() {
                         onClick={() => toggleModule(comp.id, mod.id, isActive)}
                         className={`relative p-2 md:p-3 rounded-xl border-2 text-left transition-all ${
                           isActive
-                            ? 'border-blue-400 bg-blue-50'
+                            ? 'border-steel-400 bg-steel-50'
                             : 'border-slate-200 bg-slate-50 opacity-50 hover:opacity-80'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1 gap-1">
                           <span className="text-xs md:text-sm font-bold text-slate-800 truncate">{mod.name}</span>
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isActive ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isActive ? 'bg-steel-500' : 'bg-slate-300'}`} />
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
                       </button>

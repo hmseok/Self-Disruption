@@ -216,7 +216,7 @@ const router = useRouter()
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
               <div><p className="text-gray-500 text-xs font-bold mb-1">총 수입 (+)</p><h3 className="text-xl md:text-2xl font-black text-blue-600">{nf(summary.income)}</h3></div>
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">🔵</div>
+              <div className="w-10 h-10 rounded-full bg-steel-50 flex items-center justify-center text-xl">🔵</div>
           </div>
           <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
               <div><p className="text-gray-500 text-xs font-bold mb-1">총 지출 (-)</p><h3 className="text-xl md:text-2xl font-black text-red-600">{nf(summary.expense)}</h3></div>
@@ -342,7 +342,7 @@ const router = useRouter()
                                   <tr key={item.id} className="hover:bg-steel-50/30 transition-colors group">
                                       <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
                                       <td className="p-3 md:p-4">
-                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-steel-50 text-steel-600' : 'bg-red-50 text-red-600'}`}>
                                               {item.type === 'income' ? '수입' : '지출'}
                                           </span>
                                       </td>
@@ -351,7 +351,7 @@ const router = useRouter()
                                           <div className="font-bold text-gray-900">{item.client_name}</div>
                                           <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>
                                       </td>
-                                      <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
+                                      <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-steel-600' : 'text-red-600'}`}>
                                           {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
                                       </td>
                                       <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
@@ -383,14 +383,14 @@ const router = useRouter()
                                       <div className="text-sm font-bold text-gray-600 mb-1">{item.transaction_date.slice(5)}</div>
                                       <div className="font-bold text-gray-900">{item.client_name}</div>
                                   </div>
-                                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-steel-50 text-steel-600' : 'bg-red-50 text-red-600'}`}>
                                       {item.type === 'income' ? '수입' : '지출'}
                                   </span>
                               </div>
                               <div className="text-xs text-gray-500 mb-2">{item.category}</div>
                               <div className="text-xs text-gray-400 mb-3">{item.description}</div>
                               <div className="flex justify-between items-center">
-                                  <div className={`text-lg font-black ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
+                                  <div className={`text-lg font-black ${item.type === 'income' ? 'text-steel-600' : 'text-red-600'}`}>
                                       {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
                                   </div>
                                   {item.status === 'pending' ? (

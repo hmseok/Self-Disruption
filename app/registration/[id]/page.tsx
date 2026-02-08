@@ -9,7 +9,7 @@ const Icons = {
   Back: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
   Save: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
   Refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-  Car: () => <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" /></svg>
+  Car: () => <svg className="w-5 h-5 text-steel-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" /></svg>
 }
 
 // 유틸리티
@@ -222,7 +222,7 @@ export default function RegistrationDetailPage() {
                     <p className="text-gray-500 font-medium">{baseModelName || car.model}</p>
                 </div>
             </div>
-            <button onClick={handleSave} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 transition-all transform hover:-translate-y-0.5">
+            <button onClick={handleSave} className="flex items-center gap-2 bg-steel-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg hover:shadow-steel-500/30 transition-all transform hover:-translate-y-0.5">
                 <Icons.Save /> <span>저장하기</span>
             </button>
         </div>
@@ -234,13 +234,13 @@ export default function RegistrationDetailPage() {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden">
                     {isAnalyzing && (
                         <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
-                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mb-3"></div>
-                            <span className="text-blue-600 font-bold animate-pulse">AI 분석 중...</span>
+                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-steel-600 border-t-transparent mb-3"></div>
+                            <span className="text-steel-600 font-bold animate-pulse">AI 분석 중...</span>
                         </div>
                     )}
                     <div className="flex justify-between items-center mb-5">
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span className="w-1.5 h-6 bg-blue-600 rounded-full"></span>차종 및 트림 정보</h2>
-                        <button onClick={handleReanalyze} className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-100 transition-colors"><Icons.Refresh /> AI 정보 갱신</button>
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span className="w-1.5 h-6 bg-steel-600 rounded-full"></span>차종 및 트림 정보</h2>
+                        <button onClick={handleReanalyze} className="flex items-center gap-1.5 text-xs bg-steel-50 text-steel-700 px-3 py-1.5 rounded-lg font-bold hover:bg-steel-100 transition-colors"><Icons.Refresh /> AI 정보 갱신</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
@@ -248,9 +248,9 @@ export default function RegistrationDetailPage() {
                             <div className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-2"><Icons.Car /> {baseModelName || car.model}</div>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-blue-600 mb-1.5 uppercase">상세 트림 선택</label>
+                            <label className="block text-xs font-bold text-steel-600 mb-1.5 uppercase">상세 트림 선택</label>
                             <select
-                                className="w-full p-4 bg-white border-2 border-blue-100 rounded-xl font-bold text-gray-800 focus:border-blue-500 outline-none transition-all cursor-pointer"
+                                className="w-full p-4 bg-white border-2 border-steel-100 rounded-xl font-bold text-gray-800 focus:border-steel-500 outline-none transition-all cursor-pointer"
                                 value={selectedTrimId}
                                 onChange={(e) => setSelectedTrimId(e.target.value)}
                             >
@@ -287,7 +287,7 @@ export default function RegistrationDetailPage() {
                          <div><label className="label">배기량</label><input className="input text-right" value={car.displacement || ''} onChange={e=>handleChange('displacement', e.target.value)}/></div>
                          <div><label className="label">승차정원</label><input className="input text-right" value={car.capacity || ''} onChange={e=>handleChange('capacity', e.target.value)}/></div>
                     </div>
-                    <div className="mt-5"><label className="label">취득가액</label><input className="input text-right text-xl font-black text-blue-600" value={f(car.purchase_price)} onChange={e=>handleChange('purchase_price', e.target.value.replace(/,/g, ''))}/></div>
+                    <div className="mt-5"><label className="label">취득가액</label><input className="input text-right text-xl font-black text-steel-600" value={f(car.purchase_price)} onChange={e=>handleChange('purchase_price', e.target.value.replace(/,/g, ''))}/></div>
                 </div>
 
                 {/* 비고 */}
@@ -320,7 +320,7 @@ export default function RegistrationDetailPage() {
       <style jsx>{`
         .label { display: block; font-size: 0.75rem; font-weight: 800; color: #9ca3af; margin-bottom: 0.4rem; text-transform: uppercase; }
         .input { width: 100%; padding: 0.875rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.75rem; font-weight: 700; transition: all 0.2s; }
-        .input:focus { background-color: #ffffff; border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .input:focus { background-color: #ffffff; border-color: #1e3a4c; outline: none; box-shadow: 0 0 0 3px rgba(30, 58, 76, 0.1); }
       `}</style>
     </div>
   )

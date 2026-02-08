@@ -75,7 +75,7 @@ const router = useRouter()
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900">📄 견적 및 계약 관리</h1>
-          <p className="text-gray-500 mt-2">전체 견적: <span className="font-bold text-blue-600">{quotes.length}</span>건</p>
+          <p className="text-gray-500 mt-2">전체 견적: <span className="font-bold text-steel-600">{quotes.length}</span>건</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
             <Link href="/" className="px-3 py-2 text-xs md:px-6 md:py-3 md:text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">
@@ -117,11 +117,11 @@ const router = useRouter()
                                     if (quote.contract) router.push(`/contracts/${quote.contract.id}`)
                                     else router.push(`/quotes/${quote.id}`)
                                 }}
-                                className={`transition-colors cursor-pointer group ${quote.contract ? 'bg-blue-50/30 hover:bg-blue-50' : 'hover:bg-gray-50'}`}
+                                className={`transition-colors cursor-pointer group ${quote.contract ? 'bg-steel-50/30 hover:bg-steel-50' : 'hover:bg-gray-50'}`}
                             >
                                 <td className="p-3 md:p-4 pl-4 md:pl-6">
                                     {quote.contract ? (
-                                        <span className="px-2 py-1 rounded-md text-xs font-black bg-blue-600 text-white shadow-sm">
+                                        <span className="px-2 py-1 rounded-md text-xs font-black bg-steel-600 text-white shadow-sm">
                                             계약확정 ✅
                                         </span>
                                     ) : (
@@ -153,7 +153,7 @@ const router = useRouter()
                                     {f(quote.deposit)}
                                 </td>
                                 <td className="p-3 md:p-4 text-right">
-                                    <span className="font-black text-blue-900 text-lg">{f(quote.rent_fee + (quote.rent_fee * 0.1))}</span>
+                                    <span className="font-black text-steel-900 text-lg">{f(quote.rent_fee + (quote.rent_fee * 0.1))}</span>
                                 </td>
                                 <td className="p-3 md:p-4 text-center text-gray-400 text-xs">
                                     {quote.created_at?.split('T')[0]}
@@ -170,10 +170,10 @@ const router = useRouter()
                   <div key={quote.id} onClick={() => {
                     if (quote.contract) router.push(`/contracts/${quote.contract.id}`)
                     else router.push(`/quotes/${quote.id}`)
-                  }} className={`p-4 cursor-pointer active:bg-gray-50 ${quote.contract ? 'bg-blue-50/30' : ''}`}>
+                  }} className={`p-4 cursor-pointer active:bg-gray-50 ${quote.contract ? 'bg-steel-50/30' : ''}`}>
                     <div className="flex justify-between items-start mb-2">
                       {quote.contract ? (
-                        <span className="px-2 py-1 rounded-md text-[10px] font-black bg-blue-600 text-white">계약확정 ✅</span>
+                        <span className="px-2 py-1 rounded-md text-[10px] font-black bg-steel-600 text-white">계약확정 ✅</span>
                       ) : (
                         <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-gray-200 text-gray-600">견적단계</span>
                       )}
@@ -191,7 +191,7 @@ const router = useRouter()
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="font-black text-blue-900 text-lg">{f(quote.rent_fee + (quote.rent_fee * 0.1))}</span>
+                      <span className="font-black text-steel-900 text-lg">{f(quote.rent_fee + (quote.rent_fee * 0.1))}</span>
                       <span className="text-xs text-gray-400 ml-1">원/월</span>
                     </div>
                   </div>

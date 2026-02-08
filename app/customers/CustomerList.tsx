@@ -75,7 +75,7 @@ const [customers, setCustomers] = useState<any[]>([])
                 <div className="flex gap-2 mt-1">
                   {['개인', '법인', '외국인'].map(t => (
                     <button key={t} onClick={()=>setForm({...form, type:t})}
-                      className={`flex-1 py-2 text-sm rounded-lg font-bold border ${form.type === t ? 'bg-gray-900 text-white border-black' : 'bg-white text-gray-500'}`}>
+                      className={`flex-1 py-2 text-sm rounded-lg font-bold border ${form.type === t ? 'bg-steel-800 text-white border-steel-800' : 'bg-white text-gray-500'}`}>
                       {t}
                     </button>
                   ))}
@@ -93,7 +93,7 @@ const [customers, setCustomers] = useState<any[]>([])
                 <label className="text-xs font-bold text-gray-500">메모</label>
                 <textarea className="w-full p-3 border rounded-xl h-20" placeholder="특이사항 입력" value={form.memo} onChange={e=>setForm({...form, memo:e.target.value})}/>
               </div>
-              <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg transition-all">
+              <button onClick={handleSave} className="w-full py-3 bg-steel-600 text-white font-bold rounded-xl hover:bg-steel-700 shadow-lg transition-all">
                 + 고객 등록 완료
               </button>
             </div>

@@ -339,7 +339,7 @@ export default function OrgManagementPage() {
                             <div className="text-xs text-slate-400 mt-1">{emp.email}</div>
                           </td>
                           <td className="p-4">
-                            <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} className="border rounded px-2 py-1 text-sm">
+                            <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} className="border rounded px-2 py-1 text-sm focus:border-steel-400 focus:ring-steel-400">
                               <option value="user">직원</option>
                               <option value="master">관리자</option>
                               {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
@@ -364,7 +364,7 @@ export default function OrgManagementPage() {
                             </label>
                           </td>
                           <td className="p-4 text-right space-x-2">
-                            <button onClick={saveEdit} className="text-sm font-bold text-blue-600 hover:underline">저장</button>
+                            <button onClick={saveEdit} className="text-sm font-bold text-steel-600 hover:underline">저장</button>
                             <button onClick={() => setEditingId(null)} className="text-sm font-bold text-slate-400 hover:underline">취소</button>
                           </td>
                         </>
@@ -377,7 +377,7 @@ export default function OrgManagementPage() {
                           <td className="p-4">
                             <span className={`text-xs font-bold px-2 py-1 rounded ${
                               emp.role === 'god_admin' ? 'bg-sky-100 text-sky-700' :
-                              emp.role === 'master' ? 'bg-blue-100 text-blue-700' :
+                              emp.role === 'master' ? 'bg-steel-100 text-steel-700' :
                               'bg-slate-100 text-slate-600'
                             }`}>{emp.role === 'god_admin' ? 'GOD ADMIN' : emp.role === 'master' ? '관리자' : '직원'}</span>
                           </td>
@@ -389,7 +389,7 @@ export default function OrgManagementPage() {
                             </span>
                           </td>
                           <td className="p-4 text-right">
-                            <button onClick={() => startEdit(emp)} className="text-sm font-bold text-blue-600 hover:underline">수정</button>
+                            <button onClick={() => startEdit(emp)} className="text-sm font-bold text-steel-600 hover:underline">수정</button>
                           </td>
                         </>
                       )}
