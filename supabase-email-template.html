@@ -1,0 +1,136 @@
+<!--
+  Sideline ERP - 인증 이메일 템플릿
+
+  설정 방법:
+  1. Supabase 대시보드 → Authentication → Email Templates
+  2. "Confirm signup" 탭 선택
+  3. Subject: "Sideline - 이메일 인증을 완료해주세요"
+  4. 아래 HTML을 Body에 붙여넣기
+
+  사용 가능한 변수:
+  {{ .ConfirmationURL }} - 인증 링크
+  {{ .Email }} - 사용자 이메일
+  {{ .SiteURL }} - 사이트 URL
+-->
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:32px 40px;text-align:center;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:36px;height:36px;background-color:#ffffff;border-radius:10px;text-align:center;vertical-align:middle;">
+                          <span style="font-size:18px;font-weight:900;color:#0f172a;line-height:36px;">S</span>
+                        </td>
+                        <td style="padding-left:12px;">
+                          <span style="font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;">Sideline</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding-top:20px;text-align:center;">
+                    <span style="display:inline-block;padding:4px 14px;background-color:rgba(59,130,246,0.2);border-radius:20px;border:1px solid rgba(59,130,246,0.2);font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:0.08em;text-transform:uppercase;">
+                      Email Verification
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <!-- Icon -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:24px;">
+                    <div style="width:64px;height:64px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:20px;line-height:64px;text-align:center;">
+                      <span style="font-size:32px;line-height:64px;">&#9993;</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Title -->
+              <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#0f172a;text-align:center;letter-spacing:-0.02em;">
+                이메일 인증을 완료해주세요
+              </h1>
+              <p style="margin:0 0 32px;font-size:14px;color:#64748b;text-align:center;line-height:1.6;">
+                Sideline ERP 서비스 이용을 위해<br/>아래 버튼을 클릭하여 이메일 인증을 완료해주세요.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:32px;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;padding:16px 48px;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;border-radius:12px;letter-spacing:0.01em;">
+                      이메일 인증하기
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Info Box -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:24px;vertical-align:top;padding-top:2px;">
+                          <span style="font-size:14px;">&#9432;</span>
+                        </td>
+                        <td style="padding-left:8px;">
+                          <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;">
+                            인증 계정: <strong style="color:#0f172a;">{{ .Email }}</strong><br/>
+                            이 링크는 24시간 동안 유효합니다.<br/>
+                            본인이 요청하지 않았다면 이 메일을 무시해주세요.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Fallback Link -->
+              <p style="margin:24px 0 0;font-size:11px;color:#94a3b8;text-align:center;line-height:1.5;">
+                버튼이 동작하지 않나요? 아래 링크를 복사하여 브라우저에 붙여넣기 해주세요:<br/>
+                <a href="{{ .ConfirmationURL }}" style="color:#3b82f6;word-break:break-all;font-size:10px;">{{ .ConfirmationURL }}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;border-top:1px solid #f1f5f9;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.5;">
+                &copy; 2025 Sideline Inc. All rights reserved.<br/>
+                Smart Mobility Business Solution
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

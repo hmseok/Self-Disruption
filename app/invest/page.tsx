@@ -1,5 +1,6 @@
 'use client'
 import { supabase } from '../utils/supabase'
+import { useApp } from '../context/AppContext'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -14,6 +15,7 @@ const formatSimpleMoney = (num: number) => {
 }
 
 export default function GeneralInvestDashboard() {
+  const { company, role } = useApp()
 
   // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
@@ -30,16 +32,22 @@ const router = useRouter()
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [company, role])
 
   const fetchData = async () => {
+    if (!company && role !== 'god_admin') return
     setLoading(true)
 
     // 오직 'general_investments' 테이블만 조회
-    const { data } = await supabase
+    let query = supabase
       .from('general_investments')
       .select('*')
-      .order('created_at', { ascending: false })
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data } = await query.order('created_at', { ascending: false })
 
     const investments = data || []
     setList(investments)

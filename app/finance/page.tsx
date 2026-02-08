@@ -1,8 +1,10 @@
 'use client'
 import { supabase } from '../utils/supabase'
+import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 export default function FinancePage() {
+  const { company, role } = useApp()
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
@@ -26,16 +28,23 @@ const router = useRouter()
     payment_method: '통장'
   })
 
-  useEffect(() => { fetchTransactions() }, [filterDate, activeTab])
+  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company])
 
   const fetchTransactions = async () => {
+    if (!company && role !== 'god_admin') return
     setLoading(true)
     const [year, month] = filterDate.split('-').map(Number)
     const lastDay = new Date(year, month, 0).getDate()
 
-    const { data: txs, error } = await supabase
+    let query = supabase
       .from('transactions')
       .select('*')
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data: txs, error } = await query
       .gte('transaction_date', `${filterDate}-01`)
       .lte('transaction_date', `${filterDate}-${lastDay}`)
       .order('transaction_date', { ascending: false })

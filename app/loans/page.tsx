@@ -1,23 +1,31 @@
 'use client'
 import { supabase } from '../utils/supabase'
+import { useApp } from '../context/AppContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation' // 👈 페이지 이동을 위해 추가
 
 export default function LoanListPage() {
+  const { company, role } = useApp()
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
   const [loans, setLoans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [company, role])
 
   const fetchData = async () => {
+    if (!company && role !== 'god_admin') return
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('loans')
       .select('*, cars(number, brand, model)')
-      .order('created_at', { ascending: false })
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data } = await query.order('created_at', { ascending: false })
 
     setLoans(data || [])
     setLoading(false)

@@ -3,6 +3,7 @@
 import { supabase } from '../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '../context/AppContext'
 
 // ✅ DB 컬럼명에 맞춰서 타입 정의 수정 (cars 테이블 기준)
 type Car = {
@@ -20,6 +21,7 @@ type Car = {
 
 export default function CarListPage() {
 const router = useRouter()
+const { company, role } = useApp()
 
   const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,10 +40,15 @@ const router = useRouter()
   // 1. DB에서 차량 목록 가져오기 (테이블명: cars)
   useEffect(() => {
     const fetchCars = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('cars') // 👈 여기가 핵심! vehicles -> cars 로 수정
         .select('*')
-        .order('created_at', { ascending: false })
+
+      if (role !== 'god_admin' && company) {
+        query = query.eq('company_id', company.id)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) {
         console.error('데이터 로딩 실패:', error)
@@ -51,7 +58,7 @@ const router = useRouter()
       setLoading(false)
     }
     fetchCars()
-  }, [])
+  }, [company, role])
 
   // 🔥 필터링 + 검색 로직
   const filteredCars = cars.filter(car => {

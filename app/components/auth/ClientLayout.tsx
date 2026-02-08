@@ -90,7 +90,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-0'} bg-gray-900 text-white transition-all duration-300 overflow-hidden flex flex-col fixed h-full z-20`}>
         <div className="p-6 flex items-center justify-between">
           <span className="text-xl font-black text-white tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')}>
-            SECONDLIFE
+            Sideline
           </span>
         </div>
 

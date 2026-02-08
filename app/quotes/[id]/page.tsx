@@ -191,7 +191,7 @@ export default function QuoteDetailPage() {
         </div>
 
         <div className="mt-20 flex justify-between text-sm text-gray-500">
-          <div><p className="font-bold text-black">SecondLife ERP</p><p>담당자: 관리자</p></div>
+          <div><p className="font-bold text-black">Sideline ERP</p><p>담당자: 관리자</p></div>
           <div className="text-right mt-5"><span className="font-bold text-black text-lg">서명: ________________ (인)</span></div>
         </div>
       </div>

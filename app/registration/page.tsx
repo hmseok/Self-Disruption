@@ -2,6 +2,7 @@
 import { supabase } from '../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '../context/AppContext'
 
 // --- [아이콘] ---
 const Icons = {
@@ -52,6 +53,7 @@ export default function RegistrationListPage() {
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
+const { company, role } = useApp()
   const [cars, setCars] = useState<any[]>([])
 
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -72,14 +74,20 @@ const router = useRouter()
   useEffect(() => {
     fetchList()
     fetchStandardCodes()
-  }, [])
+  }, [company, role])
 
   useEffect(() => {
     if (selectedTrim) setFinalPrice(selectedTrim.price)
   }, [selectedTrim])
 
   const fetchList = async () => {
-    const { data } = await supabase.from('cars').select('*').order('created_at', { ascending: false })
+    let query = supabase.from('cars').select('*')
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data } = await query.order('created_at', { ascending: false })
     setCars(data || [])
   }
 

@@ -1,7 +1,9 @@
 'use client'
 import { supabase } from '../utils/supabase'
+import { useApp } from '../context/AppContext'
 import { useEffect, useState } from 'react'
 export default function CustomerPage() {
+  const { company, role } = useApp()
 const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -12,12 +14,23 @@ const [customers, setCustomers] = useState<any[]>([])
 
   // 목록 불러오기
   const fetchCustomers = async () => {
-    const { data } = await supabase.from('customers').select('*').order('id', { ascending: false })
+    if (!company && role !== 'god_admin') {
+      setLoading(false)
+      return
+    }
+
+    let query = supabase.from('customers').select('*')
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data } = await query.order('id', { ascending: false })
     setCustomers(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { fetchCustomers() }, [])
+  useEffect(() => { fetchCustomers() }, [company, role])
 
   // 고객 저장
   const handleSave = async () => {

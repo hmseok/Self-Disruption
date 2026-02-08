@@ -2,6 +2,7 @@
 import { supabase } from '../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '../context/AppContext'
 
 // --- [아이콘] ---
 const Icons = {
@@ -46,6 +47,7 @@ const compressImage = async (file: File): Promise<File> => {
 export default function InsuranceListPage() {
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
+const { company, role } = useApp()
   const [list, setList] = useState<any[]>([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
@@ -54,13 +56,18 @@ const router = useRouter()
   const [allCars, setAllCars] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => { fetchList() }, [])
+  useEffect(() => { fetchList() }, [company, role])
 
   const fetchList = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('cars')
       .select(`id, number, model, brand, vin, insurance_contracts (id, company, end_date, premium, status)`)
-      .order('created_at', { ascending: false })
+
+    if (role !== 'god_admin' && company) {
+      query = query.eq('company_id', company.id)
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) { console.error("리스트 로딩 실패:", error.message); return; }
     const formatted = data?.map((car: any) => ({ ...car, insurance: car.insurance_contracts?.[0] || null }))

@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -9,18 +8,19 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code')
 
   if (code) {
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    // 서버사이드에서 코드를 세션으로 교환 (이메일 인증 확인 처리)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
     try {
-      // 1. 코드를 세션으로 교환 (로그인 처리)
       await supabase.auth.exchangeCodeForSession(code)
     } catch (error) {
       console.error('Auth Callback Error:', error)
-      return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_callback_failed`)
+      return NextResponse.redirect(`${requestUrl.origin}/?error=auth_failed`)
     }
   }
 
-  // 🚨 [수정됨] 메인('/')으로 보내지 말고, '인증 완료 페이지'로 보냅니다.
+  // 인증 완료 페이지로 리다이렉트
   return NextResponse.redirect(`${requestUrl.origin}/auth/verified`)
 }

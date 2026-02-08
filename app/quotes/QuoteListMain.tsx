@@ -1,21 +1,34 @@
 'use client'
 import { supabase } from '../utils/supabase'
+import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 
 export default function QuoteListPage() {
+  const { company, role } = useApp()
 const router = useRouter()
   const [quotes, setQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchQuotes = async () => {
+      if (!company && role !== 'god_admin') {
+        setLoading(false)
+        return
+      }
+
       // 1. 견적서 가져오기
-      const { data: quotesData, error: quoteError } = await supabase
+      let query = supabase
         .from('quotes')
         .select('*')
+
+      if (role !== 'god_admin' && company) {
+        query = query.eq('company_id', company.id)
+      }
+
+      const { data: quotesData, error: quoteError } = await query
         .order('id', { ascending: false })
 
       if (quoteError || !quotesData) {
@@ -50,7 +63,7 @@ const router = useRouter()
     }
 
     fetchQuotes()
-  }, [])
+  }, [company, role])
 
   const f = (n: number) => n?.toLocaleString() || '0'
 
