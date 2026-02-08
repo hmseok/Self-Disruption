@@ -84,7 +84,7 @@ function MenuItem({ item, pathname, accent }: { item: { name: string; path: stri
             : 'bg-steel-600 text-white shadow-sm shadow-steel-900/30'
           : accent
             ? 'text-sky-300/60 hover:bg-sky-900/10 hover:text-sky-200'
-            : 'text-steel-400 hover:bg-steel-900 hover:text-steel-200'
+            : 'text-steel-300 hover:bg-steel-800 hover:text-white'
       }`}
     >
       <Icon />
@@ -224,12 +224,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <div className="flex h-[100dvh] bg-gray-50 overflow-hidden">
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-950/95 backdrop-blur-sm border-b border-steel-900/50 safe-top">
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-900/95 backdrop-blur-sm border-b border-steel-700/50 safe-top">
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="text-white p-1.5 rounded-lg hover:bg-steel-900 transition-colors flex-shrink-0"
+              className="text-white p-1.5 rounded-lg hover:bg-steel-800 transition-colors flex-shrink-0"
             >
               <Icons.Menu />
             </button>
@@ -242,7 +242,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <select
                 value={adminSelectedCompanyId || ''}
                 onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
-                className="ml-auto flex-1 min-w-0 max-w-48 bg-steel-900/80 text-white text-xs font-medium rounded-md px-2 py-1.5 border border-steel-800 focus:outline-none focus:border-sky-500 cursor-pointer truncate"
+                className="ml-auto flex-1 min-w-0 max-w-48 bg-steel-800/80 text-white text-xs font-medium rounded-md px-2 py-1.5 border border-steel-800 focus:outline-none focus:border-sky-500 cursor-pointer truncate"
               >
                 <option value="">전체 보기</option>
                 {allCompanies.map((c: any) => (
@@ -266,22 +266,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       />
 
       {/* 사이드바 */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 bg-steel-950 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 bg-steel-900 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
-          <div className="px-5 py-4 flex items-center justify-between border-b border-steel-900">
+          <div className="px-5 py-4 flex items-center justify-between border-b border-steel-800">
             <span className="text-lg font-black text-white tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')}>
               Sideline
             </span>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-steel-500 hover:text-white lg:hidden">
+            <button onClick={() => setIsSidebarOpen(false)} className="text-steel-400 hover:text-white lg:hidden">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
 
           {/* 워크스페이스 */}
           <div className="px-3 py-3">
-            <div className="bg-steel-900/60 rounded-lg px-3 py-3 border border-steel-800/40">
+            <div className="bg-steel-800/50 rounded-lg px-3 py-3 border border-steel-700/30">
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
                 <div className="text-white font-bold text-sm truncate">
@@ -307,7 +307,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                   role === 'god_admin' ? 'bg-sky-900/80 text-sky-300' :
                   role === 'master' ? 'bg-blue-900/80 text-blue-300' :
-                  'bg-steel-800 text-steel-400'
+                  'bg-steel-800 text-steel-300'
                 }`}>
                   {role === 'god_admin' ? 'GOD ADMIN' : role === 'master' ? '관리자' : '직원'}
                 </span>
@@ -339,7 +339,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <select
                   value={adminSelectedCompanyId || ''}
                   onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
-                  className="w-full bg-steel-900 text-white text-xs font-bold rounded-md px-2 py-1.5 border border-steel-700 focus:outline-none focus:border-sky-500 cursor-pointer"
+                  className="w-full bg-steel-800 text-white text-xs font-bold rounded-md px-2 py-1.5 border border-steel-700 focus:outline-none focus:border-sky-500 cursor-pointer"
                 >
                   <option value="">전체 보기</option>
                   {allCompanies.map((c: any) => (
@@ -360,7 +360,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
                   pathname === '/dashboard'
                     ? 'bg-steel-600 text-white shadow-sm shadow-steel-900/30'
-                    : 'text-steel-400 hover:bg-steel-900 hover:text-steel-200'
+                    : 'text-steel-300 hover:bg-steel-800 hover:text-white'
                 }`}
               >
                 <Icons.Home />
@@ -372,7 +372,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             {businessGroups.map(group => (
               <div key={group.id} className="mb-3">
                 <div className="px-3 mb-1">
-                  <span className="text-[10px] font-bold text-steel-500 uppercase tracking-wider">{group.label}</span>
+                  <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">{group.label}</span>
                 </div>
                 <div className="space-y-0.5">
                   {group.items.map(item => (
@@ -384,7 +384,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
             {/* 구분선 + 관리 영역 */}
             {(showPlatform || showSettings) && (
-              <div className="border-t border-steel-900 mt-3 pt-3">
+              <div className="border-t border-steel-800 mt-3 pt-3">
 
                 {/* 플랫폼 관리 (god_admin) */}
                 {showPlatform && (
@@ -404,7 +404,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 {showSettings && (
                   <div className="mb-3">
                     <div className="px-3 mb-1">
-                      <span className="text-[10px] font-bold text-steel-500 uppercase tracking-wider">설정</span>
+                      <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">설정</span>
                     </div>
                     <div className="space-y-0.5">
                       {SETTINGS_MENUS.map(item => (
@@ -418,7 +418,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </nav>
 
           {/* 유저 정보 */}
-          <div className="p-3 border-t border-steel-900">
+          <div className="p-3 border-t border-steel-800">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-steel-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
                 {user?.email?.[0]?.toUpperCase()}
@@ -427,7 +427,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <p className="text-xs font-medium truncate text-steel-300">{user?.email}</p>
                 <button
                   onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
-                  className="text-[10px] text-steel-500 hover:text-red-400 transition-colors"
+                  className="text-[10px] text-steel-400 hover:text-red-400 transition-colors"
                 >
                   로그아웃
                 </button>
