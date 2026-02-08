@@ -220,19 +220,19 @@ const { company, role } = useApp()
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-12 px-6 bg-gray-50/50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
         <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/공제 관리</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/공제 관리</h1>
             <p className="text-gray-500 mt-2 text-sm">청약서/증권을 업로드하면 AI가 <b>자동 분류 및 병합</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">
-            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 및 병합 중...' : '증권 업로드'}</span>
                 <input type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
             </label>
-            <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-5 py-3 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
+            <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
                 <Icons.Plus /> <span>차량 선택 등록</span>
             </button>
         </div>
@@ -250,36 +250,37 @@ const { company, role } = useApp()
        )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[700px]">
           <thead className="bg-gray-50/50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs tracking-wider">
             <tr>
-                <th className="p-5 pl-8">차량번호</th>
-                <th className="p-5">차대번호 (VIN)</th>
-                <th className="p-5">브랜드/모델</th>
-                <th className="p-5">보험사</th>
-                <th className="p-5">만기일</th>
-                <th className="p-5 text-right">보험료</th>
-                <th className="p-5 text-center">상태</th>
-                <th className="p-5 text-center">관리</th>
+                <th className="p-3 md:p-5 pl-4 md:pl-8">차량번호</th>
+                <th className="p-3 md:p-5 hidden sm:table-cell">차대번호 (VIN)</th>
+                <th className="p-3 md:p-5 hidden md:table-cell">브랜드/모델</th>
+                <th className="p-3 md:p-5">보험사</th>
+                <th className="p-3 md:p-5">만기일</th>
+                <th className="p-3 md:p-5 text-right">보험료</th>
+                <th className="p-3 md:p-5 text-center">상태</th>
+                <th className="p-3 md:p-5 text-center">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {list.map((item) => (
               <tr key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="hover:bg-blue-50/30 cursor-pointer transition-colors group">
-                <td className="p-5 pl-8 font-black text-lg text-gray-900">{item.number}</td>
-                <td className="p-5">
+                <td className="p-3 md:p-5 pl-4 md:pl-8 font-black text-lg text-gray-900">{item.number}</td>
+                <td className="p-3 md:p-5 hidden sm:table-cell">
                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono text-xs font-bold border border-gray-200 select-all">
                         {item.vin || '-'}
                      </span>
                 </td>
-                <td className="p-5 text-gray-700 font-medium">
+                <td className="p-3 md:p-5 text-gray-700 font-medium hidden md:table-cell">
                     <span className="text-blue-600 font-bold mr-1">{item.brand}</span>
                     {item.model}
                 </td>
-                <td className="p-5 font-bold text-gray-700">{item.insurance?.company || '-'}</td>
-                <td className="p-5 font-mono text-gray-600">{item.insurance?.end_date || '-'}</td>
-                <td className="p-5 text-right font-medium text-blue-600">{item.insurance?.premium ? `${f(item.insurance.premium)}원` : '-'}</td>
-                <td className="p-5 text-center">
+                <td className="p-3 md:p-5 font-bold text-gray-700">{item.insurance?.company || '-'}</td>
+                <td className="p-3 md:p-5 font-mono text-gray-600">{item.insurance?.end_date || '-'}</td>
+                <td className="p-3 md:p-5 text-right font-medium text-blue-600">{item.insurance?.premium ? `${f(item.insurance.premium)}원` : '-'}</td>
+                <td className="p-3 md:p-5 text-center">
                   {item.insurance ? (
                       new Date(item.insurance.end_date) < new Date() ?
                       <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">만료됨</span> :
@@ -288,7 +289,7 @@ const { company, role } = useApp()
                       <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-full text-xs font-bold">미가입</span>
                   )}
                 </td>
-                <td className="p-5 text-center">
+                <td className="p-3 md:p-5 text-center">
                     {item.insurance && (
                         <button
                             onClick={(e) => handleDeleteInsurance(e, item.insurance.id)}
@@ -301,9 +302,10 @@ const { company, role } = useApp()
                 </td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan={8} className="p-20 text-center text-gray-400">등록된 차량이 없습니다.</td></tr>}
+            {list.length === 0 && <tr><td colSpan={8} className="p-12 md:p-20 text-center text-gray-400">등록된 차량이 없습니다.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isModalOpen && (

@@ -192,7 +192,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showSettings = role === 'god_admin' || role === 'master'
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 overflow-x-hidden">
       {/* 모바일 토글 */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -362,8 +362,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60">
-        <div className="min-h-screen">
+      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-x-hidden w-full min-w-0">
+        <div className="min-h-screen pt-14 lg:pt-0 overflow-x-hidden max-w-full">
           {children}
         </div>
       </main>

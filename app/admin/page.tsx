@@ -14,6 +14,7 @@ type CompanyWithUsers = {
   id: string
   name: string
   business_number: string | null
+  business_registration_url: string | null
   plan: string
   is_active: boolean
   created_at: string
@@ -98,6 +99,47 @@ export default function AdminDashboard() {
     fetchData()
   }
 
+  // 사업자등록증 업로드
+  const [uploadingCompanyId, setUploadingCompanyId] = useState<string | null>(null)
+
+  const handleUploadBusinessDoc = async (companyId: string, file: File) => {
+    if (!file) return
+    setUploadingCompanyId(companyId)
+    try {
+      // 현재 로그인 사용자 UID 가져오기 (폴더 정책용)
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const uid = authUser?.id || 'admin'
+
+      // 파일 Storage 업로드 (uid 폴더 하위에 저장)
+      const ext = file.name.split('.').pop() || 'jpg'
+      const filePath = `${uid}/business_doc_${companyId}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('business-docs')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('business-docs')
+        .getPublicUrl(filePath)
+
+      // companies 테이블 업데이트
+      const { error: updateError } = await supabase
+        .from('companies')
+        .update({ business_registration_url: urlData.publicUrl })
+        .eq('id', companyId)
+
+      if (updateError) throw updateError
+
+      alert('✅ 사업자등록증이 등록되었습니다.')
+      fetchData()
+    } catch (err: any) {
+      alert('업로드 실패: ' + err.message)
+    } finally {
+      setUploadingCompanyId(null)
+    }
+  }
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
 
   // 필터링
@@ -118,55 +160,55 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* 헤더 */}
-        <div className="mb-8 flex justify-between items-end">
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
               {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
             </h1>
-            <p className="text-slate-500 mt-1">회사 가입 승인 및 사용자 관리</p>
+            <p className="text-slate-500 mt-1 text-sm">회사 가입 승인 및 사용자 관리</p>
           </div>
           <div className="flex gap-2">
             {role === 'god_admin' && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"
+                className="px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-indigo-700"
               >
-                + 회사 직접 등록
+                + 회사 등록
               </button>
             )}
-            <button onClick={fetchData} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">
+            <button onClick={fetchData} className="px-3 md:px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs md:text-sm font-bold text-slate-600 hover:bg-slate-100">
               새로고침
             </button>
           </div>
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-xs font-bold text-slate-400 uppercase mb-1">전체 회사</div>
-            <div className="text-3xl font-black text-slate-900">{companies.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">전체 회사</div>
+            <div className="text-2xl md:text-3xl font-black text-slate-900">{companies.length}</div>
           </div>
           {pendingCount > 0 && (
-            <div className="bg-yellow-50 p-5 rounded-2xl border border-yellow-200 shadow-sm">
-              <div className="text-xs font-bold text-yellow-600 uppercase mb-1">승인 대기</div>
-              <div className="text-3xl font-black text-yellow-700">{pendingCount}</div>
+            <div className="bg-yellow-50 p-4 md:p-5 rounded-2xl border border-yellow-200 shadow-sm">
+              <div className="text-[10px] md:text-xs font-bold text-yellow-600 uppercase mb-1">승인 대기</div>
+              <div className="text-2xl md:text-3xl font-black text-yellow-700">{pendingCount}</div>
             </div>
           )}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-xs font-bold text-slate-400 uppercase mb-1">전체 사용자</div>
-            <div className="text-3xl font-black text-blue-600">{companies.reduce((sum, c) => sum + c.users.length, 0)}</div>
+          <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">전체 사용자</div>
+            <div className="text-2xl md:text-3xl font-black text-blue-600">{companies.reduce((sum, c) => sum + c.users.length, 0)}</div>
           </div>
-          <Link href="/admin/employees" className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
-            <div className="text-xs font-bold text-slate-400 uppercase mb-1">바로가기</div>
-            <div className="text-lg font-bold text-slate-700 group-hover:text-blue-600">조직/권한 관리 →</div>
+          <Link href="/admin/employees" className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
+            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">바로가기</div>
+            <div className="text-sm md:text-lg font-bold text-slate-700 group-hover:text-blue-600">조직/권한 →</div>
           </Link>
         </div>
 
         {/* 필터 탭 */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4 md:mb-6 overflow-x-auto">
           {[
             { key: 'all', label: '전체', count: companies.length },
             { key: 'pending', label: '승인 대기', count: pendingCount },
@@ -193,16 +235,16 @@ export default function AdminDashboard() {
               !comp.is_active ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200'
             }`}>
               {/* 회사 헤더 */}
-              <div className="p-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm ${
+              <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
                     !comp.is_active ? 'bg-yellow-500' : 'bg-indigo-600'
                   }`}>
                     {comp.name[0]}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{comp.name}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 text-sm md:text-base">{comp.name}</span>
                       {!comp.is_active && (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 animate-pulse">
                           승인 대기
@@ -216,10 +258,46 @@ export default function AdminDashboard() {
                         {comp.plan.toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="text-xs text-slate-400">{comp.business_number || '사업자번호 없음'}</span>
                       <span className="text-xs text-slate-400">가입: {formatDate(comp.created_at)}</span>
                       <span className="text-xs text-slate-400">직원 {comp.users.length}명</span>
+                      {comp.business_registration_url && (
+                        <a
+                          href={comp.business_registration_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                          </svg>
+                          사업자등록증
+                        </a>
+                      )}
+                      {role === 'god_admin' && (
+                        <label className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                          comp.business_registration_url
+                            ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                        } ${uploadingCompanyId === comp.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                          </svg>
+                          {uploadingCompanyId === comp.id ? '업로드중...' : comp.business_registration_url ? '재등록' : '등록증 업로드'}
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            disabled={uploadingCompanyId === comp.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleUploadBusinessDoc(comp.id, file)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -247,8 +325,8 @@ export default function AdminDashboard() {
 
               {/* 소속 유저 목록 */}
               {comp.users.length > 0 && (
-                <div className="border-t border-slate-100">
-                  <table className="w-full text-left">
+                <div className="border-t border-slate-100 overflow-x-auto">
+                  <table className="w-full text-left min-w-[500px]">
                     <thead>
                       <tr className="bg-slate-50/50">
                         <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이름</th>

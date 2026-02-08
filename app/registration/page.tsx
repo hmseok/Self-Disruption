@@ -254,21 +254,21 @@ const { company, role } = useApp()
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-12 px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
 
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
          <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">차량 등록증 관리</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">차량 등록증 관리</h1>
             <p className="text-gray-500 mt-2 text-sm">등록증(PDF/이미지) 업로드 시 AI가 브랜드/모델을 자동 분석합니다.</p>
          </div>
          <div className="flex gap-3">
-            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
                 {/* 🔥 .pdf 추가 */}
                 <input type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
             </label>
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-5 py-3 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
                 <Icons.Plus /> <span>수동 등록</span>
             </button>
          </div>
@@ -294,21 +294,21 @@ const { company, role } = useApp()
        {/* 리스트 테이블 */}
        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[650px]">
                 <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs font-bold tracking-wider">
                     <tr>
-                        <th className="p-5 pl-8 w-20">이미지</th>
-                        <th className="p-5">차량 정보 (번호/모델)</th>
-                        <th className="p-5">소유자 / 차대번호</th>
-                        <th className="p-5">연식 / 연료</th>
-                        <th className="p-5 text-right">취득가액</th>
-                        <th className="p-5 text-center">관리</th>
+                        <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
+                        <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
+                        <th className="p-3 md:p-5 hidden sm:table-cell">소유자 / 차대번호</th>
+                        <th className="p-3 md:p-5 hidden md:table-cell">연식 / 연료</th>
+                        <th className="p-3 md:p-5 text-right">취득가액</th>
+                        <th className="p-3 md:p-5 text-center">관리</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {cars.map((car) => (
                         <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-blue-50/30 transition-colors cursor-pointer">
-                            <td className="p-5 pl-8">
+                            <td className="p-3 md:p-5 pl-4 md:pl-8">
                                 <div className="w-14 h-10 bg-gray-100 rounded border overflow-hidden">
                                     {car.registration_image_url ?
                                         (car.registration_image_url.endsWith('.pdf') ?
@@ -319,27 +319,27 @@ const { company, role } = useApp()
                                     }
                                 </div>
                             </td>
-                            <td className="p-5">
+                            <td className="p-3 md:p-5">
                                 <div className="font-black text-gray-900 text-lg">{car.number}</div>
                                 <div className="text-gray-500 text-sm font-medium">
                                     <span className="text-blue-600 font-bold mr-1">{car.brand}</span>
                                     {car.model}
                                 </div>
                             </td>
-                            <td className="p-5">
+                            <td className="p-3 md:p-5 hidden sm:table-cell">
                                 <div className="text-gray-900 font-bold">{car.owner_name || '-'}</div>
                                 <div className="text-xs text-gray-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-gray-100 select-all">
                                     {car.vin || '-'}
                                 </div>
                             </td>
-                            <td className="p-5">
+                            <td className="p-3 md:p-5 hidden md:table-cell">
                                 <div className="flex flex-wrap gap-1">
                                     <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
                                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.fuel_type === '전기' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type || '기타'}</span>
                                 </div>
                             </td>
-                            <td className="p-5 text-right font-bold text-gray-700">{f(car.purchase_price)}원</td>
-                            <td className="p-5 text-center">
+                            <td className="p-3 md:p-5 text-right font-bold text-gray-700">{f(car.purchase_price)}원</td>
+                            <td className="p-3 md:p-5 text-center">
                                 <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
                             </td>
                         </tr>

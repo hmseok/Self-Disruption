@@ -25,6 +25,11 @@ function AuthPage() {
     name: '', phone: '', companyName: '', businessNumber: '',
   })
 
+  // 사업자등록증 파일
+  const [bizFile, setBizFile] = useState<File | null>(null)
+  const [bizFilePreview, setBizFilePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [validity, setValidity] = useState({
     email: false, password: false, passwordConfirm: false,
     phone: false, companyName: false,
@@ -86,6 +91,71 @@ function AuthPage() {
     if (clean.length < 10) return
     const { data } = await supabase.rpc('check_business_number_exists', { check_bn: bn })
     setDupCheck(prev => ({ ...prev, businessNumber: data === true ? false : true }))
+  }
+
+  // 사업자등록증 파일 선택 핸들러
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 파일 크기 체크 (10MB 이하)
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ text: '파일 크기는 10MB 이하만 가능합니다.', type: 'error' })
+      return
+    }
+
+    // 파일 형식 체크
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if (!allowedTypes.includes(file.type)) {
+      setMessage({ text: 'JPG, PNG, WEBP, PDF 파일만 업로드 가능합니다.', type: 'error' })
+      return
+    }
+
+    setBizFile(file)
+
+    // 이미지 미리보기
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (ev) => setBizFilePreview(ev.target?.result as string)
+      reader.readAsDataURL(file)
+    } else {
+      setBizFilePreview(null) // PDF는 미리보기 없이 파일명만 표시
+    }
+  }
+
+  const handleFileRemove = () => {
+    setBizFile(null)
+    setBizFilePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // 사업자등록증 업로드 (회원가입 후 호출)
+  const uploadBusinessDoc = async (userId: string): Promise<string | null> => {
+    if (!bizFile) return null
+
+    try {
+      const ext = bizFile.name.split('.').pop()?.toLowerCase() || 'file'
+      const filePath = `${userId}/business_registration.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('business-docs')
+        .upload(filePath, bizFile, { upsert: true })
+
+      if (uploadError) {
+        console.error('파일 업로드 실패:', uploadError)
+        return null
+      }
+
+      // 공개 URL 생성
+      const { data: urlData } = supabase.storage
+        .from('business-docs')
+        .getPublicUrl(filePath)
+
+      return urlData?.publicUrl || null
+    } catch (err) {
+      console.error('업로드 에러:', err)
+      return null
+    }
   }
 
   // 이미 로그인된 사용자 → 바로 이동
@@ -277,7 +347,7 @@ function AuthPage() {
     }
 
     // 5. Supabase 회원가입 실행
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
@@ -296,6 +366,15 @@ function AuthPage() {
       setMessage({ text: error.message, type: 'error' })
       setLoading(false)
       return
+    }
+
+    // 6. 사업자등록증 업로드 (대표만, 파일이 있을 때)
+    if (roleType === 'founder' && bizFile && signUpData?.user?.id) {
+      const docUrl = await uploadBusinessDoc(signUpData.user.id)
+      if (docUrl) {
+        // 회사 레코드에 URL 저장 (RPC)
+        await supabase.rpc('update_company_doc_url', { doc_url: docUrl })
+      }
     }
 
     setLoading(false)
@@ -408,7 +487,7 @@ function AuthPage() {
   // RENDER
   // ==================================
   return (
-    <div className="flex min-h-screen w-full font-sans">
+    <div className="flex min-h-screen w-full font-sans overflow-x-hidden">
 
       {/* ========== LEFT PANEL - Brand ========== */}
       <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white flex-col justify-between p-14 relative overflow-hidden">
@@ -834,6 +913,64 @@ function AuthPage() {
                           className="w-full px-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl outline-none text-sm font-medium text-slate-900 placeholder-slate-300 focus:bg-white focus:border-slate-300 transition-all"/>
                       </div>
                     )}
+
+                    {/* 사업자등록증 첨부 (대표만) */}
+                    {roleType === 'founder' && (
+                      <div className="animate-fade-in-down">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                          Business Registration Doc <span className="text-slate-300 normal-case">(선택)</span>
+                        </label>
+
+                        {!bizFile ? (
+                          <label
+                            className="flex flex-col items-center justify-center w-full h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all group"
+                          >
+                            <div className="flex flex-col items-center gap-1.5">
+                              <svg className="w-7 h-7 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                              </svg>
+                              <span className="text-xs text-slate-400 group-hover:text-blue-500 font-medium">사업자등록증 업로드</span>
+                              <span className="text-[10px] text-slate-300">JPG, PNG, PDF (10MB 이하)</span>
+                            </div>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                            />
+                          </label>
+                        ) : (
+                          <div className="bg-slate-50 border-2 border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                            {/* 미리보기 */}
+                            {bizFilePreview ? (
+                              <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
+                                <img src={bizFilePreview} alt="미리보기" className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+                                <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-700 truncate">{bizFile.name}</p>
+                              <p className="text-[10px] text-slate-400">{(bizFile.size / 1024 / 1024).toFixed(1)}MB</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleFileRemove}
+                              className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -882,6 +1019,7 @@ function AuthPage() {
                     setFormData({ email: '', password: '', passwordConfirm: '', name: '', phone: '', companyName: '', businessNumber: '' })
                     setValidity({ email: false, password: false, passwordConfirm: false, phone: false, companyName: false })
                     setDupCheck({ email: null, phone: null, companyName: null, businessNumber: null })
+                    handleFileRemove()
                   }}
                   className="ml-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
                 >

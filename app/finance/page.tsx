@@ -180,13 +180,13 @@ const router = useRouter()
   const filteredList = list.filter(item => activeTab === 'ledger' ? item.status === 'completed' : item.status === 'pending')
 
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6 pb-40 animate-fade-in-up">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 pb-20 md:pb-40 animate-fade-in-up">
 
       {/* 1. 상단 헤더 (제목 + 날짜) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b pb-6 gap-4">
           <div>
               <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-black text-gray-900">💰 자금 관리</h1>
+                  <h1 className="text-2xl md:text-3xl font-black text-gray-900">💰 자금 관리</h1>
                   <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
                          className="border-2 border-gray-200 rounded-lg px-3 py-1 font-bold text-lg bg-gray-50 hover:bg-white focus:border-indigo-500 transition-colors cursor-pointer text-gray-700" />
               </div>
@@ -206,18 +206,18 @@ const router = useRouter()
 
       {/* 2. 대시보드 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
-              <div><p className="text-gray-500 text-xs font-bold mb-1">총 수입 (+)</p><h3 className="text-2xl font-black text-blue-600">{nf(summary.income)}</h3></div>
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
+              <div><p className="text-gray-500 text-xs font-bold mb-1">총 수입 (+)</p><h3 className="text-xl md:text-2xl font-black text-blue-600">{nf(summary.income)}</h3></div>
               <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl">🔵</div>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
-              <div><p className="text-gray-500 text-xs font-bold mb-1">총 지출 (-)</p><h3 className="text-2xl font-black text-red-600">{nf(summary.expense)}</h3></div>
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
+              <div><p className="text-gray-500 text-xs font-bold mb-1">총 지출 (-)</p><h3 className="text-xl md:text-2xl font-black text-red-600">{nf(summary.expense)}</h3></div>
               <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-xl">🔴</div>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-white p-6 rounded-2xl border border-green-100 shadow-sm flex justify-between items-center">
+          <div className="bg-gradient-to-br from-green-50 to-white p-4 md:p-6 rounded-2xl border border-green-100 shadow-sm flex justify-between items-center">
               <div>
                   <p className="text-green-800 text-xs font-bold mb-1">지출 예정 (Pending)</p>
-                  <h3 className="text-2xl font-black text-green-700">-{nf(summary.pendingExpense)}</h3>
+                  <h3 className="text-xl md:text-2xl font-black text-green-700">-{nf(summary.pendingExpense)}</h3>
               </div>
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">🔮</div>
           </div>
@@ -252,7 +252,7 @@ const router = useRouter()
       </div>
 
       {/* 4. 입력 폼 (Ref) */}
-      <div ref={formRef} className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100 mb-8 scroll-mt-32 ring-1 ring-black/5">
+      <div ref={formRef} className="bg-white p-4 md:p-6 rounded-3xl shadow-lg border border-gray-100 mb-8 scroll-mt-32 ring-1 ring-black/5">
           <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   {activeTab === 'schedule' ? '🗓️ 예정 내역 등록' : '✏️ 입출금 내역 등록'}
@@ -306,60 +306,62 @@ const router = useRouter()
               </h3>
               <span className="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full font-bold text-gray-500">Total: {filteredList.length}</span>
           </div>
-          <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
-                  <tr>
-                      <th className="p-4 pl-6 font-bold">Date</th>
-                      <th className="p-4 font-bold">Type</th>
-                      <th className="p-4 font-bold">Category</th>
-                      <th className="p-4 font-bold">Description</th>
-                      <th className="p-4 font-bold text-right">Amount</th>
-                      <th className="p-4 pr-6 font-bold text-center">Action</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 text-sm">
-                  {loading ? (
-                      <tr><td colSpan={6} className="p-10 text-center text-gray-400">데이터를 불러오는 중입니다...</td></tr>
-                  ) : filteredList.length === 0 ? (
-                      <tr><td colSpan={6} className="p-20 text-center text-gray-400 bg-gray-50/30">
-                          {activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}
-                      </td></tr>
-                  ) : (
-                      filteredList.map((item) => (
-                          <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                              <td className="p-4 pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
-                              <td className="p-4">
-                                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                                      {item.type === 'income' ? '수입' : '지출'}
-                                  </span>
-                              </td>
-                              <td className="p-4 font-bold text-gray-700">{item.category}</td>
-                              <td className="p-4">
-                                  <div className="font-bold text-gray-900">{item.client_name}</div>
-                                  <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>
-                              </td>
-                              <td className={`p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
-                                  {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
-                              </td>
-                              <td className="p-4 pr-6 text-center">
-                                  {item.status === 'pending' ? (
-                                      <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <button onClick={() => handleConfirm(item.id)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm">
-                                              승인
+          <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
+                      <tr>
+                          <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">Date</th>
+                          <th className="p-3 md:p-4 font-bold hidden sm:table-cell">Type</th>
+                          <th className="p-3 md:p-4 font-bold hidden sm:table-cell">Category</th>
+                          <th className="p-3 md:p-4 font-bold">Description</th>
+                          <th className="p-3 md:p-4 font-bold text-right">Amount</th>
+                          <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">Action</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 text-sm">
+                      {loading ? (
+                          <tr><td colSpan={6} className="p-10 text-center text-gray-400">데이터를 불러오는 중입니다...</td></tr>
+                      ) : filteredList.length === 0 ? (
+                          <tr><td colSpan={6} className="p-20 text-center text-gray-400 bg-gray-50/30">
+                              {activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}
+                          </td></tr>
+                      ) : (
+                          filteredList.map((item) => (
+                              <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
+                                  <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
+                                  <td className="p-3 md:p-4 hidden sm:table-cell">
+                                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                          {item.type === 'income' ? '수입' : '지출'}
+                                      </span>
+                                  </td>
+                                  <td className="p-3 md:p-4 font-bold text-gray-700 hidden sm:table-cell">{item.category}</td>
+                                  <td className="p-3 md:p-4">
+                                      <div className="font-bold text-gray-900">{item.client_name}</div>
+                                      <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>
+                                  </td>
+                                  <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
+                                  </td>
+                                  <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
+                                      {item.status === 'pending' ? (
+                                          <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button onClick={() => handleConfirm(item.id)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm">
+                                                  승인
+                                              </button>
+                                              <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5">🗑️</button>
+                                          </div>
+                                      ) : (
+                                          <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity px-2">
+                                              삭제
                                           </button>
-                                          <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5">🗑️</button>
-                                      </div>
-                                  ) : (
-                                      <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity px-2">
-                                          삭제
-                                      </button>
-                                  )}
-                              </td>
-                          </tr>
-                      ))
-                  )}
-              </tbody>
-          </table>
+                                      )}
+                                  </td>
+                              </tr>
+                          ))
+                      )}
+                  </tbody>
+              </table>
+          </div>
       </div>
     </div>
   )

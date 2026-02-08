@@ -52,18 +52,18 @@ const router = useRouter()
   const totalInvest = contracts.reduce((sum, item) => sum + (item.invest_amount || 0), 0)
 
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in-up">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 animate-fade-in-up">
       {/* 상단 헤더 */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900">
              🤝 {currentCompany?.name} 지입/위수탁 관리
           </h1>
           <p className="text-gray-500 mt-2">차주 및 투자자와의 계약 현황을 관리합니다.</p>
         </div>
         <button
           onClick={() => router.push('/jiip/new')} // (나중에 등록 페이지 만들 예정)
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
+          className="bg-indigo-600 text-white px-4 py-2 text-sm md:px-6 md:py-3 md:text-base rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
         >
           + 신규 계약 등록
         </button>
@@ -71,17 +71,17 @@ const router = useRouter()
 
       {/* 요약 대시보드 (간단) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-400 font-bold">총 운영 차량</p>
-            <p className="text-3xl font-black text-gray-800">{contracts.length}대</p>
+            <p className="text-xl md:text-3xl font-black text-gray-800">{contracts.length}대</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-400 font-bold">총 투자 유치금</p>
-            <p className="text-3xl font-black text-indigo-600">{totalInvest.toLocaleString()}원</p>
+            <p className="text-xl md:text-3xl font-black text-indigo-600">{totalInvest.toLocaleString()}원</p>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-400 font-bold">이번 달 지급 예정액</p>
-            <p className="text-3xl font-black text-gray-400">-</p> {/* 추후 구현 */}
+            <p className="text-xl md:text-3xl font-black text-gray-400">-</p> {/* 추후 구현 */}
         </div>
       </div>
 
@@ -97,41 +97,41 @@ const router = useRouter()
            </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="p-5 font-bold">계약 차량</th>
-                  <th className="p-5 font-bold">투자자(차주)</th>
-                  <th className="p-5 font-bold">투자금 / 수익률</th>
-                  <th className="p-5 font-bold">월 관리비</th>
-                  <th className="p-5 font-bold">지급일</th>
-                  <th className="p-5 font-bold text-center">상태</th>
+                  <th className="p-3 md:p-5 font-bold">계약 차량</th>
+                  <th className="p-3 md:p-5 font-bold">투자자(차주)</th>
+                  <th className="p-3 md:p-5 font-bold">투자금 / 수익률</th>
+                  <th className="p-3 md:p-5 font-bold hidden sm:table-cell">월 관리비</th>
+                  <th className="p-3 md:p-5 font-bold hidden sm:table-cell">지급일</th>
+                  <th className="p-3 md:p-5 font-bold text-center">상태</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {contracts.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => router.push(`/jiip/${item.id}`)}>
-                    <td className="p-5">
+                    <td className="p-3 md:p-5">
                       <div className="font-bold text-gray-900">{item.car?.number || '차량 미지정'}</div>
                       <div className="text-xs text-gray-400">{item.car?.model}</div>
                     </td>
-                    <td className="p-5">
+                    <td className="p-3 md:p-5">
                       <div className="font-bold text-gray-700">{item.investor_name}</div>
                       <div className="text-xs text-gray-400">{item.investor_phone}</div>
                     </td>
-                    <td className="p-5">
+                    <td className="p-3 md:p-5">
                       <div className="font-bold text-indigo-600">{item.invest_amount.toLocaleString()}원</div>
                       <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold">
                         {item.share_ratio}% 배분
                       </span>
                     </td>
-                    <td className="p-5 text-sm font-bold text-gray-600">
+                    <td className="p-3 md:p-5 text-sm font-bold text-gray-600 hidden sm:table-cell">
                       {item.admin_fee.toLocaleString()}원
                     </td>
-                    <td className="p-5 text-sm font-bold text-gray-500">
+                    <td className="p-3 md:p-5 text-sm font-bold text-gray-500 hidden sm:table-cell">
                       매월 {item.payout_day}일
                     </td>
-                    <td className="p-5 text-center">
+                    <td className="p-3 md:p-5 text-center">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
                         item.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
                       }`}>

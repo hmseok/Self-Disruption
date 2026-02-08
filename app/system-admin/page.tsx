@@ -116,18 +116,18 @@ export default function SystemAdminPage() {
       <div className="max-w-7xl mx-auto">
 
         {/* 헤더 */}
-        <div className="mb-6 flex justify-between items-end">
-          <div>
+        <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
+          <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">구독/모듈 관리</h1>
-            <p className="text-slate-500 mt-1 text-sm md:text-base">회사별 기능 모듈을 ON/OFF 제어합니다. 모듈을 켜면 해당 회사의 사이드바 메뉴와 대시보드 카드가 활성화됩니다.</p>
+            <p className="text-slate-500 mt-1 text-xs sm:text-sm md:text-base">회사별 기능 모듈을 ON/OFF 제어합니다.</p>
           </div>
-          <button onClick={loadData} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">
+          <button onClick={loadData} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 self-start sm:self-auto flex-shrink-0">
             새로고침
           </button>
         </div>
 
         {/* 필터 + 통계 */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-3 md:gap-4 mb-6">
           <div className="flex gap-2">
             {[
               { key: 'active' as const, label: '승인된 회사', count: companies.filter(c => c.is_active).length },
@@ -161,16 +161,16 @@ export default function SystemAdminPage() {
                 !comp.is_active ? 'border-yellow-300 opacity-60' : 'border-slate-200'
               }`}>
                 {/* 회사 헤더 */}
-                <div className="p-5 flex items-center justify-between border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm ${
+                <div className="p-3 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
                       comp.is_active ? 'bg-indigo-600' : 'bg-yellow-500'
                     }`}>
                       {comp.name[0]}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{comp.name}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-sm md:text-base">{comp.name}</span>
                         <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
                           comp.plan === 'master' ? 'bg-yellow-100 text-yellow-700' :
                           comp.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
@@ -206,21 +206,21 @@ export default function SystemAdminPage() {
                 </div>
 
                 {/* 모듈 토글 그리드 */}
-                <div className="p-3 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3">
+                <div className="p-2 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-3">
                   {modules.map(mod => {
                     const isActive = !!matrix[`${comp.id}_${mod.id}`]
                     return (
                       <button
                         key={mod.id}
                         onClick={() => toggleModule(comp.id, mod.id, isActive)}
-                        className={`relative p-3 rounded-xl border-2 text-left transition-all ${
+                        className={`relative p-2 md:p-3 rounded-xl border-2 text-left transition-all ${
                           isActive
                             ? 'border-blue-400 bg-blue-50'
                             : 'border-slate-200 bg-slate-50 opacity-50 hover:opacity-80'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-bold text-slate-800 truncate">{mod.name}</span>
+                        <div className="flex items-center justify-between mb-1 gap-1">
+                          <span className="text-xs md:text-sm font-bold text-slate-800 truncate">{mod.name}</span>
                           <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isActive ? 'bg-blue-500' : 'bg-slate-300'}`} />
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>

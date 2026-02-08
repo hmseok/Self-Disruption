@@ -32,8 +32,8 @@ type PlatformStats = {
   pendingCompanies: number
   totalUsers: number
   totalActiveModules: number
-  pendingList: { id: string; name: string; business_number: string; plan: string; created_at: string }[]
-  companyList: { id: string; name: string; plan: string; is_active: boolean; created_at: string; moduleCount: number }[]
+  pendingList: { id: string; name: string; business_number: string; business_registration_url: string | null; plan: string; created_at: string }[]
+  companyList: { id: string; name: string; plan: string; is_active: boolean; created_at: string; moduleCount: number; business_registration_url: string | null }[]
 }
 
 export default function DashboardPage() {
@@ -96,14 +96,14 @@ export default function DashboardPage() {
         // 승인 대기 회사 목록
         const { data: pendingData } = await supabase
           .from('companies')
-          .select('id, name, business_number, plan, created_at')
+          .select('id, name, business_number, business_registration_url, plan, created_at')
           .eq('is_active', false)
           .order('created_at', { ascending: false })
 
         // 전체 회사 목록 (활성 모듈 수 포함)
         const { data: allCompanies } = await supabase
           .from('companies')
-          .select('id, name, plan, is_active, created_at')
+          .select('id, name, plan, is_active, created_at, business_registration_url')
           .eq('is_active', true)
           .order('created_at', { ascending: false })
 
@@ -410,6 +410,19 @@ export default function DashboardPage() {
                       </div>
                       {c.business_number && <p className="text-xs text-gray-400">사업자번호: {c.business_number}</p>}
                       <p className="text-xs text-gray-400">신청일: {new Date(c.created_at).toLocaleDateString('ko-KR')}</p>
+                      {c.business_registration_url && (
+                        <a
+                          href={c.business_registration_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                          </svg>
+                          사업자등록증 보기
+                        </a>
+                      )}
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       <button
@@ -460,12 +473,13 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-              <table className="w-full text-left min-w-[500px]">
+              <table className="w-full text-left min-w-[560px]">
                 <thead className="bg-gray-50 text-gray-400 text-xs font-bold uppercase tracking-wider">
                   <tr>
                     <th className="p-3 md:p-4">회사명</th>
                     <th className="p-3 md:p-4 text-center">플랜</th>
                     <th className="p-3 md:p-4 text-center">활성 모듈</th>
+                    <th className="p-3 md:p-4 text-center">등록증</th>
                     <th className="p-3 md:p-4 text-right">가입일</th>
                   </tr>
                 </thead>
@@ -485,6 +499,24 @@ export default function DashboardPage() {
                       <td className="p-3 md:p-4 text-center">
                         <span className="text-sm font-bold text-gray-700">{c.moduleCount}</span>
                         <span className="text-xs text-gray-400">/9</span>
+                      </td>
+                      <td className="p-3 md:p-4 text-center">
+                        {c.business_registration_url ? (
+                          <a
+                            href={c.business_registration_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                            </svg>
+                            보기
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-gray-300">-</span>
+                        )}
                       </td>
                       <td className="p-3 md:p-4 text-right text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString('ko-KR')}</td>
                     </tr>
@@ -605,32 +637,32 @@ export default function DashboardPage() {
 
       {/* 경영 현황판 */}
       {showFinance && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">월 예상 매출</span>
-              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-sm">💵</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">월 예상 매출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-50 flex items-center justify-center text-sm">💵</span>
             </div>
-            <p className="text-2xl font-black text-blue-600">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
-            <p className="mt-2 text-[11px] text-gray-400">활성 렌트 계약 기준</p>
+            <p className="text-xl md:text-2xl font-black text-blue-600">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">활성 렌트 계약 기준</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">월 고정 지출</span>
-              <span className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-sm">💸</span>
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide">월 고정 지출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-red-50 flex items-center justify-center text-sm">💸</span>
             </div>
-            <p className="text-2xl font-black text-red-500">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
-            <p className="mt-2 text-[11px] text-gray-400">할부금 + 보험료 (월 환산)</p>
+            <p className="text-xl md:text-2xl font-black text-red-500">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">할부금 + 보험료 (월 환산)</p>
           </div>
-          <div className="bg-gray-900 rounded-2xl p-5 shadow-lg ring-2 ring-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wide">월 순수익</span>
-              <span className="w-8 h-8 rounded-lg bg-yellow-900/30 flex items-center justify-center text-sm">🏆</span>
+          <div className="bg-gray-900 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-gray-100">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-yellow-400 uppercase tracking-wide">월 순수익</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-yellow-900/30 flex items-center justify-center text-sm">🏆</span>
             </div>
-            <p className={`text-2xl font-black ${stats.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <p className={`text-xl md:text-2xl font-black ${stats.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {loading ? '-' : formatMoney(stats.netProfit)}<span className="text-sm font-bold text-gray-500 ml-1">원</span>
             </p>
-            <p className="mt-2 text-[11px] text-gray-500">매출 - 고정지출</p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-500">매출 - 고정지출</p>
           </div>
         </div>
       )}
@@ -680,25 +712,25 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               ) : (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                <table className="w-full text-left min-w-[400px]">
+                  <thead className="bg-gray-50 text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="p-4">차량번호</th>
-                      <th className="p-4">차종</th>
-                      <th className="p-4 text-center">상태</th>
-                      <th className="p-4 text-right">등록일</th>
+                      <th className="p-3 md:p-4">차량번호</th>
+                      <th className="p-3 md:p-4">차종</th>
+                      <th className="p-3 md:p-4 text-center">상태</th>
+                      <th className="p-3 md:p-4 text-right">등록일</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {recentCars.map(car => (
                       <tr key={car.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => router.push(`/cars/${car.id}`)}>
-                        <td className="p-4 font-black text-gray-900">{car.number}</td>
-                        <td className="p-4">
-                          <span className="font-bold text-gray-700 text-sm">{car.brand}</span>
-                          <span className="text-gray-400 text-xs ml-1">{car.model}</span>
+                        <td className="p-3 md:p-4 font-black text-gray-900 text-sm">{car.number}</td>
+                        <td className="p-3 md:p-4">
+                          <span className="font-bold text-gray-700 text-xs md:text-sm">{car.brand}</span>
+                          <span className="text-gray-400 text-[10px] md:text-xs ml-1">{car.model}</span>
                         </td>
-                        <td className="p-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                        <td className="p-3 md:p-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-bold ${
                             car.status === 'available' ? 'bg-green-100 text-green-700' :
                             car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
                             'bg-red-100 text-red-600'
@@ -706,7 +738,7 @@ export default function DashboardPage() {
                             {car.status === 'available' ? '대기' : car.status === 'rented' ? '대여' : car.status}
                           </span>
                         </td>
-                        <td className="p-4 text-right text-xs text-gray-400">{car.created_at?.split('T')[0]}</td>
+                        <td className="p-3 md:p-4 text-right text-[10px] md:text-xs text-gray-400">{car.created_at?.split('T')[0]}</td>
                       </tr>
                     ))}
                   </tbody>
