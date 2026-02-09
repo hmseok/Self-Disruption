@@ -1,6 +1,6 @@
 'use client'
 import { supabase } from '../utils/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 
@@ -54,6 +54,8 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
   const [logs, setLogs] = useState<string[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [allCars, setAllCars] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -85,9 +87,24 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
       else { alert("삭제되었습니다."); fetchList(); }
   }
 
+  // 드래그 앤 드롭 핸들러
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+    const files = e.dataTransfer.files
+    if (files?.length) processFiles(files)
+  }
+
+  // 파일 선택 핸들러
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files?.length) processFiles(files)
+    e.target.value = ''
+  }
+
   // 🚀 [AI 업로드] 스마트 병합(Update) 로직 적용
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files
+  const processFiles = async (files: FileList) => {
       if (!files?.length) return
       if (!confirm(`총 ${files.length}건을 분석합니다.\n기존 계약이 있으면 자동으로 파일을 병합(업데이트)합니다.`)) return
 
@@ -230,11 +247,14 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
             <p className="text-gray-500 mt-2 text-sm">청약서/증권을 업로드하면 AI가 <b>자동 분류 및 병합</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">
-            <label className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={bulkProcessing}
+                className={`cursor-pointer group flex items-center gap-2 bg-blue-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+            >
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 및 병합 중...' : '증권 업로드'}</span>
-                <input type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
-            </label>
+            </button>
             <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
                 <Icons.Plus /> <span>차량 선택 등록</span>
             </button>
@@ -251,6 +271,35 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
             <div className="h-32 overflow-y-auto font-mono text-xs text-gray-300 border-t border-gray-700 pt-2 scrollbar-hide">{logs.map((log, i) => <div key={i}>{log}</div>)}</div>
          </div>
        )}
+
+      {/* 드래그 앤 드롭 영역 */}
+      {!bulkProcessing && (
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+            isDragging
+              ? 'border-blue-500 bg-blue-50 scale-[1.01]'
+              : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-blue-50/30'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*, .pdf"
+            className="hidden"
+            onChange={handleBulkUpload}
+          />
+          <div className="text-3xl mb-2">{isDragging ? '📥' : '📄'}</div>
+          <p className="text-sm font-bold text-gray-700">
+            {isDragging ? '여기에 파일을 놓으세요' : '청약서/증권 파일을 드래그하여 업로드'}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         {list.length === 0 ? (

@@ -1,6 +1,6 @@
 'use client'
 import { supabase } from '../../utils/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 
@@ -30,6 +30,16 @@ export default function RegistrationDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+
+  // ESC 키로 이미지 모달 닫기
+  useEffect(() => {
+    if (!isImageModalOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsImageModalOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isImageModalOpen])
 
   const [car, setCar] = useState<any>({})
   const [trims, setTrims] = useState<any[]>([])
