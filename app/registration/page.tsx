@@ -60,6 +60,8 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
   const [logs, setLogs] = useState<string[]>([])
   const [showResultModal, setShowResultModal] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 수동 등록용
   const [standardCodes, setStandardCodes] = useState<any[]>([])
@@ -114,12 +116,25 @@ const { company, role, adminSelectedCompanyId } = useApp()
   // 현재 사용할 company_id 결정
   const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files
+  // 드래그 앤 드롭 핸들러
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+    const files = e.dataTransfer.files
+    if (files?.length) processFiles(files)
+  }
+
+  const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files?.length) processFiles(files)
+    e.target.value = '' // 같은 파일 재선택 가능하도록 초기화
+  }
+
+  const processFiles = async (files: FileList) => {
       if (!files?.length) return
       if (role === 'god_admin' && !adminSelectedCompanyId) {
         alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
-        e.target.value = ''
         return
       }
       if (!confirm(`총 ${files.length}건을 분석합니다.\n(PDF, JPG, PNG 지원)`)) return
@@ -279,8 +294,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
             <label className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5 ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
-                {/* 🔥 .pdf 추가 */}
-                <input type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
+                <input ref={fileInputRef} type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
             </label>
             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
                 <Icons.Plus /> <span>수동 등록</span>
@@ -302,6 +316,31 @@ const { company, role, adminSelectedCompanyId } = useApp()
                 <span className="text-red-400">❌ 실패: {progress.fail}</span>
             </div>
             <div className="h-32 overflow-y-auto font-mono text-xs text-gray-300 border-t border-gray-700 pt-2 scrollbar-hide">{logs.map((log, i) => <div key={i}>{log}</div>)}</div>
+         </div>
+       )}
+
+       {/* 드래그 앤 드롭 업로드 영역 */}
+       {!bulkProcessing && (
+         <div
+           onDragOver={handleDragOver}
+           onDragLeave={handleDragLeave}
+           onDrop={handleDrop}
+           onClick={() => fileInputRef.current?.click()}
+           className={`mb-6 border-2 border-dashed rounded-2xl p-6 md:p-8 text-center cursor-pointer transition-all ${
+             isDragging
+               ? 'border-steel-500 bg-steel-50 scale-[1.01]'
+               : 'border-gray-200 bg-white hover:border-steel-300 hover:bg-steel-50/30'
+           }`}
+         >
+           <div className="flex flex-col items-center gap-2">
+             <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isDragging ? 'bg-steel-100 text-steel-600' : 'bg-gray-100 text-gray-400'}`}>
+               <Icons.Upload />
+             </div>
+             <p className={`font-bold text-sm ${isDragging ? 'text-steel-600' : 'text-gray-500'}`}>
+               {isDragging ? '여기에 파일을 놓으세요' : '등록증 파일을 드래그하거나 클릭하여 업로드'}
+             </p>
+             <p className="text-xs text-gray-400">PDF, JPG, PNG 지원 · 여러 파일 동시 업로드 가능</p>
+           </div>
          </div>
        )}
 

@@ -33,6 +33,12 @@ type PermMatrix = {
   }
 }
 
+const ROLE_LABELS: Record<string, { label: string; bg: string }> = {
+  god_admin: { label: 'GOD ADMIN', bg: 'bg-sky-100 text-sky-700' },
+  master:    { label: '관리자', bg: 'bg-steel-100 text-steel-700' },
+  user:      { label: '직원', bg: 'bg-slate-100 text-slate-600' },
+}
+
 export default function OrgManagementPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
 
@@ -41,8 +47,11 @@ export default function OrgManagementPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
   const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState<string | null>(null)
+
+  // 수정 모달
+  const [editingEmp, setEditingEmp] = useState<any | null>(null)
   const [editForm, setEditForm] = useState<any>({})
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // 탭
   const [activeTab, setActiveTab] = useState<'employees' | 'org' | 'permissions'>('employees')
@@ -66,7 +75,6 @@ export default function OrgManagementPage() {
         setSelectedPosition('')
         loadAll()
       } else {
-        // 회사 미선택 시 초기화
         setEmployees([])
         setPositions([])
         setDepartments([])
@@ -107,7 +115,6 @@ export default function OrgManagementPage() {
     setDepartments(data || [])
   }
 
-  // 회사에 활성화된 모듈만 로드
   const loadModules = async () => {
     if (!activeCompanyId) return
     const { data } = await supabase
@@ -143,9 +150,9 @@ export default function OrgManagementPage() {
     setMatrix(m)
   }
 
-  // ===== 직원 수정 =====
-  const startEdit = (emp: any) => {
-    setEditingId(emp.id)
+  // ===== 직원 수정 모달 =====
+  const openEditModal = (emp: any) => {
+    setEditingEmp(emp)
     setEditForm({
       employee_name: emp.employee_name || '',
       phone: emp.phone || '',
@@ -156,15 +163,48 @@ export default function OrgManagementPage() {
     })
   }
 
+  const closeEditModal = () => {
+    setEditingEmp(null)
+    setEditForm({})
+    setSavingEdit(false)
+  }
+
   const saveEdit = async () => {
-    if (!editingId) return
+    if (!editingEmp) return
     if (role === 'master' && editForm.role === 'god_admin') {
       alert('god_admin 권한은 부여할 수 없습니다.')
       return
     }
-    const { error } = await supabase.from('profiles').update(editForm).eq('id', editingId)
-    if (error) alert('저장 실패: ' + error.message)
-    else { setEditingId(null); loadEmployees() }
+    setSavingEdit(true)
+
+    // FK 필드: 빈 문자열 → null 변환
+    const payload = {
+      ...editForm,
+      position_id: editForm.position_id || null,
+      department_id: editForm.department_id || null,
+    }
+
+    console.log('📝 직원 수정 payload:', payload)
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', editingEmp.id)
+      .select()
+
+    if (error) {
+      alert('저장 실패: ' + error.message)
+      console.error('❌ 직원 수정 에러:', error)
+      setSavingEdit(false)
+    } else if (!data || data.length === 0) {
+      alert('저장 실패: 권한이 없거나 대상을 찾을 수 없습니다. (RLS 정책 확인 필요)')
+      console.warn('⚠️ 업데이트 반환 0건 - RLS 정책 문제 가능성')
+      setSavingEdit(false)
+    } else {
+      console.log('✅ 직원 수정 완료:', data[0])
+      closeEditModal()
+      loadEmployees()
+    }
   }
 
   // ===== 직급 관리 =====
@@ -253,6 +293,12 @@ export default function OrgManagementPage() {
   // 그룹별 모듈 분류
   const moduleGroups = [...new Set(activeModules.map(m => m.group))]
 
+  // 날짜 포맷
+  const formatDate = (d: string) => {
+    if (!d) return '-'
+    return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -267,14 +313,65 @@ export default function OrgManagementPage() {
     { key: 'permissions' as const, label: '페이지 권한', count: activeModules.length },
   ]
 
+  // ── 직원 카드 (공용 컴포넌트) ──
+  const EmployeeCard = ({ emp }: { emp: any }) => {
+    const r = ROLE_LABELS[emp.role] || ROLE_LABELS.user
+    return (
+      <div
+        className="flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50/70 transition-colors cursor-pointer group"
+        onClick={() => openEditModal(emp)}
+      >
+        {/* 아바타 */}
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
+          emp.role === 'god_admin' ? 'bg-sky-500' :
+          emp.role === 'master' ? 'bg-steel-600' :
+          'bg-slate-400'
+        }`}>
+          {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+        </div>
+
+        {/* 정보 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-sm text-slate-900 truncate">{emp.employee_name || '(이름 미설정)'}</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.bg}`}>{r.label}</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${emp.is_active !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+              {emp.is_active !== false ? '활성' : '비활성'}
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5 truncate">{emp.email}</div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {emp.position?.name && (
+              <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.position.name}</span>
+            )}
+            {emp.department?.name && (
+              <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.department.name}</span>
+            )}
+            {emp.phone && (
+              <span className="text-[11px] text-slate-400">{emp.phone}</span>
+            )}
+          </div>
+        </div>
+
+        {/* 가입일 (데스크톱) + 수정 아이콘 */}
+        <div className="hidden md:block text-right flex-shrink-0">
+          <div className="text-[11px] text-slate-400">{formatDate(emp.created_at)}</div>
+        </div>
+        <div className="text-slate-300 group-hover:text-steel-500 transition-colors flex-shrink-0">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
 
         {/* 헤더 */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
-          <p className="text-slate-500 mt-1">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
+        <div className="mb-5 md:mb-6">
+          <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
+          <p className="text-slate-500 mt-1 text-xs md:text-base">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
           {role === 'god_admin' && !adminSelectedCompanyId && (
             <div className="mt-4 p-4 bg-sky-50 border border-sky-200 rounded-xl">
               <p className="text-sm font-bold text-sky-700">사이드바에서 회사를 선택해주세요.</p>
@@ -287,14 +384,14 @@ export default function OrgManagementPage() {
         {role === 'god_admin' && !adminSelectedCompanyId ? null : (<>
 
         {/* 탭 */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-1.5 md:gap-2 mb-5 md:mb-6">
           {TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
+              className={`px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-1.5 md:gap-2 whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-slate-900 text-white shadow-lg'
+                  ? 'bg-steel-600 text-white shadow-lg'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
@@ -311,95 +408,31 @@ export default function OrgManagementPage() {
         {/* ================================================================ */}
         {activeTab === 'employees' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+            <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-bold">직원 목록</h2>
-                <p className="text-sm text-slate-400 mt-0.5">총 {employees.length}명</p>
+                <h2 className="text-base md:text-lg font-bold text-slate-900">직원 목록</h2>
+                <p className="text-xs text-slate-400 mt-0.5">총 {employees.length}명 · 클릭하여 수정</p>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase">이름/이메일</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase">역할</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase">직급</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase">부서</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase">상태</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase text-right">액션</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.map(emp => (
-                    <tr key={emp.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      {editingId === emp.id ? (
-                        <>
-                          <td className="p-4">
-                            <input value={editForm.employee_name} onChange={e => setEditForm({...editForm, employee_name: e.target.value})} className="border rounded px-2 py-1 text-sm w-full" placeholder="이름" />
-                            <div className="text-xs text-slate-400 mt-1">{emp.email}</div>
-                          </td>
-                          <td className="p-4">
-                            <select value={editForm.role} onChange={e => setEditForm({...editForm, role: e.target.value})} className="border rounded px-2 py-1 text-sm focus:border-steel-400 focus:ring-steel-400">
-                              <option value="user">직원</option>
-                              <option value="master">관리자</option>
-                              {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
-                            </select>
-                          </td>
-                          <td className="p-4">
-                            <select value={editForm.position_id} onChange={e => setEditForm({...editForm, position_id: e.target.value || null})} className="border rounded px-2 py-1 text-sm">
-                              <option value="">미지정</option>
-                              {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                          </td>
-                          <td className="p-4">
-                            <select value={editForm.department_id} onChange={e => setEditForm({...editForm, department_id: e.target.value || null})} className="border rounded px-2 py-1 text-sm">
-                              <option value="">미지정</option>
-                              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </select>
-                          </td>
-                          <td className="p-4">
-                            <label className="flex items-center gap-2 text-sm">
-                              <input type="checkbox" checked={editForm.is_active} onChange={e => setEditForm({...editForm, is_active: e.target.checked})} />
-                              활성
-                            </label>
-                          </td>
-                          <td className="p-4 text-right space-x-2">
-                            <button onClick={saveEdit} className="text-sm font-bold text-steel-600 hover:underline">저장</button>
-                            <button onClick={() => setEditingId(null)} className="text-sm font-bold text-slate-400 hover:underline">취소</button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="p-4">
-                            <div className="font-bold text-slate-900">{emp.employee_name || '(이름 미설정)'}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">{emp.email}</div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${
-                              emp.role === 'god_admin' ? 'bg-sky-100 text-sky-700' :
-                              emp.role === 'master' ? 'bg-steel-100 text-steel-700' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>{emp.role === 'god_admin' ? 'GOD ADMIN' : emp.role === 'master' ? '관리자' : '직원'}</span>
-                          </td>
-                          <td className="p-4 text-sm text-slate-600">{emp.position?.name || '-'}</td>
-                          <td className="p-4 text-sm text-slate-600">{emp.department?.name || '-'}</td>
-                          <td className="p-4">
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${emp.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {emp.is_active !== false ? '활성' : '비활성'}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <button onClick={() => startEdit(emp)} className="text-sm font-bold text-steel-600 hover:underline">수정</button>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                  {employees.length === 0 && (
-                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">직원이 없습니다.</td></tr>
-                  )}
-                </tbody>
-              </table>
+
+            {/* 데스크톱 헤더 */}
+            <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div className="w-10 mr-3"></div>
+              <div className="flex-1">이름 / 이메일 / 소속</div>
+              <div className="w-24 text-right mr-8">가입일</div>
+              <div className="w-4"></div>
+            </div>
+
+            {/* 직원 리스트 */}
+            <div className="divide-y divide-slate-100">
+              {employees.map(emp => (
+                <EmployeeCard key={emp.id} emp={emp} />
+              ))}
+              {employees.length === 0 && (
+                <div className="p-10 text-center text-slate-400 text-sm">
+                  등록된 직원이 없습니다.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -408,43 +441,43 @@ export default function OrgManagementPage() {
         {/* 직급 · 부서 탭 */}
         {/* ================================================================ */}
         {activeTab === 'org' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             {/* 직급 관리 */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <h2 className="text-base font-bold mb-3">직급 추가</h2>
+            <div className="space-y-3 md:space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
+                <h2 className="text-sm md:text-base font-bold mb-3">직급 추가</h2>
                 <div className="flex gap-2 items-end">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-400 block mb-1">직급명</label>
                     <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="예: 과장" />
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 과장" />
                   </div>
-                  <div className="w-24">
+                  <div className="w-20 md:w-24">
                     <label className="text-[10px] font-bold text-slate-400 block mb-1">레벨</label>
                     <input type="number" min={1} max={10} value={newPositionLevel}
                       onChange={e => setNewPositionLevel(Number(e.target.value))}
-                      className="w-full border rounded-lg px-3 py-2 text-sm" />
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" />
                   </div>
-                  <button onClick={addPosition} className="px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-slate-800 flex-shrink-0">
+                  <button onClick={addPosition} className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 flex-shrink-0 active:scale-95 transition-all">
                     추가
                   </button>
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-500">직급 목록 ({positions.length})</h3>
+                <div className="p-3 md:p-4 border-b border-slate-100">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-500">직급 목록 ({positions.length})</h3>
                 </div>
                 <div className="divide-y divide-slate-50">
                   {positions.map(pos => (
-                    <div key={pos.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50">
-                      <div className="flex items-center gap-3">
-                        <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded w-12 text-center">
+                    <div key={pos.id} className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 hover:bg-slate-50/50">
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <span className="bg-steel-100 text-steel-700 text-[10px] font-bold px-2 py-0.5 rounded w-12 text-center">
                           Lv.{pos.level}
                         </span>
                         <span className="font-bold text-sm text-slate-800">{pos.name}</span>
                       </div>
-                      <button onClick={() => deletePosition(pos.id)} className="text-xs font-bold text-red-400 hover:text-red-600">삭제</button>
+                      <button onClick={() => deletePosition(pos.id)} className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all">삭제</button>
                     </div>
                   ))}
                   {positions.length === 0 && (
@@ -455,30 +488,30 @@ export default function OrgManagementPage() {
             </div>
 
             {/* 부서 관리 */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <h2 className="text-base font-bold mb-3">부서 추가</h2>
+            <div className="space-y-3 md:space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
+                <h2 className="text-sm md:text-base font-bold mb-3">부서 추가</h2>
                 <div className="flex gap-2 items-end">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-400 block mb-1">부서명</label>
                     <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="예: 영업팀" />
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 영업팀" />
                   </div>
-                  <button onClick={addDepartment} className="px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-slate-800 flex-shrink-0">
+                  <button onClick={addDepartment} className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 flex-shrink-0 active:scale-95 transition-all">
                     추가
                   </button>
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-500">부서 목록 ({departments.length})</h3>
+                <div className="p-3 md:p-4 border-b border-slate-100">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-500">부서 목록 ({departments.length})</h3>
                 </div>
                 <div className="divide-y divide-slate-50">
                   {departments.map(dept => (
-                    <div key={dept.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50">
+                    <div key={dept.id} className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 hover:bg-slate-50/50">
                       <span className="font-bold text-sm text-slate-800">{dept.name}</span>
-                      <button onClick={() => deleteDepartment(dept.id)} className="text-xs font-bold text-red-400 hover:text-red-600">삭제</button>
+                      <button onClick={() => deleteDepartment(dept.id)} className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all">삭제</button>
                     </div>
                   ))}
                   {departments.length === 0 && (
@@ -496,15 +529,15 @@ export default function OrgManagementPage() {
         {activeTab === 'permissions' && (
           <div>
             {/* 직급 선택 + 저장 */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex gap-1.5 md:gap-2 flex-wrap">
                 {positions.map(pos => (
                   <button
                     key={pos.id}
                     onClick={() => setSelectedPosition(pos.id)}
-                    className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-bold text-[11px] md:text-xs transition-all active:scale-95 ${
                       selectedPosition === pos.id
-                        ? 'bg-slate-900 text-white shadow-md'
+                        ? 'bg-steel-600 text-white shadow-md'
                         : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
                     }`}
                   >
@@ -515,47 +548,50 @@ export default function OrgManagementPage() {
               <button
                 onClick={savePermissions}
                 disabled={saving || !selectedPosition}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:bg-slate-300 transition-colors shadow-md"
+                className="px-5 md:px-6 py-2 md:py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors shadow-md active:scale-95 flex-shrink-0"
               >
                 {saving ? '저장 중...' : '변경사항 저장'}
               </button>
             </div>
 
             {positions.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                <p className="text-slate-400">직급이 없습니다. &quot;직급 · 부서&quot; 탭에서 먼저 직급을 추가해주세요.</p>
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
+                <p className="text-slate-400 text-sm">직급이 없습니다. &quot;직급 · 부서&quot; 탭에서 먼저 직급을 추가해주세요.</p>
               </div>
             ) : activeModules.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                <p className="text-slate-400">활성화된 모듈이 없습니다.</p>
-                <p className="text-slate-400 text-sm mt-1">구독 관리에서 모듈을 활성화해주세요.</p>
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
+                <p className="text-slate-400 text-sm">활성화된 모듈이 없습니다.</p>
+                <p className="text-slate-400 text-xs mt-1">구독 관리에서 모듈을 활성화해주세요.</p>
               </div>
             ) : (
               <>
                 {/* 일괄 설정 */}
-                <div className="bg-white rounded-t-2xl border border-b-0 border-slate-200 p-3 flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-400">일괄:</span>
-                  {[
-                    { field: 'can_view', label: '조회' },
-                    { field: 'can_create', label: '생성' },
-                    { field: 'can_edit', label: '수정' },
-                    { field: 'can_delete', label: '삭제' },
-                  ].map(item => (
-                    <div key={item.field} className="flex items-center gap-1">
-                      <button onClick={() => toggleAll(item.field, true)}
-                        className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold hover:bg-green-200">
-                        {item.label} ON
-                      </button>
-                      <button onClick={() => toggleAll(item.field, false)}
-                        className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold hover:bg-red-200">
-                        OFF
-                      </button>
-                    </div>
-                  ))}
+                <div className="bg-white rounded-t-2xl border border-b-0 border-slate-200 p-2.5 md:p-3">
+                  <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                    <span className="text-[10px] md:text-xs font-bold text-slate-400">일괄 설정:</span>
+                    {[
+                      { field: 'can_view', label: '조회' },
+                      { field: 'can_create', label: '생성' },
+                      { field: 'can_edit', label: '수정' },
+                      { field: 'can_delete', label: '삭제' },
+                    ].map(item => (
+                      <div key={item.field} className="flex items-center gap-1">
+                        <span className="text-[10px] md:text-xs font-bold text-slate-600">{item.label}</span>
+                        <button onClick={() => toggleAll(item.field, true)}
+                          className="text-[10px] bg-green-100 text-green-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-green-200 active:scale-95">
+                          ON
+                        </button>
+                        <button onClick={() => toggleAll(item.field, false)}
+                          className="text-[10px] bg-red-100 text-red-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-red-200 active:scale-95">
+                          OFF
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* 권한 매트릭스 */}
-                <div className="bg-white rounded-b-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {/* 데스크톱: 권한 매트릭스 테이블 */}
+                <div className="hidden md:block bg-white rounded-b-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
@@ -578,7 +614,7 @@ export default function OrgManagementPage() {
                               const key = `${selectedPosition}_${mod.path}`
                               const perm = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
                               return (
-                                <tr key={mod.path} className="border-b border-slate-50 hover:bg-blue-50/30">
+                                <tr key={mod.path} className="border-b border-slate-50 hover:bg-steel-50/30">
                                   <td className="p-3">
                                     <div className="font-bold text-sm text-slate-800">{mod.name}</div>
                                     <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
@@ -589,7 +625,7 @@ export default function OrgManagementPage() {
                                         type="checkbox"
                                         checked={(perm as any)[field]}
                                         onChange={() => togglePerm(selectedPosition, mod.path, field)}
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                                        className="w-4 h-4 rounded border-slate-300 text-steel-600 cursor-pointer"
                                       />
                                     </td>
                                   ))}
@@ -597,7 +633,7 @@ export default function OrgManagementPage() {
                                     <select
                                       value={perm.data_scope}
                                       onChange={e => changeScope(selectedPosition, mod.path, e.target.value)}
-                                      className="text-xs border rounded-lg px-2 py-1 bg-white"
+                                      className="text-xs border rounded-lg px-2 py-1 bg-white focus:border-steel-400 outline-none"
                                     >
                                       {DATA_SCOPES.map(s => (
                                         <option key={s.value} value={s.value}>{s.label}</option>
@@ -614,9 +650,59 @@ export default function OrgManagementPage() {
                   </div>
                 </div>
 
+                {/* 모바일: 권한 카드 레이아웃 */}
+                <div className="md:hidden bg-white rounded-b-2xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
+                  {moduleGroups.map(group => (
+                    <div key={`m-group-${group}`}>
+                      <div className="bg-slate-100/70 px-3 py-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group}</span>
+                      </div>
+                      {activeModules.filter(m => m.group === group).map(mod => {
+                        const key = `${selectedPosition}_${mod.path}`
+                        const perm = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
+                        return (
+                          <div key={mod.path} className="p-3">
+                            <div className="mb-2">
+                              <div className="font-bold text-sm text-slate-800">{mod.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {[
+                                { field: 'can_view', label: '조회' },
+                                { field: 'can_create', label: '생성' },
+                                { field: 'can_edit', label: '수정' },
+                                { field: 'can_delete', label: '삭제' },
+                              ].map(item => (
+                                <label key={item.field} className="flex items-center gap-1.5 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={(perm as any)[item.field]}
+                                    onChange={() => togglePerm(selectedPosition, mod.path, item.field)}
+                                    className="w-4 h-4 rounded border-slate-300 text-steel-600"
+                                  />
+                                  <span className="text-xs text-slate-600">{item.label}</span>
+                                </label>
+                              ))}
+                              <select
+                                value={perm.data_scope}
+                                onChange={e => changeScope(selectedPosition, mod.path, e.target.value)}
+                                className="text-[11px] border rounded-lg px-2 py-1 bg-white ml-auto focus:border-steel-400 outline-none"
+                              >
+                                {DATA_SCOPES.map(s => (
+                                  <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+
                 {/* 안내 */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
-                  <p className="text-xs text-blue-700">
+                <div className="mt-4 p-3 bg-steel-50 rounded-xl border border-steel-100">
+                  <p className="text-[11px] md:text-xs text-steel-700">
                     <strong>안내:</strong> god_admin과 관리자(master)는 항상 전체 권한을 가집니다. 이 설정은 일반 직원의 직급별 권한을 제어합니다.
                     활성화된 모듈만 표시됩니다.
                   </p>
@@ -628,6 +714,131 @@ export default function OrgManagementPage() {
 
         </>)}
       </div>
+
+      {/* ================================================================ */}
+      {/* 직원 수정 모달 */}
+      {/* ================================================================ */}
+      {editingEmp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEditModal}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* 모달 헤더 */}
+            <div className="px-6 py-5 border-b bg-slate-50 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">직원 정보 수정</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{editingEmp.email}</p>
+              </div>
+              <button onClick={closeEditModal} className="text-2xl font-light text-slate-400 hover:text-slate-900 transition-colors">&times;</button>
+            </div>
+
+            {/* 모달 본문 */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* 이름 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">이름</label>
+                <input
+                  value={editForm.employee_name}
+                  onChange={e => setEditForm({ ...editForm, employee_name: e.target.value })}
+                  className="w-full p-3 border rounded-xl text-sm font-bold focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  placeholder="직원 이름"
+                />
+              </div>
+
+              {/* 연락처 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">연락처</label>
+                <input
+                  value={editForm.phone}
+                  onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full p-3 border rounded-xl text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  placeholder="010-0000-0000"
+                />
+              </div>
+
+              {/* 역할 & 상태 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">역할</label>
+                  <select
+                    value={editForm.role}
+                    onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  >
+                    <option value="user">직원</option>
+                    <option value="master">관리자</option>
+                    {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">상태</label>
+                  <select
+                    value={editForm.is_active ? 'active' : 'inactive'}
+                    onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
+                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  >
+                    <option value="active">활성</option>
+                    <option value="inactive">비활성</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 직급 & 부서 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">직급</label>
+                  <select
+                    value={editForm.position_id}
+                    onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  >
+                    <option value="">미지정</option>
+                    {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">부서</label>
+                  <select
+                    value={editForm.department_id}
+                    onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
+                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
+                  >
+                    <option value="">미지정</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* 참고 정보 */}
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">이메일</span>
+                  <span className="text-slate-600 font-medium">{editingEmp.email}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">가입일</span>
+                  <span className="text-slate-600 font-medium">{formatDate(editingEmp.created_at)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 모달 푸터 */}
+            <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
+              <button
+                onClick={closeEditModal}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="flex-1 py-2.5 bg-steel-600 text-white rounded-xl hover:bg-steel-700 disabled:bg-slate-300 font-bold text-sm transition-colors active:scale-[0.98]"
+              >
+                {savingEdit ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

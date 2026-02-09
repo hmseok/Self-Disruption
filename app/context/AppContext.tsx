@@ -78,7 +78,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchSession = async () => {
     try {
       // 1. 세션 확인
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+      // Refresh Token 만료/무효 → 강제 로그아웃
+      if (sessionError) {
+        console.warn('⚠️ 세션 에러 (토큰 만료 등):', sessionError.message)
+        await supabase.auth.signOut().catch(() => {})
+        clearState()
+        setLoading(false)
+        return
+      }
 
       if (!session) {
         clearState()
@@ -131,8 +140,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setRole('user')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AppContext 로딩 에러:', error)
+      // 인증 관련 에러인 경우 강제 로그아웃
+      if (error?.message?.includes('Refresh Token') || error?.message?.includes('JWT') || error?.status === 401) {
+        console.warn('⚠️ 인증 토큰 에러 → 로그아웃 처리')
+        await supabase.auth.signOut().catch(() => {})
+        clearState()
+      }
     } finally {
       setLoading(false)
     }
