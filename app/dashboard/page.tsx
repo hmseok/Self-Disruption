@@ -44,7 +44,6 @@ export default function DashboardPage() {
     totalCustomers: 0, activeInvestments: 0, totalInvestAmount: 0, jiipContracts: 0,
     monthlyRevenue: 0, monthlyExpense: 0, netProfit: 0,
   })
-  const [recentCars, setRecentCars] = useState<any[]>([])
   const [platformStats, setPlatformStats] = useState<PlatformStats>({
     totalCompanies: 0, activeCompanies: 0, pendingCompanies: 0,
     totalUsers: 0, totalActiveModules: 0,
@@ -162,11 +161,6 @@ export default function DashboardPage() {
         const { data: carData } = await carQuery
         const cars = carData || []
 
-        // 최근 등록 차량 5개
-        let recentQuery = supabase.from('cars').select('*').order('created_at', { ascending: false }).limit(5)
-        if (companyId) recentQuery = recentQuery.eq('company_id', companyId)
-        const { data: recentData } = await recentQuery
-
         // 고객 수
         let custQuery = supabase.from('customers').select('id', { count: 'exact' })
         if (companyId) custQuery = custQuery.eq('company_id', companyId)
@@ -213,7 +207,6 @@ export default function DashboardPage() {
           monthlyExpense: totalFinance + totalInsurance,
           netProfit: monthlyRevenue - (totalFinance + totalInsurance),
         })
-        setRecentCars(recentData || [])
       }
 
     } catch (err) {
@@ -604,81 +597,87 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI 카드 영역 */}
-      {(showCars || showCustomers || showInvest) && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-          {showCars && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
-              <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">보유 차량</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">🚗</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : stats.totalCars}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">대</span></p>
-              <div className="mt-1 md:mt-2 flex flex-wrap gap-1.5 md:gap-2 text-[10px] md:text-[11px] font-medium">
-                <span className="text-green-600">대기 {stats.availableCars}</span>
-                <span className="text-blue-600">대여 {stats.rentedCars}</span>
-                <span className="text-red-500">정비 {stats.maintenanceCars}</span>
-              </div>
-            </div>
-          )}
-          {showCustomers && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
-              <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">고객 수</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">👥</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : stats.totalCustomers}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">명</span></p>
-              <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">등록된 전체 고객</p>
-            </div>
-          )}
-          {showInvest && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
-              <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">투자 유치</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💰</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-black text-gray-900">{loading ? '-' : formatMoney(stats.totalInvestAmount)}<span className="text-sm md:text-base font-bold text-gray-400 ml-1">원</span></p>
-              <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">일반투자 {stats.activeInvestments}건 / 지입 {stats.jiipContracts}건</p>
-            </div>
-          )}
-          {showCars && (
-            <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-white to-steel-50">
-              <div className="flex items-center justify-between mb-2 md:mb-3">
-                <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">가동률</span>
-                <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">📊</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-black text-gray-900">
-                {loading || stats.totalCars === 0 ? '-' : Math.round((stats.rentedCars / stats.totalCars) * 100)}
-                <span className="text-sm md:text-base font-bold text-gray-400 ml-1">%</span>
-              </p>
-              <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">대여 중 / 전체 차량 비율</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 경영 현황판 */}
-      {showFinance && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-          <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm bg-gradient-to-br from-white to-steel-50">
+      {/* KPI 카드 — god admin 스타일 다크 그라데이션 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+        {showCars && (
+          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">월 예상 매출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💵</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">보유 차량</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">🚗</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-blue-600">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">활성 렌트 계약 기준</p>
+            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : stats.totalCars}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">대</span></p>
+            <div className="mt-1 md:mt-2 flex flex-wrap gap-1.5 md:gap-2 text-[10px] md:text-[11px] font-medium text-steel-200">
+              <span>대기 {stats.availableCars}</span>
+              <span>·</span>
+              <span>대여 {stats.rentedCars}</span>
+              <span>·</span>
+              <span>정비 {stats.maintenanceCars}</span>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl p-4 md:p-5 border border-steel-100 shadow-sm bg-gradient-to-br from-white to-steel-50">
+        )}
+        {showCustomers && (
+          <div className="bg-gradient-to-br from-steel-700 to-steel-900 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-steel-600 uppercase tracking-wide">월 고정 지출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-steel-50 flex items-center justify-center text-sm">💸</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">고객 수</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">👥</span>
             </div>
-            <p className="text-xl md:text-2xl font-black text-red-500">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-gray-400 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">할부금 + 보험료 (월 환산)</p>
+            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : stats.totalCustomers}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">명</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">등록된 전체 고객</p>
+          </div>
+        )}
+        {showInvest && (
+          <div className="bg-gradient-to-br from-sky-600 to-blue-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-sky-200 uppercase">투자 유치</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💰</span>
+            </div>
+            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : formatMoney(stats.totalInvestAmount)}<span className="text-sm md:text-base font-bold text-sky-200 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-sky-200">일반 {stats.activeInvestments}건 · 지입 {stats.jiipContracts}건</p>
+          </div>
+        )}
+        {showCars && (
+          <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase">가동률</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-green-50 flex items-center justify-center text-sm">📊</span>
+            </div>
+            <p className="text-2xl md:text-3xl font-black text-gray-900">
+              {loading || stats.totalCars === 0 ? '-' : Math.round((stats.rentedCars / stats.totalCars) * 100)}
+              <span className="text-sm md:text-base font-bold text-gray-400 ml-1">%</span>
+            </p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-400">대여 중 / 전체 비율</p>
+          </div>
+        )}
+        {!showCars && !showCustomers && !showInvest && (
+          <div className="col-span-2 md:col-span-4 bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-6 text-white shadow-lg text-center">
+            <p className="text-lg font-black">활성화된 모듈이 없습니다</p>
+            <p className="text-steel-200 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
+          </div>
+        )}
+      </div>
+
+      {/* 경영 현황판 — 다크 스타일 */}
+      {showFinance && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-8">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-blue-200 uppercase">월 예상 매출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💵</span>
+            </div>
+            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-blue-200 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-blue-200">활성 렌트 계약 기준</p>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-rose-700 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <span className="text-[10px] md:text-xs font-bold text-red-200 uppercase">월 고정 지출</span>
+              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💸</span>
+            </div>
+            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-red-200 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-red-200">할부금 + 보험료 (월 환산)</p>
           </div>
           <div className="bg-gray-900 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-gray-100">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-yellow-400 uppercase tracking-wide">월 순수익</span>
+              <span className="text-[10px] md:text-xs font-bold text-yellow-400 uppercase">월 순수익</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-yellow-900/30 flex items-center justify-center text-sm">🏆</span>
             </div>
             <p className={`text-xl md:text-2xl font-black ${stats.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -689,87 +688,25 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 빠른 액션 + 최근 차량 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {quickActions.length > 0 && (
-          <div className="lg:col-span-1">
-            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">빠른 이동</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {quickActions.map(action => (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  className="group bg-white rounded-xl p-4 border border-steel-100 shadow-sm hover:shadow-md transition-all hover:scale-[1.02] hover:border-steel-200 bg-gradient-to-br from-white to-steel-50"
-                >
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center text-lg shadow-sm mb-3`}>
-                    {action.icon}
-                  </div>
-                  <p className="text-gray-900 font-bold text-sm">{action.label}</p>
-                  <p className="text-gray-400 text-xs mt-0.5">{action.desc}</p>
-                </Link>
-              ))}
-            </div>
+      {/* 업무 바로가기 — 다크 카드 스타일 */}
+      {quickActions.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold text-steel-500 uppercase tracking-wider mb-3">업무 바로가기</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {quickActions.map(action => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="group bg-gray-900 rounded-xl p-4 md:p-5 hover:bg-gray-800 transition-all hover:scale-[1.02] border border-gray-800"
+              >
+                <span className="text-2xl">{action.icon}</span>
+                <p className="text-white font-bold text-sm mt-2">{action.label}</p>
+                <p className="text-gray-500 text-xs mt-0.5">{action.desc}</p>
+              </Link>
+            ))}
           </div>
-        )}
-
-        {showCars && (
-          <div className={quickActions.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">최근 등록 차량</h2>
-              <Link href="/registration" className="text-xs text-steel-600 hover:text-steel-800 font-bold">전체 보기 →</Link>
-            </div>
-            <div className="bg-white rounded-xl border border-steel-100 shadow-sm overflow-x-auto">
-              {loading ? (
-                <div className="p-12 text-center text-steel-600">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-steel-600 mx-auto mb-2"></div>
-                  로딩 중...
-                </div>
-              ) : recentCars.length === 0 ? (
-                <div className="p-12 text-center">
-                  <p className="text-4xl mb-3">🚗</p>
-                  <p className="text-gray-500 font-bold">등록된 차량이 없습니다</p>
-                  <p className="text-gray-400 text-sm mt-1">차량 관리에서 첫 번째 차량을 등록해보세요</p>
-                  <Link href="/registration" className="inline-block mt-4 px-4 py-2 bg-steel-600 text-white text-sm font-bold rounded-lg hover:bg-steel-700">
-                    차량 등록하기
-                  </Link>
-                </div>
-              ) : (
-                <table className="w-full text-left min-w-[400px]">
-                  <thead className="bg-steel-50 text-steel-800 text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                    <tr>
-                      <th className="p-3 md:p-4">차량번호</th>
-                      <th className="p-3 md:p-4">차종</th>
-                      <th className="p-3 md:p-4 text-center">상태</th>
-                      <th className="p-3 md:p-4 text-right">등록일</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-steel-100">
-                    {recentCars.map(car => (
-                      <tr key={car.id} className="hover:bg-steel-50 cursor-pointer transition-colors" onClick={() => router.push(`/registration/${car.id}`)}>
-                        <td className="p-3 md:p-4 font-black text-gray-900 text-sm">{car.number}</td>
-                        <td className="p-3 md:p-4">
-                          <span className="font-bold text-gray-700 text-xs md:text-sm">{car.brand}</span>
-                          <span className="text-gray-400 text-[10px] md:text-xs ml-1">{car.model}</span>
-                        </td>
-                        <td className="p-3 md:p-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] md:text-[11px] font-bold ${
-                            car.status === 'available' ? 'bg-green-100 text-green-700' :
-                            car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
-                            'bg-red-100 text-red-600'
-                          }`}>
-                            {car.status === 'available' ? '대기' : car.status === 'rented' ? '대여' : car.status}
-                          </span>
-                        </td>
-                        <td className="p-3 md:p-4 text-right text-[10px] md:text-xs text-gray-400">{car.created_at?.split('T')[0]}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
