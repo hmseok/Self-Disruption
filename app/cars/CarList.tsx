@@ -97,7 +97,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
             />
 
             {/* 차량 등록 버튼 */}
-            <button className="bg-gray-900 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-black shadow-lg text-center whitespace-nowrap text-sm flex-shrink-0">
+            <button className="bg-steel-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-center whitespace-nowrap text-sm flex-shrink-0">
               + 등록
             </button>
 

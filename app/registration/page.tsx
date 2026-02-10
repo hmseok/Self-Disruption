@@ -459,7 +459,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                     <div className="flex justify-between py-1 border-b border-gray-200 mt-2"><span className="text-yellow-600 font-bold">중복 제외</span><span className="font-bold text-yellow-600">{progress.skipped}건</span></div>
                     <div className="flex justify-between py-1 mt-2"><span className="text-red-500">실패</span><span className="font-bold text-red-500">{progress.fail}건</span></div>
                 </div>
-                <button onClick={() => setShowResultModal(false)} className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-800">확인</button>
+                <button onClick={() => setShowResultModal(false)} className="w-full bg-steel-600 text-white py-3 rounded-xl font-bold hover:bg-steel-700">확인</button>
             </div>
         </div>
        )}
@@ -490,7 +490,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
             </div>
             <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
                 <button onClick={()=>setIsModalOpen(false)} className="px-5 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-200">취소</button>
-                <button onClick={handleRegister} className="px-6 py-3 rounded-xl font-bold bg-black text-white hover:bg-gray-800 shadow-lg">등록 완료</button>
+                <button onClick={handleRegister} className="px-6 py-3 rounded-xl font-bold bg-steel-600 text-white hover:bg-steel-700 shadow-lg">등록 완료</button>
             </div>
           </div>
         </div>

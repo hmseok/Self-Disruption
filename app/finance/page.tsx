@@ -235,10 +235,10 @@ const router = useRouter()
       <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-1.5 rounded-2xl mb-6 gap-2">
           {/* 좌측: 탭 스위처 */}
           <div className="flex bg-white rounded-xl shadow-sm p-1 w-full md:w-auto">
-              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
                   📊 확정된 장부
               </button>
-              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-900 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
                   🗓️ 예정 스케줄
               </button>
           </div>
@@ -298,7 +298,7 @@ const router = useRouter()
                   <input type="text" placeholder="0" className="w-full border border-gray-200 p-2.5 rounded-xl text-right font-black text-gray-900" value={form.amount ? Number(form.amount).toLocaleString() : ''} onChange={e=>setForm({...form, amount: e.target.value.replace(/,/g, '')})} />
               </div>
               <div className="md:col-span-1">
-                  <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-green-600 hover:bg-green-700' : 'bg-steel-900 hover:bg-black'}`}>
+                  <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-green-600 hover:bg-green-700' : 'bg-steel-600 hover:bg-steel-700'}`}>
                       등록
                   </button>
               </div>

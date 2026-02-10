@@ -121,7 +121,7 @@ export default function FinanceTab({ carId }: { carId: string }) {
                 </div>
             </div>
 
-            <button onClick={handleSave} className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors">
+            <button onClick={handleSave} className="w-full py-3 bg-steel-600 text-white font-bold rounded-xl hover:bg-steel-700 transition-colors">
                 금융 정보 저장
             </button>
         </div>

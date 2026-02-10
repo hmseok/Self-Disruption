@@ -388,7 +388,7 @@ export default function LoanDetailPage() {
 
       {/* 하단 저장 버튼 */}
       <div className="mt-8 flex gap-4">
-         <button onClick={handleSave} className="flex-1 bg-steel-900 text-white py-4 rounded-2xl font-black text-xl hover:bg-black transition-all shadow-xl">
+         <button onClick={handleSave} className="flex-1 bg-steel-600 text-white py-4 rounded-2xl font-black text-xl hover:bg-steel-700 transition-all shadow-xl">
             {isNew ? '✨ 금융 정보 등록 완료' : '💾 수정 내용 저장'}
          </button>
       </div>

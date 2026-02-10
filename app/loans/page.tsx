@@ -56,7 +56,7 @@ const router = useRouter()
         {/* 👇 신규 등록 버튼 (페이지 이동) */}
         <button
           onClick={() => router.push('/loans/new')}
-          className="bg-steel-900 text-white px-4 py-2 text-sm md:px-6 md:py-3 md:text-base rounded-xl font-bold hover:bg-black transition-all shadow-lg"
+          className="bg-steel-600 text-white px-4 py-2 text-sm md:px-6 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors shadow-lg"
         >
           + 신규 금융 등록
         </button>

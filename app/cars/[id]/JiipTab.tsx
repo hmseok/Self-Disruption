@@ -155,7 +155,7 @@ export default function JiipTab({ carId }: { carId: string }) {
                     <input className="p-2 border rounded text-sm text-right" placeholder="월 배당금(이자)" value={f(investForm.monthly_payout)} onChange={e=>setInvestForm({...investForm, monthly_payout:p(e.target.value)})}/>
                     <input type="date" className="p-2 border rounded text-sm" value={investForm.invest_date} onChange={e=>setInvestForm({...investForm, invest_date:e.target.value})}/>
                 </div>
-                <button onClick={handleAddInvestor} className="w-full py-2 bg-gray-800 text-white font-bold rounded-lg hover:bg-black text-sm">
+                <button onClick={handleAddInvestor} className="w-full py-2 bg-steel-600 text-white font-bold rounded-lg hover:bg-steel-700 text-sm">
                     + 투자자 추가
                 </button>
             </div>

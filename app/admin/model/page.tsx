@@ -91,7 +91,7 @@ export default function VehicleCodeManager() {
             <h1 className="text-3xl font-black text-gray-900">🚙 차량 표준 코드 관리</h1>
             <p className="text-gray-500 mt-2">AI가 수집한 데이터와 수동으로 등록한 모델/트림을 관리합니다.</p>
         </div>
-        <button onClick={() => setIsModelModalOpen(true)} className="bg-black text-white px-5 py-3 rounded-xl font-bold hover:bg-gray-800 shadow-lg flex items-center gap-2">
+        <button onClick={() => setIsModelModalOpen(true)} className="bg-steel-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg flex items-center gap-2">
             <PlusIcon /> 신규 모델 등록
         </button>
       </div>
@@ -176,7 +176,7 @@ export default function VehicleCodeManager() {
                 <input className="w-full p-2 border rounded mb-2" placeholder="모델명 (예: EV4)" value={newModel.model_name} onChange={e=>setNewModel({...newModel, model_name:e.target.value})} />
                 <input className="w-full p-2 border rounded mb-4" type="number" placeholder="연식 (예: 2025)" value={newModel.year} onChange={e=>setNewModel({...newModel, year:Number(e.target.value)})} />
                 <div className="flex gap-2">
-                    <button onClick={handleCreateModel} className="flex-1 bg-black text-white py-2 rounded-lg font-bold">등록</button>
+                    <button onClick={handleCreateModel} className="flex-1 bg-steel-600 text-white py-2 rounded-lg font-bold hover:bg-steel-700">등록</button>
                     <button onClick={()=>setIsModelModalOpen(false)} className="flex-1 bg-gray-100 py-2 rounded-lg">취소</button>
                 </div>
             </div>

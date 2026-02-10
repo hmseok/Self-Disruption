@@ -219,13 +219,13 @@ export default function PermissionsPage() {
   const groups = [...new Set(ALL_PAGES.map(p => p.group))]
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
-        <div className="mb-8 flex justify-between items-end">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">권한 설정</h1>
-            <p className="text-slate-500 mt-1">직급별로 페이지 접근 권한과 데이터 범위를 설정합니다.</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">권한 설정</h1>
+            <p className="text-slate-500 mt-1 text-sm">직급별로 페이지 접근 권한과 데이터 범위를 설정합니다.</p>
           </div>
           <div className="flex items-center gap-3">
             {/* god_admin: 회사 선택 */}
@@ -246,7 +246,7 @@ export default function PermissionsPage() {
             <button
               onClick={saveAll}
               disabled={saving}
-              className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors shadow-lg"
+              className="px-6 py-2.5 md:px-8 md:py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors shadow-lg"
             >
               {saving ? '저장 중...' : '변경사항 저장'}
             </button>
@@ -278,7 +278,7 @@ export default function PermissionsPage() {
           /* 권한 매트릭스 테이블 */
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {/* 전체 선택 컨트롤 */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-4">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-4 flex-wrap">
               <span className="text-xs font-bold text-slate-500">일괄 설정:</span>
               {['can_view', 'can_create', 'can_edit', 'can_delete'].map(field => (
                 <div key={field} className="flex items-center gap-1">
@@ -307,11 +307,9 @@ export default function PermissionsPage() {
                 <tbody>
                   {groups.map(group => (
                     <React.Fragment key={`group-${group}`}>
-                      {/* 그룹 헤더 */}
                       <tr className="bg-slate-100">
                         <td colSpan={6} className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</td>
                       </tr>
-                      {/* 해당 그룹의 페이지들 */}
                       {ALL_PAGES.filter(p => p.group === group).map(page => {
                         const key = `${posId}_${page.path}`
                         const perm = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
@@ -360,6 +358,7 @@ export default function PermissionsPage() {
             이 설정은 일반 직원(user 역할)의 직급에 따른 세부 권한을 제어합니다.
           </p>
         </div>
+
       </div>
     </div>
   )

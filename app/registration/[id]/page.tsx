@@ -339,7 +339,7 @@ export default function RegistrationDetailPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div><label className="label">차량번호</label><input className="input" value={car.number || ''} onChange={e=>handleChange('number', e.target.value)} /></div>
                         <div><label className="label">소유자</label><input className="input" value={car.owner_name || ''} onChange={e=>handleChange('owner_name', e.target.value)} /></div>
-                        <div className="md:col-span-2"><label className="label">사용본거지</label><div className="flex gap-2"><input className="input flex-1 bg-gray-50" value={car.location || ''} readOnly /><button onClick={()=>open({onComplete: handleAddressComplete})} className="bg-gray-800 text-white px-5 rounded-xl text-sm font-bold">주소검색</button></div></div>
+                        <div className="md:col-span-2"><label className="label">사용본거지</label><div className="flex gap-2"><input className="input flex-1 bg-gray-50" value={car.location || ''} readOnly /><button onClick={()=>open({onComplete: handleAddressComplete})} className="bg-steel-600 text-white px-5 rounded-xl text-sm font-bold hover:bg-steel-700">주소검색</button></div></div>
                         <div><label className="label">최초등록일</label><input type="date" className="input" value={car.registration_date || ''} onChange={e=>handleChange('registration_date', e.target.value)} /></div>
                         <div>
                             <label className="label">차대번호</label>

@@ -113,7 +113,7 @@ export default function CarDetailPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={handleDelete} className="px-4 py-2 border border-red-100 text-red-500 font-bold rounded-xl hover:bg-red-50">삭제</button>
-          <button onClick={handleUpdate} disabled={saving} className="px-6 py-2 bg-steel-900 text-white font-bold rounded-xl shadow-lg hover:bg-black transition-all">
+          <button onClick={handleUpdate} disabled={saving} className="px-6 py-2 bg-steel-600 text-white font-bold rounded-xl shadow-lg hover:bg-steel-700 transition-all">
             {saving ? '저장 중...' : '💾 저장'}
           </button>
         </div>
@@ -181,7 +181,7 @@ export default function CarDetailPage() {
                  <div className="bg-white p-6 rounded-full mb-4 shadow-sm"><span className="text-4xl">🚙</span></div>
                  <h3 className="text-xl font-bold text-gray-800 mb-2">차량 제원 및 등록증</h3>
                  <p className="text-gray-400 mb-6 text-center text-sm">자동차등록증 상의 제원 정보와 원본 파일을 관리합니다.</p>
-                 <button onClick={() => router.push(`/registration/${carId}`)} className="bg-black text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition-transform hover:-translate-y-1">등록증 상세 페이지로 이동 →</button>
+                 <button onClick={() => router.push(`/registration/${carId}`)} className="bg-steel-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-steel-700 transition-all">등록증 상세 페이지로 이동 →</button>
                </div>
              )}
 
@@ -228,7 +228,7 @@ export default function CarDetailPage() {
                       <input type="date" className="w-full border rounded-lg p-2 text-sm" value={newLoan.end_date} onChange={e => setNewLoan({...newLoan, end_date: e.target.value})} />
                     </div>
                   </div>
-                  <button onClick={handleAddLoan} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black transition-colors">등록하기</button>
+                  <button onClick={handleAddLoan} className="w-full bg-steel-600 text-white py-3 rounded-xl font-bold hover:bg-steel-700 transition-colors">등록하기</button>
                 </div>
 
                 {/* 2. 목록 리스트 */}

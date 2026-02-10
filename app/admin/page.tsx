@@ -396,13 +396,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-          {role === 'god_admin' && (
-            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 md:p-5 rounded-2xl border border-yellow-200 shadow-sm">
-              <div className="text-[10px] md:text-xs font-bold text-yellow-600 uppercase mb-1">God Admin</div>
-              <div className="text-2xl md:text-3xl font-black text-yellow-700">{godAdmins.length}</div>
-            </div>
-          )}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
           <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">가입 회사</div>
             <div className="text-2xl md:text-3xl font-black text-slate-900">{clientCompanies.length}</div>
@@ -415,96 +409,9 @@ export default function AdminDashboard() {
           )}
           <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">전체 사용자</div>
-            <div className="text-2xl md:text-3xl font-black text-steel-600">{totalUsers + godAdmins.length}</div>
+            <div className="text-2xl md:text-3xl font-black text-steel-600">{totalUsers}</div>
           </div>
         </div>
-
-        {/* ===== God Admin 섹션 ===== */}
-        {role === 'god_admin' && godAdmins.length > 0 && (
-          <div className="mb-6 md:mb-8">
-            <button
-              onClick={() => setExpandedSection(expandedSection === 'admins' ? null : 'admins')}
-              className="flex items-center gap-2 mb-3 group"
-            >
-              <svg className={`w-4 h-4 text-yellow-500 transition-transform ${expandedSection === 'admins' ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-              </svg>
-              <h2 className="text-sm font-bold text-yellow-600 uppercase tracking-wider">
-                Platform Administrators ({godAdmins.length})
-              </h2>
-            </button>
-
-            {expandedSection === 'admins' && (
-              <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm overflow-hidden">
-                {/* Desktop */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gradient-to-r from-yellow-50 to-orange-50">
-                        <th className="px-5 py-3 text-[10px] font-bold text-yellow-600 uppercase"></th>
-                        <th className="px-5 py-3 text-[10px] font-bold text-yellow-600 uppercase">이름</th>
-                        <th className="px-5 py-3 text-[10px] font-bold text-yellow-600 uppercase">이메일</th>
-                        <th className="px-5 py-3 text-[10px] font-bold text-yellow-600 uppercase">가입일</th>
-                        <th className="px-5 py-3 text-[10px] font-bold text-yellow-600 uppercase">상태</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {godAdmins.map((admin) => (
-                        <tr key={admin.id} className="border-t border-yellow-100 hover:bg-yellow-50/30">
-                          <td className="px-5 py-3">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-                              {(admin.employee_name || admin.email)?.[0]?.toUpperCase() || '?'}
-                            </div>
-                          </td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-slate-900">{admin.employee_name || '이름 미설정'}</span>
-                              {admin.id === user?.id && (
-                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-100 text-sky-600">(나)</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-5 py-3 text-sm text-slate-500">{admin.email}</td>
-                          <td className="px-5 py-3 text-xs text-slate-400">{formatDate(admin.created_at)}</td>
-                          <td className="px-5 py-3">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded bg-green-100 text-green-700">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                              활성
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {/* Mobile */}
-                <div className="md:hidden divide-y divide-yellow-100">
-                  {godAdmins.map((admin) => (
-                    <div key={admin.id} className="p-4 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-                        {(admin.employee_name || admin.email)?.[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm text-slate-900">{admin.employee_name || '이름 미설정'}</span>
-                          {admin.id === user?.id && (
-                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-100 text-sky-600">(나)</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 truncate mt-0.5">{admin.email}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{formatDate(admin.created_at)}</div>
-                      </div>
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex-shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                        활성
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ===== 미배정 사용자 ===== */}
         {role === 'god_admin' && unassignedUsers.length > 0 && (

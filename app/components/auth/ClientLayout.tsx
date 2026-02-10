@@ -58,6 +58,7 @@ const BUSINESS_GROUPS = [
 const PLATFORM_MENUS = [
   { name: '회사/가입 관리', path: '/admin', iconKey: 'Admin' },
   { name: '구독 관리', path: '/system-admin', iconKey: 'Setting' },
+  { name: '개발자 모드', path: '/admin/developer', iconKey: 'Database' },
 ]
 
 // god_admin + master: 설정

@@ -48,7 +48,7 @@ export default function DepreciationPage() {
           <h1 className="text-3xl font-black">📉 잔가율(감가) 기준표</h1>
           <p className="text-gray-500 mt-2">차종별 연식에 따른 잔존가치율(%)을 정의합니다. 렌트료 산출의 핵심 기준입니다.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 shadow-lg">+ 신규 분류 등록</button>
+        <button onClick={() => setIsModalOpen(true)} className="bg-steel-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg">+ 신규 분류 등록</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -100,7 +100,7 @@ export default function DepreciationPage() {
                             </div>
                         ))}
                     </div>
-                    <button onClick={handleSave} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 mt-2">저장하기</button>
+                    <button onClick={handleSave} className="w-full bg-steel-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-steel-700 mt-2">저장하기</button>
                 </div>
             </div>
         </div>

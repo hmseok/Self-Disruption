@@ -79,7 +79,7 @@ const [list, setList] = useState<any[]>([])
         </div>
         <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 shadow-lg transition-transform hover:-translate-y-1"
+            className="bg-steel-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg"
         >
             + 신규 기준가 등록
         </button>
@@ -177,7 +177,7 @@ const [list, setList] = useState<any[]>([])
                     </div>
                 </div>
 
-                <button onClick={handleSave} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 mt-4">
+                <button onClick={handleSave} className="w-full bg-steel-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-steel-700 mt-4">
                     저장하기
                 </button>
             </div>

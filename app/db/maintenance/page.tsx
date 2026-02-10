@@ -41,7 +41,7 @@ const [list, setList] = useState<any[]>([])
           <h1 className="text-3xl font-black">🔧 정비/소모품 DB</h1>
           <p className="text-gray-500 mt-2">표준 정비 단가와 교체 주기를 관리합니다. 유지비 산출의 기준이 됩니다.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 shadow-lg">+ 소모품 등록</button>
+        <button onClick={() => setIsModalOpen(true)} className="bg-steel-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg">+ 소모품 등록</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -103,7 +103,7 @@ const [list, setList] = useState<any[]>([])
                         <input className="w-full p-2 border rounded text-center font-bold" type="number" value={newItem.cycle_month} onChange={e => setNewItem({...newItem, cycle_month: Number(e.target.value)})} />
                     </div>
                 </div>
-                <button onClick={handleSave} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:bg-gray-800 mt-2">저장하기</button>
+                <button onClick={handleSave} className="w-full bg-steel-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-steel-700 mt-2">저장하기</button>
             </div>
         </div>
       )}

@@ -112,7 +112,7 @@ export default function LotteDbPage() {
             <h1 className="text-2xl font-black text-red-700">🏢 통합 견적 DB</h1>
             <p className="text-sm text-gray-500">단기(일) / 중기(월) / 장기(년) 통합 견적 관리 시스템</p>
         </div>
-        <button onClick={() => setIsAiModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:-translate-y-1 transition-transform">
+        <button onClick={() => setIsAiModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg transition-transform">
             ✨ 통합 견적 설계
         </button>
       </div>
@@ -319,7 +319,7 @@ export default function LotteDbPage() {
                         )}
                     </div>
 
-                    <button onClick={handleRealAiEstimate} disabled={aiLoading} className="w-full bg-black text-white py-3.5 rounded-xl font-bold hover:bg-gray-800 disabled:bg-gray-400">
+                    <button onClick={handleRealAiEstimate} disabled={aiLoading} className="w-full bg-steel-600 text-white py-3.5 rounded-xl font-bold hover:bg-steel-700 disabled:bg-gray-400">
                         {aiLoading ? <span className="animate-pulse">시장 분석 중...</span> : `🚀 ${rentalType === 'daily' ? '단기' : rentalType === 'monthly' ? '월간' : '장기'} 견적 산출`}
                     </button>
                 </div>

@@ -149,7 +149,7 @@ export default function CarCodePage() {
       {/* 1. 헤더 */}
       <div className="shrink-0 flex justify-between items-end pb-2 border-b">
           <div><h1 className="text-2xl font-black">🏗️ 통합 차량 관리 & AI 견적</h1><p className="text-sm text-gray-500">차량 데이터 및 AI 기반 경쟁사 상세 견적 분석</p></div>
-          <button onClick={() => setIsAiModalOpen(true)} className="bg-black text-white px-5 py-2.5 rounded-xl font-bold hover:bg-gray-800 shadow-lg text-sm transition-transform hover:-translate-y-1">✨ AI 데이터 수집</button>
+          <button onClick={() => setIsAiModalOpen(true)} className="bg-steel-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-sm">✨ AI 데이터 수집</button>
       </div>
 
       {/* 2. 메인 작업 영역 */}
@@ -158,7 +158,7 @@ export default function CarCodePage() {
         {/* [좌측] 모델 목록 */}
         <div className="col-span-3 bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden">
             <div className="shrink-0 p-3 bg-gray-50 border-b font-bold flex justify-between items-center"><span className="text-sm">📂 모델 목록</span>{checkedModelIds.length > 0 && <button onClick={deleteSelectedModels} className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">삭제</button>}</div>
-            <div className="shrink-0 p-2 border-b flex gap-1"><input className="w-1/3 p-1.5 border rounded text-xs" placeholder="브랜드" value={newModel.brand} onChange={e=>setNewModel({...newModel, brand: e.target.value})} /><input className="w-2/3 p-1.5 border rounded text-xs" placeholder="모델명" value={newModel.model_name} onChange={e=>setNewModel({...newModel, model_name: e.target.value})} /><button onClick={addModel} className="bg-gray-800 text-white px-2 rounded text-xs">+</button></div>
+            <div className="shrink-0 p-2 border-b flex gap-1"><input className="w-1/3 p-1.5 border rounded text-xs" placeholder="브랜드" value={newModel.brand} onChange={e=>setNewModel({...newModel, brand: e.target.value})} /><input className="w-2/3 p-1.5 border rounded text-xs" placeholder="모델명" value={newModel.model_name} onChange={e=>setNewModel({...newModel, model_name: e.target.value})} /><button onClick={addModel} className="bg-steel-600 hover:bg-steel-700 text-white px-2 rounded text-xs">+</button></div>
             <div className="flex-1 overflow-y-auto">{models.map(m => (<div key={m.id} onClick={() => handleSelectModel(m)} className={`p-3 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-2 ${selectedModel?.id === m.id ? 'bg-steel-50 border-l-4 border-l-steel-600' : ''}`}><input type="checkbox" onClick={e=>e.stopPropagation()} onChange={()=>toggleModelCheck(m.id)} checked={checkedModelIds.includes(m.id)} className="w-3 h-3" /><div><div className="font-bold text-sm">{m.brand} {m.model_name}</div><div className="text-xs text-gray-400">{m.year}년형</div></div></div>))}</div>
         </div>
 
@@ -229,7 +229,7 @@ export default function CarCodePage() {
                              </div>
                         </div>
                     )}
-                    <button onClick={handleCalculateQuote} disabled={aiLoading} className="w-full bg-black text-white py-3 rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50 shadow-lg">{aiLoading ? '조건 스캔 중...' : '견적 검색하기 🚀'}</button>
+                    <button onClick={handleCalculateQuote} disabled={aiLoading} className="w-full bg-steel-600 text-white py-3 rounded-xl font-bold hover:bg-steel-700 disabled:opacity-50 shadow-lg">{aiLoading ? '조건 스캔 중...' : '견적 검색하기 🚀'}</button>
                 </div>
             </div>
         </div>
@@ -267,7 +267,7 @@ export default function CarCodePage() {
       )}
 
       {/* AI 수집 모달 (기존 동일) */}
-      {isAiModalOpen && (<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setIsAiModalOpen(false)}><div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}><h2 className="text-lg font-bold">✨ AI 데이터 수집</h2><div className="flex border-b"><button onClick={()=>setSearchMode('single')} className={`flex-1 py-2 text-xs font-bold ${searchMode==='single'?'text-purple-600 border-b-2 border-purple-600':''}`}>단일</button><button onClick={()=>setSearchMode('brand')} className={`flex-1 py-2 text-xs font-bold ${searchMode==='brand'?'text-purple-600 border-b-2 border-purple-600':''}`}>브랜드</button></div><div><input className="w-full p-2 border rounded text-xs" placeholder="브랜드" value={aiRequest.brand} onChange={e=>setAiRequest({...aiRequest, brand: e.target.value})} /></div>{searchMode==='single'&&<input className="w-full p-2 border rounded text-xs" placeholder="모델명" value={aiRequest.model_name} onChange={e=>setAiRequest({...aiRequest, model_name: e.target.value})} />}<button onClick={handleAiExecute} disabled={aiLoading} className="w-full bg-black text-white py-3 rounded-lg font-bold text-sm disabled:opacity-50">{aiLoading?progressMsg||'수집 중...':'실행'}</button><button onClick={()=>setIsAiModalOpen(false)} className="w-full py-2 text-xs text-gray-400">닫기</button></div></div>)}
+      {isAiModalOpen && (<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setIsAiModalOpen(false)}><div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}><h2 className="text-lg font-bold">✨ AI 데이터 수집</h2><div className="flex border-b"><button onClick={()=>setSearchMode('single')} className={`flex-1 py-2 text-xs font-bold ${searchMode==='single'?'text-purple-600 border-b-2 border-purple-600':''}`}>단일</button><button onClick={()=>setSearchMode('brand')} className={`flex-1 py-2 text-xs font-bold ${searchMode==='brand'?'text-purple-600 border-b-2 border-purple-600':''}`}>브랜드</button></div><div><input className="w-full p-2 border rounded text-xs" placeholder="브랜드" value={aiRequest.brand} onChange={e=>setAiRequest({...aiRequest, brand: e.target.value})} /></div>{searchMode==='single'&&<input className="w-full p-2 border rounded text-xs" placeholder="모델명" value={aiRequest.model_name} onChange={e=>setAiRequest({...aiRequest, model_name: e.target.value})} />}<button onClick={handleAiExecute} disabled={aiLoading} className="w-full bg-steel-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-steel-700 disabled:opacity-50">{aiLoading?progressMsg||'수집 중...':'실행'}</button><button onClick={()=>setIsAiModalOpen(false)} className="w-full py-2 text-xs text-gray-400">닫기</button></div></div>)}
     </div>
   )
 }

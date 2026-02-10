@@ -81,7 +81,7 @@ const router = useRouter()
             <Link href="/" className="px-3 py-2 text-xs md:px-6 md:py-3 md:text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">
                 🚗 차량 관리로
             </Link>
-            <Link href="/quotes/new" className="px-3 py-2 text-xs md:px-6 md:py-3 md:text-sm bg-gray-900 text-white rounded-xl font-bold hover:bg-black shadow-lg">
+            <Link href="/quotes/new" className="px-3 py-2 text-xs md:px-6 md:py-3 md:text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 shadow-lg transition-colors">
                 + 새 견적 작성
             </Link>
         </div>
