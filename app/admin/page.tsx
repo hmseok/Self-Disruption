@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
-import AddCompanyModal from '../components/admin/AddCompanyModal'
 
 // ============================================
 // 회사/가입 관리 — god_admin + 회사 + 사용자 통합
@@ -37,7 +36,6 @@ export default function AdminDashboard() {
   const [companies, setCompanies] = useState<CompanyWithUsers[]>([])
   const [unassignedUsers, setUnassignedUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'active'>('all')
 
   useEffect(() => {
@@ -366,23 +364,11 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* 헤더 */}
-        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
-          <div>
-            <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">
-              {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
-            </h1>
-            <p className="text-slate-500 mt-1 text-xs md:text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
-          </div>
-          <div className="flex gap-2">
-            {role === 'god_admin' && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-3 md:px-4 py-2 bg-steel-600 text-white rounded-xl text-xs md:text-sm font-bold hover:bg-steel-700 transition-colors"
-              >
-                + 회사 등록
-              </button>
-            )}
-          </div>
+        <div className="mb-5 md:mb-6">
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+            🏢 {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
+          </h1>
+          <p className="text-slate-500 mt-1 text-xs md:text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
         </div>
 
         {/* KPI */}
@@ -456,7 +442,7 @@ export default function AdminDashboard() {
 
         {/* 필터 탭 */}
         <div className="flex items-center gap-2 mb-4 md:mb-6 overflow-x-auto">
-          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider mr-2 flex-shrink-0">회사</h2>
+          <h2 className="text-base md:text-lg font-black text-slate-800 mr-2 flex-shrink-0">가입 회사</h2>
           {[
             { key: 'all', label: '전체', count: clientCompanies.length },
             { key: 'pending', label: '승인 대기', count: pendingCount },
@@ -488,11 +474,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <AddCompanyModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={fetchData}
-      />
     </div>
   )
 }

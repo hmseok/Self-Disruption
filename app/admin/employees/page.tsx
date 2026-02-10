@@ -370,7 +370,7 @@ export default function OrgManagementPage() {
 
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
-          <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 조직/권한 관리</h1>
           <p className="text-slate-500 mt-1 text-xs md:text-sm">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
           {role === 'god_admin' && !adminSelectedCompanyId && (
             <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">

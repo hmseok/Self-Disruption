@@ -174,7 +174,7 @@ export default function SystemAdminPage() {
 
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
-          <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">구독/모듈 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📦 구독/모듈 관리</h1>
           <p className="text-slate-500 mt-1 text-xs md:text-sm">전체 모듈 풀에서 플랜별로 배분하고, 회사별 모듈을 관리합니다.</p>
         </div>
 

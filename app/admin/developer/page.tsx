@@ -90,7 +90,7 @@ export default function DeveloperPage() {
 
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
-          <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">개발자 모드</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛠️ 개발자 모드</h1>
           <p className="text-slate-500 mt-1 text-xs md:text-sm">플랫폼 관리자(Super God Admin) 현황, 초대 코드 발급 및 시스템 관리</p>
         </div>
 
