@@ -301,7 +301,7 @@ export default function OrgManagementPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
       </div>
     )
@@ -371,11 +371,11 @@ export default function OrgManagementPage() {
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
           <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">조직/권한 관리</h1>
-          <p className="text-slate-500 mt-1 text-xs md:text-base">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
+          <p className="text-slate-500 mt-1 text-xs md:text-sm">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
           {role === 'god_admin' && !adminSelectedCompanyId && (
-            <div className="mt-4 p-4 bg-sky-50 border border-sky-200 rounded-xl">
-              <p className="text-sm font-bold text-sky-700">사이드바에서 회사를 선택해주세요.</p>
-              <p className="text-xs text-sky-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
+            <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">
+              <p className="text-sm font-bold text-steel-700">사이드바에서 회사를 선택해주세요.</p>
+              <p className="text-xs text-steel-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
             </div>
           )}
         </div>
@@ -596,12 +596,12 @@ export default function OrgManagementPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="p-3 text-xs font-bold text-slate-500 min-w-[180px]">페이지</th>
-                          <th className="p-3 text-xs font-bold text-slate-500 text-center w-16">조회</th>
-                          <th className="p-3 text-xs font-bold text-slate-500 text-center w-16">생성</th>
-                          <th className="p-3 text-xs font-bold text-slate-500 text-center w-16">수정</th>
-                          <th className="p-3 text-xs font-bold text-slate-500 text-center w-16">삭제</th>
-                          <th className="p-3 text-xs font-bold text-slate-500 text-center min-w-[120px]">데이터 범위</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase min-w-[180px]">페이지</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">조회</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">생성</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">수정</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">삭제</th>
+                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center min-w-[120px]">데이터 범위</th>
                         </tr>
                       </thead>
                       <tbody>

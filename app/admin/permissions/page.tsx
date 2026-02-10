@@ -208,8 +208,8 @@ export default function PermissionsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin text-4xl">&#9203;</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
       </div>
     )
   }
@@ -222,10 +222,10 @@ export default function PermissionsPage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end">
+        <div className="mb-5 md:mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">권한 설정</h1>
-            <p className="text-slate-500 mt-1 text-sm">직급별로 페이지 접근 권한과 데이터 범위를 설정합니다.</p>
+            <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">권한 설정</h1>
+            <p className="text-slate-500 mt-1 text-xs md:text-sm">직급별로 페이지 접근 권한과 데이터 범위를 설정합니다.</p>
           </div>
           <div className="flex items-center gap-3">
             {/* god_admin: 회사 선택 */}
@@ -254,14 +254,14 @@ export default function PermissionsPage() {
         </div>
 
         {/* 직급 선택 탭 */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-1.5 md:gap-2 mb-5 md:mb-6 flex-wrap">
           {positions.map(pos => (
             <button
               key={pos.id}
               onClick={() => setSelectedPosition(pos.id)}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+              className={`px-3 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${
                 selectedPosition === pos.id
-                  ? 'bg-slate-900 text-white shadow-lg'
+                  ? 'bg-steel-600 text-white shadow-lg'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
@@ -271,15 +271,15 @@ export default function PermissionsPage() {
         </div>
 
         {positions.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <p className="text-slate-400 text-lg">직급이 없습니다. 먼저 직원 관리에서 직급을 추가해주세요.</p>
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
+            <p className="text-slate-400 text-sm">직급이 없습니다. 먼저 직원 관리에서 직급을 추가해주세요.</p>
           </div>
         ) : (
           /* 권한 매트릭스 테이블 */
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {/* 전체 선택 컨트롤 */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-4 flex-wrap">
-              <span className="text-xs font-bold text-slate-500">일괄 설정:</span>
+            <div className="p-3 md:p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2 md:gap-4 flex-wrap">
+              <span className="text-[10px] md:text-xs font-bold text-slate-400">일괄 설정:</span>
               {['can_view', 'can_create', 'can_edit', 'can_delete'].map(field => (
                 <div key={field} className="flex items-center gap-1">
                   <button onClick={() => toggleAll(field, true)} className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold hover:bg-green-200">
@@ -296,19 +296,19 @@ export default function PermissionsPage() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="p-4 text-xs font-bold text-slate-500 sticky left-0 bg-slate-50 min-w-[200px]">페이지</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 text-center w-20">조회</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 text-center w-20">생성</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 text-center w-20">수정</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 text-center w-20">삭제</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 text-center min-w-[140px]">데이터 범위</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase sticky left-0 bg-slate-50 min-w-[200px]">페이지</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase text-center w-20">조회</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase text-center w-20">생성</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase text-center w-20">수정</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase text-center w-20">삭제</th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase text-center min-w-[140px]">데이터 범위</th>
                   </tr>
                 </thead>
                 <tbody>
                   {groups.map(group => (
                     <React.Fragment key={`group-${group}`}>
-                      <tr className="bg-slate-100">
-                        <td colSpan={6} className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</td>
+                      <tr className="bg-slate-100/70">
+                        <td colSpan={6} className="px-4 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group}</td>
                       </tr>
                       {ALL_PAGES.filter(p => p.group === group).map(page => {
                         const key = `${posId}_${page.path}`
@@ -352,8 +352,8 @@ export default function PermissionsPage() {
         )}
 
         {/* 안내 */}
-        <div className="mt-6 p-4 bg-steel-50 rounded-xl border border-steel-200">
-          <p className="text-sm text-steel-800">
+        <div className="mt-6 p-3 md:p-4 bg-steel-50 rounded-xl border border-steel-100">
+          <p className="text-[11px] md:text-xs text-steel-700">
             <strong>권한 체계 안내:</strong> god_admin과 master(대표) 역할은 이 설정과 무관하게 항상 전체 접근 권한을 가집니다.
             이 설정은 일반 직원(user 역할)의 직급에 따른 세부 권한을 제어합니다.
           </p>

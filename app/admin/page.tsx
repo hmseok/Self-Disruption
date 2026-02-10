@@ -285,13 +285,13 @@ export default function AdminDashboard() {
             <>
               <button
                 onClick={() => approveCompany(comp.id)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all"
+                className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
               >
                 승인
               </button>
               <button
                 onClick={() => rejectCompany(comp.id)}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-bold hover:bg-red-600 transition-all"
+                className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
               >
                 거부
               </button>
@@ -368,16 +368,16 @@ export default function AdminDashboard() {
         {/* 헤더 */}
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
+            <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">
               {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
             </h1>
-            <p className="text-slate-500 mt-1 text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
+            <p className="text-slate-500 mt-1 text-xs md:text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
           </div>
           <div className="flex gap-2">
             {role === 'god_admin' && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-3 md:px-4 py-2 bg-steel-600 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-steel-700"
+                className="px-3 md:px-4 py-2 bg-steel-600 text-white rounded-xl text-xs md:text-sm font-bold hover:bg-steel-700 transition-colors"
               >
                 + 회사 등록
               </button>
@@ -465,9 +465,9 @@ export default function AdminDashboard() {
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key as any)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${
                 activeFilter === tab.key
-                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-slate-900 text-white'
+                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-steel-600 text-white'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >

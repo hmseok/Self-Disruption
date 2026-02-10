@@ -187,8 +187,8 @@ export default function DeveloperPage() {
         </div>
 
         {/* Super God Admin 초대 코드 */}
-        <div className="mb-5 p-3 bg-sky-50 rounded-xl border border-sky-100">
-          <p className="text-[11px] md:text-xs text-sky-700">
+        <div className="mb-5 p-3 bg-steel-50 rounded-xl border border-steel-100">
+          <p className="text-[11px] md:text-xs text-steel-700">
             <strong>Super God Admin 초대:</strong> 이메일 주소를 입력하면 초대 코드가 발급되고 해당 이메일로 자동 발송됩니다.
             수신자는 회원가입 시 &quot;관리자&quot; 탭에서 초대 코드를 입력해 플랫폼 관리자로 가입할 수 있습니다.
             코드는 1회용이며 72시간 후 만료됩니다.
