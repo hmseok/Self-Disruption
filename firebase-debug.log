@@ -1,0 +1,21 @@
+[debug] [2026-02-10T07:47:11.611Z] ----------------------------------------------------------------------
+[debug] [2026-02-10T07:47:11.613Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only hosting --project secondlife-485816
+[debug] [2026-02-10T07:47:11.613Z] CLI Version:   15.5.1
+[debug] [2026-02-10T07:47:11.613Z] Platform:      darwin
+[debug] [2026-02-10T07:47:11.613Z] Node Version:  v24.13.0
+[debug] [2026-02-10T07:47:11.614Z] Time:          Tue Feb 10 2026 16:47:11 GMT+0900 (Korean Standard Time)
+[debug] [2026-02-10T07:47:11.614Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-10T07:47:12.310Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-10T07:47:12.311Z] > authorizing via signed-in user (sukhomin87@gmail.com)
+[debug] [2026-02-10T07:47:12.311Z] [iam] checking project secondlife-485816 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-02-10T07:47:12.311Z] Checked if tokens are valid: true, expires at: 1770710719768
+[debug] [2026-02-10T07:47:12.311Z] Checked if tokens are valid: true, expires at: 1770710719768
+[debug] [2026-02-10T07:47:12.311Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/secondlife-485816:testIamPermissions [none]
+[debug] [2026-02-10T07:47:12.311Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/secondlife-485816:testIamPermissions  x-goog-user-project=secondlife-485816
+[debug] [2026-02-10T07:47:12.311Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/secondlife-485816:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-10T07:47:12.529Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/secondlife-485816:testIamPermissions 200
+[debug] [2026-02-10T07:47:12.529Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/secondlife-485816:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-02-10T07:47:12.530Z] Checked if tokens are valid: true, expires at: 1770710719768
+[debug] [2026-02-10T07:47:12.530Z] Checked if tokens are valid: true, expires at: 1770710719768
+[debug] [2026-02-10T07:47:12.530Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/secondlife-485816 [none]
