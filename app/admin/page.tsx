@@ -23,6 +23,7 @@ type CompanyWithUsers = {
   users: { id: string; email: string; employee_name: string | null; role: string; is_active: boolean }[]
 }
 
+
 export default function AdminDashboard() {
   const { user, company, role, setAdminSelectedCompanyId } = useApp()
   const router = useRouter()
