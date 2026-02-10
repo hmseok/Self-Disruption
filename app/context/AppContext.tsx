@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../utils/supabase'
 import type { Profile, PagePermission, Position, Department } from '../types/rbac'
 
@@ -62,6 +62,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [menuRefreshKey, setMenuRefreshKey] = useState(0)
   const triggerMenuRefresh = () => setMenuRefreshKey(prev => prev + 1)
 
+  // ★ 무한루프 방지: fetchSession 중복 호출 차단
+  const isFetchingRef = useRef(false)
+
   // 세션 없을 때 상태 초기화
   const clearState = () => {
     setUser(null)
@@ -76,6 +79,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const fetchSession = async () => {
+    // 이미 로딩 중이면 중복 호출 방지
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
     try {
       // 1. 세션 확인
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -155,6 +161,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } finally {
       setLoading(false)
+      isFetchingRef.current = false
     }
   }
 
@@ -163,17 +170,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchSession()
 
     // ✅ 핵심: 로그인/로그아웃 이벤트 감지 → 자동으로 상태 갱신
+    // 초기 SIGNED_IN 이벤트는 fetchSession()에서 이미 처리하므로 무시
+    let initialEventSkipped = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('🔄 Auth 상태 변경:', event)
+        if (event === 'SIGNED_IN' && !initialEventSkipped) {
+          // 초기 마운트 시 발생하는 SIGNED_IN은 건너뜀 (fetchSession()이 이미 처리)
+          initialEventSkipped = true
+          return
+        }
+        initialEventSkipped = true
+
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          // 로그인 또는 토큰 갱신 → 로딩 상태로 전환 후 세션 데이터 다시 로드
-          setLoading(true)
           fetchSession()
         } else if (event === 'SIGNED_OUT') {
-          // 로그아웃 → 상태 초기화 + 로딩 상태로 전환 (중간 화면 방지)
           setLoading(true)
           clearState()
+          setLoading(false)
         }
       }
     )
