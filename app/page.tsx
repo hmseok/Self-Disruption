@@ -12,7 +12,11 @@ function AuthPage() {
   const isLocal = process.env.NODE_ENV === 'development'
 
   const [view, setView] = useState<'login' | 'signup' | 'verify' | 'verified'>('login')
-  const [roleType, setRoleType] = useState<'founder' | 'employee'>('founder')
+  const [roleType, setRoleType] = useState<'founder' | 'employee' | 'admin'>('founder')
+  // 관리자 초대 코드
+  const [adminInviteCode, setAdminInviteCode] = useState('')
+  const [inviteValid, setInviteValid] = useState<null | boolean>(null) // null=미확인, true=유효, false=무효
+  const [inviteChecking, setInviteChecking] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -425,12 +429,38 @@ function AuthPage() {
     }
   }
 
+  // 관리자 초대 코드 검증
+  const checkInviteCode = async (code: string) => {
+    if (!code || code.trim().length < 4) { setInviteValid(null); return }
+    setInviteChecking(true)
+    try {
+      const res = await fetch('/api/admin-invite/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      const result = await res.json()
+      setInviteValid(result.valid)
+    } catch { setInviteValid(false) }
+    setInviteChecking(false)
+  }
+
   // 회원가입
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // 1. 기본 유효성 검증
-    if (!validity.email || !validity.password || !validity.passwordConfirm || !validity.companyName) {
+    // ★ 관리자 가입: 초대 코드만 검증
+    if (roleType === 'admin') {
+      if (!validity.email || !validity.password || !validity.passwordConfirm) {
+        setMessage({ text: '이메일, 비밀번호를 입력해주세요.', type: 'error' }); return
+      }
+      if (!inviteValid) {
+        setMessage({ text: '유효한 관리자 초대 코드를 입력해주세요.', type: 'error' }); return
+      }
+    }
+
+    // 1. 기본 유효성 검증 (일반 가입)
+    if (roleType !== 'admin' && (!validity.email || !validity.password || !validity.passwordConfirm || !validity.companyName)) {
       setMessage({ text: '모든 항목을 올바르게 입력해주세요.', type: 'error' })
       return
     }
@@ -497,8 +527,8 @@ function AuthPage() {
     setMessage(null)
 
     try {
-      // 4. 서버사이드 통합 검증 (최종 확인)
-      try {
+      // 4. 서버사이드 통합 검증 (최종 확인 — admin 가입은 스킵)
+      if (roleType !== 'admin') try {
         const { data: validation, error: valError } = await supabase.rpc('validate_signup', {
           p_email: formData.email,
           p_phone: formData.phone,
@@ -534,9 +564,10 @@ function AuthPage() {
           data: {
             full_name: formData.name,
             phone: formData.phone,
-            role: roleType === 'founder' ? 'master' : 'user',
-            company_name: formData.companyName,
+            role: roleType === 'admin' ? 'god_admin' : roleType === 'founder' ? 'master' : 'user',
+            company_name: roleType === 'admin' ? null : formData.companyName,
             business_number: roleType === 'founder' ? formData.businessNumber : null,
+            admin_invite_code: roleType === 'admin' ? adminInviteCode.trim().toUpperCase() : null,
           }
         }
       })
@@ -960,6 +991,7 @@ function AuthPage() {
                     {[
                       { key: 'founder', label: '기업 대표', desc: '회사를 등록합니다' },
                       { key: 'employee', label: '직원', desc: '기존 회사에 합류합니다' },
+                      { key: 'admin', label: '관리자', desc: '초대 코드로 가입' },
                     ].map(tab => (
                       <button
                         key={tab.key}
@@ -967,7 +999,7 @@ function AuthPage() {
                         onClick={() => setRoleType(tab.key as any)}
                         className={`flex-1 py-3 px-2 rounded-lg text-center transition-all ${
                           roleType === tab.key
-                            ? 'bg-white text-slate-900 shadow-sm'
+                            ? tab.key === 'admin' ? 'bg-sky-600 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
                             : 'text-steel-400 hover:text-steel-600'
                         }`}
                       >
@@ -975,6 +1007,42 @@ function AuthPage() {
                         <div className="text-[10px] mt-0.5 opacity-60">{tab.desc}</div>
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* 관리자 초대 코드 입력 (admin 가입 시) */}
+                {view === 'signup' && roleType === 'admin' && (
+                  <div className="p-4 bg-sky-50 rounded-xl border border-sky-200 mb-2">
+                    <label className="text-[11px] font-bold text-sky-700 block mb-1.5">관리자 초대 코드</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={adminInviteCode}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase()
+                          setAdminInviteCode(val)
+                          setInviteValid(null)
+                        }}
+                        placeholder="XXXX-XXXX"
+                        className="flex-1 px-3 py-2.5 border border-sky-200 rounded-lg text-sm font-mono tracking-wider text-center focus:outline-none focus:border-sky-500 bg-white"
+                        maxLength={9}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => checkInviteCode(adminInviteCode)}
+                        disabled={inviteChecking || adminInviteCode.length < 4}
+                        className="px-4 py-2.5 bg-sky-600 text-white rounded-lg text-xs font-bold hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {inviteChecking ? '...' : '확인'}
+                      </button>
+                    </div>
+                    {inviteValid === true && (
+                      <p className="text-xs text-green-600 font-bold mt-2">유효한 초대 코드입니다.</p>
+                    )}
+                    {inviteValid === false && (
+                      <p className="text-xs text-red-500 font-bold mt-2">유효하지 않거나 만료된 코드입니다.</p>
+                    )}
+                    <p className="text-[10px] text-sky-500 mt-2">기존 플랫폼 관리자에게 초대 코드를 받으세요.</p>
                   </div>
                 )}
 
@@ -1078,8 +1146,8 @@ function AuthPage() {
                       </div>
                     </div>
 
-                    {/* 회사명 */}
-                    <div>
+                    {/* 회사명 (관리자 가입 시 숨김) */}
+                    {roleType !== 'admin' && <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[11px] font-bold text-slate-500">
                           {roleType === 'founder' ? '회사명 (법인명)' : '회사명'}
@@ -1110,7 +1178,7 @@ function AuthPage() {
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2"><ValidIcon valid={validity.companyName} /></div>
                       </div>
-                    </div>
+                    </div>}
 
                     {/* 사업자번호 (대표만) */}
                     {roleType === 'founder' && (
