@@ -4,17 +4,17 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/secondlife-erp:$COMMIT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/self-disruption:latest'
+      - 'gcr.io/$PROJECT_ID/secondlife-erp:latest'
       - '.'
 
   # Container Registry에 푸시
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/secondlife-erp:$COMMIT_SHA']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/self-disruption:latest']
+    args: ['push', 'gcr.io/$PROJECT_ID/secondlife-erp:latest']
 
   # Cloud Run 배포
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -22,9 +22,9 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'self-disruption'
+      - 'secondlife-erp'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/secondlife-erp:$COMMIT_SHA'
       - '--region'
       - 'asia-northeast3'
       - '--platform'
@@ -32,8 +32,8 @@ steps:
       - '--allow-unauthenticated'
 
 images:
-  - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/self-disruption:latest'
+  - 'gcr.io/$PROJECT_ID/secondlife-erp:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/secondlife-erp:latest'
 
 # ★ 이 옵션이 서비스 계정 + 로그 버킷 오류를 해결합니다
 options:
