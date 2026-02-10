@@ -1,0 +1,40 @@
+steps:
+  # Docker 이미지 빌드
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/self-disruption:latest'
+      - '.'
+
+  # Container Registry에 푸시
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/self-disruption:latest']
+
+  # Cloud Run 배포
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'self-disruption'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
+      - '--region'
+      - 'asia-northeast3'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/self-disruption:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/self-disruption:latest'
+
+# ★ 이 옵션이 서비스 계정 + 로그 버킷 오류를 해결합니다
+options:
+  logging: CLOUD_LOGGING_ONLY
