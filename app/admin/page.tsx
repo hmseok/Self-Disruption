@@ -11,6 +11,7 @@ import AddCompanyModal from '../components/admin/AddCompanyModal'
 // god_admin 회사는 별도 섹션으로 분리
 // ============================================
 
+
 type CompanyWithUsers = {
   id: string
   name: string
