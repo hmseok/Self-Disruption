@@ -352,7 +352,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
                 <span>{bulkProcessing ? '분석 및 병합 중...' : '증권 업로드'}</span>
             </button>
             <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
-                <Icons.Plus /> <span>차량 선택 등록</span>
+                <Icons.Plus /> <span>신규보험등록</span>
             </button>
         </div>
       </div>

@@ -143,7 +143,7 @@ export default function QuoteCalculatorPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-6 animate-fade-in-up">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
       <h1 className="text-3xl font-black text-gray-900 mb-8">🧮 스마트 렌탈료 계산기</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -155,7 +155,7 @@ export default function QuoteCalculatorPage() {
           <div className="bg-white p-6 rounded-3xl border shadow-sm">
             <label className="block text-sm font-bold text-gray-500 mb-2">고객 선택</label>
             <select
-                className="w-full p-4 border-2 border-gray-200 rounded-xl font-bold text-lg focus:border-black outline-none"
+                className="w-full p-4 border border-gray-200 rounded-xl font-bold text-lg focus:border-steel-500 outline-none"
                 value={selectedCustomerName}
                 onChange={(e) => setSelectedCustomerName(e.target.value)}
             >
@@ -172,7 +172,7 @@ export default function QuoteCalculatorPage() {
           <div className="bg-white p-6 rounded-3xl border shadow-sm">
             <label className="block text-sm font-bold text-gray-500 mb-2">대상 차량 선택</label>
             <select
-                className="w-full p-4 border-2 border-steel-100 rounded-xl font-bold text-lg bg-steel-50 focus:border-steel-500 outline-none"
+                className="w-full p-4 border border-steel-100 rounded-xl font-bold text-lg bg-steel-50 focus:border-steel-500 outline-none"
                 onChange={(e) => handleCarSelect(e.target.value)}
             >
                 <option value="">차량을 선택하세요</option>
@@ -223,7 +223,7 @@ export default function QuoteCalculatorPage() {
           <div className="bg-steel-50/50 p-6 rounded-3xl border border-steel-200">
             <h3 className="font-bold text-steel-900 mb-4">💰 마진 설정</h3>
             <div className="flex items-center gap-4">
-                <input type="text" className="w-full p-4 border-2 border-steel-200 rounded-xl text-right font-black text-2xl text-steel-600 outline-none" value={f(margin)} onChange={(e) => setMargin(p(e.target.value))}/>
+                <input type="text" className="w-full p-4 border border-steel-200 rounded-xl text-right font-black text-2xl text-steel-600 outline-none" value={f(margin)} onChange={(e) => setMargin(p(e.target.value))}/>
                 <span className="font-bold text-gray-500 whitespace-nowrap">원 남기기</span>
             </div>
             <div className="mt-4 flex gap-2">

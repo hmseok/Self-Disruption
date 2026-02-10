@@ -120,7 +120,7 @@ function UploadContent() {
   }
 
   return (
-    <div className="max-w-full mx-auto py-10 px-6 animate-fade-in-up">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
       <div className="flex justify-between items-center mb-8 max-w-6xl mx-auto">
           <div>
             <h1 className="text-3xl font-black text-gray-900">✨ AI 금융 내역 분석기</h1>

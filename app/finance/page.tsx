@@ -188,7 +188,7 @@ const router = useRouter()
   const filteredList = list.filter(item => activeTab === 'ledger' ? item.status === 'completed' : item.status === 'pending')
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 pb-20 md:pb-40 animate-fade-in-up">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 pb-20 md:pb-40 bg-gray-50/50 min-h-screen">
 
       {/* 1. 상단 헤더 (제목 + 날짜) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b pb-6 gap-4">

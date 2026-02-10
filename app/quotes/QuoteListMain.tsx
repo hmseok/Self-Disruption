@@ -70,7 +70,7 @@ const router = useRouter()
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>

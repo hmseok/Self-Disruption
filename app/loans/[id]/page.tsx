@@ -184,7 +184,7 @@ export default function LoanDetailPage() {
   if (loading) return <div className="p-20 text-center font-bold text-gray-500">데이터 불러오는 중... ⏳</div>
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6 animate-fade-in-up pb-40">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen pb-40">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-8 border-b pb-6">
         <div>

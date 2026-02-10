@@ -108,10 +108,10 @@ export default function QuoteDetailPage() {
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
 
       {linkedContract && (
-        <div className="bg-steel-600 text-white p-6 rounded-2xl shadow-lg mb-8 flex justify-between items-center animate-fade-in no-print">
+        <div className="bg-steel-600 text-white p-6 rounded-2xl shadow-lg mb-8 flex justify-between items-center no-print">
             <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">✅ 계약 확정된 건입니다</h2>
                 <p className="text-steel-100 text-sm mt-1">계약번호: {String(linkedContract.id).slice(0,8)}</p>

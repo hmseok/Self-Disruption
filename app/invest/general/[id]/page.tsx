@@ -224,7 +224,7 @@ export default function GeneralInvestDetail() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6 pb-32">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen pb-32">
 
         {/* PDF 생성용 숨겨진 영역 */}
         <div style={{position:'absolute', top:'-10000px', left:'-10000px'}}>
