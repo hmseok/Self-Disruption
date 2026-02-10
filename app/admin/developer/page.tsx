@@ -7,12 +7,25 @@ import { useRouter } from 'next/navigation'
 
 // ============================================
 // 개발자 모드 (god_admin 전용)
-// Super God Admin 초대 코드 발급 및 관리
+// 플랫폼 관리자 현황 + 초대 코드 발급 및 관리
 // ============================================
+
+type GodAdmin = {
+  id: string
+  email: string
+  employee_name: string | null
+  role: string
+  is_active: boolean
+  created_at: string
+}
 
 export default function DeveloperPage() {
   const router = useRouter()
   const { role, loading: appLoading } = useApp()
+
+  // 플랫폼 관리자 목록
+  const [godAdmins, setGodAdmins] = useState<GodAdmin[]>([])
+  const [adminsLoading, setAdminsLoading] = useState(true)
 
   // Super God Admin 초대
   const [invites, setInvites] = useState<any[]>([])
@@ -29,6 +42,18 @@ export default function DeveloperPage() {
     }
   }, [appLoading, role])
 
+  // 플랫폼 관리자 목록 로드
+  const loadGodAdmins = async () => {
+    setAdminsLoading(true)
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, email, employee_name, role, is_active, created_at')
+      .eq('role', 'god_admin')
+      .order('created_at', { ascending: true })
+    setGodAdmins(data || [])
+    setAdminsLoading(false)
+  }
+
   // 초대 코드 목록 로드
   const loadInvites = async () => {
     setInviteLoading(true)
@@ -44,9 +69,12 @@ export default function DeveloperPage() {
 
   useEffect(() => {
     if (!appLoading && role === 'god_admin') {
+      loadGodAdmins()
       loadInvites()
     }
   }, [appLoading, role])
+
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
 
   if (appLoading || role !== 'god_admin') {
     return (
@@ -63,7 +91,99 @@ export default function DeveloperPage() {
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
           <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">개발자 모드</h1>
-          <p className="text-slate-500 mt-1 text-xs md:text-sm">플랫폼 관리자(Super God Admin) 초대 코드 발급 및 시스템 관리</p>
+          <p className="text-slate-500 mt-1 text-xs md:text-sm">플랫폼 관리자(Super God Admin) 현황, 초대 코드 발급 및 시스템 관리</p>
+        </div>
+
+        {/* ===== 플랫폼 관리자 KPI ===== */}
+        <div className="mb-5">
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 md:p-5 rounded-2xl border border-yellow-200 shadow-sm">
+            <div className="text-[10px] md:text-xs font-bold text-yellow-600 uppercase mb-1">플랫폼 관리자</div>
+            <div className="text-2xl md:text-3xl font-black text-yellow-700">{godAdmins.length}명</div>
+          </div>
+        </div>
+
+        {/* ===== 플랫폼 관리자 목록 ===== */}
+        <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm overflow-hidden mb-5">
+          <div className="p-4 border-b border-yellow-100 bg-gradient-to-r from-yellow-50 to-orange-50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white uppercase tracking-wider">GOD ADMIN</span>
+              <span className="text-sm font-bold text-yellow-800">플랫폼 관리자 목록</span>
+            </div>
+            <button
+              onClick={loadGodAdmins}
+              className="text-xs text-yellow-600 hover:text-yellow-800 font-bold"
+            >
+              새로고침
+            </button>
+          </div>
+
+          {adminsLoading ? (
+            <div className="p-8 text-center text-sm text-slate-400">로딩 중...</div>
+          ) : godAdmins.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">등록된 플랫폼 관리자가 없습니다.</div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-yellow-50/30">
+                      <th className="px-5 py-2 text-[10px] font-bold text-yellow-600 uppercase">관리자</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-yellow-600 uppercase">이메일</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-yellow-600 uppercase">가입일</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-yellow-600 uppercase">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {godAdmins.map(admin => (
+                      <tr key={admin.id} className="border-t border-yellow-50 hover:bg-yellow-50/30">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                              {(admin.employee_name || admin.email)[0].toUpperCase()}
+                            </div>
+                            <span className="text-sm font-bold text-slate-800">{admin.employee_name || '(미설정)'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{admin.email}</td>
+                        <td className="px-5 py-3 text-xs text-slate-400">{formatDate(admin.created_at)}</td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded ${
+                            admin.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-green-500' : 'bg-red-400'}`}></span>
+                            {admin.is_active ? '활성' : '비활성'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Mobile Cards */}
+              <div className="md:hidden divide-y divide-yellow-100">
+                {godAdmins.map(admin => (
+                  <div key={admin.id} className="p-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                      {(admin.employee_name || admin.email)[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-bold text-slate-800">{admin.employee_name || '(미설정)'}</span>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded ${
+                          admin.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-green-500' : 'bg-red-400'}`}></span>
+                          {admin.is_active ? '활성' : '비활성'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{admin.email}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Super God Admin 초대 코드 */}
