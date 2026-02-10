@@ -286,17 +286,14 @@ function AuthPage() {
     }
   }
 
-  // 이미 로그인된 사용자 → 바로 이동 + 로그인 이벤트 자동 감지
+  // 이미 로그인된 사용자 → 대시보드로 1회만 이동
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) window.location.href = '/dashboard'
-    }
-    checkSession()
+    let redirected = false
 
-    // 로그인 이벤트 감지 → 자동 리다이렉트 (dev login 등 모든 방식 대응)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // ★ INITIAL_SESSION 또는 SIGNED_IN에서 세션 있으면 1회만 리다이렉트
+      if (!redirected && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+        redirected = true
         window.location.href = '/dashboard'
       }
     })
