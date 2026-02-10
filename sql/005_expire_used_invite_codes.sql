@@ -135,3 +135,5 @@ SELECT '✅ 005_expire_used_invite_codes.sql 완료' AS result;
 SELECT '  - 기존 사용된 코드 일괄 만료 처리' AS detail
 UNION ALL SELECT '  - handle_new_user() 초대코드 사용 시 expires_at=NOW() 추가'
 UNION ALL SELECT '  - 트리거 재생성 완료';
+
+
