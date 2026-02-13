@@ -1,51 +1,43 @@
 'use client'
 
 import { useState } from 'react'
-import dynamic from 'next/dynamic'
+import dynamicImport from 'next/dynamic'
 
-export const dynamic = 'force-dynamic'
-
-// 🏷️ 탭 설정
+// 탭 설정 — 각 탭에 설명 추가
 const tabs = [
-  { id: 'depreciation', label: '감가기준', icon: '📉' },
-  { id: 'insurance', label: '보험료', icon: '🛡️' },
-  { id: 'maintenance', label: '정비비', icon: '🔧' },
-  { id: 'tax', label: '자동차세', icon: '🏛️' },
-  { id: 'finance', label: '금융금리', icon: '🏦' },
-  { id: 'registration', label: '등록비용', icon: '📋' },
-  { id: 'rules', label: '기본설정', icon: '⚙️' },
+  { id: 'depreciation', label: '감가기준', icon: '📉', desc: '차량 잔존가치율' },
+  { id: 'insurance', label: '보험료', icon: '🛡️', desc: '보험료 기준표' },
+  { id: 'maintenance', label: '정비비', icon: '🔧', desc: '월 정비비 기준' },
+  { id: 'tax', label: '자동차세', icon: '🏛️', desc: '법정 세율 기준' },
+  { id: 'finance', label: '금융금리', icon: '🏦', desc: '금융상품 요율' },
+  { id: 'registration', label: '등록비용', icon: '📋', desc: '취등록 비용' },
+  { id: 'rules', label: '기본설정', icon: '⚙️', desc: '시스템 파라미터' },
 ]
 
-// 🎯 동적 탭 컴포넌트 로딩
-// 각 탭은 나중에 구현될 예정이므로, 지금은 플레이스홀더 사용
-const TabComponents: Record<string, React.ComponentType<any>> = {
-  depreciation: dynamic(() => import('./DepreciationTab').catch(() => TabPlaceholder), { ssr: false }),
-  insurance: dynamic(() => import('./InsuranceTab').catch(() => TabPlaceholder), { ssr: false }),
-  maintenance: dynamic(() => import('./MaintenanceTab').catch(() => TabPlaceholder), { ssr: false }),
-  tax: dynamic(() => import('./TaxTab').catch(() => TabPlaceholder), { ssr: false }),
-  finance: dynamic(() => import('./FinanceTab').catch(() => TabPlaceholder), { ssr: false }),
-  registration: dynamic(() => import('./RegistrationTab').catch(() => TabPlaceholder), { ssr: false }),
-  rules: dynamic(() => import('./BusinessRulesTab').catch(() => TabPlaceholder), { ssr: false }),
-}
-
-// 📋 탭 컴포넌트가 없을 때 플레이스홀더
-function TabPlaceholder({ tabId }: { tabId?: string }) {
+// 동적 탭 컴포넌트 로딩
+function TabPlaceholder() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
       <div className="text-6xl mb-4">⚙️</div>
       <h3 className="text-lg font-bold text-gray-700 mb-2">개발 예정</h3>
-      <p className="text-sm text-gray-500">
-        이 탭은 아직 구현되지 않았습니다. 곧 추가될 예정입니다.
-      </p>
+      <p className="text-sm text-gray-500">이 탭은 아직 구현되지 않았습니다.</p>
     </div>
   )
 }
 
-// ────────────────────────────────────────────────────────────────
-// 🎨 산출 기준 데이터 관리 — 메인 대시보드
-// ────────────────────────────────────────────────────────────────
+const TabComponents: Record<string, React.ComponentType<any>> = {
+  depreciation: dynamicImport(() => import('./DepreciationTab').catch(() => TabPlaceholder), { ssr: false }),
+  insurance: dynamicImport(() => import('./InsuranceTab').catch(() => TabPlaceholder), { ssr: false }),
+  maintenance: dynamicImport(() => import('./MaintenanceTab').catch(() => TabPlaceholder), { ssr: false }),
+  tax: dynamicImport(() => import('./TaxTab').catch(() => TabPlaceholder), { ssr: false }),
+  finance: dynamicImport(() => import('./FinanceTab').catch(() => TabPlaceholder), { ssr: false }),
+  registration: dynamicImport(() => import('./RegistrationTab').catch(() => TabPlaceholder), { ssr: false }),
+  rules: dynamicImport(() => import('./BusinessRulesTab').catch(() => TabPlaceholder), { ssr: false }),
+}
+
 export default function PricingStandardsPage() {
   const [activeTab, setActiveTab] = useState<string>('depreciation')
+  const [showGuide, setShowGuide] = useState(true)
 
   const getCurrentTabComponent = () => {
     const TabComponent = TabComponents[activeTab] || TabPlaceholder
@@ -56,33 +48,89 @@ export default function PricingStandardsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-3xl font-black text-gray-900">산출 기준 데이터 관리</h1>
-          <p className="text-sm text-gray-500 mt-2">
-            렌트료 산출에 필요한 기본 데이터와 시장 가격 기준을 관리합니다.
-          </p>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-black text-gray-900">산출 기준 데이터 관리</h1>
+              <p className="text-xs text-gray-500 mt-1">
+                렌트료 산출에 필요한 기본 데이터와 시장 가격 기준을 관리합니다
+              </p>
+            </div>
+            <button
+              onClick={() => setShowGuide(!showGuide)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            >
+              {showGuide ? '가이드 숨기기' : '가이드 보기'}
+              <span className="text-blue-500">💡</span>
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* 초보자 가이드 배너 */}
+      {showGuide && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+                <span className="text-xl flex-shrink-0">📊</span>
+                <div>
+                  <p className="font-bold text-gray-800 mb-1">기준 데이터란?</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    렌트료를 산출할 때 필요한 감가율, 보험료, 정비비, 세금, 금리 등의 기초 데이터입니다.
+                    대형 렌터카사(롯데·SK·현대캐피탈)도 동일한 구조의 기준표를 관리합니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+                <span className="text-xl flex-shrink-0">🔍</span>
+                <div>
+                  <p className="font-bold text-gray-800 mb-1">실시간 검증이란?</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    각 탭 오른쪽의 검증 패널에서 Gemini AI로 현재 시장 데이터를 실시간 조회합니다.
+                    우리 기준표와 시장가를 비교해 적정성을 판단할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+                <span className="text-xl flex-shrink-0">🏢</span>
+                <div>
+                  <p className="font-bold text-gray-800 mb-1">업계 비교 기준</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    롯데렌탈·SK렌터카·현대캐피탈 등 대형사 기준을 참고합니다.
+                    소규모 렌터카도 동일 원가구조를 이해하면 전문가 수준의 산출이 가능합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 탭 바 */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-2 overflow-x-auto -mx-6 px-6 py-4 scrollbar-hide">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
+          <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`
-                  px-4 py-2 rounded-full whitespace-nowrap transition-all text-sm font-semibold
+                  flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold min-w-fit
                   ${
                     activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }
                 `}
               >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {activeTab === tab.id && (
+                  <span className="text-blue-200 text-[10px] hidden sm:inline">
+                    {tab.desc}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -90,7 +138,7 @@ export default function PricingStandardsPage() {
       </div>
 
       {/* 탭 컨텐츠 */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
         {getCurrentTabComponent()}
       </div>
     </div>

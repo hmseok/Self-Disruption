@@ -63,6 +63,7 @@ interface NewCarResult {
   variants: NewCarVariant[]
   available: boolean
   message?: string
+  source?: string
 }
 
 interface BusinessRules {
