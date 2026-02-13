@@ -22,3 +22,4 @@ WHERE sm.path = '/quotes/pricing'
     SELECT 1 FROM company_modules ex
     WHERE ex.company_id = cm.company_id AND ex.module_id = sm.id
   );
+
