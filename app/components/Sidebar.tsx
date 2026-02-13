@@ -129,6 +129,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           {renderMenuItem('등록/제원 상세', '/registration', <Icons.Clipboard />)}
           {renderMenuItem('보험/사고/정비', '/insurance', <Icons.Shield />)}
           <div className="pt-1 pb-1 border-t border-gray-800 mx-2 my-1" /> {/* 구분선 */}
+          {renderMenuItem('산출 기준 관리', '/db/pricing-standards', <Icons.Calculator />)}
           {renderMenuItem('차량 시세/감가 DB', '/db/models', <Icons.Chart />)}
           {renderMenuItem('정비/부품 DB', '/db/maintenance', <Icons.Wrench />)}
         </div>
