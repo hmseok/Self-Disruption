@@ -110,6 +110,11 @@ async function lookupNewCar(brand: string, model: string) {
 옵션 없으면 options: []
 개별소비세율이 다른 가격이 있으면 반드시 모두 포함!
 
+★★★ 선택 옵션/패키지 — 절대 생략 금지 ★★★
+각 트림별로 제공되는 선택 옵션, 선택 패키지, H Genuine Accessories 등을 모두 포함해라.
+가격표 페이지의 "선택 품목", "옵션", "패키지" 섹션을 반드시 확인하고 빠짐없이 추출해라.
+옵션이 많더라도 절대 생략하지 마라. 응답이 길어져도 모든 옵션을 포함하는 것이 우선이다.
+
 \`\`\`json
 {
   "brand": "기아",
@@ -174,6 +179,10 @@ async function lookupNewCar(brand: string, model: string) {
           { google_search: {} },
           { url_context: {} },
         ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 65536,
+        },
       }),
     }
   )
@@ -213,6 +222,10 @@ async function lookupWithSearchOnly(apiKey: string, prompt: string) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         tools: [{ google_search: {} }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 65536,
+        },
       }),
     }
   )

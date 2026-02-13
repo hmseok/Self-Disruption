@@ -261,8 +261,7 @@ export default function RentPricingBuilder() {
   const [newCarPurchasePrice, setNewCarPurchasePrice] = useState('')
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState('')
-  const [brandModels, setBrandModels] = useState<{ category: string; models: { name: string }[] }[]>([])
-  const [isLoadingModels, setIsLoadingModels] = useState(false)
+  // brandModels, isLoadingModels 제거됨 — 모델명은 직접 타이핑
   const [isParsingQuote, setIsParsingQuote] = useState(false)
   const [savedCarPrices, setSavedCarPrices] = useState<any[]>([])
   const [isSavingPrice, setIsSavingPrice] = useState(false)
@@ -509,41 +508,8 @@ export default function RentPricingBuilder() {
   }, [cars, applyReferenceTableMappings])
 
   // ============================================
-  // 🆕 브랜드 선택 → 모델 목록 자동 조회
+  // 🆕 브랜드 선택 → 모델명은 직접 타이핑 (AI 자동조회 비활성화)
   // ============================================
-  useEffect(() => {
-    if (!newCarBrand.trim() || newCarBrand === '__custom__') {
-      setBrandModels([])
-      return
-    }
-    // 프리셋 브랜드만 자동 조회 (직접 입력은 제외)
-    const allPresets = [...DOMESTIC_BRANDS, ...IMPORT_BRAND_PRESETS]
-    if (!allPresets.includes(newCarBrand)) return
-
-    let cancelled = false
-    const fetchModels = async () => {
-      setIsLoadingModels(true)
-      setBrandModels([])
-      setNewCarModel('')
-      try {
-        const res = await fetch('/api/lookup-brand-models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ brand: newCarBrand }),
-        })
-        const data = await res.json()
-        if (!cancelled && res.ok && data.categories) {
-          setBrandModels(data.categories)
-        }
-      } catch (err) {
-        console.error('모델 목록 조회 실패:', err)
-      } finally {
-        if (!cancelled) setIsLoadingModels(false)
-      }
-    }
-    fetchModels()
-    return () => { cancelled = true }
-  }, [newCarBrand])
 
   // ============================================
   // 🆕 신차 AI 조회 (가격표)
@@ -1102,7 +1068,7 @@ export default function RentPricingBuilder() {
                     } else {
                       setNewCarBrand(val)
                     }
-                    setNewCarModel(''); setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError(''); setBrandModels([])
+                    setNewCarModel(''); setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('')
                   }}
                   className="w-40 p-3 border border-gray-200 rounded-xl font-bold text-base bg-white focus:border-blue-400 outline-none"
                 >
@@ -1136,60 +1102,22 @@ export default function RentPricingBuilder() {
                 )
               })()}
               <div className="flex-1">
-                <label className="block text-[11px] font-bold text-gray-400 mb-1">
-                  모델명
-                  {isLoadingModels && <span className="ml-1 text-blue-500 animate-pulse">조회중...</span>}
-                </label>
-                {brandModels.length > 0 ? (
-                  <select
-                    value={newCarModel}
-                    onChange={(e) => {
-                      setNewCarModel(e.target.value)
-                      setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('')
-                    }}
-                    className="w-full p-3 border border-gray-200 rounded-xl font-bold text-base bg-white focus:border-blue-400 outline-none"
-                  >
-                    <option value="">모델 선택</option>
-                    {brandModels.map((cat) => (
-                      <optgroup key={cat.category} label={cat.category}>
-                        {cat.models.map((m) => (
-                          <option key={m.name} value={m.name}>{m.name}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                    <option value="__custom__">직접 입력</option>
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder={isLoadingModels ? '모델 목록 조회 중...' : '모델명 (예: K5, 아반떼, GLC)'}
-                    value={newCarModel === '__custom__' ? '' : newCarModel}
-                    onChange={(e) => setNewCarModel(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNewCarLookup()}
-                    disabled={isLoadingModels}
-                    className="w-full p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-blue-400 outline-none disabled:bg-gray-50"
-                  />
-                )}
+                <label className="block text-[11px] font-bold text-gray-400 mb-1">모델명</label>
+                <input
+                  type="text"
+                  placeholder="모델명 입력 (예: K5, 아반떼, 싼타페)"
+                  value={newCarModel}
+                  onChange={(e) => {
+                    setNewCarModel(e.target.value)
+                    setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('')
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNewCarLookup()}
+                  className="w-full p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-blue-400 outline-none"
+                />
               </div>
-              {/* 모델 직접 입력 모드 (드롭다운에서 "직접 입력" 선택 시) */}
-              {newCarModel === '__custom__' && brandModels.length > 0 && (
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">직접 입력</label>
-                  <input
-                    type="text"
-                    placeholder="모델명 입력"
-                    onChange={(e) => {
-                      // __custom__를 실제 값으로 교체하지 않고 별도 state처리 대신, 직접 set
-                      if (e.target.value) setNewCarModel(e.target.value)
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNewCarLookup()}
-                    className="w-36 p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-blue-400 outline-none"
-                  />
-                </div>
-              )}
               <button
                 onClick={handleNewCarLookup}
-                disabled={isLookingUp || isParsingQuote || !newCarBrand.trim() || !newCarModel.trim() || newCarModel === '__custom__'}
+                disabled={isLookingUp || isParsingQuote || !newCarBrand.trim() || !newCarModel.trim()}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
               >
                 {isLookingUp ? (

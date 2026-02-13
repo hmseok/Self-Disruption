@@ -31,6 +31,21 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
+  # Cloudflare CDN 캐시 퍼지 (배포 후 구 HTML 캐시 제거)
+  - name: 'gcr.io/cloud-builders/curl'
+    args:
+      - '-s'
+      - '-X'
+      - 'POST'
+      - 'https://api.cloudflare.com/client/v4/zones/$$CLOUDFLARE_ZONE_ID/purge_cache'
+      - '-H'
+      - 'Authorization: Bearer $$CLOUDFLARE_API_TOKEN'
+      - '-H'
+      - 'Content-Type: application/json'
+      - '-d'
+      - '{"purge_everything":true}'
+    secretEnv: ['CLOUDFLARE_ZONE_ID', 'CLOUDFLARE_API_TOKEN']
+
 images:
   - 'gcr.io/$PROJECT_ID/secondlife-erp:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/secondlife-erp:latest'
