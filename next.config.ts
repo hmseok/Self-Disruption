@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // 🐳 도커 배포 필수 설정
+  bundler: 'webpack',   // Turbopack standalone CSS 누락 버그 회피
 
   // 1. 빌드 에러 무시 (TypeScript는 아직 여기서 지원합니다)
   typescript: {
