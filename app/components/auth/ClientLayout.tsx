@@ -33,10 +33,11 @@ const Icons: any = {
 
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
-  '/insurance': 'vehicle', '/registration': 'vehicle',
+  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/customers': 'sales',
   '/finance': 'finance', '/finance/settlement': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
+  '/db/pricing-standards': 'data', '/db/models': 'data', '/db/maintenance': 'data', '/db/codes': 'data', '/db/depreciation': 'data', '/db/lotte': 'data',
 }
 
 // 메뉴명 오버라이드
@@ -52,6 +53,7 @@ const BUSINESS_GROUPS = [
   { id: 'sales', label: '영업' },
   { id: 'finance', label: '재무' },
   { id: 'invest', label: '투자' },
+  { id: 'data', label: '데이터 관리' },
 ]
 
 // god_admin 전용: 플랫폼 관리
