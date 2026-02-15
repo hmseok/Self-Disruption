@@ -39,6 +39,12 @@ const PROMPT = `
           "name": "트림명",
           "base_price": 25000000,
           "note": "주요사양 1줄",
+          "exterior_colors": [
+            { "name": "컬러명", "code": "코드", "price": 0 }
+          ],
+          "interior_colors": [
+            { "name": "컬러명", "code": "코드", "price": 0 }
+          ],
           "options": [
             { "name": "옵션명", "price": 500000, "description": "설명" }
           ]
@@ -116,7 +122,7 @@ export async function POST(request: NextRequest) {
           ],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 65536,
           },
         }),
       }
@@ -162,9 +168,48 @@ export async function POST(request: NextRequest) {
     }
 
     let jsonStr = jsonMatch[1].trim()
+    // trailing comma 제거
     jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
 
-    const result = JSON.parse(jsonStr)
+    // 잘린 JSON 복구 시도
+    let result: any
+    try {
+      result = JSON.parse(jsonStr)
+    } catch (parseErr: any) {
+      console.warn(`⚠️ [견적서파싱] JSON 파싱 실패, 복구 시도: ${parseErr.message}`)
+      // 잘린 배열/객체 닫기 시도
+      let fixed = jsonStr
+      // 마지막 완전한 객체까지 자르기
+      const lastComplete = Math.max(
+        fixed.lastIndexOf('}],'),
+        fixed.lastIndexOf('}]')
+      )
+      if (lastComplete > 0) {
+        fixed = fixed.substring(0, lastComplete + 2)
+      }
+      // 열린 brackets 닫기
+      const opens = (fixed.match(/\[/g) || []).length
+      const closes = (fixed.match(/\]/g) || []).length
+      const openBraces = (fixed.match(/\{/g) || []).length
+      const closeBraces = (fixed.match(/\}/g) || []).length
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}'
+      for (let i = 0; i < opens - closes; i++) fixed += ']'
+      // 마지막에 닫히지 않은 최상위 객체 닫기
+      if (!fixed.trimEnd().endsWith('}')) fixed += '}'
+      // trailing comma 다시 제거
+      fixed = fixed.replace(/,\s*([}\]])/g, '$1')
+      try {
+        result = JSON.parse(fixed)
+        console.log(`✅ [견적서파싱] JSON 복구 성공`)
+      } catch (retryErr: any) {
+        console.error(`❌ [견적서파싱] JSON 복구도 실패: ${retryErr.message}\n원본(앞500): ${jsonStr.substring(0, 500)}\n원본(뒤500): ${jsonStr.substring(jsonStr.length - 500)}`)
+        return NextResponse.json(
+          { error: `견적서 분석 결과 파싱 실패. 파일이 너무 복잡하거나 AI 응답이 잘렸습니다. 다시 시도해주세요.` },
+          { status: 500 }
+        )
+      }
+    }
+
     result.source = `견적서 업로드 (${file.name})`
 
     console.log(`✅ [견적서파싱] ${result.brand} ${result.model} — 차종 ${result.variants?.length || 0}개`)

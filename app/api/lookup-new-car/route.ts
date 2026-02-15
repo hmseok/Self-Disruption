@@ -97,6 +97,14 @@ async function lookupNewCar(brand: string, model: string) {
     - name: 트림명
     - base_price: 기본 출고가 (원, 정수, 부가세 포함)
     - note: 주요사양 1줄
+    - exterior_colors[]: 외장 컬러 배열
+      - name: 컬러명 (예: "스노우 화이트 펄")
+      - code: 컬러코드 (있으면, 예: "SWP")
+      - price: 추가금액 (기본 컬러면 0)
+    - interior_colors[]: 내장 컬러 배열
+      - name: 컬러명 (예: "블랙 모노톤")
+      - code: 컬러코드 (있으면)
+      - price: 추가금액 (기본이면 0)
     - options[]: 선택 옵션 배열
       - name: 옵션/패키지명
       - price: 추가 금액 (원, 정수)
@@ -115,6 +123,11 @@ async function lookupNewCar(brand: string, model: string) {
 가격표 페이지의 "선택 품목", "옵션", "패키지" 섹션을 반드시 확인하고 빠짐없이 추출해라.
 옵션이 많더라도 절대 생략하지 마라. 응답이 길어져도 모든 옵션을 포함하는 것이 우선이다.
 
+★★★ 외장/내장 컬러 — 중요 ★★★
+각 트림별로 제공되는 외장 컬러와 내장 컬러를 모두 포함해라.
+가격표에 컬러별 추가금액이 있으면 price에 반영하고, 기본 컬러는 price: 0으로.
+컬러 정보가 없으면 exterior_colors: [], interior_colors: []로 둬라.
+
 \`\`\`json
 {
   "brand": "기아",
@@ -132,6 +145,13 @@ async function lookupNewCar(brand: string, model: string) {
           "name": "트렌디",
           "base_price": 14410000,
           "note": "기본형",
+          "exterior_colors": [
+            { "name": "스노우 화이트 펄", "code": "SWP", "price": 0 },
+            { "name": "오로라 블랙 펄", "code": "ABP", "price": 0 }
+          ],
+          "interior_colors": [
+            { "name": "블랙", "code": "BK", "price": 0 }
+          ],
           "options": [
             { "name": "내비게이션 패키지", "price": 600000, "description": "8인치 내비+후방카메라" }
           ]
@@ -148,6 +168,13 @@ async function lookupNewCar(brand: string, model: string) {
           "name": "트렌디",
           "base_price": 14210000,
           "note": "기본형 (개소세 인하)",
+          "exterior_colors": [
+            { "name": "스노우 화이트 펄", "code": "SWP", "price": 0 },
+            { "name": "오로라 블랙 펄", "code": "ABP", "price": 0 }
+          ],
+          "interior_colors": [
+            { "name": "블랙", "code": "BK", "price": 0 }
+          ],
           "options": [
             { "name": "내비게이션 패키지", "price": 600000, "description": "8인치 내비+후방카메라" }
           ]
@@ -280,8 +307,32 @@ function parseGeminiResponse(data: any) {
   try {
     return JSON.parse(jsonStr)
   } catch (parseErr: any) {
-    console.error(`❌ JSON 파싱 실패: ${parseErr.message}\n${jsonStr.substring(0, 500)}`)
-    throw new Error(`AI 응답 JSON 파싱 실패: ${parseErr.message}`)
+    console.warn(`⚠️ [신차조회] JSON 파싱 실패, 복구 시도: ${parseErr.message}`)
+    // 잘린 JSON 복구
+    let fixed = jsonStr
+    const lastComplete = Math.max(
+      fixed.lastIndexOf('}],'),
+      fixed.lastIndexOf('}]')
+    )
+    if (lastComplete > 0) {
+      fixed = fixed.substring(0, lastComplete + 2)
+    }
+    const opens = (fixed.match(/\[/g) || []).length
+    const closes = (fixed.match(/\]/g) || []).length
+    const openBraces = (fixed.match(/\{/g) || []).length
+    const closeBraces = (fixed.match(/\}/g) || []).length
+    for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}'
+    for (let i = 0; i < opens - closes; i++) fixed += ']'
+    if (!fixed.trimEnd().endsWith('}')) fixed += '}'
+    fixed = fixed.replace(/,\s*([}\]])/g, '$1')
+    try {
+      const recovered = JSON.parse(fixed)
+      console.log(`✅ [신차조회] JSON 복구 성공`)
+      return recovered
+    } catch (retryErr: any) {
+      console.error(`❌ JSON 복구도 실패: ${retryErr.message}\n원본(앞500): ${jsonStr.substring(0, 500)}\n원본(뒤500): ${jsonStr.substring(jsonStr.length - 500)}`)
+      throw new Error(`AI 응답 JSON 파싱 실패. 다시 시도해주세요.`)
+    }
   }
 }
 

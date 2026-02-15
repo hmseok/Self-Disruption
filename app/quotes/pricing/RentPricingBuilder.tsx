@@ -41,10 +41,18 @@ interface NewCarOption {
   description?: string
 }
 
+interface NewCarColor {
+  name: string
+  code?: string
+  price: number
+}
+
 interface NewCarTrim {
   name: string
   base_price: number
   note?: string
+  exterior_colors?: NewCarColor[]
+  interior_colors?: NewCarColor[]
   options: NewCarOption[]
 }
 
@@ -320,7 +328,7 @@ export default function RentPricingBuilder() {
   const [autoMaintType, setAutoMaintType] = useState('')
 
   // 🆕 신차 조회 모드
-  const [lookupMode, setLookupMode] = useState<'registered' | 'newcar'>('registered')
+  const [lookupMode, setLookupMode] = useState<'registered' | 'newcar' | 'saved'>('registered')
   const [newCarBrand, setNewCarBrand] = useState('')
   const [newCarModel, setNewCarModel] = useState('')
   const [newCarResult, setNewCarResult] = useState<NewCarResult | null>(null)
@@ -329,6 +337,8 @@ export default function RentPricingBuilder() {
   const [newCarSelectedVariant, setNewCarSelectedVariant] = useState<NewCarVariant | null>(null)
   const [newCarSelectedTrim, setNewCarSelectedTrim] = useState<NewCarTrim | null>(null)
   const [newCarSelectedOptions, setNewCarSelectedOptions] = useState<NewCarOption[]>([])
+  const [newCarSelectedExterior, setNewCarSelectedExterior] = useState<NewCarColor | null>(null)
+  const [newCarSelectedInterior, setNewCarSelectedInterior] = useState<NewCarColor | null>(null)
   const [newCarPurchasePrice, setNewCarPurchasePrice] = useState('')
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState('')
@@ -340,7 +350,6 @@ export default function RentPricingBuilder() {
 
   // 저장된 워크시트 목록
   const [worksheets, setWorksheets] = useState<any[]>([])
-  const [worksheetListOpen, setWorksheetListOpen] = useState(false)
 
   // --- 데이터 로드 ---
   useEffect(() => {
@@ -601,6 +610,9 @@ export default function RentPricingBuilder() {
     setNewCarSelectedVariant(null)
     setNewCarSelectedTrim(null)
     setNewCarSelectedOptions([])
+    setNewCarSelectedExterior(null)
+    setNewCarSelectedInterior(null)
+    setNewCarSelectedOptions([])
     setNewCarPurchasePrice('')
     setSelectedCar(null)
 
@@ -639,6 +651,8 @@ export default function RentPricingBuilder() {
     setNewCarSelectedVariant(null)
     setNewCarSelectedTrim(null)
     setNewCarSelectedOptions([])
+    setNewCarSelectedExterior(null)
+    setNewCarSelectedInterior(null)
     setNewCarPurchasePrice('')
     setSelectedCar(null)
 
@@ -679,18 +693,15 @@ export default function RentPricingBuilder() {
   }, [effectiveCompanyId])
 
   useEffect(() => {
-    if (lookupMode === 'newcar' && effectiveCompanyId) {
+    if (effectiveCompanyId) {
       fetchSavedPrices()
     }
-  }, [lookupMode, effectiveCompanyId, fetchSavedPrices])
-
-  useEffect(() => {
-    if (effectiveCompanyId) fetchWorksheets()
-  }, [effectiveCompanyId, fetchWorksheets])
+  }, [effectiveCompanyId, fetchSavedPrices])
 
   // 🆕 신차 가격 데이터 DB 저장
   const handleSaveCarPrice = useCallback(async () => {
-    if (!newCarResult || !effectiveCompanyId) return
+    if (!newCarResult) { alert('저장할 가격 데이터가 없습니다.'); return }
+    if (!effectiveCompanyId) { alert('회사 정보를 불러올 수 없습니다. 다시 로그인해주세요.'); return }
     setIsSavingPrice(true)
     try {
       const payload = {
@@ -701,12 +712,37 @@ export default function RentPricingBuilder() {
         source: newCarResult.source || 'AI 조회',
         price_data: newCarResult,
       }
-      const { error } = await supabase.from('new_car_prices').insert([payload])
-      if (error) throw error
+      // 같은 브랜드+모델+연식이면 업데이트, 없으면 신규 등록
+      const { data: existing } = await supabase
+        .from('new_car_prices')
+        .select('id')
+        .eq('company_id', effectiveCompanyId)
+        .eq('brand', newCarResult.brand)
+        .eq('model', newCarResult.model)
+        .eq('year', newCarResult.year)
+        .maybeSingle()
+
+      let error: any = null
+      if (existing) {
+        const { error: e } = await supabase
+          .from('new_car_prices')
+          .update({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
+          .eq('id', existing.id)
+        error = e
+      } else {
+        const { error: e } = await supabase.from('new_car_prices').insert([payload])
+        error = e
+      }
+      if (error) {
+        console.error('[가격저장] DB 에러:', error)
+        throw error
+      }
       await fetchSavedPrices()
       alert('가격 데이터가 저장되었습니다.')
     } catch (err: any) {
-      alert(`저장 실패: ${err.message}`)
+      console.error('[가격저장] 실패:', err)
+      const msg = err?.message || err?.details || JSON.stringify(err)
+      alert(`저장 실패: ${msg}\n\n※ new_car_prices 테이블이 없으면 Supabase SQL Editor에서 supabase_new_car_prices.sql을 실행해주세요.`)
     } finally {
       setIsSavingPrice(false)
     }
@@ -724,8 +760,11 @@ export default function RentPricingBuilder() {
     setNewCarSelectedVariant(null)
     setNewCarSelectedTrim(null)
     setNewCarSelectedOptions([])
+    setNewCarSelectedExterior(null)
+    setNewCarSelectedInterior(null)
     setNewCarPurchasePrice('')
     setLookupError('')
+    setLookupMode('newcar')
   }, [])
 
   // 🆕 저장된 가격 데이터 삭제
@@ -746,6 +785,10 @@ export default function RentPricingBuilder() {
       .limit(50)
     setWorksheets(data || [])
   }, [effectiveCompanyId])
+
+  useEffect(() => {
+    if (effectiveCompanyId) fetchWorksheets()
+  }, [effectiveCompanyId, fetchWorksheets])
 
   // 저장된 워크시트 삭제
   const handleDeleteWorksheet = async (id: string) => {
@@ -808,21 +851,22 @@ export default function RentPricingBuilder() {
     setMargin(ws.target_margin || 150000)
     setAnnualMileage(ws.annual_mileage || 1.5)
     setDepMileageRate(ws.dep_mileage_rate || 2)
-    setWorksheetListOpen(false)
   }
 
   // 🆕 신차 트림 선택 후 분석 시작 (옵션 합산 반영)
   const handleNewCarAnalysis = useCallback(() => {
     if (!newCarResult || !newCarSelectedVariant || !newCarSelectedTrim) return
 
-    // 출고가 = 트림 기본가 + 선택 옵션 합산
+    // 출고가 = 트림 기본가 + 선택 옵션 합산 + 컬러 추가금
     const optionsTotal = newCarSelectedOptions.reduce((sum, opt) => sum + opt.price, 0)
-    const factoryTotal = newCarSelectedTrim.base_price + optionsTotal
+    const colorExtra = (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0)
+    const factoryTotal = newCarSelectedTrim.base_price + optionsTotal + colorExtra
     const purchasePrice = parseNum(newCarPurchasePrice) || Math.round(factoryTotal * 0.87)
 
-    // 옵션 이름 리스트 (트림 표시에 포함)
-    const optionNames = newCarSelectedOptions.length > 0
-      ? ` + ${newCarSelectedOptions.map(o => o.name).join(', ')}`
+    // 컬러 + 옵션 이름 리스트 (트림 표시에 포함)
+    const colorNames = [newCarSelectedExterior?.name, newCarSelectedInterior?.name].filter(Boolean)
+    const optionNames = [...colorNames, ...newCarSelectedOptions.map(o => o.name)].length > 0
+      ? ` + ${[...colorNames, ...newCarSelectedOptions.map(o => o.name)].join(', ')}`
       : ''
 
     // selectedCar에 임시 데이터 설정 (기존 산출 로직 호환)
@@ -1012,7 +1056,9 @@ export default function RentPricingBuilder() {
 
   // 워크시트 저장 (등록차량 + 신차 모두 지원)
   const handleSaveWorksheet = async () => {
-    if (!selectedCar || !effectiveCompanyId || !calculations) return
+    if (!selectedCar) { alert('차량을 먼저 선택해주세요.'); return }
+    if (!effectiveCompanyId) { alert('회사 정보를 불러올 수 없습니다. 다시 로그인해주세요.'); return }
+    if (!calculations) { alert('산출 결과가 없습니다. 차량을 먼저 분석해주세요.'); return }
     setSaving(true)
 
     const baseData = {
@@ -1088,6 +1134,8 @@ export default function RentPricingBuilder() {
               year: selectedCar.year,
               fuel: selectedCar.fuel,
               trim: selectedCar.trim || '',
+              exterior_color: newCarSelectedExterior?.name || '',
+              interior_color: newCarSelectedInterior?.name || '',
             },
           }])
         error = e
@@ -1161,91 +1209,51 @@ export default function RentPricingBuilder() {
         </div>
       </div>
 
-      {/* ===== 저장된 워크시트 목록 ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-8 overflow-hidden">
-        <button
-          onClick={() => setWorksheetListOpen(!worksheetListOpen)}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-lg">📋</span>
-            <span className="font-bold text-gray-800">저장된 워크시트</span>
-            <span className="bg-steel-100 text-steel-700 text-xs font-bold px-2 py-0.5 rounded-full">{worksheets.length}</span>
-          </div>
-          <span className={`text-gray-400 transition-transform ${worksheetListOpen ? 'rotate-180' : ''}`}>▼</span>
-        </button>
-        {worksheetListOpen && (
-          <div className="border-t border-gray-100">
-            {worksheets.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">저장된 워크시트가 없습니다</p>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {worksheets.map((ws: any) => {
-                  const carLabel = ws.cars
-                    ? `${ws.cars.brand} ${ws.cars.model} ${ws.cars.trim || ''}`.trim()
-                    : ws.newcar_info
-                      ? `[신차] ${ws.newcar_info.brand} ${ws.newcar_info.model} ${ws.newcar_info.trim || ''}`.trim()
-                      : '차량 정보 없음'
-                  const dateStr = ws.updated_at
-                    ? new Date(ws.updated_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-                    : '-'
-                  return (
-                    <div key={ws.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 group">
-                      <button
-                        onClick={() => handleLoadWorksheet(ws)}
-                        className="flex-1 text-left min-w-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-800 text-sm truncate">{carLabel}</span>
-                          {ws.status === 'draft' && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">임시</span>}
-                          {ws.status === 'confirmed' && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">확정</span>}
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-xs text-gray-400">{dateStr}</span>
-                          <span className="text-xs text-gray-500">추천 렌트가: {(ws.suggested_rent || 0).toLocaleString()}원</span>
-                          <span className="text-xs text-gray-500">{ws.term_months}개월</span>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteWorksheet(ws.id)}
-                        className="ml-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-sm"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* ===== 차량 선택 ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-8">
-        {/* 모드 토글 */}
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={() => { setLookupMode('registered'); setSelectedCar(null); setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('') }}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-              lookupMode === 'registered'
-                ? 'bg-steel-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            등록차량 선택
-          </button>
-          <button
-            onClick={() => { setLookupMode('newcar'); setSelectedCar(null) }}
-            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-1.5 ${
-              lookupMode === 'newcar'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            <span>✨</span> 신차 AI 조회
-          </button>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-8 overflow-hidden">
+        {/* 모드 탭 */}
+        <div className="flex border-b border-gray-200">
+          {[
+            { key: 'registered', label: '등록차량', icon: '🚗' },
+            { key: 'newcar', label: '신차 조회', icon: '✨' },
+            { key: 'saved', label: '저장 목록', icon: '📋', count: worksheets.length + savedCarPrices.length },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setLookupMode(tab.key as any)
+                if (tab.key === 'registered') {
+                  setSelectedCar(null)
+                  setNewCarResult(null)
+                  setNewCarSelectedTax('')
+                  setNewCarSelectedFuel('')
+                  setNewCarSelectedVariant(null)
+                  setNewCarSelectedTrim(null)
+                  setNewCarSelectedOptions([])
+                  setNewCarSelectedExterior(null)
+                  setNewCarSelectedInterior(null)
+                  setLookupError('')
+                } else if (tab.key === 'newcar') {
+                  setSelectedCar(null)
+                }
+              }}
+              className={`flex items-center gap-1.5 px-5 py-3 text-sm font-bold border-b-2 transition-colors ${
+                lookupMode === tab.key
+                  ? 'border-steel-600 text-steel-700'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="bg-gray-100 text-gray-600 text-[11px] font-bold px-1.5 py-0.5 rounded-full ml-1">{tab.count}</span>
+              )}
+            </button>
+          ))}
         </div>
+
+        <div className="p-6">
 
         {/* === 등록차량 모드 === */}
         {lookupMode === 'registered' && (
@@ -1428,42 +1436,6 @@ export default function RentPricingBuilder() {
               </div>
             )}
 
-            {/* 저장된 가격 데이터 목록 */}
-            {savedCarPrices.length > 0 && !newCarResult && (
-              <div className="mb-4">
-                <label className="block text-xs font-bold text-gray-500 mb-2">💾 저장된 가격 데이터</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {savedCarPrices.map((sp) => (
-                    <div
-                      key={sp.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 transition-colors group"
-                    >
-                      <button
-                        onClick={() => handleLoadSavedPrice(sp)}
-                        className="flex-1 text-left"
-                      >
-                        <span className="text-sm font-bold text-gray-800">
-                          {sp.brand} {sp.model}
-                        </span>
-                        <span className="ml-2 text-xs text-gray-400">
-                          {sp.year}년식 · {sp.price_data?.variants?.length || 0}개 차종
-                        </span>
-                        <div className="text-[10px] text-gray-400 mt-0.5">
-                          {sp.source?.includes('견적서') ? '📄' : '🔍'} {new Date(sp.created_at).toLocaleDateString('ko-KR')}
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSavedPrice(sp.id)}
-                        className="opacity-0 group-hover:opacity-100 ml-2 text-xs text-red-400 hover:text-red-600 transition-opacity"
-                        title="삭제"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* ====== 계층형 선택 UI: 개별소비세 → 유종 → 차종 그룹 → 트림 → 옵션 ====== */}
             {newCarResult && newCarResult.variants?.length > 0 && (() => {
@@ -1651,11 +1623,69 @@ export default function RentPricingBuilder() {
                   </div>
                 )}
 
-                {/* ── STEP 4: 선택 옵션 (트림 선택 후, 옵션이 있을 때) ── */}
+                {/* 외장 컬러 선택 */}
+                {newCarSelectedTrim && (newCarSelectedTrim.exterior_colors?.length ?? 0) > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">{stepIcons[3 + stepOffset]} 외장 컬러</label>
+                    <div className="flex flex-wrap gap-2">
+                      {newCarSelectedTrim.exterior_colors!.map((color, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setNewCarSelectedExterior(
+                            newCarSelectedExterior?.name === color.name ? null : color
+                          )}
+                          className={`px-3 py-2 text-xs rounded-xl border font-bold transition-colors ${
+                            newCarSelectedExterior?.name === color.name
+                              ? 'bg-gray-800 text-white border-gray-800'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                          }`}
+                        >
+                          {color.name}
+                          {color.code && <span className="ml-1 text-gray-400">({color.code})</span>}
+                          {color.price > 0 && <span className="ml-1 text-blue-500">+{(color.price).toLocaleString()}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {newCarSelectedTrim && (!newCarSelectedTrim.exterior_colors || newCarSelectedTrim.exterior_colors.length === 0) && (
+                  <div className="text-xs text-gray-400 bg-gray-50 rounded-xl p-3 mt-2">
+                    이 가격표에 컬러 정보가 포함되지 않았습니다. 새로 AI 조회하면 컬러가 표시됩니다.
+                  </div>
+                )}
+
+                {/* 내장 컬러 선택 */}
+                {newCarSelectedTrim && (newCarSelectedTrim.interior_colors?.length ?? 0) > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">{stepIcons[4 + stepOffset]} 내장 컬러</label>
+                    <div className="flex flex-wrap gap-2">
+                      {newCarSelectedTrim.interior_colors!.map((color, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setNewCarSelectedInterior(
+                            newCarSelectedInterior?.name === color.name ? null : color
+                          )}
+                          className={`px-3 py-2 text-xs rounded-xl border font-bold transition-colors ${
+                            newCarSelectedInterior?.name === color.name
+                              ? 'bg-gray-800 text-white border-gray-800'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                          }`}
+                        >
+                          {color.name}
+                          {color.code && <span className="ml-1 text-gray-400">({color.code})</span>}
+                          {color.price > 0 && <span className="ml-1 text-blue-500">+{(color.price).toLocaleString()}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── STEP 5: 선택 옵션 (트림 선택 후, 옵션이 있을 때) ── */}
                 {newCarSelectedTrim && newCarSelectedTrim.options?.length > 0 && (
                   <div>
                     <label className="block text-xs font-bold text-gray-500 mb-2">
-                      {stepIcons[3 + stepOffset]} 선택 옵션/패키지 <span className="text-gray-400 font-normal">(복수 선택 가능)</span>
+                      {stepIcons[5 + stepOffset]} 선택 옵션/패키지 <span className="text-gray-400 font-normal">(복수 선택 가능)</span>
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {newCarSelectedTrim.options.map((opt, idx) => {
@@ -1789,9 +1819,123 @@ export default function RentPricingBuilder() {
             </div>
           </div>
         )}
+
+        {/* === 저장 목록 탭 === */}
+        {lookupMode === 'saved' && (
+          <div className="space-y-6">
+            {/* 저장된 워크시트 */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-black text-gray-700">산출 워크시트</span>
+                <span className="bg-steel-100 text-steel-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{worksheets.length}</span>
+              </div>
+              {worksheets.length === 0 ? (
+                <p className="text-center text-gray-400 py-6 text-sm bg-gray-50 rounded-xl">저장된 워크시트가 없습니다</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {worksheets.map((ws: any) => {
+                    const carLabel = ws.cars
+                      ? `${ws.cars.brand} ${ws.cars.model} ${ws.cars.trim || ''}`.trim()
+                      : ws.newcar_info
+                        ? `[신차] ${ws.newcar_info.brand} ${ws.newcar_info.model}`.trim()
+                        : '차량 정보 없음'
+                    const dateStr = ws.updated_at
+                      ? new Date(ws.updated_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                      : '-'
+                    return (
+                      <div key={ws.id} className="flex items-center justify-between px-4 py-3 bg-white border border-gray-150 rounded-xl hover:border-steel-300 group cursor-pointer"
+                        onClick={() => handleLoadWorksheet(ws)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-800 text-sm">{carLabel}</span>
+                            {ws.status === 'draft' && <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">임시</span>}
+                            {ws.status === 'confirmed' && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">확정</span>}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <span className="text-[11px] text-gray-400">{dateStr}</span>
+                            <span className="text-[11px] text-gray-500">렌트가 {(ws.suggested_rent || 0).toLocaleString()}원</span>
+                            <span className="text-[11px] text-gray-400">{ws.term_months}개월</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <span className="text-[11px] text-steel-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">불러오기</span>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteWorksheet(ws.id) }}
+                            className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-xs p-0.5">✕</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 저장된 가격표 */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-black text-gray-700">신차 가격표</span>
+                <span className="bg-indigo-100 text-indigo-600 text-[11px] font-bold px-2 py-0.5 rounded-full">{savedCarPrices.length}</span>
+              </div>
+              {savedCarPrices.length === 0 ? (
+                <p className="text-center text-gray-400 py-6 text-sm bg-gray-50 rounded-xl">저장된 가격표가 없습니다. 신차 조회 탭에서 AI 조회 후 저장하세요.</p>
+              ) : (
+                <div>
+                  {(() => {
+                    const grouped: Record<string, any[]> = {}
+                    savedCarPrices.forEach((sp: any) => {
+                      const brand = sp.brand || '기타'
+                      if (!grouped[brand]) grouped[brand] = []
+                      grouped[brand].push(sp)
+                    })
+                    return Object.entries(grouped).map(([brand, items]) => (
+                      <div key={brand} className="mb-3 last:mb-0">
+                        <div className="flex items-center gap-2 mb-1.5 px-1">
+                          <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{brand}</span>
+                          <div className="flex-1 h-px bg-gray-200" />
+                          <span className="text-[10px] text-gray-400">{items.length}개 모델</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                          {items.map((sp: any) => (
+                            <div
+                              key={sp.id}
+                              className="flex items-center justify-between px-3 py-2.5 bg-white border border-gray-150 rounded-xl hover:border-indigo-300 hover:bg-indigo-50/40 transition-all group cursor-pointer"
+                              onClick={() => handleLoadSavedPrice(sp)}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-gray-800 text-sm">{sp.model}</span>
+                                  <span className="text-[11px] text-gray-400">{sp.year}년</span>
+                                  <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">{sp.price_data?.variants?.length || 0}차종</span>
+                                  {sp.source?.includes('견적서') ? (
+                                    <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">견적서</span>
+                                  ) : (
+                                    <span className="text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded font-bold">AI</span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-gray-400 mt-0.5 block">
+                                  {new Date(sp.updated_at || sp.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })} 저장
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 ml-2 shrink-0">
+                                <span className="text-[11px] text-indigo-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">선택</span>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteSavedPrice(sp.id) }}
+                                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-0.5 text-xs">✕</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        </div>
       </div>
 
-      {!selectedCar ? (
+      {!selectedCar && lookupMode !== 'saved' ? (
         <div className="text-center py-20 text-gray-400">
           <span className="text-6xl block mb-4">🏗️</span>
           <p className="text-lg font-bold">차량을 선택하면 렌트가 산출 분석이 시작됩니다</p>
