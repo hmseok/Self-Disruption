@@ -1,420 +1,604 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useApp } from '../../context/AppContext'
 
 // ============================================
-// 통합 견적 DB — 경쟁사 벤치마크 + 견적 결과 비교
-// lotte_rentcar_db (일렌트/월렌트/장기렌트 통합)
+// 벤치마크 비교 — 경쟁사 렌트가 vs 우리 원가 비교 분석
+// 시장 포지셔닝 · 가격 갭 분석 · 경쟁력 대시보드
 // ============================================
 
 const f = (n: number) => n?.toLocaleString('ko-KR') || '0'
+const pct = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
 
-const RENTAL_TYPES = [
-  { key: 'all', label: '전체', color: 'bg-gray-900 text-white' },
-  { key: 'daily', label: '단기(일)', color: 'bg-orange-100 text-orange-700' },
-  { key: 'monthly', label: '월간', color: 'bg-green-100 text-green-700' },
-  { key: 'long', label: '장기', color: 'bg-blue-100 text-blue-700' },
-]
+// 경쟁사 목록
+const COMPETITORS = ['롯데렌터카', 'SK렌터카', '쏘카', 'AJ렌터카', '기타']
+const TERM_OPTIONS = [12, 24, 36, 48, 60]
 
-export default function LotteDbPage() {
+// 차량 카테고리 자동 매핑
+function mapCategory(brand: string): string {
+  const imports = ['BMW', 'Mercedes', 'Benz', '벤츠', 'Audi', '아우디', 'Volvo', '볼보', 'Lexus', '렉서스', 'Tesla', '테슬라', 'Porsche', '포르쉐', 'Land Rover', '랜드로버', 'Mini', '미니']
+  const evKeywords = ['전기', 'EV', 'ev', '아이오닉', 'IONIQ', 'EV6', 'EV9', '테슬라', 'Tesla', 'Model']
+  const b = brand || ''
+  if (evKeywords.some(k => b.includes(k))) return '전기차'
+  if (imports.some(k => b.toLowerCase().includes(k.toLowerCase()))) return '수입차'
+  return '국산차'
+}
+
+// 감가 카테고리 매핑 (pricing-standards 기준)
+function mapDepCategory(brand: string, model: string): string {
+  const m = (model || '').toLowerCase()
+  const b = (brand || '').toLowerCase()
+  const imports = ['bmw', 'benz', '벤츠', 'mercedes', 'audi', '아우디', 'volvo', '볼보', 'lexus', '렉서스', 'porsche', '포르쉐', 'land rover', '랜드로버']
+  const evKw = ['ev', '전기', '아이오닉', 'ioniq', '테슬라', 'tesla', 'model']
+  if (evKw.some(k => m.includes(k) || b.includes(k))) return '전기차 국산'
+  if (imports.some(k => b.includes(k))) {
+    if (['suv', 'x3', 'x5', 'gle', 'glc', 'q5', 'q7', 'xc60', 'xc90', 'cayenne', 'rx', 'nx'].some(k => m.includes(k))) return '수입 중형 SUV'
+    return '수입 중형 세단'
+  }
+  if (['모닝', '스파크', '레이', '캐스퍼'].some(k => m.includes(k))) return '국산 경차'
+  if (['아반떼', 'k3', 'k5', '소나타', '쏘나타'].some(k => m.includes(k))) return '국산 준중형 세단'
+  if (['그랜저', 'k8', 'g80', 'g90'].some(k => m.includes(k))) return '국산 대형 세단'
+  if (['투싼', '스포티지', '셀토스', '코나', 'xm3'].some(k => m.includes(k))) return '국산 중형 SUV'
+  if (['팰리세이드', '쏘렌토', '모하비', 'gv80'].some(k => m.includes(k))) return '국산 대형 SUV'
+  if (['카니발', '스타리아'].some(k => m.includes(k))) return '국산 MPV/미니밴'
+  return '국산 중형 세단'
+}
+
+export default function BenchmarkPage() {
   const supabase = createClientComponentClient()
-  const { role } = useApp()
-
-  const [list, setList] = useState<any[]>([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState('all')
-  const [showGuide, setShowGuide] = useState(true)
-  const [selectedContract, setSelectedContract] = useState<any>(null)
-  const [checkedIds, setCheckedIds] = useState<number[]>([])
-
-  // AI 견적
-  const [showAiModal, setShowAiModal] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [rentalType, setRentalType] = useState<'daily' | 'monthly' | 'long'>('long')
-  const [targetBrand, setTargetBrand] = useState('')
-  const [targetModel, setTargetModel] = useState('')
-  const [targetTerm, setTargetTerm] = useState('48')
-  const [conditions, setConditions] = useState({
-    mileage: '2만km', age: '만 26세 이상', deposit: '보증금 0%', maintenance: false, type: 'buyout'
-  })
-
+  const { role, company } = useApp()
   const isAdmin = role === 'god_admin' || role === 'master'
 
-  useEffect(() => { fetchList() }, [])
+  // 데이터 상태
+  const [benchmarks, setBenchmarks] = useState<any[]>([])
+  const [depRates, setDepRates] = useState<any[]>([])
+  const [insuranceRates, setInsuranceRates] = useState<any[]>([])
+  const [maintCosts, setMaintCosts] = useState<any[]>([])
+  const [taxRates, setTaxRates] = useState<any[]>([])
+  const [financeRates, setFinanceRates] = useState<any[]>([])
+  const [regCosts, setRegCosts] = useState<any[]>([])
+  const [businessRules, setBusinessRules] = useState<any[]>([])
 
-  useEffect(() => {
-    if (rentalType === 'daily') setTargetTerm('1')
-    else if (rentalType === 'monthly') setTargetTerm('1')
-    else setTargetTerm('48')
-  }, [rentalType])
+  // UI 상태
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterCompetitor, setFilterCompetitor] = useState('all')
+  const [filterTerm, setFilterTerm] = useState(0) // 0 = 전체
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
 
-  const fetchList = async () => {
-    const { data } = await supabase.from('lotte_rentcar_db').select('*').order('created_at', { ascending: false })
-    setList(data || [])
-  }
-
-  const parseContract = (item: any) => {
-    try { return JSON.parse(item.memo) } catch { return {} }
-  }
-
-  const getRentalType = (item: any) => {
-    const d = parseContract(item)
-    return d.rental_type || 'long'
-  }
-
-  const filteredList = list.filter(item => {
-    const matchSearch = !searchTerm || item.model?.includes(searchTerm) || item.brand?.includes(searchTerm)
-    const matchType = filterType === 'all' || getRentalType(item) === filterType
-    return matchSearch && matchType
+  // 등록 폼
+  const [formData, setFormData] = useState({
+    competitor: '롯데렌터카', brand: '', model: '', trim: '',
+    new_car_price: '', term: 48, deposit_rate: 0,
+    monthly_price: '', source_url: '', memo: '',
   })
 
-  // 통계
-  const stats = {
-    total: list.length,
-    daily: list.filter(i => getRentalType(i) === 'daily').length,
-    monthly: list.filter(i => getRentalType(i) === 'monthly').length,
-    long: list.filter(i => getRentalType(i) === 'long').length,
-    avgPrice: list.length > 0 ? Math.round(list.reduce((s, i) => s + (i.monthly_price || 0), 0) / list.length) : 0,
+  // ─── 데이터 로드 ───
+  const loadAll = useCallback(async () => {
+    setLoading(true)
+    const [b, d, ins, mnt, tx, fin, reg, br] = await Promise.all([
+      supabase.from('lotte_rentcar_db').select('*').order('created_at', { ascending: false }),
+      supabase.from('depreciation_db').select('*'),
+      supabase.from('insurance_rate_table').select('*'),
+      supabase.from('maintenance_cost_table').select('*'),
+      supabase.from('vehicle_tax_table').select('*'),
+      supabase.from('finance_rate_table').select('*'),
+      supabase.from('registration_cost_table').select('*'),
+      supabase.from('business_rules').select('*'),
+    ])
+    setBenchmarks(b.data || [])
+    setDepRates(d.data || [])
+    setInsuranceRates(ins.data || [])
+    setMaintCosts(mnt.data || [])
+    setTaxRates(tx.data || [])
+    setFinanceRates(fin.data || [])
+    setRegCosts(reg.data || [])
+    setBusinessRules(br.data || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadAll() }, [loadAll])
+
+  // ─── 우리 원가 산출 엔진 ───
+  const getRule = (key: string, def: number) => {
+    const r = businessRules.find((b: any) => b.rule_key === key)
+    return r ? Number(r.rule_value) : def
   }
 
-  const toggleCheck = (id: number) => {
-    setCheckedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
+  const calcOurCost = useCallback((brand: string, model: string, newPrice: number, termMonths: number) => {
+    if (!newPrice || !termMonths || depRates.length === 0) return null
 
-  const handleDeleteSelected = async () => {
-    if (!confirm(`${checkedIds.length}개 견적을 삭제하시겠습니까?`)) return
-    await supabase.from('lotte_rentcar_db').delete().in('id', checkedIds)
-    setCheckedIds([])
-    fetchList()
-  }
+    // 1. 감가비
+    const depCat = mapDepCategory(brand, model)
+    const depRow = depRates.find((d: any) => d.category === depCat) || depRates[0]
+    const years = Math.ceil(termMonths / 12)
+    const rateKey = `rate_${years}yr`
+    const residualPct = (depRow?.[rateKey] || 50) / 100
+    const residualValue = newPrice * residualPct * 0.8
+    const monthlyDep = Math.round((newPrice - residualValue) / termMonths)
 
-  // AI 견적 요청
-  const handleAiEstimate = async () => {
-    if (!targetBrand || !targetModel) { alert('브랜드와 차종을 입력하세요.'); return }
-    setAiLoading(true)
-    try {
-      const res = await fetch('/api/car-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'estimate_price', rental_type: rentalType,
-          brand: targetBrand, model: targetModel, term: Number(targetTerm),
-          conditions,
-        }),
-      })
-      const result = await res.json()
-      if (result.error) throw new Error(result.error)
+    // 2. 취득 원가 (등록비 포함)
+    const acqTaxRate = 0.07
+    const regExtra = 500000 // 공채+탁송+번호판 등 간편 추정
+    const totalAcq = newPrice * (1 + acqTaxRate) + regExtra
+    const monthlyAcqDep = Math.round((totalAcq - residualValue) / termMonths)
 
-      const metaData = JSON.stringify({
-        ...result.contract_details, rental_type: rentalType, conditions_input: conditions,
-      })
+    // 3. 금융비용
+    const ltvRate = getRule('LOAN_LTV_DEFAULT', 70) / 100
+    const loanAmt = newPrice * ltvRate
+    const equityAmt = newPrice - loanAmt
+    const finRow = financeRates.find((f: any) => f.finance_type === '캐피탈대출' && termMonths >= (f.term_months_min || 0) && termMonths <= (f.term_months_max || 999))
+    const annualRate = finRow ? Number(finRow.annual_rate) : 4.8
+    const investRate = getRule('INVESTMENT_RETURN_RATE', 5)
+    const monthlyFinance = Math.round(loanAmt * (annualRate / 100) / 12 + equityAmt * (investRate / 100) / 12)
 
-      let typeTag = ''
-      if (rentalType === 'daily') typeTag = '[단기] '
-      else if (rentalType === 'monthly') typeTag = '[월간] '
+    // 4. 보험
+    const vehCat = mapCategory(brand)
+    const insType = vehCat === '수입차' ? '수입 승용' : vehCat === '전기차' ? '전기차' : '국산 승용'
+    const insRow = insuranceRates.find((i: any) => i.vehicle_type === insType && newPrice >= (i.value_min || 0) && newPrice <= (i.value_max || 999999999))
+    const monthlyIns = insRow ? Math.round(Number(insRow.annual_premium) / 12) : Math.round(newPrice * 0.06 / 12)
 
-      await supabase.from('lotte_rentcar_db').insert([{
-        brand: targetBrand, model: targetModel,
-        trim: typeTag + (conditions.mileage || '기본'),
-        term: Number(targetTerm), deposit_rate: 0,
-        monthly_price: result.estimated_price || 0, memo: metaData,
-      }])
+    // 5. 정비비
+    const maintType = vehCat === '수입차' ? '수입차' : vehCat === '전기차' ? '전기차' : '국산 중형'
+    const maintRow = maintCosts.find((m: any) => m.vehicle_type === maintType && (m.age_min || 0) <= 1 && (m.age_max || 99) >= 1)
+    const monthlyMaint = maintRow ? Number(maintRow.monthly_cost) : 50000
 
-      setShowAiModal(false)
-      fetchList()
-    } catch (e: any) {
-      alert('견적 산출 실패: ' + e.message)
-    } finally {
-      setAiLoading(false)
+    // 6. 세금
+    const monthlyTax = vehCat === '전기차' ? Math.round(20000 / 12) : Math.round(19 * 2000 * 1.3 / 12) // 2000cc 기준
+
+    // 7. 리스크 적립
+    const riskRate = getRule('RISK_RESERVE_RATE', 0.5)
+    const monthlyRisk = Math.round(newPrice * (riskRate / 100) / 12)
+
+    const totalBEP = monthlyAcqDep + monthlyFinance + monthlyIns + monthlyMaint + monthlyTax + monthlyRisk
+
+    return {
+      monthlyDep, monthlyAcqDep, monthlyFinance, monthlyIns, monthlyMaint, monthlyTax, monthlyRisk,
+      totalBEP, residualPct: Math.round(residualPct * 100), depCategory: depCat,
+      annualRate, ltvRate: Math.round(ltvRate * 100),
     }
+  }, [depRates, insuranceRates, maintCosts, financeRates, businessRules])
+
+  // ─── 필터 + 분석 데이터 ───
+  const enrichedList = useMemo(() => {
+    return benchmarks.map(item => {
+      const meta = (() => { try { return JSON.parse(item.memo || '{}') } catch { return {} } })()
+      const competitor = meta.competitor || '롯데렌터카'
+      const newPrice = meta.new_car_price || item.new_car_price || 0
+      const ourCost = newPrice > 0 ? calcOurCost(item.brand, item.model, newPrice, item.term || 48) : null
+      const gap = ourCost && item.monthly_price > 0
+        ? ((item.monthly_price - ourCost.totalBEP) / ourCost.totalBEP * 100)
+        : null
+
+      return { ...item, competitor, newPrice, ourCost, gap, meta }
+    })
+  }, [benchmarks, calcOurCost])
+
+  const filteredList = useMemo(() => {
+    return enrichedList.filter(item => {
+      const matchSearch = !searchTerm ||
+        item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.model?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchComp = filterCompetitor === 'all' || item.competitor === filterCompetitor
+      const matchTerm = filterTerm === 0 || item.term === filterTerm
+      return matchSearch && matchComp && matchTerm
+    })
+  }, [enrichedList, searchTerm, filterCompetitor, filterTerm])
+
+  // ─── 전체 통계 ───
+  const stats = useMemo(() => {
+    const withGap = enrichedList.filter(i => i.gap !== null)
+    const avgGap = withGap.length > 0 ? withGap.reduce((s, i) => s + i.gap, 0) / withGap.length : 0
+    const cheaper = withGap.filter(i => i.gap > 0).length // 경쟁사가 우리보다 비싼 건
+    const moreExpensive = withGap.filter(i => i.gap < 0).length // 경쟁사가 우리보다 싼 건
+    const competitorCounts = COMPETITORS.reduce((acc, c) => {
+      acc[c] = enrichedList.filter(i => i.competitor === c).length
+      return acc
+    }, {} as Record<string, number>)
+
+    return {
+      total: enrichedList.length,
+      analyzed: withGap.length,
+      avgGap,
+      advantageCount: cheaper, // 우리 가격 우위
+      disadvantageCount: moreExpensive, // 경쟁 열위
+      competitorCounts,
+      avgCompetitorPrice: enrichedList.length > 0
+        ? Math.round(enrichedList.reduce((s, i) => s + (i.monthly_price || 0), 0) / enrichedList.length)
+        : 0,
+    }
+  }, [enrichedList])
+
+  // ─── 경쟁사 견적 등록 ───
+  const handleAdd = async () => {
+    if (!formData.brand || !formData.model || !formData.monthly_price) {
+      alert('브랜드, 모델, 월 렌트료를 입력해주세요.')
+      return
+    }
+    const meta = JSON.stringify({
+      competitor: formData.competitor,
+      new_car_price: Number(formData.new_car_price) || 0,
+      source_url: formData.source_url,
+      collected_at: new Date().toISOString(),
+      note: formData.memo,
+    })
+    await supabase.from('lotte_rentcar_db').insert([{
+      brand: formData.brand,
+      model: formData.model,
+      trim: formData.trim,
+      term: formData.term,
+      deposit_rate: formData.deposit_rate,
+      monthly_price: Number(formData.monthly_price),
+      memo: meta,
+    }])
+    setShowAddModal(false)
+    setFormData({ competitor: '롯데렌터카', brand: '', model: '', trim: '', new_car_price: '', term: 48, deposit_rate: 0, monthly_price: '', source_url: '', memo: '' })
+    loadAll()
   }
 
-  const getTypeInfo = (type: string) => {
-    if (type === 'daily') return { label: '단기', color: 'bg-orange-100 text-orange-700 border-orange-200', unit: '일' }
-    if (type === 'monthly') return { label: '월간', color: 'bg-green-100 text-green-700 border-green-200', unit: '개월' }
-    return { label: '장기', color: 'bg-blue-100 text-blue-700 border-blue-200', unit: '개월' }
+  const handleDelete = async (id: number) => {
+    if (!confirm('이 견적을 삭제하시겠습니까?')) return
+    await supabase.from('lotte_rentcar_db').delete().eq('id', id)
+    if (selectedItem?.id === id) setSelectedItem(null)
+    loadAll()
+  }
+
+  // ─── 갭 색상 ───
+  const gapColor = (gap: number | null) => {
+    if (gap === null) return 'text-gray-400'
+    if (gap > 5) return 'text-emerald-600' // 경쟁사 대비 우리가 저렴 (우위)
+    if (gap > 0) return 'text-emerald-500'
+    if (gap > -5) return 'text-amber-600'
+    return 'text-red-600' // 경쟁사 대비 우리가 비쌈 (열위)
+  }
+
+  const gapBg = (gap: number | null) => {
+    if (gap === null) return 'bg-gray-50'
+    if (gap > 5) return 'bg-emerald-50 border-emerald-200'
+    if (gap > 0) return 'bg-emerald-50/50 border-emerald-100'
+    if (gap > -5) return 'bg-amber-50 border-amber-200'
+    return 'bg-red-50 border-red-200'
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">벤치마크 데이터 로딩 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
+      {/* ─── 헤더 ─── */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-black text-gray-900">통합 견적 DB</h1>
+              <h1 className="text-2xl font-black text-gray-900">벤치마크 비교</h1>
               <p className="text-xs text-gray-500 mt-1">
-                단기/월간/장기 렌트 견적 결과 통합 관리 | 경쟁사 벤치마크 비교
+                경쟁사 렌트 견적 vs 우리 원가 비교 분석 · 시장 포지셔닝 · 가격 경쟁력 진단
               </p>
             </div>
-            <div className="flex gap-2">
+            {isAdmin && (
               <button
-                onClick={() => setShowAiModal(true)}
-                className="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700"
+                onClick={() => setShowAddModal(true)}
+                className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800 transition-colors"
               >
-                AI 견적 산출
+                + 경쟁사 견적 등록
               </button>
-              <button
-                onClick={() => setShowGuide(!showGuide)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-              >
-                {showGuide ? '가이드 숨기기' : '가이드 보기'}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* 가이드 */}
-      {showGuide && (
-        <div className="bg-gradient-to-r from-red-50 to-pink-50 border-b border-red-100">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-              <div className="flex items-start gap-2 p-3 bg-white/70 rounded-xl">
-                <span className="text-lg flex-shrink-0">📋</span>
-                <div>
-                  <p className="font-bold text-gray-800 mb-0.5">견적 아카이브</p>
-                  <p className="text-gray-600">AI 산출 견적과 경쟁사 견적을 저장하고 이력을 관리합니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 p-3 bg-white/70 rounded-xl">
-                <span className="text-lg flex-shrink-0">📊</span>
-                <div>
-                  <p className="font-bold text-gray-800 mb-0.5">가격 비교</p>
-                  <p className="text-gray-600">같은 차종의 단기·월간·장기 견적을 비교하여 최적 상품을 설계합니다.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 p-3 bg-white/70 rounded-xl">
-                <span className="text-lg flex-shrink-0">🤖</span>
-                <div>
-                  <p className="font-bold text-gray-800 mb-0.5">AI 견적 산출</p>
-                  <p className="text-gray-600">Gemini AI가 시장 데이터를 분석하여 경쟁력 있는 렌트가를 산출합니다.</p>
-                </div>
-              </div>
+      {/* ─── 경쟁력 요약 대시보드 ─── */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-black">{stats.total}</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">수집 견적</p>
             </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className={`text-2xl font-black ${stats.avgGap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {stats.analyzed > 0 ? pct(stats.avgGap) : '-'}
+              </p>
+              <p className="text-[10px] text-slate-300 mt-0.5">평균 가격 갭</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-emerald-400">{stats.advantageCount}</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">가격 우위</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-black text-red-400">{stats.disadvantageCount}</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">가격 열위</p>
+            </div>
+          </div>
+
+          {/* 경쟁사별 분포 */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {COMPETITORS.map(c => {
+              const cnt = stats.competitorCounts[c] || 0
+              if (cnt === 0) return null
+              return (
+                <span key={c} className="px-2 py-1 bg-white/5 rounded-lg text-[10px] text-slate-300">
+                  {c} <span className="font-bold text-white ml-1">{cnt}건</span>
+                </span>
+              )
+            })}
           </div>
         </div>
-      )}
+      </div>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* 왼쪽: 견적 목록 */}
+
+          {/* ═══ 왼쪽: 벤치마크 목록 ═══ */}
           <div className="lg:col-span-8">
-            {/* 검색 + 필터 */}
-            <div className="flex items-center gap-2 mb-3">
+            {/* 필터 바 */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="브랜드, 모델명 검색..."
-                className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white"
+                type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                placeholder="브랜드 · 모델명 검색..."
+                className="flex-1 min-w-[140px] px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-gray-300"
               />
-              {checkedIds.length > 0 && isAdmin && (
-                <button onClick={handleDeleteSelected} className="px-3 py-2 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200">
-                  {checkedIds.length}개 삭제
-                </button>
-              )}
+              <select
+                value={filterCompetitor} onChange={e => setFilterCompetitor(e.target.value)}
+                className="px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white"
+              >
+                <option value="all">전체 경쟁사</option>
+                {COMPETITORS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select
+                value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}
+                className="px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white"
+              >
+                <option value={0}>전체 기간</option>
+                {TERM_OPTIONS.map(t => <option key={t} value={t}>{t}개월</option>)}
+              </select>
             </div>
 
-            {/* 렌트 유형 필터 */}
-            <div className="flex flex-wrap gap-1 mb-3">
-              {RENTAL_TYPES.map(rt => (
-                <button
-                  key={rt.key}
-                  onClick={() => setFilterType(rt.key)}
-                  className={`px-2.5 py-1 text-[10px] font-bold rounded-full transition-colors ${
-                    filterType === rt.key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            {/* 견적 카드 리스트 */}
+            <div className="space-y-2">
+              {filteredList.length === 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                  <p className="text-3xl mb-2">📊</p>
+                  <p className="text-sm font-bold text-gray-400">등록된 경쟁사 견적이 없습니다</p>
+                  <p className="text-xs text-gray-300 mt-1">우측 상단 '경쟁사 견적 등록'으로 데이터를 수집해주세요</p>
+                </div>
+              )}
+
+              {filteredList.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedItem(item)}
+                  className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md ${
+                    selectedItem?.id === item.id ? 'ring-2 ring-gray-900 border-gray-900' : 'border-gray-100'
                   }`}
                 >
-                  {rt.label} ({rt.key === 'all' ? stats.total : rt.key === 'daily' ? stats.daily : rt.key === 'monthly' ? stats.monthly : stats.long})
-                </button>
-              ))}
-            </div>
+                  <div className="flex items-center justify-between">
+                    {/* 좌: 차종 + 경쟁사 */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-lg">
+                          {item.competitor}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{item.brand} {item.model}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {item.trim && <span className="text-[10px] text-gray-400 truncate">{item.trim}</span>}
+                          <span className="text-[10px] text-gray-300">|</span>
+                          <span className="text-[10px] font-bold text-gray-500">{item.term}개월</span>
+                          {item.newPrice > 0 && (
+                            <>
+                              <span className="text-[10px] text-gray-300">|</span>
+                              <span className="text-[10px] text-gray-400">신차 {f(item.newPrice)}원</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-            {/* 견적 테이블 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-center px-3 py-2.5 w-8">
-                        <input type="checkbox" className="w-3 h-3"
-                          checked={checkedIds.length === filteredList.length && filteredList.length > 0}
-                          onChange={() => setCheckedIds(checkedIds.length === filteredList.length ? [] : filteredList.map(i => i.id))}
-                        />
-                      </th>
-                      <th className="text-left px-4 py-2.5 font-bold text-gray-500">구분</th>
-                      <th className="text-left px-4 py-2.5 font-bold text-gray-500">차종</th>
-                      <th className="text-center px-4 py-2.5 font-bold text-gray-500">기간</th>
-                      <th className="text-right px-4 py-2.5 font-bold text-gray-500">견적가</th>
-                      <th className="text-center px-4 py-2.5 font-bold text-gray-500 w-16">상세</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {filteredList.map(item => {
-                      const rType = getRentalType(item)
-                      const typeInfo = getTypeInfo(rType)
-                      const d = parseContract(item)
-                      return (
-                        <tr key={item.id} className={`transition-colors ${checkedIds.includes(item.id) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
-                          <td className="text-center px-3 py-2.5">
-                            <input type="checkbox" className="w-3 h-3"
-                              checked={checkedIds.includes(item.id)}
-                              onChange={() => toggleCheck(item.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${typeInfo.color}`}>
-                              {typeInfo.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <p className="font-bold text-gray-800">{item.brand} {item.model}</p>
-                            <p className="text-[10px] text-gray-400">{item.trim}</p>
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-600">
-                              {item.term}{typeInfo.unit}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <span className="font-black text-red-600">{f(item.monthly_price)}원</span>
-                            <span className="text-[10px] text-gray-400">/{rType === 'daily' ? '일' : '월'}</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <button
-                              onClick={() => setSelectedContract({ ...item, rType })}
-                              className="px-2 py-0.5 border border-gray-200 rounded text-[10px] font-bold text-gray-500 hover:bg-gray-50"
-                            >
-                              보기
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                    {filteredList.length === 0 && (
-                      <tr><td colSpan={6} className="p-8 text-center text-gray-400">견적 데이터가 없습니다</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    {/* 중: 경쟁사 가격 */}
+                    <div className="text-right flex-shrink-0 mx-4">
+                      <p className="text-xs text-gray-400">경쟁사</p>
+                      <p className="text-base font-black text-gray-900">{f(item.monthly_price)}<span className="text-[10px] text-gray-400">원/월</span></p>
+                    </div>
+
+                    {/* 우: 가격 갭 */}
+                    <div className={`flex-shrink-0 w-24 text-center px-2 py-2 rounded-lg border ${gapBg(item.gap)}`}>
+                      {item.gap !== null ? (
+                        <>
+                          <p className={`text-sm font-black ${gapColor(item.gap)}`}>{pct(item.gap)}</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">
+                            {item.gap > 0 ? '우리 우위' : '경쟁 열위'}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-gray-300 font-bold">-</p>
+                          <p className="text-[9px] text-gray-300">신차가 필요</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* 오른쪽: 통계 + 상세 */}
+          {/* ═══ 오른쪽: 상세 분석 패널 ═══ */}
           <div className="lg:col-span-4 space-y-4">
-            {/* 통계 */}
-            <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white sticky top-32">
-              <h4 className="text-xs font-bold text-slate-400 mb-3">견적 현황</h4>
 
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="bg-slate-800 rounded-lg p-2.5 text-center">
-                  <p className="text-xl font-black text-white">{stats.total}</p>
-                  <p className="text-[10px] text-slate-400">전체 견적</p>
-                </div>
-                <div className="bg-slate-800 rounded-lg p-2.5 text-center">
-                  <p className="text-xl font-black text-red-400">{f(stats.avgPrice)}</p>
-                  <p className="text-[10px] text-slate-400">평균 견적가</p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">단기(일)</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-orange-400 rounded-full" style={{ width: `${stats.total > 0 ? stats.daily / stats.total * 100 : 0}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-white w-6 text-right">{stats.daily}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">월간</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-400 rounded-full" style={{ width: `${stats.total > 0 ? stats.monthly / stats.total * 100 : 0}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-white w-6 text-right">{stats.monthly}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">장기</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-400 rounded-full" style={{ width: `${stats.total > 0 ? stats.long / stats.total * 100 : 0}%` }} />
-                    </div>
-                    <span className="text-xs font-bold text-white w-6 text-right">{stats.long}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 선택된 견적 상세 */}
-            {selectedContract && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-gray-900 text-white p-4">
-                  <div className="flex justify-between items-start">
+            {/* 선택된 항목 원가 분석 */}
+            {selectedItem ? (
+              <>
+                <div className="bg-slate-900 rounded-2xl p-5 text-white sticky top-24">
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <p className="text-xs text-gray-400">견적서</p>
-                      <p className="text-sm font-black">{selectedContract.brand} {selectedContract.model}</p>
+                      <p className="text-[10px] text-slate-400">원가 비교 분석</p>
+                      <p className="text-sm font-black mt-0.5">{selectedItem.brand} {selectedItem.model}</p>
+                      <p className="text-[10px] text-slate-500">{selectedItem.competitor} · {selectedItem.term}개월</p>
                     </div>
-                    <button onClick={() => setSelectedContract(null)} className="text-gray-400 hover:text-white text-xs">닫기</button>
+                    <button onClick={() => setSelectedItem(null)} className="text-slate-500 hover:text-white text-xs">✕</button>
                   </div>
-                  <p className="text-2xl font-black text-red-400 mt-2">{f(selectedContract.monthly_price)}원<span className="text-xs text-gray-400">/{selectedContract.rType === 'daily' ? '일' : '월'}</span></p>
+
+                  {/* 가격 비교 바 */}
+                  <div className="space-y-3 mb-4">
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-slate-400">경쟁사 월렌트료</span>
+                        <span className="font-bold text-white">{f(selectedItem.monthly_price)}원</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{
+                          width: selectedItem.ourCost
+                            ? `${Math.min(100, selectedItem.monthly_price / Math.max(selectedItem.monthly_price, selectedItem.ourCost.totalBEP) * 100)}%`
+                            : '100%'
+                        }} />
+                      </div>
+                    </div>
+                    {selectedItem.ourCost && (
+                      <div>
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-slate-400">우리 원가 (BEP)</span>
+                          <span className="font-bold text-amber-400">{f(selectedItem.ourCost.totalBEP)}원</span>
+                        </div>
+                        <div className="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full" style={{
+                            width: `${Math.min(100, selectedItem.ourCost.totalBEP / Math.max(selectedItem.monthly_price, selectedItem.ourCost.totalBEP) * 100)}%`
+                          }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 갭 결과 */}
+                  {selectedItem.gap !== null && (
+                    <div className={`rounded-xl p-3 text-center ${selectedItem.gap >= 0 ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
+                      <p className={`text-xl font-black ${selectedItem.gap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {pct(selectedItem.gap)}
+                      </p>
+                      <p className="text-[10px] text-slate-300 mt-0.5">
+                        {selectedItem.gap >= 0
+                          ? `경쟁사가 ${f(selectedItem.monthly_price - selectedItem.ourCost!.totalBEP)}원 더 비쌈 → 마진 확보 가능`
+                          : `우리가 ${f(selectedItem.ourCost!.totalBEP - selectedItem.monthly_price)}원 더 비쌈 → 원가 절감 필요`
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="p-4 space-y-2 text-xs">
-                  {(() => {
-                    const d = parseContract(selectedContract)
-                    const ti = getTypeInfo(selectedContract.rType)
-                    return (
-                      <>
-                        <div className="flex justify-between py-1 border-b border-gray-50">
-                          <span className="text-gray-400">유형</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${ti.color}`}>{ti.label}</span>
+
+                {/* 원가 구성 상세 */}
+                {selectedItem.ourCost && (
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-50 bg-gray-50">
+                      <h4 className="text-xs font-bold text-gray-700">우리 원가 구성 (월 기준)</h4>
+                      <p className="text-[10px] text-gray-400">{selectedItem.ourCost.depCategory} · 잔가율 {selectedItem.ourCost.residualPct}%</p>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      {[
+                        { label: '감가상각비', value: selectedItem.ourCost.monthlyAcqDep, desc: '취득원가 기준', pct: selectedItem.ourCost.monthlyAcqDep / selectedItem.ourCost.totalBEP * 100 },
+                        { label: '금융비용', value: selectedItem.ourCost.monthlyFinance, desc: `LTV ${selectedItem.ourCost.ltvRate}% · ${selectedItem.ourCost.annualRate}%`, pct: selectedItem.ourCost.monthlyFinance / selectedItem.ourCost.totalBEP * 100 },
+                        { label: '보험료', value: selectedItem.ourCost.monthlyIns, desc: '영업용 자동차보험', pct: selectedItem.ourCost.monthlyIns / selectedItem.ourCost.totalBEP * 100 },
+                        { label: '정비비', value: selectedItem.ourCost.monthlyMaint, desc: '소모품+예비비', pct: selectedItem.ourCost.monthlyMaint / selectedItem.ourCost.totalBEP * 100 },
+                        { label: '자동차세', value: selectedItem.ourCost.monthlyTax, desc: '영업용 세율', pct: selectedItem.ourCost.monthlyTax / selectedItem.ourCost.totalBEP * 100 },
+                        { label: '리스크적립', value: selectedItem.ourCost.monthlyRisk, desc: '사고/면책 준비금', pct: selectedItem.ourCost.monthlyRisk / selectedItem.ourCost.totalBEP * 100 },
+                      ].map((row, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <div className="w-16 text-right">
+                            <p className="text-[10px] font-bold text-gray-700">{row.label}</p>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-slate-600 rounded-full" style={{ width: `${Math.min(100, row.pct)}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-gray-800 w-14 text-right">{f(row.value)}</span>
+                            </div>
+                            <p className="text-[9px] text-gray-400 mt-0.5">{row.desc}</p>
+                          </div>
                         </div>
-                        <div className="flex justify-between py-1 border-b border-gray-50">
-                          <span className="text-gray-400">기간</span>
-                          <span className="font-bold">{selectedContract.term}{ti.unit}</span>
-                        </div>
-                        {d.conditions_input?.mileage && (
-                          <div className="flex justify-between py-1 border-b border-gray-50">
-                            <span className="text-gray-400">주행거리</span>
-                            <span className="font-bold">{d.conditions_input.mileage}</span>
-                          </div>
-                        )}
-                        {d.maintenance_info && (
-                          <div className="flex justify-between py-1 border-b border-gray-50">
-                            <span className="text-gray-400">정비/보험</span>
-                            <span className="font-bold">{d.maintenance_info}</span>
-                          </div>
-                        )}
-                        {d.market_comment && (
-                          <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                            <p className="text-[10px] font-bold text-gray-400 mb-1">AI 분석</p>
-                            <p className="text-[10px] text-gray-600 leading-relaxed">{d.market_comment}</p>
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
+                      ))}
+
+                      <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between">
+                        <span className="text-xs font-bold text-gray-900">월 BEP 합계</span>
+                        <span className="text-xs font-black text-red-600">{f(selectedItem.ourCost.totalBEP)}원</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 삭제 */}
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(selectedItem.id)}
+                    className="w-full py-2 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    이 견적 삭제
+                  </button>
+                )}
+              </>
+            ) : (
+              /* 기본 안내 */
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <h4 className="text-xs font-bold text-gray-900 mb-3">사용 가이드</h4>
+                <div className="space-y-3 text-[11px] text-gray-600">
+                  <div className="flex gap-2">
+                    <span className="text-base flex-shrink-0">1️⃣</span>
+                    <div>
+                      <p className="font-bold text-gray-800">경쟁사 견적 수집</p>
+                      <p className="text-gray-500 mt-0.5">롯데/SK/쏘카 등 경쟁사 홈페이지에서 동일 차종의 렌트 견적을 수집합니다.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-base flex-shrink-0">2️⃣</span>
+                    <div>
+                      <p className="font-bold text-gray-800">신차가 입력 → 자동 원가 산출</p>
+                      <p className="text-gray-500 mt-0.5">신차가를 입력하면 감가·보험·정비·금융·세금·리스크 6대 원가를 자동 산출합니다.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-base flex-shrink-0">3️⃣</span>
+                    <div>
+                      <p className="font-bold text-gray-800">가격 갭 분석</p>
+                      <p className="text-gray-500 mt-0.5">경쟁사 렌트료 vs 우리 원가를 비교하여 마진 확보 가능 여부와 경쟁력을 진단합니다.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-base flex-shrink-0">💡</span>
+                    <div>
+                      <p className="font-bold text-gray-800">포지셔닝 전략</p>
+                      <p className="text-gray-500 mt-0.5">갭이 +면 가격 경쟁력 있음, -면 원가 절감이나 서비스 차별화가 필요합니다.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* 연동 링크 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <h4 className="text-xs font-bold text-gray-900 mb-2">관련 페이지</h4>
+            {/* 관련 페이지 */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <h4 className="text-xs font-bold text-gray-900 mb-2">연동 페이지</h4>
               <div className="space-y-1.5">
-                <a href="/quotes/pricing" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">
+                <a href="/quotes/pricing" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                   렌트가 산출기 →
                 </a>
-                <a href="/db/pricing-standards" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">
-                  산출 기준 관리 →
+                <a href="/db/pricing-standards" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                  산출 기준 관리 (7대 테이블) →
                 </a>
-                <a href="/db/models" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">
+                <a href="/db/models" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
                   차량 시세 DB →
+                </a>
+                <a href="/db/maintenance" className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                  정비/부품 DB →
                 </a>
               </div>
             </div>
@@ -422,85 +606,100 @@ export default function LotteDbPage() {
         </div>
       </div>
 
-      {/* AI 견적 모달 */}
-      {showAiModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAiModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
-              <h3 className="text-sm font-bold">AI 통합 견적 산출</h3>
-              <button onClick={() => setShowAiModal(false)} className="text-white/70 hover:text-white">×</button>
+      {/* ═══ 경쟁사 견적 등록 모달 ═══ */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-900 text-white px-5 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold">경쟁사 견적 등록</h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">경쟁사 홈페이지에서 확인한 견적을 등록합니다</p>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white text-lg">×</button>
             </div>
 
-            {/* 렌트 유형 탭 */}
-            <div className="flex border-b bg-gray-50">
-              {[
-                { key: 'daily' as const, label: '단기(일)', activeColor: 'text-orange-600 border-orange-500' },
-                { key: 'monthly' as const, label: '월간', activeColor: 'text-green-600 border-green-500' },
-                { key: 'long' as const, label: '장기', activeColor: 'text-blue-600 border-blue-500' },
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setRentalType(t.key)}
-                  className={`flex-1 py-2.5 text-xs font-bold transition-all ${
-                    rentalType === t.key ? `bg-white ${t.activeColor} border-b-2` : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-500 block mb-1">브랜드</label>
-                  <input className="w-full px-2 py-1.5 text-xs border rounded-lg" value={targetBrand} onChange={e => setTargetBrand(e.target.value)} placeholder="현대" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-gray-500 block mb-1">모델명</label>
-                  <input className="w-full px-2 py-1.5 text-xs border rounded-lg" value={targetModel} onChange={e => setTargetModel(e.target.value)} placeholder="그랜저" />
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* 경쟁사 선택 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 block mb-1.5">경쟁사</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {COMPETITORS.map(c => (
+                    <button key={c}
+                      onClick={() => setFormData({...formData, competitor: c})}
+                      className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-colors ${
+                        formData.competitor === c ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >{c}</button>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-3 border space-y-2">
+              {/* 차량 정보 */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 block mb-1">
-                    {rentalType === 'daily' ? '대여일수' : rentalType === 'monthly' ? '대여개월' : '계약기간'}
-                  </label>
-                  <select className="w-full px-2 py-1.5 text-xs border rounded-lg bg-white" value={targetTerm} onChange={e => setTargetTerm(e.target.value)}>
-                    {rentalType === 'daily' && [1,2,3,5,7,10,15,30].map(d => <option key={d} value={d}>{d}일</option>)}
-                    {rentalType === 'monthly' && [1,2,3,6,11].map(m => <option key={m} value={m}>{m}개월</option>)}
-                    {rentalType === 'long' && [24,36,48,60].map(y => <option key={y} value={y}>{y}개월</option>)}
-                  </select>
+                  <label className="text-[10px] font-bold text-gray-500 block mb-1">브랜드 *</label>
+                  <input className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="현대"
+                    value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 block mb-1">모델명 *</label>
+                  <input className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="그랜저"
+                    value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} />
+                </div>
+              </div>
 
-                {rentalType === 'long' && (
-                  <>
-                    <div className="flex gap-2">
-                      <select className="flex-1 px-2 py-1.5 text-[10px] border rounded-lg" value={conditions.mileage} onChange={e => setConditions({...conditions, mileage: e.target.value})}>
-                        <option>2만km/년</option><option>3만km/년</option><option>무제한</option>
-                      </select>
-                      <select className="flex-1 px-2 py-1.5 text-[10px] border rounded-lg" value={conditions.deposit} onChange={e => setConditions({...conditions, deposit: e.target.value})}>
-                        <option>보증금 0%</option><option>보증금 30%</option>
-                      </select>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={conditions.maintenance} onChange={e => setConditions({...conditions, maintenance: e.target.checked})} className="w-3 h-3" />
-                      <span className="text-[10px] font-bold text-gray-700">정비포함</span>
-                    </label>
-                  </>
-                )}
-                {rentalType !== 'long' && (
-                  <p className="text-[10px] text-gray-400 text-center">* 단기/월간은 정비·보험 기본 포함</p>
-                )}
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 block mb-1">트림/등급</label>
+                <input className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="캘리그래피 2.5T"
+                  value={formData.trim} onChange={e => setFormData({...formData, trim: e.target.value})} />
+              </div>
+
+              {/* 가격 정보 */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 block mb-1">신차가격 (원가 비교용)</label>
+                  <input type="number" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="45000000"
+                    value={formData.new_car_price} onChange={e => setFormData({...formData, new_car_price: e.target.value})} />
+                  <p className="text-[9px] text-gray-400 mt-1">* 입력 시 우리 원가(BEP)가 자동 산출되어 비교 분석됩니다</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-1">계약기간</label>
+                    <select className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white"
+                      value={formData.term} onChange={e => setFormData({...formData, term: Number(e.target.value)})}>
+                      {TERM_OPTIONS.map(t => <option key={t} value={t}>{t}개월</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-1">보증금률 (%)</label>
+                    <input type="number" className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="0"
+                      value={formData.deposit_rate} onChange={e => setFormData({...formData, deposit_rate: Number(e.target.value)})} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-red-500 block mb-1">경쟁사 월 렌트료 (원) *</label>
+                  <input type="number" className="w-full px-3 py-2 text-xs border border-red-200 rounded-lg bg-red-50 font-bold" placeholder="850000"
+                    value={formData.monthly_price} onChange={e => setFormData({...formData, monthly_price: e.target.value})} />
+                </div>
+              </div>
+
+              {/* 출처/메모 */}
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 block mb-1">출처 URL</label>
+                <input className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="https://www.lotterentacar.net/..."
+                  value={formData.source_url} onChange={e => setFormData({...formData, source_url: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 block mb-1">메모</label>
+                <input className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" placeholder="정비포함, 보험 완전자차 등"
+                  value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} />
               </div>
 
               <button
-                onClick={handleAiEstimate}
-                disabled={aiLoading}
-                className="w-full py-2.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                onClick={handleAdd}
+                className="w-full py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
               >
-                {aiLoading ? '시장 분석 중...' : 'AI 견적 산출'}
+                등록하기
               </button>
             </div>
           </div>
