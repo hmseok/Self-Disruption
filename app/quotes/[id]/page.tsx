@@ -6,6 +6,118 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 export const dynamic = "force-dynamic";
 
+// CostBar 컴포넌트 (메인 컴포넌트 외부에 정의)
+const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
+  const pct = total > 0 ? Math.abs(value) / total * 100 : 0
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-24 text-gray-500 text-xs">{label}</span>
+      <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+      </div>
+      <span className="w-24 text-right font-bold text-xs">{Math.round(value || 0).toLocaleString()}원</span>
+      <span className="w-10 text-right text-gray-400 text-[11px]">{pct.toFixed(0)}%</span>
+    </div>
+  )
+}
+
+// 고객 정보 카드 컴포넌트
+const CustomerInfoCard = ({ quote }: { quote: any }) => {
+  const [customer, setCustomer] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      if (!quote.customer_id) {
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      try {
+        const { data } = await supabase.from('customers').select('*').eq('id', quote.customer_id).single()
+        if (data) setCustomer(data)
+      } catch (e) {
+        console.error('고객 정보 불러오기 오류:', e)
+      }
+      setLoading(false)
+    }
+    fetchCustomer()
+  }, [quote.customer_id])
+
+  const displayName = customer?.name || quote.customer_name || '미등록'
+  const displayPhone = customer?.phone || quote.customer_phone || '-'
+  const displayEmail = customer?.email || quote.customer_email || '-'
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+          <span>👤</span> 고객 정보
+        </h3>
+      </div>
+      <div className="p-6 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500 text-sm">고객명</span>
+          <span className="font-bold text-gray-900 text-lg">{displayName}</span>
+        </div>
+        {displayPhone && displayPhone !== '-' && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500 text-sm">전화</span>
+            <span className="text-gray-700 font-medium">{displayPhone}</span>
+          </div>
+        )}
+        {displayEmail && displayEmail !== '-' && (
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500 text-sm">이메일</span>
+            <span className="text-gray-700 font-medium text-sm">{displayEmail}</span>
+          </div>
+        )}
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500 text-sm">계약기간</span>
+          <span className="text-gray-700 font-medium">{quote.start_date} ~ {quote.end_date}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500 text-sm">렌탈 유형</span>
+          <span className="px-3 py-1 bg-steel-50 text-steel-600 rounded-lg text-sm font-bold">{quote.rental_type}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 만료일 경고 컴포넌트
+const ExpirationWarning = ({ expiresAt }: { expiresAt: string }) => {
+  const today = new Date()
+  const expDate = new Date(expiresAt)
+  const daysUntilExpiry = Math.floor((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (daysUntilExpiry < 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+        <span className="text-2xl">⚠️</span>
+        <div>
+          <h4 className="font-bold text-red-700">견적 만료됨</h4>
+          <p className="text-red-600 text-sm">{Math.abs(daysUntilExpiry)}일 전에 만료되었습니다.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (daysUntilExpiry < 7) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+        <span className="text-2xl">⏰</span>
+        <div>
+          <h4 className="font-bold text-amber-700">곧 만료됩니다</h4>
+          <p className="text-amber-600 text-sm">{daysUntilExpiry}일 남음 - {expiresAt}에 만료됩니다.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
 export default function QuoteDetailPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -16,6 +128,7 @@ export default function QuoteDetailPage() {
   const [linkedContract, setLinkedContract] = useState<any>(null)
   const [worksheet, setWorksheet] = useState<any>(null)
   const [creating, setCreating] = useState(false)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     const fetchQuoteDetail = async () => {
@@ -60,9 +173,41 @@ export default function QuoteDetailPage() {
     fetchQuoteDetail()
   }, [quoteId, router])
 
+  // 견적 상태 업데이트 (보관)
+  const handleArchiveQuote = async () => {
+    if (!confirm('이 견적을 보관하시겠습니까?')) return
+
+    setUpdating(true)
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'archived' })
+        .eq('id', quoteId)
+
+      if (error) throw error
+
+      alert('✅ 견적이 보관되었습니다.')
+      setQuote({ ...quote, status: 'archived' })
+    } catch (e: any) {
+      alert('에러: ' + e.message)
+    }
+    setUpdating(false)
+  }
+
   // 계약 확정 로직
   const handleCreateContract = async () => {
     if (linkedContract) return alert('이미 계약이 확정된 건입니다.')
+    if (quote.status === 'archived') return alert('보관된 견적서로는 계약을 확정할 수 없습니다.')
+
+    // 만료일 확인
+    if (quote.expires_at) {
+      const expDate = new Date(quote.expires_at)
+      const today = new Date()
+      if (today > expDate) {
+        return alert('만료된 견적서로는 계약을 확정할 수 없습니다.')
+      }
+    }
+
     if (!confirm('이 견적서로 계약을 확정하시겠습니까?')) return
 
     setCreating(true)
@@ -72,6 +217,7 @@ export default function QuoteDetailPage() {
       const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
         quote_id: quote.id,
         car_id: quote.car_id,
+        customer_id: quote.customer_id || null,
         customer_name: quote.customer_name,
         start_date: quote.start_date,
         end_date: quote.end_date,
@@ -89,12 +235,27 @@ export default function QuoteDetailPage() {
       const startDate = new Date(quote.start_date)
 
       if (quote.deposit > 0) {
-        schedules.push({ contract_id: contract.id, round_number: 0, due_date: quote.start_date, amount: quote.deposit, vat: 0, status: 'unpaid' })
+        schedules.push({
+          contract_id: contract.id,
+          round_number: 0,
+          due_date: quote.start_date,
+          amount: quote.deposit,
+          vat: 0,
+          status: 'unpaid'
+        })
       }
+
       for (let i = 1; i <= termMonths; i++) {
         const d = new Date(startDate)
         d.setMonth(d.getMonth() + i)
-        schedules.push({ contract_id: contract.id, round_number: i, due_date: d.toISOString().split('T')[0], amount: rent + vat, vat: vat, status: 'unpaid' })
+        schedules.push({
+          contract_id: contract.id,
+          round_number: i,
+          due_date: d.toISOString().split('T')[0],
+          amount: rent + vat,
+          vat: vat,
+          status: 'unpaid'
+        })
       }
 
       await supabase.from('payment_schedules').insert(schedules)
@@ -118,24 +279,12 @@ export default function QuoteDetailPage() {
   )
   if (!quote) return null
 
-  const f = (n: number) => n?.toLocaleString() || '0'
+  const f = (n: number) => Math.round(n || 0).toLocaleString()
   const totalCost = worksheet ? worksheet.total_monthly_cost : 0
   const margin = worksheet ? worksheet.target_margin : 0
 
-  // 원가 비중 바
-  const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
-    const pct = total > 0 ? Math.abs(value) / total * 100 : 0
-    return (
-      <div className="flex items-center gap-3 text-sm">
-        <span className="w-24 text-gray-500 text-xs">{label}</span>
-        <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-          <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-        </div>
-        <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
-        <span className="w-10 text-right text-gray-400 text-[11px]">{pct.toFixed(0)}%</span>
-      </div>
-    )
-  }
+  // 계약 확정 버튼 활성화 여부
+  const canCreateContract = !linkedContract && quote.status !== 'archived' && (!quote.expires_at || new Date(quote.expires_at) > new Date())
 
   return (
     <div className="max-w-[1400px] mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
@@ -155,17 +304,38 @@ export default function QuoteDetailPage() {
             {quote.created_at?.split('T')[0]} 작성
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">
             🖨️ 인쇄
           </button>
-          {!linkedContract && (
+          <button
+            onClick={() => router.push(`/quotes/new?quote_id=${quoteId}`)}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50"
+          >
+            ✏️ 수정
+          </button>
+          <button
+            onClick={handleArchiveQuote}
+            disabled={updating || quote.status === 'archived'}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {updating ? '처리 중...' : '📦 보관'}
+          </button>
+          {canCreateContract && (
             <button
               onClick={handleCreateContract}
               disabled={creating}
               className="px-6 py-2 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 shadow-lg disabled:opacity-50 transition-colors"
             >
               {creating ? '처리 중...' : '🚀 계약 확정'}
+            </button>
+          )}
+          {!canCreateContract && (
+            <button
+              disabled
+              className="px-6 py-2 text-sm bg-gray-300 text-gray-500 rounded-xl font-bold shadow-lg opacity-50 cursor-not-allowed"
+            >
+              🚀 계약 확정
             </button>
           )}
         </div>
@@ -176,7 +346,7 @@ export default function QuoteDetailPage() {
         <div className="bg-steel-600 text-white p-5 rounded-2xl shadow-lg mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 no-print">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">✅ 계약 확정 완료</h2>
-            <p className="text-steel-100 text-sm mt-0.5">계약번호: {String(linkedContract.id).slice(0,8)}</p>
+            <p className="text-steel-100 text-sm mt-0.5">계약번호: {String(linkedContract.id).slice(0, 8)}</p>
           </div>
           <button
             onClick={() => router.push(`/contracts/${linkedContract.id}`)}
@@ -193,28 +363,13 @@ export default function QuoteDetailPage() {
         {/* ===== 왼쪽: 견적 정보 ===== */}
         <div className="lg:col-span-7 space-y-6">
 
-          {/* 고객 정보 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <span>👤</span> 고객 정보
-              </h3>
-            </div>
-            <div className="p-6 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">고객명</span>
-                <span className="font-bold text-gray-900 text-lg">{quote.customer_name}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">계약기간</span>
-                <span className="text-gray-700 font-medium">{quote.start_date} ~ {quote.end_date}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">렌탈 유형</span>
-                <span className="px-3 py-1 bg-steel-50 text-steel-600 rounded-lg text-sm font-bold">{quote.rental_type}</span>
-              </div>
-            </div>
-          </div>
+          {/* 만료 경고 */}
+          {quote.expires_at && (
+            <ExpirationWarning expiresAt={quote.expires_at} />
+          )}
+
+          {/* 고객 정보 카드 */}
+          <CustomerInfoCard quote={quote} />
 
           {/* 차량 정보 */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
