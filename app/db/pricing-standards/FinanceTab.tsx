@@ -41,6 +41,7 @@ export default function FinanceTab() {
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
+  const [showAIPanel, setShowAIPanel] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -176,137 +177,145 @@ export default function FinanceTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8">
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">금융상품 요율표 (편집 가능)</h3>
-                <p className="text-xs text-gray-400 mt-0.5">위 분류기준·시장금리를 참고하여 검수한 후 사용하세요</p>
-              </div>
-              <div className="flex gap-2">
-                {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드 💡</button>}
-                <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">+ 행 추가</button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-3 py-2.5 text-left font-semibold text-gray-600 min-w-[90px]">금융유형</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 min-w-[70px]">최소기간</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 min-w-[70px]">최대기간</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 min-w-[70px]">연이율</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 min-w-[90px]">월이자(3천만)</th>
-                    <th className="px-3 py-2.5 text-left font-semibold text-gray-600 min-w-[100px]">설명</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 min-w-[80px]">적용일</th>
-                    <th className="px-3 py-2.5 text-left font-semibold text-gray-600 min-w-[80px]">비고</th>
-                    <th className="px-3 py-2.5 text-center font-semibold text-gray-600 w-[50px]">삭제</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
-                    <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
-                  ) : (
-                    rows.map((row) => (
-                      <tr key={row.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition">
-                        <td className="px-3 py-2.5">
-                          <select value={row.finance_type} onChange={(e) => handleUpdateField(row.id, 'finance_type', e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none">
-                            {FINANCE_TYPES.map(type => (<option key={type} value={type}>{type}</option>))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="number" value={row.term_months_min} onChange={(e) => handleUpdateField(row.id, 'term_months_min', parseInt(e.target.value))}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="number" value={row.term_months_max} onChange={(e) => handleUpdateField(row.id, 'term_months_max', parseInt(e.target.value))}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="number" step="0.01" value={row.annual_rate} onChange={(e) => handleUpdateField(row.id, 'annual_rate', parseFloat(e.target.value))}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center font-bold focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className="text-blue-600 font-semibold">{simulateMonthlyInterest(row.annual_rate).toLocaleString()}원</span>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="date" value={row.effective_date} onChange={(e) => handleUpdateField(row.id, 'effective_date', e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+      {/* Table Section - Full Width */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">금융상품 요율표 (편집 가능)</h3>
+            <p className="text-xs text-gray-400 mt-0.5">위 분류기준·시장금리를 참고하여 검수한 후 사용하세요</p>
+          </div>
+          <div className="flex gap-2">
+            {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드 💡</button>}
+            <button onClick={() => setShowAIPanel(!showAIPanel)} 
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
+              {showAIPanel ? '🔍 AI 검증 닫기' : '🔍 AI 검증'}
+            </button>
+            <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">+ 행 추가</button>
           </div>
         </div>
-
-        <div className="lg:col-span-4">
-          <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white sticky top-32">
-            <h3 className="text-sm font-bold mb-1">실시간 금리 검증</h3>
-            <p className="text-[10px] text-slate-400 mb-4">Gemini AI로 현재 금리 시세를 검색합니다</p>
-
-            <textarea value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="예: 현대캐피탈 렌터카 대출금리 2025, 오토리스 최저금리..."
-              className="w-full px-3 py-2.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none h-16 mb-3" />
-
-            <button onClick={handleSearch} disabled={searchLoading || !searchQuery.trim()}
-              className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
-              {searchLoading ? '금리 조회 중...' : '🔍 실시간 금리 검증'}
-            </button>
-
-            {/* 금리별 월이자 비교 */}
-            <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-700">
-              <p className="text-[10px] font-semibold text-blue-300 mb-2">금리별 월이자 비교 (3천만원 기준)</p>
-              <div className="space-y-1.5 text-xs">
-                {[4, 5, 6, 7, 8, 9].map(rate => (
-                  <div key={rate} className="flex justify-between items-center">
-                    <span className="text-slate-400">{rate}.0%</span>
-                    <div className="flex-1 mx-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(rate / 10) * 100}%` }} />
-                    </div>
-                    <span className="text-white font-semibold w-16 text-right">{simulateMonthlyInterest(rate).toLocaleString()}원</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {searchResults && (
-              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
-                  <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
-                </div>
-                <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                  {searchResults.results}
-                </div>
-                {searchResults.sources?.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-700">
-                    <p className="text-[10px] text-slate-400 mb-1">출처:</p>
-                    {searchResults.sources.map((s, i) => (
-                      <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-[10px] underline block truncate">{s}</a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-2 py-2 text-left font-semibold text-gray-600 min-w-[130px]">유형</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[80px]">최소(월)</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[80px]">최대(월)</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[80px]">연이율</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[100px]">월이자</th>
+                <th className="px-2 py-2 text-left font-semibold text-gray-600">설명</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[120px]">적용일</th>
+                <th className="px-2 py-2 text-left font-semibold text-gray-600">비고</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 w-[50px]">삭제</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition">
+                    <td className="px-2 py-2 min-w-[130px]">
+                      <select value={row.finance_type} onChange={(e) => handleUpdateField(row.id, 'finance_type', e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none">
+                        {FINANCE_TYPES.map(type => (<option key={type} value={type}>{type}</option>))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-2 w-[80px]">
+                      <input type="number" value={row.term_months_min} onChange={(e) => handleUpdateField(row.id, 'term_months_min', parseInt(e.target.value))}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2 w-[80px]">
+                      <input type="number" value={row.term_months_max} onChange={(e) => handleUpdateField(row.id, 'term_months_max', parseInt(e.target.value))}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2 w-[80px]">
+                      <input type="number" step="0.01" value={row.annual_rate} onChange={(e) => handleUpdateField(row.id, 'annual_rate', parseFloat(e.target.value))}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center font-bold focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2 w-[100px] text-center">
+                      <span className="text-blue-600 font-semibold">{simulateMonthlyInterest(row.annual_rate).toLocaleString()}원</span>
+                    </td>
+                    <td className="px-2 py-2">
+                      <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2 w-[120px]">
+                      <input type="date" value={row.effective_date} onChange={(e) => handleUpdateField(row.id, 'effective_date', e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2">
+                      <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-blue-400 focus:outline-none" />
+                    </td>
+                    <td className="px-2 py-2 w-[50px] text-center">
+                      <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* AI Verification Panel - Collapsible */}
+      {showAIPanel && (
+        <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white border border-slate-800">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-bold mb-1">실시간 금리 검증</h3>
+              <p className="text-[10px] text-slate-400 mb-4">Gemini AI로 현재 금리 시세를 검색합니다</p>
+
+              <textarea value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="예: 현대캐피탈 렌터카 대출금리 2025, 오토리스 최저금리..."
+                className="w-full px-3 py-2.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none h-16 mb-3" />
+
+              <button onClick={handleSearch} disabled={searchLoading || !searchQuery.trim()}
+                className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
+                {searchLoading ? '금리 조회 중...' : '🔍 실시간 금리 검증'}
+              </button>
+
+              {searchResults && (
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
+                    <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
+                  </div>
+                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                    {searchResults.results}
+                  </div>
+                  {searchResults.sources?.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-slate-700">
+                      <p className="text-[10px] text-slate-400 mb-1">출처:</p>
+                      {searchResults.sources.map((s, i) => (
+                        <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-[10px] underline block truncate">{s}</a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              {/* 금리별 월이자 비교 */}
+              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                <p className="text-[10px] font-semibold text-blue-300 mb-2">금리별 월이자 비교 (3천만원 기준)</p>
+                <div className="space-y-1.5 text-xs">
+                  {[4, 5, 6, 7, 8, 9].map(rate => (
+                    <div key={rate} className="flex justify-between items-center">
+                      <span className="text-slate-400">{rate}.0%</span>
+                      <div className="flex-1 mx-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(rate / 10) * 100}%` }} />
+                      </div>
+                      <span className="text-white font-semibold w-16 text-right">{simulateMonthlyInterest(rate).toLocaleString()}원</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

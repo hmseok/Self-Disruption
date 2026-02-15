@@ -56,6 +56,7 @@ export default function RegistrationTab() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [vehiclePrice, setVehiclePrice] = useState(30000000)
   const [showGuide, setShowGuide] = useState(true)
+  const [showAIPanel, setShowAIPanel] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -184,10 +185,10 @@ export default function RegistrationTab() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 font-semibold text-gray-600 min-w-[80px]">지역</th>
-                  <th className="text-center py-2 px-3 font-semibold text-gray-600 min-w-[90px]">비영업용</th>
-                  <th className="text-center py-2 px-3 font-semibold text-gray-600 min-w-[90px]">영업용(렌터카)</th>
-                  <th className="text-left py-2 px-3 font-semibold text-gray-600 min-w-[120px]">참고</th>
+                  <th className="text-left py-2 px-3 font-semibold text-gray-600 min-w-[80px] whitespace-nowrap">지역</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-600 min-w-[90px] whitespace-nowrap">비영업용</th>
+                  <th className="text-center py-2 px-3 font-semibold text-gray-600 min-w-[90px] whitespace-nowrap">영업용(렌터카)</th>
+                  <th className="text-left py-2 px-3 font-semibold text-gray-600 min-w-[120px] whitespace-nowrap">참고</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -205,131 +206,133 @@ export default function RegistrationTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8">
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">등록비용 기준표 (편집 가능)</h3>
-                <p className="text-xs text-gray-400 mt-0.5">비용유형·차종·지역별 요율 및 고정금액 관리</p>
-              </div>
-              <div className="flex gap-2">
-                {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드</button>}
-                <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">+ 행 추가</button>
-              </div>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {Object.entries(groupedByCostType).map(([costType, typeRows]) => (
-                typeRows.length > 0 && (
-                  <div key={costType} className={`rounded-xl p-4 border ${COST_TYPE_COLORS[costType] || 'bg-gray-50 border-gray-200'}`}>
-                    <div className="text-xs font-bold text-gray-700 mb-3">{costType}</div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-gray-200/50">
-                            <th className="text-left py-2 px-2 text-gray-600 font-medium min-w-[60px]">차종</th>
-                            <th className="text-left py-2 px-2 text-gray-600 font-medium min-w-[60px]">지역</th>
-                            <th className="text-center py-2 px-2 text-gray-600 font-medium min-w-[60px]">요율(%)</th>
-                            <th className="text-center py-2 px-2 text-gray-600 font-medium min-w-[80px]">고정금액</th>
-                            <th className="text-left py-2 px-2 text-gray-600 font-medium min-w-[80px]">설명</th>
-                            <th className="text-left py-2 px-2 text-gray-600 font-medium min-w-[70px]">비고</th>
-                            <th className="text-center py-2 px-2 text-gray-600 font-medium w-[40px]">삭제</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {typeRows.map((row) => (
-                            <tr key={row.id} className="border-b border-gray-200/30 hover:bg-white/50">
-                              <td className="py-2 px-2">
-                                <select value={row.vehicle_category} onChange={(e) => handleUpdateField(row.id, 'vehicle_category', e.target.value)}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none">{VEHICLE_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select>
-                              </td>
-                              <td className="py-2 px-2">
-                                <select value={row.region} onChange={(e) => handleUpdateField(row.id, 'region', e.target.value)}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none">{REGIONS.map(r => (<option key={r} value={r}>{r}</option>))}</select>
-                              </td>
-                              <td className="py-2 px-2">
-                                <input type="number" step="0.01" value={row.rate} onChange={(e) => handleUpdateField(row.id, 'rate', parseFloat(e.target.value))}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center font-semibold focus:border-blue-400 focus:outline-none" />
-                              </td>
-                              <td className="py-2 px-2">
-                                <input type="number" value={row.fixed_amount} onChange={(e) => handleUpdateField(row.id, 'fixed_amount', parseInt(e.target.value))}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center focus:border-blue-400 focus:outline-none" />
-                              </td>
-                              <td className="py-2 px-2">
-                                <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none" />
-                              </td>
-                              <td className="py-2 px-2">
-                                <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
-                                  className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none" />
-                              </td>
-                              <td className="py-2 px-2 text-center">
-                                <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              ))}
-            </div>
-
-            {/* 총 등록비 시뮬레이션 */}
-            <div className="p-5 border-t border-gray-100 bg-blue-50">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-xs font-semibold text-blue-900">총 등록비 시뮬레이션 (서울 · 승용 기준)</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600">차량가:</span>
-                  <input type="number" value={vehiclePrice} onChange={(e) => setVehiclePrice(parseInt(e.target.value) || 0)}
-                    className="px-2 py-1 text-xs border border-blue-200 rounded w-28" />
-                  <span className="text-xs text-gray-600">원</span>
-                </div>
-              </div>
-              <div className="text-xs text-gray-700">
-                {(vehiclePrice / 10000).toLocaleString()}만원 차량 → 예상 등록비 합계:
-                <span className="font-bold text-blue-700 text-sm ml-2">{calculateTotal().toLocaleString()}원</span>
-              </div>
-            </div>
+      {/* Full-width table section */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">등록비용 기준표 (편집 가능)</h3>
+            <p className="text-xs text-gray-400 mt-0.5">비용유형·차종·지역별 요율 및 고정금액 관리</p>
+          </div>
+          <div className="flex gap-2">
+            {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드</button>}
+            <button onClick={() => setShowAIPanel(!showAIPanel)} 
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
+              {showAIPanel ? '🔍 AI 검증 닫기' : '🔍 AI 검증'}
+            </button>
+            <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">+ 행 추가</button>
           </div>
         </div>
 
-        <div className="lg:col-span-4">
-          <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white sticky top-32">
-            <h3 className="text-sm font-bold mb-1">실시간 등록비 검증</h3>
-            <p className="text-[10px] text-slate-400 mb-4">최신 취득세율·공채율·수수료를 검색합니다</p>
-
-            <textarea value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="예: 서울 승용차 취득세율 2025, 경기도 공채매입률..."
-              className="w-full px-3 py-2.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none h-16 mb-3" />
-
-            <button onClick={handleSearch} disabled={searchLoading || !searchQuery.trim()}
-              className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
-              {searchLoading ? '조회 중...' : '실시간 등록비 검증'}
-            </button>
-
-            {searchResults && (
-              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
-                  <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
+        <div className="p-5 space-y-4">
+          {Object.entries(groupedByCostType).map(([costType, typeRows]) => (
+            typeRows.length > 0 && (
+              <div key={costType} className={`rounded-xl p-4 border ${COST_TYPE_COLORS[costType] || 'bg-gray-50 border-gray-200'}`}>
+                <div className="text-xs font-bold text-gray-700 mb-3">{costType}</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200/50">
+                        <th className="text-left py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap min-w-[80px]">차종</th>
+                        <th className="text-left py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap min-w-[70px]">지역</th>
+                        <th className="text-center py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap w-[80px]">요율(%)</th>
+                        <th className="text-center py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap w-[100px]">고정액</th>
+                        <th className="text-left py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap">설명</th>
+                        <th className="text-left py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap">비고</th>
+                        <th className="text-center py-1.5 px-1.5 text-gray-600 font-medium whitespace-nowrap w-[50px]">삭제</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {typeRows.map((row) => (
+                        <tr key={row.id} className="border-b border-gray-200/30 hover:bg-white/50">
+                          <td className="py-1.5 px-1.5 whitespace-nowrap">
+                            <select value={row.vehicle_category} onChange={(e) => handleUpdateField(row.id, 'vehicle_category', e.target.value)}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none">{VEHICLE_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select>
+                          </td>
+                          <td className="py-1.5 px-1.5 whitespace-nowrap">
+                            <select value={row.region} onChange={(e) => handleUpdateField(row.id, 'region', e.target.value)}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none">{REGIONS.map(r => (<option key={r} value={r}>{r}</option>))}</select>
+                          </td>
+                          <td className="py-1.5 px-1.5">
+                            <input type="number" step="0.01" value={row.rate} onChange={(e) => handleUpdateField(row.id, 'rate', parseFloat(e.target.value))}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center font-semibold focus:border-blue-400 focus:outline-none" />
+                          </td>
+                          <td className="py-1.5 px-1.5">
+                            <input type="number" value={row.fixed_amount} onChange={(e) => handleUpdateField(row.id, 'fixed_amount', parseInt(e.target.value))}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center focus:border-blue-400 focus:outline-none" />
+                          </td>
+                          <td className="py-1.5 px-1.5">
+                            <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none" />
+                          </td>
+                          <td className="py-1.5 px-1.5">
+                            <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
+                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-blue-400 focus:outline-none" />
+                          </td>
+                          <td className="py-1.5 px-1.5 text-center">
+                            <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">{searchResults.results}</div>
-                {searchResults.sources?.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-700">
-                    <p className="text-[10px] text-slate-400 mb-1">출처:</p>
-                    {searchResults.sources.map((s, i) => (
-                      <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-[10px] underline block truncate">{s}</a>
-                    ))}
-                  </div>
-                )}
               </div>
-            )}
+            )
+          ))}
+        </div>
+
+        {/* 총 등록비 시뮬레이션 */}
+        <div className="p-5 border-t border-gray-100 bg-blue-50">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-xs font-semibold text-blue-900">총 등록비 시뮬레이션 (서울 · 승용 기준)</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-600">차량가:</span>
+              <input type="number" value={vehiclePrice} onChange={(e) => setVehiclePrice(parseInt(e.target.value) || 0)}
+                className="px-2 py-1 text-xs border border-blue-200 rounded w-28" />
+              <span className="text-xs text-gray-600">원</span>
+            </div>
+          </div>
+          <div className="text-xs text-gray-700">
+            {(vehiclePrice / 10000).toLocaleString()}만원 차량 → 예상 등록비 합계:
+            <span className="font-bold text-blue-700 text-sm ml-2">{calculateTotal().toLocaleString()}원</span>
           </div>
         </div>
       </div>
+
+      {/* Collapsible AI panel below table */}
+      {showAIPanel && (
+        <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white">
+          <h3 className="text-sm font-bold mb-1">실시간 등록비 검증</h3>
+          <p className="text-[10px] text-slate-400 mb-4">최신 취득세율·공채율·수수료를 검색합니다</p>
+
+          <textarea value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="예: 서울 승용차 취득세율 2025, 경기도 공채매입률..."
+            className="w-full px-3 py-2.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none h-16 mb-3" />
+
+          <button onClick={handleSearch} disabled={searchLoading || !searchQuery.trim()}
+            className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
+            {searchLoading ? '조회 중...' : '실시간 등록비 검증'}
+          </button>
+
+          {searchResults && (
+            <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
+                <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
+              </div>
+              <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">{searchResults.results}</div>
+              {searchResults.sources?.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-700">
+                  <p className="text-[10px] text-slate-400 mb-1">출처:</p>
+                  {searchResults.sources.map((s, i) => (
+                    <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-[10px] underline block truncate">{s}</a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

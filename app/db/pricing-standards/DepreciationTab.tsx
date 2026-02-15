@@ -37,6 +37,7 @@ export default function DepreciationTab() {
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
   const [searching, setSearching] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
+  const [showAIPanel, setShowAIPanel] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -187,197 +188,197 @@ export default function DepreciationTab() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* 왼쪽: CRUD 테이블 (8/12) */}
-        <div className="lg:col-span-8">
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-            <div className="p-5 border-b border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold text-gray-900">감가 기준표</h3>
-                <div className="flex gap-2">
-                  {!showGuide && (
-                    <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                      가이드 💡
-                    </button>
-                  )}
-                  <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                    + 행 추가
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">셀을 클릭하여 편집 → 다른 곳 클릭 시 자동 저장 · 잔존율은 신차가 대비 잔존가치(%)</p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600 min-w-[120px]">차종 카테고리</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 min-w-[80px]">1년차</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 min-w-[80px]">2년차</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 min-w-[80px]">3년차</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 min-w-[80px]">4년차</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 min-w-[80px]">5년차</th>
-                    <th className="px-3 py-3 text-center font-semibold text-gray-600 w-[50px]">삭제</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {rows.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다. 행을 추가해주세요.</td></tr>
-                  ) : (
-                    rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="px-4 py-3">
-                          {editingCell?.rowId === row.id && editingCell?.field === 'category' ? (
-                            <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
-                              className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none" />
-                          ) : (
-                            <span onClick={() => handleCellClick(row.id, 'category', row.category)}
-                              className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block font-medium text-gray-800">
-                              {row.category}
-                            </span>
-                          )}
-                        </td>
-                        {(['rate_1yr', 'rate_2yr', 'rate_3yr', 'rate_4yr', 'rate_5yr'] as const).map((field) => (
-                          <td key={field} className="px-3 py-3 text-center">
-                            {editingCell?.rowId === row.id && editingCell?.field === field ? (
-                              <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
-                                className="w-16 px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none mx-auto text-center" step="0.1" min="0" max="100" />
-                            ) : (
-                              <span onClick={() => handleCellClick(row.id, field, row[field])}
-                                className={`cursor-pointer px-2 py-0.5 rounded inline-block font-bold text-xs ${getRateColor(row[field])}`}>
-                                {row[field]?.toFixed(1)}%
-                              </span>
-                            )}
-                          </td>
-                        ))}
-                        <td className="px-3 py-3 text-center">
-                          <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs transition-colors">삭제</button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 업계 비교 테이블 */}
-            <div className="p-5 border-t border-gray-100 bg-gray-50/50">
-              <p className="text-xs font-semibold text-gray-500 mb-3">📊 업계 평균 참고값 (대형 렌터카사 기반)</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-gray-400">
-                      <th className="text-left py-1.5 px-3 font-medium min-w-[100px]">차종</th>
-                      <th className="text-center py-1.5 px-2 font-medium">1년</th>
-                      <th className="text-center py-1.5 px-2 font-medium">2년</th>
-                      <th className="text-center py-1.5 px-2 font-medium">3년</th>
-                      <th className="text-center py-1.5 px-2 font-medium">4년</th>
-                      <th className="text-center py-1.5 px-2 font-medium">5년</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {INDUSTRY_BENCHMARKS.map((b, i) => (
-                      <tr key={i} className="text-gray-500 border-t border-gray-100">
-                        <td className="py-1.5 px-3">{b.type}</td>
-                        <td className="text-center py-1.5 px-2">{b.yr1}%</td>
-                        <td className="text-center py-1.5 px-2">{b.yr2}%</td>
-                        <td className="text-center py-1.5 px-2">{b.yr3}%</td>
-                        <td className="text-center py-1.5 px-2">{b.yr4}%</td>
-                        <td className="text-center py-1.5 px-2">{b.yr5}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* 감가 기준표 - Full Width */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
+        <div className="p-5 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-gray-900">감가 기준표</h3>
+            <div className="flex gap-2">
+              {!showGuide && (
+                <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                  가이드 💡
+                </button>
+              )}
+              <button onClick={() => setShowAIPanel(!showAIPanel)} 
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
+                {showAIPanel ? '🔍 AI 검증 닫기' : '🔍 AI 검증'}
+              </button>
+              <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+                + 행 추가
+              </button>
             </div>
           </div>
+          <p className="text-xs text-gray-400">셀을 클릭하여 편집 → 다른 곳 클릭 시 자동 저장 · 잔존율은 신차가 대비 잔존가치(%)</p>
         </div>
 
-        {/* 오른쪽: 실시간 검증 패널 */}
-        <div className="lg:col-span-4">
-          <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white sticky top-32">
-            <h3 className="text-sm font-bold mb-1">실시간 시장 검증</h3>
-            <p className="text-[10px] text-slate-400 mb-4">Gemini AI로 현재 중고차 시세를 조회하여 잔존율 적정성을 검증합니다</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap min-w-[140px]">차종</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">1년차</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">2년차</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">3년차</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">4년차</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">5년차</th>
+                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[50px]">삭제</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다. 행을 추가해주세요.</td></tr>
+              ) : (
+                rows.map((row) => (
+                  <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="px-2 py-2">
+                      {editingCell?.rowId === row.id && editingCell?.field === 'category' ? (
+                        <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                          className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none" />
+                      ) : (
+                        <span onClick={() => handleCellClick(row.id, 'category', row.category)}
+                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block font-medium text-gray-800">
+                          {row.category}
+                        </span>
+                      )}
+                    </td>
+                    {(['rate_1yr', 'rate_2yr', 'rate_3yr', 'rate_4yr', 'rate_5yr'] as const).map((field) => (
+                      <td key={field} className="px-2 py-2 text-center">
+                        {editingCell?.rowId === row.id && editingCell?.field === field ? (
+                          <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                            className="w-16 px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none mx-auto text-center" step="0.1" min="0" max="100" />
+                        ) : (
+                          <span onClick={() => handleCellClick(row.id, field, row[field])}
+                            className={`cursor-pointer px-2 py-0.5 rounded inline-block font-bold text-xs ${getRateColor(row[field])}`}>
+                            {row[field]?.toFixed(1)}%
+                          </span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 text-center">
+                      <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs transition-colors">삭제</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-            <div className="mb-3">
-              <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">검증할 차종</label>
-              <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
-                <option value="">선택하세요</option>
-                {rows.map((row) => (<option key={row.id} value={row.category}>{row.category}</option>))}
-              </select>
-            </div>
-
-            <button onClick={handleSearch} disabled={searching || !selectedCategory}
-              className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
-              {searching ? '시장 데이터 조회 중...' : '🔍 실시간 시장 검증'}
-            </button>
-
-            {/* 현재값 vs 업계 비교 */}
-            {comparison && (
-              <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-700">
-                <p className="text-[10px] font-semibold text-slate-300 mb-2">📊 현재값 vs 업계 평균</p>
-                <div className="space-y-1.5 text-xs">
-                  {[
-                    { label: '1년차', diff: comparison.diffs.yr1 },
-                    { label: '3년차', diff: comparison.diffs.yr3 },
-                    { label: '5년차', diff: comparison.diffs.yr5 },
-                  ].map(({ label, diff }) => (
-                    <div key={label} className="flex justify-between items-center">
-                      <span className="text-slate-400">{label}</span>
-                      <span className={`font-semibold ${diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-300'}`}>
-                        {diff > 0 ? '+' : ''}{diff.toFixed(1)}%p
-                        {diff > 2 && ' (보수적)'}
-                        {diff < -2 && ' (공격적)'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-slate-500 mt-2">
-                  +는 업계보다 보수적(잔존율 높음), -는 공격적(잔존율 낮음)
-                </p>
-              </div>
-            )}
-
-            {/* 검색 결과 */}
-            {searchResults && (
-              <div className="space-y-3">
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
-                    <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
-                  </div>
-                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                    {searchResults.results}
-                  </div>
-                </div>
-
-                {searchResults.sources.length > 0 && (
-                  <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                    <h4 className="text-[10px] font-semibold text-blue-300 mb-2">참고 출처</h4>
-                    <div className="space-y-1">
-                      {searchResults.sources.map((source, idx) => (
-                        <a key={idx} href={source} target="_blank" rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300 text-[10px] break-all underline block leading-snug">
-                          {source.length > 60 ? source.substring(0, 60) + '...' : source}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!searchResults && !searching && (
-              <div className="text-center text-slate-500 text-xs py-3">
-                차종을 선택하고 검증을 시작하세요.<br/>
-                <span className="text-slate-600 text-[10px]">중고차 시세·매각 데이터를 실시간으로 조회합니다</span>
-              </div>
-            )}
+        {/* 업계 비교 테이블 */}
+        <div className="p-5 border-t border-gray-100 bg-gray-50/50">
+          <p className="text-xs font-semibold text-gray-500 mb-3">📊 업계 평균 참고값 (대형 렌터카사 기반)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-400">
+                  <th className="text-left py-1.5 px-2 font-medium min-w-[100px] whitespace-nowrap">차종</th>
+                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">1년</th>
+                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">2년</th>
+                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">3년</th>
+                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">4년</th>
+                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">5년</th>
+                </tr>
+              </thead>
+              <tbody>
+                {INDUSTRY_BENCHMARKS.map((b, i) => (
+                  <tr key={i} className="text-gray-500 border-t border-gray-100">
+                    <td className="py-1.5 px-2">{b.type}</td>
+                    <td className="text-center py-1.5 px-2">{b.yr1}%</td>
+                    <td className="text-center py-1.5 px-2">{b.yr2}%</td>
+                    <td className="text-center py-1.5 px-2">{b.yr3}%</td>
+                    <td className="text-center py-1.5 px-2">{b.yr4}%</td>
+                    <td className="text-center py-1.5 px-2">{b.yr5}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+
+      {/* AI 검증 패널 - Collapsible */}
+      {showAIPanel && (
+        <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white border border-slate-800">
+          <h3 className="text-sm font-bold mb-1">실시간 시장 검증</h3>
+          <p className="text-[10px] text-slate-400 mb-4">Gemini AI로 현재 중고차 시세를 조회하여 잔존율 적정성을 검증합니다</p>
+
+          <div className="mb-3">
+            <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">검증할 차종</label>
+            <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
+              <option value="">선택하세요</option>
+              {rows.map((row) => (<option key={row.id} value={row.category}>{row.category}</option>))}
+            </select>
+          </div>
+
+          <button onClick={handleSearch} disabled={searching || !selectedCategory}
+            className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
+            {searching ? '시장 데이터 조회 중...' : '🔍 실시간 시장 검증'}
+          </button>
+
+          {/* 현재값 vs 업계 비교 */}
+          {comparison && (
+            <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-700">
+              <p className="text-[10px] font-semibold text-slate-300 mb-2">📊 현재값 vs 업계 평균</p>
+              <div className="space-y-1.5 text-xs">
+                {[
+                  { label: '1년차', diff: comparison.diffs.yr1 },
+                  { label: '3년차', diff: comparison.diffs.yr3 },
+                  { label: '5년차', diff: comparison.diffs.yr5 },
+                ].map(({ label, diff }) => (
+                  <div key={label} className="flex justify-between items-center">
+                    <span className="text-slate-400">{label}</span>
+                    <span className={`font-semibold ${diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                      {diff > 0 ? '+' : ''}{diff.toFixed(1)}%p
+                      {diff > 2 && ' (보수적)'}
+                      {diff < -2 && ' (공격적)'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2">
+                +는 업계보다 보수적(잔존율 높음), -는 공격적(잔존율 낮음)
+              </p>
+            </div>
+          )}
+
+          {/* 검색 결과 */}
+          {searchResults && (
+            <div className="space-y-3">
+              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
+                  <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
+                </div>
+                <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                  {searchResults.results}
+                </div>
+              </div>
+
+              {searchResults.sources.length > 0 && (
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                  <h4 className="text-[10px] font-semibold text-blue-300 mb-2">참고 출처</h4>
+                  <div className="space-y-1">
+                    {searchResults.sources.map((source, idx) => (
+                      <a key={idx} href={source} target="_blank" rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 text-[10px] break-all underline block leading-snug">
+                        {source.length > 60 ? source.substring(0, 60) + '...' : source}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!searchResults && !searching && (
+            <div className="text-center text-slate-500 text-xs py-3">
+              차종을 선택하고 검증을 시작하세요.<br/>
+              <span className="text-slate-600 text-[10px]">중고차 시세·매각 데이터를 실시간으로 조회합니다</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
