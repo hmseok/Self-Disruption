@@ -349,11 +349,12 @@ export default function RentPricingBuilder() {
           rulesData.forEach((r: any) => { ruleMap[r.key] = Number(r.value) })
           setRules(ruleMap)
 
-          // 기본값 설정
-          if (ruleMap.DEP_YEAR_1) setDepYear1Rate(ruleMap.DEP_YEAR_1)
-          if (ruleMap.DEP_YEAR_2PLUS) setDepYear2Rate(ruleMap.DEP_YEAR_2PLUS)
-          if (ruleMap.DEP_YEAR) setDepYear1Rate(ruleMap.DEP_YEAR * 100)
-          if (ruleMap.DEP_MILEAGE_10K) setDepMileageRate(ruleMap.DEP_MILEAGE_10K * 100 || 2)
+          // 기본값 설정 (DB값이 % 단위인지 소수인지 자동 판별)
+          const toPercent = (v: number) => v > 0 && v < 1 ? v * 100 : v
+          if (ruleMap.DEP_YEAR_1) setDepYear1Rate(toPercent(ruleMap.DEP_YEAR_1))
+          else if (ruleMap.DEP_YEAR) setDepYear1Rate(toPercent(ruleMap.DEP_YEAR))
+          if (ruleMap.DEP_YEAR_2PLUS) setDepYear2Rate(toPercent(ruleMap.DEP_YEAR_2PLUS))
+          if (ruleMap.DEP_MILEAGE_10K) setDepMileageRate(toPercent(ruleMap.DEP_MILEAGE_10K))
           if (ruleMap.LOAN_INTEREST_RATE) setLoanRate(ruleMap.LOAN_INTEREST_RATE)
           if (ruleMap.INVESTMENT_RETURN_RATE) setInvestmentRate(ruleMap.INVESTMENT_RETURN_RATE)
           if (ruleMap.MONTHLY_MAINTENANCE_BASE) setMonthlyMaintenance(ruleMap.MONTHLY_MAINTENANCE_BASE)
