@@ -557,8 +557,6 @@ export default function BenchmarkPage() {
                 {[
                   { href: '/quotes/pricing', label: '렌트가 산출기' },
                   { href: '/db/pricing-standards', label: '산출 기준 관리 (7대 테이블)' },
-                  { href: '/db/models', label: '차량 시세 DB' },
-                  { href: '/db/maintenance', label: '정비/부품 DB' },
                 ].map(l => (
                   <a key={l.href} href={l.href} className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">{l.label} →</a>
                 ))}

@@ -1,117 +1,59 @@
-# 기준 데이터 관리 대시보드 설계안
+# /db/codes 환경설정 페이지 리뉴얼 플랜
 
-## 개요
-렌트가 산출의 6가지 원가 항목에 대한 근거 데이터를 **하나의 통합 대시보드**에서 관리하고, **Gemini 실시간 검색**으로 최신 데이터를 검증/갱신하는 페이지.
+## 현재 문제
+- `/db/codes/page.tsx`는 "환경설정/코드"라는 이름이지만, 실제로는 레거시 **차량 모델 DB + AI 견적 스캔** 페이지
+- 해당 기능은 이미 `/quotes/pricing` (렌트가 산출 빌더)에서 더 정교하게 구현됨
+- `car_code_models`, `car_code_trims`, `car_code_options`, `lotte_rentcar_db` 레거시 테이블 사용
+- page2~5.tsx도 모두 레거시 백업 파일
 
-## 페이지 위치
-`/app/db/pricing-standards/page.tsx` (기준 데이터 관리)
+## 리뉴얼 방향
+기존 레거시 코드를 제거하고, **실제 "환경설정"** 기능을 하는 페이지로 완전 교체
 
-## 화면 구조
+## 새 /db/codes 페이지 구성 — 3개 탭
 
-### 상단: 6개 탭
-```
-[감가기준] [보험료] [정비비] [자동차세] [금융금리] [등록비용] [기본설정]
-```
+### 탭 1: 공통 코드 관리 (common_codes 테이블)
+- `common_codes` 테이블 CRUD
+- 그룹별 코드 관리 (group_code → code → name)
+- 드롭다운, 상태값, 차량유형 등 시스템 전체 열거형 데이터 관리
+- 그룹 추가/삭제, 코드 추가/편집/삭제, sort_order 조정
+- 활성/비활성 토글
 
-### 각 탭 공통 레이아웃
-```
-┌─────────────────────────────────────────────────────┐
-│ 좌측 (8col): 기준표 테이블                            │
-│  - 현재 DB에 저장된 기준 데이터 CRUD                    │
-│  - 인라인 편집 (클릭하면 바로 수정)                      │
-│  - 행 추가/삭제                                       │
-│                                                      │
-│ 우측 (4col): 실시간 검증 패널 (다크 배경)               │
-│  - Gemini 검색 버튼                                   │
-│  - 검색 결과 (최신 시장 데이터)                         │
-│  - "기준표에 반영" 버튼 → 좌측 테이블에 자동 업데이트     │
-│  - 마지막 검색 일시 표시                                │
-└─────────────────────────────────────────────────────┘
-```
+### 탭 2: 회사 설정 (companies 테이블)
+- 현재 로그인 회사의 기본 정보 편집
+- 회사명, 사업자번호, 대표자, 연락처, 주소
+- 렌터카 관련 설정: 기본 계약기간, 기본 보증금, 기본 마진율
+- 로고/브랜딩 (향후 확장)
 
-## 탭별 상세
+### 탭 3: 시스템 모듈 관리 (god_admin 전용)
+- `system_modules` 목록 조회
+- `company_modules` 활성/비활성 토글
+- 각 회사별 모듈 접근 권한 확인
+- 일반 사용자에게는 "현재 활성화된 모듈" 목록만 표시
 
-### 1. 감가기준 탭
-- **테이블**: `depreciation_db` (16개 차종 × 5년 잔존가치율)
-- **실시간 검색**: "2024년 [차종] 중고차 시세 감가율" → Gemini 검색
-- **검증**: 현재 기준표의 감가율 vs 실제 시장 시세 비교
+## 구현 파일
 
-### 2. 보험료 탭
-- **테이블**: `insurance_rate_table` (차종/가격대별 연 보험료)
-- **실시간 검색**: "영업용 자동차보험 [차종] 보험료" → 보험사별 견적 비교
-- **검증**: 기준표 보험료 vs 시장 실제 보험료
+### 삭제할 파일
+- `app/db/codes/page2.tsx` ~ `page5.tsx` (백업 파일 삭제)
 
-### 3. 정비비 탭
-- **테이블**: `maintenance_cost_table` (차종/연식대별 월 정비비)
-- **실시간 검색**: "[차종] 정비비용 평균" → 연식별 예상 정비비
-- **검증**: 현재 기준 vs 실제 정비 이력 데이터
+### 생성/수정할 파일
+1. **`app/db/codes/page.tsx`** — 새 환경설정 메인 (3탭 구조, 기존 파일 완전 교체)
+2. **`app/db/codes/CommonCodesTab.tsx`** — 공통 코드 관리 탭
+3. **`app/db/codes/CompanySettingsTab.tsx`** — 회사 설정 탭
+4. **`app/db/codes/SystemModulesTab.tsx`** — 모듈 관리 탭 (god_admin 전용)
 
-### 4. 자동차세 탭
-- **테이블**: `vehicle_tax_table` (영업용/비영업용, 배기량별)
-- **실시간 검색**: "영업용 자동차세 배기량별 세율 2025" → 최신 세율 확인
-- **검증**: 지방세법 개정 여부 체크
-- **⚠️ 치명적 이슈 수정**: 영업용 세율 18~19원/cc → 확인 필요
+## UI/UX 가이드
+- pricing-standards 페이지와 동일한 탭 UI 패턴 사용
+- 최대 너비 1400px, 가이드 배너 포함
+- 초보자도 이해할 수 있는 설명 텍스트 포함
+- 인라인 편집 + 저장 버튼 패턴 (pricing-standards와 동일)
 
-### 5. 금융금리 탭
-- **테이블**: `finance_rate_table` (대출유형/기간별 금리)
-- **실시간 검색**: "캐피탈 자동차담보대출 금리 2025" → 최신 금리
-- **검증**: 기준 금리 vs 현재 시장 금리
+## 기술 스택
+- `createClientComponentClient` from `@supabase/auth-helpers-nextjs`
+- `useApp()` 훅으로 role, company 정보 접근
+- Tailwind CSS (기존 스타일 패턴 유지)
+- 'use client' 컴포넌트
 
-### 6. 등록비용 탭
-- **테이블**: `registration_cost_table` (취득세/공채/탁송 등)
-- **실시간 검색**: "자동차 취득세율 [지역]" → 지역별 세율 확인
-- **검증**: 공채 매입률 지역별 최신 데이터
-
-### 7. 기본설정 탭
-- **테이블**: `business_rules` (28개 키-값 설정)
-- **CRUD**: 키별 값 수정 (JSON 값 지원)
-- **그룹핑**: 감가/금융/운영/할인/등록 카테고리별 그룹
-
-## 실시간 검색 구현
-
-### API Route
-`/app/api/search-pricing-data/route.ts`
-
-```typescript
-// Gemini 2.0 Flash + Google Search Grounding
-// 각 탭별 맞춤 검색 프롬프트 생성
-// 결과를 구조화된 JSON으로 파싱
-// 검색 이력 저장 (pricing_search_logs 테이블)
-```
-
-### 검색 프롬프트 예시
-- 감가: "2025년 현대 쏘나타 하이브리드 1년차 감가율과 잔존가치"
-- 보험: "영업용 승용차 보험료 차량가 3000만원 기준 연간 보험료"
-- 금리: "2025년 2월 캐피탈 자동차 담보대출 금리 비교"
-- 세금: "영업용 자동차세 배기량별 세율표 2025"
-
-## 기술 구현
-
-### 파일 목록
-1. `/app/db/pricing-standards/page.tsx` — 메인 페이지 (탭 라우팅)
-2. `/app/db/pricing-standards/DepreciationTab.tsx` — 감가기준 탭
-3. `/app/db/pricing-standards/InsuranceTab.tsx` — 보험료 탭
-4. `/app/db/pricing-standards/MaintenanceTab.tsx` — 정비비 탭
-5. `/app/db/pricing-standards/TaxTab.tsx` — 자동차세 탭
-6. `/app/db/pricing-standards/FinanceTab.tsx` — 금융금리 탭
-7. `/app/db/pricing-standards/RegistrationTab.tsx` — 등록비용 탭
-8. `/app/db/pricing-standards/BusinessRulesTab.tsx` — 기본설정 탭
-9. `/app/api/search-pricing-data/route.ts` — Gemini 검색 API
-
-### 스타일
-- RentPricingBuilder와 동일한 톤앤매너 (steel 테마)
-- 우측 패널: 다크 배경 (slate-900)
-- 테이블: 인라인 편집 가능한 입력 필드
-- 실시간 검색 결과: 카드 형태로 표시, "반영" 버튼
-
-### 사이드바 메뉴 추가
-- 기존 `/db` 하위에 "산출 기준 관리" 메뉴 항목 추가
-
-## 데이터 흐름
-```
-기준 데이터 관리 페이지 (CRUD)
-  ↓ Supabase 테이블 저장
-렌트가 산출기 (RentPricingBuilder)
-  ↑ 기준표 자동 로드 & 매핑
-  → 견적서 생성
-```
+## 영향 범위
+- `/db/codes` 경로 유지 (네비게이션 변경 불필요)
+- system_modules에 이미 등록됨 (012 SQL)
+- 레거시 테이블(car_code_*, lotte_rentcar_db)은 이 페이지에서 참조하지 않음

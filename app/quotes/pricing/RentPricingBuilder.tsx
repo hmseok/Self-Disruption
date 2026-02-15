@@ -170,6 +170,75 @@ const f = (n: number) => Math.round(n).toLocaleString()
 const parseNum = (v: string) => Number(v.replace(/,/g, '')) || 0
 
 // ============================================
+// 서브 컴포넌트 (렌더 밖에 정의 — 커서 이탈 방지)
+// ============================================
+
+// 원가 비중 바
+const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
+  const pct = total > 0 ? Math.abs(value) / total * 100 : 0
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-20 text-gray-500 text-xs">{label}</span>
+      <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+      </div>
+      <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
+      <span className="w-10 text-right text-gray-400 text-xs">{pct.toFixed(0)}%</span>
+    </div>
+  )
+}
+
+// 섹션 카드 래퍼
+const Section = ({ icon, title, children, className = '' }: {
+  icon: string; title: string; children: React.ReactNode; className?: string
+}) => (
+  <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
+    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+      <h3 className="font-bold text-gray-800 flex items-center gap-2">
+        <span>{icon}</span> {title}
+      </h3>
+    </div>
+    <div className="p-6">{children}</div>
+  </div>
+)
+
+// 입력 행
+const InputRow = ({ label, value, onChange, suffix = '원', type = 'money', sub = '' }: {
+  label: string; value: number; onChange: (v: number) => void; suffix?: string; type?: string; sub?: string
+}) => (
+  <div className="flex items-center justify-between py-2">
+    <div>
+      <span className="text-gray-600 text-sm">{label}</span>
+      {sub && <span className="block text-xs text-gray-400">{sub}</span>}
+    </div>
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        className="w-32 text-right border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:border-steel-500 focus:ring-1 focus:ring-steel-500 outline-none"
+        value={type === 'percent' ? value : f(value)}
+        onChange={(e) => {
+          const v = type === 'percent' ? parseFloat(e.target.value) || 0 : parseNum(e.target.value)
+          onChange(v)
+        }}
+      />
+      <span className="text-xs text-gray-400 w-8">{suffix}</span>
+    </div>
+  </div>
+)
+
+// 결과 행
+const ResultRow = ({ label, value, highlight = false, negative = false }: {
+  label: string; value: number; highlight?: boolean; negative?: boolean
+}) => (
+  <div className={`flex justify-between items-center py-2 ${highlight ? 'text-lg' : 'text-sm'}`}>
+    <span className={highlight ? 'font-bold text-gray-800' : 'text-gray-500'}>{label}</span>
+    <span className={`font-bold ${highlight ? 'text-xl' : ''} ${negative ? 'text-green-600' : highlight ? 'text-steel-600' : 'text-gray-800'}`}>
+      {negative ? '-' : ''}{f(Math.abs(value))}원
+    </span>
+  </div>
+)
+
+// ============================================
 // 메인 컴포넌트
 // ============================================
 export default function RentPricingBuilder() {
@@ -717,16 +786,35 @@ export default function RentPricingBuilder() {
     const carAge = thisYear - (selectedCar.year || thisYear)
     const mileage10k = (selectedCar.mileage || 0) / 10000
 
-    // 1. 시세하락 / 감가 (🆕 취득원가 기반)
-    const yearDep = carAge <= 1
+    // 1. 시세하락 / 감가 (계약기간 반영)
+    // 현재 시점 감가율
+    const yearDepNow = carAge <= 1
       ? depYear1Rate
       : depYear1Rate + (depYear2Rate * (carAge - 1))
-    const mileageDep = mileage10k * depMileageRate
-    const totalDepRate = Math.min(yearDep + mileageDep, 85) // 최대 85%
-    const currentMarketValue = Math.round(factoryPrice * (1 - totalDepRate / 100))
-    // 🆕 취득원가(차량가+등록비) 기준으로 감가비 계산 — 더 정확한 원가
+    const mileageDepNow = mileage10k * depMileageRate
+    const totalDepRateNow = Math.min(yearDepNow + mileageDepNow, 85)
+    const currentMarketValue = Math.round(factoryPrice * (1 - totalDepRateNow / 100))
+
+    // 계약 종료 시점 감가율 (계약기간 + 예상주행 반영)
+    const termYears = termMonths / 12
+    const endAge = carAge + termYears
+    const yearDepEnd = endAge <= 1
+      ? depYear1Rate
+      : depYear1Rate + (depYear2Rate * (endAge - 1))
+    // 연간 1.5만km 주행 가정 → 계약기간 중 추가 주행
+    const projectedMileage10k = mileage10k + (termYears * 1.5)
+    const mileageDepEnd = projectedMileage10k * depMileageRate
+    const totalDepRateEnd = Math.min(yearDepEnd + mileageDepEnd, 85)
+    const endMarketValue = Math.round(factoryPrice * (1 - totalDepRateEnd / 100))
+
+    // 계약기간 동안의 실제 감가 = 현재시세 - 종료시세
+    const yearDep = yearDepNow   // UI 표시용 (현재)
+    const mileageDep = mileageDepNow // UI 표시용 (현재)
+    const totalDepRate = totalDepRateNow // UI 표시용 (현재)
+
+    // 취득원가 기준 월 감가비
     const costBase = totalAcquisitionCost > 0 ? totalAcquisitionCost : purchasePrice
-    const residualValue = Math.round(factoryPrice * (1 - totalDepRate / 100) * 0.8)
+    const residualValue = Math.round(endMarketValue * 0.8) // 종료시점 시세 × 80%
     const monthlyDepreciation = Math.round(Math.max(0, costBase - residualValue) / termMonths)
 
     // 2. 금융비용
@@ -782,10 +870,14 @@ export default function RentPricingBuilder() {
     }
 
     return {
-      carAge, mileage10k,
-      // 감가
+      carAge, mileage10k, termYears,
+      // 감가 — 현재
       yearDep, mileageDep, totalDepRate,
-      currentMarketValue, monthlyDepreciation,
+      currentMarketValue,
+      // 감가 — 계약 종료 시점
+      yearDepEnd, mileageDepEnd, totalDepRateEnd,
+      endMarketValue, projectedMileage10k,
+      monthlyDepreciation,
       // 금융
       equityAmount, monthlyLoanInterest, monthlyOpportunityCost, totalMonthlyFinance,
       // 운영
@@ -910,71 +1002,6 @@ export default function RentPricingBuilder() {
       </div>
     )
   }
-
-  // 원가 비중 바
-  const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
-    const pct = total > 0 ? Math.abs(value) / total * 100 : 0
-    return (
-      <div className="flex items-center gap-3 text-sm">
-        <span className="w-20 text-gray-500 text-xs">{label}</span>
-        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-          <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-        </div>
-        <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
-        <span className="w-10 text-right text-gray-400 text-xs">{pct.toFixed(0)}%</span>
-      </div>
-    )
-  }
-
-  // 섹션 카드 래퍼
-  const Section = ({ icon, title, children, className = '' }: {
-    icon: string; title: string; children: React.ReactNode; className?: string
-  }) => (
-    <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
-      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2">
-          <span>{icon}</span> {title}
-        </h3>
-      </div>
-      <div className="p-6">{children}</div>
-    </div>
-  )
-
-  // 입력 행
-  const InputRow = ({ label, value, onChange, suffix = '원', type = 'money', sub = '' }: {
-    label: string; value: number; onChange: (v: number) => void; suffix?: string; type?: string; sub?: string
-  }) => (
-    <div className="flex items-center justify-between py-2">
-      <div>
-        <span className="text-gray-600 text-sm">{label}</span>
-        {sub && <span className="block text-xs text-gray-400">{sub}</span>}
-      </div>
-      <div className="flex items-center gap-1">
-        <input
-          type="text"
-          className="w-32 text-right border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:border-steel-500 focus:ring-1 focus:ring-steel-500 outline-none"
-          value={type === 'percent' ? value : f(value)}
-          onChange={(e) => {
-            const v = type === 'percent' ? parseFloat(e.target.value) || 0 : parseNum(e.target.value)
-            onChange(v)
-          }}
-        />
-        <span className="text-xs text-gray-400 w-8">{suffix}</span>
-      </div>
-    </div>
-  )
-
-  // 결과 행
-  const ResultRow = ({ label, value, highlight = false, negative = false }: {
-    label: string; value: number; highlight?: boolean; negative?: boolean
-  }) => (
-    <div className={`flex justify-between items-center py-2 ${highlight ? 'text-lg' : 'text-sm'}`}>
-      <span className={highlight ? 'font-bold text-gray-800' : 'text-gray-500'}>{label}</span>
-      <span className={`font-bold ${highlight ? 'text-xl' : ''} ${negative ? 'text-green-600' : highlight ? 'text-steel-600' : 'text-gray-800'}`}>
-        {negative ? '-' : ''}{f(Math.abs(value))}원
-      </span>
-    </div>
-  )
 
   return (
     <div className="max-w-[1400px] mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
@@ -1589,41 +1616,76 @@ export default function RentPricingBuilder() {
             </Section>
 
             {/* 2. 시세하락 분석 */}
-            <Section icon="📉" title="시세하락 / 감가 분석">
+            <Section icon="📉" title={`시세하락 / 감가 분석 (${termMonths}개월 계약)`}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <InputRow label="1년차 감가율" value={depYear1Rate} onChange={setDepYear1Rate} suffix="%" type="percent" />
                   <InputRow label="2년차~ 연간 감가율" value={depYear2Rate} onChange={setDepYear2Rate} suffix="%" type="percent" />
                   <InputRow label="주행거리 감가율" value={depMileageRate} onChange={setDepMileageRate} suffix="%/만km" type="percent" />
-                  <div className="border-t mt-3 pt-3">
+                  <div className="border-t mt-3 pt-3 space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">차령</span>
+                      <span className="text-gray-500">현재 차령</span>
                       <span className="font-bold">{calculations.carAge}년</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">주행거리</span>
+                      <span className="text-gray-500">현재 주행거리</span>
                       <span className="font-bold">{calculations.mileage10k.toFixed(1)}만km</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-blue-600">
+                      <span>종료 시 차령</span>
+                      <span className="font-bold">{(calculations.carAge + calculations.termYears).toFixed(1)}년</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-blue-600">
+                      <span>종료 시 주행 (추정)</span>
+                      <span className="font-bold">{calculations.projectedMileage10k.toFixed(1)}만km</span>
                     </div>
                   </div>
                 </div>
                 <div>
+                  {/* 현재 시점 */}
                   <div className="bg-gray-50 rounded-xl p-4 mb-3">
-                    <div className="flex justify-between mb-2">
+                    <p className="text-xs font-bold text-gray-400 mb-2">현재 시점</p>
+                    <div className="flex justify-between mb-1">
                       <span className="text-sm text-gray-500">연식 감가</span>
                       <span className="font-bold text-red-500">{calculations.yearDep.toFixed(1)}%</span>
                     </div>
-                    <div className="flex justify-between mb-2">
+                    <div className="flex justify-between mb-1">
                       <span className="text-sm text-gray-500">주행 감가</span>
                       <span className="font-bold text-red-500">{calculations.mileageDep.toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t">
                       <span className="text-sm font-bold text-gray-700">총 감가율</span>
-                      <span className="font-black text-red-600 text-lg">{calculations.totalDepRate.toFixed(1)}%</span>
+                      <span className="font-black text-red-600">{calculations.totalDepRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="text-right text-sm text-gray-600 mt-1">
+                      추정 시세: <b>{f(calculations.currentMarketValue)}원</b>
                     </div>
                   </div>
+                  {/* 계약 종료 시점 */}
+                  <div className="bg-blue-50 rounded-xl p-4 mb-3">
+                    <p className="text-xs font-bold text-blue-400 mb-2">{termMonths}개월 후 (종료 시점)</p>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-blue-500">연식 감가</span>
+                      <span className="font-bold text-blue-600">{calculations.yearDepEnd.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-blue-500">주행 감가</span>
+                      <span className="font-bold text-blue-600">{calculations.mileageDepEnd.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-blue-200">
+                      <span className="text-sm font-bold text-blue-700">총 감가율</span>
+                      <span className="font-black text-blue-700">{calculations.totalDepRateEnd.toFixed(1)}%</span>
+                    </div>
+                    <div className="text-right text-sm text-blue-600 mt-1">
+                      추정 시세: <b>{f(calculations.endMarketValue)}원</b>
+                    </div>
+                  </div>
+                  {/* 월 감가비용 */}
                   <div className="bg-red-50 rounded-xl p-4 text-center">
-                    <span className="text-xs text-red-400 block">현재 추정 시세</span>
-                    <span className="text-2xl font-black text-red-600">{f(calculations.currentMarketValue)}원</span>
+                    <span className="text-xs text-red-400 block">계약기간 중 시세 하락</span>
+                    <span className="text-lg font-black text-red-600">
+                      {f(calculations.currentMarketValue - calculations.endMarketValue)}원
+                    </span>
                     <span className="text-xs text-gray-500 block mt-1">
                       월 감가비용: <b className="text-red-500">{f(calculations.monthlyDepreciation)}원</b>
                     </span>

@@ -24,10 +24,6 @@ const ALL_PAGES = [
   { path: '/finance', name: '자금 장부', group: '경영 지원' },
   { path: '/finance/upload', name: '거래 업로드', group: '경영 지원' },
   { path: '/db/pricing-standards', name: '산출 기준 관리', group: '데이터 관리' },
-  { path: '/db/models', name: '차량 시세 DB', group: '데이터 관리' },
-  { path: '/db/maintenance', name: '정비/부품 DB', group: '데이터 관리' },
-  { path: '/db/codes', name: '환경설정/코드', group: '데이터 관리' },
-  { path: '/db/depreciation', name: '감가 DB', group: '데이터 관리' },
   { path: '/db/lotte', name: '시세 참조', group: '데이터 관리' },
 ]
 

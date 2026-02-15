@@ -37,7 +37,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/customers': 'sales',
   '/finance': 'finance', '/finance/settlement': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
-  '/db/pricing-standards': 'data', '/db/models': 'data', '/db/maintenance': 'data', '/db/lotte': 'data',
+  '/db/pricing-standards': 'data', '/db/lotte': 'data',
 }
 
 // 메뉴명 오버라이드
