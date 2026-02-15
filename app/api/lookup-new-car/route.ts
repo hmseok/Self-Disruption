@@ -51,26 +51,27 @@ async function lookupNewCar(brand: string, model: string) {
   const site = getOfficialSite(brand)
 
   const prompt = `
-너는 대한민국 자동차 제조사 공식 홈페이지 전용 가격표 수집기야.
+너는 대한민국 신차 가격 정보 수집 전문가야.
 반드시 JSON 코드 블록만 출력해야 하고, 설명이나 사족은 절대 쓰지 마.
 
-★★★ 핵심 규칙: 반드시 공식 홈페이지(${site.domain})에서만 데이터를 가져와라 ★★★
-제3자 사이트, 뉴스, 블로그, 커뮤니티 데이터는 절대 사용하지 마라.
-공식 사이트에서 데이터를 찾을 수 없으면 available: false로 반환해라.
+★★★ 핵심 규칙: 최대한 다양한 소스를 검색해서 가장 정확하고 최신 데이터를 가져와라 ★★★
 
 [작업 순서 — 반드시 따라라]
-1단계: "${brand} ${model}" 가격표 페이지를 찾아라.
-  - 검색어: "${brand} ${model} 가격표 site:${site.domain}"
-  - 공식 사이트: ${site.url}
-2단계: 찾은 가격표 페이지 URL을 직접 방문해서 읽어라.
-  - 반드시 ${site.domain} 도메인의 URL만 열어라.
-  - 공식 홈페이지의 가격표 페이지를 url_context로 직접 열어서 내용을 확인해라.
-  - 페이지 안의 모든 트림명, 가격, 옵션명, 옵션 가격을 빠짐없이 추출해라.
+1단계: "${brand} ${model}" 가격 정보를 최대한 폭넓게 검색해라.
+  - 검색어: "${brand} ${model} 2025 가격표 트림 옵션"
+  - 공식 사이트 우선: ${site.url}
+  - 공식 사이트에서 못 찾으면 자동차 전문 사이트, 리뷰 사이트, 자동차 커뮤니티 등도 활용
+2단계: 여러 소스의 데이터를 교차 검증해서 가장 정확한 현재 판매 가격을 정리해라.
+  - 공식 홈페이지 데이터가 있으면 그것을 기준으로 사용
+  - 없으면 가장 신뢰할 만한 소스(전문 리뷰, 자동차 매체 등)의 데이터를 활용
+  - 중고차 가격, 할인 프로모션 가격은 제외 — 신차 출고가(정가)만 수집
 3단계: 추출한 데이터를 아래 JSON 형식으로 정리해라.
 
-[데이터 출처 — 절대 규칙]
-✅ 허용: ${site.domain} 공식 가격표 페이지만
-❌ 금지: 제3자 사이트, 뉴스, 블로그, 중고차, 할인 프로모션, 추측 가격
+[데이터 우선순위]
+1순위: 공식 홈페이지 (${site.domain}) 가격표
+2순위: 자동차 전문 매체/리뷰 사이트 (예: 오토뷰, 카이즈유, 다나와 등)
+3순위: 신뢰할 수 있는 커뮤니티/블로그 (최신 가격표 정리글)
+❌ 제외: 중고차 가격, 할인/프로모션, 추측 가격
 
 [데이터 구조]
 하나의 모델은 여러 "차종 그룹(variant)"을 가질 수 있다.
@@ -87,7 +88,7 @@ async function lookupNewCar(brand: string, model: string) {
 - brand: 브랜드 한글명
 - model: 모델명
 - year: 현재 판매 연식
-- source: 실제 참조한 가격표 페이지 URL
+- source: 실제 참조한 주요 소스 URL (공식 홈페이지 또는 참고 사이트)
 - variants[]: 차종 그룹 배열
   - variant_name: 그룹명 (예: "1.0 가솔린")
   - fuel_type: 휘발유/경유/LPG/전기/하이브리드
@@ -191,7 +192,7 @@ async function lookupNewCar(brand: string, model: string) {
 `
 
   // 🔥 google_search + url_context 두 도구 동시 사용
-  //    google_search: 공식 가격표 페이지 URL 검색
+  //    google_search: 다양한 소스에서 가격 정보 검색
   //    url_context:   찾은 URL을 직접 방문해서 페이지 내용 읽기
   console.log(`🔍 [신차조회] ${brand} ${model} — google_search + url_context 모드`)
 
@@ -304,36 +305,65 @@ function parseGeminiResponse(data: any) {
   let jsonStr = jsonMatch[1].trim()
   jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
 
-  try {
-    return JSON.parse(jsonStr)
-  } catch (parseErr: any) {
-    console.warn(`⚠️ [신차조회] JSON 파싱 실패, 복구 시도: ${parseErr.message}`)
-    // 잘린 JSON 복구
-    let fixed = jsonStr
-    const lastComplete = Math.max(
-      fixed.lastIndexOf('}],'),
-      fixed.lastIndexOf('}]')
-    )
-    if (lastComplete > 0) {
-      fixed = fixed.substring(0, lastComplete + 2)
-    }
-    const opens = (fixed.match(/\[/g) || []).length
-    const closes = (fixed.match(/\]/g) || []).length
-    const openBraces = (fixed.match(/\{/g) || []).length
-    const closeBraces = (fixed.match(/\}/g) || []).length
-    for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}'
-    for (let i = 0; i < opens - closes; i++) fixed += ']'
-    if (!fixed.trimEnd().endsWith('}')) fixed += '}'
-    fixed = fixed.replace(/,\s*([}\]])/g, '$1')
-    try {
-      const recovered = JSON.parse(fixed)
-      console.log(`✅ [신차조회] JSON 복구 성공`)
-      return recovered
-    } catch (retryErr: any) {
-      console.error(`❌ JSON 복구도 실패: ${retryErr.message}\n원본(앞500): ${jsonStr.substring(0, 500)}\n원본(뒤500): ${jsonStr.substring(jsonStr.length - 500)}`)
-      throw new Error(`AI 응답 JSON 파싱 실패. 다시 시도해주세요.`)
+  const result = recoverTruncatedJson(jsonStr, '신차조회')
+  if (!result) {
+    throw new Error(`AI 응답 JSON 파싱 실패. 다시 시도해주세요.`)
+  }
+  return result
+}
+
+// 잘린 JSON 복구 함수
+function recoverTruncatedJson(str: string, tag: string): any {
+  try { return JSON.parse(str) } catch (_) {}
+
+  console.warn(`⚠️ [${tag}] JSON 파싱 실패, 복구 시도`)
+  let fixed = str
+
+  // 잘린 문자열 값 처리 — 마지막 불완전 필드 제거
+  const patterns = [
+    /,\s*"[^"]*":\s*"[^"]*$/, // 잘린 문자열 값
+    /,\s*"[^"]*":\s*\d+[^,}\]]*$/, // 잘린 숫자
+    /,\s*"[^"]*":\s*$/, // 잘린 키:값
+    /,\s*"[^"]*$/, // 잘린 키
+    /,\s*\{[^}]*$/, // 잘린 객체
+  ]
+  for (const pat of patterns) {
+    const m = fixed.match(pat)
+    if (m && m.index !== undefined) {
+      fixed = fixed.substring(0, m.index)
+      break
     }
   }
+
+  // 여러 cut point 시도
+  const cutPoints = [
+    fixed.lastIndexOf('}],"'),
+    fixed.lastIndexOf('}],'),
+    fixed.lastIndexOf('}]'),
+    fixed.lastIndexOf('},'),
+    fixed.lastIndexOf('}'),
+  ]
+
+  for (const cp of cutPoints) {
+    if (cp <= 0) continue
+    let attempt = fixed.substring(0, cp + (fixed[cp] === '}' && fixed[cp + 1] === ']' ? 2 : 1))
+    attempt = attempt.replace(/,\s*$/, '')
+    attempt = attempt.replace(/,\s*([}\]])/g, '$1')
+    const opens = (attempt.match(/\[/g) || []).length - (attempt.match(/\]/g) || []).length
+    const openBraces = (attempt.match(/\{/g) || []).length - (attempt.match(/\}/g) || []).length
+    for (let i = 0; i < openBraces; i++) attempt += '}'
+    for (let i = 0; i < opens; i++) attempt += ']'
+    if (!attempt.trimEnd().endsWith('}')) attempt += '}'
+    attempt = attempt.replace(/,\s*([}\]])/g, '$1')
+    try {
+      const parsed = JSON.parse(attempt)
+      console.log(`✅ [${tag}] JSON 복구 성공 (cutPoint: ${cp})`)
+      return parsed
+    } catch (_) { continue }
+  }
+
+  console.error(`❌ [${tag}] JSON 복구 실패\n원본(앞500): ${str.substring(0, 500)}\n원본(뒤500): ${str.substring(str.length - 500)}`)
+  return null
 }
 
 export async function POST(request: NextRequest) {
