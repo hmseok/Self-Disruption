@@ -1,85 +1,170 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-interface DepreciationRow {
+// ─── Types ────────────────────────────────────────────────
+interface DepreciationRate {
   id: number
-  category: string
+  origin: string
+  vehicle_class: string
+  fuel_type: string
   rate_1yr: number
   rate_2yr: number
   rate_3yr: number
   rate_4yr: number
   rate_5yr: number
+  description: string
+  is_active: boolean
+  updated_at: string
 }
 
-interface SearchResult {
-  results: string
-  sources: string[]
-  searched_at: string
+interface Adjustment {
+  id: number
+  adjustment_type: string
+  target_origin: string | null
+  target_vehicle_class: string | null
+  target_fuel_type: string | null
+  factor: number
+  label: string
+  description: string
+  effective_from: string
+  effective_to: string | null
+  is_active: boolean
+}
+
+interface HistoryEntry {
+  id: number
+  source_table: string
+  source_id: number
+  changed_field: string
+  old_value: string | null
+  new_value: string | null
+  changed_at: string
+  reason: string | null
+}
+
+// ─── Constants ────────────────────────────────────────────
+const ORIGINS = ['국산', '수입'] as const
+const VEHICLE_CLASSES = [
+  '경차', '소형_세단', '준중형_세단', '중형_세단', '대형_세단',
+  '소형_SUV', '중형_SUV', '대형_SUV', 'MPV', '프리미엄',
+] as const
+const FUEL_TYPES = ['내연기관', '하이브리드', '전기'] as const
+
+const CLASS_LABELS: Record<string, string> = {
+  '경차': '경차', '소형_세단': '소형 세단', '준중형_세단': '준중형 세단',
+  '중형_세단': '중형 세단', '대형_세단': '대형 세단', '소형_SUV': '소형 SUV',
+  '중형_SUV': '중형 SUV', '대형_SUV': '대형 SUV', 'MPV': 'MPV/미니밴', '프리미엄': '프리미엄',
+}
+
+const FUEL_LABELS: Record<string, string> = {
+  '내연기관': '내연기관', '하이브리드': 'HEV', '전기': 'EV',
+}
+
+const FUEL_COLORS: Record<string, string> = {
+  '내연기관': 'bg-gray-100 text-gray-700',
+  '하이브리드': 'bg-emerald-50 text-emerald-700',
+  '전기': 'bg-blue-50 text-blue-700',
+}
+
+const ORIGIN_COLORS: Record<string, string> = {
+  '국산': 'bg-steel-50 text-steel-700',
+  '수입': 'bg-amber-50 text-amber-700',
 }
 
 // 업계 비교 기준 데이터 (대형 렌터카사 참고)
 const INDUSTRY_BENCHMARKS = [
-  { company: '업계 평균', type: '국산 중형', yr1: 82, yr2: 68, yr3: 57, yr4: 48, yr5: 40 },
-  { company: '업계 평균', type: '수입 중형', yr1: 75, yr2: 60, yr3: 48, yr4: 38, yr5: 30 },
-  { company: '업계 평균', type: '국산 SUV', yr1: 85, yr2: 73, yr3: 63, yr4: 54, yr5: 46 },
+  { origin: '국산', cls: '중형_세단', fuel: '내연기관', yr1: 78, yr3: 56, yr5: 36 },
+  { origin: '수입', cls: '중형_세단', fuel: '내연기관', yr1: 72, yr3: 48, yr5: 33 },
+  { origin: '국산', cls: '중형_SUV', fuel: '내연기관', yr1: 80, yr3: 60, yr5: 41 },
+  { origin: '국산', cls: '중형_세단', fuel: '전기', yr1: 75, yr3: 50, yr5: 32 },
 ]
 
+// ─── Component ────────────────────────────────────────────
 export default function DepreciationTab() {
   const supabase = createClientComponentClient()
 
-  const [rows, setRows] = useState<DepreciationRow[]>([])
+  // 데이터
+  const [rates, setRates] = useState<DepreciationRate[]>([])
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([])
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 필터
+  const [filterOrigin, setFilterOrigin] = useState<string>('전체')
+  const [filterFuel, setFilterFuel] = useState<string>('전체')
+
+  // UI 상태
   const [editingCell, setEditingCell] = useState<{ rowId: number; field: string } | null>(null)
   const [editValue, setEditValue] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult | null>(null)
-  const [searching, setSearching] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
+  const [showAdjustments, setShowAdjustments] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<{ results: string; sources: string[]; searched_at: string } | null>(null)
 
-  const fetchData = async () => {
+  // ─── 데이터 로드 ──────────────────────────────────────
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('depreciation_db')
-        .select('*')
-        .order('id', { ascending: true })
-
-      if (error) throw error
-      setRows(data || [])
-      if (data && data.length > 0 && !selectedCategory) {
-        setSelectedCategory(data[0].category)
-      }
+      const [ratesRes, adjRes, histRes] = await Promise.all([
+        supabase.from('depreciation_rates').select('*').order('origin').order('vehicle_class').order('fuel_type'),
+        supabase.from('depreciation_adjustments').select('*').order('adjustment_type').order('factor', { ascending: false }),
+        supabase.from('depreciation_history').select('*').order('changed_at', { ascending: false }).limit(30),
+      ])
+      if (ratesRes.error) throw ratesRes.error
+      setRates(ratesRes.data || [])
+      setAdjustments(adjRes.data || [])
+      setHistory(histRes.data || [])
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [fetchData])
 
+  // ─── 필터 로직 ────────────────────────────────────────
+  const filteredRates = rates.filter(r => {
+    if (filterOrigin !== '전체' && r.origin !== filterOrigin) return false
+    if (filterFuel !== '전체' && r.fuel_type !== filterFuel) return false
+    return true
+  })
+
+  // ─── 셀 편집 ─────────────────────────────────────────
   const handleCellClick = (rowId: number, field: string, value: any) => {
     setEditingCell({ rowId, field })
-    setEditValue(String(value || ''))
+    setEditValue(String(value ?? ''))
   }
 
   const handleCellBlur = async () => {
     if (!editingCell) return
     const { rowId, field } = editingCell
-    const row = rows.find(r => r.id === rowId)
-    if (!row) return
+    const row = rates.find(r => r.id === rowId)
+    if (!row) { setEditingCell(null); return }
 
-    const newValue = field.startsWith('rate_') ? parseFloat(editValue) || 0 : editValue
-    const oldValue = row[field as keyof DepreciationRow]
-    if (oldValue === newValue) { setEditingCell(null); return }
+    const isRate = field.startsWith('rate_')
+    const newValue = isRate ? parseFloat(editValue) || 0 : editValue
+    const oldValue = row[field as keyof DepreciationRate]
+    if (String(oldValue) === String(newValue)) { setEditingCell(null); return }
 
     try {
-      const { error } = await supabase.from('depreciation_db').update({ [field]: newValue }).eq('id', rowId)
+      const { error } = await supabase.from('depreciation_rates').update({ [field]: newValue }).eq('id', rowId)
       if (error) throw error
-      setRows(rows.map(r => r.id === rowId ? { ...r, [field]: newValue } : r))
+      setRates(rates.map(r => r.id === rowId ? { ...r, [field]: newValue } : r))
+
+      // 이력 기록
+      await supabase.from('depreciation_history').insert({
+        source_table: 'depreciation_rates',
+        source_id: rowId,
+        changed_field: field,
+        old_value: String(oldValue),
+        new_value: String(newValue),
+      })
     } catch (error) {
       console.error('업데이트 실패:', error)
     } finally {
@@ -87,12 +172,16 @@ export default function DepreciationTab() {
     }
   }
 
+  // ─── 행 추가/삭제 ────────────────────────────────────
   const handleAddRow = async () => {
     try {
-      const newRow = { category: '새 카테고리', rate_1yr: 0, rate_2yr: 0, rate_3yr: 0, rate_4yr: 0, rate_5yr: 0 }
-      const { data, error } = await supabase.from('depreciation_db').insert([newRow]).select()
+      const { data, error } = await supabase.from('depreciation_rates').insert([{
+        origin: '국산', vehicle_class: '중형_세단', fuel_type: '내연기관',
+        rate_1yr: 0, rate_2yr: 0, rate_3yr: 0, rate_4yr: 0, rate_5yr: 0,
+        description: '', is_active: true,
+      }]).select()
       if (error) throw error
-      if (data && data[0]) setRows([...rows, data[0]])
+      if (data?.[0]) setRates([...rates, data[0]])
     } catch (error) {
       console.error('행 추가 실패:', error)
     }
@@ -101,20 +190,55 @@ export default function DepreciationTab() {
   const handleDeleteRow = async (rowId: number) => {
     if (!confirm('정말 삭제하시겠습니까?')) return
     try {
-      const { error } = await supabase.from('depreciation_db').delete().eq('id', rowId)
+      const { error } = await supabase.from('depreciation_rates').delete().eq('id', rowId)
       if (error) throw error
-      setRows(rows.filter(r => r.id !== rowId))
+      setRates(rates.filter(r => r.id !== rowId))
     } catch (error) {
       console.error('삭제 실패:', error)
     }
   }
 
-  const getRateColor = (rate: number) => {
-    if (rate >= 70) return 'text-emerald-600 bg-emerald-50'
-    if (rate >= 50) return 'text-amber-600 bg-amber-50'
-    return 'text-red-600 bg-red-50'
+  // ─── 보정 계수 토글 ──────────────────────────────────
+  const handleToggleAdjustment = async (adj: Adjustment) => {
+    try {
+      const { error } = await supabase.from('depreciation_adjustments')
+        .update({ is_active: !adj.is_active }).eq('id', adj.id)
+      if (error) throw error
+      setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, is_active: !a.is_active } : a))
+
+      await supabase.from('depreciation_history').insert({
+        source_table: 'depreciation_adjustments',
+        source_id: adj.id,
+        changed_field: 'is_active',
+        old_value: String(adj.is_active),
+        new_value: String(!adj.is_active),
+      })
+    } catch (error) {
+      console.error('보정 계수 변경 실패:', error)
+    }
   }
 
+  const handleUpdateAdjustmentFactor = async (adj: Adjustment, newFactor: number) => {
+    if (adj.factor === newFactor) return
+    try {
+      const { error } = await supabase.from('depreciation_adjustments')
+        .update({ factor: newFactor }).eq('id', adj.id)
+      if (error) throw error
+      setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, factor: newFactor } : a))
+
+      await supabase.from('depreciation_history').insert({
+        source_table: 'depreciation_adjustments',
+        source_id: adj.id,
+        changed_field: 'factor',
+        old_value: String(adj.factor),
+        new_value: String(newFactor),
+      })
+    } catch (error) {
+      console.error('계수 업데이트 실패:', error)
+    }
+  }
+
+  // ─── AI 검색 ─────────────────────────────────────────
   const handleSearch = async () => {
     if (!selectedCategory) return
     try {
@@ -125,8 +249,7 @@ export default function DepreciationTab() {
         body: JSON.stringify({ category: 'depreciation', context: { vehicle_type: selectedCategory } }),
       })
       if (!response.ok) throw new Error('검색 실패')
-      const data: SearchResult = await response.json()
-      setSearchResults(data)
+      setSearchResults(await response.json())
     } catch (error) {
       console.error('검색 실패:', error)
     } finally {
@@ -134,30 +257,38 @@ export default function DepreciationTab() {
     }
   }
 
-  // 현재값과 업계 비교
-  const getComparison = () => {
-    const currentRow = rows.find(r => r.category === selectedCategory)
-    if (!currentRow) return null
-    const benchmark = INDUSTRY_BENCHMARKS.find(b => 
-      selectedCategory.includes(b.type.replace('업계 평균 ', ''))
-    ) || INDUSTRY_BENCHMARKS[0]
-    
-    return {
-      current: currentRow,
-      benchmark,
-      diffs: {
-        yr1: currentRow.rate_1yr - benchmark.yr1,
-        yr3: currentRow.rate_3yr - benchmark.yr3,
-        yr5: currentRow.rate_5yr - benchmark.yr5,
-      }
-    }
+  // ─── 유틸 ────────────────────────────────────────────
+  const getRateColor = (rate: number) => {
+    if (rate >= 70) return 'text-emerald-600 bg-emerald-50'
+    if (rate >= 50) return 'text-amber-600 bg-amber-50'
+    if (rate > 0) return 'text-red-600 bg-red-50'
+    return 'text-gray-400 bg-gray-50'
   }
+
+  const getActiveAdjustments = (type: string) => adjustments.filter(a => a.adjustment_type === type && a.is_active)
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+  // ─── 보정 적용 미리보기 ───────────────────────────────
+  const getAdjustedRate = (row: DepreciationRate, field: string) => {
+    const baseRate = row[field as keyof DepreciationRate] as number
+    if (!baseRate) return baseRate
+
+    let factor = 1.0
+    for (const adj of adjustments.filter(a => a.is_active)) {
+      // 범위 체크
+      if (adj.target_origin && adj.target_origin !== row.origin) continue
+      if (adj.target_vehicle_class && adj.target_vehicle_class !== row.vehicle_class) continue
+      if (adj.target_fuel_type && adj.target_fuel_type !== row.fuel_type) continue
+      factor *= adj.factor
+    }
+    return Math.round(baseRate * factor * 10) / 10
+  }
+
+  const hasActiveAdjustments = adjustments.some(a => a.is_active && a.factor !== 1.0)
 
   if (loading) {
     return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
   }
-
-  const comparison = getComparison()
 
   return (
     <div className="space-y-4">
@@ -167,94 +298,186 @@ export default function DepreciationTab() {
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">📉</span>
-              <h3 className="text-sm font-bold text-gray-800">감가상각 기준이란?</h3>
+              <h3 className="text-sm font-bold text-gray-800">감가상각 기준 (3축 분류)</h3>
             </div>
             <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 leading-relaxed">
             <div>
-              <p className="font-semibold text-gray-700 mb-1">개념</p>
-              <p>차량의 잔존가치율(%)을 연차별로 관리합니다. 신차 가격 대비 1~5년 후 남은 가치 비율입니다. 예를 들어 3년 잔존율 57%면, 3천만원 차량이 3년 후 1,710만원의 가치입니다.</p>
+              <p className="font-semibold text-gray-700 mb-1">3축 분류 체계</p>
+              <p><strong>원산지</strong>(국산/수입) × <strong>차급</strong>(경차~프리미엄) × <strong>연료</strong>(내연기관/HEV/EV)로 분류합니다. 조합별로 잔존율이 다르며, 없는 조합은 상위 그룹 값을 참조합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">산출 영향</p>
-              <p>렌트료 = (신차가 - 잔존가) ÷ 계약월수 + 기타비용. 잔존율이 높을수록 감가 비용이 줄어 렌트료가 낮아집니다. 이 값이 렌트료의 40~60%를 차지하는 핵심 요소입니다.</p>
+              <p className="font-semibold text-gray-700 mb-1">보정 계수</p>
+              <p>기본 감가율에 3가지 보정을 곱합니다: <strong>주행거리 약정</strong>(연 2만km 기준), <strong>시장 상황</strong>(특이 이벤트 시), <strong>인기도</strong>(A/B/C 등급). 보정 계수 패널에서 관리합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">대형사 기준 참고</p>
-              <p>롯데렌탈·SK렌터카 등은 자체 중고차 매각 데이터 + 시장 시세를 반영합니다. 국산차는 잔존율이 높고, 수입차·전기차는 변동폭이 큽니다. 실시간 검증으로 시장가를 확인하세요.</p>
+              <p className="font-semibold text-gray-700 mb-1">산출 공식</p>
+              <p>최종 잔존율 = 기본 잔존율 × 주행거리 보정 × 시장 보정 × 인기도 보정. 이 값으로 렌트료의 감가 비용(40~60% 비중)을 산출합니다.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* 감가 기준표 - Full Width */}
+      {/* 메인 테이블 영역 */}
       <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
+        {/* 헤더 */}
         <div className="p-5 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-900">감가 기준표</h3>
             <div className="flex gap-2">
               {!showGuide && (
-                <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100 transition-colors">
                   가이드 💡
                 </button>
               )}
-              <button onClick={() => setShowAIPanel(!showAIPanel)} 
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
-                {showAIPanel ? '🔍 AI 검증 닫기' : '🔍 AI 검증'}
+              <button onClick={() => setShowAdjustments(!showAdjustments)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAdjustments ? 'bg-amber-500 text-white' : 'text-amber-600 bg-amber-50 hover:bg-amber-100'}`}>
+                {showAdjustments ? '⚙️ 보정 계수 닫기' : '⚙️ 보정 계수'}
+                {hasActiveAdjustments && !showAdjustments && <span className="ml-1 w-1.5 h-1.5 bg-amber-500 rounded-full inline-block" />}
               </button>
-              <button onClick={handleAddRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+              <button onClick={() => setShowHistory(!showHistory)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showHistory ? 'bg-slate-700 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
+                {showHistory ? '📋 이력 닫기' : '📋 이력'}
+              </button>
+              <button onClick={() => setShowAIPanel(!showAIPanel)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
+                {showAIPanel ? '🔍 AI 닫기' : '🔍 AI 검증'}
+              </button>
+              <button onClick={handleAddRow} className="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition-colors">
                 + 행 추가
               </button>
             </div>
           </div>
-          <p className="text-xs text-gray-400">셀을 클릭하여 편집 → 다른 곳 클릭 시 자동 저장 · 잔존율은 신차가 대비 잔존가치(%)</p>
+
+          {/* 필터 */}
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-gray-400 font-semibold">필터</span>
+            <div className="flex gap-1">
+              {['전체', ...ORIGINS].map(o => (
+                <button key={o} onClick={() => setFilterOrigin(o)}
+                  className={`px-2.5 py-1 text-[11px] rounded-md transition ${filterOrigin === o ? 'bg-gray-900 text-white font-semibold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {o}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex gap-1">
+              {['전체', ...FUEL_TYPES].map(f => (
+                <button key={f} onClick={() => setFilterFuel(f)}
+                  className={`px-2.5 py-1 text-[11px] rounded-md transition ${filterFuel === f ? 'bg-gray-900 text-white font-semibold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {f === '전체' ? f : FUEL_LABELS[f] || f}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] text-gray-400 ml-auto">{filteredRates.length}건</span>
+          </div>
         </div>
 
+        {/* 테이블 */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="text-xs">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap min-w-[140px]">차종</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">1년차</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">2년차</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">3년차</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">4년차</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[80px]">5년차</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[50px]">삭제</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">원산지</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">차급</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">연료</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">1년차</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">2년차</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">3년차</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">4년차</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">5년차</th>
+                {hasActiveAdjustments && <th className="px-3 py-2 text-center font-semibold text-amber-600 whitespace-nowrap">보정 3년</th>}
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">설명</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">삭제</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다. 행을 추가해주세요.</td></tr>
+              {filteredRates.length === 0 ? (
+                <tr><td colSpan={hasActiveAdjustments ? 11 : 10} className="px-4 py-10 text-center text-gray-400">
+                  {rates.length === 0 ? '데이터가 없습니다. 행을 추가해주세요.' : '필터 조건에 맞는 데이터가 없습니다.'}
+                </td></tr>
               ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-2 py-2">
-                      {editingCell?.rowId === row.id && editingCell?.field === 'category' ? (
-                        <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
-                          className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none" />
+                filteredRates.map((row) => (
+                  <tr key={row.id} className={`hover:bg-gray-50/30 transition-colors ${!row.is_active ? 'opacity-40' : ''}`}>
+                    {/* 원산지 */}
+                    <td className="px-3 py-2">
+                      {editingCell?.rowId === row.id && editingCell?.field === 'origin' ? (
+                        <select value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                          className="px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          {ORIGINS.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
                       ) : (
-                        <span onClick={() => handleCellClick(row.id, 'category', row.category)}
-                          className="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded inline-block font-medium text-gray-800">
-                          {row.category}
+                        <span onClick={() => handleCellClick(row.id, 'origin', row.origin)}
+                          className={`cursor-pointer px-2 py-0.5 rounded text-[11px] font-bold ${ORIGIN_COLORS[row.origin] || ''}`}>
+                          {row.origin}
                         </span>
                       )}
                     </td>
+                    {/* 차급 */}
+                    <td className="px-3 py-2">
+                      {editingCell?.rowId === row.id && editingCell?.field === 'vehicle_class' ? (
+                        <select value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                          className="px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          {VEHICLE_CLASSES.map(c => <option key={c} value={c}>{CLASS_LABELS[c]}</option>)}
+                        </select>
+                      ) : (
+                        <span onClick={() => handleCellClick(row.id, 'vehicle_class', row.vehicle_class)}
+                          className="cursor-pointer font-medium text-gray-800 hover:bg-gray-50 px-2 py-0.5 rounded inline-block">
+                          {CLASS_LABELS[row.vehicle_class] || row.vehicle_class}
+                        </span>
+                      )}
+                    </td>
+                    {/* 연료 */}
+                    <td className="px-3 py-2">
+                      {editingCell?.rowId === row.id && editingCell?.field === 'fuel_type' ? (
+                        <select value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                          className="px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          {FUEL_TYPES.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      ) : (
+                        <span onClick={() => handleCellClick(row.id, 'fuel_type', row.fuel_type)}
+                          className={`cursor-pointer px-2 py-0.5 rounded text-[11px] font-semibold ${FUEL_COLORS[row.fuel_type] || ''}`}>
+                          {FUEL_LABELS[row.fuel_type] || row.fuel_type}
+                        </span>
+                      )}
+                    </td>
+                    {/* 잔존율 */}
                     {(['rate_1yr', 'rate_2yr', 'rate_3yr', 'rate_4yr', 'rate_5yr'] as const).map((field) => (
-                      <td key={field} className="px-2 py-2 text-center">
+                      <td key={field} className="px-3 py-2 text-center">
                         {editingCell?.rowId === row.id && editingCell?.field === field ? (
                           <input type="number" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
-                            className="w-16 px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none mx-auto text-center" step="0.1" min="0" max="100" />
+                            className="w-16 px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none mx-auto text-center" step="0.1" min="0" max="100" />
                         ) : (
                           <span onClick={() => handleCellClick(row.id, field, row[field])}
                             className={`cursor-pointer px-2 py-0.5 rounded inline-block font-bold text-xs ${getRateColor(row[field])}`}>
-                            {row[field]?.toFixed(1)}%
+                            {row[field] > 0 ? `${Number(row[field]).toFixed(1)}%` : '—'}
                           </span>
                         )}
                       </td>
                     ))}
-                    <td className="px-2 py-2 text-center">
+                    {/* 보정 적용 미리보기 */}
+                    {hasActiveAdjustments && (
+                      <td className="px-3 py-2 text-center">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700">
+                          {getAdjustedRate(row, 'rate_3yr').toFixed(1)}%
+                        </span>
+                      </td>
+                    )}
+                    {/* 설명 */}
+                    <td className="px-3 py-2">
+                      {editingCell?.rowId === row.id && editingCell?.field === 'description' ? (
+                        <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onBlur={handleCellBlur} autoFocus
+                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none" />
+                      ) : (
+                        <span onClick={() => handleCellClick(row.id, 'description', row.description)}
+                          className="cursor-pointer text-gray-500 hover:text-gray-700 inline-block max-w-[200px] truncate">
+                          {row.description || '—'}
+                        </span>
+                      )}
+                    </td>
+                    {/* 삭제 */}
+                    <td className="px-3 py-2 text-center">
                       <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs transition-colors">삭제</button>
                     </td>
                   </tr>
@@ -264,30 +487,30 @@ export default function DepreciationTab() {
           </table>
         </div>
 
-        {/* 업계 비교 테이블 */}
+        {/* 업계 비교 */}
         <div className="p-5 border-t border-gray-100 bg-gray-50/50">
           <p className="text-xs font-semibold text-gray-500 mb-3">📊 업계 평균 참고값 (대형 렌터카사 기반)</p>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="text-xs">
               <thead>
                 <tr className="text-gray-400">
-                  <th className="text-left py-1.5 px-2 font-medium min-w-[100px] whitespace-nowrap">차종</th>
-                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">1년</th>
-                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">2년</th>
-                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">3년</th>
-                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">4년</th>
-                  <th className="text-center py-1.5 px-2 font-medium whitespace-nowrap">5년</th>
+                  <th className="text-left py-1.5 px-3 font-medium whitespace-nowrap">원산지</th>
+                  <th className="text-left py-1.5 px-3 font-medium whitespace-nowrap">차급</th>
+                  <th className="text-left py-1.5 px-3 font-medium whitespace-nowrap">연료</th>
+                  <th className="text-center py-1.5 px-3 font-medium whitespace-nowrap">1년</th>
+                  <th className="text-center py-1.5 px-3 font-medium whitespace-nowrap">3년</th>
+                  <th className="text-center py-1.5 px-3 font-medium whitespace-nowrap">5년</th>
                 </tr>
               </thead>
               <tbody>
                 {INDUSTRY_BENCHMARKS.map((b, i) => (
                   <tr key={i} className="text-gray-500 border-t border-gray-100">
-                    <td className="py-1.5 px-2">{b.type}</td>
-                    <td className="text-center py-1.5 px-2">{b.yr1}%</td>
-                    <td className="text-center py-1.5 px-2">{b.yr2}%</td>
-                    <td className="text-center py-1.5 px-2">{b.yr3}%</td>
-                    <td className="text-center py-1.5 px-2">{b.yr4}%</td>
-                    <td className="text-center py-1.5 px-2">{b.yr5}%</td>
+                    <td className="py-1.5 px-3">{b.origin}</td>
+                    <td className="py-1.5 px-3">{CLASS_LABELS[b.cls] || b.cls}</td>
+                    <td className="py-1.5 px-3">{FUEL_LABELS[b.fuel] || b.fuel}</td>
+                    <td className="text-center py-1.5 px-3">{b.yr1}%</td>
+                    <td className="text-center py-1.5 px-3">{b.yr3}%</td>
+                    <td className="text-center py-1.5 px-3">{b.yr5}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -296,7 +519,139 @@ export default function DepreciationTab() {
         </div>
       </div>
 
-      {/* AI 검증 패널 - Collapsible */}
+      {/* ── 보정 계수 패널 ─────────────────────────────── */}
+      {showAdjustments && (
+        <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">보정 계수 관리</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">활성화된 보정 계수는 기본 잔존율에 곱하여 최종 잔존율을 산출합니다</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* 주행거리 약정 보정 */}
+            <div>
+              <p className="text-xs font-bold text-gray-700 mb-2">🛣️ 주행거리 약정 보정</p>
+              <p className="text-[10px] text-gray-400 mb-3">기본 감가율은 연 2만km 기준입니다</p>
+              <div className="space-y-2">
+                {adjustments.filter(a => a.adjustment_type === 'mileage').map(adj => (
+                  <div key={adj.id} className={`p-3 rounded-lg border transition ${adj.is_active ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-800">{adj.label}</span>
+                      <button onClick={() => handleToggleAdjustment(adj)}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${adj.is_active ? 'bg-amber-500' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${adj.is_active ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500">{adj.description}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-gray-400">계수:</span>
+                      <input type="number" step="0.01" value={adj.factor}
+                        onChange={(e) => handleUpdateAdjustmentFactor(adj, parseFloat(e.target.value) || 1)}
+                        className="w-16 px-1.5 py-0.5 text-xs border rounded text-center font-mono focus:outline-none focus:border-amber-400" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 시장 상황 보정 */}
+            <div>
+              <p className="text-xs font-bold text-gray-700 mb-2">📈 시장 상황 보정</p>
+              <p className="text-[10px] text-gray-400 mb-3">특수 상황 시에만 활성화하세요</p>
+              <div className="space-y-2">
+                {adjustments.filter(a => a.adjustment_type === 'market_condition').map(adj => (
+                  <div key={adj.id} className={`p-3 rounded-lg border transition ${adj.is_active ? (adj.factor > 1 ? 'bg-emerald-50 border-emerald-200' : adj.factor < 1 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200') : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-800">{adj.label}</span>
+                      <button onClick={() => handleToggleAdjustment(adj)}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${adj.is_active ? 'bg-amber-500' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${adj.is_active ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500">{adj.description}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-gray-400">계수:</span>
+                      <input type="number" step="0.01" value={adj.factor}
+                        onChange={(e) => handleUpdateAdjustmentFactor(adj, parseFloat(e.target.value) || 1)}
+                        className="w-16 px-1.5 py-0.5 text-xs border rounded text-center font-mono focus:outline-none focus:border-amber-400" />
+                      <span className={`text-[10px] font-semibold ${adj.factor > 1 ? 'text-emerald-600' : adj.factor < 1 ? 'text-red-600' : 'text-gray-400'}`}>
+                        {adj.factor > 1 ? `+${((adj.factor - 1) * 100).toFixed(0)}%` : adj.factor < 1 ? `${((adj.factor - 1) * 100).toFixed(0)}%` : '±0'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 인기도 보정 */}
+            <div>
+              <p className="text-xs font-bold text-gray-700 mb-2">⭐ 인기도 보정</p>
+              <p className="text-[10px] text-gray-400 mb-3">견적 시 차량 인기도에 따라 선택합니다</p>
+              <div className="space-y-2">
+                {adjustments.filter(a => a.adjustment_type === 'popularity').map(adj => (
+                  <div key={adj.id} className={`p-3 rounded-lg border transition ${adj.is_active ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-800">{adj.label}</span>
+                      <button onClick={() => handleToggleAdjustment(adj)}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${adj.is_active ? 'bg-amber-500' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${adj.is_active ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500">{adj.description}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-gray-400">계수:</span>
+                      <input type="number" step="0.01" value={adj.factor}
+                        onChange={(e) => handleUpdateAdjustmentFactor(adj, parseFloat(e.target.value) || 1)}
+                        className="w-16 px-1.5 py-0.5 text-xs border rounded text-center font-mono focus:outline-none focus:border-amber-400" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 보정 요약 */}
+          {hasActiveAdjustments && (
+            <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-xs font-semibold text-amber-800 mb-1">현재 활성 보정</p>
+              <div className="flex flex-wrap gap-2">
+                {adjustments.filter(a => a.is_active && a.factor !== 1.0).map(a => (
+                  <span key={a.id} className="px-2 py-0.5 bg-white rounded border border-amber-300 text-[10px] text-amber-700">
+                    {a.label}: <strong>×{a.factor}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 변경 이력 ──────────────────────────────────── */}
+      {showHistory && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-3">변경 이력</h3>
+          {history.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">아직 변경 이력이 없습니다</p>
+          ) : (
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {history.map(h => (
+                <div key={h.id} className="flex items-center gap-3 text-xs py-1.5 border-b border-gray-50">
+                  <span className="text-[10px] text-gray-400 whitespace-nowrap">{formatDate(h.changed_at)}</span>
+                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-mono">{h.changed_field}</span>
+                  <span className="text-red-400 line-through">{h.old_value}</span>
+                  <span className="text-gray-300">→</span>
+                  <span className="text-emerald-600 font-semibold">{h.new_value}</span>
+                  {h.reason && <span className="text-gray-400 text-[10px]">({h.reason})</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── AI 검증 패널 ───────────────────────────────── */}
       {showAIPanel && (
         <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white border border-slate-800">
           <h3 className="text-sm font-bold mb-1">실시간 시장 검증</h3>
@@ -305,63 +660,39 @@ export default function DepreciationTab() {
           <div className="mb-3">
             <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">검증할 차종</label>
             <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500">
+              className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-steel-500">
               <option value="">선택하세요</option>
-              {rows.map((row) => (<option key={row.id} value={row.category}>{row.category}</option>))}
+              {rates.map((row) => (
+                <option key={row.id} value={`${row.origin} ${CLASS_LABELS[row.vehicle_class]} ${FUEL_LABELS[row.fuel_type]}`}>
+                  {row.origin} {CLASS_LABELS[row.vehicle_class]} ({FUEL_LABELS[row.fuel_type]})
+                </option>
+              ))}
             </select>
           </div>
 
           <button onClick={handleSearch} disabled={searching || !selectedCategory}
-            className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
+            className="w-full px-4 py-2.5 bg-steel-600 text-white font-semibold text-xs rounded-lg hover:bg-steel-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
             {searching ? '시장 데이터 조회 중...' : '🔍 실시간 시장 검증'}
           </button>
 
-          {/* 현재값 vs 업계 비교 */}
-          {comparison && (
-            <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-700">
-              <p className="text-[10px] font-semibold text-slate-300 mb-2">📊 현재값 vs 업계 평균</p>
-              <div className="space-y-1.5 text-xs">
-                {[
-                  { label: '1년차', diff: comparison.diffs.yr1 },
-                  { label: '3년차', diff: comparison.diffs.yr3 },
-                  { label: '5년차', diff: comparison.diffs.yr5 },
-                ].map(({ label, diff }) => (
-                  <div key={label} className="flex justify-between items-center">
-                    <span className="text-slate-400">{label}</span>
-                    <span className={`font-semibold ${diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-300'}`}>
-                      {diff > 0 ? '+' : ''}{diff.toFixed(1)}%p
-                      {diff > 2 && ' (보수적)'}
-                      {diff < -2 && ' (공격적)'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-slate-500 mt-2">
-                +는 업계보다 보수적(잔존율 높음), -는 공격적(잔존율 낮음)
-              </p>
-            </div>
-          )}
-
-          {/* 검색 결과 */}
           {searchResults && (
             <div className="space-y-3">
               <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
+                  <h4 className="text-[10px] font-semibold text-slate-300">Gemini 검증 결과</h4>
                   <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
                 </div>
                 <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                   {searchResults.results}
                 </div>
               </div>
-
-              {searchResults.sources.length > 0 && (
+              {searchResults.sources?.length > 0 && (
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                  <h4 className="text-[10px] font-semibold text-blue-300 mb-2">참고 출처</h4>
+                  <h4 className="text-[10px] font-semibold text-slate-300 mb-2">참고 출처</h4>
                   <div className="space-y-1">
                     {searchResults.sources.map((source, idx) => (
                       <a key={idx} href={source} target="_blank" rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 text-[10px] break-all underline block leading-snug">
+                        className="text-slate-400 hover:text-slate-300 text-[10px] break-all underline block leading-snug">
                         {source.length > 60 ? source.substring(0, 60) + '...' : source}
                       </a>
                     ))}
@@ -373,7 +704,7 @@ export default function DepreciationTab() {
 
           {!searchResults && !searching && (
             <div className="text-center text-slate-500 text-xs py-3">
-              차종을 선택하고 검증을 시작하세요.<br/>
+              차종을 선택하고 검증을 시작하세요.<br />
               <span className="text-slate-600 text-[10px]">중고차 시세·매각 데이터를 실시간으로 조회합니다</span>
             </div>
           )}

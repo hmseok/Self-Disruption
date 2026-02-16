@@ -881,12 +881,24 @@ export default function RentPricingBuilder() {
     // 취득원가 계산
     // ============================================
     // ★ 렌터카(자동차대여업) = 영업용 → 취득세 4% (비영업용 승용 7%와 다름)
-    const acqTaxRecord = regCosts.find(r => r.cost_type === '취득세' && (r.vehicle_category === (fuelCat === '전기' ? '전기차' : '영업용')))
+    const acqTaxRecord = regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === (fuelCat === '전기' ? '영업용 전기' : '영업용'))
       || regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === '영업용')
     const deliveryRecord = regCosts.find(r => r.cost_type === '탁송료')
 
     // 영업용 취득세: 4% (지방세법 제12조제1항제2호)
-    const acqTaxAmt = acqTaxRecord ? Math.round(carInfo.purchase_price * acqTaxRecord.rate / 100) : Math.round(carInfo.purchase_price * 0.04)
+    let acqTaxAmt = acqTaxRecord ? Math.round(carInfo.purchase_price * acqTaxRecord.rate / 100) : Math.round(carInfo.purchase_price * 0.04)
+
+    // ★ 경차 취득세 감면 (지방세특례제한법 제75조)
+    // 경차(배기량 1,000cc 미만) 취득세 75만원까지 면제
+    // 예: 14,900,000 × 4% = 596,000원 < 750,000원 → 전액 면제
+    const isLightCar = (carInfo.displacement && carInfo.displacement < 1000)
+      || /레이|Ray|모닝|Morning|다마스|라보|마티즈|스파크|Spark/i.test(`${carInfo.model || ''} ${carInfo.trim || ''}`)
+    const LIGHT_CAR_TAX_EXEMPT_LIMIT = 750000 // 경차 취득세 면제 한도
+    if (isLightCar && acqTaxAmt <= LIGHT_CAR_TAX_EXEMPT_LIMIT) {
+      acqTaxAmt = 0 // 전액 면제
+    } else if (isLightCar && acqTaxAmt > LIGHT_CAR_TAX_EXEMPT_LIMIT) {
+      acqTaxAmt = acqTaxAmt - LIGHT_CAR_TAX_EXEMPT_LIMIT // 초과분만 납부
+    }
     setAcquisitionTax(acqTaxAmt)
 
     // ============================================
@@ -919,56 +931,37 @@ export default function RentPricingBuilder() {
 
     const bondCC = carInfo.engine_cc || engineCC || cc || 0
 
-    const BOND_RATES_BUSINESS: Record<string, { getRate: (cc: number) => number; bondType: string; maturityYears: number }> = {
-      '서울': {
-        bondType: '도시철도채권',
-        maturityYears: 7,
-        getRate: (cc: number) => {
-          if (cc >= 2000) return 8
-          if (cc >= 1600) return 5
-          return 0 // 1600cc 미만 면제
-        },
-      },
-      '부산': {
-        bondType: '도시철도채권',
-        maturityYears: 5,
-        getRate: (cc: number) => {
-          if (cc >= 2000) return 4
-          if (cc >= 1600) return 2
-          return 0
-        },
-      },
-      '대구': {
-        bondType: '도시철도채권',
-        maturityYears: 5,
-        getRate: (cc: number) => {
-          if (cc >= 2000) return 4
-          if (cc >= 1600) return 2
-          return 0
-        },
-      },
-      // 지역개발채권 지역 → 영업용 면제
-      '인천': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '광주': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '대전': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '울산': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '세종': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '경기': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '강원': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '충북': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '충남': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '전북': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '전남': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '경북': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '경남': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
-      '제주': { bondType: '지역개발채권', maturityYears: 5, getRate: () => 0 },
+    // ★ 공채매입: DB 연동 (registration_cost_table에서 영업용 데이터 조회)
+    // 배기량 기준으로 영업용/영업용 중형/영업용 소형 카테고리 매칭
+    const getBondCategoryForCC = (cc: number): string => {
+      if (cc >= 2000) return '영업용'       // 대형: 2000cc 이상
+      if (cc >= 1600) return '영업용 중형'   // 중형: 1600~2000cc
+      return '영업용 소형'                    // 소형: 1600cc 미만
+    }
+    const bondCategory = getBondCategoryForCC(bondCC)
+
+    // DB에서 해당 지역 + 배기량 카테고리 공채매입 데이터 조회
+    let bondRecord = regCosts.find(r =>
+      r.cost_type === '공채매입' && r.region === registrationRegion && r.vehicle_category === bondCategory
+    )
+    // 정확한 배기량 카테고리가 없으면 해당 지역의 기본 '영업용' 카테고리로 폴백
+    if (!bondRecord) {
+      bondRecord = regCosts.find(r =>
+        r.cost_type === '공채매입' && r.region === registrationRegion && r.vehicle_category === '영업용'
+      )
+    }
+    // 지역 데이터 자체가 없으면 '기타' 지역으로 폴백 (영업용 면제)
+    if (!bondRecord) {
+      bondRecord = regCosts.find(r =>
+        r.cost_type === '공채매입' && r.region === '기타' && r.vehicle_category === '영업용'
+      )
     }
 
-    const regionData = BOND_RATES_BUSINESS[registrationRegion] || BOND_RATES_BUSINESS['서울']
-    const bondRate = regionData.getRate(bondCC)
+    const bondRate = bondRecord ? Number(bondRecord.rate) : 0
     const bondGross = Math.round(carInfo.purchase_price * bondRate / 100)
-    // 공채할인율: 시장 금리에 따라 변동, 약 4~8% 수준. 기본 6% 적용
-    const bondDiscountRate = 0.06
+    // 공채할인율: DB에서 조회, 없으면 기본 6%
+    const bondDiscountRecord = regCosts.find(r => r.cost_type === '공채할인')
+    const bondDiscountRate = bondDiscountRecord ? Number(bondDiscountRecord.rate) / 100 : 0.06
     const bondNet = bondRate > 0 ? Math.round(bondGross * (1 - bondDiscountRate)) : 0
     setBondCost(bondNet)
 
@@ -2158,7 +2151,7 @@ export default function RentPricingBuilder() {
 
         {/* 분석 요약 */}
         {selectedCar && calc && (
-          <div className="bg-gray-900 text-white rounded-2xl p-5 mb-6">
+          <div className="bg-steel-900 text-white rounded-2xl p-5 mb-6">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-gray-400 text-xs">분석 차량</p>
@@ -2284,7 +2277,7 @@ export default function RentPricingBuilder() {
               if (customerMode === 'manual' && !manualCustomer.name.trim()) return alert('고객명을 입력해주세요.')
               setWizardStep('preview')
             }}
-            className="flex-[2] py-3 bg-gray-900 text-white rounded-xl font-black hover:bg-gray-800 transition-colors">
+            className="flex-[2] py-3 bg-steel-900 text-white rounded-xl font-black hover:bg-steel-800 transition-colors">
             견적서 미리보기 &rarr;
           </button>
         </div>
@@ -2334,7 +2327,7 @@ export default function RentPricingBuilder() {
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-white disabled:opacity-50">
               {quoteSaving ? '저장중...' : '임시저장'}</button>
             <button onClick={() => handleSaveQuote('active')} disabled={quoteSaving}
-              className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-black hover:bg-gray-800 disabled:opacity-50">
+              className="px-5 py-2 bg-steel-900 text-white rounded-lg text-sm font-black hover:bg-steel-800 disabled:opacity-50">
               {quoteSaving ? '저장중...' : '견적서 확정'}</button>
           </div>
         </div>
@@ -2345,7 +2338,7 @@ export default function RentPricingBuilder() {
           {/* ========== PAGE 1: 핵심 정보 ========== */}
           <div className="quote-page-1">
             {/* 헤더 */}
-            <div className="bg-gray-900 text-white px-6 py-4 print:px-5 print:py-3 quote-header-bg">
+            <div className="bg-steel-900 text-white px-6 py-4 print:px-5 print:py-3 quote-header-bg">
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-2xl font-black tracking-tight print:text-xl">장기렌트 견적서</h1>
@@ -2442,18 +2435,18 @@ export default function RentPricingBuilder() {
               </div>
 
               {/* 4. 월 렌탈료 — 핵심만 (컴팩트) */}
-              <div className="border-2 border-gray-900 rounded-xl overflow-hidden quote-rental-highlight">
-                <div className="bg-gray-900 text-white px-4 py-1.5"><p className="font-black text-xs">월 렌탈료 안내</p></div>
+              <div className="border-2 border-steel-900 rounded-xl overflow-hidden quote-rental-highlight">
+                <div className="bg-steel-900 text-white px-4 py-1.5"><p className="font-black text-xs">월 렌탈료 안내</p></div>
                 <div className="px-3 py-2">
                   <div className={`grid ${contractType === 'buyout' ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                     <div className="text-center py-2 px-2 bg-gray-50 rounded-lg">
                       <p className="text-[9px] text-gray-400 font-bold">보증금{deposit === 0 ? '' : ' (계약 시 1회)'}</p>
                       <p className="text-base font-black text-gray-800">{deposit === 0 ? '없음' : <>{f(deposit)}<span className="text-[10px] font-bold">원</span></>}</p>
                     </div>
-                    <div className="text-center py-2 px-2 bg-blue-50 rounded-lg border-2 border-blue-300">
-                      <p className="text-[9px] text-blue-500 font-bold">월 렌탈료 (VAT 포함)</p>
-                      <p className="text-xl font-black text-blue-700">{f(calc.rentWithVAT)}<span className="text-[10px] font-bold">원</span></p>
-                      <p className="text-[9px] text-blue-400">공급가 {f(calc.suggestedRent)} + VAT {f(rentVAT)}</p>
+                    <div className="text-center py-2 px-2 bg-steel-50 rounded-lg border-2 border-steel-300">
+                      <p className="text-[9px] text-steel-500 font-bold">월 렌탈료 (VAT 포함)</p>
+                      <p className="text-xl font-black text-steel-700">{f(calc.rentWithVAT)}<span className="text-[10px] font-bold">원</span></p>
+                      <p className="text-[9px] text-steel-400">공급가 {f(calc.suggestedRent)} + VAT {f(rentVAT)}</p>
                     </div>
                     {contractType === 'buyout' && (
                       <div className="text-center py-2 px-2 bg-amber-50 rounded-lg border-2 border-amber-200">
@@ -2609,9 +2602,9 @@ export default function RentPricingBuilder() {
           <button onClick={() => window.print()}
             className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white">인쇄 / PDF</button>
           <button onClick={() => handleSaveQuote('draft')} disabled={quoteSaving}
-            className="flex-1 py-3 bg-gray-600 text-white rounded-xl font-bold hover:bg-gray-700 disabled:opacity-50">임시저장</button>
+            className="flex-1 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 disabled:opacity-50">임시저장</button>
           <button onClick={() => handleSaveQuote('active')} disabled={quoteSaving}
-            className="flex-[2] py-3 bg-gray-900 text-white rounded-xl font-black hover:bg-gray-800 disabled:opacity-50">
+            className="flex-[2] py-3 bg-steel-900 text-white rounded-xl font-black hover:bg-steel-800 disabled:opacity-50">
             {quoteSaving ? '저장 중...' : '견적서 확정'}</button>
         </div>
       </div>
@@ -2879,7 +2872,7 @@ export default function RentPricingBuilder() {
                     }
                     setNewCarModel(''); setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('')
                   }}
-                  className="w-40 p-3 border border-gray-200 rounded-xl font-bold text-base bg-white focus:border-blue-400 outline-none"
+                  className="w-40 p-3 border border-gray-200 rounded-xl font-bold text-base bg-white focus:border-steel-400 outline-none"
                 >
                   <option value="">선택</option>
                   <optgroup label="국내">
@@ -2902,7 +2895,7 @@ export default function RentPricingBuilder() {
                       placeholder="브랜드 입력"
                       value={newCarBrand}
                       onChange={(e) => setNewCarBrand(e.target.value)}
-                      className="w-32 p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-blue-400 outline-none"
+                      className="w-32 p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-steel-400 outline-none"
                     />
                   </div>
                 )
@@ -2918,13 +2911,13 @@ export default function RentPricingBuilder() {
                     setNewCarResult(null); setNewCarSelectedTax(''); setNewCarSelectedFuel(''); setNewCarSelectedVariant(null); setNewCarSelectedTrim(null); setNewCarSelectedOptions([]); setLookupError('')
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && handleNewCarLookup()}
-                  className="w-full p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-blue-400 outline-none"
+                  className="w-full p-3 border border-gray-200 rounded-xl font-bold text-base focus:border-steel-400 outline-none"
                 />
               </div>
               <button
                 onClick={handleNewCarLookup}
                 disabled={isLookingUp || isParsingQuote || !newCarBrand.trim() || !newCarModel.trim()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                className="px-6 py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
               >
                 {isLookingUp ? (
                   <span className="flex items-center gap-2">
@@ -2938,13 +2931,13 @@ export default function RentPricingBuilder() {
 
             {/* AI 조회 진행 상태 */}
             {isLookingUp && lookupStage && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-4">
+              <div className="p-4 bg-steel-50 border border-steel-200 rounded-xl mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="inline-block w-5 h-5 border-2 border-steel-500 border-t-transparent rounded-full animate-spin" />
                   <div>
-                    <p className="text-sm font-bold text-blue-700">{lookupStage}</p>
+                    <p className="text-sm font-bold text-steel-700">{lookupStage}</p>
                     {lookupElapsed > 0 && (
-                      <p className="text-xs text-blue-500 mt-0.5">경과 시간: {lookupElapsed}초 {lookupElapsed >= 15 && '· 웹 검색 중이라 시간이 걸릴 수 있습니다'}</p>
+                      <p className="text-xs text-steel-500 mt-0.5">경과 시간: {lookupElapsed}초 {lookupElapsed >= 15 && '· 웹 검색 중이라 시간이 걸릴 수 있습니다'}</p>
                     )}
                   </div>
                 </div>
@@ -3050,7 +3043,7 @@ export default function RentPricingBuilder() {
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-gray-800 text-sm">{sp.model}</span>
                                   <span className="text-[11px] text-gray-400">{sp.year}년</span>
-                                  <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">{sp.price_data?.variants?.length || 0}차종</span>
+                                  <span className="text-[10px] bg-steel-50 text-steel-600 px-1.5 py-0.5 rounded font-bold">{sp.price_data?.variants?.length || 0}차종</span>
                                   {sp.source?.includes('견적서') ? (
                                     <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">견적서</span>
                                   ) : (
@@ -3109,13 +3102,13 @@ export default function RentPricingBuilder() {
           const stepIcons = ['①', '②', '③', '④', '⑤', '⑥']
 
           return (
-          <div className="mt-4 p-5 bg-white border border-blue-200 rounded-2xl shadow-sm space-y-4">
+          <div className="mt-4 p-5 bg-white border border-steel-200 rounded-2xl shadow-sm space-y-4">
             {/* 모델 헤더 + 저장 버튼 */}
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm font-bold text-gray-700">
                 {newCarResult.brand} {newCarResult.model} — {newCarResult.year}년식
               </span>
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-bold">
+              <span className="text-xs px-2 py-0.5 bg-steel-100 text-steel-700 rounded-full font-bold">
                 차종 {newCarResult.variants.length}개
               </span>
               {newCarResult.source?.includes('견적서') && (
@@ -3209,8 +3202,8 @@ export default function RentPricingBuilder() {
                       }}
                       className={`px-4 py-2.5 rounded-xl border-2 transition-all text-sm font-bold ${
                         newCarSelectedFuel === fuel
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-200 hover:border-blue-300 bg-white text-gray-700'
+                          ? 'border-steel-500 bg-steel-50 text-steel-700 shadow-md'
+                          : 'border-gray-200 hover:border-steel-300 bg-white text-gray-700'
                       }`}
                     >
                       <span>{fuelIcon[fuel] || '🚗'} {fuel}</span>
@@ -3240,8 +3233,8 @@ export default function RentPricingBuilder() {
                       }}
                       className={`px-4 py-2.5 rounded-xl border-2 transition-all text-sm font-bold ${
                         newCarSelectedVariant?.variant_name === v.variant_name
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
-                          : 'border-gray-200 hover:border-blue-300 bg-white text-gray-700'
+                          ? 'border-steel-500 bg-steel-50 text-steel-700 shadow-md'
+                          : 'border-gray-200 hover:border-steel-300 bg-white text-gray-700'
                       }`}
                     >
                       <span>{v.variant_name}</span>
@@ -3275,12 +3268,12 @@ export default function RentPricingBuilder() {
                       }}
                       className={`p-4 rounded-xl border-2 transition-all text-left ${
                         newCarSelectedTrim?.name === trim.name
-                          ? 'border-blue-500 bg-blue-50 shadow-md'
-                          : 'border-gray-200 hover:border-blue-300 bg-white'
+                          ? 'border-steel-500 bg-steel-50 shadow-md'
+                          : 'border-gray-200 hover:border-steel-300 bg-white'
                       }`}
                     >
                       <p className="font-bold text-gray-800">{trim.name}</p>
-                      <p className="text-blue-600 font-bold mt-1">{f(trim.base_price)}원</p>
+                      <p className="text-steel-600 font-bold mt-1">{f(trim.base_price)}원</p>
                       {trim.note && <p className="text-xs text-gray-400 mt-1">{trim.note}</p>}
                     </button>
                   ))}
@@ -3307,7 +3300,7 @@ export default function RentPricingBuilder() {
                     >
                       {color.name}
                       {color.code && <span className="ml-1 opacity-60">({color.code})</span>}
-                      {color.price > 0 && <span className="ml-1 text-blue-400">+{(color.price).toLocaleString()}</span>}
+                      {color.price > 0 && <span className="ml-1 text-steel-400">+{(color.price).toLocaleString()}</span>}
                     </button>
                   ))}
                 </div>
@@ -3333,7 +3326,7 @@ export default function RentPricingBuilder() {
                     >
                       {color.name}
                       {color.code && <span className="ml-1 opacity-60">({color.code})</span>}
-                      {color.price > 0 && <span className="ml-1 text-blue-400">+{(color.price).toLocaleString()}</span>}
+                      {color.price > 0 && <span className="ml-1 text-steel-400">+{(color.price).toLocaleString()}</span>}
                     </button>
                   ))}
                 </div>
@@ -3369,18 +3362,18 @@ export default function RentPricingBuilder() {
                         }}
                         className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                           isChecked
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300 bg-white'
+                            ? 'border-steel-500 bg-steel-50'
+                            : 'border-gray-200 hover:border-steel-300 bg-white'
                         }`}
                       >
                         <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${
-                          isChecked ? 'bg-blue-600 text-white' : 'bg-gray-100 border border-gray-300'
+                          isChecked ? 'bg-steel-600 text-white' : 'bg-gray-100 border border-gray-300'
                         }`}>
                           {isChecked && <span className="text-xs">✓</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-sm text-gray-800">{opt.name}</p>
-                          <p className="text-blue-600 font-bold text-sm">+{f(opt.price)}원</p>
+                          <p className="text-steel-600 font-bold text-sm">+{f(opt.price)}원</p>
                           {opt.description && <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>}
                         </div>
                       </button>
@@ -3402,13 +3395,13 @@ export default function RentPricingBuilder() {
                   {(newCarSelectedExterior?.price || 0) > 0 && (
                     <div className="flex items-center justify-between text-sm mt-1">
                       <span className="text-gray-400">+ 외장 {newCarSelectedExterior!.name}</span>
-                      <span className="font-bold text-blue-600">+{f(newCarSelectedExterior!.price)}원</span>
+                      <span className="font-bold text-steel-600">+{f(newCarSelectedExterior!.price)}원</span>
                     </div>
                   )}
                   {(newCarSelectedInterior?.price || 0) > 0 && (
                     <div className="flex items-center justify-between text-sm mt-1">
                       <span className="text-gray-400">+ 내장 {newCarSelectedInterior!.name}</span>
-                      <span className="font-bold text-blue-600">+{f(newCarSelectedInterior!.price)}원</span>
+                      <span className="font-bold text-steel-600">+{f(newCarSelectedInterior!.price)}원</span>
                     </div>
                   )}
                   {newCarSelectedOptions.length > 0 && (
@@ -3416,7 +3409,7 @@ export default function RentPricingBuilder() {
                       {newCarSelectedOptions.map((opt, idx) => (
                         <div key={idx} className="flex items-center justify-between text-sm mt-1">
                           <span className="text-gray-400">+ {opt.name}</span>
-                          <span className="font-bold text-blue-600">+{f(opt.price)}원</span>
+                          <span className="font-bold text-steel-600">+{f(opt.price)}원</span>
                         </div>
                       ))}
                     </>
@@ -3454,19 +3447,19 @@ export default function RentPricingBuilder() {
                               placeholder="0"
                               value={newCarPurchasePrice}
                               onChange={(e) => setNewCarPurchasePrice(e.target.value.replace(/[^0-9,]/g, ''))}
-                              className="w-full p-3 pr-8 border border-gray-200 rounded-lg font-bold text-base focus:border-blue-400 outline-none"
+                              className="w-full p-3 pr-8 border border-gray-200 rounded-lg font-bold text-base focus:border-steel-400 outline-none"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">원</span>
                           </div>
                           {discountAmt > 0 && (
-                            <span className="text-[11px] text-blue-600 font-bold mt-1 block">
+                            <span className="text-[11px] text-steel-600 font-bold mt-1 block">
                               출고가 대비 {(discountAmt / totalFactory * 100).toFixed(1)}% 할인
                             </span>
                           )}
                         </div>
                         <button
                           onClick={handleNewCarAnalysis}
-                          className="px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-900 transition-colors whitespace-nowrap cursor-pointer"
+                          className="px-6 py-3 bg-steel-700 text-white rounded-xl font-bold text-sm hover:bg-steel-800 transition-colors whitespace-nowrap cursor-pointer"
                         >
                           분석 시작
                         </button>
@@ -3492,7 +3485,7 @@ export default function RentPricingBuilder() {
           <div className="mt-4">
             {(lookupMode === 'newcar' || lookupMode === 'saved') && newCarResult && (
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">✨ 신차 시뮬레이션</span>
+                <span className="text-xs px-2 py-1 bg-steel-100 text-steel-700 rounded-full font-bold">✨ 신차 시뮬레이션</span>
                 <span className="text-xs text-gray-400">임시 분석 — 정식 등록 전 참고용</span>
               </div>
             )}
@@ -3535,10 +3528,10 @@ export default function RentPricingBuilder() {
 
             {/* 🆕 0. AI 자동분류 결과 */}
             {autoCategory && (
-              <div className="bg-gradient-to-r from-steel-50 to-blue-50 border border-steel-200 rounded-2xl p-4 flex flex-wrap gap-3 items-center">
+              <div className="bg-gradient-to-r from-steel-50 to-steel-50 border border-steel-200 rounded-2xl p-4 flex flex-wrap gap-3 items-center">
                 <span className="text-sm font-bold text-steel-800">🤖 기준표 자동 매핑:</span>
                 <span className="bg-steel-600 text-white text-xs font-bold px-3 py-1 rounded-full">잔가: {autoCategory}</span>
-                <span className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">보험: {autoInsType}</span>
+                <span className="bg-steel-600 text-white text-xs font-bold px-3 py-1 rounded-full">보험: {autoInsType}</span>
                 <span className="bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full">정비: {autoMaintType}</span>
               </div>
             )}
@@ -3567,7 +3560,7 @@ export default function RentPricingBuilder() {
             {/* 🆕 1.5 취득원가 분석 */}
             <Section icon="📋" title="취득원가 분석 (차량가 + 등록비)">
               {/* 등록 지역 선택 */}
-              <div className="mb-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+              <div className="mb-4 p-4 bg-steel-50/50 rounded-xl border border-steel-100">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold text-gray-600">차량 등록 지역</p>
                   <span className="text-[10px] text-gray-400">
@@ -3611,7 +3604,7 @@ export default function RentPricingBuilder() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <ResultRow label="차량 매입가" value={purchasePrice} />
-                  <InputRow label="취득세 (영업용 4%)" value={acquisitionTax} onChange={setAcquisitionTax} sub="렌터카 대여업 영업용 기준" />
+                  <InputRow label={acquisitionTax === 0 && factoryPrice > 0 ? '취득세 (경차 면제)' : '취득세 (영업용 4%)'} value={acquisitionTax} onChange={setAcquisitionTax} sub={acquisitionTax === 0 && factoryPrice > 0 ? '경차 취득세 감면 (지방세특례제한법 제75조)' : '렌터카 대여업 영업용 기준'} />
                   <InputRow
                     label={bondCost > 0 ? `공채 실부담 (${registrationRegion})` : `공채 (${registrationRegion})`}
                     value={bondCost}
@@ -3974,11 +3967,11 @@ export default function RentPricingBuilder() {
                       <span className="text-gray-500">현재 주행거리</span>
                       <span className="font-bold">{calculations.mileage10k.toFixed(1)}만km</span>
                     </div>
-                    <div className="flex justify-between text-sm text-blue-600">
+                    <div className="flex justify-between text-sm text-steel-600">
                       <span>종료 시 차령</span>
                       <span className="font-bold">{(calculations.carAge + calculations.termYears).toFixed(1)}년</span>
                     </div>
-                    <div className="flex justify-between text-sm text-blue-600">
+                    <div className="flex justify-between text-sm text-steel-600">
                       <span>종료 시 주행 (추정)</span>
                       <span className="font-bold">{calculations.projectedMileage10k.toFixed(1)}만km</span>
                     </div>
@@ -4014,30 +4007,30 @@ export default function RentPricingBuilder() {
                     </div>
                   </div>
                   {/* 계약 종료 시점 */}
-                  <div className="bg-blue-50 rounded-xl p-4 mb-3">
-                    <p className="text-xs font-bold text-blue-400 mb-2">
+                  <div className="bg-steel-50 rounded-xl p-4 mb-3">
+                    <p className="text-xs font-bold text-steel-400 mb-2">
                       {termMonths}개월 후 (차령 {(calculations.carAge + calculations.termYears).toFixed(1)}년)
                     </p>
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm text-blue-500">연식 감가</span>
-                      <span className="font-bold text-blue-600">{calculations.yearDepEnd.toFixed(1)}%</span>
+                      <span className="text-sm text-steel-500">연식 감가</span>
+                      <span className="font-bold text-steel-600">{calculations.yearDepEnd.toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm text-blue-500">
+                      <span className="text-sm text-steel-500">
                         주행 보정
-                        <span className="text-[10px] text-blue-400 ml-1">
+                        <span className="text-[10px] text-steel-400 ml-1">
                           (기준{calculations.avgMileageEnd.toFixed(1)}만 대비 {calculations.excessMileageEnd >= 0 ? '+' : ''}{calculations.excessMileageEnd.toFixed(1)}만km)
                         </span>
                       </span>
-                      <span className={`font-bold ${calculations.mileageDepEnd >= 0 ? 'text-blue-600' : 'text-green-500'}`}>
+                      <span className={`font-bold ${calculations.mileageDepEnd >= 0 ? 'text-steel-600' : 'text-green-500'}`}>
                         {calculations.mileageDepEnd >= 0 ? '+' : ''}{calculations.mileageDepEnd.toFixed(1)}%
                       </span>
                     </div>
-                    <div className="flex justify-between pt-2 border-t border-blue-200">
-                      <span className="text-sm font-bold text-blue-700">총 감가율</span>
-                      <span className="font-black text-blue-700">{calculations.totalDepRateEnd.toFixed(1)}%</span>
+                    <div className="flex justify-between pt-2 border-t border-steel-200">
+                      <span className="text-sm font-bold text-steel-700">총 감가율</span>
+                      <span className="font-black text-steel-700">{calculations.totalDepRateEnd.toFixed(1)}%</span>
                     </div>
-                    <div className="text-right text-sm text-blue-600 mt-1">
+                    <div className="text-right text-sm text-steel-600 mt-1">
                       추정 시세: <b>{f(calculations.endMarketValue)}원</b>
                     </div>
                   </div>
@@ -4215,12 +4208,12 @@ export default function RentPricingBuilder() {
                   {insAutoMode && insEstimate ? (
                     <>
                       {/* 담보별 내역 */}
-                      <div className="bg-blue-50 rounded-xl p-3">
+                      <div className="bg-steel-50 rounded-xl p-3">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-bold text-blue-600">
+                          <span className="text-xs font-bold text-steel-600">
                             공제조합 추정 · {insEstimate.vehicleClass}
                           </span>
-                          <span className="text-[10px] text-blue-400">
+                          <span className="text-[10px] text-steel-400">
                             연령 ×{insEstimate.ageFactor.toFixed(2)} · 차령 ×{insEstimate.carAgeFactor.toFixed(2)}
                           </span>
                         </div>
@@ -4277,7 +4270,7 @@ export default function RentPricingBuilder() {
                             onClick={() => setDeductible(v)}
                             className={`py-1.5 px-3 text-xs rounded-lg border font-bold transition-colors
                               ${deductible === v
-                                ? v === 0 ? 'bg-blue-500 text-white border-blue-500' : 'bg-red-500 text-white border-red-500'
+                                ? v === 0 ? 'bg-steel-500 text-white border-steel-500' : 'bg-red-500 text-white border-red-500'
                                 : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                           >
                             {v === 0 ? '완전자차' : `${v / 10000}만`}
@@ -4620,9 +4613,9 @@ export default function RentPricingBuilder() {
 
                 {/* 시장 평균 비교 */}
                 {calculations.marketAvg > 0 && (
-                  <div className={`rounded-xl p-4 text-center ${calculations.marketDiff > 10 ? 'bg-red-50' : calculations.marketDiff < -5 ? 'bg-green-50' : 'bg-blue-50'}`}>
+                  <div className={`rounded-xl p-4 text-center ${calculations.marketDiff > 10 ? 'bg-red-50' : calculations.marketDiff < -5 ? 'bg-green-50' : 'bg-steel-50'}`}>
                     <span className="text-xs text-gray-500 block">시장 평균 대비</span>
-                    <span className={`text-3xl font-black ${calculations.marketDiff > 10 ? 'text-red-600' : calculations.marketDiff < -5 ? 'text-green-600' : 'text-blue-600'}`}>
+                    <span className={`text-3xl font-black ${calculations.marketDiff > 10 ? 'text-red-600' : calculations.marketDiff < -5 ? 'text-green-600' : 'text-steel-600'}`}>
                       {calculations.marketDiff > 0 ? '+' : ''}{calculations.marketDiff.toFixed(1)}%
                     </span>
                     <span className="text-sm text-gray-500 block mt-1">
@@ -4929,7 +4922,7 @@ export default function RentPricingBuilder() {
                   <p className="text-xs text-gray-400 mb-3 font-bold">원가 비중 분석</p>
                   <div className="space-y-2">
                     <CostBar label="감가" value={calculations.monthlyDepreciation} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-red-500" />
-                    <CostBar label="금융" value={calculations.totalMonthlyFinance} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-blue-500" />
+                    <CostBar label="금융" value={calculations.totalMonthlyFinance} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-steel-500" />
                     <CostBar label="보험+세금" value={monthlyInsuranceCost + calculations.monthlyTax} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-purple-500" />
                     <CostBar label="정비" value={monthlyMaintenance} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-amber-500" />
                     <CostBar label="리스크" value={calculations.monthlyRiskReserve} total={calculations.totalMonthlyCost + calculations.totalDiscount} color="bg-red-400" />

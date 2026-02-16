@@ -61,7 +61,7 @@ export default function PricingStandardsPage() {
               className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
             >
               {showGuide ? '가이드 숨기기' : '가이드 보기'}
-              <span className="text-blue-500">💡</span>
+              <span className="text-gray-500">💡</span>
             </button>
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function PricingStandardsPage() {
 
       {/* 초보자 가이드 배너 */}
       {showGuide && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+        <div className="bg-gradient-to-r from-slate-50 to-zinc-50 border-b border-slate-200">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
@@ -119,7 +119,7 @@ export default function PricingStandardsPage() {
                   flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold min-w-fit
                   ${
                     activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                      ? 'bg-gray-900 text-white shadow-md shadow-gray-400'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }
                 `}
@@ -127,7 +127,7 @@ export default function PricingStandardsPage() {
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
                 {activeTab === tab.id && (
-                  <span className="text-blue-200 text-[10px] hidden sm:inline">
+                  <span className="text-gray-300 text-[10px] hidden sm:inline">
                     {tab.desc}
                   </span>
                 )}

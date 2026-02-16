@@ -19,11 +19,10 @@ const RULE_CATEGORIES: RuleCategory[] = [
   { name: '금융 설정', icon: '🏦', keys: ['LOAN_INTEREST_RATE', 'LOAN_LTV_DEFAULT', 'INVESTMENT_RETURN_RATE'],
     explanation: '차량 구매 자금의 대출 이자율, 담보인정비율(LTV), 자체자금 운용 시 기회비용(투자수익률)을 설정합니다.' },
   { name: '운영 설정', icon: '🔧', keys: ['INSURANCE_LOADING', 'MONTHLY_MAINTENANCE_BASE', 'CAR_TAX_RATE', 'CAR_TAX_TYPE'],
-    explanation: '보험료 로딩율(보험사 수수료 반영), 기본 월정비비, 자동차세 기본 세율, 자동차세 유형(영업용/비영업용)을 관리합니다.' },
+    explanation: '보험료 로딩율(보험사 수수료 반영), 기본 월정비비, 자동차세 기본 세율(영업용), 자동차세 유형을 관리합니다.' },
   { name: '리스크/할인', icon: '🛡️', keys: ['DEDUCTIBLE_AMOUNT', 'RISK_RESERVE_RATE', 'DEPOSIT_DISCOUNT_RATE', 'PREPAYMENT_DISCOUNT_RATE', 'DEFAULT_DEPOSIT'],
     explanation: '자차 면책금, 리스크 적립율(사고·수리 대비), 보증금 할인율, 선납 할인율, 기본 보증금을 관리합니다.' },
-  { name: '등록비', icon: '📋', keys: ['REG_ACQUISITION_TAX', 'REG_BOND_RATE_SEOUL', 'REG_BOND_RATE_GYEONGGI', 'REG_DELIVERY_FEE', 'REG_MISC_FEE'],
-    explanation: '취득세율, 서울/경기 공채매입률, 탁송료, 기타 등록 수수료를 설정합니다. 이 값들이 등록비 계산의 기본값으로 사용됩니다.' },
+  // 등록비는 registration_cost_table(등록비용 탭)에서 직접 관리 → 여기서 중복 제거
   { name: '기타', icon: '⚙️', keys: ['DEFAULT_MARGIN_RATE', 'OVERHEAD_RATE', 'VAT_RATE', 'DEFAULT_TERM_MONTHS'],
     explanation: '마진율, 관리비율(인건비·사무실·시스템 등), 부가세율(10%), 기본 계약기간(월)을 관리합니다.' },
 ]
@@ -38,18 +37,19 @@ const KEY_DETAILS: Record<string, { label: string; unit: string; range: string; 
   INVESTMENT_RETURN_RATE: { label: '기회비용 수익률', unit: '%', range: '3~6%', industryRef: '정기예금 3~4%, 적극투자 5~6%' },
   INSURANCE_LOADING: { label: '보험 로딩율', unit: '%', range: '10~30%', industryRef: '보험사 수수료 + 관리비 반영' },
   MONTHLY_MAINTENANCE_BASE: { label: '기본 월 정비비', unit: '원', range: '50,000~200,000', industryRef: '국산 중형 기준 약 8~12만원' },
-  CAR_TAX_RATE: { label: '자동차세 기본세율', unit: '원/cc', range: '18~200', industryRef: '영업용 18~24원, 비영업용 80~200원' },
-  CAR_TAX_TYPE: { label: '자동차세 유형', unit: '', range: '영업용/비영업용', industryRef: '렌터카는 영업용 (세율 1/10)' },
+  CAR_TAX_RATE: { label: '자동차세 기본세율', unit: '원/cc', range: '18~24', industryRef: '영업용 18원(1600cc↓), 19원(2500cc↓), 24원(2500cc↑)' },
+  CAR_TAX_TYPE: { label: '자동차세 유형', unit: '', range: '영업용', industryRef: '렌터카=영업용 고정 (비영업용 대비 1/10)' },
   DEDUCTIBLE_AMOUNT: { label: '자차 면책금', unit: '원', range: '200,000~1,000,000', industryRef: '대형사 30~50만원, 중소사 50~100만원' },
   RISK_RESERVE_RATE: { label: '리스크 적립율', unit: '%', range: '1~5%', industryRef: '차량가의 2~3%를 연 적립' },
   DEPOSIT_DISCOUNT_RATE: { label: '보증금 할인율', unit: '%/천만원', range: '1~3%', industryRef: '보증금 1천만원당 월 1~2% 할인' },
   PREPAYMENT_DISCOUNT_RATE: { label: '선납 할인율', unit: '%', range: '2~5%', industryRef: '선납금 비율에 따라 할인' },
   DEFAULT_DEPOSIT: { label: '기본 보증금', unit: '원', range: '0~5,000,000', industryRef: '보통 0~300만원' },
-  REG_ACQUISITION_TAX: { label: '취득세율', unit: '%', range: '4~7%', industryRef: '승용 7%, 전기차 4%' },
-  REG_BOND_RATE_SEOUL: { label: '서울 공채매입률', unit: '%', range: '6~20%', industryRef: '영업용 6~10%, 비영업용 12~20%' },
-  REG_BOND_RATE_GYEONGGI: { label: '경기 공채매입률', unit: '%', range: '3~10%', industryRef: '영업용 3~5%, 비영업용 4~10%' },
-  REG_DELIVERY_FEE: { label: '탁송료', unit: '원', range: '100,000~500,000', industryRef: '거리에 따라 10~50만원' },
-  REG_MISC_FEE: { label: '기타 등록비', unit: '원', range: '50,000~200,000', industryRef: '번호판+인지세+대행료+검사비' },
+  // 등록비 관련 키는 등록비용 탭(registration_cost_table)에서 직접 관리
+  REG_ACQUISITION_TAX: { label: '(미사용) 취득세율', unit: '%', range: '4%', industryRef: '→ 등록비용 탭에서 관리' },
+  REG_BOND_RATE_SEOUL: { label: '(미사용) 서울 공채', unit: '%', range: '8%', industryRef: '→ 등록비용 탭에서 관리' },
+  REG_BOND_RATE_GYEONGGI: { label: '(미사용) 경기 공채', unit: '%', range: '0%', industryRef: '→ 등록비용 탭에서 관리' },
+  REG_DELIVERY_FEE: { label: '(미사용) 탁송료', unit: '원', range: '350,000', industryRef: '→ 등록비용 탭에서 관리' },
+  REG_MISC_FEE: { label: '(미사용) 기타 등록비', unit: '원', range: '167,000', industryRef: '→ 등록비용 탭에서 관리' },
   DEFAULT_MARGIN_RATE: { label: '기본 마진율', unit: '%', range: '5~20%', industryRef: '대형사 5~10%, 중소사 10~20%' },
   OVERHEAD_RATE: { label: '관리비율', unit: '%', range: '3~10%', industryRef: '인건비·사무실·시스템 등 간접비' },
   VAT_RATE: { label: '부가세율', unit: '%', range: '10%', industryRef: '법정 10% 고정' },
@@ -136,7 +136,7 @@ export default function BusinessRulesTab() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-8">
           {!showGuide && (
-            <button onClick={() => setShowGuide(true)} className="mb-3 px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드 💡</button>
+            <button onClick={() => setShowGuide(true)} className="mb-3 px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드 💡</button>
           )}
           <div className="space-y-4">
             {RULE_CATEGORIES.map((category) => {
@@ -175,7 +175,7 @@ export default function BusinessRulesTab() {
                           {/* 업계 참고 정보 */}
                           {detail && (
                             <div className="flex flex-wrap gap-3 mb-3 text-[10px]">
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">적정 범위: {detail.range}</span>
+                              <span className="px-2 py-0.5 bg-steel-50 text-steel-600 rounded-full">적정 범위: {detail.range}</span>
                               <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full">업계: {detail.industryRef}</span>
                               {detail.unit && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">단위: {detail.unit}</span>}
                             </div>
@@ -191,7 +191,7 @@ export default function BusinessRulesTab() {
                                   const v = parseFloat(e.target.value)
                                   if (!isNaN(v) && v !== rule.value) handleSave(rule.id, v)
                                 }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
+                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
                             ) : valueType === 'boolean' ? (
                               <select defaultValue={rule.value ? 'true' : 'false'}
                                 onChange={(e) => handleSave(rule.id, e.target.value === 'true')}
@@ -202,7 +202,7 @@ export default function BusinessRulesTab() {
                             ) : (
                               <input type="text" defaultValue={rule.value}
                                 onBlur={(e) => { if (e.target.value !== rule.value) handleSave(rule.id, e.target.value) }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
+                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
                             )}
                             {isSaved && <span className="text-green-600 text-xs font-semibold">💾 저장됨</span>}
                           </div>
@@ -239,7 +239,7 @@ export default function BusinessRulesTab() {
               </div>
 
               <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] font-semibold text-blue-300 mb-2">주요 설정값 요약</div>
+                <div className="text-[10px] font-semibold text-slate-300 mb-2">주요 설정값 요약</div>
                 <div className="space-y-1 text-xs text-slate-300">
                   {getRuleByKey('DEFAULT_MARGIN_RATE') && <div className="flex justify-between"><span>마진율</span><span className="font-semibold text-white">{getRuleByKey('DEFAULT_MARGIN_RATE')!.value}%</span></div>}
                   {getRuleByKey('VAT_RATE') && <div className="flex justify-between"><span>부가세율</span><span className="font-semibold text-white">{getRuleByKey('VAT_RATE')!.value}%</span></div>}
@@ -249,12 +249,12 @@ export default function BusinessRulesTab() {
                 </div>
               </div>
 
-              <div className="p-3 bg-gradient-to-br from-blue-900 to-slate-900 rounded-lg border border-blue-700">
-                <div className="text-[10px] font-semibold text-blue-300 mb-1">월 금융비용 합계</div>
+              <div className="p-3 bg-gradient-to-br from-steel-800 to-slate-900 rounded-lg border border-steel-700">
+                <div className="text-[10px] font-semibold text-slate-300 mb-1">월 금융비용 합계</div>
                 <div className="text-lg font-black text-white">
                   {(calculateMonthlyInterest() + calculateOpportunityCost() + calculateRiskReserve()).toLocaleString()}원
                 </div>
-                <div className="text-[10px] text-blue-200 mt-0.5">대출이자 + 기회비용 + 리스크적립</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">대출이자 + 기회비용 + 리스크적립</div>
               </div>
 
               <div className="p-2 bg-slate-800 rounded-lg text-[10px] text-slate-500 border border-slate-700">

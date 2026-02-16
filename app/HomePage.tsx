@@ -78,14 +78,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-xs font-bold text-gray-400 flex gap-2">
                     <span className="text-green-600">대기 {stats.available}</span>
-                    <span className="text-blue-600">대여중 {stats.rented}</span>
+                    <span className="text-steel-600">대여중 {stats.rented}</span>
                 </div>
             </div>
 
             {/* 카드 2: 월 예상 매출 */}
             <div className="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between h-40">
                 <span className="text-gray-500 font-bold text-sm">이번 달 예상 매출</span>
-                <div className="text-blue-600">
+                <div className="text-steel-600">
                     <span className="text-3xl font-black">{f(stats.monthlyRevenue)}</span>
                     <span className="text-sm font-bold ml-1">원</span>
                 </div>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 카드 4: 월 순수익 (하이라이트) */}
-            <div className="bg-gray-900 text-white p-6 rounded-3xl shadow-lg flex flex-col justify-between h-40 ring-4 ring-gray-100">
+            <div className="bg-steel-900 text-white p-6 rounded-3xl shadow-lg flex flex-col justify-between h-40 ring-4 ring-gray-100">
                 <span className="text-yellow-400 font-bold text-sm">💰 이번 달 순수익</span>
                 <div>
                     <span className="text-4xl font-black">{f(stats.netProfit)}</span>
@@ -119,11 +119,11 @@ export default function DashboardPage() {
         <div>
             <h2 className="text-2xl font-black text-gray-900">🚙 차량 관리</h2>
             <div className="flex gap-4 mt-2 text-sm font-bold text-gray-500">
-                <Link href="/quotes" className="hover:text-blue-600 hover:underline">📄 견적/계약 대장 &gt;</Link>
-                <Link href="/customers" className="hover:text-blue-600 hover:underline">👥 고객 관리 &gt;</Link>
+                <Link href="/quotes" className="hover:text-steel-600 hover:underline">📄 견적/계약 대장 &gt;</Link>
+                <Link href="/customers" className="hover:text-steel-600 hover:underline">👥 고객 관리 &gt;</Link>
             </div>
         </div>
-        <Link href="/cars/new" className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-colors shadow-lg">
+        <Link href="/cars/new" className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-steel-800 transition-colors shadow-lg">
           + 차량 등록
         </Link>
       </div>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
             <Link
               key={car.id}
               href={`/cars/${car.id}`}
-              className="block bg-white p-6 rounded-2xl border-2 border-gray-100 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer group"
+              className="block bg-white p-6 rounded-2xl border-2 border-gray-100 hover:border-steel-500 hover:shadow-xl transition-all cursor-pointer group"
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-4">
@@ -143,13 +143,13 @@ export default function DashboardPage() {
                         {car.image_url ? <img src={car.image_url} className="w-full h-full object-cover"/> : <span className="flex h-full items-center justify-center text-xs text-gray-300">No img</span>}
                     </div>
                     <div>
-                        <h3 className="text-xl font-black text-gray-900 group-hover:text-blue-600 transition-colors">{car.number}</h3>
+                        <h3 className="text-xl font-black text-gray-900 group-hover:text-steel-600 transition-colors">{car.number}</h3>
                         <p className="text-gray-500 font-medium text-sm">{car.brand} {car.model} {car.trim}</p>
                     </div>
                 </div>
                 <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
                   car.status === 'available' ? 'bg-green-100 text-green-700' :
-                  car.status === 'rented' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                  car.status === 'rented' ? 'bg-steel-100 text-steel-700' : 'bg-gray-100 text-gray-600'
                 }`}>
                   {car.status === 'available' ? '대기중' : car.status === 'rented' ? '대여중' : car.status}
                 </span>

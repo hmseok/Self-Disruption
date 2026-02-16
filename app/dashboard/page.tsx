@@ -406,7 +406,7 @@ export default function DashboardPage() {
                         <span className="font-black text-gray-900">{c.name}</span>
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
                           c.plan === 'master' ? 'bg-yellow-100 text-yellow-700' :
-                          c.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
+                          c.plan === 'pro' ? 'bg-steel-100 text-steel-700' :
                           'bg-gray-100 text-gray-500'
                         }`}>{c.plan?.toUpperCase() || 'FREE'}</span>
                       </div>
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                           href={c.business_registration_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-steel-50 text-steel-600 hover:bg-steel-100 transition-colors"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
@@ -455,7 +455,7 @@ export default function DashboardPage() {
               <Link
                 key={action.href}
                 href={action.href}
-                className="group bg-gray-900 rounded-xl p-4 md:p-5 hover:bg-gray-800 transition-all hover:scale-[1.02] border border-gray-800"
+                className="group bg-steel-900 rounded-xl p-4 md:p-5 hover:bg-steel-800 transition-all hover:scale-[1.02] border border-gray-800"
               >
                 <span className="text-2xl">{action.icon}</span>
                 <p className="text-white font-bold text-sm mt-2">{action.label}</p>
@@ -494,7 +494,7 @@ export default function DashboardPage() {
                       <td className="p-3 md:p-4 text-center">
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                           c.plan === 'master' ? 'bg-yellow-100 text-yellow-700' :
-                          c.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
+                          c.plan === 'pro' ? 'bg-steel-100 text-steel-700' :
                           'bg-gray-100 text-gray-500'
                         }`}>{c.plan?.toUpperCase() || 'FREE'}</span>
                       </td>
@@ -509,7 +509,7 @@ export default function DashboardPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-steel-50 text-steel-600 hover:bg-steel-100 transition-colors"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
@@ -542,7 +542,7 @@ export default function DashboardPage() {
     : null
 
   const allQuickActions = [
-    { label: '등록/이전', desc: '차량 등록증 관리', href: '/registration', icon: '📄', color: 'from-blue-500 to-blue-600', modulePath: '/registration' },
+    { label: '등록/이전', desc: '차량 등록증 관리', href: '/registration', icon: '📄', color: 'from-steel-500 to-steel-600', modulePath: '/registration' },
     { label: '보험/가입', desc: '보험 계약 관리', href: '/insurance', icon: '🛡️', color: 'from-teal-500 to-teal-600', modulePath: '/insurance' },
     { label: '고객 관리', desc: '고객 정보 관리', href: '/customers', icon: '👥', color: 'from-emerald-500 to-emerald-600', modulePath: '/customers' },
     { label: '견적/계약', desc: '견적서 작성', href: '/quotes', icon: '📋', color: 'from-amber-500 to-amber-600', modulePath: '/quotes' },
@@ -581,13 +581,13 @@ export default function DashboardPage() {
             {company?.plan && role !== 'god_admin' && (
               <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
                 company.plan === 'master' ? 'bg-yellow-100 text-yellow-700' :
-                company.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
+                company.plan === 'pro' ? 'bg-steel-100 text-steel-700' :
                 'bg-gray-100 text-gray-500'
               }`}>{company.plan.toUpperCase()}</span>
             )}
             {role !== 'god_admin' && (
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                role === 'master' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                role === 'master' ? 'bg-steel-100 text-steel-700' : 'bg-gray-100 text-gray-600'
               }`}>{role === 'master' ? '관리자' : '직원'}</span>
             )}
             {position && (
@@ -626,7 +626,7 @@ export default function DashboardPage() {
           </div>
         )}
         {showInvest && (
-          <div className="bg-gradient-to-br from-sky-600 to-blue-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <span className="text-[10px] md:text-xs font-bold text-sky-200 uppercase">투자 유치</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💰</span>
@@ -659,13 +659,13 @@ export default function DashboardPage() {
       {/* 경영 현황판 — 다크 스타일 */}
       {showFinance && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-8">
-          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-blue-200 uppercase">월 예상 매출</span>
+              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">월 예상 매출</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💵</span>
             </div>
-            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-blue-200 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-blue-200">활성 렌트 계약 기준</p>
+            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-steel-200 ml-1">원</span></p>
+            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">활성 렌트 계약 기준</p>
           </div>
           <div className="bg-gradient-to-br from-red-500 to-rose-700 rounded-2xl p-4 md:p-5 text-white shadow-lg">
             <div className="flex items-center justify-between mb-2 md:mb-3">
@@ -675,7 +675,7 @@ export default function DashboardPage() {
             <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-red-200 ml-1">원</span></p>
             <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-red-200">할부금 + 보험료 (월 환산)</p>
           </div>
-          <div className="bg-gray-900 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-gray-100">
+          <div className="bg-steel-900 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-gray-100">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <span className="text-[10px] md:text-xs font-bold text-yellow-400 uppercase">월 순수익</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-yellow-900/30 flex items-center justify-center text-sm">🏆</span>
@@ -697,7 +697,7 @@ export default function DashboardPage() {
               <Link
                 key={action.href}
                 href={action.href}
-                className="group bg-gray-900 rounded-xl p-4 md:p-5 hover:bg-gray-800 transition-all hover:scale-[1.02] border border-gray-800"
+                className="group bg-steel-900 rounded-xl p-4 md:p-5 hover:bg-steel-800 transition-all hover:scale-[1.02] border border-gray-800"
               >
                 <span className="text-2xl">{action.icon}</span>
                 <p className="text-white font-bold text-sm mt-2">{action.label}</p>

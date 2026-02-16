@@ -149,13 +149,13 @@ export default function MaintenanceTab() {
             <h3 className="text-xs font-bold text-gray-700">차종 분류 기준 (정비비 적용 기준)</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[100px] whitespace-nowrap">분류</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[150px] whitespace-nowrap">해당 차종</th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600 min-w-[90px] whitespace-nowrap">비용 범위</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[130px] whitespace-nowrap">특이사항</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">분류</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">해당 차종</th>
+                  <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">비용 범위</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">특이사항</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -163,7 +163,7 @@ export default function MaintenanceTab() {
                   <tr key={info.type} className="hover:bg-gray-50/50">
                     <td className="px-3 py-2 font-semibold text-gray-800">{info.type}</td>
                     <td className="px-3 py-2 text-gray-500">{info.desc}</td>
-                    <td className="px-3 py-2 text-center font-medium text-blue-600">{info.costRange}</td>
+                    <td className="px-3 py-2 text-center font-medium text-steel-600">{info.costRange}</td>
                     <td className="px-3 py-2 text-gray-500">{info.note}</td>
                   </tr>
                 ))}
@@ -178,13 +178,13 @@ export default function MaintenanceTab() {
             <h3 className="text-xs font-bold text-gray-700">주요 정비 항목 및 주기 참고</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[100px] whitespace-nowrap">항목</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[100px] whitespace-nowrap">교체주기</th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600 min-w-[90px] whitespace-nowrap">비용</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 min-w-[100px] whitespace-nowrap">참고</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">항목</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">교체주기</th>
+                  <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">비용</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">참고</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -210,26 +210,26 @@ export default function MaintenanceTab() {
             <p className="text-xs text-gray-400 mt-0.5">차종별·연료별·연식별 월 정비비 기준</p>
           </div>
           <div className="flex gap-2">
-            {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">가이드 💡</button>}
+            {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드 💡</button>}
             <button onClick={() => setShowAIPanel(!showAIPanel)} 
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${showAIPanel ? 'bg-slate-900 text-white' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}>
               {showAIPanel ? '🔍 AI 검증 닫기' : '🔍 AI 검증'}
             </button>
-            <button onClick={addRow} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">+ 행 추가</button>
+            <button onClick={addRow} className="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800">+ 행 추가</button>
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap min-w-[140px]">차종</th>
-                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap min-w-[100px]">연료</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[70px]">연식~</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[70px]">~연식</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[100px]">월정비비</th>
-                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">포함</th>
-                <th className="px-2 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">비고</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-600 whitespace-nowrap w-[50px]">삭제</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">차종</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">연료</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">연식~</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">~연식</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">월정비비</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">포함</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">비고</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">삭제</th>
               </tr>
             </thead>
             <tbody>
@@ -237,64 +237,64 @@ export default function MaintenanceTab() {
                 <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition">
-                    <td className="px-2 py-2 whitespace-nowrap">
+                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'vehicle_type' ? (
                         <select value={row.vehicle_type} onChange={(e) => { updateField(row.id, 'vehicle_type', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
                           {VEHICLE_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('vehicle_type') }}
-                          className="cursor-pointer text-gray-800 hover:text-blue-600 font-medium inline-block">{row.vehicle_type}</span>
+                          className="cursor-pointer text-gray-800 hover:text-gray-600 font-medium inline-block">{row.vehicle_type}</span>
                       )}
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'fuel_type' ? (
                         <select value={row.fuel_type} onChange={(e) => { updateField(row.id, 'fuel_type', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
                           {FUEL_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('fuel_type') }}
-                          className="cursor-pointer text-gray-700 hover:text-blue-600 inline-block">{row.fuel_type}</span>
+                          className="cursor-pointer text-gray-700 hover:text-gray-600 inline-block">{row.fuel_type}</span>
                       )}
                     </td>
                     {(['age_min', 'age_max'] as const).map(field => (
-                      <td key={field} className="px-2 py-2 text-center">
+                      <td key={field} className="px-3 py-2 text-center">
                         {editingId === row.id && editingField === field ? (
                           <input type="number" value={row[field]} onChange={(e) => updateField(row.id, field, parseInt(e.target.value) || 0)}
                             onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                            className="w-14 px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none text-center" />
+                            className="w-14 px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none text-center" />
                         ) : (
                           <span onClick={() => { setEditingId(row.id || null); setEditingField(field) }}
-                            className="cursor-pointer text-gray-700 hover:text-blue-600 inline-block">{row[field]}년</span>
+                            className="cursor-pointer text-gray-700 hover:text-gray-600 inline-block">{row[field]}년</span>
                         )}
                       </td>
                     ))}
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-3 py-2 text-center">
                       {editingId === row.id && editingField === 'monthly_cost' ? (
                         <input type="number" value={row.monthly_cost} onChange={(e) => updateField(row.id, 'monthly_cost', parseInt(e.target.value) || 0)}
                           onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-20 px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none text-center" />
+                          className="w-20 px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none text-center" />
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('monthly_cost') }}
-                          className="cursor-pointer font-bold text-blue-600 hover:text-blue-700 inline-block">{formatCurrency(row.monthly_cost)}원</span>
+                          className="cursor-pointer font-bold text-steel-600 hover:text-steel-700 inline-block">{formatCurrency(row.monthly_cost)}원</span>
                       )}
                     </td>
                     {(['includes', 'notes'] as const).map(field => (
-                      <td key={field} className="px-2 py-2">
+                      <td key={field} className="px-3 py-2">
                         {editingId === row.id && editingField === field ? (
                           <input type="text" value={row[field]} onChange={(e) => updateField(row.id, field, e.target.value)}
                             onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                            className="w-full px-2 py-1 border border-blue-400 rounded text-xs focus:outline-none" />
+                            className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none" />
                         ) : (
                           <span onClick={() => { setEditingId(row.id || null); setEditingField(field) }}
-                            className="cursor-pointer text-gray-500 hover:text-blue-600 inline-block">{row[field] || '—'}</span>
+                            className="cursor-pointer text-gray-500 hover:text-gray-600 inline-block">{row[field] || '—'}</span>
                         )}
                       </td>
                     ))}
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-3 py-2 text-center">
                       <button onClick={() => deleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
                     </td>
                   </tr>
@@ -315,7 +315,7 @@ export default function MaintenanceTab() {
             <div>
               <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">차종</label>
               <select value={searchVehicleType} onChange={(e) => setSearchVehicleType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500">
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500">
                 <option value="">선택하세요</option>
                 {VEHICLE_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
               </select>
@@ -323,7 +323,7 @@ export default function MaintenanceTab() {
             <div>
               <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">차량 연식 (년차)</label>
               <input type="number" value={searchAge} onChange={(e) => setSearchAge(parseInt(e.target.value) || 1)} min="1"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-blue-500" />
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500" />
             </div>
           </div>
 
@@ -336,8 +336,8 @@ export default function MaintenanceTab() {
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between"><span className="text-slate-400">차종</span><span className="text-white">{matched.vehicle_type}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">연식 범위</span><span className="text-white">{matched.age_min}~{matched.age_max}년</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">월 정비비</span><span className="font-bold text-blue-400">{formatCurrency(matched.monthly_cost)}원</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">연 환산</span><span className="text-blue-300">{formatCurrency(matched.monthly_cost * 12)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">월 정비비</span><span className="font-bold text-steel-400">{formatCurrency(matched.monthly_cost)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">연 환산</span><span className="text-slate-300">{formatCurrency(matched.monthly_cost * 12)}원</span></div>
                 </div>
               </div>
             ) : (
@@ -348,14 +348,14 @@ export default function MaintenanceTab() {
           })()}
 
           <button onClick={handleSearch} disabled={searching || !searchVehicleType}
-            className="w-full px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
+            className="w-full px-4 py-2.5 bg-steel-600 text-white font-semibold text-xs rounded-lg hover:bg-steel-700 disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors mb-4">
             {searching ? '시장 데이터 조회 중...' : '🔍 실시간 정비비 검증'}
           </button>
 
           {searchResults && (
             <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[10px] font-semibold text-blue-300">Gemini 검증 결과</h4>
+                <h4 className="text-[10px] font-semibold text-slate-300">Gemini 검증 결과</h4>
                 <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
               </div>
               <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
@@ -365,7 +365,7 @@ export default function MaintenanceTab() {
                 <div className="mt-2 pt-2 border-t border-slate-700">
                   <p className="text-[10px] text-slate-400 mb-1">출처:</p>
                   {searchResults.sources.map((s, i) => (
-                    <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-[10px] underline block truncate">{s}</a>
+                    <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="text-slate-400 text-[10px] underline block truncate">{s}</a>
                   ))}
                 </div>
               )}
