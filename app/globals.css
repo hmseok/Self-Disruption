@@ -143,6 +143,12 @@ body {
   }
 }
 
+/* 모든 버튼/링크에 pointer 커서 */
+button:not(:disabled),
+[role="button"] {
+  cursor: pointer;
+}
+
 /* 모바일: 네이티브 앱 느낌 */
 @media (max-width: 768px) {
   button, a, input, textarea, select {
@@ -184,7 +190,7 @@ body {
 
 /* ── 인쇄 전용 스타일 ── */
 @media print {
-  /* 사이드바, 헤더, 오버레이 모두 숨김 */
+  /* 사이드바, 헤더, 오버레이, 스텝 인디케이터 모두 숨김 */
   aside, .sidebar-overlay, nav,
   [data-print-hide], .print-hide {
     display: none !important;
@@ -196,14 +202,107 @@ body {
     width: 100% !important;
     max-width: 100% !important;
   }
-  body {
+  html, body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
-  /* 그림자/둥근모서리 제거 */
-  .print-clean, .print-clean * {
+  /* 앱 셸 모든 부모 컨테이너 height/overflow 해제 */
+  body > div,
+  body > div > div,
+  body > div > div > div,
+  main,
+  main > div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+  }
+  /* 모바일 헤더 인쇄 숨김 */
+  .fixed.top-0 {
+    display: none !important;
+  }
+
+  /* ── 견적서 인쇄 전용 ── */
+  .quote-print-area {
     box-shadow: none !important;
     border-radius: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* 배경색 보존 */
+  .quote-print-area .quote-header-bg {
+    background: #1a1a2e !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* 파란색 월 렌탈료 박스 배경 보존 */
+  .quote-print-area .bg-blue-50,
+  .quote-print-area .bg-amber-50,
+  .quote-print-area .bg-gray-50,
+  .quote-print-area .bg-gray-900 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* 1페이지: 핵심 정보 — 같은 페이지 유지 */
+  .quote-print-area .quote-page-1 {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* 2페이지: 상세 안내 — 새 페이지 시작 + 서명란 하단 고정 */
+  .quote-print-area .quote-page-2 {
+    page-break-before: always;
+    break-before: always;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(297mm - 24mm); /* A4 높이 - 상하 여백 */
+  }
+  /* 테이블 깨짐 방지 */
+  .quote-print-area table {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* 섹션 단위 페이지 넘김 방지 */
+  .quote-print-area .quote-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* 월 렌탈료 섹션 반드시 같은 페이지 */
+  .quote-print-area .quote-rental-highlight {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* 서명란은 새 페이지 방지 */
+  .quote-print-area .quote-signature {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+  /* 인쇄 시 텍스트 크기 보정 — 컴팩트 */
+  .quote-print-area {
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+  .quote-print-area h1 { font-size: 16pt; }
+  .quote-print-area table td,
+  .quote-print-area table th { font-size: 9pt; padding: 4px 8px; }
+  .quote-print-area .text-2xl { font-size: 16pt !important; }
+  .quote-print-area .text-xl,
+  .quote-print-area .text-lg { font-size: 12pt !important; }
+  /* 유의사항 폰트 크기 */
+  .quote-print-area .quote-notices p { font-size: 8pt; line-height: 1.5; }
+  /* 페이지 여백 */
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
+  /* 배경 제거 */
+  .quote-print-wrapper {
+    background: white !important;
+    padding: 0 !important;
+    min-height: auto !important;
   }
 }

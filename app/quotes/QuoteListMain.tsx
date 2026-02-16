@@ -2,7 +2,7 @@
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 
 // ============================================================================
@@ -58,20 +58,36 @@ function DesktopRowActions({
   onDelete: (quoteId: string) => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+
+  // 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!showMenu) return
+    const close = () => setShowMenu(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [showMenu])
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={(e) => {
           e.stopPropagation()
+          if (!showMenu && btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect()
+            setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+          }
           setShowMenu(!showMenu)
         }}
-        className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
+        className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 cursor-pointer"
       >
         ⋯
       </button>
       {showMenu && (
-        <div className="absolute right-0 top-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg z-10 min-w-[140px]">
+        <div style={{ top: menuPos.top, right: menuPos.right }}
+          className="fixed bg-white rounded-lg border border-gray-200 shadow-lg z-50 min-w-[140px]">
           <button
             onClick={(e) => {
               e.stopPropagation()
