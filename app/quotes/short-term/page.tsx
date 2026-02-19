@@ -1,6 +1,6 @@
 'use client'
 import { Suspense } from "react";
-import RentPricingBuilder from "./RentPricingBuilder";
+import ShortTermReplacementBuilder from "./ShortTermReplacementBuilder";
 
 function LoadingFallback() {
   return (
@@ -16,7 +16,7 @@ function LoadingFallback() {
 export default function Page() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <RentPricingBuilder />
+      <ShortTermReplacementBuilder />
     </Suspense>
   );
 }

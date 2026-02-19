@@ -34,7 +34,7 @@ const Icons: any = {
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/quotes': 'sales', '/quotes/pricing': 'sales', '/customers': 'sales',
+  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/customers': 'sales',
   '/finance': 'finance', '/finance/settlement': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
   '/db/pricing-standards': 'data', '/db/lotte': 'data',
@@ -114,6 +114,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isDesktop = window.innerWidth >= 1024
     setIsSidebarOpen(isDesktop)
   }, [])
+
+  // ★ 앱 셸 활성화 시 body에 클래스 추가 (로그인 페이지 제외)
+  const isAuthPage = pathname === '/' || pathname.startsWith('/auth')
+  useEffect(() => {
+    if (!isAuthPage) {
+      document.body.classList.add('app-shell')
+    }
+    return () => {
+      document.body.classList.remove('app-shell')
+    }
+  }, [isAuthPage])
 
   // 모바일에서 메뉴 클릭 시 사이드바 닫기
   useEffect(() => {
@@ -217,10 +228,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [loading, user, pathname, router])
 
   // 로그인/인증 페이지 제외
-  if (pathname === '/' || pathname.startsWith('/auth')) return <>{children}</>
+  if (isAuthPage) return <>{children}</>
+
+  // 로딩 중 → 깔끔한 스플래시 (빈 레이아웃 깨짐 방지)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50" style={{ height: '100dvh' }}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-steel-300 border-t-steel-600 rounded-full animate-spin mx-auto" />
+          <p className="mt-3 text-sm text-steel-400 font-medium">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
 
   // 로그아웃 상태 → 빈 화면 (useEffect에서 리디렉트 처리)
-  if (!loading && !user) {
+  if (!user) {
     return null
   }
 
@@ -239,7 +262,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showSettings = !isPendingApproval && (role === 'god_admin' || role === 'master')
 
   return (
-    <div className="flex h-[100dvh] bg-gray-50 overflow-hidden print:!h-auto print:!overflow-visible print:!block">
+    <div className="flex h-screen bg-gray-50 overflow-hidden print:!h-auto print:!overflow-visible print:!block" style={{ height: '100dvh' }}>
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
         <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-900/95 backdrop-blur-sm border-b border-steel-700/50 safe-top">
@@ -458,7 +481,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* 메인 콘텐츠 — 앱 셸: 내부 스크롤 */}
-      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-hidden w-full min-w-0 h-[100dvh] print:!ml-0 print:!h-auto print:!overflow-visible print:!block">
+      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-hidden w-full min-w-0 h-screen print:!ml-0 print:!h-auto print:!overflow-visible print:!block" style={{ height: '100dvh' }}>
         <div className="h-full pt-12 lg:pt-0 overflow-y-auto overflow-x-hidden overscroll-none max-w-full print:!pt-0 print:!h-auto print:!overflow-visible print:!block">
           {children}
         </div>

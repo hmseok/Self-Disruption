@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from './utils/supabase'
 
 // ============================================
@@ -9,6 +10,7 @@ import { supabase } from './utils/supabase'
 // ============================================
 
 function AuthPage() {
+  const router = useRouter()
   const isLocal = process.env.NODE_ENV === 'development'
 
   const [view, setView] = useState<'login' | 'signup' | 'verify' | 'verified'>('login')
@@ -294,7 +296,7 @@ function AuthPage() {
       // ★ INITIAL_SESSION 또는 SIGNED_IN에서 세션 있으면 1회만 리다이렉트
       if (!redirected && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
         redirected = true
-        window.location.href = '/dashboard'
+        router.push('/dashboard')
       }
     })
     return () => { subscription.unsubscribe() }
@@ -418,7 +420,7 @@ function AuthPage() {
         setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
         setLoading(false)
       } else {
-        window.location.href = '/dashboard'
+        router.push('/dashboard')
       }
     } catch (err: any) {
       setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
@@ -660,7 +662,7 @@ function AuthPage() {
       // 이미 세션이 있을 수 있으므로 세션 확인 후 이동
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        window.location.href = '/dashboard'
+        router.push('/dashboard')
         return
       }
       // 세션이 없으면 다시 로그인 시도
@@ -671,7 +673,7 @@ function AuthPage() {
       if (error) {
         setMessage({ text: '로그인 중 오류가 발생했습니다. 로그인 페이지에서 다시 시도해주세요.', type: 'error' })
       } else {
-        window.location.href = '/dashboard'
+        router.push('/dashboard')
       }
     } catch (err: any) {
       setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })

@@ -11,8 +11,8 @@ const inter = Inter({ subsets: ['latin'] })
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: 'cover',
 }
 
@@ -36,7 +36,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
+      <head>
+        {/* 모바일 CSS 로딩 실패 대비 — 최소한의 레이아웃 보장 인라인 스타일 */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          html,body{margin:0;padding:0;height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+          body{background:#f9fafb;color:#171717}
+          svg{max-width:24px;max-height:24px}
+        `}} />
+      </head>
       <body className={inter.className}>
         <AppProvider>
           <UploadProvider>
