@@ -171,19 +171,23 @@ export default function ShortTermReplacementBuilder() {
   const cid = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   const [subTab, setSubTab] = useState<SubTab>('settings')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // 롯데 기준 요율
-  const [lotteRates, setLotteRates] = useState<LotteRate[]>([])
+  // 롯데 기준 요율 — 초기값으로 기본 데이터 세팅
+  const [lotteRates, setLotteRates] = useState<LotteRate[]>(
+    LOTTE_DEFAULT_DATA.map((d, i) => ({ ...d, id: `lotte_${i}` }))
+  )
   const [lotteEditMode, setLotteEditMode] = useState(false)
   const [lotteUpdateDate, setLotteUpdateDate] = useState<string>('2025.02.10')
   const [lotteUpdating, setLotteUpdating] = useState(false)
   const [lotteCatFilter, setLotteCatFilter] = useState<string>('전체')
   const [lotteOpen, setLotteOpen] = useState(true)
 
-  // 정비군 요율
-  const [rates, setRates] = useState<RateRow[]>([])
+  // 정비군 요율 — 초기값으로 기본 데이터 세팅
+  const [rates, setRates] = useState<RateRow[]>(
+    DEFAULT_GROUPS.map((g, i) => ({ ...g, id: `temp_${i}`, daily_rate: calcRate(g.lotte_base_rate, 40) }))
+  )
   const [globalDiscount, setGlobalDiscount] = useState(40)
   const [rateEditMode, setRateEditMode] = useState(false)
 
@@ -204,23 +208,13 @@ export default function ShortTermReplacementBuilder() {
   const [quoteFilter, setQuoteFilter] = useState('all')
 
   // ─── 데이터 로드 ───
-  useEffect(() => { if (cid) loadAll(); else setLoading(false) }, [cid])
+  useEffect(() => { if (cid) loadAll() }, [cid])
 
   const loadAll = async () => {
-    setLoading(true)
     try {
-      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-      await Promise.race([Promise.all([loadLotteRates(), loadRates()]), timeout])
+      await Promise.all([loadLotteRates(), loadRates()])
     } catch (e) {
-      console.warn('단기대차 데이터 로드 실패 (기본값 사용):', e)
-      // 기본값이 없으면 세팅
-      if (lotteRates.length === 0) setLotteRates(LOTTE_DEFAULT_DATA.map((d, i) => ({ ...d, id: `lotte_${i}` })))
-      if (rates.length === 0) {
-        const mapped = DEFAULT_GROUPS.map((g, i) => ({ ...g, id: `temp_${i}`, daily_rate: calcRate(g.lotte_base_rate, 40) }))
-        setRates(mapped)
-      }
-    } finally {
-      setLoading(false)
+      console.warn('단기대차 데이터 로드 실패 (기본값 유지):', e)
     }
   }
 
@@ -384,7 +378,7 @@ export default function ShortTermReplacementBuilder() {
     return lotteRates.filter(r => r.lotte_category === lotteCatFilter)
   }, [lotteRates, lotteCatFilter])
 
-  if (loading) return <div className="p-20 text-center font-bold text-gray-500">데이터 불러오는 중...</div>
+  // loading 게이트 제거 — 기본 데이터로 즉시 렌더링, DB 데이터는 백그라운드 갱신
 
   // ═══════════════════════════════════════════════════
   // 렌더링
