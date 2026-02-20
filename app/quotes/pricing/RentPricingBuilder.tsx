@@ -17,6 +17,7 @@ interface CarData {
   trim?: string
   year?: number
   fuel?: string
+  fuel_type?: string         // DB 컬럼명 호환 (fuel과 동일 데이터)
   mileage?: number
   purchase_price: number
   factory_price?: number
@@ -99,12 +100,14 @@ const PREMIUM_MODELS = ['S-Class', 'S클래스', '7시리즈', 'A8', 'LS', 'G80'
   '카이엔', '파나메라', 'Cayenne', 'Panamera', 'X7', 'GLS', 'Q8', 'Range Rover']
 
 // 전기차 판별: fuel 기반 키워드 (연료 타입에서 판별)
-const EV_FUEL_KEYWORDS = ['전기', 'EV', 'Electric', 'BEV']
+const EV_FUEL_KEYWORDS = ['전기', 'EV', 'Electric', 'BEV', 'ELECTRIC', '배터리', 'Battery']
 // 전기차 판별: 모델명 기반 키워드 (정확한 모델명만)
-const EV_MODEL_KEYWORDS = ['EV6', 'EV9', '아이오닉', 'IONIQ', 'EQE', 'EQS', 'EQA', 'EQB',
-  'iX', 'i4', 'i5', 'i7', 'E-TRON', 'Q8 E-TRON', 'ID.3', 'ID.4',
+const EV_MODEL_KEYWORDS = ['EV3', 'EV4', 'EV5', 'EV6', 'EV9', '아이오닉', 'IONIQ', 'EQE', 'EQS', 'EQA', 'EQB',
+  'iX', 'i4', 'i5', 'i7', 'iX1', 'iX3', 'E-TRON', 'Q4 E-TRON', 'Q6 E-TRON', 'Q8 E-TRON', 'ID.3', 'ID.4', 'ID.7',
   'MODEL 3', 'MODEL Y', 'MODEL S', 'MODEL X', '모델3', '모델Y', '모델S', '모델X',
-  'KONA ELECTRIC', '코나 일렉트릭', 'NIRO EV', '니로 EV', 'BOLT', '볼트']
+  'KONA ELECTRIC', '코나 일렉트릭', 'NIRO EV', '니로 EV', 'NIRO PLUS', '니로 플러스',
+  'BOLT', '볼트', 'MACH-E', '머스탱 마하', 'ENYAQ', 'BORN', 'ARIYA', '아리아',
+  'e-2008', 'e-208', 'E-C4', 'DOLPHIN', 'SEAL', 'ATTO', '돌핀', '씰', '아토']
 const HEV_KEYWORDS = ['하이브리드', 'HEV', 'PHEV', 'Hybrid']
 
 // ============================================
@@ -514,8 +517,8 @@ const DEP_CLASS_MULTIPLIER: Record<string, { label: string; mult: number }> = {
   '수입 대형 세단':    { label: '수입 대형 세단', mult: 1.25 },
   '수입 중형 SUV':    { label: '수입 중형 SUV', mult: 1.0 },
   '수입 프리미엄':     { label: '수입 프리미엄', mult: 1.20 },
-  '전기차 국산':      { label: '전기차 국산', mult: 1.15 },
-  '전기차 수입':      { label: '전기차 수입', mult: 1.25 },
+  '전기차 국산':      { label: '전기차 국산', mult: 0.90 },
+  '전기차 수입':      { label: '전기차 수입', mult: 1.05 },
   '하이브리드':       { label: '하이브리드', mult: 0.85 },
 }
 
@@ -917,12 +920,14 @@ export default function RentPricingBuilder() {
   // 🆕 공통 기준 테이블 매핑 함수
   // ============================================
   const applyReferenceTableMappings = useCallback((carInfo: {
-    brand: string, model: string, fuel_type?: string,
+    brand: string, model: string, fuel_type?: string, fuel?: string,
     purchase_price: number, engine_cc?: number, year?: number,
-    factory_price?: number, is_commercial?: boolean
+    factory_price?: number, is_commercial?: boolean, displacement?: number, trim?: string
   }, opts?: { skipInsurance?: boolean, skipFinance?: boolean }) => {
+    // fuel_type 우선, 없으면 fuel 사용
+    const resolvedFuel = carInfo.fuel_type || carInfo.fuel || ''
     // 3축 카테고리 자동 매핑
-    const axes = mapToDepAxes(carInfo.brand, carInfo.model, carInfo.fuel_type, carInfo.purchase_price)
+    const axes = mapToDepAxes(carInfo.brand, carInfo.model, resolvedFuel, carInfo.purchase_price)
     setAutoCategory(axes.label)
 
     // 3축 기준표 매칭 (depreciation_rates) → DB 기반 동적 곡선 생성
@@ -950,7 +955,7 @@ export default function RentPricingBuilder() {
     }
 
     // 보험료 자동 조회 — 실데이터 기반 (insurance_base_premium + insurance_own_vehicle_rate)
-    const insType = mapToInsuranceType(carInfo.brand, carInfo.fuel_type)
+    const insType = mapToInsuranceType(carInfo.brand, resolvedFuel)
     setAutoInsType(insType)
     if (!opts?.skipInsurance) {
       let annualPremium = 0
@@ -959,7 +964,7 @@ export default function RentPricingBuilder() {
       const isMultiSeat = (carInfo.model || '').includes('카니발') || (carInfo.model || '').includes('스타리아')
       const baseRec = insBasePremiums.find(r => r.vehicle_usage === (isMultiSeat ? '다인승' : '승용'))
       const fuelKey = (() => {
-        const f = (carInfo.fuel_type || carInfo.fuel || '').toLowerCase()
+        const f = resolvedFuel.toLowerCase()
         if (['전기', 'ev', 'electric', 'bev'].some(k => f.includes(k))) return '전기'
         if (['하이브리드', 'hybrid', 'hev', 'phev'].some(k => f.includes(k))) return '하이브리드'
         if (['디젤', 'diesel'].some(k => f.includes(k))) return '디젤'
@@ -1000,7 +1005,7 @@ export default function RentPricingBuilder() {
     }
 
     // 정비 유형 자동 매핑 + 패키지 비용 계산
-    const maintMapping = mapToMaintenanceType(carInfo.brand, carInfo.model, carInfo.fuel_type, carInfo.purchase_price)
+    const maintMapping = mapToMaintenanceType(carInfo.brand, carInfo.model, resolvedFuel, carInfo.purchase_price)
     setAutoMaintType(maintMapping.type)
     // 전기차면 엔진오일 패키지 → 기본정비로 자동 전환
     if (maintMapping.type === '전기차' && maintPackage === 'oil_only') {
@@ -1014,7 +1019,7 @@ export default function RentPricingBuilder() {
 
     // 자동차세 계산 (영업용/비영업용 구분)
     const cc = carInfo.engine_cc || 0
-    const fuelCat = (carInfo.fuel_type || '').includes('전기') ? '전기' : '내연기관'
+    const fuelCat = resolvedFuel.includes('전기') || EV_FUEL_KEYWORDS.some(k => resolvedFuel.toUpperCase().includes(k.toUpperCase())) || EV_MODEL_KEYWORDS.some(k => carInfo.model.toUpperCase().includes(k.toUpperCase())) ? '전기' : '내연기관'
     const isCommercial = carInfo.is_commercial !== false // 기본값 영업용 (렌터카)
     const taxType = isCommercial ? '영업용' : '비영업용'
     const taxRecord = taxRates.find(r =>
