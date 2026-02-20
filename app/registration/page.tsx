@@ -330,19 +330,18 @@ const { company, role, adminSelectedCompanyId } = useApp()
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
          <div>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 등록/제원 상세</h1>
-            <p className="text-gray-500 mt-2 text-sm">등록증(PDF/이미지)을 업로드하면 AI가 <b>브랜드/모델을 자동 분석</b>합니다.</p>
          </div>
          <div className="flex gap-3">
             <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={bulkProcessing}
-                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 hover:shadow-lg transition-all ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
             >
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
             </button>
             <input ref={fileInputRef} type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
                 <Icons.Plus /> <span>신규차량등록</span>
             </button>
          </div>

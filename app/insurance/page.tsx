@@ -396,18 +396,17 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
         <div>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/사고/정비</h1>
-            <p className="text-gray-500 mt-2 text-sm">청약서/증권을 업로드하면 AI가 <b>자동 분류 및 병합</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">
             <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={bulkProcessing}
-                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 hover:shadow-lg transition-all ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
             >
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 및 병합 중...' : '증권 업로드'}</span>
             </button>
-            <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all">
+            <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
                 <Icons.Plus /> <span>신규보험등록</span>
             </button>
         </div>

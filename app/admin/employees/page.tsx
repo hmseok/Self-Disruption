@@ -371,7 +371,6 @@ export default function OrgManagementPage() {
         {/* 헤더 */}
         <div className="mb-5 md:mb-6">
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 조직/권한 관리</h1>
-          <p className="text-slate-500 mt-1 text-xs md:text-sm">직원, 직급/부서, 페이지 접근 권한을 한곳에서 관리합니다.</p>
           {role === 'god_admin' && !adminSelectedCompanyId && (
             <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">
               <p className="text-sm font-bold text-steel-700">사이드바에서 회사를 선택해주세요.</p>
@@ -389,15 +388,15 @@ export default function OrgManagementPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-1.5 md:gap-2 whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 md:gap-2 whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-steel-600 text-white shadow-lg'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  ? 'bg-steel-900 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
               }`}
             >
               {tab.label}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'
+                activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
               }`}>{tab.count}</span>
             </button>
           ))}
@@ -458,7 +457,7 @@ export default function OrgManagementPage() {
                       onChange={e => setNewPositionLevel(Number(e.target.value))}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" />
                   </div>
-                  <button onClick={addPosition} className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 flex-shrink-0 active:scale-95 transition-all">
+                  <button onClick={addPosition} className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex-shrink-0 active:scale-95">
                     추가
                   </button>
                 </div>
@@ -497,7 +496,7 @@ export default function OrgManagementPage() {
                     <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 영업팀" />
                   </div>
-                  <button onClick={addDepartment} className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 flex-shrink-0 active:scale-95 transition-all">
+                  <button onClick={addDepartment} className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex-shrink-0 active:scale-95">
                     추가
                   </button>
                 </div>
@@ -535,10 +534,10 @@ export default function OrgManagementPage() {
                   <button
                     key={pos.id}
                     onClick={() => setSelectedPosition(pos.id)}
-                    className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg font-bold text-[11px] md:text-xs transition-all active:scale-95 ${
+                    className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
                       selectedPosition === pos.id
-                        ? 'bg-steel-600 text-white shadow-md'
-                        : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
+                        ? 'bg-steel-900 text-white'
+                        : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     Lv.{pos.level} {pos.name}
@@ -548,7 +547,7 @@ export default function OrgManagementPage() {
               <button
                 onClick={savePermissions}
                 disabled={saving || !selectedPosition}
-                className="px-5 md:px-6 py-2 md:py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors shadow-md active:scale-95 flex-shrink-0"
+                className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors flex-shrink-0"
               >
                 {saving ? '저장 중...' : '변경사항 저장'}
               </button>
@@ -824,14 +823,14 @@ export default function OrgManagementPage() {
             <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
               <button
                 onClick={closeEditModal}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 font-bold text-sm transition-colors"
+                className="flex-1 py-2.5 border border-gray-200 bg-white text-gray-600 rounded-xl hover:bg-gray-50 font-bold text-sm transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={saveEdit}
                 disabled={savingEdit}
-                className="flex-1 py-2.5 bg-steel-600 text-white rounded-xl hover:bg-steel-700 disabled:bg-slate-300 font-bold text-sm transition-colors active:scale-[0.98]"
+                className="flex-1 py-2.5 bg-steel-600 text-white rounded-xl hover:bg-steel-700 disabled:bg-slate-300 font-bold text-sm transition-colors"
               >
                 {savingEdit ? '저장 중...' : '저장'}
               </button>

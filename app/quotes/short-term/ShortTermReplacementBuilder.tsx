@@ -130,7 +130,7 @@ const ALL_GROUPS = ['1군', '2군', '3군', '4군', '5군', '6군', '8군', '9�
 const DAY_PRESETS = [5, 10, 15, 20]
 const SUB_TABS = [
   { key: 'settings', label: '요금 조회', icon: '🔍' },
-  { key: 'quote', label: '견적 작성', icon: '📝' },
+  { key: 'quote', label: '대차 상품', icon: '📋' },
 ] as const
 type SubTab = typeof SUB_TABS[number]['key']
 
@@ -593,26 +593,25 @@ export default function ShortTermReplacementBuilder() {
   // 렌더링
   // ═══════════════════════════════════════════════════
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen">
 
       {/* ===== 헤더 ===== */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-          🔧 단기렌터카 견적
-        </h1>
-        <p className="text-gray-500 mt-1 text-sm">
-          사고·고장 대차 요율 산출 및 견적 관리
-        </p>
+      <div className="mb-6 md:mb-8 flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+            🔧 단기렌터카 견적
+          </h1>
+        </div>
       </div>
 
       {/* ─── 서브탭 ─── */}
-      <div className="flex gap-2 mb-4 overflow-x-auto">
+      <div className="flex gap-2 mb-6 overflow-x-auto">
         {SUB_TABS.map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
-            className={`py-2 px-4 border rounded-xl font-bold text-xs transition-colors whitespace-nowrap ${
-              subTab === t.key ? 'border-steel-500 bg-steel-50 text-steel-700 shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:border-steel-300'
+            className={`py-2.5 px-5 rounded-xl font-bold text-xs transition-all whitespace-nowrap ${
+              subTab === t.key ? 'bg-steel-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-500 hover:border-steel-400'
             }`}>
-            {t.label}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
@@ -625,23 +624,27 @@ export default function ShortTermReplacementBuilder() {
 
           {/* ─── 빠른 견적 계산기 (고객 응대용) + 할인율 통합 ─── */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-steel-50 to-purple-50/30 border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-              <span className="font-bold text-gray-800 text-sm">빠른 견적 계산기 <span className="text-xs text-gray-400 font-medium ml-1">차종 선택 → 기간 입력 → 예상금액</span></span>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-steel-500" />
+                <h3 className="font-black text-gray-800 text-sm">빠른 견적 계산기</h3>
+                <span className="text-xs text-gray-400 font-medium">차종 → 기간 → 예상금액</span>
+              </div>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-4">
               {/* 할인율 슬라이더 (인라인) */}
-              <div className="flex items-center gap-3 bg-purple-50/50 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-bold text-purple-700 shrink-0">할인율</span>
+              <div className="flex items-center gap-3 bg-steel-50 rounded-xl px-4 py-2.5">
+                <span className="text-sm font-black text-steel-700 shrink-0">할인율</span>
                 <input type="range" min={10} max={100} step={5} value={globalDiscount}
                   onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                  className="flex-1 h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600" />
+                  className="flex-1 h-2 bg-steel-200 rounded-lg appearance-none cursor-pointer accent-steel-600" />
                 <div className="flex items-center gap-1">
                   <input type="number" min={1} max={100} value={globalDiscount}
                     onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                    className="w-14 border border-purple-200 px-2 py-1 rounded-lg text-center font-bold text-purple-700 text-sm focus:border-purple-500 outline-none bg-white" />
-                  <span className="text-sm font-bold text-purple-400">%</span>
+                    className="w-14 border border-steel-200 px-2 py-1 rounded-lg text-center font-black text-steel-700 text-sm focus:border-steel-500 outline-none bg-white" />
+                  <span className="text-sm font-bold text-steel-400">%</span>
                 </div>
-                <span className="text-xs text-purple-400 font-bold shrink-0">롯데 대비</span>
+                <span className="text-xs text-steel-400 font-bold shrink-0">롯데 대비</span>
               </div>
 
               {/* 1행: 카테고리 + 차종 선택 */}
@@ -735,7 +738,7 @@ export default function ShortTermReplacementBuilder() {
                         { d: 3, h: 6, label: '3일+6h' }, { d: 5, h: 10, label: '5일+10h' }, { d: 7, h: 6, label: '7일+6h' },
                       ].map((p, i) => (
                         <button key={`c${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-500 hover:bg-purple-100'}`}>
+                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-steel-700 text-white' : 'bg-steel-50 text-steel-500 hover:bg-steel-100'}`}>
                           {p.label}
                         </button>
                       ))}
@@ -791,7 +794,7 @@ export default function ShortTermReplacementBuilder() {
 
               {/* 결과 표시 — 영수증 스타일 */}
               {qcResult && qcSelectedRate && (
-                <div className="bg-gradient-to-r from-steel-50 to-purple-50/30 rounded-xl border border-steel-200/50 overflow-hidden">
+                <div className="bg-steel-50/50 rounded-xl border border-steel-200/50 overflow-hidden">
                   {/* 차종 정보 */}
                   <div className="px-4 py-2.5 border-b border-steel-200/30 bg-white/40">
                     <div className="text-sm text-gray-600">
@@ -819,7 +822,7 @@ export default function ShortTermReplacementBuilder() {
                           <tr key={li} className="text-sm border-t border-gray-200/50">
                             <td className="py-1.5 font-bold text-gray-700">{line.label} 요율</td>
                             <td className="py-1.5 text-right text-red-400 line-through">{f(line.unitBase)}원</td>
-                            <td className="py-1.5 text-right font-bold text-purple-600">{f(line.unitDisc)}원</td>
+                            <td className="py-1.5 text-right font-bold text-steel-600">{f(line.unitDisc)}원</td>
                             <td className="py-1.5 text-center text-gray-500">×{line.qty}{line.qty > 1 ? '일' : ''}</td>
                             <td className="py-1.5 text-right font-bold text-gray-800">{f(line.subtotalDisc)}원</td>
                           </tr>
@@ -835,8 +838,8 @@ export default function ShortTermReplacementBuilder() {
                       <span className="text-red-400 line-through">{f(qcResult.totalBase)}원</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-purple-500 font-bold">할인 ({globalDiscount}%) 적용</span>
-                      <span className="text-purple-600 font-bold">-{f(qcResult.discountAmount)}원</span>
+                      <span className="text-steel-500 font-bold">할인 ({globalDiscount}%) 적용</span>
+                      <span className="text-steel-600 font-bold">-{f(qcResult.discountAmount)}원</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">할인 적용가</span>
@@ -871,8 +874,8 @@ export default function ShortTermReplacementBuilder() {
                   </div>
 
                   {/* 최종 금액 */}
-                  <div className="px-4 py-3 bg-steel-600 flex justify-between items-center">
-                    <span className="text-sm font-bold text-steel-200">최종 금액 (VAT 포함)</span>
+                  <div className="px-4 py-3 bg-steel-900 flex justify-between items-center rounded-b-xl">
+                    <span className="text-sm font-black text-steel-300">최종 금액 (VAT 포함)</span>
                     <span className="text-xl font-black text-white">{f(qcResult.totalWithVat)}원</span>
                   </div>
                 </div>
@@ -887,8 +890,12 @@ export default function ShortTermReplacementBuilder() {
 
           {/* 정비군별 요율 매핑 */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50/50 border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-              <span className="font-bold text-gray-800 text-sm">정비군별 요율 매핑 <span className="text-xs text-gray-400 font-medium ml-1">롯데 기준가 × {globalDiscount}% = 턴키 단가</span></span>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-steel-500" />
+                <h3 className="font-black text-gray-800 text-sm">정비군별 요율 매핑</h3>
+                <span className="text-xs text-gray-400 font-medium">롯데 기준가 × {globalDiscount}% = 턴키 단가</span>
+              </div>
               <div className="flex gap-1.5">
                 {rateEditMode ? (
                   <>
@@ -907,7 +914,7 @@ export default function ShortTermReplacementBuilder() {
                   <th className="py-2 px-3 text-left text-sm font-bold">차종 분류</th>
                   <th className="py-2 px-3 text-left text-sm font-bold">배기량</th>
                   <th className="py-2 pr-3 text-right text-sm font-bold text-red-400">롯데 기준</th>
-                  <th className="py-2 px-3 text-center text-sm font-bold text-purple-500">할인율</th>
+                  <th className="py-2 px-3 text-center text-sm font-bold text-steel-500">할인율</th>
                   <th className="py-2 px-3 text-center text-sm font-bold">방식</th>
                   <th className="py-2 pr-4 text-right text-sm font-bold text-steel-600">턴키 1일</th>
                 </tr></thead>
@@ -955,7 +962,7 @@ export default function ShortTermReplacementBuilder() {
                             <input type="number" className="w-14 border border-gray-200 px-1.5 py-1 rounded text-sm font-bold text-center" value={r.discount_percent}
                               onChange={e => { const pct = Number(e.target.value); const n = [...rates]; n[i] = { ...n[i], discount_percent: pct, daily_rate: r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, pct) : r.daily_rate }; setRates(n) }} />
                           ) : (
-                            <span className="text-sm font-bold text-purple-600">{r.discount_percent}%</span>
+                            <span className="text-sm font-bold text-steel-600">{r.discount_percent}%</span>
                           )}
                         </td>
                         <td className="py-2 px-3 text-center">
@@ -1009,12 +1016,12 @@ export default function ShortTermReplacementBuilder() {
               {lotteEditMode ? (
                 <>
                   <button onClick={() => { setLotteEditMode(false); loadLotteRates() }} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">취소</button>
-                  <button onClick={saveLotteRates} disabled={saving} className="py-1 px-3 text-sm rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 disabled:opacity-50 transition-colors">{saving ? '저장 중...' : '저장'}</button>
+                  <button onClick={saveLotteRates} disabled={saving} className="py-1 px-3 text-sm rounded-lg bg-steel-600 text-white font-bold hover:bg-steel-700 disabled:opacity-50 transition-colors">{saving ? '저장 중...' : '저장'}</button>
                 </>
               ) : (
                 <div className="flex gap-1.5">
                   <button onClick={fetchLotteRatesAuto} disabled={lotteUpdating}
-                    className="py-1 px-3 text-sm rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600 disabled:opacity-50 transition-colors">
+                    className="py-1 px-3 text-sm rounded-lg bg-steel-600 text-white font-bold hover:bg-steel-700 disabled:opacity-50 transition-colors">
                     {lotteUpdating ? '가져오는 중...' : '자동 업데이트'}
                   </button>
                   <button onClick={() => setLotteEditMode(true)} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">수동 편집</button>
@@ -1050,7 +1057,7 @@ export default function ShortTermReplacementBuilder() {
                 <th className="py-2 pr-3 text-right text-sm font-bold">4일</th>
                 <th className="py-2 pr-3 text-right text-sm font-bold">5~6일</th>
                 <th className="py-2 pr-3 text-right text-sm font-bold">7일+</th>
-                <th className="py-2 pr-3 text-right text-sm font-bold text-purple-500">할인율({globalDiscount}%)</th>
+                <th className="py-2 pr-3 text-right text-sm font-bold text-steel-500">할인율({globalDiscount}%)</th>
                 <th className="py-2 px-3 pr-4 text-center text-sm font-bold text-steel-600">매핑</th>
                 {lotteEditMode && <th className="py-2 px-2 pr-4 text-center text-sm font-bold"></th>}
               </tr></thead>
@@ -1089,7 +1096,7 @@ export default function ShortTermReplacementBuilder() {
                         </td>
                       ))}
                       <td className="py-2 pr-3 text-right whitespace-nowrap">
-                        <span className="text-sm font-black text-purple-600">{f(calcRate(lr.rate_1_3days, globalDiscount))}</span>
+                        <span className="text-sm font-black text-steel-600">{f(calcRate(lr.rate_1_3days, globalDiscount))}</span>
                       </td>
                       <td className="py-2 px-3 pr-4 text-center whitespace-nowrap">
                         {lotteEditMode ? (
@@ -1186,12 +1193,12 @@ export default function ShortTermReplacementBuilder() {
 
           {/* ① 시장 표준 요율 설정 + 계약 조건 */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50/50 border-b border-gray-100 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-bold text-gray-800 text-xs whitespace-nowrap">① 시장 표준 요율 설정</span>
-                <span className="text-[11px] text-gray-400 hidden sm:inline">전문가 수집 데이터 기반 · 값 조정 가능</span>
+                <span className="w-2 h-2 rounded-full bg-steel-500" />
+                <h3 className="font-black text-gray-800 text-sm whitespace-nowrap">시장 표준 요율 설정</h3>
+                <span className="text-[11px] text-gray-400 hidden sm:inline">전문가 수집 데이터 기반</span>
               </div>
-              <span className="text-[11px] text-gray-400 hidden sm:inline whitespace-nowrap">값 조정 → 요율표 실시간 반영</span>
             </div>
             <div className="p-4 space-y-4">
 
@@ -1240,7 +1247,7 @@ export default function ShortTermReplacementBuilder() {
               {/* 적용 공식 + 산출 결과 */}
               <div className="bg-gray-50 rounded-xl px-4 py-2.5 space-y-1">
                 <div className="text-[11px] text-gray-400">공식: 일단가 × ((사고발생율÷100 × 사고수리일수) + (고장발생율÷100 × 고장수리일수)) × 대차일수</div>
-                <div className="text-[11px] text-gray-500">리스크 계수: <span className="font-bold text-blue-600">{accidentRisk.toFixed(4)}</span><span className="text-gray-300"> (사고)</span> + <span className="font-bold text-purple-600">{breakdownRisk.toFixed(4)}</span><span className="text-gray-300"> (고장)</span> = <span className="font-black text-steel-700">{totalRisk.toFixed(4)}</span></div>
+                <div className="text-[11px] text-gray-500">리스크 계수: <span className="font-bold text-steel-600">{accidentRisk.toFixed(4)}</span><span className="text-gray-300"> (사고)</span> + <span className="font-bold text-steel-600">{breakdownRisk.toFixed(4)}</span><span className="text-gray-300"> (고장)</span> = <span className="font-black text-steel-700">{totalRisk.toFixed(4)}</span></div>
               </div>
 
               {/* 구분선 */}
@@ -1273,8 +1280,8 @@ export default function ShortTermReplacementBuilder() {
                   <div className="flex items-center gap-2">
                     <input type="range" min={10} max={100} step={5} value={globalDiscount}
                       onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                      className="flex-1 h-1.5 accent-purple-600 rounded-full" />
-                    <span className="text-sm font-black text-purple-600 w-12 text-right">{globalDiscount}%</span>
+                      className="flex-1 h-1.5 accent-steel-600 rounded-full" />
+                    <span className="text-sm font-black text-steel-600 w-12 text-right">{globalDiscount}%</span>
                   </div>
                   <span className="text-[10px] text-gray-400 mt-0.5 block">시장 30~50%</span>
                 </div>
@@ -1284,19 +1291,20 @@ export default function ShortTermReplacementBuilder() {
 
           {/* ② 요율표 자동 산출 */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50/50 border-b border-gray-100 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-bold text-gray-800 text-xs whitespace-nowrap">② 견적 요율표 <span className="text-[10px] font-medium text-gray-400">(1대당)</span></span>
-                <span className="text-[11px] text-gray-400 whitespace-nowrap">롯데 {globalDiscount}%</span>
+                <span className="w-2 h-2 rounded-full bg-steel-500" />
+                <h3 className="font-black text-gray-800 text-sm whitespace-nowrap">견적 요율표</h3>
+                <span className="text-[10px] font-medium text-gray-400">(1대당 · 롯데 {globalDiscount}%)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={exportExcel}
-                  className="flex items-center gap-1 py-1 px-2.5 bg-green-600 text-white rounded-md text-[11px] font-bold hover:bg-green-700 transition-colors">
+                  className="flex items-center gap-1 py-1 px-2.5 bg-green-600 text-white rounded-lg text-[11px] font-bold hover:bg-green-700 transition-colors">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   엑셀
                 </button>
                 <button onClick={() => window.print()}
-                  className="flex items-center gap-1 py-1 px-2.5 bg-steel-600 text-white rounded-md text-[11px] font-bold hover:bg-steel-700 transition-colors">
+                  className="flex items-center gap-1 py-1 px-2.5 bg-steel-600 text-white rounded-lg text-[11px] font-bold hover:bg-steel-700 transition-colors">
                   인쇄
                 </button>
               </div>
@@ -1313,13 +1321,13 @@ export default function ShortTermReplacementBuilder() {
                   ))}
                 </colgroup>
                 <thead>
-                  <tr className="bg-steel-700 text-white text-sm">
-                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-600">등급</th>
-                    <th className="py-2.5 px-2 text-left font-bold border-r border-steel-600">차종</th>
-                    <th className="py-2.5 px-2 text-center font-bold hidden sm:table-cell whitespace-nowrap border-r border-steel-600">배기량</th>
-                    <th className="py-2.5 px-2 text-right font-bold whitespace-nowrap border-r border-steel-600">일단가</th>
+                  <tr className="bg-steel-900 text-white text-sm">
+                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-800">등급</th>
+                    <th className="py-2.5 px-2 text-left font-bold border-r border-steel-800">차종</th>
+                    <th className="py-2.5 px-2 text-center font-bold hidden sm:table-cell whitespace-nowrap border-r border-steel-800">배기량</th>
+                    <th className="py-2.5 px-2 text-right font-bold whitespace-nowrap border-r border-steel-800">일단가</th>
                     {selectedDaysList.map((d, idx) => (
-                      <th key={d} className={`py-2.5 px-2 text-right font-bold text-yellow-300 whitespace-nowrap ${idx < selectedDaysList.length - 1 ? 'border-r border-steel-600' : ''}`}>
+                      <th key={d} className={`py-2.5 px-2 text-right font-bold text-yellow-300 whitespace-nowrap ${idx < selectedDaysList.length - 1 ? 'border-r border-steel-800' : ''}`}>
                         {d}일<span className="text-xs font-medium text-white/50 ml-0.5">/월</span>
                       </th>
                     ))}
@@ -1362,10 +1370,13 @@ export default function ShortTermReplacementBuilder() {
 
           {/* ③ 고객 정보 + 견적 저장 */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50/50 border-b border-gray-100 px-4 py-2.5">
-              <span className="font-bold text-gray-800 text-xs">③ 고객 정보 및 저장</span>
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-steel-500" />
+                <h3 className="font-black text-gray-800 text-sm">고객 정보 및 저장</h3>
+              </div>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-6 space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1">업체명</label>
@@ -1392,11 +1403,11 @@ export default function ShortTermReplacementBuilder() {
               {/* 버튼 */}
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button onClick={saveQuote} disabled={quoteSaving}
-                  className="py-2 px-5 bg-steel-700 text-white rounded-lg text-sm font-bold hover:bg-steel-800 shadow-sm transition-all disabled:opacity-50">
-                  {quoteSaving ? '저장 중...' : 'DB 저장'}
+                  className="py-2.5 px-6 bg-steel-900 text-white rounded-xl text-sm font-black hover:bg-steel-800 shadow-sm transition-all disabled:opacity-50">
+                  {quoteSaving ? '저장 중...' : '견적 저장'}
                 </button>
                 <button onClick={exportExcel}
-                  className="py-2 px-5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm transition-all">
+                  className="py-2.5 px-6 bg-steel-600 text-white rounded-xl text-sm font-bold hover:bg-steel-700 shadow-sm transition-all">
                   엑셀 다운로드
                 </button>
               </div>

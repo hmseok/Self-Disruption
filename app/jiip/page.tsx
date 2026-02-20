@@ -81,11 +81,10 @@ const router = useRouter()
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
              🤝 위수탁(지입) 정산
           </h1>
-          <p className="text-gray-500 mt-2">차주 및 투자자와의 계약 현황을 관리합니다.</p>
         </div>
         <button
-          onClick={() => router.push('/jiip/new')} // (나중에 등록 페이지 만들 예정)
-          className="bg-steel-600 text-white px-4 py-2 text-sm md:px-6 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 shadow-lg shadow-steel-200 transition-all"
+          onClick={() => router.push('/jiip/new')}
+          className="py-2.5 px-5 bg-steel-600 text-white text-sm md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors"
         >
           + 신규 계약 등록
         </button>

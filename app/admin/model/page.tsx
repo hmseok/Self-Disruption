@@ -89,7 +89,6 @@ export default function VehicleCodeManager() {
       <div className="flex justify-between items-end mb-6 md:mb-8">
         <div>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 차량 표준 코드 관리</h1>
-            <p className="text-gray-500 mt-1 text-sm">AI가 수집한 데이터와 수동으로 등록한 모델/트림을 관리합니다.</p>
         </div>
         <button onClick={() => setIsModelModalOpen(true)} className="bg-steel-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg flex items-center gap-2">
             <PlusIcon /> 신규 모델 등록

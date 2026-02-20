@@ -37,7 +37,7 @@ function MainTabBar({
         <button
           key={tab.value}
           onClick={() => onTabChange(tab.value)}
-          className={`flex-1 px-4 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
+          className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === tab.value
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
@@ -79,7 +79,7 @@ function StatusFilterTabs({
         <button
           key={tab.value}
           onClick={() => onFilterChange(tab.value)}
-          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+          className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
             activeFilter === tab.value
               ? 'bg-steel-600 text-white'
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -112,7 +112,7 @@ function NewQuoteButton() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="px-4 py-2.5 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 shadow-lg transition-all flex items-center gap-1.5"
+        className="px-4 py-2.5 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-all flex items-center gap-1.5"
       >
         <span className="text-lg leading-none">+</span> 새 견적
         <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
@@ -262,7 +262,7 @@ function ShortStatusFilterTabs({
         <button
           key={tab.value}
           onClick={() => onFilterChange(tab.value)}
-          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+          className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${
             activeFilter === tab.value
               ? 'bg-amber-500 text-white'
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -397,15 +397,15 @@ function ShortTermDetailModal({
         <div className="p-5 border-t border-gray-100 flex flex-wrap gap-2">
           {quote.status === 'draft' && (
             <button onClick={() => { onStatusChange(quote.id, 'sent'); onClose() }}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors">📤 발송 처리</button>
+              className="flex-1 py-2.5 px-3 text-sm font-bold rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors">📤 발송 처리</button>
           )}
           {quote.status === 'sent' && (
             <button onClick={() => { onStatusChange(quote.id, 'accepted'); onClose() }}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors">✅ 수락 처리</button>
+              className="flex-1 py-2.5 px-3 text-sm font-bold rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors">✅ 수락 처리</button>
           )}
           {quote.status === 'accepted' && (
             <button onClick={() => { onStatusChange(quote.id, 'contracted'); onClose() }}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl bg-purple-500 text-white hover:bg-purple-600 transition-colors">📝 계약 완료</button>
+              className="flex-1 py-2.5 px-3 text-sm font-bold rounded-xl bg-purple-500 text-white hover:bg-purple-600 transition-colors">📝 계약 완료</button>
           )}
           {quote.status !== 'cancelled' && quote.status !== 'contracted' && (
             <button onClick={() => { onStatusChange(quote.id, 'cancelled'); onClose() }}
@@ -643,8 +643,7 @@ export default function QuoteListPage() {
       {/* ── Header ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">견적/계약 관리</h1>
-          <p className="text-gray-500 mt-1 text-sm">견적 작성 · 발송 · 계약 관리를 한 곳에서</p>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📑 견적/계약 관리</h1>
         </div>
         <NewQuoteButton />
       </div>
@@ -808,7 +807,7 @@ export default function QuoteListPage() {
                   <p className="text-gray-500 text-sm mb-4">
                     {shortStatusFilter === 'all' ? '단기렌트 견적이 없습니다.' : `${shortStatusFilter === 'draft' ? '작성중' : shortStatusFilter === 'sent' ? '발송됨' : shortStatusFilter === 'accepted' ? '수락됨' : shortStatusFilter === 'contracted' ? '계약완료' : '취소'} 상태의 견적이 없습니다.`}
                   </p>
-                  <Link href="/quotes/short-term" className="inline-block px-6 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-md">
+                  <Link href="/quotes/short-term" className="inline-block px-6 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
                     단기렌트 견적 작성하기
                   </Link>
                 </div>
@@ -855,16 +854,16 @@ export default function QuoteListPage() {
                               <td className="p-4 text-center" onClick={e => e.stopPropagation()}>
                                 <div className="flex gap-1 justify-center">
                                   {sq.status === 'draft' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold hover:bg-blue-100">발송</button>
+                                    <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-blue-100">발송</button>
                                   )}
                                   {sq.status === 'sent' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold hover:bg-green-100">수락</button>
+                                    <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-green-100">수락</button>
                                   )}
                                   {sq.status === 'accepted' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold hover:bg-purple-100">계약</button>
+                                    <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-purple-100">계약</button>
                                   )}
                                   {sq.status !== 'cancelled' && sq.status !== 'contracted' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="text-xs bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded font-bold hover:bg-gray-100">취소</button>
+                                    <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="text-xs bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded-lg font-bold hover:bg-gray-100">취소</button>
                                   )}
                                 </div>
                               </td>
@@ -906,18 +905,18 @@ export default function QuoteListPage() {
                           {/* Inline actions */}
                           <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
                             {sq.status === 'draft' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-blue-100 text-blue-600 font-bold hover:bg-blue-200">📤 발송</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-blue-100 text-blue-600 font-bold hover:bg-blue-200 transition-colors">📤 발송</button>
                             )}
                             {sq.status === 'sent' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-green-100 text-green-600 font-bold hover:bg-green-200">✅ 수락</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-green-100 text-green-600 font-bold hover:bg-green-200 transition-colors">✅ 수락</button>
                             )}
                             {sq.status === 'accepted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-purple-100 text-purple-600 font-bold hover:bg-purple-200">📝 계약</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-purple-100 text-purple-600 font-bold hover:bg-purple-200 transition-colors">📝 계약</button>
                             )}
                             {sq.status !== 'cancelled' && sq.status !== 'contracted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="px-3 py-2 text-xs rounded-lg bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">취소</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="px-3 py-2 text-xs rounded-lg bg-gray-100 text-gray-500 font-bold hover:bg-gray-200 transition-colors">취소</button>
                             )}
-                            <button onClick={() => { if (confirm('삭제하시겠습니까?')) handleShortDelete(sq.id) }} className="px-3 py-2 text-xs rounded-lg bg-red-50 text-red-500 font-bold hover:bg-red-100">🗑️</button>
+                            <button onClick={() => { if (confirm('삭제하시겠습니까?')) handleShortDelete(sq.id) }} className="px-3 py-2 text-xs rounded-lg bg-red-50 text-red-500 font-bold hover:bg-red-100 transition-colors">🗑️</button>
                           </div>
                         </div>
                       )

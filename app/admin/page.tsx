@@ -368,7 +368,6 @@ export default function AdminDashboard() {
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
             🏢 {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
           </h1>
-          <p className="text-gray-500 mt-1 text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
         </div>
 
         {/* KPI */}
@@ -451,10 +450,10 @@ export default function AdminDashboard() {
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key as any)}
-              className={`px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeFilter === tab.key
-                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-steel-600 text-white'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-steel-900 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
               }`}
             >
               {tab.label} ({tab.count})

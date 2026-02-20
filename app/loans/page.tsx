@@ -198,20 +198,19 @@ export default function LoanListPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏦 대출/금융사 관리</h1>
-          <p className="text-gray-500 mt-2 text-sm">견적서를 업로드하면 AI가 <b>자동 인식</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={ocrProcessing}
-            className={`flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 hover:shadow-lg transition-all ${ocrProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${ocrProcessing ? 'opacity-50 pointer-events-none' : ''}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             <span>{ocrProcessing ? '분석 중...' : '견적서 업로드'}</span>
           </button>
           <button
             onClick={() => router.push('/loans/new')}
-            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all"
+            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             <span>직접 등록</span>

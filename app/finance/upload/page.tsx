@@ -124,7 +124,6 @@ function UploadContent() {
       <div className="flex justify-between items-center mb-8 max-w-6xl mx-auto">
           <div>
             <h1 className="text-3xl font-black text-gray-900">✨ AI 금융 내역 분석기</h1>
-            <p className="text-gray-500 mt-2">파일을 업로드하면 백그라운드에서 AI가 분석합니다.</p>
           </div>
           <button onClick={() => router.back()} className="text-gray-500 font-bold hover:text-black">← 돌아가기</button>
       </div>
@@ -160,7 +159,7 @@ function UploadContent() {
                   </div>
                   <div className="flex gap-2">
                       <button onClick={clearResults} className="text-red-500 font-bold px-4 hover:text-red-700 text-sm">전체 취소</button>
-                      <button onClick={handleBulkSave} className="bg-steel-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-steel-700 shadow-md">💾 전체 저장</button>
+                      <button onClick={handleBulkSave} className="bg-steel-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-steel-700 transition-colors">💾 전체 저장</button>
                   </div>
               </div>
 

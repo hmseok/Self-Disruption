@@ -222,7 +222,6 @@ export default function PermissionsPage() {
         <div className="mb-5 md:mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🔐 권한 설정</h1>
-            <p className="text-slate-500 mt-1 text-xs md:text-sm">직급별로 페이지 접근 권한과 데이터 범위를 설정합니다.</p>
           </div>
           <div className="flex items-center gap-3">
             {/* god_admin: 회사 선택 */}

@@ -114,10 +114,9 @@ export default function GeneralInvestDashboard() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💼 투자자/펀딩 정산</h1>
-          <p className="text-gray-500 mt-2">법인 운영 자금 및 순수 투자 계약 현황입니다.</p>
         </div>
 
-        <Link href="/invest/general/new" className="bg-steel-600 text-white px-4 py-2 text-sm md:px-6 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 shadow-lg flex items-center gap-2 transition-all">
+        <Link href="/invest/general/new" className="py-2.5 px-5 bg-steel-600 text-white text-sm md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors flex items-center gap-2">
           + 신규 투자 등록
         </Link>
       </div>
