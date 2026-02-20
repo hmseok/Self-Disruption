@@ -85,11 +85,11 @@ export default function VehicleCodeManager() {
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6">
-      <div className="flex justify-between items-end mb-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+      <div className="flex justify-between items-end mb-6 md:mb-8">
         <div>
-            <h1 className="text-3xl font-black text-gray-900">🚙 차량 표준 코드 관리</h1>
-            <p className="text-gray-500 mt-2">AI가 수집한 데이터와 수동으로 등록한 모델/트림을 관리합니다.</p>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 차량 표준 코드 관리</h1>
+            <p className="text-gray-500 mt-1 text-sm">AI가 수집한 데이터와 수동으로 등록한 모델/트림을 관리합니다.</p>
         </div>
         <button onClick={() => setIsModelModalOpen(true)} className="bg-steel-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg flex items-center gap-2">
             <PlusIcon /> 신규 모델 등록

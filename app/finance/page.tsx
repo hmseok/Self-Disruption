@@ -188,13 +188,13 @@ const router = useRouter()
   const filteredList = list.filter(item => activeTab === 'ledger' ? item.status === 'completed' : item.status === 'pending')
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 pb-20 md:pb-40 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 pb-20 md:pb-40 bg-gray-50/50 min-h-screen">
 
       {/* 1. 상단 헤더 (제목 + 날짜) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b pb-6 gap-4">
           <div>
               <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl md:text-3xl font-black text-gray-900">💰 자금 관리</h1>
+                  <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
                   <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
                          className="border border-gray-200 rounded-lg px-3 py-1 font-bold text-lg bg-gray-50 hover:bg-white focus:border-steel-500 transition-colors cursor-pointer text-gray-700" />
               </div>

@@ -392,10 +392,10 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
   }).sort((a, b) => new Date(a.insurance.end_date).getTime() - new Date(b.insurance.end_date).getTime())
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
         <div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/공제 관리</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/사고/정비</h1>
             <p className="text-gray-500 mt-2 text-sm">청약서/증권을 업로드하면 AI가 <b>자동 분류 및 병합</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">

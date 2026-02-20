@@ -47,14 +47,14 @@ export default function PricingStandardsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50/50">
       {/* 헤더 */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-black text-gray-900">산출 기준 데이터 관리</h1>
-              <p className="text-xs text-gray-500 mt-1">
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 산출 기준 관리</h1>
+              <p className="text-gray-500 mt-1 text-sm">
                 렌트료 산출에 필요한 기본 데이터와 시장 가격 기준을 관리합니다
               </p>
             </div>
@@ -72,7 +72,7 @@ export default function PricingStandardsPage() {
       {/* 초보자 가이드 배너 */}
       {showGuide && (
         <div className="bg-gradient-to-r from-slate-50 to-zinc-50 border-b border-slate-200">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
                 <span className="text-xl flex-shrink-0">📊</span>
@@ -111,7 +111,7 @@ export default function PricingStandardsPage() {
 
       {/* 탭 바 */}
       <div className="bg-white border-b border-gray-100">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
             {tabs.map((tab) => (
               <button
@@ -140,7 +140,7 @@ export default function PricingStandardsPage() {
       </div>
 
       {/* 탭 컨텐츠 */}
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
         {getCurrentTabComponent()}
       </div>
     </div>

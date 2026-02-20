@@ -361,14 +361,14 @@ export default function AdminDashboard() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-50/50">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
         {/* 헤더 */}
-        <div className="mb-5 md:mb-6">
+        <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
             🏢 {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
           </h1>
-          <p className="text-slate-500 mt-1 text-xs md:text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
+          <p className="text-gray-500 mt-1 text-sm">회사 가입 승인, 사용자 관리 및 플랫폼 관리자 현황</p>
         </div>
 
         {/* KPI */}

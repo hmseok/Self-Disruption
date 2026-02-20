@@ -216,7 +216,7 @@ export default function ReportDashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto py-12 px-6 min-h-screen flex items-center justify-center">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-5xl mb-4 animate-pulse">📊</div>
           <p className="text-gray-500 font-bold">리포트 데이터를 불러오는 중...</p>
@@ -226,11 +226,11 @@ export default function ReportDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900">📊 리포트 / 통계</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 리포트 / 통계</h1>
           <p className="text-gray-500 mt-2">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
         </div>
         <div className="flex gap-2">

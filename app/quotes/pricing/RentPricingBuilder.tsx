@@ -698,6 +698,7 @@ export default function RentPricingBuilder() {
   const [selectedCar, setSelectedCar] = useState<CarData | null>(null)
   const [rules, setRules] = useState<BusinessRules>({})
   const [loading, setLoading] = useState(true)
+  const [editLoading, setEditLoading] = useState(false) // 견적 수정 모드 로딩
   const [saving, setSaving] = useState(false)
   const [currentWorksheetId, setCurrentWorksheetId] = useState<string | null>(null)
 
@@ -918,7 +919,7 @@ export default function RentPricingBuilder() {
   const applyReferenceTableMappings = useCallback((carInfo: {
     brand: string, model: string, fuel_type?: string,
     purchase_price: number, engine_cc?: number, year?: number,
-    factory_price?: number
+    factory_price?: number, is_commercial?: boolean
   }, opts?: { skipInsurance?: boolean, skipFinance?: boolean }) => {
     // 3축 카테고리 자동 매핑
     const axes = mapToDepAxes(carInfo.brand, carInfo.model, carInfo.fuel_type, carInfo.purchase_price)
@@ -1011,11 +1012,13 @@ export default function RentPricingBuilder() {
     const oilAdjust = maintPackage === 'oil_only' && oilChangeFreq === 2 ? 1.8 : 1.0
     setMonthlyMaintenance(Math.round(baseCost * multiplier * oilAdjust))
 
-    // 자동차세 계산 (vehicle_tax_table — 영업용!)
+    // 자동차세 계산 (영업용/비영업용 구분)
     const cc = carInfo.engine_cc || 0
     const fuelCat = (carInfo.fuel_type || '').includes('전기') ? '전기' : '내연기관'
+    const isCommercial = carInfo.is_commercial !== false // 기본값 영업용 (렌터카)
+    const taxType = isCommercial ? '영업용' : '비영업용'
     const taxRecord = taxRates.find(r =>
-      r.tax_type === '영업용' &&
+      r.tax_type === taxType &&
       r.fuel_category === fuelCat &&
       cc >= r.cc_min && cc <= r.cc_max
     )
@@ -1025,10 +1028,24 @@ export default function RentPricingBuilder() {
       else tax = Math.round(cc * taxRecord.rate_per_cc)
       tax = Math.round(tax * (1 + taxRecord.education_tax_rate / 100))
     } else {
-      if (cc <= 1000) tax = cc * 80
-      else if (cc <= 1600) tax = cc * 140
-      else tax = cc * 200
-      tax = Math.round(tax * 1.3)
+      // fallback: 법정 기본 세율 적용
+      if (fuelCat === '전기') {
+        // 전기차 고정세액 (지방세법 시행령)
+        if (isCommercial) {
+          tax = 20000 // 영업용 전기차: 연 2만원, 교육세 비과세
+        } else {
+          tax = Math.round(130000 * 1.3) // 비영업용 전기차: 연 13만원 + 교육세 30% = 169,000원
+        }
+      } else if (isCommercial) {
+        // 영업용 내연기관 fallback: 18원/cc, 교육세 비과세
+        tax = cc * 18
+      } else {
+        // 비영업용 내연기관 fallback: cc 구간별 세율 + 교육세 30%
+        if (cc <= 1000) tax = cc * 80
+        else if (cc <= 1600) tax = cc * 140
+        else tax = cc * 200
+        tax = Math.round(tax * 1.3)
+      }
     }
     setAnnualTax(tax)
     setEngineCC(cc)
@@ -1045,13 +1062,17 @@ export default function RentPricingBuilder() {
     // ============================================
     // 취득원가 계산
     // ============================================
-    // ★ 렌터카(자동차대여업) = 영업용 → 취득세 4% (비영업용 승용 7%와 다름)
-    const acqTaxRecord = regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === (fuelCat === '전기' ? '영업용 전기' : '영업용'))
-      || regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === '영업용')
+    // ★ 취득세: 영업용 4% / 비영업용 승용 7% (지방세법 제12조)
+    const acqCategory = isCommercial
+      ? (fuelCat === '전기' ? '영업용 전기' : '영업용')
+      : (fuelCat === '전기' ? '비영업용 전기' : '비영업용')
+    const acqTaxRecord = regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === acqCategory)
+      || regCosts.find(r => r.cost_type === '취득세' && r.vehicle_category === (isCommercial ? '영업용' : '비영업용'))
     const deliveryRecord = regCosts.find(r => r.cost_type === '탁송료')
 
-    // 영업용 취득세: 4% (지방세법 제12조제1항제2호)
-    let acqTaxAmt = acqTaxRecord ? Math.round(carInfo.purchase_price * acqTaxRecord.rate / 100) : Math.round(carInfo.purchase_price * 0.04)
+    // 취득세: 영업용 4%, 비영업용 7% (지방세법 제12조)
+    const defaultAcqRate = isCommercial ? 0.04 : 0.07
+    let acqTaxAmt = acqTaxRecord ? Math.round(carInfo.purchase_price * acqTaxRecord.rate / 100) : Math.round(carInfo.purchase_price * defaultAcqRate)
 
     // ★ 경차 취득세 감면 (지방세특례제한법 제75조)
     // 경차(배기량 1,000cc 미만) 취득세 75만원까지 면제
@@ -1180,8 +1201,8 @@ export default function RentPricingBuilder() {
       .limit(1)
       .single()
     setLinkedInsurance(insData)
-    if (insData?.total_premium) {
-      setMonthlyInsuranceCost(Math.round(insData.total_premium / 12))
+    if (insData?.premium) {
+      setMonthlyInsuranceCost(Math.round(insData.premium / 12))
       setInsAutoMode(false)  // 실제 보험 데이터가 있으면 자동추정 비활성화
     }
 
@@ -1230,6 +1251,7 @@ export default function RentPricingBuilder() {
         engine_cc: car.engine_cc,
         year: car.year,
         factory_price: car.factory_price,
+        is_commercial: car.is_commercial,
       },
       { skipInsurance: !!insData, skipFinance: !!finData }
     )
@@ -1334,8 +1356,9 @@ export default function RentPricingBuilder() {
     quoteLoadedRef.current = quoteId
 
     const loadQuoteForEdit = async () => {
+      setEditLoading(true)
       const { data: q } = await supabase.from('quotes').select('*').eq('id', quoteId).single()
-      if (!q) return
+      if (!q) { setEditLoading(false); return }
       setEditingQuoteId(quoteId)
       const d = q.quote_detail || {}
       // 고객 정보 복원
@@ -1369,11 +1392,159 @@ export default function RentPricingBuilder() {
       // 가격 복원
       if (d.factory_price) setFactoryPrice(d.factory_price)
       if (d.purchase_price) setPurchasePrice(d.purchase_price)
-      // worksheet 연결 시 worksheet 로드
-      if (q.worksheet_id || d.worksheet_id) {
-        const wsId = q.worksheet_id || d.worksheet_id
+      // 차량 복원: car_id가 있으면 등록차량 선택
+      let loadedInsData: any = null
+      let loadedFinData: any = null
+      if (q.car_id) {
+        // cars가 아직 로드되지 않았을 수 있으므로 직접 DB에서 조회
+        const { data: carData } = await supabase.from('cars').select('*').eq('id', q.car_id).single()
+        if (carData) {
+          setSelectedCar(carData)
+          setLookupMode('registered')
+          if (!d.factory_price) setFactoryPrice(carData.factory_price || Math.round(carData.purchase_price * 1.15))
+          if (!d.purchase_price) setPurchasePrice(carData.purchase_price)
+          setEngineCC(carData.engine_cc || 0)
+          // 신차/중고차 구분
+          const thisY = new Date().getFullYear()
+          if (carData.is_used === false && (carData.year || thisY) >= thisY) {
+            setCarAgeMode('new')
+            setCustomCarAge(0)
+          } else {
+            setCarAgeMode('used')
+            setCustomCarAge(Math.max(0, thisY - (carData.year || thisY)))
+          }
+
+          // --- 취득원가 구성 항목 로드 (car_costs) ---
+          const { data: costsData } = await supabase
+            .from('car_costs')
+            .select('category, item_name, amount')
+            .eq('car_id', q.car_id)
+            .order('sort_order', { ascending: true })
+          const hasCarCosts = costsData && costsData.length > 0
+          hasCarCostsRef.current = hasCarCosts
+          if (hasCarCosts) {
+            setCarCostItems(costsData.map((c: any) => ({ category: c.category, item_name: c.item_name, amount: Number(c.amount) || 0 })))
+            const costTotal = costsData.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+            if (costTotal > 0) setTotalAcquisitionCost(costTotal)
+          }
+          // quote_detail에 저장된 totalAcquisitionCost가 있으면 우선 사용
+          if (d.total_acquisition_cost > 0) {
+            setTotalAcquisitionCost(d.total_acquisition_cost)
+          }
+
+          // --- 연동 보험/금융 로드 ---
+          const { data: insData } = await supabase
+            .from('insurance_contracts')
+            .select('*')
+            .eq('car_id', q.car_id)
+            .order('id', { ascending: false })
+            .limit(1)
+            .single()
+          loadedInsData = insData
+          setLinkedInsurance(insData)
+          if (insData?.premium) {
+            setMonthlyInsuranceCost(Math.round(insData.premium / 12))
+            setInsAutoMode(false)
+          }
+          const { data: finData } = await supabase
+            .from('financial_products')
+            .select('*')
+            .eq('car_id', q.car_id)
+            .order('id', { ascending: false })
+            .limit(1)
+            .single()
+          loadedFinData = finData
+          setLinkedFinance(finData)
+          if (finData) {
+            if (finData.loan_amount) setLoanAmount(finData.loan_amount)
+            if (finData.interest_rate) setLoanRate(finData.interest_rate)
+          }
+
+          // 기준 테이블 매핑 적용
+          applyReferenceTableMappings(
+            {
+              brand: carData.brand,
+              model: carData.model,
+              fuel_type: carData.fuel_type,
+              purchase_price: carData.purchase_price,
+              engine_cc: carData.engine_cc,
+              year: carData.year,
+              factory_price: carData.factory_price,
+              is_commercial: carData.is_commercial,
+            },
+            { skipInsurance: !!insData, skipFinance: !!finData }
+          )
+          // car_costs가 있으면 자동계산된 totalAcquisitionCost를 다시 덮어쓰기
+          if (hasCarCosts) {
+            const costTotal = costsData!.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+            if (costTotal > 0) setTotalAcquisitionCost(costTotal)
+          }
+          if (d.total_acquisition_cost > 0) {
+            setTotalAcquisitionCost(d.total_acquisition_cost)
+          }
+        }
+      }
+      // worksheet 연결 시 워크시트 데이터 완전 로드
+      const wsId = searchParams.get('worksheet_id') || q.worksheet_id || d.worksheet_id
+      if (wsId) {
+        const { data: ws } = await supabase
+          .from('pricing_worksheets')
+          .select('*, cars(number, brand, model, trim, year)')
+          .eq('id', wsId)
+          .single()
+        if (ws) {
+          // 워크시트 ID 기억
+          setCurrentWorksheetId(ws.id)
+
+          // 위에서 로드한 연동 보험/금융 데이터 참조 (덮어쓰기 방지)
+          const hasLinkedIns = !!(loadedInsData?.premium)
+          const hasLinkedFin = !!(loadedFinData?.loan_amount)
+
+          // 차량 정보는 이미 위에서 복원됨 → 워크시트의 산출 데이터만 복원
+          setFactoryPrice(ws.factory_price || d.factory_price || 0)
+          setPurchasePrice(ws.purchase_price || d.purchase_price || 0)
+          // 금융: 연동 금융이 있으면 워크시트 값으로 덮어쓰지 않음
+          if (!hasLinkedFin) {
+            setLoanAmount(ws.loan_amount ?? d.loan_amount ?? 0)
+            setLoanRate(ws.loan_interest_rate ?? d.loan_rate ?? 4.5)
+          }
+          setInvestmentRate(ws.investment_rate ?? d.investment_rate ?? 6.0)
+          // 보험: 연동 보험이 있으면 워크시트 값으로 덮어쓰지 않음
+          if (!hasLinkedIns) {
+            setMonthlyInsuranceCost(ws.monthly_insurance || 0)
+            if (ws.ins_auto_mode !== undefined) setInsAutoMode(ws.ins_auto_mode)
+          }
+          if (ws.driver_age_group) setDriverAgeGroup(ws.driver_age_group as DriverAgeGroup)
+          setMonthlyMaintenance(ws.monthly_maintenance ?? d.cost_breakdown?.maintenance ?? 40000)
+          if (ws.maint_package) setMaintPackage(ws.maint_package as MaintenancePackage)
+          if (ws.oil_change_freq) setOilChangeFreq(ws.oil_change_freq as 1 | 2)
+          setDeductible(ws.deductible ?? d.deductible ?? 500000)
+          setDeposit(ws.deposit_amount ?? d.deposit ?? 3000000)
+          setPrepayment(ws.prepayment_amount ?? d.prepayment ?? 0)
+          if (ws.deposit_discount_rate !== undefined && ws.deposit_discount_rate !== null) setDepositDiscountRate(ws.deposit_discount_rate)
+          if (ws.prepayment_discount_rate !== undefined && ws.prepayment_discount_rate !== null) setPrepaymentDiscountRate(ws.prepayment_discount_rate)
+          if (ws.registration_region) setRegistrationRegion(ws.registration_region)
+          setTermMonths(ws.term_months || d.term_months || 36)
+          setMargin(ws.target_margin ?? d.margin ?? 150000)
+          setAnnualMileage(ws.annual_mileage || d.annualMileage || 2)
+          setBaselineKm(ws.baseline_km || d.baselineKm || 2)
+          if (ws.excess_mileage_rate) setExcessMileageRate(ws.excess_mileage_rate)
+          if (ws.excess_rate_margin_pct !== undefined) setExcessRateMarginPct(ws.excess_rate_margin_pct)
+          if (ws.dep_curve_preset) setDepCurvePreset(ws.dep_curve_preset as DepCurvePreset)
+          if (ws.dep_custom_curve) setDepCustomCurve(ws.dep_custom_curve)
+          if (ws.dep_class_override !== undefined) setDepClassOverride(ws.dep_class_override || '')
+          if (ws.contract_type) setContractType(ws.contract_type as 'return' | 'buyout')
+          if (ws.residual_rate !== undefined) setResidualRate(ws.residual_rate)
+          if (ws.buyout_premium !== undefined) setBuyoutPremium(ws.buyout_premium)
+          // 차령 모드 복원
+          if (ws.car_age_mode) {
+            setCarAgeMode(ws.car_age_mode as 'new' | 'used')
+            setCustomCarAge(ws.custom_car_age || 0)
+          }
+        }
         router.replace(`/quotes/pricing?worksheet_id=${wsId}&car_id=${q.car_id || ''}&quote_id=${quoteId}`)
       }
+      setEditLoading(false)
     }
     loadQuoteForEdit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1649,12 +1820,15 @@ export default function RentPricingBuilder() {
     setMonthlyInsuranceCost(ws.monthly_insurance || 0)
     if (ws.driver_age_group) setDriverAgeGroup(ws.driver_age_group as DriverAgeGroup)
     if (ws.ins_auto_mode !== undefined) setInsAutoMode(ws.ins_auto_mode)
-    setMonthlyMaintenance(ws.monthly_maintenance || 40000)
+    setMonthlyMaintenance(ws.monthly_maintenance ?? 40000)
     if (ws.maint_package) setMaintPackage(ws.maint_package as MaintenancePackage)
     if (ws.oil_change_freq) setOilChangeFreq(ws.oil_change_freq as 1 | 2)
     setDeductible(ws.deductible || 500000)
     setDeposit(ws.deposit_amount || 3000000)
     setPrepayment(ws.prepayment_amount || 0)
+    if (ws.deposit_discount_rate !== undefined && ws.deposit_discount_rate !== null) setDepositDiscountRate(ws.deposit_discount_rate)
+    if (ws.prepayment_discount_rate !== undefined && ws.prepayment_discount_rate !== null) setPrepaymentDiscountRate(ws.prepayment_discount_rate)
+    if (ws.registration_region) setRegistrationRegion(ws.registration_region)
     setTermMonths(ws.term_months || 36)
     setMargin(ws.target_margin || 150000)
     setAnnualMileage(ws.annual_mileage || 2)
@@ -1741,7 +1915,7 @@ export default function RentPricingBuilder() {
   // 초과주행 km당 요금: 현재 약정 vs 무제한(5만km) 감가 차이 기반 패널티 산출
   const UNLIMITED_KM = 5  // 무제한 = 5만km/년
   const excessRateBreakdown = useMemo(() => {
-    const ZERO = { depCost: 0, maintCost: 0, margin: 0, total: 0, depDiffPct: 0, extraKm: 0, depAmount: 0, tierPenalty: 1, maintItems: [] as { name: string; perKm: number }[] }
+    const ZERO = { depCost: 0, maintCost: 0, margin: 0, total: 0, depDiffPct: 0, extraKm: 0, depAmount: 0, tierPenalty: 1, maintItems: [] as { name: string; perKm: number }[], baseCost: 0 }
     // 출고가 없으면 매입가로 대체 (수동 입력 모드 등)
     const basePrice = factoryPrice > 0 ? factoryPrice : purchasePrice
     if (basePrice <= 0) return ZERO
@@ -1786,10 +1960,12 @@ export default function RentPricingBuilder() {
     const maintBreakdown = getMaintCostPerKm(maintPackage, maintMult, isEV)
     const maintCostPerKm = maintBreakdown.total
 
-    // 마진
-    const marginPerKm = Math.round((depCostPerKm + maintCostPerKm) * (excessRateMarginPct / 100))
-    const total = depCostPerKm + maintCostPerKm + marginPerKm
-    return { depCost: depCostPerKm, maintCost: maintCostPerKm, margin: marginPerKm, total, depDiffPct, extraKm, depAmount: depAmountDiff, tierPenalty, maintItems: maintBreakdown.items }
+    // 원가 합계 (감가비 + 정비비)
+    const baseCost = depCostPerKm + maintCostPerKm
+    // 마진 적용
+    const marginPerKm = Math.round(baseCost * (excessRateMarginPct / 100))
+    const total = baseCost + marginPerKm
+    return { depCost: depCostPerKm, maintCost: maintCostPerKm, margin: marginPerKm, total, depDiffPct, extraKm, depAmount: depAmountDiff, tierPenalty, maintItems: maintBreakdown.items, baseCost }
   }, [factoryPrice, purchasePrice, monthlyMaintenance, baselineKm, excessRateMarginPct, annualMileage, termMonths, selectedCar, carAgeMode, customCarAge, maintPackage])
 
   // 자동 연동
@@ -1894,7 +2070,10 @@ export default function RentPricingBuilder() {
     const popularityFactor = (() => {
       const popAdjs = depAdjustments.filter(a => a.adjustment_type === 'popularity' && a.is_active)
       const match = popAdjs.find(a => a.label === popularityGrade)
-      return match ? Number(match.factor) : 1.0
+      if (match) return Number(match.factor)
+      // DB에 인기도 데이터 없으면 기본값 사용
+      const defaultPop: Record<string, number> = { 'S등급 (인기)': 1.05, 'A등급 (준인기)': 1.02, 'B등급 (일반)': 1.0, 'C등급 (비인기)': 0.97, 'D등급 (저인기)': 0.93 }
+      return defaultPop[popularityGrade] ?? 1.0
     })()
     // 종합 보정계수
     const adjustmentFactor = mileageFactor * marketFactor * popularityFactor
@@ -1999,14 +2178,15 @@ export default function RentPricingBuilder() {
     const buyoutPrice = residualValue  // 인수형일 때만 의미 있음
     const monthlyDepreciation = Math.round(Math.max(0, costBase - residualValue) / termMonths)
 
-    // 2. 금융비용 (평균잔액법)
-    // 감가비로 원금이 매월 회수되므로, 대출잔액 & 자기자본 묶인 금액이 점차 줄어듦
-    // 초기잔액 = 투입금, 종료잔액 = 투입금 × (잔존가치/매입가) 비율
-    const residualRatio = purchasePrice > 0 ? Math.max(0, residualValue / purchasePrice) : 0
-    const loanEndBalance = Math.round(loanAmount * residualRatio)
-    const avgLoanBalance = Math.round((loanAmount + loanEndBalance) / 2)
+    // 2. 금융비용 (평균잔액법) — 총취득원가 기준
+    // 대출: 차량매입가 한도 내 (담보가치 기준, 부대비용은 대출 불가)
+    // 자기자본: 총취득원가 - 대출금 (취득세·공채·탁송 등 부대비용 포함)
+    const effectiveLoan = Math.min(loanAmount, purchasePrice) // 대출은 매입가 초과 불가
+    const residualRatio = costBase > 0 ? Math.max(0, residualValue / costBase) : 0
+    const loanEndBalance = Math.round(effectiveLoan * residualRatio)
+    const avgLoanBalance = Math.round((effectiveLoan + loanEndBalance) / 2)
 
-    const equityAmount = purchasePrice - loanAmount
+    const equityAmount = costBase - effectiveLoan // 총취득원가 - 대출 = 자기자본 (부대비용 포함)
     const equityEndBalance = Math.round(equityAmount * residualRatio)
     const avgEquityBalance = Math.round((equityAmount + equityEndBalance) / 2)
 
@@ -2157,7 +2337,7 @@ export default function RentPricingBuilder() {
       matchedDepRate, autoAxes, effectiveAxes, activeCurve,
       adjustmentFactor, mileageFactor, marketFactor, popularityFactor,
       // 금융
-      equityAmount, monthlyLoanInterest, monthlyOpportunityCost, totalMonthlyFinance,
+      effectiveLoan, equityAmount, monthlyLoanInterest, monthlyOpportunityCost, totalMonthlyFinance,
       avgLoanBalance, loanEndBalance, avgEquityBalance, equityEndBalance,
       // 운영
       monthlyTax, monthlyInspectionCost, inspectionCostPerTime, inspectionsInTerm, inspIntervalMonths, totalMonthlyOperation,
@@ -2243,6 +2423,9 @@ export default function RentPricingBuilder() {
       monthly_risk_reserve: calculations.monthlyRiskReserve,
       deposit_amount: deposit,
       prepayment_amount: prepayment,
+      deposit_discount_rate: depositDiscountRate,
+      prepayment_discount_rate: prepaymentDiscountRate,
+      registration_region: registrationRegion,
       monthly_deposit_discount: calculations.monthlyDepositDiscount,
       monthly_prepayment_discount: calculations.monthlyPrepaymentDiscount,
       total_monthly_cost: calculations.totalMonthlyCost,
@@ -2426,7 +2609,6 @@ export default function RentPricingBuilder() {
         status,
       }
       const extendedCols: Record<string, any> = {
-        term: termMonths,
         customer_name: customerMode === 'select' ? (selectedCustomer?.name || '') : manualCustomer.name.trim(),
         rental_type: contractType === 'buyout' ? '인수형렌트' : '반납형렌트',
         margin,
@@ -2436,38 +2618,42 @@ export default function RentPricingBuilder() {
         worksheet_id: currentWorksheetId || null,
       }
 
-      let fullPayload = { ...basePayload, ...extendedCols }
+      // 저장 시도 순서: fullPayload → basePayload + quote_detail → basePayload만
+      const payloadsToTry = [
+        { ...basePayload, ...extendedCols },
+        { ...basePayload, quote_detail: detailData, customer_name: extendedCols.customer_name, memo: extendedCols.memo, expires_at: extendedCols.expires_at },
+        { ...basePayload, quote_detail: detailData },
+        basePayload,
+      ]
+
       let error: any = null
       let insertData: any = null
 
-      if (editingQuoteId) {
-        // 수정 모드: UPDATE
-        const { data: d, error: e } = await supabase.from('quotes').update(fullPayload).eq('id', editingQuoteId).select()
-        error = e; insertData = d
-      } else {
-        // 신규: INSERT
-        const { data: d, error: e } = await supabase.from('quotes').insert([fullPayload]).select()
-        error = e; insertData = d
-        // term 컬럼 없으면 재시도
-        if (error && error.message?.includes('term')) {
-          delete fullPayload.term
-          const r2 = await supabase.from('quotes').insert([fullPayload]).select()
-          error = r2.error; insertData = r2.data
+      for (const payload of payloadsToTry) {
+        if (editingQuoteId) {
+          const { data: d, error: e } = await supabase.from('quotes').update(payload).eq('id', editingQuoteId).select()
+          error = e; insertData = d
+        } else {
+          const { data: d, error: e } = await supabase.from('quotes').insert([payload]).select()
+          error = e; insertData = d
         }
-        // 확장 컬럼 없으면 base만 재시도
-        if (error && error.message?.includes('column')) {
-          const r3 = await supabase.from('quotes').insert([basePayload]).select()
-          error = r3.error; insertData = r3.data
-        }
+        if (!error) break // 성공 시 루프 종료
+        console.warn('Quote save retry, dropping columns:', error.message || error.code)
       }
 
       setQuoteSaving(false)
       if (error) {
         console.error('Quote save error:', error)
-        alert('저장 실패: ' + error.message)
+        const errMsg = error.message || error.details || error.hint || JSON.stringify(error)
+        alert('저장 실패: ' + errMsg)
       } else {
+        const savedId = editingQuoteId || insertData?.[0]?.id
         alert(`견적서가 ${status === 'draft' ? '임시저장' : '확정'}되었습니다.`)
-        router.push('/quotes')
+        if (savedId) {
+          router.push(`/quotes/${savedId}`)
+        } else {
+          router.push('/quotes')
+        }
       }
     } catch (err: any) {
       setQuoteSaving(false)
@@ -2479,7 +2665,7 @@ export default function RentPricingBuilder() {
   // ============================================
   // 렌더링
   // ============================================
-  if (loading) {
+  if (loading || editLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -2671,9 +2857,6 @@ export default function RentPricingBuilder() {
     const calc = calculations
     const car = selectedCar
     const rentVAT = Math.round(calc.suggestedRent * 0.1)
-    const totalPayments = calc.rentWithVAT * termMonths
-    const totalWithDeposit = totalPayments + deposit
-    const totalWithBuyout = contractType === 'buyout' ? totalWithDeposit + calc.buyoutPrice : totalWithDeposit
 
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 quote-print-wrapper">
@@ -2813,37 +2996,49 @@ export default function RentPricingBuilder() {
                 </div>
               </div>
 
-              {/* 4. 월 렌탈료 — 테이블 형식 (컴팩트) */}
+              {/* 4. 월 렌탈료 — 핵심 강조 */}
               <div className="border-2 border-steel-900 rounded-lg overflow-hidden quote-rental-highlight">
-                <div className="bg-steel-900 text-white px-3 py-1"><p className="font-black text-xs">월 렌탈료 안내</p></div>
+                <div className="bg-steel-900 text-white px-4 py-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-gray-400">월 렌탈료 (VAT 포함)</p>
+                    <p className="text-2xl font-black tracking-tight">{f(calc.rentWithVAT)}<span className="text-sm ml-0.5">원</span></p>
+                  </div>
+                  <div className="text-right text-[10px] text-gray-400 space-y-0.5">
+                    <p>공급가 {f(calc.suggestedRent)}원</p>
+                    <p>부가세 {f(rentVAT)}원</p>
+                  </div>
+                </div>
                 <div className="border border-gray-200 rounded-b-lg overflow-hidden">
                   <table className="w-full text-xs"><tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-28">보증금</td>
-                      <td className="px-3 py-1.5 font-bold text-gray-800">{deposit === 0 ? '없음' : `${f(deposit)}원`}{deposit > 0 && <span className="text-[10px] text-gray-400 ml-1">(계약 시 1회)</span>}</td>
-                    </tr>
+                    {deposit > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-28">보증금</td>
+                        <td className="px-3 py-1.5 font-bold text-gray-800">{f(deposit)}원 <span className="text-[10px] text-gray-400">(계약 시 1회)</span></td>
+                      </tr>
+                    )}
                     {prepayment > 0 && (
                       <tr className="border-b border-gray-100">
                         <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">선납금</td>
                         <td className="px-3 py-1.5 font-bold text-gray-800">{f(prepayment)}원 <span className="text-[10px] text-gray-400">(계약 시 1회)</span></td>
                       </tr>
                     )}
-                    <tr className="border-b border-gray-100 bg-steel-50">
-                      <td className="px-3 py-2 font-bold text-steel-600">월 렌탈료<br/><span className="text-[9px] font-normal">(VAT 포함)</span></td>
-                      <td className="px-3 py-2">
-                        <span className="text-lg font-black text-steel-700">{f(calc.rentWithVAT)}<span className="text-[10px]">원</span></span>
-                        <span className="text-[10px] text-steel-400 ml-2">공급가 {f(calc.suggestedRent)} + VAT {f(rentVAT)}</span>
-                      </td>
-                    </tr>
                     {contractType === 'buyout' && (
                       <tr className="border-b border-gray-100 bg-amber-50">
-                        <td className="px-3 py-1.5 font-bold text-amber-600">인수가격<br/><span className="text-[9px] font-normal">(만기 시)</span></td>
-                        <td className="px-3 py-1.5 font-black text-amber-700 text-base">{f(calc.buyoutPrice)}<span className="text-[10px]">원</span></td>
+                        <td className="bg-amber-50 px-3 py-1.5 font-bold text-amber-600">인수가격 (만기)</td>
+                        <td className="px-3 py-1.5 font-black text-amber-700">{f(calc.buyoutPrice)}원</td>
                       </tr>
                     )}
+                    <tr className="border-b border-gray-100">
+                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">약정주행</td>
+                      <td className="px-3 py-1.5">연 {f(annualMileage * 10000)}km · 초과 시 <span className="font-bold text-red-500">km당 {f(quoteExcessRate)}원</span></td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">자차 면책금</td>
+                      <td className="px-3 py-1.5">사고 시 <span className="font-bold">{f(deductible)}원</span>{deductible === 0 && <span className="text-green-500 text-xs ml-1 font-bold">완전면책</span>}</td>
+                    </tr>
                     <tr>
-                      <td colSpan={2} className="px-3 py-1 text-[9px] text-gray-400 text-center">
-                        렌탈료 포함: 자동차보험(종합) · 자동차세 · 취득세 · 등록비{maintPackage !== 'self' ? ' · 정비' : ''}
+                      <td colSpan={2} className="px-3 py-1.5 text-[10px] text-gray-400">
+                        렌탈료 포함: 자동차보험(종합) · 자동차세 · 취득세 · 등록비{maintPackage !== 'self' ? ` · ${MAINT_PACKAGE_LABELS[maintPackage] || '정비'}` : ''}
                       </td>
                     </tr>
                   </tbody></table>
@@ -2891,26 +3086,7 @@ export default function RentPricingBuilder() {
                 <p className="text-[8px] text-gray-400 mt-1">※ 렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함</p>
               </div>
 
-              {/* 5. 주요 약정 요약 — 1페이지 하단에 핵심만 */}
-              <div className="quote-section">
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">주요 약정 요약</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs"><tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-28">약정 주행거리</td>
-                      <td className="px-3 py-1.5">연간 {f(annualMileage * 10000)}km · 초과 시 <span className="font-bold text-red-500">km당 {f(quoteExcessRate)}원</span></td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">자차 면책금</td>
-                      <td className="px-3 py-1.5">사고 시 <span className="font-bold">{f(deductible)}원</span>{deductible === 0 && <span className="text-green-500 text-xs ml-1 font-bold">완전면책</span>}</td>
-                    </tr>
-                    <tr>
-                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">중도해지</td>
-                      <td className="px-3 py-1.5">잔여 렌탈료의 <span className="font-bold text-red-500">35%</span> 위약금</td>
-                    </tr>
-                  </tbody></table>
-                </div>
-              </div>
+              {/* (주요 약정 → 렌탈료 카드로 통합됨) */}
             </div>
           </div>
 
@@ -3069,21 +3245,16 @@ export default function RentPricingBuilder() {
   // Step 1: 원가분석 (기존 UI)
   // ============================================
   return (
-    <div className="max-w-[1400px] mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
       {/* ===== 헤더 ===== */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link href="/quotes" className="text-gray-400 hover:text-gray-600 text-sm">견적 관리</Link>
-            <span className="text-gray-300">/</span>
-            <span className="text-steel-600 font-bold text-sm">렌트가 산출</span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900">
-            렌트가 산출 빌더
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+            🧮 장기렌터카 견적
           </h1>
           <p className="text-gray-500 mt-1 text-sm">
-            견적 작성 전 모든 비용 요소를 분석하여 적정 렌트가를 산출합니다
+            모든 비용 요소를 분석하여 적정 렌트가를 산출합니다
           </p>
         </div>
         <div className="flex gap-2">
@@ -4230,7 +4401,7 @@ export default function RentPricingBuilder() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <ResultRow label="차량 매입가" value={purchasePrice} />
-                        <InputRow label={acquisitionTax === 0 && factoryPrice > 0 ? '취득세 (경차 면제)' : '취득세 (영업용 4%)'} value={acquisitionTax} onChange={setAcquisitionTax} sub={acquisitionTax === 0 && factoryPrice > 0 ? '경차 취득세 감면' : '렌터카 대여업 영업용 기준'} />
+                        <InputRow label={acquisitionTax === 0 && factoryPrice > 0 ? '취득세 (경차 면제)' : `취득세 (${selectedCar?.is_commercial === false ? '비영업용 7%' : '영업용 4%'})`} value={acquisitionTax} onChange={setAcquisitionTax} sub={acquisitionTax === 0 && factoryPrice > 0 ? '경차 취득세 감면' : selectedCar?.is_commercial === false ? '비영업용(일반) 승용차 기준' : '렌터카 대여업 영업용 기준'} />
                         <InputRow
                           label={bondCost > 0 ? `공채 실부담 (${registrationRegion})` : `공채 (${registrationRegion})`}
                           value={bondCost}
@@ -4263,7 +4434,7 @@ export default function RentPricingBuilder() {
             </Section>
 
             {/* 2. 시세하락 분석 */}
-            <Section icon="📉" title={`시세하락 / 감가 분석 (${termMonths}개월 계약)`} defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">감가율 {(calculations.totalDepRateEnd * 100).toFixed(1)}%</span><span className="text-red-500 font-bold">월 {f(calculations.monthlyDepreciation)}원</span></span> : undefined}>
+            <Section icon="📉" title={`시세하락 / 감가 분석 (${termMonths}개월 계약)`} defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">감가율 {calculations.totalDepRateEnd.toFixed(1)}%</span><span className="text-red-500 font-bold">월 {f(calculations.monthlyDepreciation)}원</span></span> : undefined}>
               {/* 차량 구분: 신차 / 연식차량 */}
               <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
                 <p className="text-xs font-bold text-gray-500 mb-2.5">차량 구분</p>
@@ -4442,12 +4613,20 @@ export default function RentPricingBuilder() {
                       <span className="text-xs font-bold text-gray-600 shrink-0">인기도</span>
                       <select value={popularityGrade} onChange={(e) => setPopularityGrade(e.target.value)}
                         className="text-[11px] border border-gray-200 rounded-lg px-2 py-1 bg-white focus:border-steel-500 outline-none">
-                        {depAdjustments.filter(a => a.adjustment_type === 'popularity').map(a => (
-                          <option key={a.id} value={a.label}>{a.label} (×{Number(a.factor).toFixed(3)})</option>
-                        ))}
-                        {depAdjustments.filter(a => a.adjustment_type === 'popularity').length === 0 && (
-                          <option value="B등급 (일반)">B등급 (일반) (×1.000)</option>
-                        )}
+                        {depAdjustments.filter(a => a.adjustment_type === 'popularity' && a.is_active).length > 0
+                          ? depAdjustments.filter(a => a.adjustment_type === 'popularity' && a.is_active).map(a => (
+                              <option key={a.id} value={a.label}>{a.label} (×{Number(a.factor).toFixed(3)})</option>
+                            ))
+                          : [
+                              { label: 'S등급 (인기)', factor: 1.05 },
+                              { label: 'A등급 (준인기)', factor: 1.02 },
+                              { label: 'B등급 (일반)', factor: 1.0 },
+                              { label: 'C등급 (비인기)', factor: 0.97 },
+                              { label: 'D등급 (저인기)', factor: 0.93 },
+                            ].map(a => (
+                              <option key={a.label} value={a.label}>{a.label} (×{a.factor.toFixed(3)})</option>
+                            ))
+                        }
                       </select>
                     </>
                   )}
@@ -4473,6 +4652,7 @@ export default function RentPricingBuilder() {
                       <span className="w-px h-4 bg-gray-200 mx-0.5" />
                       <span className="text-[10px] text-gray-500">
                         보정 ×{calculations.adjustmentFactor.toFixed(3)}
+                        {calculations.popularityFactor !== 1.0 && <span className="text-purple-600 ml-1">인기도×{calculations.popularityFactor.toFixed(3)}</span>}
                         {calculations.mileageFactor !== 1.0 && <span className="text-blue-600 ml-1">주행×{calculations.mileageFactor.toFixed(3)}</span>}
                         {calculations.marketFactor !== 1.0 && <span className="text-orange-600 ml-1">시장×{calculations.marketFactor.toFixed(3)}</span>}
                       </span>
@@ -4659,7 +4839,7 @@ export default function RentPricingBuilder() {
                 {/* 원가 분석 상세 */}
                 <div className="bg-orange-50 rounded-lg p-3 space-y-0.5 mb-3">
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">감가율차이 +{excessRateBreakdown.depDiffPct.toFixed(1)}%p</span>
+                    <span className="text-gray-500">감가율차이 +{excessRateBreakdown.depDiffPct.toFixed(1)}%p {excessRateBreakdown.tierPenalty !== 1 ? `(패널티 ×${excessRateBreakdown.tierPenalty.toFixed(2)})` : ''}</span>
                     <span className="font-bold text-gray-700">감가비 {f(excessRateBreakdown.depCost)}원/km</span>
                   </div>
                   {excessRateBreakdown.maintItems.length > 0 && (
@@ -4668,13 +4848,15 @@ export default function RentPricingBuilder() {
                       <span className="font-bold text-gray-700">{f(excessRateBreakdown.maintCost)}원/km</span>
                     </div>
                   )}
-                  {excessRateBreakdown.tierPenalty !== 1 && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">약정패널티 ×{excessRateBreakdown.tierPenalty.toFixed(2)}</span>
-                      <span className="text-gray-500">마진 {excessRateMarginPct}% = {f(excessRateBreakdown.margin)}원</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-xs border-t border-orange-200 pt-1 mt-1">
+                    <span className="font-bold text-gray-700">원가 소계</span>
+                    <span className="font-bold text-gray-700">{f(excessRateBreakdown.baseCost)}원/km</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-orange-600 font-bold">마진 {excessRateMarginPct}%</span>
+                    <span className="font-bold text-orange-600">+{f(excessRateBreakdown.margin)}원/km</span>
+                  </div>
+                  <div className="flex justify-between text-xs border-t border-orange-300 pt-1 mt-1">
                     <span className="font-bold text-gray-700">산출 합계</span>
                     <span className="font-black text-red-600">{f(excessRateBreakdown.total)}원/km</span>
                   </div>
@@ -4707,20 +4889,32 @@ export default function RentPricingBuilder() {
             </Section>
 
             {/* 3. 금융비용 분석 */}
-            <Section icon="🏦" title="금융비용 분석" defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">대출 {f(loanAmount)}원 · {loanRate}%</span><span className="text-blue-600 font-bold">월 {f(calculations.totalMonthlyFinance)}원</span></span> : undefined}>
+            <Section icon="🏦" title="금융비용 분석" defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">대출 {f(calculations.effectiveLoan)}원 · 자기자본 {f(calculations.equityAmount)}원</span><span className="text-blue-600 font-bold">월 {f(calculations.totalMonthlyFinance)}원</span></span> : undefined}>
+              {/* 투자 기준 안내 */}
+              <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 mb-3 text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500">총취득원가</span>
+                  <span className="font-black text-gray-800">{f(totalAcquisitionCost || purchasePrice)}원</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500">대출한도 (매입가)</span>
+                  <span className="font-bold text-gray-700">{f(purchasePrice)}원</span>
+                </div>
+              </div>
+
               {/* ① 선택: 조달방식 + LTV */}
               <div className="flex items-center gap-1.5 mb-3">
                 <span className="text-xs font-bold text-gray-600 shrink-0">조달방식</span>
                 {[
-                  { val: 'loan', label: '대출' },
-                  { val: 'equity', label: '자기자본' },
+                  { val: 'loan', label: '대출100%' },
+                  { val: 'equity', label: '자기자본100%' },
                   { val: 'mixed', label: '혼합' },
                 ].map(opt => {
                   const current = loanAmount <= 0 ? 'equity' : loanAmount >= purchasePrice ? 'loan' : 'mixed'
                   return (
                     <button key={opt.val}
                       onClick={() => {
-                        if (opt.val === 'loan') setLoanAmount(purchasePrice)
+                        if (opt.val === 'loan') setLoanAmount(purchasePrice) // 매입가 한도까지
                         else if (opt.val === 'equity') setLoanAmount(0)
                         else setLoanAmount(Math.round(purchasePrice * 0.7))
                       }}
@@ -4733,10 +4927,10 @@ export default function RentPricingBuilder() {
                     </button>
                   )
                 })}
-                {loanAmount > 0 && loanAmount < purchasePrice && (
+                {loanAmount > 0 && (
                   <div className="flex items-center gap-1 ml-auto">
                     <span className="text-xs font-bold text-gray-600 shrink-0">대출비율</span>
-                    {[50, 60, 70, 80].map(pct => (
+                    {[30, 50, 70, 80, 90, 100].map(pct => (
                       <button key={pct}
                         onClick={() => setLoanAmount(Math.round(purchasePrice * pct / 100))}
                         className={`py-0.5 px-2 text-[11px] rounded-lg border font-bold transition-colors
@@ -4755,31 +4949,38 @@ export default function RentPricingBuilder() {
               <div className="space-y-1 mb-3">
                 {loanAmount > 0 && (
                   <>
-                    <InputRow label="대출 원금" value={loanAmount} onChange={setLoanAmount} sub={`매입가의 ${purchasePrice > 0 ? (loanAmount/purchasePrice*100).toFixed(0) : 0}%`} />
+                    <InputRow label="대출 원금" value={loanAmount} onChange={(v: number) => setLoanAmount(Math.min(v, purchasePrice))} sub={`매입가의 ${purchasePrice > 0 ? (loanAmount/purchasePrice*100).toFixed(0) : 0}% (한도: ${f(purchasePrice)}원)`} />
                     <InputRow label="대출 이자율 (연)" value={loanRate} onChange={setLoanRate} suffix="%" type="percent" />
                   </>
                 )}
-                {loanAmount < purchasePrice && (
-                  <InputRow label="투자수익률" value={investmentRate} onChange={setInvestmentRate} suffix="%" type="percent" sub={`자기자본 ${f(purchasePrice - loanAmount)}원 기회비용`} />
+                {calculations && calculations.equityAmount > 0 && (
+                  <>
+                    <InputRow label="자기자본" value={calculations.equityAmount} onChange={(v: number) => setLoanAmount(Math.max(0, Math.min((totalAcquisitionCost || purchasePrice) - v, purchasePrice)))} sub={`총취득원가의 ${(totalAcquisitionCost || purchasePrice) > 0 ? (calculations.equityAmount / (totalAcquisitionCost || purchasePrice) * 100).toFixed(0) : 0}%${loanAmount < purchasePrice && totalAcquisitionCost > purchasePrice ? ' (부대비용 포함)' : ''}`} />
+                    <InputRow label="투자수익률 (연)" value={investmentRate} onChange={setInvestmentRate} suffix="%" type="percent" sub="자기자본 기회비용" />
+                  </>
                 )}
               </div>
 
               {/* ③ 상세: 산출 내역 */}
               <div className="bg-gray-50/80 rounded-lg p-3 space-y-0.5 mb-3">
-                {loanAmount > 0 && (
+                <div className="flex justify-between text-xs py-0.5 text-gray-400 mb-1">
+                  <span>투자 기준: 총취득원가 {f(calculations.costBase)}원</span>
+                  <span>대출 한도: 매입가 {f(purchasePrice)}원</span>
+                </div>
+                {calculations.effectiveLoan > 0 && (
                   <>
-                    <div className="flex justify-between text-xs py-0.5"><span className="text-gray-500">대출잔액</span><span className="font-bold text-gray-700">{f(loanAmount)} → {f(calculations.loanEndBalance)} (평균 {f(calculations.avgLoanBalance)})</span></div>
+                    <div className="flex justify-between text-xs py-0.5"><span className="text-gray-500">대출잔액</span><span className="font-bold text-gray-700">{f(calculations.effectiveLoan)} → {f(calculations.loanEndBalance)} (평균 {f(calculations.avgLoanBalance)})</span></div>
                     <ResultRow label="월 대출이자" value={calculations.monthlyLoanInterest} />
                   </>
                 )}
-                {loanAmount < purchasePrice && (
+                {calculations.equityAmount > 0 && (
                   <>
-                    {loanAmount > 0 && <div className="border-t border-gray-200 my-1" />}
-                    <div className="flex justify-between text-xs py-0.5"><span className="text-gray-500">자기자본</span><span className="font-bold text-gray-700">{f(calculations.equityAmount)} → {f(calculations.equityEndBalance)} (평균 {f(calculations.avgEquityBalance)})</span></div>
+                    {calculations.effectiveLoan > 0 && <div className="border-t border-gray-200 my-1" />}
+                    <div className="flex justify-between text-xs py-0.5"><span className="text-gray-500">자기자본{totalAcquisitionCost > purchasePrice && loanAmount >= purchasePrice ? ' (부대비용 포함)' : ''}</span><span className="font-bold text-gray-700">{f(calculations.equityAmount)} → {f(calculations.equityEndBalance)} (평균 {f(calculations.avgEquityBalance)})</span></div>
                     <ResultRow label="월 기회비용" value={calculations.monthlyOpportunityCost} />
                   </>
                 )}
-                <p className="text-[10px] text-gray-400 pt-1 border-t border-gray-200 mt-1">평균잔액법 · 감가 회수 반영</p>
+                <p className="text-[10px] text-gray-400 pt-1 border-t border-gray-200 mt-1">평균잔액법 · 총취득원가 기준 · 대출은 매입가 한도</p>
               </div>
 
               {/* ④ 결과 */}
@@ -4835,7 +5036,7 @@ export default function RentPricingBuilder() {
                 </div>
               ) : insAutoMode ? (
                 <div className="bg-gray-50/80 rounded-lg p-3 mb-3">
-                  <div className="flex justify-between text-xs"><span className="text-gray-500">{linkedInsurance ? `연동 · 연 ${f(linkedInsurance.total_premium || 0)}원` : autoInsType ? `기준표 (${autoInsType})` : '직접 입력'}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-gray-500">{linkedInsurance ? `연동 · 연 ${f(linkedInsurance.premium || 0)}원` : autoInsType ? `기준표 (${autoInsType})` : '직접 입력'}</span></div>
                 </div>
               ) : null}
 
@@ -4871,24 +5072,30 @@ export default function RentPricingBuilder() {
             </Section>
 
             {/* 4-2. 자동차세 */}
-            <Section icon="🏛️" title="자동차세 (영업용)" defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">{engineCC || 0}cc</span><span className="text-purple-600 font-bold">월 {f(calculations.monthlyTax)}원</span></span> : undefined}>
+            <Section icon="🏛️" title={`자동차세 (${selectedCar?.is_commercial === false ? '비영업용' : '영업용'})`} defaultOpen={false} summary={calculations ? <span className="flex items-center gap-2"><span className="text-gray-400">{engineCC || 0}cc</span><span className="text-purple-600 font-bold">월 {f(calculations.monthlyTax)}원</span></span> : undefined}>
               {/* ① 입력 */}
               <div className="space-y-1 mb-3">
                 <InputRow label="배기량" value={engineCC} onChange={(v) => {
                   setEngineCC(v)
                   const fuelCat = selectedCar?.fuel_type?.includes('전기') ? '전기' : '내연기관'
-                  const tr = taxRates.find(r => r.tax_type === '영업용' && r.fuel_category === fuelCat && v >= r.cc_min && v <= r.cc_max)
+                  const isComm = selectedCar?.is_commercial !== false
+                  const taxTypeKey = isComm ? '영업용' : '비영업용'
+                  const tr = taxRates.find(r => r.tax_type === taxTypeKey && r.fuel_category === fuelCat && v >= r.cc_min && v <= r.cc_max)
                   let tax = 0
                   if (tr) {
                     tax = tr.fixed_annual > 0 ? tr.fixed_annual : Math.round(v * tr.rate_per_cc)
                     tax = Math.round(tax * (1 + tr.education_tax_rate / 100))
+                  } else if (fuelCat === '전기') {
+                    tax = isComm ? 20000 : Math.round(130000 * 1.3) // 전기차 고정세액
+                  } else if (isComm) {
+                    tax = v * 18 // 영업용 내연기관 fallback
                   } else {
-                    if (v <= 1000) tax = v * 18; else if (v <= 1600) tax = v * 18; else tax = v * 19
-                    tax = Math.round(tax * 1.3)
+                    if (v <= 1000) tax = v * 80; else if (v <= 1600) tax = v * 140; else tax = v * 200
+                    tax = Math.round(tax * 1.3) // 비영업용 내연기관 + 교육세 30%
                   }
                   setAnnualTax(tax)
                 }} suffix="cc" />
-                <InputRow label="연간 자동차세" value={annualTax} onChange={setAnnualTax} sub="영업용 세율" />
+                <InputRow label="연간 자동차세" value={annualTax} onChange={setAnnualTax} sub={`${selectedCar?.is_commercial === false ? '비영업용' : '영업용'} 세율`} />
               </div>
               {/* ② 결과 */}
               <ResultRow label="월 자동차세" value={calculations.monthlyTax} highlight />

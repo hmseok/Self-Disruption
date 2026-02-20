@@ -62,7 +62,7 @@ export default function DashboardPage() {
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen animate-fade-in">
 
       {/* 1. 상단 경영 대시보드 (New!) */}
       <div className="mb-12">

@@ -110,10 +110,10 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
         {/* 1️⃣ 그룹: 대고객 (영업) */}
         {renderGroupHeader('sales', '대고객 영업')}
         <div className={`space-y-1 transition-all duration-300 ${openGroups.sales || isCollapsed ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-           {renderMenuItem('장기렌터카 견적', '/quotes/pricing', <Icons.Calculator />)}
-           {renderMenuItem('단기대차 견적', '/quotes/short-term', <Icons.Wrench />)}
-           {renderMenuItem('렌트 견적/계약', '/quotes', <Icons.DocumentCheck />)}
            {renderMenuItem('고객 관리 (CRM)', '/customers', <Icons.UserGroup />)}
+           {renderMenuItem('장기렌터카 견적', '/quotes/pricing', <Icons.Calculator />)}
+           {renderMenuItem('단기렌터카 견적', '/quotes/short-term', <Icons.Wrench />)}
+           {renderMenuItem('렌트 견적/계약', '/quotes', <Icons.DocumentCheck />)}
         </div>
 
         {/* 2️⃣ 그룹: 파트너 (자금/정산) */}

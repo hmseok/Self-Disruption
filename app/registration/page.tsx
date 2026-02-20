@@ -325,11 +325,11 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚗 차량 등록증 관리</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 등록/제원 상세</h1>
             <p className="text-gray-500 mt-2 text-sm">등록증(PDF/이미지)을 업로드하면 AI가 <b>브랜드/모델을 자동 분석</b>합니다.</p>
          </div>
          <div className="flex gap-3">
@@ -347,6 +347,27 @@ const { company, role, adminSelectedCompanyId } = useApp()
             </button>
          </div>
        </div>
+
+       {/* 드래그 앤 드롭 업로드 영역 (최상단) */}
+       {!bulkProcessing && (
+         <div
+           onDragOver={handleDragOver}
+           onDragLeave={handleDragLeave}
+           onDrop={handleDrop}
+           onClick={() => fileInputRef.current?.click()}
+           className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+             isDragging
+               ? 'border-steel-500 bg-steel-50 scale-[1.01]'
+               : 'border-gray-300 bg-white hover:border-steel-400 hover:bg-steel-50/30'
+           }`}
+         >
+           <div className="text-3xl mb-2">{isDragging ? '📥' : '🚗'}</div>
+           <p className="text-sm font-bold text-gray-700">
+             {isDragging ? '여기에 파일을 놓으세요' : '등록증 파일을 드래그하여 업로드'}
+           </p>
+           <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
+         </div>
+       )}
 
        {/* 📊 KPI 대시보드 */}
        {cars.length > 0 && !bulkProcessing && (
@@ -459,27 +480,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
                무시
              </button>
            </div>
-         </div>
-       )}
-
-       {/* 드래그 앤 드롭 업로드 영역 */}
-       {!bulkProcessing && (
-         <div
-           onDragOver={handleDragOver}
-           onDragLeave={handleDragLeave}
-           onDrop={handleDrop}
-           onClick={() => fileInputRef.current?.click()}
-           className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-             isDragging
-               ? 'border-steel-500 bg-steel-50 scale-[1.01]'
-               : 'border-gray-300 bg-white hover:border-steel-400 hover:bg-steel-50/30'
-           }`}
-         >
-           <div className="text-3xl mb-2">{isDragging ? '📥' : '🚗'}</div>
-           <p className="text-sm font-bold text-gray-700">
-             {isDragging ? '여기에 파일을 놓으세요' : '등록증 파일을 드래그하여 업로드'}
-           </p>
-           <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
          </div>
        )}
 

@@ -103,7 +103,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
       {/* 상단 헤더 영역 */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-3 md:gap-4">
         <div>
-          <h1 className="text-xl md:text-3xl font-black text-gray-900">🚙 차량 관리 대장</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 전체 차량 대장</h1>
           <p className="text-gray-500 mt-1 md:mt-2 text-sm">
             총 보유: <span className="font-bold text-steel-600">{cars.length}</span>대 /
             검색됨: {filteredCars.length}대

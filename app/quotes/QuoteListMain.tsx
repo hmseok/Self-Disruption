@@ -108,20 +108,21 @@ function DesktopRowActions({
           >
             📦 보관
           </button>
-          {!quote.contract && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                if (confirm('이 견적서를 삭제하시겠습니까?')) {
-                  onDelete(quote.id)
-                }
-                setShowMenu(false)
-              }}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 font-medium text-red-600"
-            >
-              🗑️ 삭제
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const msg = quote.contract
+                ? '⚠️ 이 견적서에 연결된 계약이 있습니다.\n계약과 함께 삭제하시겠습니까?'
+                : '이 견적서를 삭제하시겠습니까?'
+              if (confirm(msg)) {
+                onDelete(quote.id)
+              }
+              setShowMenu(false)
+            }}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 font-medium text-red-600"
+          >
+            🗑️ 삭제
+          </button>
         </div>
       )}
     </div>
@@ -162,19 +163,20 @@ function MobileRowActions({
       >
         📦 보관
       </button>
-      {!quote.contract && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            if (confirm('이 견적서를 삭제하시겠습니까?')) {
-              onDelete(quote.id)
-            }
-          }}
-          className="flex-1 px-3 py-2 text-xs rounded-lg bg-red-100 text-red-600 font-bold hover:bg-red-200 transition-colors"
-        >
-          🗑️ 삭제
-        </button>
-      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          const msg = quote.contract
+            ? '⚠️ 이 견적서에 연결된 계약이 있습니다.\n계약과 함께 삭제하시겠습니까?'
+            : '이 견적서를 삭제하시겠습니까?'
+          if (confirm(msg)) {
+            onDelete(quote.id)
+          }
+        }}
+        className="flex-1 px-3 py-2 text-xs rounded-lg bg-red-100 text-red-600 font-bold hover:bg-red-200 transition-colors"
+      >
+        🗑️ 삭제
+      </button>
     </div>
   )
 }
@@ -194,6 +196,20 @@ function QuoteStatusBadge({ quote }: { quote: any }) {
     return (
       <span className="px-2 py-1 rounded-md text-xs font-black bg-steel-600 text-white shadow-sm">
         ✅ 계약확정
+      </span>
+    )
+  }
+  if (quote.signed_at) {
+    return (
+      <span className="px-2 py-1 rounded-md text-xs font-black bg-green-100 text-green-700 shadow-sm">
+        서명완료
+      </span>
+    )
+  }
+  if (quote.shared_at) {
+    return (
+      <span className="px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-700">
+        발송됨
       </span>
     )
   }
@@ -357,12 +373,15 @@ export default function QuoteListPage() {
     []
   )
 
-  // Handle delete
+  // Handle delete (계약확정 견적서도 삭제 가능 — 연결 계약 먼저 삭제)
   const handleDelete = useCallback(
     async (quoteId: string) => {
       try {
-        const { error } = await supabase.from('quotes').delete().eq('id', quoteId)
+        // 연결된 계약이 있으면 먼저 삭제
+        const { error: contractErr } = await supabase.from('contracts').delete().eq('quote_id', quoteId)
+        if (contractErr) console.warn('계약 삭제 실패 (무시):', contractErr.message)
 
+        const { error } = await supabase.from('quotes').delete().eq('id', quoteId)
         if (error) throw error
 
         setQuotes((prev) => prev.filter((q) => q.id !== quoteId))
@@ -377,11 +396,11 @@ export default function QuoteListPage() {
   const displayedQuotes = filteredQuotes()
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900">📄 견적 및 계약 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📄 렌트 견적/계약</h1>
           <p className="text-gray-500 mt-2">
             전체 견적: <span className="font-bold text-steel-600">{counts.all}</span>건
           </p>

@@ -108,12 +108,12 @@ export default function GeneralInvestDashboard() {
   })
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen pb-20 md:pb-32">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen pb-20 md:pb-32">
 
       {/* 상단 헤더 */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900">💰 일반 투자 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💼 투자자/펀딩 정산</h1>
           <p className="text-gray-500 mt-2">법인 운영 자금 및 순수 투자 계약 현황입니다.</p>
         </div>
 

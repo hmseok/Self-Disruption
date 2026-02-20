@@ -723,10 +723,6 @@ export default function QuoteCreator() {
               <div className="bg-gray-50 rounded-xl p-4">
                 <table className="w-full text-sm">
                   <tbody>
-                    <tr className="border-b border-gray-200">
-                      <td className="py-2 text-gray-500">월 렌탈료 x {data.termMonths}개월</td>
-                      <td className="py-2 text-right font-bold">{f(totalPayments)}원</td>
-                    </tr>
                     {data.deposit > 0 && (
                       <tr className="border-b border-gray-200">
                         <td className="py-2 text-gray-500">보증금</td>
@@ -745,12 +741,6 @@ export default function QuoteCreator() {
                         <td className="py-2 text-right font-black text-amber-600">{f(calc.buyoutPrice)}원</td>
                       </tr>
                     )}
-                    <tr>
-                      <td className="py-3 font-black text-base">계약기간 총 비용</td>
-                      <td className="py-3 text-right font-black text-xl text-gray-900">
-                        {f(totalWithBuyout)}원
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>

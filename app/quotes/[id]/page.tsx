@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from '../../utils/supabase'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 export const dynamic = "force-dynamic";
@@ -75,6 +75,12 @@ export default function QuoteDetailPage() {
   const [creating, setCreating] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [viewMode, setViewMode] = useState<'quote' | 'analysis'>('quote')
+  // 공유 관련
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareStatus, setShareStatus] = useState<'none' | 'shared' | 'signed'>('none')
 
   useEffect(() => {
     const fetchQuoteDetail = async () => {
@@ -116,6 +122,53 @@ export default function QuoteDetailPage() {
     }
     fetchQuoteDetail()
   }, [quoteId, router])
+
+  // 공유 상태 로드
+  useEffect(() => {
+    if (!quoteId || !quote) return
+    if (quote.signed_at) { setShareStatus('signed'); return }
+    if (quote.shared_at) setShareStatus('shared')
+  }, [quoteId, quote])
+
+  const handleShare = useCallback(async () => {
+    setShareLoading(true)
+    setShowShareModal(true)
+    try {
+      const res = await fetch(`/api/quotes/${quoteId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiryDays: 7 })
+      })
+      const data = await res.json()
+      if (data.shareUrl) {
+        setShareUrl(data.shareUrl)
+        setShareStatus('shared')
+      } else {
+        alert(data.error || '공유 링크 생성 실패')
+        setShowShareModal(false)
+      }
+    } catch {
+      alert('서버 오류')
+      setShowShareModal(false)
+    }
+    setShareLoading(false)
+  }, [quoteId])
+
+  const handleCopyShareUrl = useCallback(() => {
+    navigator.clipboard.writeText(shareUrl)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }, [shareUrl])
+
+  const handleRevokeShare = useCallback(async () => {
+    if (!confirm('공유 링크를 비활성화하시겠습니까?')) return
+    try {
+      await fetch(`/api/quotes/${quoteId}/share`, { method: 'DELETE' })
+      setShareUrl('')
+      setShareStatus('none')
+      setShowShareModal(false)
+    } catch { alert('오류') }
+  }, [quoteId])
 
   const handleArchiveQuote = async () => {
     if (!confirm('이 견적을 보관하시겠습니까?')) return
@@ -231,6 +284,7 @@ export default function QuoteDetailPage() {
   const displayNumber = car.number || ''
   const factoryPrice = detail.factory_price || car.factory_price || 0
   const purchasePrice = detail.purchase_price || car.purchase_price || 0
+  const totalAcquisitionCost = detail.total_acquisition_cost || detail.cost_base || purchasePrice
   const driverAgeGroup = detail.driver_age_group || '26세이상'
 
   // 만료 상태
@@ -268,6 +322,14 @@ export default function QuoteDetailPage() {
             <button onClick={() => router.push(`/quotes/pricing?quote_id=${quoteId}`)}
               className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
               {worksheet ? '렌트가 산출 수정' : '견적서 수정'}
+            </button>
+            <button onClick={handleShare}
+              className={`px-4 py-2 text-sm rounded-xl font-bold transition-colors ${
+                shareStatus === 'signed' ? 'bg-green-100 text-green-700 border border-green-300' :
+                shareStatus === 'shared' ? 'bg-blue-100 text-blue-700 border border-blue-300' :
+                'border border-blue-300 text-blue-600 hover:bg-blue-50'
+              }`}>
+              {shareStatus === 'signed' ? '서명완료' : shareStatus === 'shared' ? '발송됨' : '견적 발송'}
             </button>
             <button onClick={handleArchiveQuote} disabled={updating || quote.status === 'archived'}
               className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white disabled:opacity-50">
@@ -485,32 +547,6 @@ export default function QuoteDetailPage() {
                         <td className="px-3 py-1.5 font-black text-amber-700 text-sm">{f(buyoutPrice)}<span className="text-[10px]">원</span> <span className="text-[10px] font-normal text-amber-400">잔존가율 {detail.residual_rate || '-'}%</span></td>
                       </tr>
                     )}
-                    <tr className="border-b border-gray-100">
-                      <td className="bg-gray-50 px-3 py-1.5 text-gray-500">월 렌탈료 x {termMonths}개월</td>
-                      <td className="px-3 py-1.5 text-right font-bold">{f(totalPayments)}원</td>
-                    </tr>
-                    {depositAmt > 0 && (
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 text-gray-500">보증금 (만기 시 환급)</td>
-                        <td className="px-3 py-1.5 text-right font-bold">{f(depositAmt)}원</td>
-                      </tr>
-                    )}
-                    {prepaymentAmt > 0 && (
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 text-gray-500">선납금 (계약 시 1회)</td>
-                        <td className="px-3 py-1.5 text-right font-bold">{f(prepaymentAmt)}원</td>
-                      </tr>
-                    )}
-                    {contractType === 'buyout' && (
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 text-amber-600 font-bold">인수가격 (만기 시, 선택)</td>
-                        <td className="px-3 py-1.5 text-right font-black text-amber-600">{f(buyoutPrice)}원</td>
-                      </tr>
-                    )}
-                    <tr className="bg-gray-50">
-                      <td className="px-3 py-2 font-black text-xs">계약기간 총 비용</td>
-                      <td className="px-3 py-2 text-right font-black text-base text-gray-900">{f(totalWithBuyout)}원</td>
-                    </tr>
                   </tbody></table>
                 </div>
               </div>
@@ -713,11 +749,11 @@ export default function QuoteDetailPage() {
           내부 원가분석 뷰
           ============================================================ */}
       {viewMode === 'analysis' && (
-        <div className="max-w-[1400px] mx-auto pb-10 px-4 md:px-6 no-print-alt">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="max-w-[1200px] mx-auto pb-10 px-4 md:px-6 no-print-alt">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
             {/* 왼쪽: 견적 기본 정보 */}
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-7 space-y-4">
 
               {/* 고객 + 차량 요약 카드 */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -763,10 +799,11 @@ export default function QuoteDetailPage() {
                   <h3 className="font-bold text-gray-800 text-sm">감가상각 분석</h3>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-4">
                     {[
                       ['차량가(신차가)', f(factoryPrice) + '원'],
                       ['매입가', f(purchasePrice) + '원'],
+                      ['취득원가', f(totalAcquisitionCost) + '원'],
                       ['현재시장가', f(detail.current_market_value) + '원'],
                       ['만기시장가', f(detail.end_market_value) + '원'],
                     ].map(([l, v], i) => (
@@ -813,7 +850,7 @@ export default function QuoteDetailPage() {
                   <div>
                     <p className="text-gray-400 text-xs mb-2 font-bold">자기자본 / 기회비용</p>
                     <div className="space-y-2">
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">자기자본</span><span className="font-bold">{f(purchasePrice - (detail.loan_amount || 0))}원</span></div>
+                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">자기자본</span><span className="font-bold">{f(totalAcquisitionCost - (detail.loan_amount || 0))}원</span></div>
                       <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">투자수익률</span><span className="font-bold">{detail.investment_rate || 0}%</span></div>
                       {costBreakdown.avg_equity_balance > 0 && (
                         <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_equity_balance)}원</span></div>
@@ -837,13 +874,15 @@ export default function QuoteDetailPage() {
             </div>
 
             {/* 오른쪽: 산출 결과 패널 */}
-            <div className="lg:col-span-5 space-y-6">
-              <div className="bg-gray-900 text-white rounded-2xl shadow-xl p-6 sticky top-6">
-                <div className="border-b border-gray-700 pb-4 mb-5">
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Pricing Analysis</p>
-                  <h2 className="text-xl font-black mt-1">원가분석 결과</h2>
+            <div className="lg:col-span-5 space-y-3">
+
+              {/* 원가분석 결과 (다크 카드) */}
+              <div className="bg-gray-900 text-white rounded-2xl shadow-xl p-4">
+                <div className="border-b border-gray-700 pb-2 mb-3">
+                  <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Pricing Analysis</p>
+                  <h2 className="text-base font-black mt-0.5">원가분석 결과</h2>
                 </div>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between"><span className="text-gray-400">감가상각</span><span className="font-bold">{f(monthlyDep)}원</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">대출이자</span><span className="font-bold">{f(monthlyLoanInterest)}원</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">기회비용</span><span className="font-bold">{f(monthlyOpportunityCost)}원</span></div>
@@ -853,27 +892,27 @@ export default function QuoteDetailPage() {
                   <div className="flex justify-between"><span className="text-gray-400">리스크적립</span><span className="font-bold">{f(monthlyRisk)}원</span></div>
                   {(depositDiscount > 0 || prepaymentDiscount > 0) && (
                     <>
-                      <div className="border-t border-gray-700 my-2" />
+                      <div className="border-t border-gray-700 my-1" />
                       {depositDiscount > 0 && <div className="flex justify-between text-green-400"><span>보증금할인</span><span className="font-bold">-{f(depositDiscount)}원</span></div>}
                       {prepaymentDiscount > 0 && <div className="flex justify-between text-green-400"><span>선납할인</span><span className="font-bold">-{f(prepaymentDiscount)}원</span></div>}
                     </>
                   )}
-                  <div className="border-t border-gray-700 my-3 pt-3">
-                    <div className="flex justify-between"><span className="text-gray-300 font-bold">총 원가</span><span className="font-black text-lg">{f(totalMonthlyCost)}원</span></div>
+                  <div className="border-t border-gray-700 my-2 pt-2">
+                    <div className="flex justify-between"><span className="text-gray-300 font-bold">총 원가</span><span className="font-black text-sm">{f(totalMonthlyCost)}원</span></div>
                   </div>
                   <div className="flex justify-between text-green-400"><span className="font-bold">+ 마진</span><span className="font-bold">{f(margin)}원</span></div>
-                  <div className="border-t border-gray-500 my-3 pt-3">
+                  <div className="border-t border-gray-500 my-2 pt-2">
                     <div className="text-right">
-                      <p className="text-xs text-yellow-400 font-bold mb-1">월 렌트료 (VAT별도)</p>
-                      <p className="text-3xl font-black tracking-tight">{f(suggestedRent)}<span className="text-lg ml-1">원</span></p>
+                      <p className="text-[10px] text-yellow-400 font-bold mb-0.5">월 렌트료 (VAT별도)</p>
+                      <p className="text-2xl font-black tracking-tight">{f(suggestedRent)}<span className="text-sm ml-1">원</span></p>
                     </div>
                   </div>
                 </div>
 
-                {/* 원가 비중 차트 */}
-                <div className="mt-5 pt-4 border-t border-gray-700">
-                  <p className="text-xs text-gray-400 mb-3 font-bold">원가 비중 분석</p>
-                  <div className="space-y-2">
+                {/* 원가 비중 바 */}
+                <div className="mt-3 pt-3 border-t border-gray-700">
+                  <p className="text-[10px] text-gray-400 mb-2 font-bold">원가 비중</p>
+                  <div className="space-y-1.5">
                     <CostBar label="감가" value={monthlyDep} total={totalCostForBar} color="bg-red-500" />
                     <CostBar label="금융" value={monthlyFinance} total={totalCostForBar} color="bg-blue-500" />
                     <CostBar label="보험+세금" value={monthlyInsurance + monthlyTax} total={totalCostForBar} color="bg-purple-500" />
@@ -883,42 +922,107 @@ export default function QuoteDetailPage() {
                 </div>
 
                 {worksheet && (
-                  <div className="mt-5 pt-4 border-t border-gray-700">
-                    <button onClick={handleEditWorksheet} className="w-full py-3 bg-steel-600 hover:bg-steel-500 text-white rounded-xl font-bold text-sm transition-colors">렌트가 산출 수정 →</button>
-                    <p className="text-[10px] text-gray-500 text-center mt-2">워크시트: {String(worksheet.id).slice(0, 8)} · {fDate(worksheet.updated_at)}</p>
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <button onClick={handleEditWorksheet} className="w-full py-2.5 bg-steel-600 hover:bg-steel-500 text-white rounded-xl font-bold text-xs transition-colors">렌트가 산출 수정 →</button>
+                    <p className="text-[10px] text-gray-500 text-center mt-1">워크시트: {String(worksheet.id).slice(0, 8)} · {fDate(worksheet.updated_at)}</p>
                   </div>
                 )}
               </div>
 
-              {/* 수익성 요약 */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                <h3 className="font-bold text-gray-700 mb-4 text-sm">수익성 요약</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm"><span className="text-gray-500">월 순이익</span><span className="font-bold text-green-600">{f(margin)}원</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-gray-500">연 순이익</span><span className="font-bold text-green-600">{f(margin * 12)}원</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-gray-500">계약기간 총이익</span><span className="font-black text-green-700 text-lg">{f(margin * termMonths)}원</span></div>
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-gray-500">마진율</span><span className="font-bold text-steel-600">{suggestedRent > 0 ? (margin / suggestedRent * 100).toFixed(1) : 0}%</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-gray-500">투자수익률 (ROI)</span><span className="font-bold text-steel-600">{purchasePrice > 0 ? ((margin * 12) / purchasePrice * 100).toFixed(1) : 0}%</span></div>
+              {/* 수익성 + 초과주행 — 2열 그리드 */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* 수익성 요약 */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
+                  <h3 className="font-bold text-gray-700 mb-2 text-xs">수익성 요약</h3>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs"><span className="text-gray-500">월 순이익</span><span className="font-bold text-green-600">{f(margin)}원</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-gray-500">총이익</span><span className="font-black text-green-700">{f(margin * termMonths)}원</span></div>
+                    <div className="border-t pt-1.5 space-y-1">
+                      <div className="flex justify-between text-xs"><span className="text-gray-500">마진율</span><span className="font-bold text-steel-600">{suggestedRent > 0 ? (margin / suggestedRent * 100).toFixed(1) : 0}%</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-gray-500">연 ROI</span><span className="font-bold text-steel-600">{totalAcquisitionCost > 0 ? ((margin * 12) / totalAcquisitionCost * 100).toFixed(1) : 0}%</span></div>
+                    </div>
                   </div>
+                </div>
+
+                {/* 초과주행 요금 */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
+                  <h3 className="font-bold text-gray-700 mb-2 text-xs">초과주행 요금</h3>
+                  {excessMileageRate > 0 ? (
+                    <>
+                      <div className="text-center bg-red-50 rounded-lg p-2 mb-2">
+                        <p className="text-red-500 text-[10px] font-bold mb-0.5">km당</p>
+                        <p className="text-lg font-black text-red-600">{f(excessMileageRate)}원</p>
+                      </div>
+                      <div className="text-[10px] text-gray-500 space-y-0.5">
+                        <p>연 {f(annualMileage * 10000)}km</p>
+                        <p>총 {f(totalMileageLimit)}km</p>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-400">설정 없음</p>
+                  )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {/* 초과주행 요금 */}
-              {excessMileageRate > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                  <h3 className="font-bold text-gray-700 mb-4 text-sm">초과주행 요금</h3>
-                  <div className="text-center bg-red-50 rounded-xl p-4 mb-3">
-                    <p className="text-red-500 text-xs font-bold mb-1">km당 추가요금</p>
-                    <p className="text-2xl font-black text-red-600">{f(excessMileageRate)}원</p>
-                  </div>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>약정: 연 {f(annualMileage * 10000)}km / 총 {f(totalMileageLimit)}km</p>
-                    <p>초과 시 만기 정산</p>
+      {/* ===== 공유 모달 ===== */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-black text-gray-900">견적서 발송</h3>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+
+            {shareLoading ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">링크 생성 중...</p>
+              </div>
+            ) : shareUrl ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">공유 링크</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareUrl}
+                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 font-mono text-gray-600 truncate"
+                    />
+                    <button
+                      onClick={handleCopyShareUrl}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                        shareCopied
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-900 text-white hover:bg-gray-700'
+                      }`}
+                    >
+                      {shareCopied ? '복사됨!' : '복사'}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-xs text-blue-700 font-bold mb-1">사용 방법</p>
+                  <ul className="text-xs text-blue-600 space-y-0.5">
+                    <li>1. 위 링크를 복사합니다</li>
+                    <li>2. 카카오톡/문자로 고객에게 전송합니다</li>
+                    <li>3. 고객이 견적을 확인하고 서명하면 계약이 자동 생성됩니다</li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-between items-center text-xs text-gray-400">
+                  <span>유효기간: 7일</span>
+                  <button onClick={handleRevokeShare} className="text-red-400 hover:text-red-600 font-bold">링크 비활성화</button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm text-center py-4">공유 링크를 생성할 수 없습니다.</p>
+            )}
           </div>
         </div>
       )}

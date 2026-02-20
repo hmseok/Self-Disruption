@@ -193,11 +193,11 @@ export default function LoanListPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-12 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">대출/금융사 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏦 대출/금융사 관리</h1>
           <p className="text-gray-500 mt-2 text-sm">견적서를 업로드하면 AI가 <b>자동 인식</b>하여 등록합니다.</p>
         </div>
         <div className="flex gap-3">

@@ -406,7 +406,7 @@ export default function SettlementDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b pb-6 gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900">📊 매출 회계 정산</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 매출 회계 정산</h1>
             <input
               type="month"
               value={filterDate}

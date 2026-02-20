@@ -268,7 +268,7 @@ export default function DashboardPage() {
   // 회사 미배정 상태
   if (!company && role !== 'god_admin') {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="mb-8">
           <p className="text-gray-500 text-sm font-medium">
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
@@ -290,7 +290,7 @@ export default function DashboardPage() {
   // 회사 승인 대기 상태
   if (company && company.is_active === false && role !== 'god_admin') {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="mb-8">
           <p className="text-gray-500 text-sm font-medium">
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
@@ -328,7 +328,7 @@ export default function DashboardPage() {
     ]
 
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
 
         {/* 헤더 */}
         <div className="mb-6 md:mb-8">
@@ -558,7 +558,7 @@ export default function DashboardPage() {
   const showFinance = hasModule('/finance') || hasModule('/quotes')
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 min-h-screen bg-gray-50">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
 
       {/* 상단 인사 영역 */}
       <div className="mb-6 md:mb-8">
