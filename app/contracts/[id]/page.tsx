@@ -3,6 +3,9 @@ import { supabase } from '../../utils/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { generateContractPdf, renderTermsHtml } from '@/lib/contract-pdf'
+import type { ContractPdfData } from '@/lib/contract-pdf'
+import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM } from '@/lib/contract-terms'
 
 // Sub-component: Contract Info Card
 function ContractInfoCard({ contract }: { contract: any }) {
@@ -158,6 +161,175 @@ function QuoteLinkSection({ contract }: { contract: any }) {
         >
           <span>🔗</span> 출처 견적 보기
         </Link>
+      </div>
+    </div>
+  )
+}
+
+// Sub-component: Contract PDF Download
+function ContractPdfSection({ contract, schedules }: { contract: any; schedules: any[] }) {
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const handleGeneratePdf = async () => {
+    setPdfLoading(true)
+    try {
+      // 계약에 연결된 약관 조회 (없으면 정적 약관 fallback)
+      let termsArticles: Array<{ title: string; content: string }> = []
+      if (contract.terms_version_id) {
+        const { data: articles } = await supabase
+          .from('contract_term_articles')
+          .select('article_number, title, content')
+          .eq('terms_id', contract.terms_version_id)
+          .order('article_number')
+        if (articles && articles.length > 0) {
+          termsArticles = articles.map((a: any) => ({
+            title: `제${a.article_number}조 (${a.title})`,
+            content: a.content,
+          }))
+        }
+      }
+      // DB 약관이 없으면 정적 약관 사용
+      if (termsArticles.length === 0) {
+        termsArticles = CONTRACT_TERMS.map(t => ({ title: t.title, content: t.content }))
+      }
+
+      // 회사 정보 조회
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('*, customer:customers(*)')
+        .eq('id', contract.quote_id)
+        .single()
+
+      const { data: company } = await supabase
+        .from('companies')
+        .select('*')
+        .single()
+
+      // 서명 데이터 조회
+      let signatureData = null
+      let signatureIp = null
+      if (contract.signature_id) {
+        const { data: sig } = await supabase
+          .from('customer_signatures')
+          .select('signature_data, ip_address, created_at')
+          .eq('id', contract.signature_id)
+          .single()
+        if (sig) {
+          signatureData = sig.signature_data
+          signatureIp = sig.ip_address
+        }
+      }
+
+      const detail = quote?.quote_detail || {}
+      const car = contract.car || {}
+
+      const pdfData: ContractPdfData = {
+        contractId: String(contract.id),
+        signedAt: quote?.signed_at || contract.created_at,
+        company: {
+          name: company?.name || '',
+          business_number: company?.business_number || '',
+          representative: company?.representative || '',
+          address: company?.address || '',
+          phone: company?.phone || '',
+          logo_url: company?.logo_url || '',
+        },
+        customer: {
+          name: contract.customer_name || quote?.customer?.name || '',
+          phone: quote?.customer?.phone || '',
+          email: quote?.customer?.email || '',
+          address: quote?.customer?.address || '',
+        },
+        car: {
+          brand: car.brand || '',
+          model: car.model || '',
+          trim: car.trim || '',
+          year: car.year || 0,
+          fuel_type: car.fuel_type || '',
+          number: car.number || '',
+          factory_price: detail.factory_price || car.factory_price || 0,
+        },
+        terms: {
+          contractType: detail.contract_type || 'return',
+          termMonths: contract.term_months || 36,
+          startDate: contract.start_date || '',
+          endDate: contract.end_date || '',
+          monthlyRent: contract.monthly_rent || 0,
+          deposit: contract.deposit || 0,
+          prepayment: detail.prepayment || 0,
+          annualMileage: detail.annualMileage || 2,
+          excessMileageRate: detail.excess_mileage_rate || 0,
+          maintPackage: detail.maint_package || 'basic',
+          deductible: detail.deductible || 0,
+          buyoutPrice: detail.buyout_price || 0,
+        },
+        signatureData,
+        signatureIp,
+        specialTerms: contract.special_terms || undefined,
+        paymentSchedule: schedules.map(s => ({
+          round: s.round_number,
+          dueDate: s.due_date,
+          amount: s.amount,
+          vat: s.vat || 0,
+        })),
+      }
+
+      const contractType = detail.contract_type || 'return'
+      const addendum = !contract.terms_version_id
+        ? (contractType === 'buyout' ? BUYOUT_TYPE_ADDENDUM : RETURN_TYPE_ADDENDUM)
+        : undefined
+      const termsHtml = renderTermsHtml(
+        termsArticles,
+        addendum || contract.special_terms || undefined,
+        '본 전자계약서는 전자서명법 제3조 및 전자문서 및 전자거래 기본법에 의거하여 자필서명과 동일한 법적 효력을 가집니다.'
+      )
+
+      const { blob, filename } = await generateContractPdf(pdfData, termsHtml)
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF 생성 실패:', err)
+      alert('PDF 생성에 실패했습니다.')
+    }
+    setPdfLoading(false)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+          <span>📑</span> 계약서
+        </h3>
+      </div>
+      <div className="p-6 space-y-2">
+        <button
+          onClick={handleGeneratePdf}
+          disabled={pdfLoading}
+          className={`w-full px-4 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            pdfLoading
+              ? 'bg-gray-100 text-gray-400 cursor-wait'
+              : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+          }`}
+        >
+          {pdfLoading ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              생성 중...
+            </>
+          ) : (
+            <>📄 계약서 PDF 다운로드</>
+          )}
+        </button>
+        <p className="text-[10px] text-gray-400 text-center">
+          약관·서명·납부스케줄 포함 정식 계약서
+        </p>
       </div>
     </div>
   )
@@ -455,6 +627,7 @@ export default function ContractDetailPage() {
           <ContractInfoCard contract={contract} />
           <VehicleInfoCard car={contract.car} />
           <QuoteLinkSection contract={contract} />
+          <ContractPdfSection contract={contract} schedules={schedules} />
           <CollectionStatusPanel schedules={schedules} />
         </div>
 

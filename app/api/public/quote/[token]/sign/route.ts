@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { Resend } from 'resend'
 
 /**
  * 공개 서명 제출 API (인증 불필요)
@@ -7,9 +8,10 @@ import { NextRequest, NextResponse } from 'next/server'
  *
  * 고객이 서명하면:
  * 1. 서명 데이터 저장
- * 2. 계약 자동 생성 + 납부 스케줄
+ * 2. 계약 자동 생성 + 납부 스케줄 + 약관 버전 연결
  * 3. 차량 상태 변경
  * 4. 토큰 상태 업데이트
+ * 5. 이메일 발송 (고객 + 담당자)
  */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -102,6 +104,35 @@ export async function POST(
     const detail = quote.quote_detail || {}
     const termMonths = detail.term_months || 36
 
+    // 5-1. 현재 활성 약관 버전 조회 → 계약에 연결
+    let termsVersionId: number | null = null
+    try {
+      const { data: activeTerms } = await supabase
+        .from('contract_terms')
+        .select('id')
+        .eq('company_id', shareToken.company_id)
+        .eq('status', 'active')
+        .single()
+      if (activeTerms) termsVersionId = activeTerms.id
+    } catch { /* contract_terms 테이블이 없어도 진행 */ }
+
+    // 5-2. 계약 유형에 맞는 기본 특약사항
+    const contractType = detail.contract_type || 'return'
+    let specialTermsText: string | null = null
+    try {
+      const { data: defaultSpecials } = await supabase
+        .from('contract_special_terms')
+        .select('content')
+        .eq('company_id', shareToken.company_id)
+        .eq('is_active', true)
+        .eq('is_default', true)
+        .in('contract_type', [contractType, 'all'])
+        .order('sort_order')
+      if (defaultSpecials?.length) {
+        specialTermsText = defaultSpecials.map((s: any) => s.content).join('\n\n')
+      }
+    } catch { /* 테이블 없어도 진행 */ }
+
     const { data: contract, error: cErr } = await supabase
       .from('contracts')
       .insert([{
@@ -115,7 +146,9 @@ export async function POST(
         deposit: quote.deposit,
         monthly_rent: quote.rent_fee,
         status: 'active',
-        signature_id: signature.id
+        signature_id: signature.id,
+        ...(termsVersionId ? { terms_version_id: termsVersionId } : {}),
+        ...(specialTermsText ? { special_terms: specialTermsText } : {}),
       }])
       .select()
       .single()
@@ -174,12 +207,88 @@ export async function POST(
       .from('quotes')
       .update({
         signed_at: new Date().toISOString(),
+        ...(termsVersionId ? { terms_version_id: termsVersionId } : {}),
       })
       .eq('id', quote.id)
+
+    // 10. 이메일 발송 (비동기 — 실패해도 계약 체결은 유지)
+    try {
+      const resendKey = process.env.RESEND_API_KEY
+      if (resendKey && customer_email) {
+        const resend = new Resend(resendKey)
+
+        // 회사 정보 조회
+        const { data: companyInfo } = await supabase
+          .from('companies')
+          .select('name, email')
+          .eq('id', shareToken.company_id)
+          .single()
+
+        const companyName = companyInfo?.name || '장기렌트'
+        const carName = `${detail.car_info?.brand || ''} ${detail.car_info?.model || ''}`.trim()
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@resend.dev'
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || req.nextUrl.origin
+        const pdfLink = `${baseUrl}/public/quote/${token}`
+
+        // 고객 이메일
+        await resend.emails.send({
+          from: `${companyName} <${fromEmail}>`,
+          to: [customer_email],
+          subject: `[${companyName}] ${carName} 장기렌트 계약 체결 완료`,
+          html: `
+            <div style="font-family:'맑은 고딕',sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <h2 style="color:#111;">${customer_name}님, 계약이 완료되었습니다.</h2>
+              <p style="color:#555;line-height:1.6;">
+                ${carName} 장기렌트 계약이 정상적으로 체결되었습니다.<br/>
+                아래 링크에서 계약서 PDF를 다운로드하실 수 있습니다.
+              </p>
+              <div style="text-align:center;margin:30px 0;">
+                <a href="${pdfLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:14px 32px;border-radius:8px;font-weight:bold;text-decoration:none;">
+                  계약서 확인 및 PDF 다운로드
+                </a>
+              </div>
+              <table style="width:100%;border-collapse:collapse;font-size:14px;color:#333;">
+                <tr><td style="padding:8px 0;color:#888;">차량</td><td style="padding:8px 0;font-weight:bold;">${carName}</td></tr>
+                <tr><td style="padding:8px 0;color:#888;">월 렌탈료</td><td style="padding:8px 0;font-weight:bold;">${(quote.rent_fee || 0).toLocaleString('ko-KR')}원 (VAT 별도)</td></tr>
+                <tr><td style="padding:8px 0;color:#888;">계약기간</td><td style="padding:8px 0;">${termMonths}개월</td></tr>
+              </table>
+              <p style="font-size:12px;color:#999;margin-top:30px;border-top:1px solid #eee;padding-top:12px;">
+                본 메일은 자동 발송되었습니다. 문의사항은 담당자에게 연락해주세요.
+              </p>
+            </div>
+          `,
+        }).catch(err => console.error('[email] 고객 이메일 발송 실패:', err))
+
+        // 담당자 알림 이메일
+        if (companyInfo?.email) {
+          await resend.emails.send({
+            from: `${companyName} 시스템 <${fromEmail}>`,
+            to: [companyInfo.email],
+            subject: `[신규 계약] ${customer_name} - ${carName}`,
+            html: `
+              <div style="font-family:'맑은 고딕',sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#111;">신규 계약이 체결되었습니다</h2>
+                <table style="width:100%;border-collapse:collapse;font-size:14px;color:#333;">
+                  <tr><td style="padding:8px 0;color:#888;">고객명</td><td style="padding:8px 0;font-weight:bold;">${customer_name}</td></tr>
+                  <tr><td style="padding:8px 0;color:#888;">연락처</td><td style="padding:8px 0;">${customer_phone || '-'}</td></tr>
+                  <tr><td style="padding:8px 0;color:#888;">이메일</td><td style="padding:8px 0;">${customer_email}</td></tr>
+                  <tr><td style="padding:8px 0;color:#888;">차량</td><td style="padding:8px 0;font-weight:bold;">${carName}</td></tr>
+                  <tr><td style="padding:8px 0;color:#888;">월 렌탈료</td><td style="padding:8px 0;">${(quote.rent_fee || 0).toLocaleString('ko-KR')}원</td></tr>
+                  <tr><td style="padding:8px 0;color:#888;">계약기간</td><td style="padding:8px 0;">${termMonths}개월</td></tr>
+                </table>
+              </div>
+            `,
+          }).catch(err => console.error('[email] 담당자 알림 발송 실패:', err))
+        }
+      }
+    } catch (emailErr: any) {
+      console.error('[email] 이메일 발송 오류 (계약 체결은 정상):', emailErr.message)
+    }
 
     return NextResponse.json({
       success: true,
       contractId: contract.id,
+      token: token,  // PDF 다운로드에 필요
       message: '계약이 성공적으로 체결되었습니다.'
     })
 

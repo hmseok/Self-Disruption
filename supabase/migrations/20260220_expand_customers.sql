@@ -90,6 +90,39 @@ ALTER TABLE customer_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customer_tax_invoices ENABLE ROW LEVEL SECURITY;
 
+-- customer_payments RLS
+CREATE POLICY "customer_payments_select" ON customer_payments FOR SELECT
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_payments_insert" ON customer_payments FOR INSERT
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_payments_update" ON customer_payments FOR UPDATE
+  USING (company_id = get_my_company_id() OR is_platform_admin())
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_payments_delete" ON customer_payments FOR DELETE
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+
+-- customer_notes RLS
+CREATE POLICY "customer_notes_select" ON customer_notes FOR SELECT
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_notes_insert" ON customer_notes FOR INSERT
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_notes_update" ON customer_notes FOR UPDATE
+  USING (company_id = get_my_company_id() OR is_platform_admin())
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_notes_delete" ON customer_notes FOR DELETE
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+
+-- customer_tax_invoices RLS
+CREATE POLICY "customer_tax_invoices_select" ON customer_tax_invoices FOR SELECT
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_tax_invoices_insert" ON customer_tax_invoices FOR INSERT
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_tax_invoices_update" ON customer_tax_invoices FOR UPDATE
+  USING (company_id = get_my_company_id() OR is_platform_admin())
+  WITH CHECK (company_id = get_my_company_id() OR is_platform_admin());
+CREATE POLICY "customer_tax_invoices_delete" ON customer_tax_invoices FOR DELETE
+  USING (company_id = get_my_company_id() OR is_platform_admin());
+
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_customers_company ON customers(company_id);
 CREATE INDEX IF NOT EXISTS idx_customers_type ON customers(type);

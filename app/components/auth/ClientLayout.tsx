@@ -66,6 +66,7 @@ const PLATFORM_MENUS = [
 // god_admin + master: 설정
 const SETTINGS_MENUS = [
   { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
+  { name: '계약 약관 관리', path: '/admin/contract-terms', iconKey: 'Doc' },
 ]
 
 // ============================================

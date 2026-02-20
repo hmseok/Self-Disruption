@@ -90,7 +90,33 @@ export async function GET(
       .eq('id', shareToken.company_id)
       .single()
 
-    // 6. 고객용 데이터 가공 (원가/마진 제외)
+    // 6. 약관 조회 (서명 전 미리보기용)
+    let termsArticles: Array<{ title: string; content: string }> = []
+    try {
+      // 회사의 active 약관 조회
+      const { data: activeTerms } = await supabase
+        .from('contract_terms')
+        .select('id, version, title')
+        .eq('company_id', shareToken.company_id)
+        .eq('status', 'active')
+        .single()
+
+      if (activeTerms) {
+        const { data: articles } = await supabase
+          .from('contract_term_articles')
+          .select('article_number, title, content')
+          .eq('terms_id', activeTerms.id)
+          .order('article_number')
+        if (articles && articles.length > 0) {
+          termsArticles = articles.map(a => ({
+            title: `제${a.article_number}조 (${a.title})`,
+            content: a.content,
+          }))
+        }
+      }
+    } catch { /* contract_terms 테이블이 없어도 진행 */ }
+
+    // 7. 고객용 데이터 가공 (원가/마진 제외)
     const detail = quote.quote_detail || {}
     const carInfo = detail.car_info || {}
     const car = carData || {}
@@ -142,7 +168,10 @@ export async function GET(
       company: company || null,
 
       // 서명 상태
-      alreadySigned: false
+      alreadySigned: false,
+
+      // 약관 조항 (서명 전 미리보기용, 없으면 프론트에서 정적 약관 표시)
+      termsArticles: termsArticles.length > 0 ? termsArticles : null,
     }
 
     return NextResponse.json(publicData)

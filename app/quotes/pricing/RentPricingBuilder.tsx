@@ -2179,23 +2179,34 @@ export default function RentPricingBuilder() {
     // 3. 운영비용
     const monthlyTax = Math.round(annualTax / 12)
     // 자동차 정기검사비 — DB 기준표 연동 (유종별 차등 적용)
-    // 차종 매핑: 배기량/차급으로 검사비용 테이블의 vehicle_class에 매칭
-    const inspVehicleClass = (() => {
-      const cc = selectedCar?.engine_cc || engineCC || 0
-      if (cc <= 1000) return '경형'
-      if (cc <= 1600) return '소형'
-      if (cc <= 2000) return '중형'
-      return '대형'
-    })()
-    // 유종 매핑: 차량의 fuel/fuel_type → DB의 fuel_type 값으로 변환
+    // 유종 매핑 먼저 (차급 판정에서 전기차 분기에 필요)
     const inspFuelType = (() => {
       const rawFuel = (selectedCar?.fuel || selectedCar?.fuel_type || '').toLowerCase()
-      if (['전기', 'ev', 'electric', 'bev'].some(k => rawFuel.includes(k))) return '전기'
+      // EV 모델명 기반 판별도 추가 (fuel 필드가 비어있는 경우 대비)
+      const modelName = (selectedCar?.model || '').toUpperCase()
+      const isEVByModel = EV_MODEL_KEYWORDS.some(k => modelName.includes(k.toUpperCase()))
+      if (isEVByModel || ['전기', 'ev', 'electric', 'bev'].some(k => rawFuel.includes(k))) return '전기'
       if (['수소', 'hydrogen', 'fcev', 'fuel cell'].some(k => rawFuel.includes(k))) return '수소'
       if (['하이브리드', 'hybrid', 'hev', 'phev'].some(k => rawFuel.includes(k))) return '하이브리드'
       if (['디젤', 'diesel'].some(k => rawFuel.includes(k))) return '디젤'
       if (['lpg', 'lng', 'cng'].some(k => rawFuel.includes(k))) return 'LPG'
       return '가솔린' // 기본값
+    })()
+    // 차종 매핑: 배기량 기반, 전기차/수소차는 가격 기반
+    const inspVehicleClass = (() => {
+      const cc = selectedCar?.engine_cc || engineCC || 0
+      // 전기차/수소차는 engine_cc가 없으므로 가격 기반 차급 판정
+      if (cc === 0 || inspFuelType === '전기' || inspFuelType === '수소') {
+        const price = purchasePrice || factoryPrice || 0
+        if (price < 20000000) return '경형'
+        if (price < 35000000) return '소형'
+        if (price < 50000000) return '중형'
+        return '대형'
+      }
+      if (cc <= 1000) return '경형'
+      if (cc <= 1600) return '소형'
+      if (cc <= 2000) return '중형'
+      return '대형'
     })()
     // DB에서 검사비용 조회 (종합검사 + 유종 + 지역 매칭, 단계적 fallback)
     const inspCostRecord =
@@ -2221,29 +2232,49 @@ export default function RentPricingBuilder() {
       )
     const inspectionCostPerTime = inspCostRecord?.total_cost || 65000  // DB fallback
 
-    // DB에서 검사 주기 조회 (사업용_승용/렌터카 기준 + 유종별 차등)
-    const inspScheduleRecord =
-      // 1순위: 사업용_승용 + 유종 매칭
-      inspectionSchedules.find(r =>
-        r.vehicle_usage === '사업용_승용' && r.fuel_type === inspFuelType &&
-        carAge >= r.age_from && carAge <= r.age_to
-      ) ||
-      // 2순위: 사업용_승용 + 전체 유종
-      inspectionSchedules.find(r =>
-        r.vehicle_usage === '사업용_승용' && (r.fuel_type === '전체' || !r.fuel_type) &&
-        carAge >= r.age_from && carAge <= r.age_to
-      ) ||
-      // 3순위: 사업용 (구 스키마 호환)
-      inspectionSchedules.find(r =>
-        r.vehicle_usage === '사업용' && carAge >= r.age_from && carAge <= r.age_to
-      )
-    const inspIntervalMonths = inspScheduleRecord?.interval_months || 24
-    const firstInspMonths = inspScheduleRecord?.first_inspection_months || 24
+    // DB에서 검사 주기 조회 함수 (차령에 따라 주기가 변하므로)
+    const getInspInterval = (ageYr: number): number => {
+      const rec =
+        inspectionSchedules.find(r =>
+          r.vehicle_usage === '사업용_승용' && r.fuel_type === inspFuelType &&
+          ageYr >= r.age_from && ageYr <= r.age_to
+        ) ||
+        inspectionSchedules.find(r =>
+          r.vehicle_usage === '사업용_승용' && (r.fuel_type === '전체' || !r.fuel_type) &&
+          ageYr >= r.age_from && ageYr <= r.age_to
+        ) ||
+        inspectionSchedules.find(r =>
+          r.vehicle_usage === '사업용' && ageYr >= r.age_from && ageYr <= r.age_to
+        )
+      return rec?.interval_months || 12  // fallback: 매년
+    }
+    const firstInspSchedule = inspectionSchedules.find(r =>
+      r.vehicle_usage === '사업용_승용' && (r.fuel_type === inspFuelType || r.fuel_type === '전체' || !r.fuel_type) &&
+      0 >= r.age_from && 0 <= r.age_to
+    )
+    const firstInspMonths = firstInspSchedule?.first_inspection_months || 24
+    const inspIntervalMonths = getInspInterval(Math.floor(carAge))  // 현재 시점 주기 (표시용)
 
-    // 계약 기간 내 검사 횟수 계산
-    const monthsUntilFirstInsp = carAge === 0 ? firstInspMonths : 0  // 신차면 첫 검사까지 대기
-    const inspectableMonths = Math.max(0, termMonths - monthsUntilFirstInsp)
-    const inspectionsInTerm = inspIntervalMonths > 0 ? Math.max(0, Math.floor(inspectableMonths / inspIntervalMonths)) : 0
+    // 계약 기간 내 검사 횟수 계산 — 차령 변화에 따른 주기 변동 반영
+    // 월 단위로 시뮬레이션하여 정확한 횟수 산출
+    const inspectionsInTerm = (() => {
+      const startAgeMonths = Math.round(carAge * 12)
+      const firstInspAt = carAge === 0 ? firstInspMonths : 0  // 신차면 첫 검사까지 대기
+      let count = 0
+      let monthSinceLastInsp = 0
+      for (let m = 1; m <= termMonths; m++) {
+        const currentAgeMonths = startAgeMonths + m
+        if (currentAgeMonths < firstInspAt) continue  // 첫 검사 전 기간은 스킵
+        const currentAgeYears = Math.floor(currentAgeMonths / 12)
+        const interval = getInspInterval(currentAgeYears)
+        monthSinceLastInsp++
+        if (monthSinceLastInsp >= interval) {
+          count++
+          monthSinceLastInsp = 0
+        }
+      }
+      return count
+    })()
     const totalInspectionCost = inspectionsInTerm * inspectionCostPerTime
     const monthlyInspectionCost = termMonths > 0 ? Math.round(totalInspectionCost / termMonths) : 0
     const totalMonthlyOperation = monthlyInsuranceCost + monthlyMaintenance + monthlyTax + monthlyInspectionCost
@@ -2520,7 +2551,7 @@ export default function RentPricingBuilder() {
     expiresAt.setDate(expiresAt.getDate() + 30)
 
     const selectedCustomer = customerMode === 'select'
-      ? customers.find((c: any) => c.id === selectedCustomerId)
+      ? customers.find((c: any) => String(c.id) === String(selectedCustomerId))
       : manualCustomer.name ? { ...manualCustomer, id: '', type: '직접입력' } : undefined
 
     // 견적서 종료일
@@ -2582,7 +2613,8 @@ export default function RentPricingBuilder() {
       // ID 값 정리 유틸 — UUID/숫자형 상관없이 원본값 그대로 전달, 빈값만 null
       const cleanId = (val: any): any => {
         if (val === null || val === undefined || val === '' || val === 0) return null
-        return val  // DB 컬럼 타입에 맞게 Supabase가 처리
+        const num = Number(val)
+        return isNaN(num) ? val : num  // DB bigint 컬럼 호환
       }
       const rawCarId = (car.id && !String(car.id).startsWith('newcar-')) ? car.id : null
       const rawCustomerId = customerMode === 'select' ? selectedCustomerId : null
@@ -2685,7 +2717,7 @@ export default function RentPricingBuilder() {
 
   // --- 견적서 미리보기용 파생값 ---
   const quoteSelectedCustomer = customerMode === 'select'
-    ? customers.find((c: any) => c.id === selectedCustomerId)
+    ? customers.find((c: any) => String(c.id) === String(selectedCustomerId))
     : manualCustomer.name ? { ...manualCustomer, id: '', type: '직접입력' } : undefined
   const quoteEndDate = (() => {
     const d = new Date(startDate); d.setMonth(d.getMonth() + termMonths)

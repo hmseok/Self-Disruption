@@ -93,7 +93,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   }
 
   return (
-    <aside className={`bg-gray-950 text-gray-300 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r border-gray-800 ${isCollapsed ? 'w-20 overflow-visible' : 'w-64 overflow-y-auto'}`}>
+    <aside className={`bg-gray-950 text-gray-300 flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r border-gray-800 ${isCollapsed ? 'w-20 overflow-visible' : 'w-64'}`}>
       
       {/* 1. 로고 */}
       <div className="p-4 flex items-center justify-between border-b border-gray-800 h-16 bg-gray-950 sticky top-0 z-20">
@@ -104,7 +104,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       </div>
 
       {/* 2. 메뉴 영역 */}
-      <nav className="flex-1 px-3 space-y-1 py-4">
+      <nav className="flex-1 px-3 space-y-1 py-4 overflow-y-auto">
         {renderMenuItem('대시보드', '/', <Icons.Dashboard />)}
 
         {/* 1️⃣ 그룹: 대고객 (영업) */}
@@ -141,6 +141,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
           {renderMenuItem('매출 회계 정산', '/finance/settlement', <Icons.Chart />)}
           {renderMenuItem('자금 장부 (입출금)', '/finance', <Icons.Calculator />)}
           {renderMenuItem('리포트 / 통계', '/report', <Icons.Chart />)}
+          <div className="pt-1 pb-1 border-t border-gray-800 mx-2 my-1" />
+          {renderMenuItem('계약 약관 관리', '/admin/contract-terms', <Icons.DocumentCheck />)}
         </div>
 
       </nav>

@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import SignaturePad from '@/app/components/signature/SignaturePad'
+import { generateContractPdf, renderTermsHtml } from '@/lib/contract-pdf'
+import type { ContractPdfData } from '@/lib/contract-pdf'
+import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM, ESIGN_NOTICE } from '@/lib/contract-terms'
 
 const f = (n: number | undefined | null) => (n ?? 0).toLocaleString('ko-KR')
 const MAINT: Record<string, string> = { self: '자가정비', oil_only: '오일류만', basic: '기본정비', full: '완전정비' }
@@ -22,6 +25,7 @@ export default function PublicQuotePage() {
   const [agreedTerms, setAgreedTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
 
   // 견적 데이터 로드
   useEffect(() => {
@@ -92,16 +96,117 @@ export default function PublicQuotePage() {
     )
   }
 
+  // ── PDF 다운로드 ──
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const handleDownloadPdf = useCallback(async () => {
+    setPdfLoading(true)
+    try {
+      // PDF 데이터 API 호출
+      const res = await fetch(`/api/public/contract/${token}/pdf`)
+      if (!res.ok) throw new Error('PDF 데이터 조회 실패')
+      const pdfData = await res.json()
+
+      // 약관 HTML 생성 (addendum: 부속 약관, specialTerms: 특약사항)
+      const termsHtml = renderTermsHtml(
+        pdfData.termsArticles || [],
+        pdfData.addendum || pdfData.specialTerms || undefined,
+        '본 전자계약서는 전자서명법 제3조 및 전자문서 및 전자거래 기본법에 의거하여 자필서명과 동일한 법적 효력을 가집니다.'
+      )
+
+      // PDF 생성
+      const contractPdfData: ContractPdfData = {
+        contractId: String(pdfData.contractId),
+        contractNumber: pdfData.contractNumber,
+        signedAt: pdfData.signedAt,
+        company: pdfData.company,
+        customer: pdfData.customer,
+        car: pdfData.car,
+        terms: pdfData.terms,
+        signatureData: pdfData.signatureData,
+        signatureIp: pdfData.signatureIp,
+        paymentSchedule: pdfData.paymentSchedule,
+        specialTerms: pdfData.specialTerms,
+      }
+
+      const { blob, filename } = await generateContractPdf(contractPdfData, termsHtml)
+
+      // 다운로드
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF 생성 실패:', err)
+      alert('계약서 PDF 생성에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    }
+    setPdfLoading(false)
+  }, [token])
+
   // ── 이미 서명됨 ──
   if (state === 'signed' || submitted) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center bg-white rounded-2xl shadow-lg p-8 max-w-sm">
+      <div className="space-y-4">
+        {/* 계약 완료 확인 */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
           </div>
           <h2 className="text-xl font-black text-gray-900 mb-2">계약이 완료되었습니다</h2>
-          <p className="text-gray-500 text-sm">서명이 정상적으로 접수되었습니다.<br />담당자가 곧 연락드리겠습니다.</p>
+          <p className="text-gray-500 text-sm leading-relaxed">
+            서명이 정상적으로 접수되었습니다.<br />
+            {customerEmail ? '입력하신 이메일로 계약서가 발송됩니다.' : '아래 버튼으로 계약서 PDF를 다운로드하세요.'}
+          </p>
+        </div>
+
+        {/* PDF 다운로드 */}
+        <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">계약서 다운로드</p>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className={`w-full py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
+              pdfLoading
+                ? 'bg-gray-100 text-gray-400 cursor-wait'
+                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] shadow-lg shadow-blue-200'
+            }`}
+          >
+            {pdfLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                계약서 생성 중...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                계약서 PDF 다운로드
+              </>
+            )}
+          </button>
+          <p className="text-[10px] text-gray-400 text-center">
+            계약 내용, 약관, 서명이 모두 포함된 정식 계약서입니다.
+          </p>
+        </div>
+
+        {/* 안내 */}
+        <div className="bg-gray-50 rounded-2xl p-4">
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">안내사항</p>
+          <ul className="text-xs text-gray-600 space-y-1.5 list-disc list-inside leading-relaxed">
+            <li>계약서 PDF는 세무서 비용처리 및 관할관청 제출에 사용 가능합니다.</li>
+            <li>전자서명은 전자서명법에 의거 자필서명과 동일한 법적 효력을 가집니다.</li>
+            <li>담당자가 별도로 연락드려 차량 인도 일정을 안내드리겠습니다.</li>
+          </ul>
+        </div>
+
+        {/* 푸터 */}
+        <div className="text-center py-4">
+          <p className="text-[10px] text-gray-300">
+            {quote?.company?.name || ''}
+          </p>
         </div>
       </div>
     )
@@ -317,6 +422,38 @@ export default function PublicQuotePage() {
           </div>
         </div>
 
+        {/* 약관 보기 */}
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowTerms(!showTerms)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <span className="text-xs font-bold text-gray-700">자동차 장기대여 약관 보기</span>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${showTerms ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {showTerms && (
+            <div className="max-h-[400px] overflow-y-auto px-4 py-3 space-y-3 border-t border-gray-200">
+              {/* DB 약관 우선, 없으면 정적 약관 fallback */}
+              {(quote.termsArticles || CONTRACT_TERMS).map((term: any, i: number) => (
+                <div key={i}>
+                  <p className="text-[11px] font-bold text-gray-800">{term.title}</p>
+                  <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">{term.content}</p>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[10px] font-bold text-gray-700">부속 약관</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  {quote.contract_type === 'buyout' ? BUYOUT_TYPE_ADDENDUM : RETURN_TYPE_ADDENDUM}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[10px] text-blue-600">{ESIGN_NOTICE}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 동의 */}
         <label className="flex items-start gap-2 cursor-pointer">
           <input
@@ -326,7 +463,7 @@ export default function PublicQuotePage() {
             className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-xs text-gray-600 leading-relaxed">
-            상기 견적 내용을 확인하였으며, 계약 조건에 동의합니다. 전자서명은 자필서명과 동일한 법적 효력을 가집니다.
+            상기 견적 내용 및 <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline font-bold">약관</button>을 확인하였으며, 계약 조건 및 개인정보 수집·이용에 동의합니다.
           </span>
         </label>
 
