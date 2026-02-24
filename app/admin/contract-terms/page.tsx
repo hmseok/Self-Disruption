@@ -836,7 +836,7 @@ export default function ContractTermsPage() {
                           </div>
                           <h4 className="font-bold text-gray-800">{article.title}</h4>
                           {editingArticle?.id !== article.id && (
-                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap line-clamp-3">{article.content}</p>
+                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{article.content}</p>
                           )}
                         </div>
                         {selectedTerms.status !== 'archived' && (

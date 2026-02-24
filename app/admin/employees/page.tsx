@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
+import InviteModal from '../../components/InviteModal'
 
 // ============================================
 // 조직/권한 통합 관리 페이지
@@ -50,6 +51,7 @@ export default function OrgManagementPage() {
   const [loading, setLoading] = useState(true)
   const [loadingInvitations, setLoadingInvitations] = useState(false)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
+  const [showInviteModal, setShowInviteModal] = useState(false)
 
   // 수정 모달
   const [editingEmp, setEditingEmp] = useState<any | null>(null)
@@ -165,9 +167,10 @@ export default function OrgManagementPage() {
     if (!activeCompanyId) return
     setLoadingInvitations(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/member-invite?company_id=${activeCompanyId}`, {
         headers: {
-          'Authorization': `Bearer ${(window as any).__session?.access_token || ''}`,
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
       })
       if (response.ok) {
@@ -189,10 +192,11 @@ export default function OrgManagementPage() {
     if (!confirm('이 초대를 취소하시겠습니까?')) return
     setCancelingId(id)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/member-invite?id=${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${(window as any).__session?.access_token || ''}`,
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
       })
       if (response.ok) {
@@ -365,7 +369,7 @@ export default function OrgManagementPage() {
     )
   }
 
-  const pendingInvitationCount = invitations.filter((inv: any) => inv.status === '대기중').length
+  const pendingInvitationCount = invitations.filter((inv: any) => inv.status === 'pending').length
 
   const TABS = [
     { key: 'employees' as const, label: '직원', count: employees.length },
@@ -395,28 +399,28 @@ export default function OrgManagementPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-sm text-slate-900 truncate">{emp.employee_name || '(이름 미설정)'}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.bg}`}>{r.label}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${emp.is_active !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${r.bg}`}>{r.label}</span>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${emp.is_active !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
               {emp.is_active !== false ? '활성' : '비활성'}
             </span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5 truncate">{emp.email}</div>
+          <div className="text-xs text-slate-400 mt-0.5 truncate">{emp.email}</div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {emp.position?.name && (
-              <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.position.name}</span>
+              <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.position.name}</span>
             )}
             {emp.department?.name && (
-              <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.department.name}</span>
+              <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.department.name}</span>
             )}
             {emp.phone && (
-              <span className="text-[11px] text-slate-400">{emp.phone}</span>
+              <span className="text-xs text-slate-400">{emp.phone}</span>
             )}
           </div>
         </div>
 
         {/* 가입일 (데스크톱) + 수정 아이콘 */}
         <div className="hidden md:block text-right flex-shrink-0">
-          <div className="text-[11px] text-slate-400">{formatDate(emp.created_at)}</div>
+          <div className="text-xs text-slate-400">{formatDate(emp.created_at)}</div>
         </div>
         <div className="text-slate-300 group-hover:text-steel-500 transition-colors flex-shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -456,7 +460,7 @@ export default function OrgManagementPage() {
               }`}
             >
               {tab.label}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
                 activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
               }`}>{tab.count}</span>
             </button>
@@ -473,10 +477,17 @@ export default function OrgManagementPage() {
                 <h2 className="text-base md:text-lg font-bold text-slate-900">직원 목록</h2>
                 <p className="text-xs text-slate-400 mt-0.5">총 {employees.length}명 · 클릭하여 수정</p>
               </div>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex items-center gap-2 active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                멤버 초대
+              </button>
             </div>
 
             {/* 데스크톱 헤더 */}
-            <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
               <div className="w-10 mr-3"></div>
               <div className="flex-1">이름 / 이메일 / 소속</div>
               <div className="w-24 text-right mr-8">가입일</div>
@@ -508,12 +519,12 @@ export default function OrgManagementPage() {
                 <h2 className="text-sm md:text-base font-bold mb-3">직급 추가</h2>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 min-w-0">
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">직급명</label>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">직급명</label>
                     <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 과장" />
                   </div>
                   <div className="w-20 md:w-24">
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">레벨</label>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">레벨</label>
                     <input type="number" min={1} max={10} value={newPositionLevel}
                       onChange={e => setNewPositionLevel(Number(e.target.value))}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" />
@@ -532,7 +543,7 @@ export default function OrgManagementPage() {
                   {positions.map(pos => (
                     <div key={pos.id} className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 hover:bg-slate-50/50">
                       <div className="flex items-center gap-2 md:gap-3">
-                        <span className="bg-steel-100 text-steel-700 text-[10px] font-bold px-2 py-0.5 rounded w-12 text-center">
+                        <span className="bg-steel-100 text-steel-700 text-xs font-bold px-2 py-0.5 rounded w-12 text-center">
                           Lv.{pos.level}
                         </span>
                         <span className="font-bold text-sm text-slate-800">{pos.name}</span>
@@ -553,7 +564,7 @@ export default function OrgManagementPage() {
                 <h2 className="text-sm md:text-base font-bold mb-3">부서 추가</h2>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 min-w-0">
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1">부서명</label>
+                    <label className="text-xs font-bold text-slate-400 block mb-1">부서명</label>
                     <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 영업팀" />
                   </div>
@@ -628,7 +639,7 @@ export default function OrgManagementPage() {
                 {/* 일괄 설정 */}
                 <div className="bg-white rounded-t-2xl border border-b-0 border-slate-200 p-2.5 md:p-3">
                   <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                    <span className="text-[10px] md:text-xs font-bold text-slate-400">일괄 설정:</span>
+                    <span className="text-xs md:text-xs font-bold text-slate-400">일괄 설정:</span>
                     {[
                       { field: 'can_view', label: '조회' },
                       { field: 'can_create', label: '생성' },
@@ -636,13 +647,13 @@ export default function OrgManagementPage() {
                       { field: 'can_delete', label: '삭제' },
                     ].map(item => (
                       <div key={item.field} className="flex items-center gap-1">
-                        <span className="text-[10px] md:text-xs font-bold text-slate-600">{item.label}</span>
+                        <span className="text-xs md:text-xs font-bold text-slate-600">{item.label}</span>
                         <button onClick={() => toggleAll(item.field, true)}
-                          className="text-[10px] bg-green-100 text-green-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-green-200 active:scale-95">
+                          className="text-xs bg-green-100 text-green-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-green-200 active:scale-95">
                           ON
                         </button>
                         <button onClick={() => toggleAll(item.field, false)}
-                          className="text-[10px] bg-red-100 text-red-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-red-200 active:scale-95">
+                          className="text-xs bg-red-100 text-red-700 px-1.5 md:px-2 py-0.5 rounded font-bold hover:bg-red-200 active:scale-95">
                           OFF
                         </button>
                       </div>
@@ -656,19 +667,19 @@ export default function OrgManagementPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase min-w-[180px]">페이지</th>
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">조회</th>
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">생성</th>
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">수정</th>
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center w-16">삭제</th>
-                          <th className="p-3 text-[10px] font-bold text-slate-400 uppercase text-center min-w-[120px]">데이터 범위</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase min-w-[180px]">페이지</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase text-center w-16">조회</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase text-center w-16">생성</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase text-center w-16">수정</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase text-center w-16">삭제</th>
+                          <th className="p-3 text-xs font-bold text-slate-400 uppercase text-center min-w-[120px]">데이터 범위</th>
                         </tr>
                       </thead>
                       <tbody>
                         {moduleGroups.map(group => (
                           <React.Fragment key={`group-${group}`}>
                             <tr className="bg-slate-100/70">
-                              <td colSpan={6} className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group}</td>
+                              <td colSpan={6} className="px-3 py-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</td>
                             </tr>
                             {activeModules.filter(m => m.group === group).map(mod => {
                               const key = `${selectedPosition}_${mod.path}`
@@ -677,7 +688,7 @@ export default function OrgManagementPage() {
                                 <tr key={mod.path} className="border-b border-slate-50 hover:bg-steel-50/30">
                                   <td className="p-3">
                                     <div className="font-bold text-sm text-slate-800">{mod.name}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
+                                    <div className="text-xs text-slate-400 font-mono">{mod.path}</div>
                                   </td>
                                   {['can_view', 'can_create', 'can_edit', 'can_delete'].map(field => (
                                     <td key={field} className="p-3 text-center">
@@ -715,7 +726,7 @@ export default function OrgManagementPage() {
                   {moduleGroups.map(group => (
                     <div key={`m-group-${group}`}>
                       <div className="bg-slate-100/70 px-3 py-1.5">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group}</span>
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</span>
                       </div>
                       {activeModules.filter(m => m.group === group).map(mod => {
                         const key = `${selectedPosition}_${mod.path}`
@@ -724,7 +735,7 @@ export default function OrgManagementPage() {
                           <div key={mod.path} className="p-3">
                             <div className="mb-2">
                               <div className="font-bold text-sm text-slate-800">{mod.name}</div>
-                              <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
+                              <div className="text-xs text-slate-400 font-mono">{mod.path}</div>
                             </div>
                             <div className="flex items-center gap-3 flex-wrap">
                               {[
@@ -746,7 +757,7 @@ export default function OrgManagementPage() {
                               <select
                                 value={perm.data_scope}
                                 onChange={e => changeScope(selectedPosition, mod.path, e.target.value)}
-                                className="text-[11px] border rounded-lg px-2 py-1 bg-white ml-auto focus:border-steel-400 outline-none"
+                                className="text-xs border rounded-lg px-2 py-1 bg-white ml-auto focus:border-steel-400 outline-none"
                               >
                                 {DATA_SCOPES.map(s => (
                                   <option key={s.value} value={s.value}>{s.label}</option>
@@ -762,7 +773,7 @@ export default function OrgManagementPage() {
 
                 {/* 안내 */}
                 <div className="mt-4 p-3 bg-steel-50 rounded-xl border border-steel-100">
-                  <p className="text-[11px] md:text-xs text-steel-700">
+                  <p className="text-xs md:text-xs text-steel-700">
                     <strong>안내:</strong> god_admin과 관리자(master)는 항상 전체 권한을 가집니다. 이 설정은 일반 직원의 직급별 권한을 제어합니다.
                     활성화된 모듈만 표시됩니다.
                   </p>
@@ -782,6 +793,13 @@ export default function OrgManagementPage() {
                 <h2 className="text-base md:text-lg font-bold text-slate-900">초대 관리</h2>
                 <p className="text-xs text-slate-400 mt-0.5">총 {invitations.length}개 · 대기중: {pendingInvitationCount}개</p>
               </div>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex items-center gap-2 active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                새 초대
+              </button>
             </div>
 
             {loadingInvitations ? (
@@ -796,7 +814,7 @@ export default function OrgManagementPage() {
             ) : (
               <>
                 {/* 데스크톱 헤더 */}
-                <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   <div className="flex-1">이메일</div>
                   <div className="w-24">부서</div>
                   <div className="w-20">직급</div>
@@ -810,11 +828,14 @@ export default function OrgManagementPage() {
                 {/* 초대 리스트 */}
                 <div className="divide-y divide-slate-100">
                   {invitations.map((inv: any) => {
-                    const statusColor =
-                      inv.status === '대기중' ? 'bg-yellow-100 text-yellow-700' :
-                      inv.status === '수락' ? 'bg-green-100 text-green-700' :
-                      inv.status === '만료' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
+                    const STATUS_MAP: Record<string, { label: string; color: string }> = {
+                      pending: { label: '대기중', color: 'bg-yellow-100 text-yellow-700' },
+                      accepted: { label: '수락', color: 'bg-green-100 text-green-700' },
+                      expired: { label: '만료', color: 'bg-red-100 text-red-700' },
+                      canceled: { label: '취소', color: 'bg-gray-100 text-gray-700' },
+                    }
+                    const statusInfo = STATUS_MAP[inv.status] || { label: inv.status, color: 'bg-gray-100 text-gray-700' }
+                    const statusColor = statusInfo.color
 
                     return (
                       <div key={inv.id} className="flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50/70 transition-colors">
@@ -822,8 +843,8 @@ export default function OrgManagementPage() {
                         <div className="md:hidden flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-2">
                             <span className="font-bold text-sm text-slate-900 truncate">{inv.email}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
-                              {inv.status}
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
+                              {statusInfo.label}
                             </span>
                           </div>
                           <div className="text-xs text-slate-600 space-y-1">
@@ -833,7 +854,7 @@ export default function OrgManagementPage() {
                             <div className="text-slate-400">생성: {formatDate(inv.created_at)}</div>
                             <div className="text-slate-400">만료: {formatDate(inv.expires_at)}</div>
                           </div>
-                          {inv.status === '대기중' && (
+                          {inv.status === 'pending' && (
                             <button
                               onClick={() => cancelInvitation(inv.id)}
                               disabled={cancelingId === inv.id}
@@ -856,13 +877,13 @@ export default function OrgManagementPage() {
                             <span className="text-xs text-slate-600">{inv.position?.name || '-'}</span>
                           </div>
                           <div className="w-16">
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
                               {ROLE_LABELS[inv.role]?.label || inv.role}
                             </span>
                           </div>
                           <div className="w-20">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
-                              {inv.status}
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
+                              {statusInfo.label}
                             </span>
                           </div>
                           <div className="w-28">
@@ -872,7 +893,7 @@ export default function OrgManagementPage() {
                             <span className="text-xs text-slate-600">{formatDate(inv.expires_at)}</span>
                           </div>
                           <div className="w-16">
-                            {inv.status === '대기중' && (
+                            {inv.status === 'pending' && (
                               <button
                                 onClick={() => cancelInvitation(inv.id)}
                                 disabled={cancelingId === inv.id}
@@ -898,6 +919,17 @@ export default function OrgManagementPage() {
       {/* ================================================================ */}
       {/* 직원 수정 모달 */}
       {/* ================================================================ */}
+      {/* 초대 모달 */}
+      {activeCompanyId && (
+        <InviteModal
+          companyName={company?.name || ''}
+          companyId={activeCompanyId}
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          onSuccess={() => { loadEmployees(); loadInvitations() }}
+        />
+      )}
+
       {editingEmp && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEditModal}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
