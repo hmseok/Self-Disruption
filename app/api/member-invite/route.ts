@@ -165,18 +165,97 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '이미 가입된 이메일입니다.' }, { status: 409 })
   }
 
-  // 중복 pending 초대 확인
+  // 중복 pending 초대 확인 → resend 모드면 기존 초대로 재발송
   const { data: pendingInvite } = await sb
     .from('member_invitations')
-    .select('id')
+    .select('id, token, expires_at')
     .eq('email', email)
     .eq('company_id', company_id)
     .eq('status', 'pending')
     .gt('expires_at', new Date().toISOString())
     .single()
 
-  if (pendingInvite) {
-    return NextResponse.json({ error: '이미 대기 중인 초대가 있습니다.' }, { status: 409 })
+  if (pendingInvite && !body.resend) {
+    return NextResponse.json({
+      error: '이미 대기 중인 초대가 있습니다. 재발송하려면 초대 목록에서 "재발송" 버튼을 눌러주세요.',
+      existing_id: pendingInvite.id,
+    }, { status: 409 })
+  }
+
+  // 기존 초대 재발송인 경우 기존 데이터 사용
+  if (pendingInvite && body.resend) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
+    const inviteUrl = `${siteUrl}/invite/${pendingInvite.token}`
+    const expiresDate = new Date(pendingInvite.expires_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    const companyName = company?.name || '회사'
+    const roleLabel = role === 'master' ? '관리자' : '직원'
+
+    let emailSent = false
+    let emailError = ''
+    let kakaoResult: { success: boolean; error?: string; method?: string } = { success: false }
+
+    // 이메일 재발송
+    if (send_channel === 'email' || send_channel === 'both') {
+      const resendApiKey = process.env.RESEND_API_KEY
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
+      if (resendApiKey) {
+        try {
+          const resend = new Resend(resendApiKey)
+          await resend.emails.send({
+            from: `Self-Disruption <${fromEmail}>`,
+            to: email,
+            subject: `[Self-Disruption] ${companyName}에서 초대합니다`,
+            html: `
+              <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
+                </div>
+                <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">멤버 초대</h2>
+                <p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">
+                  <strong style="color: #0369a1;">${companyName}</strong>의 새로운 멤버로 초대되었습니다.
+                </p>
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <a href="${inviteUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">가입하기</a>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+                  <a href="${inviteUrl}" style="color: #0284c7; word-break: break-all;">${inviteUrl}</a>
+                </p>
+              </div>
+            `,
+          })
+          emailSent = true
+        } catch (err: any) {
+          emailError = err.message
+          console.error('[member-invite resend] 이메일 실패:', err.message)
+        }
+      } else {
+        emailError = 'RESEND_API_KEY 미설정'
+      }
+    }
+
+    // 카카오/SMS 재발송
+    if (['kakao', 'sms', 'both'].includes(send_channel) && recipient_phone) {
+      if (send_channel === 'sms') {
+        kakaoResult = await sendInviteSMS(recipient_phone, getInviteSMSTemplate(companyName, inviteUrl, expiresDate))
+      } else {
+        kakaoResult = await sendInviteKakao(recipient_phone, companyName, inviteUrl, expiresDate)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      resent: true,
+      id: pendingInvite.id,
+      token: pendingInvite.token,
+      send_channel,
+      emailSent,
+      emailError: emailError || undefined,
+      kakaoSent: kakaoResult.success,
+      kakaoMethod: kakaoResult.method,
+      kakaoError: kakaoResult.error,
+      smsFallback: kakaoResult.method === 'sms',
+      inviteUrl,
+    })
   }
 
   // 회사명 조회
@@ -272,21 +351,24 @@ export async function POST(request: NextRequest) {
         emailSent = true
       } catch (err: any) {
         emailError = err.message
+        console.error('[member-invite] 이메일 발송 실패:', err.message)
       }
     } else {
       emailError = 'RESEND_API_KEY 미설정'
+      console.error('[member-invite] RESEND_API_KEY 환경변수 없음')
     }
   }
 
   // 카카오/SMS 발송 (kakao, sms, both)
   if (['kakao', 'sms', 'both'].includes(send_channel) && recipient_phone) {
+    console.log('[member-invite] 카카오/SMS 발송 시도:', { send_channel, recipient_phone })
     if (send_channel === 'sms') {
       const smsMsg = getInviteSMSTemplate(companyName, inviteUrl, expiresDate)
       kakaoResult = await sendInviteSMS(recipient_phone, smsMsg)
     } else {
-      // kakao 또는 both → 카카오 시도 (실패 시 SMS fallback)
       kakaoResult = await sendInviteKakao(recipient_phone, companyName, inviteUrl, expiresDate)
     }
+    console.log('[member-invite] 카카오/SMS 결과:', JSON.stringify(kakaoResult))
   }
 
   return NextResponse.json({

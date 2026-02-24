@@ -5,9 +5,14 @@ node_modules
 .next
 .git
 .DS_Store
-README.md
-npm-debug.log
 mobile
 sql
 email-templates
+_archive
+docs
+supabase
 *.md
+.claude
+.env*
+.vercel
+npm-debug.log

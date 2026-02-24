@@ -94,21 +94,54 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         }),
       })
 
-      const data = await res.json()
+      let data = await res.json()
 
-      if (!res.ok) throw new Error(data.error || '초대 실패')
+      // 409: 이미 대기 중 → 재발송 확인
+      if (res.status === 409 && data.existing_id) {
+        if (confirm('이미 대기 중인 초대가 있습니다. 재발송하시겠습니까?')) {
+          const resendRes = await fetch('/api/member-invite', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              email,
+              company_id: companyId,
+              position_id: positionId || null,
+              department_id: departmentId || null,
+              role,
+              send_channel: sendChannel,
+              recipient_phone: phone || '',
+              resend: true,
+            }),
+          })
+          data = await resendRes.json()
+          if (!resendRes.ok) throw new Error(data.error || '재발송 실패')
+        } else {
+          setLoading(false)
+          return
+        }
+      } else if (!res.ok) {
+        throw new Error(data.error || '초대 실패')
+      }
 
       // 결과 메시지
+      console.log('[InviteModal] 발송 결과:', JSON.stringify(data))
       const results: string[] = []
+      const errors: string[] = []
       if (data.emailSent) results.push('이메일')
+      else if (data.emailError) errors.push(`이메일: ${data.emailError}`)
       if (data.kakaoSent) results.push(data.smsFallback ? '문자(SMS)' : '카카오톡')
+      else if (data.kakaoError) errors.push(`카카오/SMS: ${data.kakaoError}`)
 
       if (results.length > 0) {
-        setMessage({ text: `✅ ${results.join(' + ')}으로 초대장을 발송했습니다!`, type: 'success' })
-      } else if (sendChannel === 'email' && !data.emailSent) {
-        setMessage({ text: `⚠️ 초대는 생성되었지만 메일 발송에 실패했습니다. 링크를 직접 전달해주세요.`, type: 'error' })
+        const errMsg = errors.length > 0 ? `\n(실패: ${errors.join(', ')})` : ''
+        setMessage({ text: `✅ ${results.join(' + ')}으로 초대장을 발송했습니다!${errMsg}`, type: 'success' })
+      } else if (errors.length > 0) {
+        setMessage({ text: `⚠️ 초대는 생성되었지만 발송 실패: ${errors.join(', ')}\n초대 링크: ${data.inviteUrl}`, type: 'error' })
       } else {
-        setMessage({ text: `⚠️ 초대가 생성되었습니다. 발송 결과를 확인해주세요.`, type: 'error' })
+        setMessage({ text: `⚠️ 초대가 생성되었습니다. 초대 링크: ${data.inviteUrl}`, type: 'error' })
       }
 
       setTimeout(() => {

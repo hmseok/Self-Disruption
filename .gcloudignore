@@ -2,9 +2,14 @@
 .gitignore
 node_modules
 .next
-README.md
 .DS_Store
 mobile
 sql
 email-templates
+_archive
+docs
+supabase
 *.md
+.claude
+.env*
+.vercel
