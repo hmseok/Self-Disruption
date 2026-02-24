@@ -50,22 +50,25 @@ export interface Company {
   created_at: string
 }
 
-// 페이지 권한
-// 부서별(department_id만) 또는 부서+직급별(department_id+position_id)로 설정
-export interface PagePermission {
+// ============================================
+// 사용자별 페이지 권한 (신규 단순 방식)
+// ============================================
+export interface UserPagePermission {
   id: string
   company_id: string
-  department_id: string | null   // NULL이면 구형 직급 전용 권한
-  position_id: string | null     // NULL이면 부서 기본 권한
-  page_path: string              // /cars, /quotes, /finance 등
+  user_id: string
+  page_path: string
   can_view: boolean
   can_create: boolean
   can_edit: boolean
   can_delete: boolean
-  data_scope: 'all' | 'department' | 'own'
+  data_scope: DataScope
   created_at: string
   updated_at: string
 }
+
+// 하위 호환용 (기존 코드에서 PagePermission 참조하는 곳)
+export type PagePermission = UserPagePermission
 
 // 권한 체크에 사용하는 액션 타입
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete'

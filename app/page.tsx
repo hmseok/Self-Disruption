@@ -1004,7 +1004,7 @@ function AuthPage() {
                 </p>
               </div>
 
-              <form method="post" action="" onSubmit={view === 'login' ? handleLogin : handleSignUp} className="space-y-4">
+              <form onSubmit={view === 'login' ? handleLogin : handleSignUp} className="space-y-4">
 
                 {/* 가입 유형 탭 (Signup only) */}
                 {view === 'signup' && (

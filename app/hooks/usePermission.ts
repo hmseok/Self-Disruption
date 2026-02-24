@@ -1,62 +1,30 @@
 'use client'
 
 import { useApp } from '../context/AppContext'
-import type { PermissionAction, DataScope, PagePermission } from '../types/rbac'
+import type { PermissionAction, DataScope } from '../types/rbac'
 
 // ============================================
-// usePermission - 권한 체크 Hook
+// usePermission - 권한 체크 Hook (사용자별 권한)
 // ============================================
-// 권한 해석 순서:
-// 1. 부서+직급별 (department_id + position_id) → 최우선
-// 2. 부서별 기본 (department_id만, position_id NULL) → 차선
-// 3. 구형 호환 (department_id NULL, position_id만) → 레거시
-// 4. 매칭 없음 → 권한 없음
+// 권한 해석:
+//   god_admin / master → 항상 모든 권한
+//   일반 user → user_page_permissions에서 해당 page_path 조회
 //
 // 사용법:
-//   const { canView, canCreate, canEdit, canDelete, getDataScope } = usePermission('/cars')
+//   const { canView, canCreate, canEdit, canDelete } = usePermission('/cars')
+//   const { hasPageAccess } = usePermission()
 
 export function usePermission(pagePath?: string) {
-  const { role, permissions, profile } = useApp()
+  const { role, permissions } = useApp()
 
-  // god_admin은 항상 모든 권한
   const isGodAdmin = role === 'god_admin'
-
-  // 해당 페이지에 대한 최적 권한 레코드 찾기
-  const findBestPermission = (page: string): PagePermission | null => {
-    const positionId = profile?.position_id
-    const departmentId = profile?.department_id
-
-    // 같은 page_path에 대한 모든 권한 레코드
-    const pagePerms = permissions.filter(p => p.page_path === page)
-    if (pagePerms.length === 0) return null
-
-    // 1순위: 부서+직급 정확 매칭
-    if (departmentId && positionId) {
-      const exact = pagePerms.find(p => p.department_id === departmentId && p.position_id === positionId)
-      if (exact) return exact
-    }
-
-    // 2순위: 부서 기본 (position_id가 NULL인 것)
-    if (departmentId) {
-      const deptDefault = pagePerms.find(p => p.department_id === departmentId && !p.position_id)
-      if (deptDefault) return deptDefault
-    }
-
-    // 3순위: 구형 호환 (department_id NULL, position_id만)
-    if (positionId) {
-      const legacy = pagePerms.find(p => !p.department_id && p.position_id === positionId)
-      if (legacy) return legacy
-    }
-
-    return null
-  }
 
   // 특정 페이지의 특정 액션 권한 확인
   const checkPermission = (page: string, action: PermissionAction): boolean => {
     if (isGodAdmin) return true
     if (role === 'master') return true
 
-    const perm = findBestPermission(page)
+    const perm = permissions.find(p => p.page_path === page)
     if (!perm) return false
 
     switch (action) {
@@ -75,7 +43,7 @@ export function usePermission(pagePath?: string) {
     const targetPage = page || pagePath
     if (!targetPage) return 'own'
 
-    const perm = findBestPermission(targetPage)
+    const perm = permissions.find(p => p.page_path === targetPage)
     return (perm?.data_scope as DataScope) || 'own'
   }
 
