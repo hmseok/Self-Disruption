@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
+import { usePermission } from '../hooks/usePermission'
 
 // ============================================
 // 대시보드 - 로그인 후 첫 화면
@@ -50,6 +51,7 @@ type PlatformStats = {
 export default function DashboardPage() {
   const router = useRouter()
   const { user, company, role, position, loading: appLoading, adminSelectedCompanyId, allCompanies } = useApp()
+  const { hasPageAccess } = usePermission()
   const [stats, setStats] = useState<DashboardStats>({
     totalCars: 0, availableCars: 0, rentedCars: 0, maintenanceCars: 0,
     totalCustomers: 0, activeInvestments: 0, totalInvestAmount: 0, jiipContracts: 0,
@@ -83,13 +85,17 @@ export default function DashboardPage() {
     fetchDashboardData()
   }, [appLoading, user, company, role, adminSelectedCompanyId])
 
-  // 모듈 활성화 체크 헬퍼
-  // god_admin이 회사를 선택한 경우 → 해당 회사의 활성 모듈 기준
-  // god_admin이 회사 미선택 → 플랫폼 대시보드(이 함수 사용 안함)
-  // 일반 사용자 → 자기 회사 활성 모듈 기준
+  // 모듈 활성화 + 권한 체크 헬퍼
+  // god_admin → 항상 true (회사 미선택 시), 또는 모듈 활성화만 체크
+  // master → 모듈 활성화만 체크 (전체 권한)
+  // 일반 직원 → 모듈 활성화 + 페이지 접근 권한 체크
   const hasModule = (path: string) => {
     if (role === 'god_admin' && !adminSelectedCompanyId) return true
-    return activeModules.has(path)
+    if (!activeModules.has(path)) return false
+    // god_admin / master는 모듈만 활성이면 OK
+    if (role === 'god_admin' || role === 'master') return true
+    // 일반 직원은 페이지 접근 권한도 필요
+    return hasPageAccess(path)
   }
 
   const fetchDashboardData = async () => {
@@ -737,7 +743,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── 차량운영 현황 ── */}
-      {!loading && (opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0 || opsStats.maintenanceWaiting > 0 || opsStats.inspectionsOverdue > 0 || opsStats.activeAccidents > 0) && (
+      {showCars && !loading && (opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0 || opsStats.maintenanceWaiting > 0 || opsStats.inspectionsOverdue > 0 || opsStats.activeAccidents > 0) && (
         <div className="mb-8 space-y-4">
           <h2 className="text-sm font-bold text-steel-500 uppercase tracking-wider">차량운영 현황</h2>
 

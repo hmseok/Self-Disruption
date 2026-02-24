@@ -69,7 +69,8 @@ export default function OrgManagementPage() {
 
   // 권한 매트릭스
   const [matrix, setMatrix] = useState<PermMatrix>({})
-  const [selectedPosition, setSelectedPosition] = useState<string>('')
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('')
+  const [selectedPosition, setSelectedPosition] = useState<string>('') // '' = 부서 기본 권한
   const [saving, setSaving] = useState(false)
 
   // 사이드바 회사 선택 기준으로 activeCompanyId 결정
@@ -154,7 +155,8 @@ export default function OrgManagementPage() {
     const { data } = await supabase.from('page_permissions').select('*').eq('company_id', activeCompanyId)
     const m: PermMatrix = {}
     data?.forEach((p: any) => {
-      const key = `${p.position_id}_${p.page_path}`
+      // 키: departmentId_positionId_pagePath (null은 빈문자열로)
+      const key = `${p.department_id || ''}_${p.position_id || ''}_${p.page_path}`
       m[key] = {
         can_view: p.can_view, can_create: p.can_create,
         can_edit: p.can_edit, can_delete: p.can_delete,
@@ -343,23 +345,26 @@ export default function OrgManagementPage() {
   }
 
   // ===== 권한 매트릭스 =====
-  const togglePerm = (posId: string, pagePath: string, field: string) => {
-    const key = `${posId}_${pagePath}`
+  // 현재 선택 기준의 매트릭스 키 생성
+  const getPermKey = (pagePath: string) => `${selectedDepartment}_${selectedPosition}_${pagePath}`
+
+  const togglePerm = (pagePath: string, field: string) => {
+    const key = getPermKey(pagePath)
     const current = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
     setMatrix(prev => ({ ...prev, [key]: { ...current, [field]: !(current as any)[field] } }))
   }
 
-  const changeScope = (posId: string, pagePath: string, scope: string) => {
-    const key = `${posId}_${pagePath}`
+  const changeScope = (pagePath: string, scope: string) => {
+    const key = getPermKey(pagePath)
     const current = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
     setMatrix(prev => ({ ...prev, [key]: { ...current, data_scope: scope } }))
   }
 
   const toggleAll = (field: string, value: boolean) => {
-    if (!selectedPosition) return
+    if (!selectedDepartment) return
     const newMatrix = { ...matrix }
     activeModules.forEach(mod => {
-      const key = `${selectedPosition}_${mod.path}`
+      const key = getPermKey(mod.path)
       const current = newMatrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
       newMatrix[key] = { ...current, [field]: value }
     })
@@ -367,26 +372,51 @@ export default function OrgManagementPage() {
   }
 
   const savePermissions = async () => {
-    if (!selectedPosition || !activeCompanyId) { alert('직급을 선택해주세요.'); return }
+    if (!selectedDepartment || !activeCompanyId) { alert('부서를 선택해주세요.'); return }
     setSaving(true)
+
+    // 먼저 기존 해당 조합의 레코드 삭제 후 새로 삽입 (upsert보다 안전)
+    const deptId = selectedDepartment
+    const posId = selectedPosition || null  // '' → null (부서 기본 권한)
 
     const upserts: any[] = []
     activeModules.forEach(mod => {
-      const key = `${selectedPosition}_${mod.path}`
+      const key = getPermKey(mod.path)
       const perm = matrix[key]
       if (perm) {
         upserts.push({
-          company_id: activeCompanyId, position_id: selectedPosition, page_path: mod.path,
+          company_id: activeCompanyId,
+          department_id: deptId,
+          position_id: posId,
+          page_path: mod.path,
           can_view: perm.can_view, can_create: perm.can_create,
-          can_edit: perm.can_edit, can_delete: perm.can_delete, data_scope: perm.data_scope,
+          can_edit: perm.can_edit, can_delete: perm.can_delete,
+          data_scope: perm.data_scope,
         })
       }
     })
 
     if (upserts.length > 0) {
+      // 기존 해당 조합 삭제
+      let deleteQuery = supabase
+        .from('page_permissions')
+        .delete()
+        .eq('company_id', activeCompanyId)
+        .eq('department_id', deptId)
+
+      if (posId) {
+        deleteQuery = deleteQuery.eq('position_id', posId)
+      } else {
+        deleteQuery = deleteQuery.is('position_id', null)
+      }
+
+      await deleteQuery
+
+      // 새로 삽입
       const { error } = await supabase
         .from('page_permissions')
-        .upsert(upserts, { onConflict: 'company_id, position_id, page_path' })
+        .insert(upserts)
+
       if (error) alert('저장 실패: ' + error.message)
       else { alert('권한이 저장되었습니다.'); loadPermissions() }
     }
@@ -631,35 +661,74 @@ export default function OrgManagementPage() {
         {/* ================================================================ */}
         {activeTab === 'permissions' && (
           <div>
-            {/* 직급 선택 + 저장 */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            {/* 부서 선택 */}
+            <div className="mb-3">
+              <label className="text-xs font-bold text-slate-500 mb-2 block">부서 선택</label>
               <div className="flex gap-1.5 md:gap-2 flex-wrap">
-                {positions.map(pos => (
+                {departments.map(dept => (
                   <button
-                    key={pos.id}
-                    onClick={() => setSelectedPosition(pos.id)}
+                    key={dept.id}
+                    onClick={() => { setSelectedDepartment(dept.id); setSelectedPosition('') }}
                     className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                      selectedPosition === pos.id
+                      selectedDepartment === dept.id
                         ? 'bg-steel-900 text-white'
                         : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    Lv.{pos.level} {pos.name}
+                    {dept.name}
                   </button>
                 ))}
               </div>
-              <button
-                onClick={savePermissions}
-                disabled={saving || !selectedPosition}
-                className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors flex-shrink-0"
-              >
-                {saving ? '저장 중...' : '변경사항 저장'}
-              </button>
             </div>
 
-            {positions.length === 0 ? (
+            {/* 직급 선택 (부서 선택 후) */}
+            {selectedDepartment && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-2 block">직급 선택 (미선택 시 부서 기본 권한)</label>
+                  <div className="flex gap-1.5 md:gap-2 flex-wrap">
+                    <button
+                      onClick={() => setSelectedPosition('')}
+                      className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                        selectedPosition === ''
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      부서 기본
+                    </button>
+                    {positions.map(pos => (
+                      <button
+                        key={pos.id}
+                        onClick={() => setSelectedPosition(pos.id)}
+                        className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                          selectedPosition === pos.id
+                            ? 'bg-steel-900 text-white'
+                            : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Lv.{pos.level} {pos.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={savePermissions}
+                  disabled={saving || !selectedDepartment}
+                  className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors flex-shrink-0"
+                >
+                  {saving ? '저장 중...' : '변경사항 저장'}
+                </button>
+              </div>
+            )}
+
+            {departments.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
-                <p className="text-slate-400 text-sm">직급이 없습니다. &quot;직급 · 부서&quot; 탭에서 먼저 직급을 추가해주세요.</p>
+                <p className="text-slate-400 text-sm">부서가 없습니다. &quot;직급 · 부서&quot; 탭에서 먼저 부서를 추가해주세요.</p>
+              </div>
+            ) : !selectedDepartment ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
+                <p className="text-slate-400 text-sm">위에서 부서를 선택해주세요.</p>
               </div>
             ) : activeModules.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
@@ -714,7 +783,7 @@ export default function OrgManagementPage() {
                               <td colSpan={6} className="px-3 py-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</td>
                             </tr>
                             {activeModules.filter(m => m.group === group).map(mod => {
-                              const key = `${selectedPosition}_${mod.path}`
+                              const key = getPermKey(mod.path)
                               const perm = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
                               return (
                                 <tr key={mod.path} className="border-b border-slate-50 hover:bg-steel-50/30">
@@ -727,7 +796,7 @@ export default function OrgManagementPage() {
                                       <input
                                         type="checkbox"
                                         checked={(perm as any)[field]}
-                                        onChange={() => togglePerm(selectedPosition, mod.path, field)}
+                                        onChange={() => togglePerm(mod.path, field)}
                                         className="w-4 h-4 rounded border-slate-300 text-steel-600 cursor-pointer"
                                       />
                                     </td>
@@ -735,7 +804,7 @@ export default function OrgManagementPage() {
                                   <td className="p-3 text-center">
                                     <select
                                       value={perm.data_scope}
-                                      onChange={e => changeScope(selectedPosition, mod.path, e.target.value)}
+                                      onChange={e => changeScope(mod.path, e.target.value)}
                                       className="text-xs border rounded-lg px-2 py-1 bg-white focus:border-steel-400 outline-none"
                                     >
                                       {DATA_SCOPES.map(s => (
@@ -761,7 +830,7 @@ export default function OrgManagementPage() {
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{group}</span>
                       </div>
                       {activeModules.filter(m => m.group === group).map(mod => {
-                        const key = `${selectedPosition}_${mod.path}`
+                        const key = getPermKey(mod.path)
                         const perm = matrix[key] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
                         return (
                           <div key={mod.path} className="p-3">
@@ -788,7 +857,7 @@ export default function OrgManagementPage() {
                               ))}
                               <select
                                 value={perm.data_scope}
-                                onChange={e => changeScope(selectedPosition, mod.path, e.target.value)}
+                                onChange={e => changeScope(mod.path, e.target.value)}
                                 className="text-xs border rounded-lg px-2 py-1 bg-white ml-auto focus:border-steel-400 outline-none"
                               >
                                 {DATA_SCOPES.map(s => (
@@ -806,7 +875,8 @@ export default function OrgManagementPage() {
                 {/* 안내 */}
                 <div className="mt-4 p-3 bg-steel-50 rounded-xl border border-steel-100">
                   <p className="text-xs md:text-xs text-steel-700">
-                    <strong>안내:</strong> god_admin과 관리자(master)는 항상 전체 권한을 가집니다. 이 설정은 일반 직원의 직급별 권한을 제어합니다.
+                    <strong>권한 체계 안내:</strong> god_admin과 관리자(master)는 항상 전체 권한을 가집니다.
+                    일반 직원은 소속 부서+직급 조합의 권한이 우선 적용되며, 없으면 부서 기본 권한이 적용됩니다.
                     활성화된 모듈만 표시됩니다.
                   </p>
                 </div>

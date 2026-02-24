@@ -86,74 +86,40 @@ export default function InviteAcceptPage() {
     setSubmitting(true)
 
     try {
-      // 1. Supabase Auth 가입
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invite.email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            name,
-            full_name: name,
-            phone,
-            invite_token: token,
-          },
-        },
+      // 1. 서버에서 계정 생성 + profile 연결 + 초대 수락 (인증메일 없음)
+      const res = await fetch('/api/member-invite/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, name, phone, password }),
       })
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          setFormError('이미 가입된 이메일입니다. 로그인 페이지로 이동해주세요.')
+      const result = await res.json()
+
+      if (!res.ok) {
+        if (result.code === 'ALREADY_REGISTERED') {
+          setFormError('이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.')
         } else {
-          setFormError(authError.message)
+          setFormError(result.error || '가입 처리에 실패했습니다.')
         }
         setSubmitting(false)
         return
       }
 
-      if (!authData.user) {
-        setFormError('가입 처리 중 오류가 발생했습니다.')
-        setSubmitting(false)
-        return
-      }
-
-      // 2. 초대 수락 처리 (서버에서 profile 생성 + 이메일 자동인증 + 초대 상태 업데이트)
-      const res = await fetch('/api/member-invite/accept', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          user_id: authData.user.id,
-          name,
-          phone,
-        }),
-      })
-
-      if (!res.ok) {
-        const errData = await res.json()
-        setFormError(errData.error || '초대 수락 처리에 실패했습니다.')
-        setSubmitting(false)
-        return
-      }
-
-      // 3. 기존 세션 정리 후 로그인 (profile이 완성된 상태에서 깨끗하게 시작)
-      await supabase.auth.signOut()
-
-      // 4. 바로 로그인 (이메일 인증은 서버에서 자동 처리됨)
+      // 2. 바로 로그인 (서버에서 이메일 인증 완료 상태로 생성됨)
       const { error: loginErr } = await supabase.auth.signInWithPassword({
         email: invite.email,
         password,
       })
 
       if (loginErr) {
-        // 로그인 실패 시 로그인 페이지로 안내
         console.error('자동 로그인 실패:', loginErr.message)
-        setPageState('success')
+        setFormError('가입은 완료되었으나 자동 로그인에 실패했습니다. 로그인 페이지로 이동합니다.')
+        setSubmitting(false)
         setTimeout(() => router.push('/'), 3000)
         return
       }
 
-      // 5. 로그인 성공 → 대시보드로 바로 이동
+      // 3. 로그인 성공 → 대시보드로 바로 이동
       setPageState('success')
       setTimeout(() => {
         router.push('/dashboard')
@@ -222,10 +188,10 @@ export default function InviteAcceptPage() {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-3">환영합니다, {name}님!</h2>
           <p className="text-gray-500 text-lg mb-2">가입이 완료되었습니다.</p>
-          <p className="text-gray-400 text-sm mb-8">로그인 페이지로 이동합니다.</p>
+          <p className="text-gray-400 text-sm mb-8">잠시 후 서비스로 이동합니다.</p>
           <div className="inline-flex items-center gap-2 text-steel-600 font-bold bg-steel-50 px-6 py-3 rounded-xl animate-pulse">
             <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-            로그인 페이지로 이동 중...
+            대시보드로 이동 중...
           </div>
         </div>
       </div>

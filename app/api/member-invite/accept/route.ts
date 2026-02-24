@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// 초대 수락 처리 (가입 완료 후 호출)
-// - profile 생성 (company_id, position_id, department_id 연결)
-// - 초대 상태 accepted로 변경
+// ============================================
+// 초대 수락 처리 (전체를 서버에서 처리)
+// 1. Admin API로 Auth 사용자 생성 (인증메일 발송 없음)
+// 2. profile 생성/업데이트 (company_id, position_id, department_id 연결)
+// 3. 초대 상태 accepted로 변경
+// ============================================
+
 function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,9 +18,9 @@ function getSupabaseAdmin() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { token, user_id, name, phone } = body
+  const { token, name, phone, password } = body
 
-  if (!token || !user_id || !name) {
+  if (!token || !name || !password) {
     return NextResponse.json({ error: '필수 정보가 누락되었습니다.' }, { status: 400 })
   }
 
@@ -41,18 +45,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '만료된 초대입니다.' }, { status: 410 })
   }
 
-  // 2. profile이 이미 있는지 확인 (handle_new_user 트리거가 먼저 만들었을 수 있음)
+  // 2. Admin API로 Auth 사용자 생성 (인증메일 발송 없음, 즉시 확인됨)
+  const { data: authData, error: authError } = await sb.auth.admin.createUser({
+    email: invite.email,
+    password,
+    email_confirm: true,  // 이메일 인증 완료 상태로 생성
+    user_metadata: {
+      name,
+      full_name: name,
+      phone,
+      invite_token: token,
+    },
+  })
+
+  if (authError) {
+    // 이미 가입된 이메일인 경우
+    if (authError.message.includes('already been registered') || authError.message.includes('already exists')) {
+      return NextResponse.json({
+        error: '이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.',
+        code: 'ALREADY_REGISTERED',
+      }, { status: 409 })
+    }
+    console.error('Auth 사용자 생성 실패:', authError.message)
+    return NextResponse.json({ error: '계정 생성 실패: ' + authError.message }, { status: 500 })
+  }
+
+  const userId = authData.user.id
+
+  // 3. profile이 이미 있는지 확인 (handle_new_user 트리거가 만들었을 수 있음)
   const { data: existingProfile } = await sb
     .from('profiles')
     .select('id')
-    .eq('id', user_id)
+    .eq('id', userId)
     .single()
 
   if (existingProfile) {
-    // 이미 있으면 업데이트
     const { error: updateErr } = await sb
       .from('profiles')
       .update({
+        email: invite.email,
         company_id: invite.company_id,
         role: invite.role,
         position_id: invite.position_id,
@@ -61,17 +92,17 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         is_active: true,
       })
-      .eq('id', user_id)
+      .eq('id', userId)
 
     if (updateErr) {
+      console.error('profile 업데이트 실패:', updateErr.message)
       return NextResponse.json({ error: 'profile 업데이트 실패: ' + updateErr.message }, { status: 500 })
     }
   } else {
-    // 없으면 생성
     const { error: insertErr } = await sb
       .from('profiles')
       .insert({
-        id: user_id,
+        id: userId,
         email: invite.email,
         company_id: invite.company_id,
         role: invite.role,
@@ -83,16 +114,9 @@ export async function POST(request: NextRequest) {
       })
 
     if (insertErr) {
+      console.error('profile 생성 실패:', insertErr.message)
       return NextResponse.json({ error: 'profile 생성 실패: ' + insertErr.message }, { status: 500 })
     }
-  }
-
-  // 3. 이메일 자동 인증 처리 (초대 이메일 수신 = 이메일 소유 증명)
-  const { error: confirmErr } = await sb.auth.admin.updateUserById(user_id, {
-    email_confirm: true,
-  })
-  if (confirmErr) {
-    console.error('이메일 자동 인증 실패 (무시):', confirmErr.message)
   }
 
   // 4. 초대 상태 업데이트
@@ -101,9 +125,9 @@ export async function POST(request: NextRequest) {
     .update({
       status: 'accepted',
       accepted_at: new Date().toISOString(),
-      accepted_by: user_id,
+      accepted_by: userId,
     })
     .eq('id', invite.id)
 
-  return NextResponse.json({ success: true, company_id: invite.company_id })
+  return NextResponse.json({ success: true, company_id: invite.company_id, email: invite.email })
 }

@@ -51,11 +51,13 @@ export interface Company {
 }
 
 // 페이지 권한
+// 부서별(department_id만) 또는 부서+직급별(department_id+position_id)로 설정
 export interface PagePermission {
   id: string
   company_id: string
-  position_id: string
-  page_path: string     // /cars, /quotes, /finance 등
+  department_id: string | null   // NULL이면 구형 직급 전용 권한
+  position_id: string | null     // NULL이면 부서 기본 권한
+  page_path: string              // /cars, /quotes, /finance 등
   can_view: boolean
   can_create: boolean
   can_edit: boolean

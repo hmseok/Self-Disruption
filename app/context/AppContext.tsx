@@ -109,12 +109,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setPosition(profileData.position || null)
         setDepartment(profileData.department || null)
 
-        if (profileData.position_id && profileData.company_id) {
-          const { data: permsData } = await supabase
+        // 권한 로드: 부서별 + 부서/직급별 (부서가 있으면 부서 기반, 없으면 구형 position 기반)
+        if (profileData.company_id && (profileData.department_id || profileData.position_id)) {
+          let permsQuery = supabase
             .from('page_permissions')
             .select('*')
             .eq('company_id', profileData.company_id)
-            .eq('position_id', profileData.position_id)
+
+          if (profileData.department_id) {
+            // 부서가 있는 경우: 해당 부서의 모든 권한 로드 (부서기본 + 부서/직급별)
+            permsQuery = permsQuery.eq('department_id', profileData.department_id)
+          } else if (profileData.position_id) {
+            // 구형 호환: 부서 없이 직급만 있는 경우
+            permsQuery = permsQuery.eq('position_id', profileData.position_id).is('department_id', null)
+          }
+
+          const { data: permsData } = await permsQuery
           setPermissions(permsData || [])
         }
 
