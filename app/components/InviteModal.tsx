@@ -17,6 +17,8 @@ interface DropdownItem {
 
 export default function InviteModal({ companyName, companyId, isOpen, onClose, onSuccess }: Props) {
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [sendChannel, setSendChannel] = useState<'email' | 'kakao' | 'sms' | 'both'>('email')
   const [role, setRole] = useState('user')
   const [departmentId, setDepartmentId] = useState('')
   const [positionId, setPositionId] = useState('')
@@ -50,6 +52,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   useEffect(() => {
     if (!isOpen) {
       setEmail('')
+      setPhone('')
+      setSendChannel('email')
       setRole('user')
       setDepartmentId('')
       setPositionId('')
@@ -59,9 +63,12 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
 
   if (!isOpen) return null
 
+  const needsPhone = ['kakao', 'sms', 'both'].includes(sendChannel)
+
   const handleInvite = async () => {
     if (!email) return setMessage({ text: '이메일을 입력해주세요.', type: 'error' })
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMessage({ text: '올바른 이메일 형식이 아닙니다.', type: 'error' })
+    if (needsPhone && !phone) return setMessage({ text: '전화번호를 입력해주세요.', type: 'error' })
 
     setLoading(true)
     setMessage(null)
@@ -82,6 +89,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           position_id: positionId || null,
           department_id: departmentId || null,
           role,
+          send_channel: sendChannel,
+          recipient_phone: phone || '',
         }),
       })
 
@@ -89,10 +98,17 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
 
       if (!res.ok) throw new Error(data.error || '초대 실패')
 
-      if (data.emailSent) {
-        setMessage({ text: `✅ ${email}로 초대 메일을 발송했습니다!`, type: 'success' })
-      } else {
+      // 결과 메시지
+      const results: string[] = []
+      if (data.emailSent) results.push('이메일')
+      if (data.kakaoSent) results.push(data.smsFallback ? '문자(SMS)' : '카카오톡')
+
+      if (results.length > 0) {
+        setMessage({ text: `✅ ${results.join(' + ')}으로 초대장을 발송했습니다!`, type: 'success' })
+      } else if (sendChannel === 'email' && !data.emailSent) {
         setMessage({ text: `⚠️ 초대는 생성되었지만 메일 발송에 실패했습니다. 링크를 직접 전달해주세요.`, type: 'error' })
+      } else {
+        setMessage({ text: `⚠️ 초대가 생성되었습니다. 발송 결과를 확인해주세요.`, type: 'error' })
       }
 
       setTimeout(() => {
@@ -132,6 +148,33 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         )}
 
         <div className="space-y-5">
+          {/* 발송 채널 선택 */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">발송 방법</label>
+            <div className="flex gap-2">
+              {([
+                { key: 'email', label: '이메일', icon: '✉️' },
+                { key: 'kakao', label: '카카오톡', icon: '💬' },
+                { key: 'sms', label: '문자(SMS)', icon: '📱' },
+                { key: 'both', label: '이메일+카카오', icon: '📨' },
+              ] as const).map(ch => (
+                <button
+                  key={ch.key}
+                  type="button"
+                  onClick={() => setSendChannel(ch.key)}
+                  disabled={loading}
+                  className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all border ${
+                    sendChannel === ch.key
+                      ? 'bg-steel-600 text-white border-steel-600'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  {ch.icon} {ch.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* 이메일 */}
           <div>
             <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">이메일 주소</label>
@@ -144,6 +187,24 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
               disabled={loading}
             />
           </div>
+
+          {/* 전화번호 (카카오/SMS/둘다 선택 시) */}
+          {needsPhone && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1.5 ml-1">전화번호</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^0-9-]/g, ''))}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-steel-500 font-bold focus:bg-white transition-colors"
+                placeholder="010-1234-5678"
+                disabled={loading}
+              />
+              {sendChannel === 'kakao' && (
+                <p className="text-[11px] text-amber-600 mt-1 ml-1">* 카카오 비즈니스 채널 심사 중이면 자동으로 SMS로 발송됩니다.</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             {/* 부서 드롭다운 */}

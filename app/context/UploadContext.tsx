@@ -18,6 +18,11 @@ export interface Transaction {
   related_id: string | null;
   related_type: string | null;
   status: string;
+  // 자동 매칭 결과
+  matched_schedule_id?: string | null;
+  match_score?: number;
+  matched_contract_name?: string | null;
+  confidence?: number;
 }
 
 // ✅ Context 타입 정의
@@ -40,6 +45,7 @@ interface UploadContextType {
   closeWidget: () => void;
   updateTransaction: (id: number, field: string, value: any) => void;
   deleteTransaction: (id: number) => void;
+  setCompanyId: (id: string) => void;
 }
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
@@ -63,6 +69,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   // 🛡️ ID 중복 방지용 Ref
   const lastIdRef = useRef(Date.now());
+
+  // 🏢 회사 ID (분석 API용)
+  const companyIdRef = useRef<string | null>(null);
+  const setCompanyId = useCallback((id: string) => { companyIdRef.current = id; }, []);
 
   // 🔑 안전한 고유 ID 생성 (병렬 처리 시 충돌 방지)
   const generateUniqueId = useCallback(() => {
@@ -192,7 +202,35 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         });
 
         const batchResults = await Promise.all(promises);
-        const newTransactions = batchResults.flat().map((item: any) => transformItem(item));
+        let newTransactions = batchResults.flat().map((item: any) => transformItem(item));
+
+        // 자동 분석/매칭 API 호출 (company_id가 있을 때만)
+        if (newTransactions.length > 0 && companyIdRef.current) {
+          try {
+            setLogs(`🔍 계약 매칭 & 세무 분류 중...`);
+            const analyzeRes = await fetch('/api/finance/analyze-bank-statement', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transactions: newTransactions, company_id: companyIdRef.current }),
+            });
+            if (analyzeRes.ok) {
+              const { transactions: enriched } = await analyzeRes.json();
+              if (Array.isArray(enriched)) {
+                newTransactions = enriched.map((item: any, idx: number) => ({
+                  ...newTransactions[idx],
+                  category: item.category || newTransactions[idx].category,
+                  related_type: item.related_type || newTransactions[idx].related_type,
+                  related_id: item.related_id || newTransactions[idx].related_id,
+                  matched_schedule_id: item.matched_schedule_id || null,
+                  match_score: item.match_score || 0,
+                  matched_contract_name: item.matched_contract_name || null,
+                  confidence: item.confidence || 0,
+                }));
+              }
+            }
+          } catch (e) { console.error('분석 API 오류:', e); }
+        }
+
         setResults(prev => [...prev, ...newTransactions]);
 
         completedChunks += batch.length;
@@ -273,7 +311,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       status, progress, currentFileIndex, totalFiles: fileQueue.length,
       currentFileName, logs, results,
       addFiles, startProcessing, pauseProcessing, resumeProcessing, cancelProcessing,
-      clearResults, closeWidget, updateTransaction, deleteTransaction
+      clearResults, closeWidget, updateTransaction, deleteTransaction, setCompanyId
     }}>
       {children}
     </UploadContext.Provider>

@@ -173,11 +173,11 @@ export default function OrgManagementPage() {
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
       })
+      const result = await response.json()
       if (response.ok) {
-        const result = await response.json()
         setInvitations(result.data || [])
       } else {
-        console.error('Failed to load invitations:', response.status)
+        console.error('Failed to load invitations:', response.status, result?.error || result)
         setInvitations([])
       }
     } catch (error) {
@@ -472,18 +472,9 @@ export default function OrgManagementPage() {
         {/* ================================================================ */}
         {activeTab === 'employees' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <h2 className="text-base md:text-lg font-bold text-slate-900">직원 목록</h2>
-                <p className="text-xs text-slate-400 mt-0.5">총 {employees.length}명 · 클릭하여 수정</p>
-              </div>
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex items-center gap-2 active:scale-95"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                멤버 초대
-              </button>
+            <div className="p-4 md:p-5 border-b border-slate-100">
+              <h2 className="text-base md:text-lg font-bold text-slate-900">직원 목록</h2>
+              <p className="text-xs text-slate-400 mt-0.5">총 {employees.length}명 · 클릭하여 수정</p>
             </div>
 
             {/* 데스크톱 헤더 */}

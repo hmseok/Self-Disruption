@@ -3,7 +3,7 @@
 import { supabase } from '../../utils/supabase'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-// 현재 에러는 경로 문제가 아니라 Provider 감싸기 문제이므로 아래 코드로 해결됩니다.
+import { useApp } from '../../context/AppContext'
 import { UploadProvider, useUpload } from '@/app/context/UploadContext'
 
 // 🏷️ 자금 성격별 분류 체계
@@ -33,8 +33,7 @@ const DEFAULT_RULES = [
 // (이 컴포넌트는 export default 하지 않습니다!)
 function UploadContent() {
   const router = useRouter()
-// ⚠️ 여기가 에러가 나던 곳입니다.
-  // 이제 부모(UploadFinancePage)가 Provider를 제공하므로 에러가 나지 않습니다.
+  const { company } = useApp()
   const {
     results,
     status,
@@ -42,7 +41,8 @@ function UploadContent() {
     startProcessing,
     updateTransaction,
     deleteTransaction,
-    clearResults
+    clearResults,
+    setCompanyId
   } = useUpload()
 
   const [isDragging, setIsDragging] = useState(false)
@@ -51,7 +51,10 @@ function UploadContent() {
   const [jiips, setJiips] = useState<any[]>([])
   const [bulkMode, setBulkMode] = useState(true)
 
-  useEffect(() => { fetchBasicData() }, [])
+  useEffect(() => {
+    fetchBasicData()
+    if (company?.id) setCompanyId(company.id)
+  }, [company])
 
   const fetchBasicData = async () => {
     const { data: c } = await supabase.from('cars').select('id, number, model'); setCars(c||[])
@@ -90,13 +93,37 @@ function UploadContent() {
     if(results.length === 0) return alert('저장할 내역이 없습니다.');
     if(!confirm(`총 ${results.length}건을 저장하시겠습니까?`)) return;
 
-    const payload = results.map(({ id, ...rest }) => rest);
-    const { error } = await supabase.from('transactions').insert(payload);
+    // 매칭 메타 정보 분리 후 저장
+    const scheduleLinks: { schedule_id: string; tx_index: number; amount: number }[] = [];
+    const payload = results.map(({ id, matched_schedule_id, match_score, matched_contract_name, confidence, ...rest }, idx) => {
+      if (matched_schedule_id) {
+        scheduleLinks.push({ schedule_id: matched_schedule_id, tx_index: idx, amount: rest.amount });
+      }
+      return rest;
+    });
+
+    const { data: inserted, error } = await supabase.from('transactions').insert(payload).select('id');
 
     if(error) {
         alert('저장 실패: ' + error.message);
     } else {
-        alert('✅ 저장되었습니다!');
+        // 스케줄 자동 연결
+        let linkedCount = 0;
+        if (inserted && scheduleLinks.length > 0) {
+          for (const link of scheduleLinks) {
+            const txId = inserted[link.tx_index]?.id;
+            if (txId) {
+              const { error: schedErr } = await supabase.from('expected_payment_schedules')
+                .update({ matched_transaction_id: txId, status: 'completed', actual_amount: link.amount })
+                .eq('id', link.schedule_id);
+              if (!schedErr) linkedCount++;
+            }
+          }
+        }
+        const msg = linkedCount > 0
+          ? `✅ ${results.length}건 저장 완료! (${linkedCount}건 스케줄 자동 연결)`
+          : `✅ ${results.length}건 저장 완료!`;
+        alert(msg);
         clearResults();
         router.push('/finance');
     }

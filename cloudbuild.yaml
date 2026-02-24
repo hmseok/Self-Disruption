@@ -56,7 +56,7 @@ options:
 
 # 로컬 gcloud builds submit 시 _TAG 기본값 (git 트리거 시 COMMIT_SHA 사용 가능)
 substitutions:
-  _TAG: 'manual-${SHORT_SHA}'
+  _TAG: 'manual'
 
 availableSecrets:
   secretManager:

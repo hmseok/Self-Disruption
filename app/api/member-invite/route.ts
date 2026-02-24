@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 
 // ============================================
 // 멤버 초대 API
-// POST   → 초대 생성 + Resend 이메일 발송
+// POST   → 초대 생성 + 이메일/카카오/SMS 발송
 // GET    → 초대 목록 조회
 // DELETE → 초대 취소 (status='canceled')
 // ============================================
@@ -35,16 +35,111 @@ async function verifyAdmin(request: NextRequest) {
   return { ...user, role: profile.role, company_id: profile.company_id }
 }
 
-// POST: 초대 생성 + 이메일 발송
+// ── Aligo SMS 발송 ──
+async function sendInviteSMS(phone: string, message: string) {
+  const apiKey = process.env.ALIGO_API_KEY
+  const userId = process.env.ALIGO_USER_ID
+  const sender = process.env.ALIGO_SENDER_PHONE
+
+  if (!apiKey || !userId || !sender) {
+    return { success: false, error: 'Aligo SMS 키 미설정 (ALIGO_API_KEY, ALIGO_USER_ID, ALIGO_SENDER_PHONE)' }
+  }
+
+  try {
+    const formData = new URLSearchParams()
+    formData.append('key', apiKey)
+    formData.append('userid', userId)
+    formData.append('sender', sender)
+    formData.append('receiver', phone.replace(/[^0-9]/g, ''))
+    formData.append('msg', message)
+    formData.append('msg_type', Buffer.byteLength(message, 'utf8') > 90 ? 'LMS' : 'SMS')
+
+    const res = await fetch('https://apis.aligo.in/send/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+    })
+    const result = await res.json()
+    return result.result_code === '1'
+      ? { success: true, method: 'sms' }
+      : { success: false, error: result.message || 'SMS 발송 실패' }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// ── Aligo 카카오 알림톡 (실패 시 SMS fallback) ──
+async function sendInviteKakao(phone: string, companyName: string, inviteUrl: string, expiresDate: string) {
+  const apiKey = process.env.ALIGO_API_KEY
+  const userId = process.env.ALIGO_USER_ID
+  const senderKey = process.env.ALIGO_SENDER_KEY
+  const cleanPhone = phone.replace(/[^0-9]/g, '')
+
+  const smsMsg = getInviteSMSTemplate(companyName, inviteUrl, expiresDate)
+
+  if (!apiKey || !userId || !senderKey) {
+    return sendInviteSMS(phone, smsMsg)
+  }
+
+  try {
+    const formData = new URLSearchParams()
+    formData.append('apikey', apiKey)
+    formData.append('userid', userId)
+    formData.append('senderkey', senderKey)
+    formData.append('tpl_code', 'TI_0001')  // 초대 알림톡 템플릿 코드
+    formData.append('sender', process.env.ALIGO_SENDER_PHONE || '')
+    formData.append('receiver_1', cleanPhone)
+    formData.append('subject_1', '멤버 초대')
+    formData.append('message_1', `[멤버 초대]\n\n${companyName}에서 새로운 멤버로 초대합니다.\n\n아래 버튼을 눌러 가입을 완료해 주세요.\n\n만료: ${expiresDate}`)
+    formData.append('button_1', JSON.stringify({
+      button: [{
+        name: '가입하기',
+        linkType: 'WL',
+        linkTypeName: '웹링크',
+        linkMo: inviteUrl,
+        linkPc: inviteUrl,
+      }]
+    }))
+    formData.append('failover', 'Y')
+    formData.append('fsubject_1', '멤버 초대')
+    formData.append('fmessage_1', smsMsg)
+
+    const res = await fetch('https://kakaoapi.aligo.in/akv10/alimtalk/send/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+    })
+    const result = await res.json()
+    if (result.code === 0) {
+      return { success: true, method: 'kakao' }
+    }
+    return sendInviteSMS(phone, smsMsg)
+  } catch {
+    return sendInviteSMS(phone, smsMsg)
+  }
+}
+
+function getInviteSMSTemplate(companyName: string, inviteUrl: string, expiresDate: string) {
+  return `[${companyName}] 멤버 초대\n${companyName}에서 새로운 멤버로 초대합니다.\n아래 링크에서 가입을 완료해 주세요.\n${inviteUrl}\n만료: ${expiresDate}`
+}
+
+// POST: 초대 생성 + 발송 (이메일/카카오/SMS)
 export async function POST(request: NextRequest) {
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
   const body = await request.json()
-  const { email, company_id, position_id, department_id, role = 'user' } = body
+  const {
+    email, company_id, position_id, department_id, role = 'user',
+    send_channel = 'email',   // 'email' | 'kakao' | 'sms' | 'both'
+    recipient_phone = '',
+  } = body
 
   if (!email || !company_id) {
     return NextResponse.json({ error: '이메일과 회사 ID가 필요합니다.' }, { status: 400 })
+  }
+  if (['kakao', 'sms', 'both'].includes(send_channel) && !recipient_phone) {
+    return NextResponse.json({ error: '카카오/SMS 발송 시 전화번호가 필요합니다.' }, { status: 400 })
   }
 
   // master는 자기 회사만 초대 가능
@@ -124,63 +219,74 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
-  // 이메일 발송
+  // ── 발송 처리 ──
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
+  const inviteUrl = `${siteUrl}/invite/${invitation.token}`
+  const expiresDate = new Date(expiresAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+  const companyName = company?.name || '회사'
+  const roleLabel = role === 'master' ? '관리자' : '직원'
+
   let emailSent = false
   let emailError = ''
-  const apiKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
+  let kakaoResult: { success: boolean; error?: string; method?: string } = { success: false }
 
-  if (apiKey) {
-    try {
-      const resend = new Resend(apiKey)
-      const inviteUrl = `${siteUrl}/invite/${invitation.token}`
-      const expiresDate = new Date(expiresAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-      const companyName = company?.name || '회사'
-      const roleLabel = role === 'master' ? '관리자' : '직원'
-
-      await resend.emails.send({
-        from: `Self-Disruption <${fromEmail}>`,
-        to: email,
-        subject: `[Self-Disruption] ${companyName}에서 초대합니다`,
-        html: `
-          <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
+  // 이메일 발송 (email 또는 both)
+  if (send_channel === 'email' || send_channel === 'both') {
+    const resendApiKey = process.env.RESEND_API_KEY
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
+    if (resendApiKey) {
+      try {
+        const resend = new Resend(resendApiKey)
+        await resend.emails.send({
+          from: `Self-Disruption <${fromEmail}>`,
+          to: email,
+          subject: `[Self-Disruption] ${companyName}에서 초대합니다`,
+          html: `
+            <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
+              </div>
+              <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">멤버 초대</h2>
+              <p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">
+                <strong style="color: #0369a1;">${companyName}</strong>의 새로운 멤버로 초대되었습니다.
+              </p>
+              <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <table style="width: 100%; font-size: 14px; color: #334155;">
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">소속 회사</td><td style="padding: 6px 0; font-weight: 700;">${companyName}</td></tr>
+                  ${departmentName ? `<tr><td style="padding: 6px 0; color: #94a3b8;">부서</td><td style="padding: 6px 0; font-weight: 700;">${departmentName}</td></tr>` : ''}
+                  ${positionName ? `<tr><td style="padding: 6px 0; color: #94a3b8;">직급</td><td style="padding: 6px 0; font-weight: 700;">${positionName}</td></tr>` : ''}
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">권한</td><td style="padding: 6px 0; font-weight: 700;">${roleLabel}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #94a3b8;">만료</td><td style="padding: 6px 0; color: #ef4444;">${expiresDate}</td></tr>
+                </table>
+              </div>
+              <div style="text-align: center; margin-bottom: 24px;">
+                <a href="${inviteUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">가입하기</a>
+              </div>
+              <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+                위 버튼이 작동하지 않으면 아래 링크를 브라우저에 직접 붙여넣으세요.<br/>
+                <a href="${inviteUrl}" style="color: #0284c7; word-break: break-all;">${inviteUrl}</a>
+              </p>
             </div>
-
-            <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">멤버 초대</h2>
-            <p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">
-              <strong style="color: #0369a1;">${companyName}</strong>의 새로운 멤버로 초대되었습니다.
-            </p>
-
-            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-              <table style="width: 100%; font-size: 14px; color: #334155;">
-                <tr><td style="padding: 6px 0; color: #94a3b8;">소속 회사</td><td style="padding: 6px 0; font-weight: 700;">${companyName}</td></tr>
-                ${departmentName ? `<tr><td style="padding: 6px 0; color: #94a3b8;">부서</td><td style="padding: 6px 0; font-weight: 700;">${departmentName}</td></tr>` : ''}
-                ${positionName ? `<tr><td style="padding: 6px 0; color: #94a3b8;">직급</td><td style="padding: 6px 0; font-weight: 700;">${positionName}</td></tr>` : ''}
-                <tr><td style="padding: 6px 0; color: #94a3b8;">권한</td><td style="padding: 6px 0; font-weight: 700;">${roleLabel}</td></tr>
-                <tr><td style="padding: 6px 0; color: #94a3b8;">만료</td><td style="padding: 6px 0; color: #ef4444;">${expiresDate}</td></tr>
-              </table>
-            </div>
-
-            <div style="text-align: center; margin-bottom: 24px;">
-              <a href="${inviteUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">가입하기</a>
-            </div>
-
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
-              위 버튼이 작동하지 않으면 아래 링크를 브라우저에 직접 붙여넣으세요.<br/>
-              <a href="${inviteUrl}" style="color: #0284c7; word-break: break-all;">${inviteUrl}</a>
-            </p>
-          </div>
-        `,
-      })
-      emailSent = true
-    } catch (err: any) {
-      emailError = err.message
+          `,
+        })
+        emailSent = true
+      } catch (err: any) {
+        emailError = err.message
+      }
+    } else {
+      emailError = 'RESEND_API_KEY 미설정'
     }
-  } else {
-    emailError = 'RESEND_API_KEY가 설정되지 않았습니다.'
+  }
+
+  // 카카오/SMS 발송 (kakao, sms, both)
+  if (['kakao', 'sms', 'both'].includes(send_channel) && recipient_phone) {
+    if (send_channel === 'sms') {
+      const smsMsg = getInviteSMSTemplate(companyName, inviteUrl, expiresDate)
+      kakaoResult = await sendInviteSMS(recipient_phone, smsMsg)
+    } else {
+      // kakao 또는 both → 카카오 시도 (실패 시 SMS fallback)
+      kakaoResult = await sendInviteKakao(recipient_phone, companyName, inviteUrl, expiresDate)
+    }
   }
 
   return NextResponse.json({
@@ -188,60 +294,100 @@ export async function POST(request: NextRequest) {
     id: invitation.id,
     token: invitation.token,
     expires_at: expiresAt,
+    send_channel,
     emailSent,
     emailError: emailError || undefined,
-    inviteUrl: `${siteUrl}/invite/${invitation.token}`,
+    kakaoSent: kakaoResult.success,
+    kakaoMethod: kakaoResult.method,
+    kakaoError: kakaoResult.error,
+    smsFallback: kakaoResult.method === 'sms',
+    inviteUrl,
   })
 }
 
 // GET: 초대 목록 조회
 export async function GET(request: NextRequest) {
-  const admin = await verifyAdmin(request)
-  if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  try {
+    const admin = await verifyAdmin(request)
+    if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { searchParams } = new URL(request.url)
-  const companyId = searchParams.get('company_id') || admin.company_id
-  const status = searchParams.get('status')
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('company_id') || admin.company_id
+    const statusFilter = searchParams.get('status')
 
-  // master는 자기 회사만
-  if (admin.role === 'master' && companyId !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
+    // master는 자기 회사만
+    if (admin.role === 'master' && companyId !== admin.company_id) {
+      return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    }
 
-  let query = getSupabaseAdmin()
-    .from('member_invitations')
-    .select(`
-      id, email, token, role, status, created_at, expires_at, accepted_at,
-      position:position_id(id, name),
-      department:department_id(id, name),
-      inviter:invited_by(employee_name)
-    `)
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false })
+    const sb = getSupabaseAdmin()
 
-  if (status) {
-    query = query.eq('status', status)
-  }
-
-  const { data, error } = await query
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // 만료된 pending 초대를 자동으로 expired로 표시
-  const now = new Date().toISOString()
-  const expired = (data || []).filter(
-    (inv: any) => inv.status === 'pending' && inv.expires_at < now
-  )
-  if (expired.length > 0) {
-    await getSupabaseAdmin()
+    // 먼저 기본 쿼리 (조인 없이)
+    let query = sb
       .from('member_invitations')
-      .update({ status: 'expired' })
-      .in('id', expired.map((e: any) => e.id))
-    // 로컬 데이터도 업데이트
-    expired.forEach((e: any) => { e.status = 'expired' })
-  }
+      .select('id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
 
-  return NextResponse.json({ data, total: data?.length || 0 })
+    if (statusFilter) {
+      query = query.eq('status', statusFilter)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('[member-invite GET] query error:', error)
+      return NextResponse.json({ error: error.message, detail: error }, { status: 500 })
+    }
+
+    // 수동으로 position, department, inviter 조인
+    const positionIds = [...new Set((data || []).map((inv: any) => inv.position_id).filter(Boolean))]
+    const departmentIds = [...new Set((data || []).map((inv: any) => inv.department_id).filter(Boolean))]
+    const inviterIds = [...new Set((data || []).map((inv: any) => inv.invited_by).filter(Boolean))]
+
+    let positionMap: Record<string, any> = {}
+    let departmentMap: Record<string, any> = {}
+    let inviterMap: Record<string, string> = {}
+
+    if (positionIds.length > 0) {
+      const { data: positions } = await sb.from('positions').select('id, name').in('id', positionIds)
+      if (positions) positionMap = Object.fromEntries(positions.map((p: any) => [p.id, { id: p.id, name: p.name }]))
+    }
+    if (departmentIds.length > 0) {
+      const { data: departments } = await sb.from('departments').select('id, name').in('id', departmentIds)
+      if (departments) departmentMap = Object.fromEntries(departments.map((d: any) => [d.id, { id: d.id, name: d.name }]))
+    }
+    if (inviterIds.length > 0) {
+      const { data: inviters } = await sb.from('profiles').select('id, employee_name').in('id', inviterIds)
+      if (inviters) inviterMap = Object.fromEntries(inviters.map((p: any) => [p.id, p.employee_name || '']))
+    }
+
+    // 데이터 합침
+    const enrichedData = (data || []).map((inv: any) => ({
+      ...inv,
+      position: inv.position_id ? positionMap[inv.position_id] || null : null,
+      department: inv.department_id ? departmentMap[inv.department_id] || null : null,
+      inviter: inv.invited_by ? { employee_name: inviterMap[inv.invited_by] || '' } : null,
+    }))
+
+    // 만료된 pending 초대를 자동으로 expired로 표시
+    const now = new Date().toISOString()
+    const expired = enrichedData.filter(
+      (inv: any) => inv.status === 'pending' && inv.expires_at < now
+    )
+    if (expired.length > 0) {
+      await sb
+        .from('member_invitations')
+        .update({ status: 'expired' })
+        .in('id', expired.map((e: any) => e.id))
+      expired.forEach((e: any) => { e.status = 'expired' })
+    }
+
+    return NextResponse.json({ data: enrichedData, total: enrichedData.length })
+  } catch (err: any) {
+    console.error('[member-invite GET] unexpected error:', err)
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+  }
 }
 
 // DELETE: 초대 취소
