@@ -288,6 +288,18 @@ function AuthPage() {
     }
   }
 
+  // ★ URL에 민감 정보(email, password)가 쿼리파라미터로 노출되면 즉시 제거
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('email') || url.searchParams.has('password')) {
+        url.searchParams.delete('email')
+        url.searchParams.delete('password')
+        window.history.replaceState({}, '', url.pathname + url.hash)
+      }
+    }
+  }, [])
+
   // 이미 로그인된 사용자 → 대시보드로 1회만 이동
   useEffect(() => {
     let redirected = false
@@ -992,7 +1004,7 @@ function AuthPage() {
                 </p>
               </div>
 
-              <form onSubmit={view === 'login' ? handleLogin : handleSignUp} className="space-y-4">
+              <form method="post" action="" onSubmit={view === 'login' ? handleLogin : handleSignUp} className="space-y-4">
 
                 {/* 가입 유형 탭 (Signup only) */}
                 {view === 'signup' && (
