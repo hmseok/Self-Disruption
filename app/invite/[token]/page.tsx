@@ -117,7 +117,7 @@ export default function InviteAcceptPage() {
         return
       }
 
-      // 2. 초대 수락 처리 (서버에서 profile 생성 + 초대 상태 업데이트)
+      // 2. 초대 수락 처리 (서버에서 profile 생성 + 이메일 자동인증 + 초대 상태 업데이트)
       const res = await fetch('/api/member-invite/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,12 +136,28 @@ export default function InviteAcceptPage() {
         return
       }
 
-      setPageState('success')
+      // 3. 기존 세션 정리 후 로그인 (profile이 완성된 상태에서 깨끗하게 시작)
+      await supabase.auth.signOut()
 
-      // 3초 후 로그인 페이지로
+      // 4. 바로 로그인 (이메일 인증은 서버에서 자동 처리됨)
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email: invite.email,
+        password,
+      })
+
+      if (loginErr) {
+        // 로그인 실패 시 로그인 페이지로 안내
+        console.error('자동 로그인 실패:', loginErr.message)
+        setPageState('success')
+        setTimeout(() => router.push('/'), 3000)
+        return
+      }
+
+      // 5. 로그인 성공 → 대시보드로 바로 이동
+      setPageState('success')
       setTimeout(() => {
-        router.push('/login')
-      }, 3000)
+        router.push('/dashboard')
+      }, 1500)
     } catch (err: any) {
       setFormError(err.message || '알 수 없는 오류가 발생했습니다.')
       setSubmitting(false)
@@ -170,7 +186,7 @@ export default function InviteAcceptPage() {
           </div>
           <h2 className="text-2xl font-black text-gray-900 mb-3">초대가 만료되었습니다</h2>
           <p className="text-gray-500 mb-8">이 초대 링크는 더 이상 유효하지 않습니다.<br/>관리자에게 새로운 초대를 요청해주세요.</p>
-          <button onClick={() => router.push('/login')} className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
+          <button onClick={() => router.push('/')} className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
             로그인 페이지로
           </button>
         </div>
@@ -188,7 +204,7 @@ export default function InviteAcceptPage() {
           </div>
           <h2 className="text-2xl font-black text-gray-900 mb-3">오류</h2>
           <p className="text-gray-500 mb-8">{errorMsg}</p>
-          <button onClick={() => router.push('/login')} className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
+          <button onClick={() => router.push('/')} className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
             로그인 페이지로
           </button>
         </div>
@@ -206,7 +222,7 @@ export default function InviteAcceptPage() {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-3">환영합니다, {name}님!</h2>
           <p className="text-gray-500 text-lg mb-2">가입이 완료되었습니다.</p>
-          <p className="text-gray-400 text-sm mb-8">이메일 인증 후 로그인해주세요.</p>
+          <p className="text-gray-400 text-sm mb-8">로그인 페이지로 이동합니다.</p>
           <div className="inline-flex items-center gap-2 text-steel-600 font-bold bg-steel-50 px-6 py-3 rounded-xl animate-pulse">
             <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
             로그인 페이지로 이동 중...
@@ -352,7 +368,7 @@ export default function InviteAcceptPage() {
           </form>
 
           <p className="text-center text-xs text-gray-400">
-            이미 계정이 있으신가요? <a href="/login" className="text-steel-600 font-bold hover:underline">로그인</a>
+            이미 계정이 있으신가요? <a href="/" className="text-steel-600 font-bold hover:underline">로그인</a>
           </p>
         </div>
       </div>

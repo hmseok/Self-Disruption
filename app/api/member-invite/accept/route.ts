@@ -87,7 +87,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. 초대 상태 업데이트
+  // 3. 이메일 자동 인증 처리 (초대 이메일 수신 = 이메일 소유 증명)
+  const { error: confirmErr } = await sb.auth.admin.updateUserById(user_id, {
+    email_confirm: true,
+  })
+  if (confirmErr) {
+    console.error('이메일 자동 인증 실패 (무시):', confirmErr.message)
+  }
+
+  // 4. 초대 상태 업데이트
   await sb
     .from('member_invitations')
     .update({

@@ -97,6 +97,8 @@ export default function ContractTermsPage() {
   const [articles, setArticles] = useState<Article[]>([])
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
   const [articleForm, setArticleForm] = useState({ title: '', content: '', category: 'general', is_required: true })
+  const [articleSearch, setArticleSearch] = useState('')
+  const [articleCategoryFilter, setArticleCategoryFilter] = useState('all')
 
   // ── 특약 ──
   const [specialTerms, setSpecialTerms] = useState<SpecialTerm[]>([])
@@ -811,9 +813,55 @@ export default function ContractTermsPage() {
                 <span className="text-sm text-gray-400">{articles.length}개 조항</span>
               </div>
 
+              {/* 검색 + 카테고리 필터 */}
+              <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <input
+                    type="text"
+                    value={articleSearch}
+                    onChange={e => setArticleSearch(e.target.value)}
+                    placeholder="조항 제목 또는 내용 검색..."
+                    className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-steel-500 focus:bg-white transition-colors"
+                  />
+                  {articleSearch && (
+                    <button
+                      onClick={() => setArticleSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                    >✕</button>
+                  )}
+                </div>
+                <select
+                  value={articleCategoryFilter}
+                  onChange={e => setArticleCategoryFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-steel-500 cursor-pointer"
+                >
+                  <option value="all">전체 카테고리</option>
+                  {Object.entries(CATEGORIES).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400 self-center whitespace-nowrap">
+                  {(() => {
+                    const q = articleSearch.toLowerCase()
+                    const filtered = articles.filter(a => {
+                      const matchCategory = articleCategoryFilter === 'all' || a.category === articleCategoryFilter
+                      const matchSearch = !q || a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q) || `제${a.article_number}조`.includes(q)
+                      return matchCategory && matchSearch
+                    })
+                    return `${filtered.length}/${articles.length}건`
+                  })()}
+                </span>
+              </div>
+
               {/* 조항 목록 + 인라인 편집 */}
               <div className="space-y-2">
-                {articles.map(article => (
+                {articles.filter(article => {
+                  const q = articleSearch.toLowerCase()
+                  const matchCategory = articleCategoryFilter === 'all' || article.category === articleCategoryFilter
+                  const matchSearch = !q || article.title.toLowerCase().includes(q) || article.content.toLowerCase().includes(q) || `제${article.article_number}조`.includes(q)
+                  return matchCategory && matchSearch
+                }).map(article => (
                   <div key={article.id}>
                     {/* 조항 카드 */}
                     <div className={`bg-white border rounded-xl p-4 transition ${

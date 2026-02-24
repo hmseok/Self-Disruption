@@ -41,7 +41,7 @@ const ROLE_LABELS: Record<string, { label: string; bg: string }> = {
 }
 
 export default function OrgManagementPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
+  const { user, company, role, adminSelectedCompanyId } = useApp()
 
   const [employees, setEmployees] = useState<any[]>([])
   const [positions, setPositions] = useState<Position[]>([])
@@ -52,6 +52,7 @@ export default function OrgManagementPage() {
   const [loadingInvitations, setLoadingInvitations] = useState(false)
   const [cancelingId, setCancelingId] = useState<string | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
 
   // 수정 모달
   const [editingEmp, setEditingEmp] = useState<any | null>(null)
@@ -266,6 +267,46 @@ export default function OrgManagementPage() {
       console.log('✅ 직원 수정 완료:', data[0])
       closeEditModal()
       loadEmployees()
+    }
+  }
+
+  // ===== 직원 탈퇴 =====
+  const withdrawEmployee = async (deleteAuth: boolean) => {
+    if (!editingEmp) return
+    const name = editingEmp.employee_name || editingEmp.email
+    const confirmMsg = deleteAuth
+      ? `⚠️ ${name} 직원을 완전 탈퇴(계정 삭제) 처리하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다. 해당 계정으로 다시 로그인할 수 없게 됩니다.`
+      : `${name} 직원을 탈퇴 처리하시겠습니까?\n\n회사 연결이 해제되고 비활성 상태로 변경됩니다.`
+
+    if (!confirm(confirmMsg)) return
+
+    setWithdrawing(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/employees/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          employee_id: editingEmp.id,
+          delete_auth: deleteAuth,
+        }),
+      })
+
+      const result = await res.json()
+      if (res.ok) {
+        alert(result.message || '탈퇴 처리가 완료되었습니다.')
+        closeEditModal()
+        loadEmployees()
+      } else {
+        alert('탈퇴 실패: ' + (result.error || '알 수 없는 오류'))
+      }
+    } catch (error: any) {
+      alert('탈퇴 처리 중 오류: ' + error.message)
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -1022,6 +1063,34 @@ export default function OrgManagementPage() {
                 </div>
               </div>
             </div>
+
+            {/* 직원 탈퇴 영역 */}
+            {editingEmp.id !== user?.id && editingEmp.role !== 'god_admin' && (
+              <div className="px-6 py-3 border-t border-red-100 bg-red-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-red-600">직원 탈퇴</p>
+                    <p className="text-xs text-red-400 mt-0.5">회사에서 직원을 제거합니다.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => withdrawEmployee(false)}
+                      disabled={withdrawing}
+                      className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    >
+                      {withdrawing ? '처리 중...' : '비활성화'}
+                    </button>
+                    <button
+                      onClick={() => withdrawEmployee(true)}
+                      disabled={withdrawing}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+                    >
+                      {withdrawing ? '처리 중...' : '완전 삭제'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 모달 푸터 */}
             <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
