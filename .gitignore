@@ -43,3 +43,6 @@ next-env.d.ts
 # mobile embedded repos (Xcode/React Native 자동생성)
 mobile/SelfDisruption/
 mobile/SelfDisruptionApp/
+
+# SQL migrations (Supabase SQL Editor에서 수동 실행)
+/sql/
