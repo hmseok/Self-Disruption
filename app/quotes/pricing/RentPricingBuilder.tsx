@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { DEFAULT_INSURANCE_COVERAGE, DEFAULT_QUOTE_NOTICES, DEFAULT_CALC_PARAMS } from '@/lib/contract-terms'
 
 // ============================================
 // 타입 정의
@@ -802,6 +803,14 @@ export default function RentPricingBuilder() {
   const [linkedInsurance, setLinkedInsurance] = useState<any>(null)
   const [linkedFinance, setLinkedFinance] = useState<any>(null)
 
+  // 계약 조건 DB 설정
+  const [termsConfig, setTermsConfig] = useState<{
+    id: number
+    insurance_coverage: any[]
+    quote_notices: any[]
+    calc_params: Record<string, any>
+  } | null>(null)
+
   // 🆕 기준 테이블 데이터
   const [depreciationDB, setDepreciationDB] = useState<any[]>([])      // legacy 유지 (fallback)
   const [depRates, setDepRates] = useState<any[]>([])                  // 3축 depreciation_rates
@@ -951,6 +960,21 @@ export default function RentPricingBuilder() {
     }
     fetchData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveCompanyId])
+
+  // 계약 조건 DB 설정 로드
+  useEffect(() => {
+    if (!effectiveCompanyId) return
+    supabase
+      .from('contract_terms')
+      .select('id, insurance_coverage, quote_notices, calc_params')
+      .eq('company_id', effectiveCompanyId)
+      .eq('status', 'active')
+      .single()
+      .then(({ data, error }) => {
+        if (data) setTermsConfig(data)
+        if (error) console.warn('계약 조건 로드 실패 (DB 기본값 사용):', error)
+      })
   }, [effectiveCompanyId])
 
   // ============================================
@@ -3106,36 +3130,22 @@ export default function RentPricingBuilder() {
                       <td className="px-3 py-1 font-bold text-gray-500 w-36">보장항목</td>
                       <td className="px-3 py-1 font-bold text-gray-500">보장내용</td>
                     </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-bold text-gray-700">대인배상 I (책임)</td>
-                      <td className="px-3 py-1.5 text-gray-600">자배법 의무보험 · 사망/부상 한도 무제한</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-bold text-gray-700">대인배상 II (종합)</td>
-                      <td className="px-3 py-1.5 text-gray-600">대인 I 초과분 무한 보장</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-bold text-gray-700">대물배상</td>
-                      <td className="px-3 py-1.5 text-gray-600">1억원 한도 (상대방 차량·재물 손해)</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-bold text-gray-700">자기신체사고</td>
-                      <td className="px-3 py-1.5 text-gray-600">사망 1.5억 / 부상·후유장해 3천만원 한도</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-bold text-gray-700">무보험차상해</td>
-                      <td className="px-3 py-1.5 text-gray-600">2억원 한도</td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-1.5 font-bold text-gray-700">자기차량손해 (자차)</td>
-                      <td className="px-3 py-1.5 text-gray-600">
-                        차량가액 기준 전손/분손 보장 · 면책금 <span className="font-bold text-steel-600">{f(deductible)}원</span>
-                        {deductible === 0 && <span className="text-green-600 font-bold ml-1">(완전면책)</span>}
-                      </td>
-                    </tr>
+                    {(termsConfig?.insurance_coverage || DEFAULT_INSURANCE_COVERAGE).map((item: any, idx: number) => (
+                      <tr key={idx} className={idx < (termsConfig?.insurance_coverage || DEFAULT_INSURANCE_COVERAGE).length - 1 ? 'border-b border-gray-100' : ''}>
+                        <td className="px-3 py-1.5 font-bold text-gray-700">{item.label}</td>
+                        <td className="px-3 py-1.5 text-gray-600">
+                          {item.description
+                            .replace(/\{deductible\}/g, f(deductible))
+                          }
+                          {item.description.includes('{deductible}') && deductible === 0 && (
+                            <span className="text-green-600 font-bold ml-1">(완전면책)</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody></table>
                 </div>
-                <p className="text-[8px] text-gray-400 mt-1">※ 렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함</p>
+                <p className="text-[8px] text-gray-400 mt-1">※ {termsConfig?.calc_params?.insurance_note || '렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함'}</p>
               </div>
 
               {/* (주요 약정 → 렌탈료 카드로 통합됨) */}
@@ -3166,7 +3176,7 @@ export default function RentPricingBuilder() {
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">중도해지</td>
-                      <td className="px-3 py-1.5">잔여 렌탈료의 <span className="font-bold text-red-500">35%</span> 위약금 발생</td>
+                      <td className="px-3 py-1.5">잔여 렌탈료의 <span className="font-bold text-red-500">{termsConfig?.calc_params?.early_termination_rate || 35}%</span> 위약금 발생</td>
                     </tr>
                     <tr>
                       <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">반납 조건</td>
@@ -3237,15 +3247,23 @@ export default function RentPricingBuilder() {
               <div className="border-t border-gray-200 pt-3 quote-section">
                 <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">유의사항 및 특약</p>
                 <div className="text-[10px] text-gray-500 space-y-1 quote-notices">
-                  <p>1. 본 견적서는 발행일로부터 30일간 유효하며, 차량 재고 및 시장 상황에 따라 변동될 수 있습니다.</p>
-                  <p>2. 보증금은 계약 종료 시 차량 상태 확인 후 손해액을 공제한 잔액을 환불합니다.</p>
-                  <p>3. 약정주행거리 초과 시 계약 종료 시점에 km당 {f(quoteExcessRate)}원의 추가 요금이 정산됩니다.</p>
-                  <p>4. 사고 발생 시 자차 면책금 {f(deductible)}원은 임차인 부담이며, 면책금 초과 수리비는 보험 처리됩니다.</p>
-                  <p>5. 중도해지 시 잔여 렌탈료의 35%에 해당하는 위약금이 발생합니다.</p>
-                  <p>6. 자동차보험(렌터카 공제조합)은 렌탈료에 포함되며, 대인II/대물1억/자손/무보험차상해/자차 종합 보장됩니다.</p>
-                  <p>7. 자동차 정기검사(종합검사)는 임대인이 일정에 맞추어 실시하며, 검사비용은 렌탈료에 포함됩니다.</p>
-                  <p>8. 렌탈 차량은 타인에게 전대·양도할 수 없으며 임대인의 사전 동의 없이 차량 개조 불가합니다.</p>
-                  {contractType === 'buyout' && <p>9. 인수 시 소유권 이전에 필요한 취득세 및 수수료는 임차인 부담입니다.</p>}
+                  {(termsConfig?.quote_notices || DEFAULT_QUOTE_NOTICES).map((item: any, idx: number) => {
+                    // Handle conditional items (e.g., show only for buyout)
+                    if (item.condition === 'buyout' && contractType !== 'buyout') {
+                      return null
+                    }
+
+                    // Replace placeholders with actual values
+                    let text = item.text || item
+                    if (typeof text === 'string') {
+                      text = text
+                        .replace(/\{deductible\}/g, f(deductible))
+                        .replace(/\{excessRate\}/g, f(quoteExcessRate))
+                        .replace(/\{earlyTerminationRate\}/g, (termsConfig?.calc_params?.early_termination_rate || 35).toString())
+                    }
+
+                    return <p key={idx}>{idx + 1}. {text}</p>
+                  })}
                 </div>
               </div>
             </div>

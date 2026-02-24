@@ -372,7 +372,7 @@ export default function RegistrationDetailPage() {
             </div>
             <label className={`block w-full py-4 rounded-xl font-bold text-center text-lg shadow-lg cursor-pointer transition-all ${uploading ? 'bg-gray-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                 {uploading ? '분석 중...' : '📸 이미지 재업로드 (AI 분석)'}
-                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
+                <input type="file" className="hidden" accept="image/*,.pdf,application/pdf" onChange={handleFileUpload} disabled={uploading} />
             </label>
         </div>
       </div>

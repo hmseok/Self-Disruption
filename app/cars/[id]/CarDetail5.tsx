@@ -166,7 +166,7 @@ export default function CarDetailPage() {
                {/* 2. 직접 업로드 버튼 (보조) */}
                <label className="cursor-pointer bg-white/90 text-gray-800 px-5 py-2 rounded-xl font-bold shadow-lg hover:bg-white transition-all hover:-translate-y-1 flex items-center gap-2 w-56 justify-center backdrop-blur">
                   <span>📂 직접 업로드</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading}/>
+                  <input type="file" className="hidden" accept="image/*,.pdf,application/pdf" onChange={handleImageUpload} disabled={uploading}/>
                </label>
             </div>
           </div>

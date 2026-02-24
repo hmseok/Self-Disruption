@@ -86,7 +86,7 @@ export default function ContractTermsPage() {
   const { company, profile, role, adminSelectedCompanyId, allCompanies } = useApp()
 
   // ── 탭 상태 ──
-  const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history'>('versions')
+  const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history' | 'insurance' | 'notices' | 'params'>('versions')
 
   // ── 약관 버전 목록 ──
   const [termsSets, setTermsSets] = useState<TermsSet[]>([])
@@ -106,9 +106,45 @@ export default function ContractTermsPage() {
   // ── 이력 ──
   const [history, setHistory] = useState<HistoryEntry[]>([])
 
+  // ── 보험 보장내역 ──
+  interface InsuranceCoverageItem {
+    label: string
+    description: string
+  }
+  const [insuranceCoverage, setInsuranceCoverage] = useState<InsuranceCoverageItem[]>([])
+  const [editingCoverageIndex, setEditingCoverageIndex] = useState<number | null>(null)
+  const [coverageForm, setCoverageForm] = useState<InsuranceCoverageItem>({ label: '', description: '' })
+
+  // ── 견적 유의사항 ──
+  type QuoteNoticeItem = string | { text: string; condition?: string }
+  const [quoteNotices, setQuoteNotices] = useState<QuoteNoticeItem[]>([])
+  const [editingNoticeIndex, setEditingNoticeIndex] = useState<number | null>(null)
+  const [noticeForm, setNoticeForm] = useState<QuoteNoticeItem>('')
+  const [noticeCondition, setNoticeCondition] = useState('')
+
+  // ── 계산 파라미터 ──
+  interface CalcParams {
+    [key: string]: any
+  }
+  const [calcParams, setCalcParams] = useState<CalcParams>({})
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    basic: true,
+    ins_base: true,
+    own_damage: true,
+    deductible_discount: true,
+    driver_age: true,
+    car_age: true,
+    ins_breakdown: true,
+    non_commercial: true,
+    excess_mileage: true,
+    early_termination: true,
+  })
+
   // ── 폼 스크롤 ref ──
   const articleFormRef = useRef<HTMLDivElement>(null)
   const specialFormRef = useRef<HTMLDivElement>(null)
+  const insuranceFormRef = useRef<HTMLDivElement>(null)
+  const noticeFormRef = useRef<HTMLDivElement>(null)
 
   // ── 버전 생성 폼 ──
   const [showNewForm, setShowNewForm] = useState(false)
@@ -160,6 +196,45 @@ export default function ContractTermsPage() {
     if (data) setHistory(data)
   }, [])
 
+  const fetchInsuranceCoverage = useCallback(async (termsId: number) => {
+    const { data } = await supabase
+      .from('contract_terms')
+      .select('insurance_coverage')
+      .eq('id', termsId)
+      .single()
+    if (data?.insurance_coverage && Array.isArray(data.insurance_coverage)) {
+      setInsuranceCoverage(data.insurance_coverage)
+    } else {
+      setInsuranceCoverage([])
+    }
+  }, [])
+
+  const fetchQuoteNotices = useCallback(async (termsId: number) => {
+    const { data } = await supabase
+      .from('contract_terms')
+      .select('quote_notices')
+      .eq('id', termsId)
+      .single()
+    if (data?.quote_notices && Array.isArray(data.quote_notices)) {
+      setQuoteNotices(data.quote_notices)
+    } else {
+      setQuoteNotices([])
+    }
+  }, [])
+
+  const fetchCalcParams = useCallback(async (termsId: number) => {
+    const { data } = await supabase
+      .from('contract_terms')
+      .select('calc_params')
+      .eq('id', termsId)
+      .single()
+    if (data?.calc_params && typeof data.calc_params === 'object') {
+      setCalcParams(data.calc_params)
+    } else {
+      setCalcParams({})
+    }
+  }, [])
+
   useEffect(() => {
     fetchTermsSets()
     fetchSpecialTerms()
@@ -169,8 +244,11 @@ export default function ContractTermsPage() {
     if (selectedTerms) {
       fetchArticles(selectedTerms.id)
       fetchHistory(selectedTerms.id)
+      fetchInsuranceCoverage(selectedTerms.id)
+      fetchQuoteNotices(selectedTerms.id)
+      fetchCalcParams(selectedTerms.id)
     }
-  }, [selectedTerms, fetchArticles, fetchHistory])
+  }, [selectedTerms, fetchArticles, fetchHistory, fetchInsuranceCoverage, fetchQuoteNotices, fetchCalcParams])
 
   /* ────────── 약관 버전 CRUD ────────── */
   const handleCreateVersion = async () => {
@@ -425,6 +503,143 @@ export default function ContractTermsPage() {
     fetchSpecialTerms()
   }
 
+  /* ────────── 보험 보장내역 CRUD ────────── */
+  const handleSaveInsuranceCoverage = async () => {
+    if (!selectedTerms) return
+    if (editingCoverageIndex !== null) {
+      if (!coverageForm.label || !coverageForm.description) return alert('모든 필드를 입력해주세요')
+      const updated = [...insuranceCoverage]
+      updated[editingCoverageIndex] = coverageForm
+      setInsuranceCoverage(updated)
+      setEditingCoverageIndex(null)
+    } else {
+      if (!coverageForm.label || !coverageForm.description) return alert('모든 필드를 입력해주세요')
+      setInsuranceCoverage([...insuranceCoverage, coverageForm])
+    }
+    setCoverageForm({ label: '', description: '' })
+  }
+
+  const handleSaveInsuranceCoverageToDb = async () => {
+    if (!selectedTerms) return
+    const { error } = await supabase
+      .from('contract_terms')
+      .update({ insurance_coverage: insuranceCoverage })
+      .eq('id', selectedTerms.id)
+    if (error) return alert('저장 실패: ' + error.message)
+    await supabase.from('contract_term_history').insert({
+      terms_id: selectedTerms.id,
+      action: 'insurance_coverage_updated',
+      new_value: JSON.stringify({ count: insuranceCoverage.length }),
+      changed_by: profile?.id || null,
+      reason: '보험 보장내역 업데이트',
+    })
+    alert('저장되었습니다')
+  }
+
+  const handleDeleteCoverage = (index: number) => {
+    if (!confirm('이 항목을 삭제하시겠습니까?')) return
+    const updated = insuranceCoverage.filter((_, i) => i !== index)
+    setInsuranceCoverage(updated)
+  }
+
+  const moveCoverageUp = (index: number) => {
+    if (index === 0) return
+    const updated = [...insuranceCoverage]
+    ;[updated[index - 1], updated[index]] = [updated[index], updated[index - 1]]
+    setInsuranceCoverage(updated)
+  }
+
+  const moveCoverageDown = (index: number) => {
+    if (index === insuranceCoverage.length - 1) return
+    const updated = [...insuranceCoverage]
+    ;[updated[index], updated[index + 1]] = [updated[index + 1], updated[index]]
+    setInsuranceCoverage(updated)
+  }
+
+  /* ────────── 견적 유의사항 CRUD ────────── */
+  const handleSaveQuoteNotice = async () => {
+    if (editingNoticeIndex !== null) {
+      if (typeof noticeForm === 'string' && !noticeForm) return alert('내용을 입력해주세요')
+      if (typeof noticeForm === 'object' && (!noticeForm.text)) return alert('내용을 입력해주세요')
+      const updated = [...quoteNotices]
+      updated[editingNoticeIndex] = noticeCondition ? { text: typeof noticeForm === 'string' ? noticeForm : noticeForm.text, condition: noticeCondition } : (typeof noticeForm === 'string' ? noticeForm : noticeForm.text)
+      setQuoteNotices(updated)
+      setEditingNoticeIndex(null)
+    } else {
+      if (typeof noticeForm === 'string' && !noticeForm) return alert('내용을 입력해주세요')
+      setQuoteNotices([...quoteNotices, noticeCondition ? { text: typeof noticeForm === 'string' ? noticeForm : noticeForm.text, condition: noticeCondition } : noticeForm])
+    }
+    setNoticeForm('')
+    setNoticeCondition('')
+  }
+
+  const handleSaveQuoteNoticesToDb = async () => {
+    if (!selectedTerms) return
+    const { error } = await supabase
+      .from('contract_terms')
+      .update({ quote_notices: quoteNotices })
+      .eq('id', selectedTerms.id)
+    if (error) return alert('저장 실패: ' + error.message)
+    await supabase.from('contract_term_history').insert({
+      terms_id: selectedTerms.id,
+      action: 'quote_notices_updated',
+      new_value: JSON.stringify({ count: quoteNotices.length }),
+      changed_by: profile?.id || null,
+      reason: '견적 유의사항 업데이트',
+    })
+    alert('저장되었습니다')
+  }
+
+  const handleDeleteNotice = (index: number) => {
+    if (!confirm('이 항목을 삭제하시겠습니까?')) return
+    const updated = quoteNotices.filter((_, i) => i !== index)
+    setQuoteNotices(updated)
+  }
+
+  const moveNoticeUp = (index: number) => {
+    if (index === 0) return
+    const updated = [...quoteNotices]
+    ;[updated[index - 1], updated[index]] = [updated[index], updated[index - 1]]
+    setQuoteNotices(updated)
+  }
+
+  const moveNoticeDown = (index: number) => {
+    if (index === quoteNotices.length - 1) return
+    const updated = [...quoteNotices]
+    ;[updated[index], updated[index + 1]] = [updated[index + 1], updated[index]]
+    setQuoteNotices(updated)
+  }
+
+  /* ────────── 계산 파라미터 CRUD ────────── */
+  const handleSaveCalcParamsToDb = async () => {
+    if (!selectedTerms) return
+    const { error } = await supabase
+      .from('contract_terms')
+      .update({ calc_params: calcParams })
+      .eq('id', selectedTerms.id)
+    if (error) return alert('저장 실패: ' + error.message)
+    await supabase.from('contract_term_history').insert({
+      terms_id: selectedTerms.id,
+      action: 'calc_params_updated',
+      new_value: JSON.stringify({ updated_at: new Date().toISOString() }),
+      changed_by: profile?.id || null,
+      reason: '계산 파라미터 업데이트',
+    })
+    alert('저장되었습니다')
+  }
+
+  const updateParamValue = (path: string, value: any) => {
+    const keys = path.split('.')
+    const updated = { ...calcParams }
+    let current = updated
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) current[keys[i]] = {}
+      current = current[keys[i]]
+    }
+    current[keys[keys.length - 1]] = value
+    setCalcParams(updated)
+  }
+
   /* ──────────────────────── 렌더링 ──────────────────────── */
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -435,17 +650,20 @@ export default function ContractTermsPage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 overflow-x-auto">
         {([
           ['versions', '약관 버전'],
           ['articles', '조항 편집'],
           ['special', '특약 템플릿'],
+          ['insurance', '보험 보장내역'],
+          ['notices', '견적 유의사항'],
+          ['params', '계산 파라미터'],
           ['history', '변경 이력'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
               tab === key
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -904,7 +1122,838 @@ export default function ContractTermsPage() {
         </div>
       )}
 
-      {/* ═══════════════════ 탭4: 변경 이력 ═══════════════════ */}
+      {/* ═══════════════════ 탭5: 보험 보장내역 ═══════════════════ */}
+      {tab === 'insurance' && (
+        <div>
+          {!selectedTerms ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 선택된 약관 정보 */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
+                    {STATUS_LABELS[selectedTerms.status]?.label}
+                  </span>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                </div>
+                <span className="text-sm text-gray-400">{insuranceCoverage.length}개 항목</span>
+              </div>
+
+              {/* 보장내역 목록 */}
+              <div className="space-y-2">
+                {insuranceCoverage.map((item, index) => (
+                  <div key={index} className={`bg-white border rounded-xl p-4 transition ${
+                    editingCoverageIndex === index
+                      ? 'border-blue-400 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        {editingCoverageIndex !== index && (
+                          <>
+                            <h4 className="font-bold text-gray-800">{item.label}</h4>
+                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description}</p>
+                          </>
+                        )}
+                      </div>
+                      {selectedTerms.status !== 'archived' && (
+                        <div className="flex gap-1 ml-3 flex-shrink-0">
+                          {editingCoverageIndex === index ? (
+                            <button
+                              onClick={() => { setEditingCoverageIndex(null); setCoverageForm({ label: '', description: '' }) }}
+                              className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                            >
+                              접기
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingCoverageIndex(index)
+                                  setCoverageForm(item)
+                                  setTimeout(() => insuranceFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
+                                }}
+                                className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCoverage(index)}
+                                className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded"
+                              >
+                                삭제
+                              </button>
+                              <button
+                                onClick={() => moveCoverageUp(index)}
+                                disabled={index === 0}
+                                className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => moveCoverageDown(index)}
+                                disabled={index === insuranceCoverage.length - 1}
+                                className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                              >
+                                ↓
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 인라인 편집 폼 */}
+                    {editingCoverageIndex === index && (
+                      <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">보장 항목명 *</label>
+                          <input
+                            type="text"
+                            placeholder="예: 차량손해보험"
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                            value={coverageForm.label}
+                            onChange={e => setCoverageForm(f => ({ ...f, label: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">
+                            설명 *
+                            <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
+                          </label>
+                          <textarea
+                            rows={4}
+                            placeholder="예: 차량 손해에 대한 보험 {deductible}원 면책금 적용"
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
+                            value={coverageForm.description}
+                            onChange={e => setCoverageForm(f => ({ ...f, description: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => { setEditingCoverageIndex(null); setCoverageForm({ label: '', description: '' }) }}
+                            className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={handleSaveInsuranceCoverage}
+                            className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                          >
+                            수정 저장
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 새 항목 추가 폼 */}
+              {selectedTerms.status !== 'archived' && editingCoverageIndex === null && (
+                <div ref={insuranceFormRef} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
+                  <h3 className="font-bold text-gray-800">새 보장내역 추가</h3>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">보장 항목명 *</label>
+                    <input
+                      type="text"
+                      placeholder="예: 차량손해보험"
+                      className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                      value={coverageForm.label}
+                      onChange={e => setCoverageForm(f => ({ ...f, label: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">
+                      설명 *
+                      <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder="예: 차량 손해에 대한 보험 {deductible}원 면책금 적용"
+                      className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
+                      value={coverageForm.description}
+                      onChange={e => setCoverageForm(f => ({ ...f, description: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={handleSaveInsuranceCoverage}
+                      className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                    >
+                      항목 추가
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 저장 버튼 */}
+              {selectedTerms.status !== 'archived' && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveInsuranceCoverageToDb}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
+                  >
+                    저장
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════ 탭6: 견적 유의사항 ═══════════════════ */}
+      {tab === 'notices' && (
+        <div>
+          {!selectedTerms ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 선택된 약관 정보 */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
+                    {STATUS_LABELS[selectedTerms.status]?.label}
+                  </span>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                </div>
+                <span className="text-sm text-gray-400">{quoteNotices.length}개 항목</span>
+              </div>
+
+              {/* 유의사항 목록 */}
+              <div className="space-y-2">
+                {quoteNotices.map((item, index) => {
+                  const itemText = typeof item === 'string' ? item : item.text
+                  const itemCondition = typeof item === 'object' ? item.condition : undefined
+                  return (
+                    <div key={index} className={`bg-white border rounded-xl p-4 transition ${
+                      editingNoticeIndex === index
+                        ? 'border-blue-400 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          {editingNoticeIndex !== index && (
+                            <>
+                              <div className="flex items-center gap-2 mb-1">
+                                {itemCondition && (
+                                  <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">
+                                    {itemCondition === 'buyout' ? '인수형' : itemCondition}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{itemText}</p>
+                            </>
+                          )}
+                        </div>
+                        {selectedTerms.status !== 'archived' && (
+                          <div className="flex gap-1 ml-3 flex-shrink-0">
+                            {editingNoticeIndex === index ? (
+                              <button
+                                onClick={() => { setEditingNoticeIndex(null); setNoticeForm(''); setNoticeCondition('') }}
+                                className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                              >
+                                접기
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setEditingNoticeIndex(index)
+                                    setNoticeForm(item)
+                                    setNoticeCondition(typeof item === 'object' ? item.condition || '' : '')
+                                    setTimeout(() => noticeFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
+                                  }}
+                                  className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteNotice(index)}
+                                  className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded"
+                                >
+                                  삭제
+                                </button>
+                                <button
+                                  onClick={() => moveNoticeUp(index)}
+                                  disabled={index === 0}
+                                  className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  onClick={() => moveNoticeDown(index)}
+                                  disabled={index === quoteNotices.length - 1}
+                                  className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                >
+                                  ↓
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 인라인 편집 폼 */}
+                      {editingNoticeIndex === index && (
+                        <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-600">
+                              유의사항 *
+                              <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
+                            </label>
+                            <textarea
+                              rows={4}
+                              placeholder="예: 면책금 {deductible}원 이상 차량손해는..."
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
+                              value={typeof noticeForm === 'string' ? noticeForm : noticeForm.text}
+                              onChange={e => setNoticeForm(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600">조건 (선택)</label>
+                            <select
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                              value={noticeCondition}
+                              onChange={e => setNoticeCondition(e.target.value)}
+                            >
+                              <option value="">조건 없음 (모든 계약 유형)</option>
+                              <option value="buyout">인수형만</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => { setEditingNoticeIndex(null); setNoticeForm(''); setNoticeCondition('') }}
+                              className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                            >
+                              취소
+                            </button>
+                            <button
+                              onClick={handleSaveQuoteNotice}
+                              className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                            >
+                              수정 저장
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* 새 항목 추가 폼 */}
+              {selectedTerms.status !== 'archived' && editingNoticeIndex === null && (
+                <div ref={noticeFormRef} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
+                  <h3 className="font-bold text-gray-800">새 유의사항 추가</h3>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">
+                      유의사항 *
+                      <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder="예: 면책금 {deductible}원 이상 차량손해는..."
+                      className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
+                      value={typeof noticeForm === 'string' ? noticeForm : noticeForm.text || ''}
+                      onChange={e => setNoticeForm(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">조건 (선택)</label>
+                    <select
+                      className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                      value={noticeCondition}
+                      onChange={e => setNoticeCondition(e.target.value)}
+                    >
+                      <option value="">조건 없음 (모든 계약 유형)</option>
+                      <option value="buyout">인수형만</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={handleSaveQuoteNotice}
+                      className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                    >
+                      항목 추가
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 저장 버튼 */}
+              {selectedTerms.status !== 'archived' && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveQuoteNoticesToDb}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
+                  >
+                    저장
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════ 탭7: 계산 파라미터 ═══════════════════ */}
+      {tab === 'params' && (
+        <div>
+          {!selectedTerms ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 선택된 약관 정보 */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
+                    {STATUS_LABELS[selectedTerms.status]?.label}
+                  </span>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                </div>
+              </div>
+
+              {selectedTerms.status === 'archived' ? (
+                <div className="text-center py-8 bg-yellow-50 border border-yellow-200 rounded-xl">
+                  <p className="text-yellow-700">보관된 약관은 편집할 수 없습니다.</p>
+                </div>
+              ) : (
+                <>
+                  {/* 섹션 1: 기본 설정 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, basic: !s.basic }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">기본 설정</h3>
+                      <span className="text-gray-400">{expandedSections.basic ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.basic && (
+                      <div className="p-4 space-y-3 border-t">
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">조기 해지 수수료율 (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                            value={calcParams.early_termination_rate || 0}
+                            onChange={e => updateParamValue('early_termination_rate', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">보험 관련 유의사항</label>
+                          <textarea
+                            rows={3}
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
+                            value={calcParams.insurance_note || ''}
+                            onChange={e => updateParamValue('insurance_note', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 2: 보험 기본분담금 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, ins_base: !s.ins_base }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">보험 기본분담금 (연)</h3>
+                      <span className="text-gray-400">{expandedSections.ins_base ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.ins_base && (
+                      <div className="p-4 space-y-3 border-t">
+                        {['경형', '소형', '중형', '대형', '수입'].map(cls => (
+                          <div key={cls}>
+                            <label className="text-xs font-medium text-gray-600">{cls}</label>
+                            <input
+                              type="number"
+                              step="1"
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                              value={calcParams.ins_base_annual?.[cls] || 0}
+                              onChange={e => {
+                                if (!calcParams.ins_base_annual) updateParamValue('ins_base_annual', {})
+                                updateParamValue(`ins_base_annual.${cls}`, parseInt(e.target.value) || 0)
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 3: 자차 요율 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, own_damage: !s.own_damage }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">자차 요율 (%)</h3>
+                      <span className="text-gray-400">{expandedSections.own_damage ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.own_damage && (
+                      <div className="p-4 space-y-3 border-t">
+                        {['경형', '소형', '중형', '대형', '수입'].map(cls => (
+                          <div key={cls}>
+                            <label className="text-xs font-medium text-gray-600">{cls}</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                              value={calcParams.ins_own_damage_rate?.[cls] || 0}
+                              onChange={e => {
+                                if (!calcParams.ins_own_damage_rate) updateParamValue('ins_own_damage_rate', {})
+                                updateParamValue(`ins_own_damage_rate.${cls}`, parseFloat(e.target.value) || 0)
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 4: 면책금 할인율 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, deductible_discount: !s.deductible_discount }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">면책금 할인율</h3>
+                      <span className="text-gray-400">{expandedSections.deductible_discount ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.deductible_discount && (
+                      <div className="p-4 space-y-2 border-t">
+                        {Object.entries(calcParams.deductible_discount || {}).map(([key, value]) => (
+                          <div key={key} className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <label className="text-xs font-medium text-gray-600">{key}</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                                value={value as number}
+                                onChange={e => updateParamValue(`deductible_discount.${key}`, parseFloat(e.target.value) || 0)}
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                const updated = { ...calcParams.deductible_discount }
+                                delete updated[key]
+                                updateParamValue('deductible_discount', updated)
+                              }}
+                              className="text-xs text-red-500 hover:bg-red-50 px-2 py-2 rounded"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                        <input
+                          type="text"
+                          placeholder="새 면책금 값 (예: 500000)"
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 5: 운전자 연령 요율 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, driver_age: !s.driver_age }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">운전자 연령 요율</h3>
+                      <span className="text-gray-400">{expandedSections.driver_age ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.driver_age && (
+                      <div className="p-4 space-y-3 border-t">
+                        {Array.isArray(calcParams.driver_age_factors) && calcParams.driver_age_factors.map((factor: any, idx: number) => (
+                          <div key={idx} className="border-b pb-3 last:border-b-0">
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">최소 연령</label>
+                                <input
+                                  type="number"
+                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                  value={factor.min_age || 0}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.driver_age_factors || [])]
+                                    updated[idx].min_age = parseInt(e.target.value) || 0
+                                    updateParamValue('driver_age_factors', updated)
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">계수</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                  value={factor.factor || 1}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.driver_age_factors || [])]
+                                    updated[idx].factor = parseFloat(e.target.value) || 1
+                                    updateParamValue('driver_age_factors', updated)
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">설명</label>
+                                <input
+                                  type="text"
+                                  placeholder="예: 20대"
+                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                  value={factor.label || ''}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.driver_age_factors || [])]
+                                    updated[idx].label = e.target.value
+                                    updateParamValue('driver_age_factors', updated)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 6: 차령별 계수 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, car_age: !s.car_age }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">차령별 계수</h3>
+                      <span className="text-gray-400">{expandedSections.car_age ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.car_age && (
+                      <div className="p-4 space-y-3 border-t">
+                        {Array.isArray(calcParams.car_age_factors) && calcParams.car_age_factors.map((factor: any, idx: number) => (
+                          <div key={idx} className="grid grid-cols-2 gap-2 pb-3 border-b last:border-b-0">
+                            <div>
+                              <label className="text-xs font-medium text-gray-600">최대 차령 (년)</label>
+                              <input
+                                type="number"
+                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                value={factor.max_age || 0}
+                                onChange={e => {
+                                  const updated = [...(calcParams.car_age_factors || [])]
+                                  updated[idx].max_age = parseInt(e.target.value) || 0
+                                  updateParamValue('car_age_factors', updated)
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-600">계수</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                value={factor.factor || 1}
+                                onChange={e => {
+                                  const updated = [...(calcParams.car_age_factors || [])]
+                                  updated[idx].factor = parseFloat(e.target.value) || 1
+                                  updateParamValue('car_age_factors', updated)
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 7: 보험 담보별 비중 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, ins_breakdown: !s.ins_breakdown }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">보험 담보별 비중</h3>
+                      <span className="text-gray-400">{expandedSections.ins_breakdown ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.ins_breakdown && (
+                      <div className="p-4 space-y-3 border-t">
+                        {['대물', '대인', '자차', '인명', '도난', '기타'].map(coverage => (
+                          <div key={coverage}>
+                            <label className="text-xs font-medium text-gray-600">{coverage}</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                              value={calcParams.ins_breakdown_ratios?.[coverage] || 0}
+                              onChange={e => {
+                                if (!calcParams.ins_breakdown_ratios) updateParamValue('ins_breakdown_ratios', {})
+                                updateParamValue(`ins_breakdown_ratios.${coverage}`, parseFloat(e.target.value) || 0)
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 8: 비영업용 계수 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, non_commercial: !s.non_commercial }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">비영업용 계수</h3>
+                      <span className="text-gray-400">{expandedSections.non_commercial ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.non_commercial && (
+                      <div className="p-4 space-y-3 border-t">
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">기본분담금 계수</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                            value={calcParams.non_commercial_base_factor || 1}
+                            onChange={e => updateParamValue('non_commercial_base_factor', parseFloat(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">자차 계수</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                            value={calcParams.non_commercial_own_factor || 1}
+                            onChange={e => updateParamValue('non_commercial_own_factor', parseFloat(e.target.value) || 1)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 9: 초과주행 요금 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, excess_mileage: !s.excess_mileage }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">초과주행 요금</h3>
+                      <span className="text-gray-400">{expandedSections.excess_mileage ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.excess_mileage && (
+                      <div className="p-4 space-y-2 border-t">
+                        {Object.entries(calcParams.excess_mileage_rates || {}).map(([key, value]) => (
+                          <div key={key} className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <label className="text-xs font-medium text-gray-600">{key}</label>
+                              <input
+                                type="number"
+                                step="1"
+                                className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
+                                value={value as number}
+                                onChange={e => updateParamValue(`excess_mileage_rates.${key}`, parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                const updated = { ...calcParams.excess_mileage_rates }
+                                delete updated[key]
+                                updateParamValue('excess_mileage_rates', updated)
+                              }}
+                              className="text-xs text-red-500 hover:bg-red-50 px-2 py-2 rounded"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 섹션 10: 중도해지 기간별 */}
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSections(s => ({ ...s, early_termination: !s.early_termination }))}
+                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <h3 className="font-bold text-gray-800">중도해지 기간별 수수료</h3>
+                      <span className="text-gray-400">{expandedSections.early_termination ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedSections.early_termination && (
+                      <div className="p-4 space-y-3 border-t">
+                        {Array.isArray(calcParams.early_termination_rates_by_period) && calcParams.early_termination_rates_by_period.map((period: any, idx: number) => (
+                          <div key={idx} className="grid grid-cols-3 gap-2 pb-3 border-b last:border-b-0">
+                            <div>
+                              <label className="text-xs font-medium text-gray-600">시작 월</label>
+                              <input
+                                type="number"
+                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                value={period.months_from || 0}
+                                onChange={e => {
+                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
+                                  updated[idx].months_from = parseInt(e.target.value) || 0
+                                  updateParamValue('early_termination_rates_by_period', updated)
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-600">종료 월</label>
+                              <input
+                                type="number"
+                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                value={period.months_to || 0}
+                                onChange={e => {
+                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
+                                  updated[idx].months_to = parseInt(e.target.value) || 0
+                                  updateParamValue('early_termination_rates_by_period', updated)
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-600">수수료율 (%)</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
+                                value={period.rate || 0}
+                                onChange={e => {
+                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
+                                  updated[idx].rate = parseFloat(e.target.value) || 0
+                                  updateParamValue('early_termination_rates_by_period', updated)
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 저장 버튼 */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveCalcParamsToDb}
+                      className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
+                    >
+                      저장
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════ 탭8: 변경 이력 ═══════════════════ */}
       {tab === 'history' && (
         <div>
           {!selectedTerms ? (
@@ -940,6 +1989,9 @@ export default function ContractTermsPage() {
                           article_added: '조항 추가',
                           article_updated: '조항 수정',
                           article_deleted: '조항 삭제',
+                          insurance_coverage_updated: '보험보장 업데이트',
+                          quote_notices_updated: '견적유의 업데이트',
+                          calc_params_updated: '계산파라미터 업데이트',
                         }
                         let detail = ''
                         try {
@@ -949,6 +2001,7 @@ export default function ContractTermsPage() {
                           if (nv?.article_number) detail = `제${nv.article_number}조 ${nv.title || ''}`
                           if (ov?.title && h.action === 'article_deleted') detail = `제${ov.article_number}조 ${ov.title}`
                           if (nv?.cloned_from) detail = `${nv.cloned_from}에서 복사`
+                          if (nv?.count) detail = `${nv.count}개 항목`
                         } catch { /* */ }
 
                         return (

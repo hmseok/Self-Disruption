@@ -413,6 +413,9 @@ async function insertAccidentRecord(
     police_reported: false,
     status: 'reported',
     notes: noteParts,
+    source: 'jandi_accident',
+    jandi_raw: rawText,
+    jandi_topic: roomName,
   }
 
   // 수리 필요 시 상태 바로 변경

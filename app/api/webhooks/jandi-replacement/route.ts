@@ -304,6 +304,9 @@ export async function POST(request: NextRequest) {
       repair_start_date: repairShop.name ? accidentDt.date : null,
       vehicle_condition: 'repairable',
       status: 'reported',
+      source: 'jandi_replacement',
+      jandi_raw: rawText,
+      jandi_topic: roomName,
       notes: [
         `[잔디 대차요청] 작성자: ${writerName} / 토픽: ${roomName}`,
         `접수시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,

@@ -46,7 +46,10 @@ export default function OrgManagementPage() {
   const [positions, setPositions] = useState<Position[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
+  const [invitations, setInvitations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingInvitations, setLoadingInvitations] = useState(false)
+  const [cancelingId, setCancelingId] = useState<string | null>(null)
 
   // 수정 모달
   const [editingEmp, setEditingEmp] = useState<any | null>(null)
@@ -54,7 +57,7 @@ export default function OrgManagementPage() {
   const [savingEdit, setSavingEdit] = useState(false)
 
   // 탭
-  const [activeTab, setActiveTab] = useState<'employees' | 'org' | 'permissions'>('employees')
+  const [activeTab, setActiveTab] = useState<'employees' | 'org' | 'permissions' | 'invitations'>('employees')
 
   // 직급/부서 추가 폼
   const [newPositionName, setNewPositionName] = useState('')
@@ -79,12 +82,20 @@ export default function OrgManagementPage() {
         setPositions([])
         setDepartments([])
         setActiveModules([])
+        setInvitations([])
         setLoading(false)
       }
     } else if (company) {
       loadAll()
     }
   }, [company, role, adminSelectedCompanyId])
+
+  // Load invitations when tab is activated or company changes
+  useEffect(() => {
+    if (activeTab === 'invitations' && activeCompanyId) {
+      loadInvitations()
+    }
+  }, [activeTab, activeCompanyId])
 
   const loadAll = async () => {
     setLoading(true)
@@ -148,6 +159,53 @@ export default function OrgManagementPage() {
       }
     })
     setMatrix(m)
+  }
+
+  const loadInvitations = async () => {
+    if (!activeCompanyId) return
+    setLoadingInvitations(true)
+    try {
+      const response = await fetch(`/api/member-invite?company_id=${activeCompanyId}`, {
+        headers: {
+          'Authorization': `Bearer ${(window as any).__session?.access_token || ''}`,
+        },
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setInvitations(result.data || [])
+      } else {
+        console.error('Failed to load invitations:', response.status)
+        setInvitations([])
+      }
+    } catch (error) {
+      console.error('Error loading invitations:', error)
+      setInvitations([])
+    } finally {
+      setLoadingInvitations(false)
+    }
+  }
+
+  const cancelInvitation = async (id: string) => {
+    if (!confirm('이 초대를 취소하시겠습니까?')) return
+    setCancelingId(id)
+    try {
+      const response = await fetch(`/api/member-invite?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${(window as any).__session?.access_token || ''}`,
+        },
+      })
+      if (response.ok) {
+        loadInvitations()
+      } else {
+        alert('초대 취소 실패: ' + response.statusText)
+      }
+    } catch (error) {
+      alert('초대 취소 중 오류가 발생했습니다.')
+      console.error('Error canceling invitation:', error)
+    } finally {
+      setCancelingId(null)
+    }
   }
 
   // ===== 직원 수정 모달 =====
@@ -307,10 +365,13 @@ export default function OrgManagementPage() {
     )
   }
 
+  const pendingInvitationCount = invitations.filter((inv: any) => inv.status === '대기중').length
+
   const TABS = [
     { key: 'employees' as const, label: '직원', count: employees.length },
     { key: 'org' as const, label: '직급 · 부서', count: positions.length + departments.length },
     { key: 'permissions' as const, label: '페이지 권한', count: activeModules.length },
+    { key: 'invitations' as const, label: '초대 관리', count: pendingInvitationCount },
   ]
 
   // ── 직원 카드 (공용 컴포넌트) ──
@@ -705,6 +766,126 @@ export default function OrgManagementPage() {
                     <strong>안내:</strong> god_admin과 관리자(master)는 항상 전체 권한을 가집니다. 이 설정은 일반 직원의 직급별 권한을 제어합니다.
                     활성화된 모듈만 표시됩니다.
                   </p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================ */}
+        {/* 초대 관리 탭 */}
+        {/* ================================================================ */}
+        {activeTab === 'invitations' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-base md:text-lg font-bold text-slate-900">초대 관리</h2>
+                <p className="text-xs text-slate-400 mt-0.5">총 {invitations.length}개 · 대기중: {pendingInvitationCount}개</p>
+              </div>
+            </div>
+
+            {loadingInvitations ? (
+              <div className="p-10 text-center">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-steel-600"></div>
+                <p className="text-slate-400 text-sm mt-2">초대 정보를 불러오는 중...</p>
+              </div>
+            ) : invitations.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 text-sm">
+                초대된 회원이 없습니다.
+              </div>
+            ) : (
+              <>
+                {/* 데스크톱 헤더 */}
+                <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <div className="flex-1">이메일</div>
+                  <div className="w-24">부서</div>
+                  <div className="w-20">직급</div>
+                  <div className="w-16">역할</div>
+                  <div className="w-20">상태</div>
+                  <div className="w-28">생성일</div>
+                  <div className="w-28">만료일</div>
+                  <div className="w-16">작업</div>
+                </div>
+
+                {/* 초대 리스트 */}
+                <div className="divide-y divide-slate-100">
+                  {invitations.map((inv: any) => {
+                    const statusColor =
+                      inv.status === '대기중' ? 'bg-yellow-100 text-yellow-700' :
+                      inv.status === '수락' ? 'bg-green-100 text-green-700' :
+                      inv.status === '만료' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+
+                    return (
+                      <div key={inv.id} className="flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50/70 transition-colors">
+                        {/* 모바일 레이아웃 */}
+                        <div className="md:hidden flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <span className="font-bold text-sm text-slate-900 truncate">{inv.email}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 space-y-1">
+                            {inv.department?.name && <div>부서: {inv.department.name}</div>}
+                            {inv.position?.name && <div>직급: {inv.position.name}</div>}
+                            <div>역할: {ROLE_LABELS[inv.role]?.label || inv.role}</div>
+                            <div className="text-slate-400">생성: {formatDate(inv.created_at)}</div>
+                            <div className="text-slate-400">만료: {formatDate(inv.expires_at)}</div>
+                          </div>
+                          {inv.status === '대기중' && (
+                            <button
+                              onClick={() => cancelInvitation(inv.id)}
+                              disabled={cancelingId === inv.id}
+                              className="mt-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all disabled:opacity-50"
+                            >
+                              {cancelingId === inv.id ? '취소 중...' : '취소'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 데스크톱 레이아웃 */}
+                        <div className="hidden md:contents">
+                          <div className="flex-1">
+                            <span className="text-sm font-bold text-slate-900">{inv.email}</span>
+                          </div>
+                          <div className="w-24">
+                            <span className="text-xs text-slate-600">{inv.department?.name || '-'}</span>
+                          </div>
+                          <div className="w-20">
+                            <span className="text-xs text-slate-600">{inv.position?.name || '-'}</span>
+                          </div>
+                          <div className="w-16">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              {ROLE_LABELS[inv.role]?.label || inv.role}
+                            </span>
+                          </div>
+                          <div className="w-20">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <div className="w-28">
+                            <span className="text-xs text-slate-600">{formatDate(inv.created_at)}</span>
+                          </div>
+                          <div className="w-28">
+                            <span className="text-xs text-slate-600">{formatDate(inv.expires_at)}</span>
+                          </div>
+                          <div className="w-16">
+                            {inv.status === '대기중' && (
+                              <button
+                                onClick={() => cancelInvitation(inv.id)}
+                                disabled={cancelingId === inv.id}
+                                className="text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all disabled:opacity-50"
+                              >
+                                {cancelingId === inv.id ? '취소 중...' : '취소'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </>
             )}
