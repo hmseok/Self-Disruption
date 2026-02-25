@@ -60,9 +60,11 @@ async function sendInviteSMS(phone: string, message: string) {
       body: formData.toString(),
     })
     const result = await res.json()
+    console.log('[Aligo SMS] 발송 결과:', JSON.stringify(result))
+    // result_code: "1" = 성공, "-" 시작 = 실패
     return result.result_code === '1'
       ? { success: true, method: 'sms' }
-      : { success: false, error: result.message || 'SMS 발송 실패' }
+      : { success: false, error: `[${result.result_code}] ${result.message || 'SMS 발송 실패'}` }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

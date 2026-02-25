@@ -83,6 +83,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loadUserData = async (authUser: any) => {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
+    setLoading(true)  // ★ 모바일 레이스컨디션 방지: 프로필 로드 중에는 로딩 상태 유지
     try {
       setUser(authUser)
 
