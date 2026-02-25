@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { Resend } from 'resend'
+import { sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend } from '../../../utils/messaging'
 
 // ============================================
 // 계약 발송 API (이메일 + 카카오 알림톡)
@@ -28,131 +28,9 @@ async function verifyAdmin(request: NextRequest) {
   return { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name }
 }
 
-// ── Aligo SMS 문자 발송 ──
-async function sendSMS(phone: string, message: string) {
-  const apiKey = process.env.ALIGO_API_KEY
-  const userId = process.env.ALIGO_USER_ID
-  const sender = process.env.ALIGO_SENDER_PHONE
 
-  if (!apiKey || !userId || !sender) {
-    return { success: false, error: 'Aligo SMS 키가 설정되지 않았습니다. (ALIGO_API_KEY, ALIGO_USER_ID, ALIGO_SENDER_PHONE)' }
-  }
-
-  const cleanPhone = phone.replace(/[^0-9]/g, '')
-
-  try {
-    const formData = new URLSearchParams()
-    formData.append('key', apiKey)
-    formData.append('userid', userId)
-    formData.append('sender', sender)
-    formData.append('receiver', cleanPhone)
-    formData.append('msg', message)
-    // 90바이트 초과 시 LMS 자동 전환
-    formData.append('msg_type', Buffer.byteLength(message, 'utf8') > 90 ? 'LMS' : 'SMS')
-
-    const res = await fetch('https://apis.aligo.in/send/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData.toString(),
-    })
-
-    const result = await res.json()
-    if (result.result_code === '1') {
-      return { success: true, method: 'sms' }
-    } else {
-      return { success: false, error: result.message || 'SMS 발송 실패' }
-    }
-  } catch (err: any) {
-    return { success: false, error: err.message }
-  }
-}
-
-// ── Aligo 카카오 알림톡 발송 (실패 시 SMS fallback) ──
-async function sendKakaoAlimtalk(phone: string, templateCode: string, variables: Record<string, string>) {
-  const apiKey = process.env.ALIGO_API_KEY
-  const userId = process.env.ALIGO_USER_ID
-  const senderKey = process.env.ALIGO_SENDER_KEY
-
-  const cleanPhone = phone.replace(/[^0-9]/g, '')
-  const smsMessage = getSMSTemplate(variables)
-
-  // senderKey 없으면 카카오 채널 미연동 → 바로 SMS
-  if (!apiKey || !userId || !senderKey) {
-    return sendSMS(phone, smsMessage)
-  }
-
-  try {
-    const formData = new URLSearchParams()
-    formData.append('apikey', apiKey)
-    formData.append('userid', userId)
-    formData.append('senderkey', senderKey)
-    formData.append('tpl_code', templateCode)
-    formData.append('sender', process.env.ALIGO_SENDER_PHONE || '01000000000')
-    formData.append('receiver_1', cleanPhone)
-    formData.append('subject_1', '계약서 서명 요청')
-    formData.append('message_1', Object.entries(variables).reduce(
-      (msg, [key, val]) => msg.replace(`#{${key}}`, val),
-      getAlimtalkTemplate(variables)
-    ))
-    formData.append('button_1', JSON.stringify({
-      button: [{
-        name: '계약서 확인 및 서명',
-        linkType: 'WL',
-        linkTypeName: '웹링크',
-        linkMo: variables.signUrl || '',
-        linkPc: variables.signUrl || '',
-      }]
-    }))
-    // 알림톡 실패 시 SMS 대체 발송 설정
-    formData.append('failover', 'Y')
-    formData.append('fsubject_1', '계약서 서명 요청')
-    formData.append('fmessage_1', smsMessage)
-
-    const res = await fetch('https://kakaoapi.aligo.in/akv10/alimtalk/send/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData.toString(),
-    })
-
-    const result = await res.json()
-    if (result.code === 0) {
-      return { success: true, method: 'kakao' }
-    } else {
-      // 알림톡 실패 → SMS fallback 직접 시도
-      console.log('알림톡 실패, SMS 대체 발송:', result.message)
-      return sendSMS(phone, smsMessage)
-    }
-  } catch (err: any) {
-    // 네트워크 오류 등 → SMS fallback
-    console.log('알림톡 오류, SMS 대체 발송:', err.message)
-    return sendSMS(phone, smsMessage)
-  }
-}
-
-function getSMSTemplate(vars: Record<string, string>) {
-  return `[${vars.companyName}] 계약서 서명 요청
-${vars.investorName}님, ${vars.contractLabel} 서명을 요청합니다.
-투자금: ${vars.investAmount}원
-아래 링크에서 확인해주세요.
-${vars.signUrl}`
-}
-
-function getAlimtalkTemplate(vars: Record<string, string>) {
-  return `[계약서 서명 요청]
-
-안녕하세요, #{investorName}님.
-#{companyName}에서 계약서 서명을 요청하였습니다.
-
-■ 계약 유형: #{contractLabel}
-■ 투자금액: #{investAmount}원
-■ 계약 기간: #{contractPeriod}
-
-아래 버튼을 눌러 계약서를 확인하고 서명해 주세요.`
-}
-
-// ── Resend 이메일 발송 ──
-async function sendContractEmail(
-  recipientEmail: string,
+// Email HTML template for contracts
+function getContractEmailHTML(
   companyName: string,
   investorName: string,
   investAmount: string,
@@ -160,50 +38,41 @@ async function sendContractEmail(
   contractPeriod: string,
   signUrl: string
 ) {
-  const apiKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@self-disruption.com'
+  return `
+    <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
+      </div>
+      <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">${contractLabel} 서명 요청</h2>
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">
+        <strong style="color: #0369a1;">${companyName}</strong>에서 계약서 서명을 요청했습니다.
+      </p>
+      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+        <table style="width: 100%; font-size: 14px; color: #334155;">
+          <tr><td style="padding: 6px 0; color: #94a3b8;">계약 유형</td><td style="padding: 6px 0; font-weight: 700;">${contractLabel}</td></tr>
+          <tr><td style="padding: 6px 0; color: #94a3b8;">투자자</td><td style="padding: 6px 0; font-weight: 700;">${investorName}</td></tr>
+          <tr><td style="padding: 6px 0; color: #94a3b8;">투자금</td><td style="padding: 6px 0; font-weight: 700;">${investAmount}원</td></tr>
+          <tr><td style="padding: 6px 0; color: #94a3b8;">계약 기간</td><td style="padding: 6px 0; font-weight: 700;">${contractPeriod}</td></tr>
+        </table>
+      </div>
+      <div style="text-align: center; margin-bottom: 24px;">
+        <a href="${signUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">계약서 확인 및 서명</a>
+      </div>
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+        위 버튼이 작동하지 않으면 아래 링크를 브라우저에 직접 붙여넣으세요.<br/>
+        <a href="${signUrl}" style="color: #0284c7; word-break: break-all;">${signUrl}</a>
+      </p>
+    </div>
+  `
+}
 
-  if (!apiKey) {
-    return { success: false, error: 'RESEND_API_KEY가 설정되지 않았습니다.' }
-  }
-
-  try {
-    const resend = new Resend(apiKey)
-    await resend.emails.send({
-      from: `Self-Disruption <${fromEmail}>`,
-      to: recipientEmail,
-      subject: `[${companyName}] ${contractLabel} 서명 요청`,
-      html: `
-        <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
-          </div>
-          <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">${contractLabel} 서명 요청</h2>
-          <p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">
-            <strong style="color: #0369a1;">${companyName}</strong>에서 계약서 서명을 요청했습니다.
-          </p>
-          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-            <table style="width: 100%; font-size: 14px; color: #334155;">
-              <tr><td style="padding: 6px 0; color: #94a3b8;">계약 유형</td><td style="padding: 6px 0; font-weight: 700;">${contractLabel}</td></tr>
-              <tr><td style="padding: 6px 0; color: #94a3b8;">투자자</td><td style="padding: 6px 0; font-weight: 700;">${investorName}</td></tr>
-              <tr><td style="padding: 6px 0; color: #94a3b8;">투자금</td><td style="padding: 6px 0; font-weight: 700;">${investAmount}원</td></tr>
-              <tr><td style="padding: 6px 0; color: #94a3b8;">계약 기간</td><td style="padding: 6px 0; font-weight: 700;">${contractPeriod}</td></tr>
-            </table>
-          </div>
-          <div style="text-align: center; margin-bottom: 24px;">
-            <a href="${signUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">계약서 확인 및 서명</a>
-          </div>
-          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
-            위 버튼이 작동하지 않으면 아래 링크를 브라우저에 직접 붙여넣으세요.<br/>
-            <a href="${signUrl}" style="color: #0284c7; word-break: break-all;">${signUrl}</a>
-          </p>
-        </div>
-      `,
-    })
-    return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message }
-  }
+// SMS message template for contracts
+function getContractSMSMessage(vars: Record<string, string>) {
+  return `[${vars.companyName}] 계약서 서명 요청
+${vars.investorName}님, ${vars.contractLabel} 서명을 요청합니다.
+투자금: ${vars.investAmount}원
+아래 링크에서 확인해주세요.
+${vars.signUrl}`
 }
 
 // POST: 계약서 발송 (이메일 / 카카오 / 둘 다)
@@ -279,27 +148,132 @@ export async function POST(request: NextRequest) {
   const contractLabel = contract_type === 'jiip' ? '위수탁(지입) 계약' : '일반 투자 계약'
   const contractPeriod = `${contract.contract_start_date || '-'} ~ ${contract.contract_end_date || '-'}`
 
+  const templateVars = {
+    investorName,
+    companyName,
+    contractLabel,
+    investAmount,
+    contractPeriod,
+    signUrl,
+  }
+
   let emailResult: { success: boolean; error?: string } = { success: false, error: '' }
   let kakaoResult: { success: boolean; error?: string; method?: string } = { success: false, error: '' }
 
   // 이메일 발송
   if (send_channel === 'email' || send_channel === 'both') {
-    emailResult = await sendContractEmail(
-      recipient_email, companyName, investorName, investAmount,
-      contractLabel, contractPeriod, signUrl
-    )
+    console.log(`[contracts send-email] 이메일 발송 시작: ${recipient_email}`)
+    emailResult = await sendEmail({
+      to: recipient_email,
+      subject: `[${companyName}] ${contractLabel} 서명 요청`,
+      html: getContractEmailHTML(
+        companyName,
+        investorName,
+        investAmount,
+        contractLabel,
+        contractPeriod,
+        signUrl
+      ),
+    })
+    console.log(`[contracts send-email] 이메일 결과:`, emailResult)
+
+    // 이메일 발송 로깅 (best-effort)
+    if (emailResult.success) {
+      logMessageSend({
+        companyId: contract.company_id,
+        templateKey: 'contract_sign_request',
+        channel: 'email',
+        recipient: recipient_email,
+        recipientName: investorName,
+        subject: `[${companyName}] ${contractLabel} 서명 요청`,
+        body: templateVars.signUrl,
+        status: 'sent',
+        resultCode: emailResult.resultCode,
+        relatedType: contract_type,
+        relatedId: contract_id,
+        sentBy: admin.id,
+      }).catch((err) => {
+        console.error(`[contracts send-email] 이메일 로그 기록 실패:`, err)
+      })
+    } else {
+      logMessageSend({
+        companyId: contract.company_id,
+        templateKey: 'contract_sign_request',
+        channel: 'email',
+        recipient: recipient_email,
+        recipientName: investorName,
+        subject: `[${companyName}] ${contractLabel} 서명 요청`,
+        body: templateVars.signUrl,
+        status: 'failed',
+        errorDetail: emailResult.error,
+        relatedType: contract_type,
+        relatedId: contract_id,
+        sentBy: admin.id,
+      }).catch((err) => {
+        console.error(`[contracts send-email] 이메일 로그 기록 실패:`, err)
+      })
+    }
   }
 
   // 카카오 알림톡 발송
   if (send_channel === 'kakao' || send_channel === 'both') {
-    kakaoResult = await sendKakaoAlimtalk(recipient_phone, 'CONTRACT_SIGN', {
-      investorName,
-      companyName,
-      contractLabel,
-      investAmount,
-      contractPeriod,
-      signUrl,
+    console.log(`[contracts send-email] 카카오 발송 시작: ${recipient_phone}`)
+    const smsMessage = getContractSMSMessage(templateVars)
+    kakaoResult = await sendKakaoAlimtalk({
+      phone: recipient_phone,
+      templateCode: 'CONTRACT_SIGN',
+      templateVars,
+      smsMessage,
+      smsTitle: '[회사명] 계약서 서명',
+      buttons: [
+        {
+          name: '계약서 확인 및 서명',
+          linkType: 'WL',
+          linkTypeName: '웹링크',
+          linkMo: signUrl,
+          linkPc: signUrl,
+        },
+      ],
     })
+    console.log(`[contracts send-email] 카카오 결과:`, kakaoResult)
+
+    // 카카오 발송 로깅 (best-effort)
+    const kakaoMethod = (kakaoResult as any).method || 'kakao'
+    if (kakaoResult.success) {
+      logMessageSend({
+        companyId: contract.company_id,
+        templateKey: 'contract_sign_request',
+        channel: kakaoMethod === 'sms' ? 'sms' : 'kakao',
+        recipient: recipient_phone,
+        recipientName: investorName,
+        subject: '계약서 서명 요청',
+        body: smsMessage,
+        status: 'sent',
+        resultCode: kakaoResult.resultCode,
+        relatedType: contract_type,
+        relatedId: contract_id,
+        sentBy: admin.id,
+      }).catch((err) => {
+        console.error(`[contracts send-email] 카카오 로그 기록 실패:`, err)
+      })
+    } else {
+      logMessageSend({
+        companyId: contract.company_id,
+        templateKey: 'contract_sign_request',
+        channel: 'kakao',
+        recipient: recipient_phone,
+        recipientName: investorName,
+        subject: '계약서 서명 요청',
+        body: smsMessage,
+        status: 'failed',
+        errorDetail: kakaoResult.error,
+        relatedType: contract_type,
+        relatedId: contract_id,
+        sentBy: admin.id,
+      }).catch((err) => {
+        console.error(`[contracts send-email] 카카오 로그 기록 실패:`, err)
+      })
+    }
   }
 
   // 결과 판단
