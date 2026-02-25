@@ -207,33 +207,28 @@ export default function CollectionsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-black text-gray-900">수금 관리</h1>
-              <p className="text-sm text-slate-500 mt-0.5">납부 현황 확인 및 수금 관리</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => changeMonth(-1)} className="p-2 rounded-lg hover:bg-slate-100">
-                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              </button>
-              <input
-                type="month"
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-steel-600"
-              />
-              <button onClick={() => changeMonth(1)} className="p-2 rounded-lg hover:bg-slate-100">
-                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* 헤더 */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 수금 관리</h1>
+            <p className="text-gray-500 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => changeMonth(-1)} className="p-2 rounded-lg hover:bg-slate-100 border border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <input
+              type="month"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-steel-600 bg-white"
+            />
+            <button onClick={() => changeMonth(1)} className="p-2 rounded-lg hover:bg-slate-100 border border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
           </div>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* KPI 카드 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KPICard label="이번달 예상 수금" value={`${nf(totalExpected)}원`} sub={`${schedules.length}건`} color="slate" />
@@ -252,7 +247,7 @@ export default function CollectionsPage() {
                   onClick={() => { setActiveTab(tab.key); setSelectedIds(new Set()) }}
                   className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                     activeTab === tab.key
-                      ? 'bg-steel-900 text-white shadow-sm'
+                      ? 'bg-steel-600 text-white shadow-sm'
                       : 'text-slate-500 hover:bg-slate-100'
                   }`}
                 >
@@ -278,7 +273,7 @@ export default function CollectionsPage() {
                 <button
                   onClick={handleSendReminder}
                   disabled={selectedIds.size === 0 || sending}
-                  className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-40 transition-all"
+                  className="px-4 py-1.5 rounded-lg bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 disabled:opacity-40 transition-all"
                 >
                   {sending ? '발송중...' : `납부 안내 발송 (${selectedIds.size})`}
                 </button>
@@ -290,7 +285,10 @@ export default function CollectionsPage() {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="w-6 h-6 border-2 border-steel-600 border-t-transparent rounded-full animate-spin" />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-7 h-7 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
+                  <span className="text-sm font-medium text-slate-400">불러오는 중...</span>
+                </div>
               </div>
             ) : displayList.length === 0 ? (
               <div className="text-center py-20 text-slate-400 text-sm">
@@ -367,7 +365,7 @@ export default function CollectionsPage() {
                         {(s.status === 'pending') && (
                           <button
                             onClick={() => setConfirmTarget(s)}
-                            className="px-3 py-1 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700 transition-all"
+                            className="px-3 py-1 rounded-lg bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 transition-all"
                           >
                             수금 확인
                           </button>
@@ -440,9 +438,9 @@ function KPICard({ label, value, sub, color }: { label: string; value: string; s
     red: 'text-red-700',
   }
   return (
-    <div className={`bg-white rounded-xl border p-4 ${colors[color] || colors.slate}`}>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className={`text-xl font-black mt-1 ${valueColors[color] || valueColors.slate}`}>{value}</p>
+    <div className={`bg-white rounded-2xl border p-4 shadow-sm ${colors[color] || colors.slate}`}>
+      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-xl font-bold mt-1 ${valueColors[color] || valueColors.slate}`}>{value}</p>
       <p className="text-xs text-slate-500 mt-0.5">{sub}</p>
     </div>
   )

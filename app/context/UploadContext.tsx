@@ -208,7 +208,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         if (newTransactions.length > 0 && companyIdRef.current) {
           try {
             setLogs(`🔍 계약 매칭 & 세무 분류 중...`);
-            const analyzeRes = await fetch('/api/finance/analyze-bank-statement', {
+            const analyzeRes = await fetch('/api/finance/classify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ transactions: newTransactions, company_id: companyIdRef.current }),
@@ -225,6 +225,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                   match_score: item.match_score || 0,
                   matched_contract_name: item.matched_contract_name || null,
                   confidence: item.confidence || 0,
+                  classification_tier: item.classification_tier || 'manual',
+                  alternatives: item.alternatives || [],
+                  card_id: item.card_id || null,
                 }));
               }
             }

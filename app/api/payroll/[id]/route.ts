@@ -206,20 +206,74 @@ export async function POST(
       .eq('id', payslip.employee_id)
       .single()
 
-    // transactions 테이블에 급여 지출 기록
-    await sb.from('transactions').insert({
-      company_id: payslip.company_id,
-      transaction_date: paidDate,
-      type: '출금',
-      client_name: emp?.employee_name || '직원',
-      description: `${payslip.pay_period} 급여 지급`,
-      amount: -Number(payslip.net_salary),
-      payment_method: '통장',
-      category: '급여',
-      related_type: 'payroll',
-      related_id: id,
-      status: 'completed',
-    })
+    // transactions 테이블에 급여 관련 기록 자동 생성
+    const txRecords = [
+      // 1. 실수령액 (통장 출금)
+      {
+        company_id: payslip.company_id,
+        transaction_date: paidDate,
+        type: 'expense',
+        client_name: emp?.employee_name || '직원',
+        description: `${payslip.pay_period} 급여 지급 (실수령)`,
+        amount: -Number(payslip.net_salary),
+        payment_method: '통장',
+        category: payslip.tax_type === '사업소득3.3%' ? '용역비(3.3%)' : '급여(정규직)',
+        related_type: 'salary',
+        related_id: payslip.employee_id,
+        classification_source: 'auto_sync',
+        confidence: 100,
+        status: 'completed',
+      },
+    ]
+
+    // 2. 4대보험 회사부담분 (근로소득인 경우)
+    if (payslip.tax_type === '근로소득') {
+      const companyInsurance = Math.round(
+        Number(payslip.national_pension || 0) +
+        Number(payslip.health_insurance || 0) +
+        Number(payslip.long_care_insurance || 0) +
+        Number(payslip.employment_insurance || 0)
+      )
+      if (companyInsurance > 0) {
+        txRecords.push({
+          company_id: payslip.company_id,
+          transaction_date: paidDate,
+          type: 'expense',
+          client_name: '4대보험(회사부담)',
+          description: `${payslip.pay_period} ${emp?.employee_name || '직원'} 4대보험 회사분`,
+          amount: -companyInsurance,
+          payment_method: '통장',
+          category: '4대보험(회사부담)',
+          related_type: 'salary',
+          related_id: payslip.employee_id,
+          classification_source: 'auto_sync',
+          confidence: 100,
+          status: 'completed',
+        })
+      }
+    }
+
+    // 3. 원천세 (세금 납부 기록)
+    const totalTax = Number(payslip.income_tax || 0) + Number(payslip.local_income_tax || 0)
+    if (totalTax > 0) {
+      txRecords.push({
+        company_id: payslip.company_id,
+        transaction_date: paidDate,
+        type: 'expense',
+        client_name: '원천세(급여)',
+        description: `${payslip.pay_period} ${emp?.employee_name || '직원'} 원천세`,
+        amount: -totalTax,
+        payment_method: '통장',
+        category: '세금/공과금',
+        related_type: 'salary',
+        related_id: payslip.employee_id,
+        classification_source: 'auto_sync',
+        confidence: 100,
+        status: 'completed',
+      })
+    }
+
+    await sb.from('transactions').insert(txRecords)
 
     return NextResponse.json({ success: true, status: 'paid', paid_date: paidDate })
   }
