@@ -92,12 +92,20 @@ export async function POST(request: NextRequest) {
   const tableName = contract_type === 'jiip' ? 'jiip_contracts' : 'general_investments'
   const { data: contract, error: fetchErr } = await sb
     .from(tableName)
-    .select('*, companies:company_id(name)')
+    .select('*')
     .eq('id', contract_id)
     .single()
 
   if (fetchErr || !contract) {
-    return NextResponse.json({ error: '계약을 찾을 수 없습니다.' }, { status: 404 })
+    console.error('[contracts send-email] 계약 조회 실패:', { tableName, contract_id, fetchErr })
+    return NextResponse.json({ error: `계약을 찾을 수 없습니다. (${fetchErr?.message || 'no data'})` }, { status: 404 })
+  }
+
+  // 회사명 별도 조회
+  let companyNameFromDb = '회사'
+  if (contract.company_id) {
+    const { data: companyData } = await sb.from('companies').select('name').eq('id', contract.company_id).single()
+    if (companyData?.name) companyNameFromDb = companyData.name
   }
 
   // 발송 로그 생성
@@ -121,7 +129,7 @@ export async function POST(request: NextRequest) {
     ? `${siteUrl}/jiip/${contract_id}/sign`
     : `${siteUrl}/invest/general/${contract_id}/sign`
 
-  const companyName = (contract as any).companies?.name || '회사'
+  const companyName = companyNameFromDb
   const investorName = contract.investor_name || '투자자'
   const investAmount = Number(contract.invest_amount || 0).toLocaleString()
   const contractLabel = contract_type === 'jiip' ? '위수탁(지입) 계약' : '일반 투자 계약'

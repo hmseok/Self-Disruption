@@ -1005,13 +1005,17 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 // ============================================
 // 탭 4: 정산 실행
 // ============================================
-function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing }: {
+function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel }: {
   items: SettlementItem[]
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
   toggleSelectAll: () => void
   onExecute: () => void
   executing: boolean
+  onSendNotify: () => void
+  sendingNotify: boolean
+  notifyChannel: 'sms' | 'email'
+  setNotifyChannel: (ch: 'sms' | 'email') => void
 }) {
   const pendingItems = items.filter(i => i.status === 'pending')
   const paidItems = items.filter(i => i.status === 'paid')
@@ -1042,17 +1046,36 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
               {selectedIds.size}건 선택 · <span className="font-bold text-gray-700">{nf(selectedTotal)}원</span>
             </span>
           </div>
-          <button
-            onClick={onExecute}
-            disabled={executing || selectedIds.size === 0}
-            className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
-              selectedIds.size > 0
+          <div className="flex items-center gap-2">
+            {/* 정산 완료 알림 발송 */}
+            <select
+              value={notifyChannel}
+              onChange={(e) => setNotifyChannel(e.target.value as 'sms' | 'email')}
+              className="px-2 py-2 rounded-lg border border-gray-200 text-xs font-bold focus:outline-none"
+            >
+              <option value="sms">SMS</option>
+              <option value="email">이메일</option>
+            </select>
+            <button
+              onClick={onSendNotify}
+              disabled={sendingNotify || selectedIds.size === 0}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 shadow-sm transition-all"
+            >
+              {sendingNotify ? '발송중...' : '정산서 발송'}
+            </button>
+            {/* 정산 실행 */}
+            <button
+              onClick={onExecute}
+              disabled={executing || selectedIds.size === 0}
+              className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all ${
+                selectedIds.size > 0
                 ? 'bg-steel-600 text-white hover:bg-steel-700 active:scale-95'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {executing ? '처리 중...' : `⚡ ${selectedIds.size}건 정산 실행`}
-          </button>
+              }`}
+            >
+              {executing ? '처리 중...' : `⚡ ${selectedIds.size}건 정산 실행`}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1158,14 +1181,16 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
       {/* 정산 완료 목록 */}
       {paidItems.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-green-50/30">
+          <div className="p-4 border-b border-gray-100 bg-green-50/30 flex items-center justify-between">
             <h3 className="font-bold text-green-800">✅ 정산 완료 ({paidItems.length}건)</h3>
+            <span className="text-xs text-gray-400">정산서 발송 시 체크박스로 선택하세요</span>
           </div>
 
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b">
                 <tr>
+                  <th className="p-4 w-12"></th>
                   <th className="p-4">구분</th>
                   <th className="p-4">대상</th>
                   <th className="p-4">차량</th>
@@ -1176,10 +1201,14 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
               <tbody className="divide-y divide-gray-50">
                 {paidItems.map(item => {
                   const tl = typeLabels[item.type]
+                  const isSelected = selectedIds.has(item.id)
                   return (
-                    <tr key={item.id} className="text-gray-400">
+                    <tr key={item.id} onClick={() => toggleSelect(item.id)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-green-50' : 'text-gray-400 hover:bg-gray-50'}`}>
                       <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold opacity-60 ${tl.color}`}>{tl.icon} {tl.label}</span>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item.id)} className="w-4 h-4 text-green-600 rounded focus:ring-green-500" />
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${isSelected ? '' : 'opacity-60'} ${tl.color}`}>{tl.icon} {tl.label}</span>
                       </td>
                       <td className="p-4 font-bold">{item.name}</td>
                       <td className="p-4 text-xs">{item.carNumber || '-'}</td>

@@ -69,6 +69,12 @@ export default function DashboardPage() {
     inspectionsDueSoon: 0, inspectionsOverdue: 0,
     activeAccidents: 0, accidentsThisMonth: [],
   })
+  const [collectionStats, setCollectionStats] = useState({
+    pendingAmount: 0, pendingCount: 0,
+    completedAmount: 0, completedCount: 0,
+    overdueAmount: 0, overdueCount: 0,
+    collectionRate: 0,
+  })
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
 
@@ -260,6 +266,34 @@ export default function DashboardPage() {
             activeAccidents: accActiveRes.count || 0,
             accidentsThisMonth: accMonthRes.data || [],
           })
+
+          // ── 수금 현황 통계 ──
+          const nowMonth = new Date().toISOString().slice(0, 7)
+          const [yr, mo] = nowMonth.split('-').map(Number)
+          const lastDayOfMonth = new Date(yr, mo, 0).getDate()
+          const { data: schedData } = await supabase
+            .from('expected_payment_schedules')
+            .select('status, expected_amount, actual_amount, payment_date')
+            .eq('company_id', companyId)
+            .gte('payment_date', `${nowMonth}-01`)
+            .lte('payment_date', `${nowMonth}-${String(lastDayOfMonth).padStart(2, '0')}`)
+
+          if (schedData) {
+            const pending = schedData.filter(s => s.status === 'pending' && s.payment_date >= today)
+            const overdue = schedData.filter(s => s.status === 'pending' && s.payment_date < today)
+            const completed = schedData.filter(s => s.status === 'completed' || s.status === 'partial')
+            const totalExpected = schedData.reduce((a, s) => a + Number(s.expected_amount || 0), 0)
+            const totalActual = completed.reduce((a, s) => a + Number(s.actual_amount || s.expected_amount || 0), 0)
+            setCollectionStats({
+              pendingAmount: pending.reduce((a, s) => a + Number(s.expected_amount || 0), 0),
+              pendingCount: pending.length,
+              completedAmount: totalActual,
+              completedCount: completed.length,
+              overdueAmount: overdue.reduce((a, s) => a + Number(s.expected_amount || 0), 0),
+              overdueCount: overdue.length,
+              collectionRate: totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0,
+            })
+          }
         }
       }
 
@@ -738,6 +772,55 @@ export default function DashboardPage() {
               {loading ? '-' : formatMoney(stats.netProfit)}<span className="text-sm font-bold text-gray-500 ml-1">원</span>
             </p>
             <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-gray-500">매출 - 고정지출</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── 수금 현황 ── */}
+      {showFinance && !loading && (collectionStats.pendingCount > 0 || collectionStats.overdueCount > 0 || collectionStats.completedCount > 0) && (
+        <div className="mb-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-steel-500 uppercase tracking-wider">이번달 수금 현황</h2>
+            <Link href="/finance/collections" className="text-xs font-bold text-steel-400 hover:text-steel-600 transition-colors">
+              자세히 보기 →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">수금율</span>
+                <span className="text-base">{collectionStats.collectionRate >= 80 ? '✅' : collectionStats.collectionRate >= 50 ? '⚠️' : '🔴'}</span>
+              </div>
+              <p className={`text-xl font-black ${collectionStats.collectionRate >= 80 ? 'text-green-600' : collectionStats.collectionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                {collectionStats.collectionRate}%
+              </p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">수금 완료</span>
+                <span className="text-base">💰</span>
+              </div>
+              <p className="text-xl font-black text-green-600">{formatMoney(collectionStats.completedAmount)}<span className="text-xs font-bold text-gray-400 ml-1">원</span></p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{collectionStats.completedCount}건</p>
+            </div>
+            <Link href="/finance/collections" className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:border-amber-300 transition-colors">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">미수금</span>
+                <span className="text-base">⏳</span>
+              </div>
+              <p className="text-xl font-black text-amber-600">{formatMoney(collectionStats.pendingAmount)}<span className="text-xs font-bold text-gray-400 ml-1">원</span></p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{collectionStats.pendingCount}건</p>
+            </Link>
+            {collectionStats.overdueCount > 0 && (
+              <Link href="/finance/collections" className="bg-white rounded-xl p-4 border border-red-200 shadow-sm hover:border-red-400 transition-colors">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-red-400 uppercase">연체</span>
+                  <span className="text-base">🚨</span>
+                </div>
+                <p className="text-xl font-black text-red-600">{formatMoney(collectionStats.overdueAmount)}<span className="text-xs font-bold text-gray-400 ml-1">원</span></p>
+                <p className="text-[10px] text-red-400 mt-0.5">{collectionStats.overdueCount}건</p>
+              </Link>
+            )}
           </div>
         </div>
       )}

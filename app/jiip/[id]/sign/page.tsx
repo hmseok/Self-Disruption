@@ -1,8 +1,6 @@
 'use client'
-import { supabase } from '../../../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
-// 👇 [수정됨] 지입 폴더 깊이(3단계)에 맞춰 점 3개(../../../)가 정답입니다!
 import ContractPaper from '../../../components/ContractPaper'
 import SignatureCanvas from 'react-signature-canvas'
 import { toPng } from 'html-to-image'
@@ -14,6 +12,7 @@ export default function JiipGuestSignPage() {
   const params = useParams()
   const id = params.id
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [item, setItem] = useState<any>(null)
   const [car, setCar] = useState<any>(null)
 
@@ -23,7 +22,7 @@ export default function JiipGuestSignPage() {
 
   // Refs
   const sigCanvas = useRef<any>({})
-  const hiddenContractRef = useRef<HTMLDivElement>(null) // PDF용 숨겨진 계약서
+  const hiddenContractRef = useRef<HTMLDivElement>(null)
   const [tempSignature, setTempSignature] = useState<string>('')
 
   // UI 상태
@@ -41,7 +40,6 @@ export default function JiipGuestSignPage() {
         main.style.padding = '0'; main.style.margin = '0'; main.style.width = '100vw'; main.style.maxWidth = '100vw'
     }
 
-    // 반응형 서명판 너비
     const handleResize = () => {
         setCanvasWidth(window.innerWidth > 600 ? 500 : window.innerWidth - 40)
     }
@@ -57,20 +55,25 @@ export default function JiipGuestSignPage() {
     }
   }, [])
 
-  // 2. 데이터 로딩
+  // 2. 데이터 로딩 (API 라우트 사용 - 로그인 불필요)
   useEffect(() => {
     const fetchData = async () => {
-      const { data: contract } = await supabase.from('jiip_contracts').select('*').eq('id', id).single()
-      if (contract) {
-        setItem(contract)
-        // 🌟 이미 서명된 파일이 있는지 확인
-        if (contract.signed_file_url) {
-            setAlreadySignedUrl(contract.signed_file_url)
+      try {
+        const res = await fetch(`/api/contracts/guest-sign?contract_type=jiip&contract_id=${id}`)
+        if (!res.ok) {
+          const err = await res.json()
+          setError(err.error || '계약 정보를 불러올 수 없습니다.')
+          setLoading(false)
+          return
         }
-
-        // 차량 정보 가져오기
-        const { data: carData } = await supabase.from('cars').select('*').eq('id', contract.car_id).single()
+        const { contract, car: carData } = await res.json()
+        setItem(contract)
         setCar(carData)
+        if (contract.signed_file_url) {
+          setAlreadySignedUrl(contract.signed_file_url)
+        }
+      } catch (e: any) {
+        setError('네트워크 오류: ' + e.message)
       }
       setLoading(false)
     }
@@ -83,7 +86,7 @@ export default function JiipGuestSignPage() {
     try { if(document.referrer && document.referrer.indexOf('kakao') !== -1) location.href = 'kakaotalk://inappbrowser/close' } catch(e) {}
   }
 
-  // 3. 서명 저장 및 PDF 생성 (Invest와 동일 로직)
+  // 3. 서명 저장 및 PDF 생성 → API로 업로드
   const handleSaveSignature = async () => {
     if (sigCanvas.current.isEmpty()) return alert("서명을 해주세요!")
 
@@ -95,7 +98,7 @@ export default function JiipGuestSignPage() {
         const signatureDataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png')
         setTempSignature(signatureDataUrl)
 
-        // 2. 렌더링 대기 (서명이 DOM에 반영될 시간 확보)
+        // 2. 렌더링 대기
         await new Promise(resolve => setTimeout(resolve, 500))
 
         if (!hiddenContractRef.current) throw new Error("계약서 로드 실패")
@@ -109,18 +112,28 @@ export default function JiipGuestSignPage() {
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
 
         const pdfBlob = pdf.output('blob')
-        const fileName = `jiip_contract_${id}_${Date.now()}.pdf`
 
-        // 4. 업로드
-        const { error: uploadError } = await supabase.storage.from('contracts').upload(fileName, pdfBlob, { contentType: 'application/pdf' })
-        if (uploadError) throw uploadError
+        // 4. API로 업로드 (로그인 불필요)
+        const formData = new FormData()
+        formData.append('contract_type', 'jiip')
+        formData.append('contract_id', String(id))
+        formData.append('file', pdfBlob, `jiip_contract_${id}_${Date.now()}.pdf`)
 
-        // 5. URL 업데이트
-        const { data: { publicUrl } } = supabase.storage.from('contracts').getPublicUrl(fileName)
-        await supabase.from('jiip_contracts').update({ signed_file_url: publicUrl }).eq('id', id)
+        const res = await fetch('/api/contracts/guest-sign', {
+          method: 'POST',
+          body: formData,
+        })
 
-        setCompleted(true)
-        setAlreadySignedUrl(publicUrl)
+        const result = await res.json()
+
+        if (!res.ok) throw new Error(result.error || '서명 저장 실패')
+
+        if (result.already_signed) {
+          setAlreadySignedUrl(result.signed_file_url)
+        } else {
+          setCompleted(true)
+          setAlreadySignedUrl(result.signed_file_url)
+        }
 
     } catch (e: any) {
         alert('오류 발생: ' + e.message)
@@ -130,7 +143,17 @@ export default function JiipGuestSignPage() {
 
   if (loading) return <div className="fixed inset-0 z-[99999] bg-white flex items-center justify-center text-gray-500 font-bold">로딩 중...</div>
 
-  // 🏁 [완료 화면] 다운로드 버튼 제공
+  if (error) return (
+    <div className="fixed inset-0 z-[99999] bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="bg-white p-10 rounded-3xl shadow-xl w-full max-w-sm border border-gray-100">
+        <div className="text-5xl mb-4">⚠️</div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">오류 발생</h1>
+        <p className="text-gray-500 text-sm">{error}</p>
+      </div>
+    </div>
+  )
+
+  // 완료 화면
   if (alreadySignedUrl || completed) {
     return (
       <div className="fixed inset-0 z-[99999] bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
@@ -149,9 +172,9 @@ export default function JiipGuestSignPage() {
                       href={alreadySignedUrl!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-steel-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-steel-700 transition-colors"
+                      className="block w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-colors"
                   >
-                      📄 계약서 다운로드 (PDF)
+                      계약서 다운로드 (PDF)
                   </a>
                   <button
                       onClick={handleCloseWindow}
@@ -166,25 +189,23 @@ export default function JiipGuestSignPage() {
     )
   }
 
-  // 📝 [서명 화면] - 지입 스타일 (하단 고정형 서명판)
+  // 서명 화면
   return (
     <div className="fixed inset-0 z-[99999] bg-gray-100 flex flex-col overflow-hidden">
 
-      {/* 🔐 PDF 생성용 숨겨진 영역 (ContractPaper 사용) */}
+      {/* PDF 생성용 숨겨진 영역 */}
       <div style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}>
           <div ref={hiddenContractRef}>
-              {/* ContractPaper 컴포넌트에 서명 이미지 전달 */}
               {item && car && <ContractPaper data={item} car={car} signatureUrl={tempSignature} />}
           </div>
       </div>
 
-      <div className="bg-steel-900 text-white p-4 text-center flex-none shadow-md z-10">
+      <div className="bg-slate-900 text-white p-4 text-center flex-none shadow-md z-10">
           <h1 className="font-bold text-lg">지입 계약 서명</h1>
-          <p className="text-xs text-steel-200 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
+          <p className="text-xs text-slate-400 mt-1">내용 확인 후 하단에 서명해 주세요.</p>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-gray-500 p-4 pb-10">
-          {/* 계약서 미리보기 */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden min-h-[300px] flex justify-center items-start pt-4 mb-4">
               <div className="origin-top transform scale-[0.45] md:scale-100">
                 {item && car && <ContractPaper data={item} car={car} />}
@@ -192,14 +213,14 @@ export default function JiipGuestSignPage() {
           </div>
 
           <div className="flex justify-between items-center mb-4">
-             <p className="text-xs text-white/80">👆 위 문서를 확인해주세요.</p>
-             <button onClick={() => setShowZoomModal(true)} className="text-xs font-bold text-steel-900 bg-white px-3 py-1.5 rounded-full shadow-sm">
-                  🔍 크게 보기
+             <p className="text-xs text-white/80">위 문서를 확인해주세요.</p>
+             <button onClick={() => setShowZoomModal(true)} className="text-xs font-bold text-slate-900 bg-white px-3 py-1.5 rounded-full shadow-sm">
+                  크게 보기
              </button>
           </div>
 
           <section className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 mb-4">
-              <h3 className="font-bold text-gray-900 text-lg mb-4">🚛 지입 차량 정보</h3>
+              <h3 className="font-bold text-gray-900 text-lg mb-4">지입 차량 정보</h3>
               <div className="space-y-3 text-sm">
                   <div className="flex justify-between py-2 border-b border-gray-50">
                       <span className="text-gray-500">차량 번호</span>
@@ -211,15 +232,15 @@ export default function JiipGuestSignPage() {
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-50">
                       <span className="text-gray-500">월 관리비</span>
-                      <span className="font-bold text-steel-600">{nf(item?.admin_fee)}원</span>
+                      <span className="font-bold text-slate-700">{nf(item?.admin_fee)}원</span>
                   </div>
               </div>
           </section>
       </div>
 
-      {/* 👇 하단 고정 서명 패드 */}
+      {/* 하단 고정 서명 패드 */}
       <div className="bg-white p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-2xl z-20 flex-none pb-8">
-          <p className="font-bold text-gray-900 mb-2 text-center text-sm">👇 아래 박스에 정자로 서명해 주세요</p>
+          <p className="font-bold text-gray-900 mb-2 text-center text-sm">아래 박스에 정자로 서명해 주세요</p>
 
           <div className="border-2 border-gray-300 rounded-xl bg-gray-50 mb-4 overflow-hidden flex justify-center h-40 relative">
               <SignatureCanvas
@@ -232,7 +253,7 @@ export default function JiipGuestSignPage() {
 
           <div className="flex gap-3">
               <button onClick={() => sigCanvas.current.clear()} className="flex-1 bg-gray-200 py-4 rounded-xl font-bold text-gray-700">지우기</button>
-              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-steel-600 py-4 rounded-xl font-bold text-white shadow-lg">
+              <button id="saveBtn" onClick={handleSaveSignature} className="flex-[2] bg-slate-900 py-4 rounded-xl font-bold text-white shadow-lg hover:bg-slate-800 transition-colors">
                   서명 제출하기
               </button>
           </div>
@@ -243,7 +264,7 @@ export default function JiipGuestSignPage() {
         <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col animate-fade-in">
             <div className="flex justify-between items-center p-4 bg-black text-white">
                 <h3 className="font-bold text-lg">계약서 원본 확인</h3>
-                <button onClick={() => setShowZoomModal(false)} className="bg-gray-800 px-4 py-2 rounded-lg text-sm font-bold">닫기 ✕</button>
+                <button onClick={() => setShowZoomModal(false)} className="bg-gray-800 px-4 py-2 rounded-lg text-sm font-bold">닫기</button>
             </div>
             <div className="flex-1 overflow-auto p-4 bg-gray-900 flex justify-center">
                 <div className="bg-white shadow-2xl min-w-[210mm] min-h-[297mm]">

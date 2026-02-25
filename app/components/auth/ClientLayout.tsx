@@ -122,7 +122,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [])
 
   // ★ 앱 셸 활성화 시 body에 클래스 추가 (로그인 페이지 제외)
-  const isAuthPage = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/public') || pathname.startsWith('/invite')
+  const isGuestPage = pathname.endsWith('/sign')
+  const isAuthPage = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/public') || pathname.startsWith('/invite') || isGuestPage
   useEffect(() => {
     if (!isAuthPage) {
       document.body.classList.add('app-shell')
@@ -228,7 +229,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   // 로그아웃 상태 → 로그인 페이지로 즉시 이동 (useEffect로 감싸서 렌더링 중 setState 방지)
   useEffect(() => {
-    if (!loading && !user && pathname !== '/' && !pathname.startsWith('/auth') && !pathname.startsWith('/public') && !pathname.startsWith('/invite')) {
+    if (!loading && !user && pathname !== '/' && !pathname.startsWith('/auth') && !pathname.startsWith('/public') && !pathname.startsWith('/invite') && !pathname.endsWith('/sign')) {
       router.replace('/')
     }
   }, [loading, user, pathname, router])
