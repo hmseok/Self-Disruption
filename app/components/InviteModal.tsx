@@ -172,6 +172,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       // 409: 이미 대기 중 → 재발송 확인
       if (res.status === 409 && data.existing_id) {
         if (confirm('이미 대기 중인 초대가 있습니다. 재발송하시겠습니까?')) {
+          console.log('[InviteModal] 재발송 요청:', { sendChannel, phone: phone || '(없음)', email, resend: true })
           const resendRes = await fetch('/api/member-invite', {
             method: 'POST',
             headers: {
@@ -190,7 +191,12 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
               resend: true,
             }),
           })
-          data = await resendRes.json()
+          try {
+            data = await resendRes.json()
+          } catch {
+            throw new Error(`재발송 서버 응답 오류 (${resendRes.status}). 잠시 후 다시 시도해주세요.`)
+          }
+          console.log('[InviteModal] 재발송 응답:', { status: resendRes.status, ...data })
           if (!resendRes.ok) throw new Error(data.error || '재발송 실패')
         } else {
           setLoading(false)
