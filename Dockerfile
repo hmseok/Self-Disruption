@@ -26,6 +26,11 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Aligo SMS/카카오 알림톡
+ENV ALIGO_API_KEY=507w2xr3sx06brni0p
+ENV ALIGO_USER_ID=fmi2bts
+ENV ALIGO_SENDER_PHONE=01098289500
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

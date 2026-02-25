@@ -108,7 +108,7 @@ function MenuItem({ item, pathname, accent }: { item: { name: string; path: stri
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, company, role, position, loading, allCompanies, adminSelectedCompanyId, setAdminSelectedCompanyId, menuRefreshKey } = useApp()
+  const { user, company, role, position, permissions, loading, allCompanies, adminSelectedCompanyId, setAdminSelectedCompanyId, menuRefreshKey } = useApp()
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
@@ -223,7 +223,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       }
       fetchMenus()
     }
-  }, [company, loading, role, adminSelectedCompanyId, menuRefreshKey])
+  }, [company, loading, role, adminSelectedCompanyId, menuRefreshKey, permissions])
 
   // 로그아웃 상태 → 로그인 페이지로 즉시 이동 (useEffect로 감싸서 렌더링 중 setState 방지)
   useEffect(() => {

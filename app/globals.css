@@ -2,7 +2,6 @@
 
 /* ── Tailwind v4: 소스 경로 명시 (production CSS 누락 방지) ── */
 @source "../app/**/*.{tsx,ts,jsx,js}";
-@source "../components/**/*.{tsx,ts,jsx,js}";
 
 /* 우측 패널 얇은 스크롤바 */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }

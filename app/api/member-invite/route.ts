@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
     email, company_id, position_id, department_id, role = 'user',
     send_channel = 'email',   // 'email' | 'kakao' | 'sms' | 'both'
     recipient_phone = '',
+    page_permissions = [],     // 페이지별 권한 배열
   } = body
 
   if (!email || !company_id) {
@@ -290,6 +291,7 @@ export async function POST(request: NextRequest) {
       role,
       invited_by: admin.id,
       expires_at: expiresAt,
+      page_permissions: page_permissions || [],
     })
     .select('id, token')
     .single()

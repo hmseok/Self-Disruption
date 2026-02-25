@@ -67,11 +67,11 @@ export default function OrgManagementPage() {
   const [newPositionLevel, setNewPositionLevel] = useState(4)
   const [newDeptName, setNewDeptName] = useState('')
 
-  // === Tab 2: 페이지 권한 (사용자별) ===
-  const [selectedUserId, setSelectedUserId] = useState<string>('')
-  const [userPermMap, setUserPermMap] = useState<UserPermMap>({})
-  const [savingPerms, setSavingPerms] = useState(false)
-  const [permsDirty, setPermsDirty] = useState(false)
+  // === Tab 2: 페이지 권한 (좌우 분할) ===
+  // allUserPerms: { [userId]: { [pagePath]: UserPermMap } }
+  const [allUserPerms, setAllUserPerms] = useState<Record<string, UserPermMap>>({})
+  const [savingPermsFor, setSavingPermsFor] = useState<string | null>(null)
+  const [selectedPermUserId, setSelectedPermUserId] = useState<string | null>(null)
 
   const activeCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
@@ -93,20 +93,17 @@ export default function OrgManagementPage() {
   }, [company, role, adminSelectedCompanyId])
 
   useEffect(() => {
-    if (activeTab === 'organization' && activeCompanyId) {
+    if (activeTab === 'organization' && activeCompanyId && ['god_admin', 'master'].includes(role || '')) {
       loadInvitations()
     }
-  }, [activeTab, activeCompanyId])
+  }, [activeTab, activeCompanyId, role])
 
-  // 선택한 사용자 변경 시 권한 로드
+  // 권한 탭 진입 시 전체 직원 권한 로드
   useEffect(() => {
-    if (selectedUserId) {
-      loadUserPermissions(selectedUserId)
-    } else {
-      setUserPermMap({})
-      setPermsDirty(false)
+    if (activeTab === 'permissions' && activeCompanyId) {
+      loadAllUserPermissions()
     }
-  }, [selectedUserId])
+  }, [activeTab, activeCompanyId])
 
   const loadAll = async () => {
     setLoading(true)
@@ -161,16 +158,18 @@ export default function OrgManagementPage() {
     }
   }
 
-  // ===== 사용자별 권한 로드 =====
-  const loadUserPermissions = async (userId: string) => {
+  // ===== 전체 직원 권한 로드 =====
+  const loadAllUserPermissions = async () => {
+    if (!activeCompanyId) return
     const { data } = await supabase
       .from('user_page_permissions')
       .select('*')
-      .eq('user_id', userId)
+      .eq('company_id', activeCompanyId)
 
-    const map: UserPermMap = {}
+    const permsMap: Record<string, UserPermMap> = {}
     data?.forEach((p: any) => {
-      map[p.page_path] = {
+      if (!permsMap[p.user_id]) permsMap[p.user_id] = {}
+      permsMap[p.user_id][p.page_path] = {
         can_view: p.can_view,
         can_create: p.can_create,
         can_edit: p.can_edit,
@@ -179,28 +178,23 @@ export default function OrgManagementPage() {
         id: p.id,
       }
     })
-    setUserPermMap(map)
-    setPermsDirty(false)
+    setAllUserPerms(permsMap)
   }
 
-  // ===== 사용자별 권한 저장 =====
-  const saveUserPermissions = async () => {
-    if (!selectedUserId || !activeCompanyId) return
-    setSavingPerms(true)
+  // ===== 특정 직원 권한 저장 =====
+  const saveUserPerms = async (userId: string) => {
+    if (!activeCompanyId) return
+    setSavingPermsFor(userId)
 
     try {
-      // 기존 해당 사용자 권한 삭제
-      await supabase
-        .from('user_page_permissions')
-        .delete()
-        .eq('user_id', selectedUserId)
+      await supabase.from('user_page_permissions').delete().eq('user_id', userId)
 
-      // 활성화된 권한만 삽입
-      const toInsert = Object.entries(userPermMap)
+      const userMap = allUserPerms[userId] || {}
+      const toInsert = Object.entries(userMap)
         .filter(([_, p]) => p.can_view || p.can_create || p.can_edit || p.can_delete)
         .map(([pagePath, p]) => ({
           company_id: activeCompanyId,
-          user_id: selectedUserId,
+          user_id: userId,
           page_path: pagePath,
           can_view: p.can_view,
           can_create: p.can_create,
@@ -213,55 +207,50 @@ export default function OrgManagementPage() {
         const { error } = await supabase.from('user_page_permissions').insert(toInsert)
         if (error) throw error
       }
-
       alert('권한이 저장되었습니다.')
-      setPermsDirty(false)
     } catch (error: any) {
       alert('저장 실패: ' + error.message)
     } finally {
-      setSavingPerms(false)
+      setSavingPermsFor(null)
     }
   }
 
-  // 페이지 ON/OFF 토글
-  const togglePageAccess = (pagePath: string, enabled: boolean) => {
-    setPermsDirty(true)
-    if (enabled) {
-      setUserPermMap(prev => ({
-        ...prev,
-        [pagePath]: { can_view: true, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
-      }))
-    } else {
-      setUserPermMap(prev => ({
-        ...prev,
-        [pagePath]: { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
-      }))
-    }
+  // 매트릭스 뷰: 페이지 ON/OFF
+  const matrixTogglePage = (userId: string, pagePath: string) => {
+    setAllUserPerms(prev => {
+      const userMap = { ...(prev[userId] || {}) }
+      if (userMap[pagePath]?.can_view) {
+        delete userMap[pagePath]
+      } else {
+        userMap[pagePath] = { can_view: true, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
+      }
+      return { ...prev, [userId]: userMap }
+    })
   }
 
-  // CRUD 토글
-  const togglePerm = (pagePath: string, field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete') => {
-    setPermsDirty(true)
-    const current = userPermMap[pagePath] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
-    setUserPermMap(prev => ({
-      ...prev,
-      [pagePath]: { ...current, [field]: !current[field] }
-    }))
+  // 상세 CRUD 토글
+  const matrixTogglePerm = (userId: string, pagePath: string, field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete') => {
+    setAllUserPerms(prev => {
+      const userMap = { ...(prev[userId] || {}) }
+      const current = userMap[pagePath] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
+      userMap[pagePath] = { ...current, [field]: !current[field] }
+      return { ...prev, [userId]: userMap }
+    })
   }
 
   // 데이터 범위 변경
-  const changeDataScope = (pagePath: string, scope: string) => {
-    setPermsDirty(true)
-    const current = userPermMap[pagePath] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
-    setUserPermMap(prev => ({
-      ...prev,
-      [pagePath]: { ...current, data_scope: scope }
-    }))
+  const matrixChangeScope = (userId: string, pagePath: string, scope: string) => {
+    setAllUserPerms(prev => {
+      const userMap = { ...(prev[userId] || {}) }
+      const current = userMap[pagePath] || { can_view: false, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
+      userMap[pagePath] = { ...current, data_scope: scope }
+      return { ...prev, [userId]: userMap }
+    })
   }
 
   // ===== 초대 관리 =====
   const loadInvitations = async () => {
-    if (!activeCompanyId) return
+    if (!activeCompanyId || !['god_admin', 'master'].includes(role || '')) return
     setLoadingInvitations(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -434,7 +423,6 @@ export default function OrgManagementPage() {
 
   // 선택 가능한 직원 목록 (god_admin/master 제외 - 이미 전체 접근)
   const assignableEmployees = employees.filter(e => e.role === 'user' && e.is_active !== false)
-  const selectedEmpInfo = employees.find(e => e.id === selectedUserId)
 
   const TABS = [
     { key: 'organization' as const, label: '조직 관리', count: employees.length },
@@ -728,147 +716,178 @@ export default function OrgManagementPage() {
             )}
 
             {/* ================================================================ */}
-            {/* Tab 2: 페이지 권한 (사용자별 직접 설정) */}
+            {/* Tab 2: 페이지 권한 (좌우 분할 마스터-디테일) */}
             {/* ================================================================ */}
             {activeTab === 'permissions' && (
-              <div className="space-y-4 md:space-y-6">
+              <div className="space-y-4">
                 {assignableEmployees.length === 0 ? (
                   <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
                     <p className="text-slate-400 text-sm">권한을 설정할 일반 직원이 없습니다.</p>
                     <p className="text-xs text-slate-300 mt-1">관리자(master)와 GOD ADMIN은 항상 전체 접근 권한을 가집니다.</p>
                   </div>
+                ) : activeModules.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+                    <p className="text-slate-400 text-sm">활성화된 모듈이 없습니다.</p>
+                  </div>
                 ) : (
-                  <>
-                    {/* 직원 선택 */}
-                    <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-                      <label className="block text-xs font-bold text-slate-500 mb-2">직원 선택</label>
-                      <select
-                        value={selectedUserId}
-                        onChange={e => setSelectedUserId(e.target.value)}
-                        className="w-full p-3 border rounded-xl text-sm font-bold bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors"
-                      >
-                        <option value="">직원을 선택하세요</option>
-                        {assignableEmployees.map(emp => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.employee_name || emp.email}
-                            {emp.department?.name ? ` · ${emp.department.name}` : ''}
-                            {emp.position?.name ? ` · ${emp.position.name}` : ''}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-0 lg:h-[calc(100vh-200px)]">
 
-                      {selectedEmpInfo && (
-                        <div className="mt-3 flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm bg-slate-400 flex-shrink-0">
-                            {(selectedEmpInfo.employee_name || selectedEmpInfo.email || '?')[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-bold text-sm text-slate-900">{selectedEmpInfo.employee_name || '(이름 미설정)'}</div>
-                            <div className="text-xs text-slate-400">
-                              {selectedEmpInfo.email}
-                              {selectedEmpInfo.department?.name ? ` · ${selectedEmpInfo.department.name}` : ''}
-                              {selectedEmpInfo.position?.name ? ` · ${selectedEmpInfo.position.name}` : ''}
+                    {/* ── 좌측: 직원 목록 (고정) ── */}
+                    <div className="lg:w-72 xl:w-80 flex-shrink-0 bg-white rounded-2xl lg:rounded-r-none border border-slate-200 overflow-hidden flex flex-col">
+                      <div className="p-4 border-b border-slate-100 flex-shrink-0">
+                        <h3 className="text-sm font-bold text-slate-900">직원 목록</h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{assignableEmployees.length}명 · 클릭하여 권한 설정</p>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        {assignableEmployees.map(emp => {
+                          const userMap = allUserPerms[emp.id] || {}
+                          const enabledCount = Object.values(userMap).filter(p => p.can_view).length
+                          const isSelected = selectedPermUserId === emp.id
+                          return (
+                            <div
+                              key={emp.id}
+                              onClick={() => setSelectedPermUserId(emp.id)}
+                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all border-b border-slate-50 ${
+                                isSelected
+                                  ? 'bg-steel-50 border-l-[3px] border-l-steel-600'
+                                  : 'hover:bg-slate-50/70 border-l-[3px] border-l-transparent'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-xs flex-shrink-0 ${
+                                isSelected ? 'bg-steel-600' : 'bg-slate-400'
+                              }`}>
+                                {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-bold text-sm truncate ${isSelected ? 'text-steel-900' : 'text-slate-700'}`}>
+                                    {emp.employee_name || '(미설정)'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {emp.department?.name && (
+                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate max-w-[60px]">{emp.department.name}</span>
+                                  )}
+                                  {emp.position?.name && (
+                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate max-w-[60px]">{emp.position.name}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${
+                                enabledCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
+                              }`}>
+                                {enabledCount}/{activeModules.length}
+                              </span>
                             </div>
-                          </div>
-                        </div>
-                      )}
+                          )
+                        })}
+                      </div>
                     </div>
 
-                    {/* 권한 설정 영역 */}
-                    {selectedUserId && (
-                      <>
-                        {activeModules.length === 0 ? (
-                          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                            <p className="text-slate-400 text-sm">활성화된 모듈이 없습니다.</p>
+                    {/* ── 우측: 권한 설정 패널 (스크롤) ── */}
+                    <div className="flex-1 bg-white rounded-2xl lg:rounded-l-none border border-slate-200 lg:border-l-0 overflow-hidden flex flex-col">
+                      {!selectedPermUserId ? (
+                        <div className="flex-1 flex items-center justify-center p-8">
+                          <div className="text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </div>
+                            <p className="text-sm font-bold text-slate-400">좌측에서 직원을 선택하세요</p>
+                            <p className="text-xs text-slate-300 mt-1">페이지별 접근 권한을 설정할 수 있습니다</p>
                           </div>
-                        ) : (
-                          moduleGroups.map(group => (
-                            <div key={`perm-group-${group}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                              <div className="px-4 md:px-5 py-3 bg-slate-50 border-b border-slate-200">
-                                <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider">{group}</h4>
-                              </div>
-                              <div className="divide-y divide-slate-100">
-                                {activeModules.filter(m => m.group === group).map(mod => {
-                                  const perm = userPermMap[mod.path]
-                                  const isEnabled = perm && (perm.can_view || perm.can_create || perm.can_edit || perm.can_delete)
-                                  return (
-                                    <div key={mod.path} className="p-4 md:p-5 hover:bg-slate-50/50 transition-colors">
-                                      {/* 페이지명 + ON/OFF */}
-                                      <div className="flex items-center justify-between gap-3 mb-2">
-                                        <div className="flex-1 min-w-0">
-                                          <h5 className="font-bold text-sm text-slate-900">{mod.name}</h5>
-                                          <p className="text-xs text-slate-400 font-mono mt-0.5">{mod.path}</p>
-                                        </div>
-                                        <button
-                                          onClick={() => togglePageAccess(mod.path, !isEnabled)}
-                                          className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap flex-shrink-0 transition-all ${
-                                            isEnabled
-                                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                              : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                          }`}
-                                        >
-                                          {isEnabled ? 'ON' : 'OFF'}
-                                        </button>
-                                      </div>
+                        </div>
+                      ) : (() => {
+                        const emp = assignableEmployees.find(e => e.id === selectedPermUserId)
+                        if (!emp) return null
+                        const userMap = allUserPerms[emp.id] || {}
+                        const enabledCount = Object.values(userMap).filter(p => p.can_view).length
 
-                                      {/* 상세 권한 (ON일 때) */}
-                                      {isEnabled && (
-                                        <div className="space-y-3 pt-3 border-t border-slate-100">
-                                          <div className="flex flex-wrap gap-2">
-                                            {([
-                                              { field: 'can_view' as const, label: '조회' },
-                                              { field: 'can_create' as const, label: '생성' },
-                                              { field: 'can_edit' as const, label: '수정' },
-                                              { field: 'can_delete' as const, label: '삭제' },
-                                            ]).map(item => (
-                                              <label key={item.field} className="flex items-center gap-2 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-slate-50 border border-slate-100">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={perm?.[item.field] || false}
-                                                  onChange={() => togglePerm(mod.path, item.field)}
-                                                  className="w-4 h-4 rounded border-slate-300 text-steel-600"
-                                                />
-                                                <span className="text-xs font-bold text-slate-700">{item.label}</span>
-                                              </label>
-                                            ))}
-                                          </div>
-                                          <div>
-                                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">데이터 범위</label>
-                                            <select
-                                              value={perm?.data_scope || 'all'}
-                                              onChange={e => changeDataScope(mod.path, e.target.value)}
-                                              className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white font-bold focus:border-steel-400 outline-none"
-                                            >
-                                              {DATA_SCOPES.map(s => (
-                                                <option key={s.value} value={s.value}>{s.label}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                        </div>
-                                      )}
+                        return (
+                          <>
+                            {/* 선택된 직원 헤더 */}
+                            <div className="p-4 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm bg-steel-600 flex-shrink-0">
+                                    {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-base text-slate-900">{emp.employee_name || '(이름 미설정)'}</span>
+                                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                        enabledCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
+                                      }`}>
+                                        {enabledCount}/{activeModules.length} 페이지
+                                      </span>
                                     </div>
-                                  )
-                                })}
+                                    <div className="text-xs text-slate-400 mt-0.5">{emp.email}</div>
+                                  </div>
+                                </div>
+                                <button onClick={() => saveUserPerms(emp.id)}
+                                  disabled={savingPermsFor === emp.id}
+                                  className="px-5 py-2 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors active:scale-95">
+                                  {savingPermsFor === emp.id ? '저장 중...' : '저장'}
+                                </button>
                               </div>
                             </div>
-                          ))
-                        )}
 
-                        {/* 저장 버튼 */}
-                        {activeModules.length > 0 && (
-                          <div className="flex justify-end">
-                            <button
-                              onClick={saveUserPermissions}
-                              disabled={savingPerms || !permsDirty}
-                              className="px-8 py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors shadow-lg active:scale-95"
-                            >
-                              {savingPerms ? '저장 중...' : permsDirty ? '변경사항 저장' : '저장됨'}
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
+                            {/* 권한 설정 영역 (스크롤) */}
+                            <div className="flex-1 overflow-y-auto">
+                              {moduleGroups.map(group => (
+                                <div key={group}>
+                                  <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{group}</span>
+                                  </div>
+                                  <div className="divide-y divide-slate-50">
+                                    {activeModules.filter(m => m.group === group).map(mod => {
+                                      const perm = userMap[mod.path]
+                                      const isOn = !!perm?.can_view
+                                      return (
+                                        <div key={mod.path} className="px-4 py-3 hover:bg-slate-50/50 transition-colors">
+                                          <div className="flex items-center gap-3">
+                                            <button onClick={() => matrixTogglePage(emp.id, mod.path)}
+                                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                                                isOn ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                              }`}>
+                                              {isOn ? 'ON' : 'OFF'}
+                                            </button>
+                                            <span className="font-bold text-sm text-slate-800 flex-1">{mod.name}</span>
+                                          </div>
+
+                                          {/* CRUD + 범위 (ON일 때 아래로) */}
+                                          {isOn && (
+                                            <div className="flex items-center gap-3 mt-2 ml-[52px]">
+                                              {(['can_view', 'can_create', 'can_edit', 'can_delete'] as const).map(f => (
+                                                <label key={f} className="flex items-center gap-1 cursor-pointer text-xs">
+                                                  <input type="checkbox" checked={perm?.[f] || false}
+                                                    onChange={() => matrixTogglePerm(emp.id, mod.path, f)}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600" />
+                                                  <span className="font-bold text-slate-600">
+                                                    {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
+                                                  </span>
+                                                </label>
+                                              ))}
+                                              <select value={perm?.data_scope || 'all'}
+                                                onChange={e => matrixChangeScope(emp.id, mod.path, e.target.value)}
+                                                className="text-xs border rounded-lg px-1.5 py-0.5 bg-white font-bold ml-auto">
+                                                {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                              </select>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  </div>
                 )}
 
                 {/* 안내 */}

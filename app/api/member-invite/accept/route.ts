@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   // 1. 초대 정보 조회
   const { data: invite, error: inviteErr } = await sb
     .from('member_invitations')
-    .select('id, email, company_id, role, position_id, department_id, status, expires_at')
+    .select('id, email, company_id, role, position_id, department_id, status, expires_at, page_permissions')
     .eq('token', token)
     .single()
 
@@ -119,7 +119,31 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 4. 초대 상태 업데이트
+  // 4. 페이지 권한 자동 생성 (초대 시 설정된 권한이 있는 경우)
+  const pagePerms = invite.page_permissions as any[] || []
+  if (pagePerms.length > 0) {
+    const permsToInsert = pagePerms
+      .filter((p: any) => p.can_view || p.can_create || p.can_edit || p.can_delete)
+      .map((p: any) => ({
+        company_id: invite.company_id,
+        user_id: userId,
+        page_path: p.page_path,
+        can_view: p.can_view || false,
+        can_create: p.can_create || false,
+        can_edit: p.can_edit || false,
+        can_delete: p.can_delete || false,
+        data_scope: p.data_scope || 'all',
+      }))
+
+    if (permsToInsert.length > 0) {
+      const { error: permErr } = await sb.from('user_page_permissions').insert(permsToInsert)
+      if (permErr) {
+        console.error('페이지 권한 생성 실패 (무시):', permErr.message)
+      }
+    }
+  }
+
+  // 5. 초대 상태 업데이트
   await sb
     .from('member_invitations')
     .update({

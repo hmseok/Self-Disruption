@@ -451,6 +451,9 @@ export default function ShortTermReplacementBuilder() {
   // ─── 빠른 견적 계산기 상태 ───
   const [qcCategory, setQcCategory] = useState<string>('')
   const [qcVehicle, setQcVehicle] = useState<string>('')
+  const [qcSearch, setQcSearch] = useState<string>('')
+  const [qcSearchOpen, setQcSearchOpen] = useState<boolean>(false)
+  const qcSearchRef = React.useRef<HTMLDivElement>(null)
   const [qcDateMode, setQcDateMode] = useState<'days' | 'range'>('days')
   const [qcDays, setQcDays] = useState<number>(1)
   const [qcHours, setQcHours] = useState<number>(0)
@@ -458,6 +461,9 @@ export default function ShortTermReplacementBuilder() {
   const [qcStartTime, setQcStartTime] = useState<string>('09:00')
   const [qcEndDate, setQcEndDate] = useState<string>('')
   const [qcEndTime, setQcEndTime] = useState<string>('18:00')
+
+  // 예상탁송비
+  const [qcDeliveryFee, setQcDeliveryFee] = useState<number>(0)
 
   // 사고 과실비율
   const [qcFaultEnabled, setQcFaultEnabled] = useState<boolean>(false)
@@ -476,6 +482,28 @@ export default function ShortTermReplacementBuilder() {
     if (!qcVehicle) return null
     return lotteRates.find(r => r.vehicle_names === qcVehicle) || null
   }, [lotteRates, qcVehicle])
+
+  // 검색 필터링: 차종명, 카테고리, 군 모두 매칭
+  const qcSearchResults = useMemo(() => {
+    if (!qcSearch.trim()) return lotteRates
+    const q = qcSearch.trim().toLowerCase()
+    return lotteRates.filter(r =>
+      r.vehicle_names.toLowerCase().includes(q) ||
+      r.lotte_category.toLowerCase().includes(q) ||
+      r.service_group.toLowerCase().includes(q)
+    )
+  }, [lotteRates, qcSearch])
+
+  // 외부 클릭 시 검색 드롭다운 닫기
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (qcSearchRef.current && !qcSearchRef.current.contains(e.target as Node)) {
+        setQcSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // 총 시간 계산 (일+시간 또는 날짜+시간 범위)
   const qcTotalHours = useMemo(() => {
@@ -565,16 +593,20 @@ export default function ShortTermReplacementBuilder() {
     const supportAmount = faultActive && qcServiceSupport > 0 ? Math.round(totalDisc * qcServiceSupport / 100) : 0
     const finalAmount = faultActive ? Math.max(0, faultAmount - supportAmount) : totalDisc
 
+    // 예상탁송비 추가
+    const grandTotal = finalAmount + qcDeliveryFee
+
     // 롯데 요금은 VAT 포함가이므로, 할인 적용가도 VAT 포함
     // 역산: 공급가액 = 최종금액 / 1.1, VAT = 최종금액 - 공급가액
-    const supplyPrice = Math.round(finalAmount / 1.1)
-    const vat = finalAmount - supplyPrice
+    const supplyPrice = Math.round(grandTotal / 1.1)
+    const vat = grandTotal - supplyPrice
     return {
       lines, totalBase, totalDisc, discountAmount,
       faultActive, faultPercent: qcFaultPercent, faultAmount, serviceSupport: qcServiceSupport, supportAmount, finalAmount,
-      supplyPrice, vat, totalWithVat: finalAmount,
+      deliveryFee: qcDeliveryFee, grandTotal,
+      supplyPrice, vat, totalWithVat: grandTotal,
     }
-  }, [qcSelectedRate, qcCalcBreakdown, globalDiscount, qcFaultEnabled, qcFaultPercent, qcServiceSupport])
+  }, [qcSelectedRate, qcCalcBreakdown, globalDiscount, qcFaultEnabled, qcFaultPercent, qcServiceSupport, qcDeliveryFee])
 
   // ─── 롯데 카테고리 필터 ───
   const lotteCategories = useMemo(() => {
@@ -624,47 +656,108 @@ export default function ShortTermReplacementBuilder() {
 
           {/* ─── 빠른 견적 계산기 (고객 응대용) + 할인율 통합 ─── */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
                 <h3 className="font-black text-gray-800 text-sm">빠른 견적 계산기</h3>
-                <span className="text-xs text-gray-400 font-medium">차종 → 기간 → 예상금액</span>
+                <span className="text-xs text-gray-400 font-medium hidden sm:inline">차종 → 기간 → 예상금액</span>
               </div>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               {/* 할인율 슬라이더 (인라인) */}
-              <div className="flex items-center gap-3 bg-steel-50 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-black text-steel-700 shrink-0">할인율</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-steel-50 rounded-xl px-3 sm:px-4 py-2.5">
+                <span className="text-xs sm:text-sm font-black text-steel-700 shrink-0">롯데 기준 할인율</span>
                 <input type="range" min={10} max={100} step={5} value={globalDiscount}
                   onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                  className="flex-1 h-2 bg-steel-200 rounded-lg appearance-none cursor-pointer accent-steel-600" />
+                  className="flex-1 min-w-[100px] h-2 bg-steel-200 rounded-lg appearance-none cursor-pointer accent-steel-600" />
                 <div className="flex items-center gap-1">
                   <input type="number" min={1} max={100} value={globalDiscount}
                     onChange={e => applyGlobalDiscount(Number(e.target.value))}
                     className="w-14 border border-steel-200 px-2 py-1 rounded-lg text-center font-black text-steel-700 text-sm focus:border-steel-500 outline-none bg-white" />
                   <span className="text-sm font-bold text-steel-400">%</span>
                 </div>
-                <span className="text-xs text-steel-400 font-bold shrink-0">롯데 대비</span>
               </div>
 
-              {/* 1행: 카테고리 + 차종 선택 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1.5">카테고리</label>
-                  <select value={qcCategory} onChange={e => { setQcCategory(e.target.value); setQcVehicle('') }}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-lg font-bold text-sm focus:border-steel-500 outline-none bg-white">
-                    <option value="">선택하세요</option>
-                    {qcCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1.5">차종</label>
-                  <select value={qcVehicle} onChange={e => setQcVehicle(e.target.value)}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-lg font-bold text-sm focus:border-steel-500 outline-none bg-white" disabled={!qcCategory}>
-                    <option value="">선택하세요</option>
-                    {qcVehicles.map((v, i) => <option key={i} value={v.vehicle_names}>{v.vehicle_names} ({v.service_group})</option>)}
-                  </select>
-                </div>
+              {/* 1행: 차량 선택 (카테고리 드롭다운 + 검색 듀얼) */}
+              <div ref={qcSearchRef} className="space-y-2">
+                {/* 선택 완료 시 표시 */}
+                {qcSelectedRate && (
+                  <div className="flex items-center gap-2 border border-steel-300 bg-steel-50 px-3 py-2.5 rounded-lg">
+                    <span className="bg-red-50 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded">{qcSelectedRate.lotte_category}</span>
+                    <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1.5 py-0.5 rounded">{qcSelectedRate.service_group}</span>
+                    <span className="text-sm font-bold text-gray-800 truncate flex-1">{qcSelectedRate.vehicle_names}</span>
+                    <span className="text-xs text-steel-500 font-bold shrink-0">{f(calcRate(qcSelectedRate.rate_1_3days, globalDiscount))}원/일</span>
+                    <button onClick={() => { setQcCategory(''); setQcVehicle(''); setQcSearch('') }}
+                      className="text-gray-400 hover:text-red-500 transition-colors shrink-0 ml-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* 선택 전: 카테고리 드롭다운 + 차종 드롭다운 + 검색 */}
+                {!qcSelectedRate && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
+                      {/* 카테고리 드롭다운 */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">카테고리</label>
+                        <select value={qcCategory} onChange={e => { setQcCategory(e.target.value); setQcVehicle(''); setQcSearch('') }}
+                          className="w-full border border-gray-300 px-3 py-2.5 rounded-lg font-bold text-sm focus:border-steel-500 outline-none bg-white">
+                          <option value="">전체</option>
+                          {qcCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      {/* 차종 드롭다운 (카테고리 선택 시) */}
+                      {qcCategory && (
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 mb-1">차종 선택</label>
+                          <select value={qcVehicle} onChange={e => setQcVehicle(e.target.value)}
+                            className="w-full border border-gray-300 px-3 py-2.5 rounded-lg font-bold text-sm focus:border-steel-500 outline-none bg-white">
+                            <option value="">선택하세요</option>
+                            {qcVehicles.map((v, i) => <option key={i} value={v.vehicle_names}>{v.vehicle_names} ({v.service_group})</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 검색 입력 */}
+                    <div className="relative">
+                      <label className="block text-xs font-bold text-gray-500 mb-1">또는 검색</label>
+                      <div className="relative">
+                        <input type="text" value={qcSearch} placeholder="차종명으로 검색 (예: 아반떼, 쏘나타, G80, 카니발)"
+                          onChange={e => { setQcSearch(e.target.value); setQcSearchOpen(true); if (e.target.value.trim()) setQcCategory('') }}
+                          onFocus={() => { if (qcSearch.trim()) setQcSearchOpen(true) }}
+                          className="w-full border border-gray-300 pl-9 pr-3 py-2.5 rounded-lg font-bold text-sm focus:border-steel-500 focus:ring-1 focus:ring-steel-200 outline-none bg-white" />
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                      </div>
+
+                      {/* 검색 결과 드롭다운 */}
+                      {qcSearchOpen && qcSearch.trim() && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                          {qcSearchResults.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-sm text-gray-400">검색 결과가 없습니다</div>
+                          ) : (
+                            <>
+                              <div className="sticky top-0 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 font-bold border-b border-gray-100">
+                                {qcSearchResults.length}개 결과
+                              </div>
+                              {qcSearchResults.map((r, i) => (
+                                <button key={r.id || i}
+                                  onClick={() => { setQcCategory(r.lotte_category); setQcVehicle(r.vehicle_names); setQcSearch(''); setQcSearchOpen(false) }}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-steel-50 transition-colors flex items-center gap-2 border-b border-gray-50 last:border-0">
+                                  <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">{r.lotte_category}</span>
+                                  <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">{r.service_group}</span>
+                                  <span className="text-sm text-gray-700 truncate">{r.vehicle_names}</span>
+                                  <span className="ml-auto text-xs text-gray-400 shrink-0">{f(calcRate(r.rate_1_3days, globalDiscount))}원/일</span>
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* 2행: 사용 기간 (일+시간 또는 날짜+시간) — 요율은 자동 결정 */}
@@ -683,65 +776,36 @@ export default function ShortTermReplacementBuilder() {
                 </div>
                 {qcDateMode === 'days' ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={0} max={365} value={qcDays} onChange={e => setQcDays(Number(e.target.value))}
-                        className="w-20 border border-gray-200 px-3 py-2 rounded-lg font-bold text-sm text-center focus:border-steel-500 outline-none" />
+                    <div className="flex items-center gap-3">
+                      {/* 일 입력 + +/- */}
+                      <div className="flex items-center gap-0">
+                        <button onClick={() => setQcDays(Math.max(0, qcDays - 1))}
+                          className="w-9 h-9 flex items-center justify-center rounded-l-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 active:scale-95 transition-all">−</button>
+                        <input type="text" inputMode="numeric" value={qcDays || ''} placeholder="0"
+                          onChange={e => { const v = e.target.value; setQcDays(v === '' ? 0 : Math.min(365, Math.max(0, parseInt(v) || 0))) }}
+                          onFocus={e => { if (qcDays === 0) e.target.value = '' }}
+                          className="w-14 h-9 border border-gray-300 bg-white text-center font-bold text-sm focus:border-steel-500 focus:ring-1 focus:ring-steel-200 outline-none" />
+                        <button onClick={() => setQcDays(Math.min(365, qcDays + 1))}
+                          className="w-9 h-9 flex items-center justify-center rounded-r-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 active:scale-95 transition-all">+</button>
+                      </div>
                       <span className="text-sm font-bold text-gray-500">일</span>
-                      <input type="number" min={0} max={23} value={qcHours} onChange={e => setQcHours(Number(e.target.value))}
-                        className="w-20 border border-gray-200 px-3 py-2 rounded-lg font-bold text-sm text-center focus:border-steel-500 outline-none" />
+
+                      {/* 시간 입력 + +/- */}
+                      <div className="flex items-center gap-0">
+                        <button onClick={() => setQcHours(Math.max(0, qcHours - 1))}
+                          className="w-9 h-9 flex items-center justify-center rounded-l-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 active:scale-95 transition-all">−</button>
+                        <input type="text" inputMode="numeric" value={qcHours || ''} placeholder="0"
+                          onChange={e => { const v = e.target.value; setQcHours(v === '' ? 0 : Math.min(23, Math.max(0, parseInt(v) || 0))) }}
+                          onFocus={e => { if (qcHours === 0) e.target.value = '' }}
+                          className="w-14 h-9 border border-gray-300 bg-white text-center font-bold text-sm focus:border-steel-500 focus:ring-1 focus:ring-steel-200 outline-none" />
+                        <button onClick={() => setQcHours(Math.min(23, qcHours + 1))}
+                          className="w-9 h-9 flex items-center justify-center rounded-r-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 active:scale-95 transition-all">+</button>
+                      </div>
                       <span className="text-sm font-bold text-gray-500">시간</span>
-                      <span className="text-xs text-gray-400 ml-1">= 총 {qcTotalHours > 0 ? (qcTotalHours < 24 ? `${qcTotalHours}시간` : `${Math.floor(qcTotalHours / 24)}일 ${Math.round(qcTotalHours % 24)}시간`) : '0'}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* 시간 단위 */}
-                      {[
-                        { d: 0, h: 6, label: '6시간' }, { d: 0, h: 10, label: '10시간' }, { d: 0, h: 12, label: '12시간' },
-                      ].map((p, i) => (
-                        <button key={`h${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-500 hover:bg-orange-100'}`}>
-                          {p.label}
-                        </button>
-                      ))}
-                      <span className="text-gray-300 mx-0.5">|</span>
-                      {/* 단기 (1~3일) */}
-                      {[
-                        { d: 1, h: 0, label: '1일' }, { d: 2, h: 0, label: '2일' }, { d: 3, h: 0, label: '3일' },
-                      ].map((p, i) => (
-                        <button key={`s${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-steel-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-steel-100 hover:text-steel-700'}`}>
-                          {p.label}
-                        </button>
-                      ))}
-                      <span className="text-gray-300 mx-0.5">|</span>
-                      {/* 중기 (4~7일) */}
-                      {[
-                        { d: 4, h: 0, label: '4일' }, { d: 5, h: 0, label: '5일' }, { d: 7, h: 0, label: '7일' },
-                      ].map((p, i) => (
-                        <button key={`m${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-steel-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-steel-100 hover:text-steel-700'}`}>
-                          {p.label}
-                        </button>
-                      ))}
-                      <span className="text-gray-300 mx-0.5">|</span>
-                      {/* 장기 (14일+) */}
-                      {[
-                        { d: 14, h: 0, label: '14일' }, { d: 30, h: 0, label: '30일' },
-                      ].map((p, i) => (
-                        <button key={`l${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-steel-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-steel-100 hover:text-steel-700'}`}>
-                          {p.label}
-                        </button>
-                      ))}
-                      <span className="text-gray-300 mx-0.5">|</span>
-                      {/* 복합 (일+시간) */}
-                      {[
-                        { d: 3, h: 6, label: '3일+6h' }, { d: 5, h: 10, label: '5일+10h' }, { d: 7, h: 6, label: '7일+6h' },
-                      ].map((p, i) => (
-                        <button key={`c${i}`} onClick={() => { setQcDays(p.d); setQcHours(p.h) }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${qcDays === p.d && qcHours === p.h ? 'bg-steel-700 text-white' : 'bg-steel-50 text-steel-500 hover:bg-steel-100'}`}>
-                          {p.label}
-                        </button>
-                      ))}
+
+                      {qcTotalHours > 0 && (
+                        <span className="text-xs text-gray-400 ml-1 hidden sm:inline">= 총 {qcTotalHours < 24 ? `${qcTotalHours}시간` : `${Math.floor(qcTotalHours / 24)}일 ${Math.round(qcTotalHours % 24)}시간`}</span>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -762,51 +826,95 @@ export default function ShortTermReplacementBuilder() {
                 )}
               </div>
 
-              {/* 3행: 사고 과실비율 (한 줄) */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <label className="text-xs font-bold text-gray-500 shrink-0">사고 과실</label>
-                <button onClick={() => setQcFaultEnabled(!qcFaultEnabled)}
-                  className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${qcFaultEnabled ? 'bg-orange-500' : 'bg-gray-200'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${qcFaultEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                </button>
-                {qcFaultEnabled ? (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold text-orange-700 shrink-0">자차과실</span>
-                      <input type="number" min={0} max={100} step={5} value={qcFaultPercent}
-                        onChange={e => setQcFaultPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-14 border border-orange-200 px-1.5 py-1.5 rounded-lg font-bold text-sm text-center focus:border-orange-500 outline-none" />
-                      <span className="text-sm font-bold text-orange-400">%</span>
+              {/* 3행: 사고 과실비율 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-gray-500 shrink-0">사고 과실</label>
+                  <button onClick={() => setQcFaultEnabled(!qcFaultEnabled)}
+                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${qcFaultEnabled ? 'bg-orange-500' : 'bg-gray-200'}`}>
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${qcFaultEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                  </button>
+                  {!qcFaultEnabled && <span className="text-xs text-gray-400">미적용 (100% 부담)</span>}
+                  {qcFaultEnabled && <span className="text-xs text-gray-400 ml-auto">실부담 {Math.max(0, qcFaultPercent - qcServiceSupport)}%</span>}
+                </div>
+                {qcFaultEnabled && (
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-xs sm:text-sm font-bold text-orange-700 shrink-0 mr-1">자차과실</span>
+                      <button onClick={() => setQcFaultPercent(Math.max(0, qcFaultPercent - 5))}
+                        className="w-7 h-7 flex items-center justify-center rounded-l-lg border border-orange-200 bg-orange-50 text-orange-500 font-bold text-sm hover:bg-orange-100 active:scale-95 transition-all">−</button>
+                      <input type="text" inputMode="numeric" value={qcFaultPercent || ''}
+                        onChange={e => { const v = e.target.value; setQcFaultPercent(v === '' ? 0 : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                        onFocus={e => { if (qcFaultPercent === 0) e.target.value = '' }}
+                        className="w-12 h-7 border-y border-orange-200 bg-white font-bold text-sm text-center focus:border-orange-500 outline-none" />
+                      <button onClick={() => setQcFaultPercent(Math.min(100, qcFaultPercent + 5))}
+                        className="w-7 h-7 flex items-center justify-center rounded-r-lg border border-orange-200 bg-orange-50 text-orange-500 font-bold text-sm hover:bg-orange-100 active:scale-95 transition-all">+</button>
+                      <span className="text-xs font-bold text-orange-400 ml-0.5">%</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-bold text-green-700 shrink-0">서비스지원</span>
-                      <input type="number" min={0} max={100} step={5} value={qcServiceSupport}
-                        onChange={e => setQcServiceSupport(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-14 border border-green-200 px-1.5 py-1.5 rounded-lg font-bold text-sm text-center focus:border-green-500 outline-none" />
-                      <span className="text-sm font-bold text-green-400">%</span>
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-xs sm:text-sm font-bold text-green-700 shrink-0 mr-1">서비스지원</span>
+                      <button onClick={() => setQcServiceSupport(Math.max(0, qcServiceSupport - 5))}
+                        className="w-7 h-7 flex items-center justify-center rounded-l-lg border border-green-200 bg-green-50 text-green-500 font-bold text-sm hover:bg-green-100 active:scale-95 transition-all">−</button>
+                      <input type="text" inputMode="numeric" value={qcServiceSupport || ''}
+                        onChange={e => { const v = e.target.value; setQcServiceSupport(v === '' ? 0 : Math.min(100, Math.max(0, parseInt(v) || 0))) }}
+                        onFocus={e => { if (qcServiceSupport === 0) e.target.value = '' }}
+                        className="w-12 h-7 border-y border-green-200 bg-white font-bold text-sm text-center focus:border-green-500 outline-none" />
+                      <button onClick={() => setQcServiceSupport(Math.min(100, qcServiceSupport + 5))}
+                        className="w-7 h-7 flex items-center justify-center rounded-r-lg border border-green-200 bg-green-50 text-green-500 font-bold text-sm hover:bg-green-100 active:scale-95 transition-all">+</button>
+                      <span className="text-xs font-bold text-green-400 ml-0.5">%</span>
                     </div>
-                    <span className="text-xs text-gray-400 ml-auto shrink-0">실부담 = {qcFaultPercent}% − {qcServiceSupport}% = {Math.max(0, qcFaultPercent - qcServiceSupport)}%</span>
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400">미적용 (100% 부담)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 4행: 예상탁송비 */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <label className="text-xs font-bold text-gray-500 shrink-0">예상탁송비</label>
+                <div className="flex items-center gap-0.5">
+                  <button onClick={() => setQcDeliveryFee(Math.max(0, qcDeliveryFee - 10000))}
+                    className="w-7 h-7 flex items-center justify-center rounded-l-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 active:scale-95 transition-all">−</button>
+                  <input type="text" inputMode="numeric" value={qcDeliveryFee || ''} placeholder="0"
+                    onChange={e => { const v = e.target.value.replace(/,/g, ''); setQcDeliveryFee(v === '' ? 0 : Math.max(0, parseInt(v) || 0)) }}
+                    onFocus={e => { if (qcDeliveryFee === 0) e.target.value = '' }}
+                    className="w-24 h-7 border border-gray-300 bg-white font-bold text-sm text-center focus:border-steel-500 outline-none" />
+                  <button onClick={() => setQcDeliveryFee(qcDeliveryFee + 10000)}
+                    className="w-7 h-7 flex items-center justify-center rounded-r-lg border border-gray-300 bg-gray-100 text-gray-600 font-bold text-sm hover:bg-gray-200 active:scale-95 transition-all">+</button>
+                  <span className="text-xs font-bold text-gray-400 ml-1">원</span>
+                </div>
+                <span className="text-[10px] text-gray-400">±1만원 단위</span>
+                {qcDeliveryFee > 0 && (
+                  <button onClick={() => setQcDeliveryFee(0)} className="text-[10px] text-red-400 hover:text-red-600 font-bold">초기화</button>
                 )}
               </div>
 
               {/* 결과 표시 — 영수증 스타일 */}
               {qcResult && qcSelectedRate && (
                 <div className="bg-steel-50/50 rounded-xl border border-steel-200/50 overflow-hidden">
-                  {/* 차종 정보 */}
-                  <div className="px-4 py-2.5 border-b border-steel-200/30 bg-white/40">
-                    <div className="text-sm text-gray-600">
-                      <span className="font-bold text-gray-800">{qcSelectedRate.lotte_category}</span>
-                      <span className="mx-1.5 text-gray-300">|</span>
-                      <span>{qcSelectedRate.vehicle_names.length > 40 ? qcSelectedRate.vehicle_names.slice(0, 40) + '...' : qcSelectedRate.vehicle_names}</span>
-                      <span className="ml-2 bg-steel-100 text-steel-700 text-xs font-bold px-1.5 py-0.5 rounded">{qcSelectedRate.service_group}</span>
+                  {/* 기간 요약 헤더 */}
+                  <div className="px-4 py-3 bg-steel-800 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-black">
+                          {(() => {
+                            const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24)
+                            const h = qcDateMode === 'days' ? qcHours : Math.round(qcTotalHours % 24)
+                            const parts = []
+                            if (d > 0) parts.push(`${d}일`)
+                            if (h > 0) parts.push(`${h}시간`)
+                            return parts.join(' ') || '0시간'
+                          })()}
+                        </span>
+                        <span className="text-steel-300 text-sm">이용</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-steel-400">적용 요율</div>
+                        <div className="text-sm font-bold text-steel-200">{qcCalcBreakdown.label}</div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* 상세 내역 테이블 */}
-                  <div className="px-4 py-3">
+                  {/* 상세 내역 — 데스크톱 테이블 */}
+                  <div className="hidden sm:block px-4 py-3">
                     <table className="w-full">
                       <thead>
                         <tr className="text-xs text-gray-400 font-bold">
@@ -830,6 +938,21 @@ export default function ShortTermReplacementBuilder() {
                       </tbody>
                     </table>
                   </div>
+                  {/* 상세 내역 — 모바일 카드 */}
+                  <div className="sm:hidden px-3 py-2.5 space-y-2">
+                    {qcResult.lines.map((line, li) => (
+                      <div key={li} className="bg-white/60 rounded-lg px-3 py-2">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-bold text-gray-700">{line.label} 요율 ×{line.qty}{line.qty > 1 ? '일' : ''}</span>
+                          <span className="text-sm font-bold text-gray-800">{f(line.subtotalDisc)}원</span>
+                        </div>
+                        <div className="flex gap-2 text-[11px]">
+                          <span className="text-red-400 line-through">롯데 {f(line.unitBase)}원</span>
+                          <span className="text-steel-600 font-bold">→ {f(line.unitDisc)}원</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
                   {/* 합계 영역 */}
                   <div className="px-4 py-3 border-t border-steel-200/50 bg-white/30 space-y-1.5">
@@ -838,7 +961,7 @@ export default function ShortTermReplacementBuilder() {
                       <span className="text-red-400 line-through">{f(qcResult.totalBase)}원</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-steel-500 font-bold">할인 ({globalDiscount}%) 적용</span>
+                      <span className="text-steel-500 font-bold">롯데 기준 할인 ({globalDiscount}%)</span>
                       <span className="text-steel-600 font-bold">-{f(qcResult.discountAmount)}원</span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -863,6 +986,12 @@ export default function ShortTermReplacementBuilder() {
                         </div>
                       </>
                     )}
+                    {qcResult.deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm border-t border-gray-200/50 pt-1.5">
+                        <span className="text-gray-600 font-bold">예상탁송비</span>
+                        <span className="font-bold text-gray-700">+{f(qcResult.deliveryFee)}원</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm border-t border-gray-200/50 pt-1.5">
                       <span className="text-gray-500 font-bold">공급가액</span>
                       <span className="font-black text-gray-800">{f(qcResult.supplyPrice)}원</span>
@@ -874,14 +1003,37 @@ export default function ShortTermReplacementBuilder() {
                   </div>
 
                   {/* 최종 금액 */}
-                  <div className="px-4 py-3 bg-steel-900 flex justify-between items-center rounded-b-xl">
-                    <span className="text-sm font-black text-steel-300">최종 금액 (VAT 포함)</span>
-                    <span className="text-xl font-black text-white">{f(qcResult.totalWithVat)}원</span>
+                  <div className="px-4 py-3 bg-steel-900 rounded-b-xl">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-black text-steel-300">최종 금액 (VAT 포함)</span>
+                      <span className="text-xl font-black text-white">{f(qcResult.totalWithVat)}원</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-steel-400">
+                        {(() => {
+                          const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24)
+                          const h = qcDateMode === 'days' ? qcHours : Math.round(qcTotalHours % 24)
+                          const totalDayEquiv = d + (h > 0 ? h / 24 : 0)
+                          if (totalDayEquiv >= 1) return `일 평균 ${f(Math.round(qcResult.totalWithVat / totalDayEquiv))}원`
+                          return `시간당 ${f(Math.round(qcResult.totalWithVat / Math.max(1, h)))}원`
+                        })()}
+                      </span>
+                      <span className="text-xs text-steel-400">
+                        {(() => {
+                          const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24)
+                          const h = qcDateMode === 'days' ? qcHours : Math.round(qcTotalHours % 24)
+                          const parts = []
+                          if (d > 0) parts.push(`${d}일`)
+                          if (h > 0) parts.push(`${h}시간`)
+                          return (parts.join(' ') || '0시간') + ' 합계'
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
               {!qcSelectedRate && (
-                <div className="text-center py-3 text-sm text-gray-300 font-bold">카테고리와 차종을 선택하면 예상금액이 표시됩니다</div>
+                <div className="text-center py-3 text-sm text-gray-300 font-bold">차종을 선택하거나 검색하면 예상금액이 표시됩니다</div>
               )}
             </div>
           </div>
@@ -914,7 +1066,7 @@ export default function ShortTermReplacementBuilder() {
                   <th className="py-2 px-3 text-left text-sm font-bold">차종 분류</th>
                   <th className="py-2 px-3 text-left text-sm font-bold">배기량</th>
                   <th className="py-2 pr-3 text-right text-sm font-bold text-red-400">롯데 기준</th>
-                  <th className="py-2 px-3 text-center text-sm font-bold text-steel-500">할인율</th>
+                  <th className="py-2 px-3 text-center text-sm font-bold text-steel-500">롯데 할인율</th>
                   <th className="py-2 px-3 text-center text-sm font-bold">방식</th>
                   <th className="py-2 pr-4 text-right text-sm font-bold text-steel-600">턴키 1일</th>
                 </tr></thead>
@@ -1045,7 +1197,8 @@ export default function ShortTermReplacementBuilder() {
             })}
           </div>
 
-          <div className="overflow-x-auto">
+          {/* 데스크톱: 테이블 */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full">
               <thead><tr className="text-gray-400 whitespace-nowrap">
                 <th className="py-2 px-3 pl-4 text-left text-sm font-bold">카테고리</th>
@@ -1057,7 +1210,7 @@ export default function ShortTermReplacementBuilder() {
                 <th className="py-2 pr-3 text-right text-sm font-bold">4일</th>
                 <th className="py-2 pr-3 text-right text-sm font-bold">5~6일</th>
                 <th className="py-2 pr-3 text-right text-sm font-bold">7일+</th>
-                <th className="py-2 pr-3 text-right text-sm font-bold text-steel-500">할인율({globalDiscount}%)</th>
+                <th className="py-2 pr-3 text-right text-sm font-bold text-steel-500">롯데 할인({globalDiscount}%)</th>
                 <th className="py-2 px-3 pr-4 text-center text-sm font-bold text-steel-600">매핑</th>
                 {lotteEditMode && <th className="py-2 px-2 pr-4 text-center text-sm font-bold"></th>}
               </tr></thead>
@@ -1119,6 +1272,29 @@ export default function ShortTermReplacementBuilder() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* 모바일: 카드형 */}
+          <div className="lg:hidden divide-y divide-gray-100">
+            {filteredLotteRates.map((lr, i) => (
+              <div key={lr.id || i} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-red-50 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded">{lr.lotte_category}</span>
+                  <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1.5 py-0.5 rounded">{lr.service_group}</span>
+                </div>
+                <p className="text-sm text-gray-700 font-bold mb-2 leading-snug">{lr.vehicle_names}</p>
+                <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
+                  <div className="flex justify-between"><span className="text-orange-400">6h</span><span className="font-bold text-orange-500">{f(lr.rate_6hrs)}</span></div>
+                  <div className="flex justify-between"><span className="text-orange-400">10h</span><span className="font-bold text-orange-500">{f(lr.rate_10hrs)}</span></div>
+                  <div className="flex justify-between"><span className="text-orange-500">12h</span><span className="font-bold text-orange-500">{f(lr.rate_12hrs)}</span></div>
+                  <div className="flex justify-between"><span className="text-red-400">1~3일</span><span className="font-bold text-red-600">{f(lr.rate_1_3days)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">4일</span><span className="font-bold text-gray-600">{f(lr.rate_4days)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">5~6일</span><span className="font-bold text-gray-600">{f(lr.rate_5_6days)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">7일+</span><span className="font-bold text-gray-600">{f(lr.rate_7plus_days)}</span></div>
+                  <div className="flex justify-between col-span-2"><span className="text-steel-500">롯데 할인({globalDiscount}%)</span><span className="font-black text-steel-600">{f(calcRate(lr.rate_1_3days, globalDiscount))}원</span></div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
@@ -1202,8 +1378,8 @@ export default function ShortTermReplacementBuilder() {
             </div>
             <div className="p-4 space-y-4">
 
-              {/* 시장 데이터 입력 — 4칸 1줄 */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* 시장 데이터 입력 */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1">사고 발생률</label>
                   <input type="number" step={0.1} min={0} value={simAccidentRate}
@@ -1254,7 +1430,7 @@ export default function ShortTermReplacementBuilder() {
               <div className="border-t border-gray-200" />
 
               {/* 대차일수 + 할인율 */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1.5">대차일수 <span className="text-gray-400 font-normal">(복수선택)</span></label>
                   <div className="flex gap-1">
@@ -1276,7 +1452,7 @@ export default function ShortTermReplacementBuilder() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">할인율 <span className="text-gray-400 font-normal">(롯데 대비)</span></label>
+                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">롯데 기준 할인율</label>
                   <div className="flex items-center gap-2">
                     <input type="range" min={10} max={100} step={5} value={globalDiscount}
                       onChange={e => applyGlobalDiscount(Number(e.target.value))}
@@ -1377,7 +1553,7 @@ export default function ShortTermReplacementBuilder() {
               </div>
             </div>
             <div className="p-6 space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 mb-1">업체명</label>
                   <input className="w-full border border-gray-200 px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
