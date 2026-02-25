@@ -50,10 +50,12 @@ async function verifyAdmin(request: NextRequest) {
 }
 
 // ── Aligo SMS 발송 ──
-async function sendInviteSMS(phone: string, message: string) {
+async function sendInviteSMS(phone: string, message: string, title?: string) {
   const apiKey = process.env.ALIGO_API_KEY
   const userId = process.env.ALIGO_USER_ID
   const sender = process.env.ALIGO_SENDER_PHONE
+
+  console.log('[Aligo SMS] 발송 시작:', { phone: phone?.substring(0, 7) + '***', msgLen: message?.length, apiKey: !!apiKey, userId: !!userId, sender: !!sender })
 
   if (!apiKey || !userId || !sender) {
     console.error('[Aligo SMS] 환경변수 미설정:', { apiKey: !!apiKey, userId: !!userId, sender: !!sender })
@@ -61,13 +63,19 @@ async function sendInviteSMS(phone: string, message: string) {
   }
 
   try {
+    const isLMS = Buffer.byteLength(message, 'utf8') > 90
     const formData = new URLSearchParams()
     formData.append('key', apiKey)
     formData.append('userid', userId)
     formData.append('sender', sender)
     formData.append('receiver', phone.replace(/[^0-9]/g, ''))
     formData.append('msg', message)
-    formData.append('msg_type', Buffer.byteLength(message, 'utf8') > 90 ? 'LMS' : 'SMS')
+    formData.append('msg_type', isLMS ? 'LMS' : 'SMS')
+    if (isLMS) {
+      formData.append('title', title || '[Self-Disruption]')
+    }
+
+    console.log('[Aligo SMS] API 호출:', { receiver: phone.replace(/[^0-9]/g, ''), msg_type: isLMS ? 'LMS' : 'SMS', msgBytes: Buffer.byteLength(message, 'utf8') })
 
     const res = await fetch('https://apis.aligo.in/send/', {
       method: 'POST',
@@ -81,6 +89,7 @@ async function sendInviteSMS(phone: string, message: string) {
       ? { success: true, method: 'sms' }
       : { success: false, error: `[${result.result_code}] ${result.message || 'SMS 발송 실패'}` }
   } catch (err: any) {
+    console.error('[Aligo SMS] 예외:', err.message)
     return { success: false, error: err.message }
   }
 }
@@ -153,6 +162,16 @@ export async function POST(request: NextRequest) {
     recipient_phone = '',
     page_permissions = [],     // 페이지별 권한 배열
   } = body
+
+  // ★ 디버그: 수신된 파라미터 전체 로그
+  console.log('[member-invite POST] 요청 파라미터:', {
+    email,
+    company_id,
+    send_channel,
+    recipient_phone: recipient_phone ? recipient_phone.substring(0, 7) + '***' : '(없음)',
+    role,
+    resend: !!body.resend,
+  })
 
   if (!email || !company_id) {
     return NextResponse.json({ error: '이메일과 회사 ID가 필요합니다.' }, { status: 400 })
@@ -255,12 +274,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 카카오/SMS 재발송
+    console.log('[member-invite resend] 발송 채널:', { send_channel, recipient_phone: !!recipient_phone })
     if (['kakao', 'sms', 'both'].includes(send_channel) && recipient_phone) {
       if (send_channel === 'sms') {
-        kakaoResult = await sendInviteSMS(recipient_phone, getInviteSMSTemplate(companyName, inviteUrl, expiresDate))
+        kakaoResult = await sendInviteSMS(recipient_phone, getInviteSMSTemplate(companyName, inviteUrl, expiresDate), `[${companyName}] 멤버 초대`)
       } else {
         kakaoResult = await sendInviteKakao(recipient_phone, companyName, inviteUrl, expiresDate)
       }
+      console.log('[member-invite resend] SMS/카카오 결과:', JSON.stringify(kakaoResult))
     }
 
     return NextResponse.json({
@@ -382,15 +403,18 @@ export async function POST(request: NextRequest) {
   }
 
   // 카카오/SMS 발송 (kakao, sms, both)
+  console.log('[member-invite] 발송 채널 확인:', { send_channel, recipient_phone: !!recipient_phone, willSendSMS: ['kakao', 'sms', 'both'].includes(send_channel) && !!recipient_phone })
   if (['kakao', 'sms', 'both'].includes(send_channel) && recipient_phone) {
     console.log('[member-invite] 카카오/SMS 발송 시도:', { send_channel, recipient_phone })
     if (send_channel === 'sms') {
       const smsMsg = getInviteSMSTemplate(companyName, inviteUrl, expiresDate)
-      kakaoResult = await sendInviteSMS(recipient_phone, smsMsg)
+      kakaoResult = await sendInviteSMS(recipient_phone, smsMsg, `[${companyName}] 멤버 초대`)
     } else {
       kakaoResult = await sendInviteKakao(recipient_phone, companyName, inviteUrl, expiresDate)
     }
     console.log('[member-invite] 카카오/SMS 결과:', JSON.stringify(kakaoResult))
+  } else {
+    console.log('[member-invite] SMS 발송 건너뜀 - send_channel:', send_channel, 'recipient_phone:', recipient_phone || '(비어있음)')
   }
 
   return NextResponse.json({

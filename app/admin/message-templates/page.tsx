@@ -123,7 +123,17 @@ export default function MessageTemplatesPage() {
         .order('sort_order', { ascending: true })
         .order('template_key', { ascending: true })
 
-      if (fetchError) throw fetchError
+      // 테이블 미존재 시 빈 배열로 처리
+      if (fetchError) {
+        if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+          console.warn('[메시지센터] message_templates 테이블 미존재 — SQL 마이그레이션 필요')
+          setTemplates([])
+          setError('메시지 템플릿 테이블이 아직 생성되지 않았습니다. SQL 마이그레이션(052)을 실행해주세요.')
+          setLoading(false)
+          return
+        }
+        throw fetchError
+      }
 
       // 각 템플릿의 발송 개수 조회
       const templatesWithCount = await Promise.all(
@@ -186,7 +196,16 @@ export default function MessageTemplatesPage() {
 
       const { data, error: fetchError } = await query.order('sent_at', { ascending: false }).limit(100)
 
-      if (fetchError) throw fetchError
+      if (fetchError) {
+        if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+          console.warn('[메시지센터] message_send_logs 테이블 미존재 — SQL 마이그레이션 필요')
+          setLogs([])
+          setError('발송 이력 테이블이 아직 생성되지 않았습니다. SQL 마이그레이션(052)을 실행해주세요.')
+          setLoading(false)
+          return
+        }
+        throw fetchError
+      }
 
       setLogs(data || [])
     } catch (err) {
@@ -302,7 +321,7 @@ export default function MessageTemplatesPage() {
     )
   }
 
-  if (appLoading || (loading && activeTab === 'templates')) {
+  if (appLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">

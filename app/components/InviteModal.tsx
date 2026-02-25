@@ -158,6 +158,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         }),
       })
 
+      console.log('[InviteModal] 요청 전송:', { sendChannel, phone: phone || '(없음)', email })
+
       // ★ JSON 파싱 안전 처리 (서버 에러 시 HTML 반환될 수 있음)
       let data: any
       try {
@@ -165,6 +167,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       } catch {
         throw new Error(`서버 응답 오류 (${res.status}). 잠시 후 다시 시도해주세요.`)
       }
+      console.log('[InviteModal] 응답:', { status: res.status, ...data })
 
       // 409: 이미 대기 중 → 재발송 확인
       if (res.status === 409 && data.existing_id) {
