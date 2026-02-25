@@ -48,25 +48,38 @@ export default function FreelancersPage() {
 
   const fetchFreelancers = async () => {
     setLoading(true)
-    let query = supabase.from('freelancers').select('*').eq('company_id', companyId).order('name')
-    if (filter === 'active') query = query.eq('is_active', true)
-    if (filter === 'inactive') query = query.eq('is_active', false)
-    const { data } = await query
-    setFreelancers(data || [])
-    setLoading(false)
+    try {
+      let query = supabase.from('freelancers').select('*').eq('company_id', companyId).order('name')
+      if (filter === 'active') query = query.eq('is_active', true)
+      if (filter === 'inactive') query = query.eq('is_active', false)
+      const { data, error } = await query
+      if (error) console.error('freelancers fetch error:', error.message)
+      setFreelancers(data || [])
+    } catch (e) {
+      console.error('freelancers exception:', e)
+      setFreelancers([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchPayments = async () => {
-    const [y, m] = paymentMonth.split('-').map(Number)
-    const lastDay = new Date(y, m, 0).getDate()
-    const { data } = await supabase
-      .from('freelancer_payments')
-      .select('*, freelancers(name, service_type)')
-      .eq('company_id', companyId)
-      .gte('payment_date', `${paymentMonth}-01`)
-      .lte('payment_date', `${paymentMonth}-${lastDay}`)
-      .order('payment_date', { ascending: false })
-    setPayments(data || [])
+    try {
+      const [y, m] = paymentMonth.split('-').map(Number)
+      const lastDay = new Date(y, m, 0).getDate()
+      const { data, error } = await supabase
+        .from('freelancer_payments')
+        .select('*, freelancers(name, service_type)')
+        .eq('company_id', companyId)
+        .gte('payment_date', `${paymentMonth}-01`)
+        .lte('payment_date', `${paymentMonth}-${lastDay}`)
+        .order('payment_date', { ascending: false })
+      if (error) console.error('payments fetch error:', error.message)
+      setPayments(data || [])
+    } catch (e) {
+      console.error('payments exception:', e)
+      setPayments([])
+    }
   }
 
   useEffect(() => { if (companyId) fetchFreelancers() }, [filter])
@@ -185,6 +198,24 @@ export default function FreelancersPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-[3px] border-slate-200 border-t-slate-600 rounded-full animate-spin" />
           <span className="text-sm font-medium text-slate-400">불러오는 중...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!companyId && !loading) {
+    return (
+      <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 프리랜서 관리</h1>
+            <p className="text-gray-500 text-sm mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-400 mt-1">회사 선택 후 프리랜서 관리를 진행할 수 있습니다</p>
         </div>
       </div>
     )

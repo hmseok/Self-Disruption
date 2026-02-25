@@ -29,12 +29,19 @@ export default function CorporateCardsPage() {
 
   const fetchCards = async () => {
     setLoading(true)
-    const { data } = await supabase.from('corporate_cards')
-      .select('*, assigned_employee:profiles!corporate_cards_assigned_employee_id_fkey(employee_name)')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-    setCards(data || [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('corporate_cards')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+      if (error) console.error('corporate_cards fetch error:', error.message)
+      setCards(data || [])
+    } catch (e) {
+      console.error('corporate_cards exception:', e)
+      setCards([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchEmployees = async () => {
@@ -124,6 +131,24 @@ export default function CorporateCardsPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-[3px] border-slate-200 border-t-slate-600 rounded-full animate-spin" />
           <span className="text-sm font-medium text-slate-400">불러오는 중...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!companyId && !loading) {
+    return (
+      <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💳 법인카드 관리</h1>
+            <p className="text-gray-500 text-sm mt-1">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-400 mt-1">회사 선택 후 법인카드 관리를 진행할 수 있습니다</p>
         </div>
       </div>
     )

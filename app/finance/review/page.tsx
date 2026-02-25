@@ -46,7 +46,8 @@ const FILTER_TABS = [
 ]
 
 export default function ClassificationReviewPage() {
-  const { company } = useApp()
+  const { company, role, adminSelectedCompanyId } = useApp()
+  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -62,10 +63,10 @@ export default function ClassificationReviewPage() {
   const [employees, setEmployees] = useState<any[]>([])
 
   const fetchItems = useCallback(async () => {
-    if (!company?.id) { setLoading(false); return }
+    if (!companyId) { setLoading(false); return }
     setLoading(true)
     try {
-      const res = await fetch(`/api/finance/classify?company_id=${company.id}&status=${filter}&limit=100`)
+      const res = await fetch(`/api/finance/classify?company_id=${companyId}&status=${filter}&limit=100`)
       if (res.ok) {
         const data = await res.json()
         setItems(data.items || [])
@@ -73,8 +74,8 @@ export default function ClassificationReviewPage() {
       }
 
       const [pRes, cRes] = await Promise.all([
-        fetch(`/api/finance/classify?company_id=${company.id}&status=pending&limit=1`),
-        fetch(`/api/finance/classify?company_id=${company.id}&status=confirmed&limit=1`),
+        fetch(`/api/finance/classify?company_id=${companyId}&status=pending&limit=1`),
+        fetch(`/api/finance/classify?company_id=${companyId}&status=confirmed&limit=1`),
       ])
       const pData = await pRes.json()
       const cData = await cRes.json()
@@ -83,21 +84,21 @@ export default function ClassificationReviewPage() {
       console.error(e)
     }
     setLoading(false)
-  }, [company?.id, filter])
+  }, [companyId, filter])
 
   const fetchRelated = useCallback(async () => {
-    if (!company?.id) return
+    if (!companyId) return
     const [j, i, f, e] = await Promise.all([
-      supabase.from('jiip_contracts').select('id, investor_name, contractor_name').eq('company_id', company.id),
-      supabase.from('general_investments').select('id, investor_name').eq('company_id', company.id),
-      supabase.from('freelancers').select('id, name').eq('company_id', company.id),
-      supabase.from('profiles').select('id, name').eq('company_id', company.id),
+      supabase.from('jiip_contracts').select('id, investor_name, contractor_name').eq('company_id', companyId),
+      supabase.from('general_investments').select('id, investor_name').eq('company_id', companyId),
+      supabase.from('freelancers').select('id, name').eq('company_id', companyId),
+      supabase.from('profiles').select('id, name').eq('company_id', companyId),
     ])
     setJiips(j.data || [])
     setInvestors(i.data || [])
     setFreelancers(f.data || [])
     setEmployees(e.data || [])
-  }, [company?.id])
+  }, [companyId])
 
   useEffect(() => { fetchItems() }, [fetchItems])
   useEffect(() => { fetchRelated() }, [fetchRelated])
@@ -203,6 +204,24 @@ export default function ClassificationReviewPage() {
     if (conf >= 80) return 'bg-emerald-500'
     if (conf >= 60) return 'bg-amber-400'
     return 'bg-red-400'
+  }
+
+  if (!companyId && !loading) {
+    return (
+      <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🤖 AI 분류 검토</h1>
+            <p className="text-gray-500 text-sm mt-1">AI가 분류한 거래를 검토하고 확정합니다 · 확정 결과는 자동으로 장부에 반영됩니다</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-400 mt-1">회사 선택 후 AI 분류 검토를 진행할 수 있습니다</p>
+        </div>
+      </div>
+    )
   }
 
   return (

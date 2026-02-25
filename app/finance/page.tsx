@@ -204,7 +204,7 @@ const router = useRouter()
           {/* 우측 상단 요약 (간단 버전) */}
           <div className="flex gap-4 text-right">
               <div>
-                  <p className="text-xs text-gray-400 font-bold uppercase">Cash Flow</p>
+                  <p className="text-xs text-gray-400 font-bold uppercase">손익</p>
                   <p className={`text-xl font-black ${summary.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {summary.profit > 0 ? '+' : ''}{nf(summary.profit)}원
                   </p>
@@ -224,7 +224,7 @@ const router = useRouter()
           </div>
           <div className="bg-gradient-to-br from-green-50 to-white p-4 md:p-6 rounded-2xl border border-green-100 shadow-sm flex justify-between items-center">
               <div>
-                  <p className="text-green-800 text-xs font-bold mb-1">지출 예정 (Pending)</p>
+                  <p className="text-green-800 text-xs font-bold mb-1">지출 예정</p>
                   <h3 className="text-xl md:text-2xl font-black text-green-700">-{nf(summary.pendingExpense)}</h3>
               </div>
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">🔮</div>
@@ -312,7 +312,7 @@ const router = useRouter()
               <h3 className="font-bold text-gray-600 text-sm">
                   {activeTab === 'ledger' ? '📚 거래 내역 장부' : '🗓️ 자금 집행 스케줄'}
               </h3>
-              <span className="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full font-bold text-gray-500">Total: {filteredList.length}</span>
+              <span className="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full font-bold text-gray-500">총 {filteredList.length}건</span>
           </div>
 
           {/* Empty State */}
@@ -329,12 +329,12 @@ const router = useRouter()
                       <table className="w-full text-left min-w-[600px]">
                           <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
                               <tr>
-                                  <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">Date</th>
-                                  <th className="p-3 md:p-4 font-bold">Type</th>
-                                  <th className="p-3 md:p-4 font-bold">Category</th>
-                                  <th className="p-3 md:p-4 font-bold">Description</th>
-                                  <th className="p-3 md:p-4 font-bold text-right">Amount</th>
-                                  <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">Action</th>
+                                  <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">거래일</th>
+                                  <th className="p-3 md:p-4 font-bold">구분</th>
+                                  <th className="p-3 md:p-4 font-bold">계정과목</th>
+                                  <th className="p-3 md:p-4 font-bold">거래처/내용</th>
+                                  <th className="p-3 md:p-4 font-bold text-right">금액</th>
+                                  <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">관리</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50 text-sm">
