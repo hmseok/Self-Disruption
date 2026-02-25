@@ -249,17 +249,27 @@ export default function OrgManagementPage() {
   }
 
   // ===== 초대 관리 =====
+  // ★ 세션 토큰 안전하게 가져오기 (만료 시 자동 갱신)
+  const getAccessToken = async (): Promise<string> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) return session.access_token
+    // 세션 없으면 갱신 시도
+    const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+    return refreshed?.access_token || ''
+  }
+
   const loadInvitations = async () => {
     if (!activeCompanyId || !['god_admin', 'master'].includes(role || '')) return
     setLoadingInvitations(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = await getAccessToken()
+      if (!token) { console.error('No valid session token'); setInvitations([]); return }
       const response = await fetch(`/api/member-invite?company_id=${activeCompanyId}`, {
-        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       const result = await response.json()
       if (response.ok) setInvitations(result.data || [])
-      else { console.error('Failed to load invitations:', response.status); setInvitations([]) }
+      else { console.error('Failed to load invitations:', response.status, result.error); setInvitations([]) }
     } catch (error) {
       console.error('Error loading invitations:', error)
       setInvitations([])
@@ -272,10 +282,10 @@ export default function OrgManagementPage() {
     if (!confirm('이 초대를 취소하시겠습니까?')) return
     setCancelingId(id)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = await getAccessToken()
       const response = await fetch(`/api/member-invite?id=${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       if (response.ok) loadInvitations()
       else alert('초대 취소 실패: ' + response.statusText)

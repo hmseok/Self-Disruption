@@ -81,12 +81,20 @@ const CONTRACT_TYPES: Record<string, string> = {
   all: '공통',
 }
 
+const CONTRACT_CATEGORIES: Record<string, { label: string; emoji: string }> = {
+  long_term_rental: { label: '장기렌트 계약서', emoji: '📋' },
+  jiip: { label: '지입(위수탁) 계약서', emoji: '📑' },
+  investment: { label: '투자 계약서', emoji: '💼' },
+  short_term_rental: { label: '단기렌트 계약서', emoji: '🚗' },
+}
+
 /* ──────────────────────── 메인 컴포넌트 ──────────────────────── */
 export default function ContractTermsPage() {
   const { company, profile, role, adminSelectedCompanyId, allCompanies } = useApp()
 
   // ── 탭 상태 ──
   const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history' | 'insurance' | 'notices' | 'params'>('versions')
+  const [selectedCategory, setSelectedCategory] = useState<string>('long_term_rental')
 
   // ── 약관 버전 목록 ──
   const [termsSets, setTermsSets] = useState<TermsSet[]>([])
@@ -163,11 +171,12 @@ export default function ContractTermsPage() {
       .from('contract_terms')
       .select('*')
       .eq('company_id', companyId)
+      .eq('contract_category', selectedCategory)
       .order('created_at', { ascending: false })
     if (!error && data) setTermsSets(data)
     else if (error) console.error('[약관] 에러:', error)
     setLoading(false)
-  }, [companyId])
+  }, [companyId, selectedCategory])
 
   const fetchArticles = useCallback(async (termsId: number) => {
     const { data } = await supabase
@@ -184,9 +193,10 @@ export default function ContractTermsPage() {
       .from('contract_special_terms')
       .select('*')
       .eq('company_id', companyId)
+      .eq('contract_category', selectedCategory)
       .order('sort_order', { ascending: true })
     if (data) setSpecialTerms(data)
-  }, [companyId])
+  }, [companyId, selectedCategory])
 
   const fetchHistory = useCallback(async (termsId: number) => {
     const { data } = await supabase
@@ -240,6 +250,7 @@ export default function ContractTermsPage() {
   useEffect(() => {
     fetchTermsSets()
     fetchSpecialTerms()
+    setSelectedTerms(null) // Reset selected terms when category changes
   }, [fetchTermsSets, fetchSpecialTerms])
 
   useEffect(() => {
@@ -264,6 +275,7 @@ export default function ContractTermsPage() {
         description: newVersion.description || null,
         effective_from: newVersion.effective_from || null,
         status: 'draft',
+        contract_category: selectedCategory,
         created_by: profile?.id || null,
       })
       .select()
@@ -298,6 +310,7 @@ export default function ContractTermsPage() {
         title: source.title,
         description: `${source.version}에서 복사`,
         status: 'draft',
+        contract_category: selectedCategory,
         created_by: profile?.id || null,
       })
       .select()
@@ -647,8 +660,28 @@ export default function ContractTermsPage() {
     <div className="max-w-6xl mx-auto py-8 px-4">
       {/* 헤더 */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">계약 약관 관리</h1>
-        <p className="text-sm text-gray-500 mt-1">장기렌트 표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {CONTRACT_CATEGORIES[selectedCategory]?.emoji} {CONTRACT_CATEGORIES[selectedCategory]?.label} 관리
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
+      </div>
+
+      {/* 계약 유형 선택 탭 */}
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+        {Object.entries(CONTRACT_CATEGORIES).map(([key, { label, emoji }]) => (
+          <button
+            key={key}
+            onClick={() => setSelectedCategory(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+              selectedCategory === key
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <span>{emoji}</span>
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* 탭 */}

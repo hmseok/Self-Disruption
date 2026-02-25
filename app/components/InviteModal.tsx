@@ -132,8 +132,13 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
     const permissionsArray = Object.values(pagePerms).filter(p => p.can_view || p.can_create || p.can_edit || p.can_delete)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('로그인이 필요합니다.')
+      // ★ 세션 토큰 안전하게 가져오기 (만료 시 자동 갱신)
+      let { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+        session = refreshed
+      }
+      if (!session?.access_token) throw new Error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
 
       const res = await fetch('/api/member-invite', {
         method: 'POST',
@@ -153,7 +158,13 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         }),
       })
 
-      let data = await res.json()
+      // ★ JSON 파싱 안전 처리 (서버 에러 시 HTML 반환될 수 있음)
+      let data: any
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error(`서버 응답 오류 (${res.status}). 잠시 후 다시 시도해주세요.`)
+      }
 
       // 409: 이미 대기 중 → 재발송 확인
       if (res.status === 409 && data.existing_id) {
@@ -208,7 +219,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         onClose()
       }, 1500)
     } catch (error: any) {
-      const msg = error.message
+      console.error('[InviteModal] 초대 발송 에러:', error)
+      const msg = error.message || '알 수 없는 오류'
       if (msg.includes('이미 가입된')) setMessage({ text: '⚠️ 이미 가입된 이메일입니다.', type: 'error' })
       else if (msg.includes('대기 중인')) setMessage({ text: '⚠️ 이미 대기 중인 초대가 있습니다.', type: 'error' })
       else setMessage({ text: `오류: ${msg}`, type: 'error' })

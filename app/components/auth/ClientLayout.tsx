@@ -71,6 +71,7 @@ const PLATFORM_MENUS = [
 const SETTINGS_MENUS = [
   { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
   { name: '계약 약관 관리', path: '/admin/contract-terms', iconKey: 'Doc' },
+  { name: '메시지 센터', path: '/admin/message-templates', iconKey: 'Clipboard' },
 ]
 
 // ============================================

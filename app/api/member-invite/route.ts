@@ -19,11 +19,22 @@ function getSupabaseAdmin() {
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
+  if (!authHeader?.startsWith('Bearer ')) {
+    console.log('[verifyAdmin] No Bearer token in header')
+    return null
+  }
 
   const token = authHeader.replace('Bearer ', '')
+  if (!token || token === 'undefined' || token === 'null') {
+    console.log('[verifyAdmin] Empty or invalid token:', token?.substring(0, 20))
+    return null
+  }
+
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
+  if (error || !user) {
+    console.log('[verifyAdmin] getUser failed:', error?.message || 'no user')
+    return null
+  }
 
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles')
@@ -31,7 +42,10 @@ async function verifyAdmin(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['god_admin', 'master'].includes(profile.role)) {
+    console.log('[verifyAdmin] Role check failed:', profile?.role, 'user:', user.email)
+    return null
+  }
   return { ...user, role: profile.role, company_id: profile.company_id }
 }
 
@@ -42,6 +56,7 @@ async function sendInviteSMS(phone: string, message: string) {
   const sender = process.env.ALIGO_SENDER_PHONE
 
   if (!apiKey || !userId || !sender) {
+    console.error('[Aligo SMS] 환경변수 미설정:', { apiKey: !!apiKey, userId: !!userId, sender: !!sender })
     return { success: false, error: 'Aligo SMS 키 미설정 (ALIGO_API_KEY, ALIGO_USER_ID, ALIGO_SENDER_PHONE)' }
   }
 
@@ -127,6 +142,7 @@ function getInviteSMSTemplate(companyName: string, inviteUrl: string, expiresDat
 
 // POST: 초대 생성 + 발송 (이메일/카카오/SMS)
 export async function POST(request: NextRequest) {
+  try {
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -190,7 +206,9 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
     const inviteUrl = `${siteUrl}/invite/${pendingInvite.token}`
     const expiresDate = new Date(pendingInvite.expires_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-    const companyName = company?.name || '회사'
+    // ★ resend 경로에서도 회사명 조회 (company는 아래에서 정의되므로 별도 조회)
+    const { data: resendCompany } = await sb.from('companies').select('name').eq('id', company_id).single()
+    const companyName = resendCompany?.name || '회사'
     const roleLabel = role === 'master' ? '관리자' : '직원'
 
     let emailSent = false
@@ -389,6 +407,10 @@ export async function POST(request: NextRequest) {
     smsFallback: kakaoResult.method === 'sms',
     inviteUrl,
   })
+  } catch (err: any) {
+    console.error('[member-invite POST] Unhandled error:', err.message, err.stack)
+    return NextResponse.json({ error: `서버 오류: ${err.message}` }, { status: 500 })
+  }
 }
 
 // GET: 초대 목록 조회
