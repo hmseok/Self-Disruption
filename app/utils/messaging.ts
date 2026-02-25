@@ -500,6 +500,66 @@ export async function sendWithTemplate(params: SendWithTemplateParams): Promise<
 }
 
 // ============================================
+// 7. 공통 이메일 HTML 래퍼
+// ============================================
+
+/**
+ * Self-Disruption 브랜딩이 적용된 이메일 HTML 래퍼
+ * @param heading 메인 제목
+ * @param subtitle 부제목
+ * @param bodyContent 본문 HTML (테이블, 문단 등)
+ * @param ctaText CTA 버튼 텍스트
+ * @param ctaUrl CTA 버튼 URL
+ * @param footerText 하단 안내 텍스트
+ */
+export function buildEmailHTML(params: {
+  heading: string
+  subtitle?: string
+  bodyContent?: string
+  ctaText?: string
+  ctaUrl?: string
+  footerText?: string
+}): string {
+  const { heading, subtitle, bodyContent, ctaText, ctaUrl, footerText } = params
+  return `
+    <div style="font-family: 'Apple SD Gothic Neo', -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 16px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; background: #1B3A5C; color: white; font-size: 11px; font-weight: 900; padding: 4px 12px; border-radius: 6px; letter-spacing: 1px;">SELF-DISRUPTION</div>
+      </div>
+      <h2 style="color: #0f172a; margin: 0 0 8px; text-align: center;">${heading}</h2>
+      ${subtitle ? `<p style="color: #64748b; font-size: 14px; margin: 0 0 24px; text-align: center;">${subtitle}</p>` : ''}
+      ${bodyContent ? `<div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">${bodyContent}</div>` : ''}
+      ${ctaText && ctaUrl ? `
+        <div style="text-align: center; margin-bottom: 24px;">
+          <a href="${ctaUrl}" style="display: inline-block; background: #1B3A5C; color: white; padding: 14px 48px; border-radius: 12px; font-weight: 900; font-size: 16px; text-decoration: none;">${ctaText}</a>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
+          위 버튼이 작동하지 않으면 아래 링크를 브라우저에 직접 붙여넣으세요.<br/>
+          <a href="${ctaUrl}" style="color: #0284c7; word-break: break-all;">${ctaUrl}</a>
+        </p>
+      ` : ''}
+      ${footerText ? `<p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 16px 0 0;">${footerText}</p>` : ''}
+    </div>
+  `
+}
+
+/**
+ * 테이블 형태의 정보 HTML 생성
+ * @param rows [{label: '소속 회사', value: '셀프디스럽션'}, ...]
+ */
+export function buildInfoTableHTML(rows: { label: string; value: string; highlight?: boolean }[]): string {
+  return `<table style="width: 100%; font-size: 14px; color: #334155;">
+    ${rows
+      .filter((r) => r.value)
+      .map(
+        (r) =>
+          `<tr><td style="padding: 6px 0; color: #94a3b8;">${r.label}</td><td style="padding: 6px 0; font-weight: 700;${r.highlight ? ' color: #ef4444;' : ''}">${r.value}</td></tr>`
+      )
+      .join('')}
+  </table>`
+}
+
+// ============================================
 // 내보내기
 // ============================================
 export {

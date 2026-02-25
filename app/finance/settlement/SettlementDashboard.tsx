@@ -123,6 +123,14 @@ export default function SettlementDashboard() {
   // 정산 실행 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [executing, setExecuting] = useState(false)
+  const [sendingNotify, setSendingNotify] = useState(false)
+  const [notifyChannel, setNotifyChannel] = useState<'sms' | 'email'>('sms')
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (msg: string, type: 'success' | 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   // ============================================
   // 데이터 로드
@@ -371,6 +379,47 @@ export default function SettlementDashboard() {
     setExecuting(false)
   }
 
+  // ============================================
+  // 정산 완료 알림 발송
+  // ============================================
+  const handleSendNotify = async () => {
+    // 정산 완료된 항목 중 선택된 것 (지입/투자만 — 대출은 알림 불필요)
+    const paidSelected = settlementItems.filter(
+      i => selectedIds.has(i.id) && i.status === 'paid' && (i.type === 'jiip' || i.type === 'invest')
+    )
+    if (paidSelected.length === 0) {
+      showToast('알림 발송할 정산 완료 항목을 선택해주세요.', 'error')
+      return
+    }
+
+    setSendingNotify(true)
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch('/api/settlement/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          items: paidSelected.map(i => ({
+            type: i.type,
+            relatedId: i.relatedId,
+            name: i.name,
+            amount: i.amount,
+            dueDate: i.dueDate,
+          })),
+          channel: notifyChannel,
+          company_id: effectiveCompanyId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(`알림 발송: ${data.sent}건 성공${data.failed > 0 ? `, ${data.failed}건 실패` : ''}`, data.failed > 0 ? 'error' : 'success')
+    } catch (err: any) {
+      showToast(`알림 발송 실패: ${err.message}`, 'error')
+    } finally {
+      setSendingNotify(false)
+    }
+  }
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -488,9 +537,22 @@ export default function SettlementDashboard() {
               toggleSelectAll={toggleSelectAll}
               onExecute={handleSettlementExecute}
               executing={executing}
+              onSendNotify={handleSendNotify}
+              sendingNotify={sendingNotify}
+              notifyChannel={notifyChannel}
+              setNotifyChannel={setNotifyChannel}
             />
           )}
         </>
+      )}
+
+      {/* 토스트 */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 px-5 py-3 rounded-xl shadow-lg text-sm font-bold text-white z-50 transition-all ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.msg}
+        </div>
       )}
     </div>
   )
