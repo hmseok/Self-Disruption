@@ -323,7 +323,7 @@ export default function LoanDetailPage() {
                 </p>
                 <p className="text-xs text-gray-400 mt-1">클릭하여 파일 선택도 가능합니다</p>
               </div>
-              <input type="file" multiple accept="image/*,.pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileChange} disabled={uploading} />
+              <input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileChange} disabled={uploading} />
               {uploading && (
                 <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl">
                   <span className="font-bold text-purple-600 animate-pulse">업로드 중...</span>

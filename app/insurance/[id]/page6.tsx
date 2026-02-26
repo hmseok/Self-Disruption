@@ -335,7 +335,7 @@ export default function InsuranceDetailPage() {
                             )}
                             {/* 파일이 없을 때만 input 활성화 */}
                             {!(ins[`${type}_form_url`] || ins[`${type}_url`]) && (
-                                <input type="file" className="absolute inset-0 cursor-pointer opacity-0" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, type as any)}/>
+                                <input type="file" className="absolute inset-0 cursor-pointer opacity-0" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, type as any)}/>
                             )}
                         </div>
                     </div>

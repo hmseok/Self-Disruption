@@ -290,7 +290,7 @@ export default function RegistrationPage() {
                     }`}>
                         {uploading ? '파일 처리 중...' : '✨ AI 자동 분석 및 업로드'}
                     </div>
-                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} disabled={uploading} />
+                    <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileUpload} disabled={uploading} />
                 </label>
 
                 <p className="text-xs text-gray-400 text-center mt-2">

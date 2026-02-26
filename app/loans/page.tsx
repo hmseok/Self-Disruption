@@ -218,7 +218,7 @@ export default function LoanListPage() {
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleFileSelect} />
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
       {/* AI 처리 상태 */}
       {ocrProcessing && (

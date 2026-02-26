@@ -262,14 +262,14 @@ export default function InsurancePage() {
                             <p className="text-green-600 font-bold text-sm">✅ 파일 등록됨</p>
                             <a href={ins.application_form_url} target="_blank" className="block w-full py-2 bg-white border border-gray-300 rounded shadow-sm text-sm font-bold hover:bg-gray-50">미리보기</a>
                             <label className="block text-xs text-gray-400 underline cursor-pointer mt-2">
-                                파일 교체 <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'application')}/>
+                                파일 교체 <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'application')}/>
                             </label>
                         </div>
                     ) : (
                         <label className="cursor-pointer">
                             <p className="text-2xl mb-1">📤</p>
                             <p className="text-sm text-gray-500">클릭하여 청약서 업로드</p>
-                            <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'application')}/>
+                            <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'application')}/>
                         </label>
                     )}
                 </div>
@@ -283,14 +283,14 @@ export default function InsurancePage() {
                             <p className="text-blue-600 font-bold text-sm">✅ 파일 등록됨</p>
                             <a href={ins.certificate_url} target="_blank" className="block w-full py-2 bg-white border border-blue-200 rounded shadow-sm text-sm font-bold text-blue-800 hover:bg-blue-50">증명서 보기</a>
                             <label className="block text-xs text-blue-400 underline cursor-pointer mt-2">
-                                파일 교체 <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
+                                파일 교체 <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
                             </label>
                         </div>
                     ) : (
                         <label className="cursor-pointer">
                             <p className="text-2xl mb-1">📤</p>
                             <p className="text-sm text-blue-500">클릭하여 증명서 업로드</p>
-                            <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
+                            <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
                         </label>
                     )}
                 </div>

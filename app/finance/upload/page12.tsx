@@ -229,7 +229,7 @@ export default function UploadFinancePage() {
 
       <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           className={`max-w-6xl mx-auto relative border-2 border-dashed rounded-3xl p-10 text-center mb-8 transition-all duration-300 group ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-indigo-300'}`}>
-          <input type="file" accept=".xlsx, .xls, .csv, image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          <input type="file" accept=".xlsx,.xls,.csv,image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           <div className="pointer-events-none">
               <span className="text-4xl mb-2 block">📂</span>
               <p className="text-gray-500 font-bold">여기에 파일을 놓아주세요</p>

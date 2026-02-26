@@ -440,7 +440,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*, .pdf"
+            accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf"
             className="hidden"
             onChange={handleBulkUpload}
           />

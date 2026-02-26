@@ -249,7 +249,7 @@ export default function InsuranceDetailPage() {
                             ) : (
                                 <div className="text-gray-400"><p className="text-2xl">📂</p><p className="text-xs">파일 업로드</p></div>
                             )}
-                            <input type="file" className="absolute inset-0 cursor-pointer opacity-0" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, type as any)}/>
+                            <input type="file" className="absolute inset-0 cursor-pointer opacity-0" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, type as any)}/>
                         </div>
                         {(ins[`${type}_form_url`] || ins[`${type}_url`]) && (
                             <a href={ins[`${type}_form_url`] || ins[`${type}_url`]} target="_blank" className="block text-center text-xs text-blue-500 font-bold mt-2 hover:underline">크게 보기 ↗</a>

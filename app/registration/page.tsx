@@ -342,7 +342,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                 <Icons.Upload />
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
             </button>
-            <input ref={fileInputRef} type="file" multiple accept="image/*, .pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
+            <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
                 <Icons.Plus /> <span>신규차량등록</span>
             </button>

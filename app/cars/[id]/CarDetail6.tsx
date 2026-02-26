@@ -179,7 +179,7 @@ export default function CarDetailPage() {
                {/* 📂 업로드 버튼 (작게 수정) */}
                <label className="cursor-pointer bg-white/90 hover:bg-white text-gray-800 text-xs px-3 py-2 rounded-lg font-bold shadow-lg backdrop-blur flex items-center gap-1 transition-transform hover:-translate-y-1">
                   <span>📂 변경</span>
-                  <input type="file" className="hidden" accept="image/*,.pdf,application/pdf" onChange={handleImageUpload} disabled={uploading}/>
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleImageUpload} disabled={uploading}/>
                </label>
 
             </div>

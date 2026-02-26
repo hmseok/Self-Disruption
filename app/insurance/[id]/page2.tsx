@@ -274,7 +274,7 @@ export default function InsuranceDetailPage() {
                             </div>
                         )}
                         <label className="absolute inset-0 cursor-pointer opacity-0">
-                            <input type="file" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'application')}/>
+                            <input type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'application')}/>
                         </label>
                     </div>
                 </div>
@@ -297,7 +297,7 @@ export default function InsuranceDetailPage() {
                             </div>
                         )}
                         <label className="absolute inset-0 cursor-pointer opacity-0">
-                            <input type="file" accept=".pdf,image/*" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
+                            <input type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={(e)=>handleFileUpload(e, 'certificate')}/>
                         </label>
                     </div>
                 </div>

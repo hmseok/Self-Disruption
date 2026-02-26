@@ -346,7 +346,7 @@ export default function InsuranceDetailPage() {
                                 <button onClick={() => appFileRef.current?.click()} className="text-xs text-steel-600 bg-steel-50 px-2.5 py-1 rounded-lg font-bold hover:bg-steel-100 transition-colors">
                                     {url ? '재업로드' : '업로드'}
                                 </button>
-                                <input ref={appFileRef} type="file" className="hidden" accept=".pdf,image/*" onChange={e => handleFileUpload(e, 'application')} />
+                                <input ref={appFileRef} type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={e => handleFileUpload(e, 'application')} />
                             </div>
                         </div>
                         <div
@@ -400,7 +400,7 @@ export default function InsuranceDetailPage() {
                                 <button onClick={() => certFileRef.current?.click()} className="text-xs text-steel-600 bg-steel-50 px-2.5 py-1 rounded-lg font-bold hover:bg-steel-100 transition-colors">
                                     {url ? '재업로드' : '업로드'}
                                 </button>
-                                <input ref={certFileRef} type="file" className="hidden" accept=".pdf,image/*" onChange={e => handleFileUpload(e, 'certificate')} />
+                                <input ref={certFileRef} type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={e => handleFileUpload(e, 'certificate')} />
                             </div>
                         </div>
                         <div

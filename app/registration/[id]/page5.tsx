@@ -292,7 +292,7 @@ export default function RegistrationPage() {
 
                  <label className={`block w-full py-4 rounded-xl font-bold text-center text-lg shadow-lg cursor-pointer transition-all ${uploading ? 'bg-gray-400 text-gray-100' : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-[1.02]'}`}>
                     {uploading ? 'AI가 문서를 읽고 있습니다...' : '📸 이미지 업로드 & AI 자동분석'}
-                    <input type="file" className="hidden" accept="image/*,.pdf,application/pdf" onChange={handleFileUpload} disabled={uploading} />
+                    <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileUpload} disabled={uploading} />
                  </label>
                  <p className="text-center text-xs text-gray-500">
                     Gemini 2.5 Pro 엔진이 차량번호, 차종, 제원, 검사일을 자동으로 입력합니다.

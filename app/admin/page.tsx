@@ -260,7 +260,7 @@ export default function AdminDashboard() {
                   {uploadingCompanyId === comp.id ? '업로드중...' : comp.business_registration_url ? '재등록' : '등록증 업로드'}
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf"
                     className="hidden"
                     disabled={uploadingCompanyId === comp.id}
                     onChange={(e) => {

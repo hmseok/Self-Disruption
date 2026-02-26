@@ -157,11 +157,11 @@ function UploadContent() {
 
       <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           className={`max-w-6xl mx-auto relative border-2 border-dashed rounded-3xl p-10 text-center mb-8 transition-all duration-300 group ${isDragging ? 'border-steel-500 bg-steel-50 scale-[1.01]' : 'border-gray-300 bg-white hover:border-steel-300'}`}>
-          <input type="file" multiple accept=".xlsx, .xls, .csv, image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          <input type="file" multiple accept=".xlsx,.xls,.csv,image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           <div className="pointer-events-none">
               <span className="text-4xl mb-2 block">📂</span>
               <p className="text-gray-500 font-bold">여기에 파일을 놓아주세요 (다중 선택 가능)</p>
-              <p className="text-xs text-gray-400 mt-2">엑셀(통장/카드), 영수증 사진 지원</p>
+              <p className="text-xs text-gray-400 mt-2">엑셀(통장/카드), 영수증 사진, PDF 문서 지원</p>
           </div>
       </div>
 

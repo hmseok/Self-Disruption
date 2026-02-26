@@ -1042,7 +1042,7 @@ export default function RegistrationDetailPage() {
                                     <button onClick={() => regFileRef.current?.click()} className="text-xs text-steel-600 bg-steel-50 px-2.5 py-1 rounded-lg font-bold hover:bg-steel-100 transition-colors">
                                         {url ? '재업로드' : '업로드'}
                                     </button>
-                                    <input ref={regFileRef} type="file" className="hidden" accept=".pdf,image/*" onChange={handleFileUpload} />
+                                    <input ref={regFileRef} type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileUpload} />
                                 </div>
                             </div>
                             <div

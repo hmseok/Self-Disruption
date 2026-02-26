@@ -257,7 +257,7 @@ export default function RegistrationPage() {
                     }`}>
                         {uploading ? '업로드 중...' : '📄 파일 업로드 (PDF/사진)'}
                     </div>
-                    <input type="file" className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} disabled={uploading} />
+                    <input type="file" className="hidden" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" onChange={handleFileUpload} disabled={uploading} />
                 </label>
             </div>
         </div>
