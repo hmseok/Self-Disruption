@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // 2. 계약 정보 조회 (고객명)
     const tableName = schedule.contract_type === 'jiip' ? 'jiip_contracts' : 'general_investments'
-    const nameField = schedule.contract_type === 'jiip' ? 'contractor_name' : 'investor_name'
+    const nameField = schedule.contract_type === 'jiip' ? 'investor_name' : 'investor_name'
     const { data: contract } = await sb
       .from(tableName)
       .select(`${nameField}, company_id`)

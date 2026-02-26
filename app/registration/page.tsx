@@ -326,12 +326,24 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
-         <div>
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+         <div style={{ textAlign: 'left' }}>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 등록/제원 상세</h1>
+            <p className="text-gray-500 text-sm mt-1">차량 등록·이전 서류 및 제원 관리</p>
          </div>
          <div className="flex gap-3">
             <button
@@ -372,37 +384,37 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
        {/* 📊 KPI 대시보드 */}
        {cars.length > 0 && !bulkProcessing && (
-         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-           <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
-             <p className="text-xs text-gray-400 font-bold">등록 차량</p>
-             <p className="text-xl md:text-2xl font-black text-gray-900 mt-1">{stats.total}<span className="text-sm text-gray-400 ml-0.5">대</span></p>
+         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+           <div style={{ flex: 1, background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', minWidth: 0 }}>
+             <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 700, whiteSpace: 'nowrap' as const }}>등록 차량</p>
+             <p style={{ fontSize: 24, fontWeight: 900, color: '#111827', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.total}<span style={{ fontSize: 14, color: '#9ca3af', marginLeft: 2 }}>대</span></p>
            </div>
-           <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100">
-             <p className="text-xs text-green-600 font-bold">친환경 차량</p>
-             <p className="text-xl md:text-2xl font-black text-green-700 mt-1">{stats.electric + stats.hybrid}<span className="text-sm text-green-500 ml-0.5">대</span></p>
-             <p className="text-[10px] text-green-500 mt-0.5">전기 {stats.electric} · 하이브리드 {stats.hybrid}</p>
+           <div style={{ flex: 1, background: '#f0fdf4', padding: 16, borderRadius: 12, border: '1px solid #dcfce7', minWidth: 0 }}>
+             <p style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, whiteSpace: 'nowrap' as const }}>친환경 차량</p>
+             <p style={{ fontSize: 24, fontWeight: 900, color: '#15803d', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.electric + stats.hybrid}<span style={{ fontSize: 14, color: '#22c55e', marginLeft: 2 }}>대</span></p>
+             <p style={{ fontSize: 10, color: '#22c55e', marginTop: 2, whiteSpace: 'nowrap' as const }}>전기 {stats.electric} · 하이브리드 {stats.hybrid}</p>
            </div>
            {(stats.consignment + stats.leasedIn) > 0 && (
-             <div className="bg-amber-50 p-3 md:p-4 rounded-xl border border-amber-100">
-               <p className="text-xs text-amber-600 font-bold">지입/임차</p>
-               <p className="text-xl md:text-2xl font-black text-amber-700 mt-1">{stats.consignment + stats.leasedIn}<span className="text-sm text-amber-500 ml-0.5">대</span></p>
-               <p className="text-[10px] text-amber-500 mt-0.5">지입 {stats.consignment} · 임차 {stats.leasedIn}</p>
+             <div style={{ flex: 1, background: '#fffbeb', padding: 16, borderRadius: 12, border: '1px solid #fde68a', minWidth: 0 }}>
+               <p style={{ fontSize: 12, color: '#d97706', fontWeight: 700, whiteSpace: 'nowrap' as const }}>지입/임차</p>
+               <p style={{ fontSize: 24, fontWeight: 900, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.consignment + stats.leasedIn}<span style={{ fontSize: 14, color: '#f59e0b', marginLeft: 2 }}>대</span></p>
+               <p style={{ fontSize: 10, color: '#f59e0b', marginTop: 2, whiteSpace: 'nowrap' as const }}>지입 {stats.consignment} · 임차 {stats.leasedIn}</p>
              </div>
            )}
-           <div className={`p-3 md:p-4 rounded-xl border ${recentCars.length > 0 ? 'bg-amber-50 border-amber-200 animate-pulse' : 'bg-amber-50 border-amber-100'}`}>
-             <p className="text-xs text-amber-600 font-bold">최근 7일 등록</p>
-             <p className="text-xl md:text-2xl font-black text-amber-700 mt-1">{recentCars.length}<span className="text-sm text-amber-500 ml-0.5">대</span></p>
+           <div style={{ flex: 1, background: '#fffbeb', padding: 16, borderRadius: 12, border: recentCars.length > 0 ? '1px solid #fde68a' : '1px solid #fef3c7', minWidth: 0 }}>
+             <p style={{ fontSize: 12, color: '#d97706', fontWeight: 700, whiteSpace: 'nowrap' as const }}>최근 7일 등록</p>
+             <p style={{ fontSize: 24, fontWeight: 900, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' as const }}>{recentCars.length}<span style={{ fontSize: 14, color: '#f59e0b', marginLeft: 2 }}>대</span></p>
            </div>
-           <div className="bg-blue-50 p-3 md:p-4 rounded-xl border border-blue-100">
-             <p className="text-xs text-blue-500 font-bold">총 취득가액</p>
-             <p className="text-lg md:text-xl font-black text-blue-700 mt-1">{f(stats.totalValue)}<span className="text-sm text-blue-400 ml-0.5">원</span></p>
+           <div style={{ flex: 1, background: '#eff6ff', padding: 16, borderRadius: 12, border: '1px solid #bfdbfe', minWidth: 0 }}>
+             <p style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, whiteSpace: 'nowrap' as const }}>총 취득가액</p>
+             <p style={{ fontSize: 20, fontWeight: 900, color: '#1d4ed8', marginTop: 4, whiteSpace: 'nowrap' as const }}>{f(stats.totalValue)}<span style={{ fontSize: 14, color: '#93c5fd', marginLeft: 2 }}>원</span></p>
              {stats.totalCost > stats.totalValue && (
-               <p className="text-[10px] text-emerald-600 font-bold mt-0.5">실투자 {f(stats.totalCost)}원</p>
+               <p style={{ fontSize: 10, color: '#059669', fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' as const }}>실투자 {f(stats.totalCost)}원</p>
              )}
            </div>
-           <div className="bg-steel-50 p-3 md:p-4 rounded-xl border border-steel-100">
-             <p className="text-xs text-steel-500 font-bold">차량 평균가</p>
-             <p className="text-lg md:text-xl font-black text-steel-700 mt-1">{f(stats.avgValue)}<span className="text-sm text-steel-400 ml-0.5">원</span></p>
+           <div style={{ flex: 1, background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', minWidth: 0 }}>
+             <p style={{ fontSize: 12, color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' as const }}>차량 평균가</p>
+             <p style={{ fontSize: 20, fontWeight: 900, color: '#475569', marginTop: 4, whiteSpace: 'nowrap' as const }}>{f(stats.avgValue)}<span style={{ fontSize: 14, color: '#94a3b8', marginLeft: 2 }}>원</span></p>
            </div>
          </div>
        )}
@@ -492,14 +504,13 @@ const { company, role, adminSelectedCompanyId } = useApp()
        )}
 
        {/* 리스트 테이블 */}
-       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
          {cars.length === 0 ? (
            <div className="p-12 md:p-20 text-center text-gray-400">등록된 차량이 없습니다.</div>
          ) : (
            <>
              {/* Desktop Table View */}
-             <div className="hidden md:block">
-               <div className="overflow-x-auto">
+             <div style={{ overflowX: 'auto' }}>
                  <table className="w-full text-left border-collapse min-w-[650px]">
                      <thead className="bg-steel-50 border-b border-gray-100 text-steel-900 uppercase text-xs font-bold tracking-wider">
                          <tr>
@@ -565,11 +576,10 @@ const { company, role, adminSelectedCompanyId } = useApp()
                          ))}
                      </tbody>
                  </table>
-               </div>
              </div>
 
              {/* Mobile Card View */}
-             <div className="md:hidden divide-y divide-gray-100">
+             <div style={{ display: 'none' }}>
                {cars.map((car) => (
                  <div key={car.id} className="p-4 flex items-center gap-3">
                    <div className="w-12 h-10 bg-gray-100 rounded border overflow-hidden flex-shrink-0" onClick={() => router.push(`/registration/${car.id}`)}>

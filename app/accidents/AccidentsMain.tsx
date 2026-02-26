@@ -453,11 +453,9 @@ export default function AccidentsMainPage() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50/50 animate-fade-in">
       {/* ── Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            사고 관리
-          </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚨 사고 관리</h1>
           <p className="text-gray-500 mt-1 text-sm">
             전체 <span className="font-bold text-steel-600">{accidents.length}</span>건
             {filteredAccidents.length !== accidents.length && ` / 검색 ${filteredAccidents.length}건`}
@@ -465,7 +463,7 @@ export default function AccidentsMainPage() {
         </div>
         <button
           onClick={openCreateModal}
-          className="bg-steel-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-sm whitespace-nowrap"
+          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
         >
           + 사고 등록
         </button>

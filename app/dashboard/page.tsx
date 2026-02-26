@@ -388,21 +388,19 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
 
         {/* 헤더 */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-            <div>
-              <p className="text-gray-500 text-xs sm:text-sm font-medium">
-                {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-              </p>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-                {getGreeting()}, <span className="text-sky-600">Platform Admin</span>
-              </h1>
-              <p className="text-gray-400 mt-1 text-sm">플랫폼 전체 현황을 확인하세요</p>
-            </div>
-            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-sky-100 text-sky-700 self-start sm:self-auto">
-              GOD ADMIN
-            </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <p className="text-gray-500 text-xs sm:text-sm font-medium">
+              {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+            </p>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight mt-1">
+              {getGreeting()}, <span className="text-sky-600">Platform Admin</span>
+            </h1>
+            <p className="text-gray-400 mt-1 text-sm">플랫폼 전체 현황을 확인하세요</p>
           </div>
+          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">
+            GOD ADMIN
+          </span>
         </div>
 
         {/* 플랫폼 KPI 카드 */}
@@ -618,20 +616,19 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
 
       {/* 상단 인사 영역 */}
-      <div className="mb-6 md:mb-8">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 md:gap-4">
-          <div>
-            <p className="text-gray-500 text-xs sm:text-sm font-medium">
-              {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-            </p>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 mt-1">
-              {getGreeting()}, <span className="text-steel-600">{selectedCompanyName || company?.name || user?.email?.split('@')[0] || '사용자'}</span>
-            </h1>
-            <p className="text-gray-400 mt-1 text-sm">
-              {role === 'god_admin' && adminSelectedCompanyId ? '선택된 회사의 업무 현황입니다' : '오늘의 업무 현황을 확인하세요'}
-            </p>
-          </div>
-          <div className="flex gap-2 items-center">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <p className="text-gray-500 text-xs sm:text-sm font-medium">
+            {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+          </p>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight mt-1">
+            {getGreeting()}, <span className="text-steel-600">{selectedCompanyName || company?.name || user?.email?.split('@')[0] || '사용자'}</span>
+          </h1>
+          <p className="text-gray-400 mt-1 text-sm">
+            {role === 'god_admin' && adminSelectedCompanyId ? '선택된 회사의 업무 현황입니다' : '오늘의 업무 현황을 확인하세요'}
+          </p>
+        </div>
+        <div className="flex gap-2 items-center">
             {role === 'god_admin' && (
               <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">GOD ADMIN</span>
             )}
@@ -651,7 +648,6 @@ export default function DashboardPage() {
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{position.name}</span>
             )}
           </div>
-        </div>
       </div>
 
       {/* KPI 카드 — god admin 스타일 다크 그라데이션 */}

@@ -3318,11 +3318,10 @@ export default function RentPricingBuilder() {
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
       {/* ===== 헤더 ===== */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            🧮 장기렌터카 견적
-          </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🧮 장기렌터카 견적</h1>
+          <p className="text-gray-500 text-sm mt-1">렌트가 산출 및 견적서 생성</p>
         </div>
         <div className="flex gap-2">
           <Link href="/quotes" className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">

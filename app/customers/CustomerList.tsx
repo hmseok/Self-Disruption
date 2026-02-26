@@ -683,14 +683,28 @@ export default function CustomerPage() {
   // ─────────────────────────────────────────────
   // 메인 렌더링
   // ─────────────────────────────────────────────
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen animate-fade-in">
       {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 고객 관리</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 고객 관리</h1>
+          <p className="text-gray-500 text-sm mt-1">고객 정보 등록 및 계약 이력 관리</p>
+        </div>
         <button
           onClick={() => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) }}
-          className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors">
+          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
           + 신규 고객
         </button>
       </div>

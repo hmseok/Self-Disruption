@@ -186,9 +186,11 @@ export default function FreelancersPage() {
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">프리랜서/용역 관리</h1>
-        <p className="text-sm text-slate-400 mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👷 프리랜서/용역 관리</h1>
+          <p className="text-sm text-slate-400 mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+        </div>
       </div>
 
       {/* 탭 */}

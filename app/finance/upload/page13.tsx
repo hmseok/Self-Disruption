@@ -49,7 +49,7 @@ export default function UploadFinancePage() {
   const fetchBasicData = async () => {
     const { data: c } = await supabase.from('cars').select('id, number, model'); setCars(c||[])
     const { data: i } = await supabase.from('general_investments').select('id, investor_name'); setInvestors(i||[])
-    const { data: j } = await supabase.from('jiip_contracts').select('id, contractor_name'); setJiips(j||[])
+    const { data: j } = await supabase.from('jiip_contracts').select('id, investor_name'); setJiips(j||[])
     const { data: r } = await supabase.from('finance_rules').select('*'); setDbRules(r||[])
   }
 
@@ -59,7 +59,7 @@ export default function UploadFinancePage() {
       const userRule = dbRules.find(r => targetText.includes(r.keyword));
       if (userRule) return { category: userRule.category, related_id: userRule.related_id, related_type: userRule.related_type }
 
-      const matchedJiip = jiips.find(j => targetText.includes(j.contractor_name));
+      const matchedJiip = jiips.find(j => targetText.includes(j.investor_name));
       if (matchedJiip) return { category: type==='income'?'지입 관리비':'지입 수익배분', related_id: matchedJiip.id, related_type: 'jiip' };
 
       const matchedInv = investors.find(inv => targetText.includes(inv.investor_name));
@@ -304,7 +304,7 @@ export default function UploadFinancePage() {
                                 <td className="p-3">
                                     <select value={item.related_id?`${item.related_type}_${item.related_id}`:''} onChange={e=>updateItem(idx,'related_composite',e.target.value)} className="w-full border rounded p-1.5 text-xs outline-none bg-white text-gray-600">
                                         <option value="">- 연결 없음 -</option>
-                                        <optgroup label="🚛 지입 차주">{jiips.map(j=><option key={j.id} value={`jiip_${j.id}`}>{j.contractor_name}</option>)}</optgroup>
+                                        <optgroup label="🚛 지입 차주">{jiips.map(j=><option key={j.id} value={`jiip_${j.id}`}>{j.investor_name}</option>)}</optgroup>
                                         <optgroup label="💰 투자자">{investors.map(i=><option key={i.id} value={`invest_${i.id}`}>{i.investor_name}</option>)}</optgroup>
                                         <optgroup label="🚗 차량">{cars.map(c=><option key={c.id} value={`car_${c.id}`}>{c.number}</option>)}</optgroup>
                                     </select>

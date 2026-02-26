@@ -336,8 +336,8 @@ export default function QuoteDetailPage() {
           <span className="text-steel-600 font-bold text-sm">견적 상세</span>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 no-print">
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem' }} className="no-print">
+          <div style={{ textAlign: 'left' }}>
             <h1 className="text-2xl font-black text-gray-900">견적서 #{String(quote.id).slice(0, 8)}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${

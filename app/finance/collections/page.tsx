@@ -93,7 +93,7 @@ export default function CollectionsPage() {
     let investMap: Record<string, any> = {}
 
     if (jiipIds.length > 0) {
-      const { data } = await supabase.from('jiip_contracts').select('id, contractor_name, phone, investor_email').in('id', jiipIds)
+      const { data } = await supabase.from('jiip_contracts').select('id, investor_name, phone, investor_email').in('id', jiipIds)
       data?.forEach(c => { jiipMap[c.id] = c })
     }
     if (investIds.length > 0) {
@@ -104,7 +104,7 @@ export default function CollectionsPage() {
     return scheds.map(s => {
       if (s.contract_type === 'jiip') {
         const c = jiipMap[s.contract_id]
-        return { ...s, customer_name: c?.contractor_name, phone: c?.phone, email: c?.investor_email }
+        return { ...s, customer_name: c?.investor_name, phone: c?.phone, email: c?.investor_email }
       } else {
         const c = investMap[s.contract_id]
         return { ...s, customer_name: c?.investor_name, phone: c?.investor_phone, email: c?.investor_email }
@@ -205,12 +205,41 @@ export default function CollectionsPage() {
     { key: 'completed', label: '수금완료', count: completedSchedules.length, color: 'text-green-600' },
   ]
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!effectiveCompanyId && !loading) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 수금 관리</h1>
+            <p className="text-gray-500 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-400 mt-1">회사 선택 후 수금 관리를 이용할 수 있습니다</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+      <div className="space-y-6">
         {/* 헤더 */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 수금 관리</h1>
             <p className="text-gray-500 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
           </div>
@@ -273,7 +302,7 @@ export default function CollectionsPage() {
                 <button
                   onClick={handleSendReminder}
                   disabled={selectedIds.size === 0 || sending}
-                  className="px-4 py-1.5 rounded-lg bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 disabled:opacity-40 transition-all"
+                  className="px-4 py-2.5 rounded-xl bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 disabled:opacity-40 transition-all shadow-sm"
                 >
                   {sending ? '발송중...' : `납부 안내 발송 (${selectedIds.size})`}
                 </button>
@@ -365,7 +394,7 @@ export default function CollectionsPage() {
                         {(s.status === 'pending') && (
                           <button
                             onClick={() => setConfirmTarget(s)}
-                            className="px-3 py-1 rounded-lg bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 transition-all"
+                            className="px-3 py-1.5 rounded-xl bg-steel-600 text-white text-xs font-bold hover:bg-steel-700 transition-all shadow-sm"
                           >
                             수금 확인
                           </button>
@@ -376,7 +405,7 @@ export default function CollectionsPage() {
                         {s.status === 'partial' && (
                           <button
                             onClick={() => setConfirmTarget(s)}
-                            className="px-3 py-1 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-all"
+                            className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-all shadow-sm"
                           >
                             추가 입금
                           </button>

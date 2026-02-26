@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         }
 
         const customerName = sched.contract_type === 'jiip'
-          ? contract.contractor_name
+          ? contract.investor_name
           : contract.investor_name
         const phone = contract.investor_phone || contract.phone || ''
         const email = contract.investor_email || contract.email || ''

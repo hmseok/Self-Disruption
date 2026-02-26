@@ -369,9 +369,11 @@ export default function MessageTemplatesPage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* 헤더 */}
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">메시지 센터</h1>
-          <p className="text-sm md:text-base text-slate-500 mt-2">SMS · 카카오 알림톡 · 이메일 · 앱 푸시 통합 관리</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💬 메시지 센터</h1>
+            <p className="text-gray-500 text-sm mt-1">SMS · 카카오 알림톡 · 이메일 · 앱 푸시 통합 관리</p>
+          </div>
         </div>
 
         {/* 에러 메시지 */}

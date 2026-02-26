@@ -159,7 +159,7 @@ export default function FinancePage() {
                       type: 'expense',
                       status: 'pending',
                       category: '지입정산금',
-                      client_name: `${jiip.contractor_name || '지입차주'} (정산)`,
+                      client_name: `${jiip.investor_name || '지입차주'} (정산)`,
                       description: `${filterDate}월 운송료 정산 지급(예정)`,
                       amount: 0,
                       payment_method: '통장',

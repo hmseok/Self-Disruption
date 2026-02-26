@@ -534,11 +534,9 @@ export default function MaintenanceMainPage() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50/50 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-3 md:gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            🔧 정비/검사 관리
-          </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🔧 정비/검사 관리</h1>
           <p className="text-gray-500 mt-1 md:mt-2 text-sm">
             정비 기록: <span className="font-bold text-steel-600">{maintenanceRecords.length}</span>건 /
             검사 기록: <span className="font-bold text-steel-600">{inspectionRecords.length}</span>건

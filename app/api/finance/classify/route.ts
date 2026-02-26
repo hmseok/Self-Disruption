@@ -2,10 +2,133 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 // ============================================
-// AI 통합 분류 API v2.0
-// POST: 거래 배열 → 세무사 분류 + 계약/급여/프리랜서/보험/카드 매칭
+// AI 통합 분류 API v3.0
+// POST: 거래 배열 → 규칙 매칭 + Gemini AI 분류 + 계약 매칭
 // 3-tier 신뢰도: auto(≥80) / review(60-79) / manual(<60)
 // ============================================
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+
+// ── Gemini AI 분류 함수 (미분류 건 일괄 처리) ──
+async function classifyWithGemini(
+  unclassified: Array<{ idx: number; client_name: string; description: string; amount: number; type: string; payment_method: string; transaction_date: string }>,
+  categoryList: string[]
+): Promise<Array<{ idx: number; category: string; confidence: number }>> {
+  if (!GEMINI_API_KEY || unclassified.length === 0) return []
+
+  // 최대 50건씩 배치
+  const batches: typeof unclassified[] = []
+  for (let i = 0; i < unclassified.length; i += 50) {
+    batches.push(unclassified.slice(i, i + 50))
+  }
+
+  const allResults: Array<{ idx: number; category: string; confidence: number }> = []
+
+  for (const batch of batches) {
+    const txLines = batch.map((tx, i) =>
+      `${i + 1}. [${tx.type === 'income' ? '입금' : '출금'}] ${tx.transaction_date} | ${tx.client_name} | ${tx.description} | ${Math.abs(tx.amount).toLocaleString()}원 | ${tx.payment_method}`
+    ).join('\n')
+
+    const prompt = `당신은 한국 법인 세무 전문가입니다. 아래 법인 통장/카드 거래내역을 보고 가장 적합한 계정과목(카테고리)을 분류해주세요.
+
+## 사용 가능한 카테고리
+${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+## 분류 규칙
+### 입금(income) 거래
+- 렌트/운송수입: 매출, 운송료, 화물, 정산
+- 지입 관리비/수수료: 지입료, 관리비 수입
+- 투자원금 입금: 투자, 증자, 출자
+- 지입 초기비용/보증금: 보증금, 인수금
+- 대출 실행(입금): 대출입금, 여신실행
+- 이자/잡이익: 이자수입, 환급, 캐시백
+- 보험금 수령: 보험금, 보상금
+- 매각/처분수입: 차량매각, 처분대금
+
+### 출금(expense) 거래
+- 유류비: 주유소, GS칼텍스, SK에너지, S-OIL, LPG, CNG
+- 정비/수리비: 정비소, 타이어, 공업사, 카센터, 세차
+- 차량보험료: XX손해보험, 삼성화재, 현대해상
+- 차량할부/리스료: 캐피탈, 파이낸셜, 할부금, 리스
+- 급여(정규직): 급여, 월급, 상여금
+- 용역비(3.3%): 프리랜서, 탁송, 외주
+- 4대보험(회사부담): 국민연금, 건강보험, 고용보험
+- 원천세/부가세: 원천세, 부가세, 부가가치세
+- 법인세/지방세: 법인세, 지방소득세
+- 복리후생(식대): 식당, 카페, 편의점, 배달
+- 접대비: 골프, 선물, 경조사
+- 여비교통비: 택시, KTX, 숙박, 주차비
+- 임차료/사무실: 월세, 임대료, 건물관리
+- 통신비: KT, SKT, LG, 인터넷
+- 수수료/카드수수료: 이체수수료, 카드수수료
+- 이자비용(대출/투자): 대출이자, 금융비용
+- 원금상환: 원금상환, 원리금
+- 쇼핑/온라인구매: 쿠팡, 네이버, 11번가
+
+### 추가 규칙
+- "카드자동집금", "카드대금" → 수수료/카드수수료
+- 사람 이름 입금/출금 → 맥락상 추정 (투자, 급여, 용역비 등)
+- 확실하지 않으면 confidence를 낮게 (50 이하)
+
+## 거래내역
+${txLines}
+
+## 응답 형식 (JSON 배열만, 설명 없이)
+[{"no":1,"category":"유류비","confidence":85},{"no":2,"category":"급여(정규직)","confidence":70}]`
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 4096,
+              responseMimeType: 'application/json',
+            },
+          }),
+        }
+      )
+
+      if (!res.ok) {
+        console.error('Gemini API error:', res.status, await res.text())
+        continue
+      }
+
+      const data = await res.json()
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+
+      // JSON 파싱 (Gemini는 responseMimeType으로 JSON 직접 반환)
+      let parsed: any[]
+      try {
+        parsed = JSON.parse(content)
+      } catch {
+        // fallback: JSON 배열 추출
+        const jsonMatch = content.match(/\[[\s\S]*\]/)
+        if (!jsonMatch) continue
+        parsed = JSON.parse(jsonMatch[0])
+      }
+
+      for (const item of parsed) {
+        const no = item.no - 1 // 0-indexed
+        if (no >= 0 && no < batch.length && categoryList.includes(item.category)) {
+          allResults.push({
+            idx: batch[no].idx,
+            category: item.category,
+            confidence: Math.min(item.confidence || 60, 90), // AI 분류는 최대 90%
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Gemini classify error:', e)
+    }
+  }
+
+  return allResults
+}
 
 function getSupabaseAdmin() {
   return createClient(
@@ -15,33 +138,60 @@ function getSupabaseAdmin() {
   )
 }
 
-// ── 세무사 기준 분류 규칙 (확장) ──
+// ── 세무사 기준 분류 규칙 (법인 전체 계정과목 기준 확장) ──
 const CATEGORY_RULES = [
-  // 수입
-  { category: '렌트/운송수입', type: 'income', keywords: ['매출', '정산', '운송료', '운임', '렌트료', '화물'] },
-  { category: '지입 관리비/수수료', type: 'income', keywords: ['지입료', '관리비', '번호판', '수수료'] },
-  { category: '투자원금 입금', type: 'income', keywords: ['투자', '증자', '자본', '출자'] },
-  { category: '지입 초기비용/보증금', type: 'income', keywords: ['보증금', '인수금', '초기비용'] },
-  { category: '대출 실행(입금)', type: 'income', keywords: ['대출입금', '대출실행', '론실행'] },
-  { category: '이자/잡이익', type: 'income', keywords: ['이자수입', '환급', '캐시백', '이자입금'] },
-  { category: '보험금 수령', type: 'income', keywords: ['보험금', '보상금', '사고보상'] },
-  // 지출
-  { category: '지입 수익배분금(출금)', type: 'expense', keywords: ['수익배분', '정산금', '배분금', '지입대금'] },
-  { category: '유류비', type: 'expense', keywords: ['주유', '가스', '엘피지', 'GS칼텍스', 'SK에너지', 'S-OIL', '충전', '연료'] },
-  { category: '정비/수리비', type: 'expense', keywords: ['정비', '모터스', '타이어', '공업사', '수리', '부품', '오토', '정비소'] },
-  { category: '차량보험료', type: 'expense', keywords: ['손해보험', '화재보험', 'KB손해', '현대해상', 'DB손해', '보험료', '자동차보험'] },
-  { category: '자동차세/공과금', type: 'expense', keywords: ['자동차세', '과태료', '범칙금', '검사', '도로공사', '하이패스', '통행료'] },
-  { category: '차량할부/리스료', type: 'expense', keywords: ['캐피탈', '파이낸셜', '할부', '리스료', '오토리스'] },
-  { category: '이자비용(대출/투자)', type: 'expense', keywords: ['이자', '금융비용', '이자지급'] },
-  { category: '원금상환', type: 'expense', keywords: ['원금상환', '원리금'] },
-  { category: '급여(정규직)', type: 'expense', keywords: ['급여', '월급', '상여금', '퇴직금', '임금'] },
-  { category: '용역비(3.3%)', type: 'expense', keywords: ['용역', '프리랜서', '3.3', '탁송', '대리운전', '외주'] },
-  { category: '4대보험(회사부담)', type: 'expense', keywords: ['국민연금', '건강보험', '고용보험', '산재보험', '4대보험'] },
-  { category: '세금/공과금', type: 'expense', keywords: ['원천세', '부가세', '법인세', '지방세', '세무서', '국세청'] },
-  { category: '복리후생(식대)', type: 'expense', keywords: ['식당', '카페', '커피', '마트', '식사', '편의점', '배달', '음식'] },
-  { category: '접대비', type: 'expense', keywords: ['접대', '골프', '선물', '경조사', '화환', '축의금'] },
-  { category: '임차료/사무실', type: 'expense', keywords: ['월세', '임대료', '관리비', '주차', '사무실'] },
-  { category: '통신/소모품', type: 'expense', keywords: ['KT', 'SKT', 'LG', '인터넷', '다이소', '문구', '쿠팡', '네이버', '사무용품'] },
+  // ═══ 수입 (매출/영업외수익) ═══
+  { category: '렌트/운송수입', type: 'income', keywords: ['매출', '정산', '운송료', '운임', '렌트료', '화물', '운반비', '배송료', '용차료'] },
+  { category: '지입 관리비/수수료', type: 'income', keywords: ['지입료', '관리비수입', '번호판사용료', '차량관리수수료'] },
+  { category: '투자원금 입금', type: 'income', keywords: ['투자', '증자', '자본', '출자', '출자금'] },
+  { category: '지입 초기비용/보증금', type: 'income', keywords: ['보증금', '인수금', '초기비용', '입주보증금'] },
+  { category: '대출 실행(입금)', type: 'income', keywords: ['대출입금', '대출실행', '론실행', '여신실행'] },
+  { category: '이자/잡이익', type: 'income', keywords: ['이자수입', '환급', '캐시백', '이자입금', '이자지급', '잡이익'] },
+  { category: '보험금 수령', type: 'income', keywords: ['보험금', '보상금', '사고보상', '보험수령'] },
+  { category: '매각/처분수입', type: 'income', keywords: ['차량매각', '매각대금', '처분대금', '중고매각'] },
+  { category: '기타수입', type: 'income', keywords: ['잡수입', '기타수입'] },
+
+  // ═══ 지출 (매출원가/판관비/영업외비용) ═══
+  // 운송업 원가
+  { category: '지입 수익배분금(출금)', type: 'expense', keywords: ['수익배분', '정산금', '배분금', '지입대금', '지입정산'] },
+  { category: '유류비', type: 'expense', keywords: ['주유', '가스', '엘피지', 'gs칼텍스', 'sk에너지', 's-oil', '충전', '연료', 'lpg', 'cng', '알뜰주유', '현대오일뱅크', '에쓰오일', '셀프주유'] },
+  { category: '정비/수리비', type: 'expense', keywords: ['정비', '모터스', '타이어', '공업사', '수리', '부품', '오토', '정비소', '엔진오일', '세차', '카센터', '브레이크', '배터리'] },
+  { category: '차량보험료', type: 'expense', keywords: ['손해보험', '화재보험', 'kb손해', '현대해상', 'db손해', '보험료', '자동차보험', '메리츠', '한화손해', '삼성화재', '흥국화재'] },
+  { category: '자동차세/공과금', type: 'expense', keywords: ['자동차세', '과태료', '범칙금', '검사', '도로공사', '하이패스', '통행료', '교통벌금', '차량등록', '번호판'] },
+  { category: '차량할부/리스료', type: 'expense', keywords: ['캐피탈', '파이낸셜', '할부', '리스료', '오토리스', '약정', '여신금융', '할부금'] },
+  { category: '화물공제/적재물보험', type: 'expense', keywords: ['화물공제', '적재물', '화물보험', '공제조합', '화물연대'] },
+
+  // 인건비
+  { category: '급여(정규직)', type: 'expense', keywords: ['급여', '월급', '상여금', '퇴직금', '임금', '성과급'] },
+  { category: '일용직급여', type: 'expense', keywords: ['일용', '일당', '아르바이트', '파트타임', '알바'] },
+  { category: '용역비(3.3%)', type: 'expense', keywords: ['용역', '프리랜서', '3.3', '탁송', '대리운전', '외주', '도급', '위탁', '하청'] },
+  { category: '4대보험(회사부담)', type: 'expense', keywords: ['국민연금', '건강보험', '고용보험', '산재보험', '4대보험', '사회보험'] },
+
+  // 세금/금융
+  { category: '원천세/부가세', type: 'expense', keywords: ['원천세', '부가세', '부가가치세', '예정신고', '확정신고'] },
+  { category: '법인세/지방세', type: 'expense', keywords: ['법인세', '지방세', '지방소득세', '법인지방소득세'] },
+  { category: '세금/공과금', type: 'expense', keywords: ['세무서', '국세청', '국세', '재산세', '종합부동산세', '취득세', '인지세'] },
+  { category: '이자비용(대출/투자)', type: 'expense', keywords: ['이자', '금융비용', '이자지급', '대출이자'] },
+  { category: '원금상환', type: 'expense', keywords: ['원금상환', '원리금', '대출상환'] },
+  { category: '수수료/카드수수료', type: 'expense', keywords: ['수수료', '카드수수료', '송금수수료', '이체수수료', '중개수수료', 'pg수수료'] },
+
+  // 일반관리비
+  { category: '임차료/사무실', type: 'expense', keywords: ['월세', '임대료', '관리비', '주차', '사무실', '임차', '부동산', '건물관리'] },
+  { category: '통신비', type: 'expense', keywords: ['kt', 'skt', 'lg유플러스', '인터넷', '통신', '전화', '알뜰폰', '티플러스'] },
+  { category: '소모품/사무용품', type: 'expense', keywords: ['다이소', '문구', '사무용품', '토너', '복사', '프린터'] },
+  { category: '복리후생(식대)', type: 'expense', keywords: ['식당', '카페', '커피', '마트', '식사', '편의점', '배달', '음식', '도시락', '푸드', '치킨', '피자', '한식', '중식', '일식', '분식'] },
+  { category: '접대비', type: 'expense', keywords: ['접대', '골프', '선물', '경조사', '화환', '축의금', '부조'] },
+  { category: '여비교통비', type: 'expense', keywords: ['택시', '기차', 'ktx', '고속버스', '시외버스', '항공', '비행기', '숙박', '호텔', '모텔', '주차비'] },
+  { category: '교육/훈련비', type: 'expense', keywords: ['교육', '훈련', '연수', '세미나', '학원', '자격증'] },
+  { category: '광고/마케팅', type: 'expense', keywords: ['광고', '마케팅', '홍보', '네이버광고', '구글애즈', '페이스북', '인스타그램'] },
+  { category: '보험료(일반)', type: 'expense', keywords: ['생명보험', '상해보험', '단체보험', '배상책임'] },
+  { category: '감가상각비', type: 'expense', keywords: ['감가상각', '상각비'] },
+  { category: '수선/유지비', type: 'expense', keywords: ['수선비', '유지보수', '시설보수'] },
+  { category: '전기/수도/가스', type: 'expense', keywords: ['전기요금', '수도요금', '가스요금', '한국전력', '도시가스'] },
+  { category: '도서/신문', type: 'expense', keywords: ['도서', '서적', '신문', '구독'] },
+  { category: '경비/보안', type: 'expense', keywords: ['경비', 'cctv', '보안', '에스원', 'adt', '경호'] },
+  { category: '쇼핑/온라인구매', type: 'expense', keywords: ['쿠팡', '네이버', '11번가', 'g마켓', '옥션', '아마존', '알리', '테무'] },
+  { category: '기타', type: 'expense', keywords: [] },
 ]
 
 // ── 유사도 함수들 ──
@@ -131,7 +281,7 @@ export async function POST(request: NextRequest) {
       salaryRes, freelancerRes, insuranceRes, carRes, cardRes
     ] = await Promise.all([
       // 기존 계약
-      sb.from('jiip_contracts').select('id, investor_name, contractor_name, admin_fee, payout_day, status')
+      sb.from('jiip_contracts').select('id, investor_name, investor_name, admin_fee, payout_day, status')
         .eq('company_id', company_id).eq('status', 'active'),
       sb.from('general_investments').select('id, investor_name, invest_amount, interest_rate, payment_day, status')
         .eq('company_id', company_id).eq('status', 'active'),
@@ -167,7 +317,7 @@ export async function POST(request: NextRequest) {
     for (const c of jiipRes.data || []) {
       targets.push({
         id: c.id, type: 'jiip',
-        name: c.investor_name || c.contractor_name || '',
+        name: c.investor_name || c.investor_name || '',
         monthlyAmount: Number(c.admin_fee) || 0,
         paymentDay: Number(c.payout_day) || 10,
         defaultCategory: '지입 관리비/수수료',
@@ -279,15 +429,39 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ── 3b. 카드 결제 매칭 (법인카드) ──
-      if (tx.payment_method === '카드' || tx.payment_method === 'Card') {
-        // 카드번호 뒷자리로 매칭
-        const cardNumHint = (tx.card_number || '').replace(/\D/g, '').slice(-4)
-        if (cardNumHint) {
-          const matchedCard = cards.find((c: any) => c.card_number?.endsWith(cardNumHint))
-          if (matchedCard) {
-            tx.card_id = matchedCard.id
-          }
+      // ── 3b. 카드 결제 매칭 (법인카드) — 다중 전략 ──
+      const pmLower = (tx.payment_method || '').toLowerCase()
+      if (pmLower === '카드' || pmLower === 'card' || pmLower.includes('카드') || pmLower.includes('card')) {
+        const rawCardNum = (tx.card_number || '').replace(/[\s-]/g, '')
+        const digitsOnly = rawCardNum.replace(/\D/g, '')
+
+        // 전략 1: 뒷4자리 매칭
+        if (digitsOnly.length >= 4) {
+          const last4 = digitsOnly.slice(-4)
+          const matchedCard = cards.find((c: any) => {
+            const cDigits = (c.card_number || '').replace(/\D/g, '')
+            return cDigits.endsWith(last4)
+          })
+          if (matchedCard) tx.card_id = matchedCard.id
+        }
+
+        // 전략 2: 뒷4자리가 마스킹됐을 때 → 앞4자리로 매칭
+        if (!tx.card_id && digitsOnly.length >= 4) {
+          const first4 = digitsOnly.slice(0, 4)
+          const matchedCard = cards.find((c: any) => {
+            const cDigits = (c.card_number || '').replace(/\D/g, '')
+            return cDigits.startsWith(first4)
+          })
+          if (matchedCard) tx.card_id = matchedCard.id
+        }
+
+        // 전략 3: 카드번호 일부분이라도 포함되면 매칭 (ex: report의 '4331')
+        if (!tx.card_id && rawCardNum.length >= 3) {
+          const matchedCard = cards.find((c: any) => {
+            const cNum = (c.card_number || '').replace(/[\s-]/g, '')
+            return cNum.includes(rawCardNum) || rawCardNum.includes(cNum.slice(-4))
+          })
+          if (matchedCard) tx.card_id = matchedCard.id
         }
       }
 
@@ -295,10 +469,26 @@ export async function POST(request: NextRequest) {
       if (result.category === '미분류') {
         for (const rule of CATEGORY_RULES) {
           if (rule.type !== txType) continue
+          if (rule.keywords.length === 0) continue // '기타'는 스킵
           for (const kw of rule.keywords) {
-            if (searchText.includes(kw.toLowerCase())) {
+            if (searchText.includes(kw)) {
               result.category = rule.category
               result.confidence = 70
+              break
+            }
+          }
+          if (result.category !== '미분류') break
+        }
+      }
+
+      // ── 3c-2. 양방향 키워드 매칭 (income/expense 무관 키워드도 체크) ──
+      if (result.category === '미분류') {
+        for (const rule of CATEGORY_RULES) {
+          if (rule.keywords.length === 0) continue
+          for (const kw of rule.keywords) {
+            if (searchText.includes(kw)) {
+              result.category = rule.category
+              result.confidence = 55 // 방향 불일치로 낮은 신뢰도
               break
             }
           }
@@ -318,8 +508,10 @@ export async function POST(request: NextRequest) {
 
         let score = 0
 
-        // 이름 유사도 (최대 50점)
-        const nameScore = nameSimilarity(clientName, target.name)
+        // 이름 유사도 — client_name + description 모두 검사 (최대 50점)
+        const nameScore1 = nameSimilarity(clientName, target.name)
+        const nameScore2 = nameSimilarity(description, target.name)
+        const nameScore = Math.max(nameScore1, nameScore2)
         score += nameScore * 0.5
 
         // 금액 근접도 (최대 40점)
@@ -334,7 +526,13 @@ export async function POST(request: NextRequest) {
           score += dateScore * 0.1
         }
 
-        if (score > 25) {
+        // 보너스: 키워드 타입별 추가 점수
+        if (target.type === 'insurance' && searchText.match(/보험|손해|화재|해상/)) score += 15
+        if (target.type === 'loan' && searchText.match(/캐피탈|파이낸셜|할부|대출|약정/)) score += 15
+        if (target.type === 'salary' && searchText.match(/급여|월급|임금/)) score += 15
+        if (target.type === 'freelancer' && searchText.match(/용역|외주|3\.3/)) score += 15
+
+        if (score > 20) {
           matchCandidates.push({ target, score })
         }
       }
@@ -413,25 +611,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ── 3g. 신뢰도 기반 분류 등급 결정 ──
-      if (result.confidence >= 80) {
-        result.classification_tier = 'auto'
-      } else if (result.confidence >= 60) {
-        result.classification_tier = 'review'
-      } else {
-        result.classification_tier = 'manual'
-      }
-
-      // 카테고리 대안 추가 (미분류인 경우 키워드 후보)
-      if (result.category === '미분류') {
-        // 가능한 카테고리 후보들 추가
-        const possibles = CATEGORY_RULES
-          .filter(r => r.type === txType)
-          .slice(0, 3)
-          .map(r => ({ category: r.category, confidence: 30 }))
-        result.alternatives = [...result.alternatives, ...possibles].slice(0, 5)
-      }
-
+      // 신뢰도/등급은 GPT 분류 후 재계산
       return {
         ...tx,
         category: result.category,
@@ -446,6 +626,51 @@ export async function POST(request: NextRequest) {
         card_id: tx.card_id || null,
       }
     })
+
+    // ── 3h. Gemini AI 분류 (미분류 & 낮은 신뢰도 건) ──
+    const unclassifiedItems = enriched
+      .map((tx: any, idx: number) => ({ ...tx, _idx: idx }))
+      .filter((tx: any) => tx.category === '미분류' || tx.category === '기타' || tx.confidence < 50)
+      .map((tx: any) => ({
+        idx: tx._idx,
+        client_name: tx.client_name || '',
+        description: tx.description || '',
+        amount: tx.amount || 0,
+        type: tx.type || 'expense',
+        payment_method: tx.payment_method || '',
+        transaction_date: tx.transaction_date || '',
+      }))
+
+    if (unclassifiedItems.length > 0) {
+      const allCats = CATEGORY_RULES.map(r => r.category)
+      const uniqueCats = [...new Set(allCats)]
+      const gptResults = await classifyWithGemini(unclassifiedItems, uniqueCats)
+
+      for (const gr of gptResults) {
+        if (enriched[gr.idx]) {
+          enriched[gr.idx].category = gr.category
+          enriched[gr.idx].confidence = gr.confidence
+          enriched[gr.idx].classification_tier = gr.confidence >= 80 ? 'auto' : gr.confidence >= 60 ? 'review' : 'manual'
+        }
+      }
+    }
+
+    // ── 3i. 최종 등급 결정 (GPT 미처리 건 포함) ──
+    for (const tx of enriched) {
+      if (!tx.classification_tier || tx.classification_tier === 'manual') {
+        if (tx.confidence >= 80) tx.classification_tier = 'auto'
+        else if (tx.confidence >= 60) tx.classification_tier = 'review'
+        else tx.classification_tier = 'manual'
+      }
+    }
+
+    // ── 3j. 디버그 로깅 ──
+    console.log(`[classify] 총 ${enriched.length}건 처리 완료`)
+    console.log(`[classify] 카테고리 분포:`, enriched.reduce((acc: Record<string, number>, t: any) => {
+      acc[t.category] = (acc[t.category] || 0) + 1; return acc
+    }, {}))
+    console.log(`[classify] 연결대상 매칭:`, enriched.filter((t: any) => t.related_id).length, '건')
+    console.log(`[classify] 카드 매칭:`, enriched.filter((t: any) => t.card_id).length, '건')
 
     // ── 4. 요약 통계 ──
     const summary = {
@@ -495,7 +720,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── GET: 분류 큐 조회 (review 대시보드용) ──
+// ── GET: 분류 검토 조회 (transactions 테이블 직접 조회) ──
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -509,23 +734,57 @@ export async function GET(request: NextRequest) {
 
     const sb = getSupabaseAdmin()
 
-    const { data, error, count } = await sb
-      .from('classification_queue')
+    // pending = 카테고리가 '기타' 또는 비어있는 건, confirmed = 제대로 분류된 건
+    const PENDING_CATEGORIES = ['기타', '미분류', '']
+
+    let query = sb
+      .from('transactions')
       .select('*', { count: 'exact' })
       .eq('company_id', company_id)
-      .eq('status', status)
+
+    if (status === 'pending') {
+      query = query.or('category.is.null,category.eq.기타,category.eq.미분류,category.eq.')
+    } else if (status === 'confirmed') {
+      query = query.not('category', 'is', null)
+        .not('category', 'eq', '기타')
+        .not('category', 'eq', '미분류')
+        .not('category', 'eq', '')
+    }
+
+    const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .limit(limit)
 
     if (error) throw error
 
-    return NextResponse.json({ items: data || [], total: count || 0 })
+    // review 페이지 형식에 맞게 변환
+    const items = (data || []).map((tx: any) => ({
+      id: tx.id,
+      company_id: tx.company_id,
+      source_data: {
+        transaction_date: tx.transaction_date,
+        client_name: tx.client_name,
+        description: tx.description,
+        amount: tx.amount,
+        type: tx.type,
+        payment_method: tx.payment_method,
+      },
+      ai_category: tx.category || '미분류',
+      ai_confidence: 0,
+      ai_related_type: tx.related_type,
+      ai_related_id: tx.related_id,
+      alternatives: [],
+      status: PENDING_CATEGORIES.includes(tx.category || '') || !tx.category ? 'pending' : 'confirmed',
+      final_category: PENDING_CATEGORIES.includes(tx.category || '') || !tx.category ? null : tx.category,
+    }))
+
+    return NextResponse.json({ items, total: count || 0 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-// ── PATCH: 분류 큐 항목 확정 (수동 결정) ──
+// ── PATCH: 거래 항목 분류 확정 (transactions 직접 업데이트) ──
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
@@ -537,15 +796,13 @@ export async function PATCH(request: NextRequest) {
 
     const sb = getSupabaseAdmin()
 
-    // 1. 큐 항목 업데이트
+    // 1. transactions 테이블 직접 업데이트
     const { data: updated, error: updateErr } = await sb
-      .from('classification_queue')
+      .from('transactions')
       .update({
-        final_category,
-        final_related_type: final_related_type || null,
-        final_related_id: final_related_id || null,
-        status: 'confirmed',
-        reviewed_at: new Date().toISOString(),
+        category: final_category,
+        related_type: final_related_type || null,
+        related_id: final_related_id || null,
       })
       .eq('id', queue_id)
       .select()
@@ -563,28 +820,6 @@ export async function PATCH(request: NextRequest) {
       }, { onConflict: 'keyword' })
 
       if (ruleErr) console.error('Rule save error:', ruleErr.message)
-    }
-
-    // 3. transactions 테이블에 확정 기록 생성 (선택적)
-    if (updated?.source_data) {
-      const src = updated.source_data as any
-      const { error: txErr } = await sb.from('transactions').insert({
-        company_id: updated.company_id,
-        transaction_date: src.transaction_date,
-        type: src.type || 'expense',
-        client_name: src.client_name || '',
-        description: src.description || '',
-        amount: Number(src.amount) || 0,
-        payment_method: src.payment_method || '통장',
-        category: final_category,
-        related_type: final_related_type || null,
-        related_id: final_related_id || null,
-        classification_source: 'manual_review',
-        confidence: 100,
-        status: 'completed',
-      })
-
-      if (txErr) console.error('Transaction insert error:', txErr.message)
     }
 
     return NextResponse.json({ success: true, data: updated })

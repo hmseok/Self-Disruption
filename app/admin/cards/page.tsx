@@ -123,9 +123,16 @@ export default function CorporateCardsPage() {
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
       {/* 헤더 */}
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">법인카드 관리</h1>
-        <p className="text-sm text-slate-400 mt-1">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💳 법인카드 관리</h1>
+          <p className="text-sm text-slate-400 mt-1">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
+        </div>
+        <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
+          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          카드 등록
+        </button>
       </div>
 
       {/* 요약 카드 */}
@@ -143,15 +150,6 @@ export default function CorporateCardsPage() {
           <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">이번달 총 사용액</p>
           <p className="text-xl font-bold text-slate-900">{formatMoney(totalMonthlyUsage)}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
         </div>
-      </div>
-
-      {/* 카드 추가 버튼 */}
-      <div className="flex justify-end mb-5">
-        <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-          className="px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800 transition-colors flex items-center gap-1.5">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          카드 등록
-        </button>
       </div>
 
       {/* 카드 목록 - 카드형 UI */}

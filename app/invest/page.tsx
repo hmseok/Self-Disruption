@@ -107,13 +107,25 @@ export default function GeneralInvestDashboard() {
     return true
   })
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen pb-20 md:pb-32">
 
       {/* 상단 헤더 */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💼 투자자/펀딩 정산</h1>
+          <p className="text-gray-500 text-sm mt-1">투자 계약 및 수익 배분 관리</p>
         </div>
 
         <Link href="/invest/general/new" className="py-2.5 px-5 bg-steel-600 text-white text-sm md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors flex items-center gap-2">

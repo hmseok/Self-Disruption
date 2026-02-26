@@ -391,13 +391,25 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
     return end >= today && end <= thirtyDaysLater
   }).sort((a, b) => new Date(a.insurance.end_date).getTime() - new Date(b.insurance.end_date).getTime())
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
-        <div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🛡️ 보험/사고/정비</h1>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ textAlign: 'left' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>🛡️ 보험/사고/정비</h1>
+            <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>보험 가입·갱신 및 사고/정비 이력 관리</p>
         </div>
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
             <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={bulkProcessing}
@@ -547,7 +559,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
         {filteredList.length === 0 ? (
             <div className="p-12 md:p-20 text-center text-gray-400">
               {list.length === 0 ? '등록된 차량이 없습니다.' : '해당 조건의 차량이 없습니다.'}
@@ -555,7 +567,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
         ) : (
             <>
               {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
+              <div style={{ overflowX: 'auto' }}>
                 <table className="w-full text-left text-sm min-w-[700px]">
                   <thead className="bg-gray-50/50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs tracking-wider">
                     <tr>
@@ -625,7 +637,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-gray-100">
+              <div style={{ display: 'none' }}>
                 {filteredList.map((item) => (
                   <div key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="p-4 hover:bg-steel-50/30 transition-colors cursor-pointer">
                     <div className="flex justify-between items-start mb-3">

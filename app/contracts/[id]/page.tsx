@@ -595,8 +595,8 @@ export default function ContractDetailPage() {
   return (
     <div className="max-w-[1400px] mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-8">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'left' }}>
           <div className="flex items-center gap-2 mb-1">
             <Link href="/quotes" className="text-gray-400 hover:text-gray-600 text-sm">
               견적/계약 관리

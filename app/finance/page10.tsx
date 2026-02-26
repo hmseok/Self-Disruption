@@ -125,7 +125,7 @@ export default function FinancePage() {
                   newTxs.push({
                       transaction_date: `${filterDate}-${jiip.payout_day?.toString().padStart(2,'0') || '10'}`,
                       type: 'expense', status: 'pending', category: '지입정산금',
-                      client_name: `${jiip.contractor_name} (정산)`, description: `${filterDate}월 운송료 정산`,
+                      client_name: `${jiip.investor_name} (정산)`, description: `${filterDate}월 운송료 정산`,
                       amount: 0, payment_method: '통장', related_type: 'jiip', related_id: String(jiip.id)
                   })
               }

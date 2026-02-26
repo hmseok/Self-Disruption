@@ -214,6 +214,17 @@ export default function ReportDashboard() {
     { key: 'partner', label: '투자/파트너' },
   ]
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen flex items-center justify-center">
@@ -228,10 +239,10 @@ export default function ReportDashboard() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-4">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 리포트 / 통계</h1>
-          <p className="text-gray-500 mt-2">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
+          <p className="text-gray-500 text-sm mt-1">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
         </div>
         <div className="flex gap-2">
           {[3, 6, 12].map(m => (

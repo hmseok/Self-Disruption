@@ -343,11 +343,11 @@ export default function GeneralInvestDetail() {
           목록으로
         </button>
 
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
-                {isNew ? '일반 투자 등록' : '투자 상세 정보'}
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+                💼 {isNew ? '일반 투자 등록' : '투자 상세 정보'}
               </h1>
               {!isNew && (
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${statusInfo.bg}`}>

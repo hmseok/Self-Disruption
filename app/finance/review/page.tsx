@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from '../../utils/supabase'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 
 // ── 분류 카테고리 옵션 ──
@@ -16,34 +16,30 @@ const CATEGORIES = [
 
 const ALL_CATEGORIES = CATEGORIES.flatMap(g => g.items)
 
-// ── 연결 유형 라벨 ──
-const TYPE_LABELS: Record<string, string> = {
-  jiip: '지입',
-  invest: '투자',
-  loan: '대출',
-  salary: '급여',
-  freelancer: '프리랜서',
-  insurance: '보험',
-  car: '차량',
+const CATEGORY_ICONS: Record<string, string> = {
+  '렌트/운송수입': '🚛', '지입 관리비/수수료': '📋', '투자원금 입금': '💰', '지입 초기비용/보증금': '🔑',
+  '대출 실행(입금)': '🏦', '이자/잡이익': '📈', '보험금 수령': '🛡️',
+  '유류비': '⛽', '정비/수리비': '🔧', '차량보험료': '🚗', '자동차세/공과금': '📄', '차량할부/리스료': '💳',
+  '이자비용(대출/투자)': '📊', '원금상환': '💸', '지입 수익배분금(출금)': '🤝',
+  '급여(정규직)': '👨‍💼', '용역비(3.3%)': '👷', '4대보험(회사부담)': '🏥',
+  '복리후생(식대)': '🍽️', '접대비': '🥂', '임차료/사무실': '🏢', '통신/소모품': '📱',
+  '세금/공과금': '🏛️', '미분류': '❓', '기타': '📦',
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  jiip: 'bg-slate-100 text-slate-700',
-  invest: 'bg-blue-50 text-blue-600',
-  loan: 'bg-amber-50 text-amber-700',
-  salary: 'bg-emerald-50 text-emerald-600',
-  freelancer: 'bg-violet-50 text-violet-600',
-  insurance: 'bg-cyan-50 text-cyan-700',
-  car: 'bg-orange-50 text-orange-600',
+const CATEGORY_COLORS: Record<string, string> = {
+  '매출': '#3b82f6', '차량': '#f59e0b', '금융': '#8b5cf6', '인건비': '#10b981', '관리비': '#ec4899', '세금': '#ef4444',
 }
+
+const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량' }
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
-const FILTER_TABS = [
-  { key: 'pending' as const, label: '대기중', icon: '⏳' },
-  { key: 'confirmed' as const, label: '확정됨', icon: '✓' },
-  { key: 'all' as const, label: '전체', icon: '◎' },
-]
+function getCategoryGroup(cat: string): string {
+  for (const g of CATEGORIES) {
+    if (g.items.includes(cat)) return g.group
+  }
+  return '기타'
+}
 
 export default function ClassificationReviewPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
@@ -52,9 +48,11 @@ export default function ClassificationReviewPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'pending' | 'confirmed' | 'all'>('pending')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkCategory, setBulkCategory] = useState('')
   const [stats, setStats] = useState({ pending: 0, confirmed: 0 })
+  const [aiClassifying, setAiClassifying] = useState(false)
+  const [aiResult, setAiResult] = useState<{ updated: number; total: number } | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
 
   // 연결 대상 조회용
   const [jiips, setJiips] = useState<any[]>([])
@@ -66,7 +64,7 @@ export default function ClassificationReviewPage() {
     if (!companyId) { setLoading(false); return }
     setLoading(true)
     try {
-      const res = await fetch(`/api/finance/classify?company_id=${companyId}&status=${filter}&limit=100`)
+      const res = await fetch(`/api/finance/classify?company_id=${companyId}&status=${filter}&limit=500`)
       if (res.ok) {
         const data = await res.json()
         setItems(data.items || [])
@@ -89,7 +87,7 @@ export default function ClassificationReviewPage() {
   const fetchRelated = useCallback(async () => {
     if (!companyId) return
     const [j, i, f, e] = await Promise.all([
-      supabase.from('jiip_contracts').select('id, investor_name, contractor_name').eq('company_id', companyId),
+      supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', companyId),
       supabase.from('general_investments').select('id, investor_name').eq('company_id', companyId),
       supabase.from('freelancers').select('id, name').eq('company_id', companyId),
       supabase.from('profiles').select('id, name').eq('company_id', companyId),
@@ -103,12 +101,23 @@ export default function ClassificationReviewPage() {
   useEffect(() => { fetchItems() }, [fetchItems])
   useEffect(() => { fetchRelated() }, [fetchRelated])
 
+  // ── 카테고리별 그룹핑 ──
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, { items: any[]; totalAmount: number; type: string }> = {}
+    for (const item of items) {
+      const cat = item.ai_category || '미분류'
+      if (!groups[cat]) groups[cat] = { items: [], totalAmount: 0, type: 'expense' }
+      groups[cat].items.push(item)
+      groups[cat].totalAmount += Math.abs(item.source_data?.amount || 0)
+      if (item.source_data?.type === 'income') groups[cat].type = 'income'
+    }
+    // 정렬: 건수 많은 순
+    return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
+  }, [items])
+
   // ── 단건 확정 ──
   const handleConfirm = async (item: any, overrides?: { category?: string; related_type?: string; related_id?: string }) => {
     const category = overrides?.category || item.ai_category || item.final_category
-    const related_type = overrides?.related_type || item.ai_related_type
-    const related_id = overrides?.related_id || item.ai_related_id
-
     try {
       const res = await fetch('/api/finance/classify', {
         method: 'PATCH',
@@ -116,8 +125,8 @@ export default function ClassificationReviewPage() {
         body: JSON.stringify({
           queue_id: item.id,
           final_category: category,
-          final_related_type: related_type,
-          final_related_id: related_id,
+          final_related_type: overrides?.related_type || item.ai_related_type,
+          final_related_id: overrides?.related_id || item.ai_related_id,
           save_as_rule: false,
         }),
       })
@@ -125,343 +134,439 @@ export default function ClassificationReviewPage() {
         setItems(prev => prev.filter(i => i.id !== item.id))
         setStats(prev => ({ pending: prev.pending - 1, confirmed: prev.confirmed + 1 }))
       }
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
-  // ── 규칙 저장 + 확정 ──
+  // ── 규칙 학습 + 확정 ──
   const handleConfirmWithRule = async (item: any, category: string) => {
     const keyword = item.source_data?.client_name || ''
     if (!keyword) return handleConfirm(item, { category })
-
     try {
       const res = await fetch('/api/finance/classify', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          queue_id: item.id,
-          final_category: category,
-          final_related_type: item.ai_related_type,
-          final_related_id: item.ai_related_id,
-          save_as_rule: true,
-          rule_keyword: keyword,
+          queue_id: item.id, final_category: category,
+          final_related_type: item.ai_related_type, final_related_id: item.ai_related_id,
+          save_as_rule: true, rule_keyword: keyword,
         }),
       })
       if (res.ok) {
         setItems(prev => prev.filter(i => i.id !== item.id))
         setStats(prev => ({ pending: prev.pending - 1, confirmed: prev.confirmed + 1 }))
       }
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
-  // ── 일괄 확정 ──
-  const handleBulkConfirm = async () => {
-    if (selectedIds.size === 0) return
-    const selected = items.filter(i => selectedIds.has(i.id))
-    for (const item of selected) {
-      await handleConfirm(item, bulkCategory ? { category: bulkCategory } : undefined)
+  // ── 확정 취소 (대기중으로 되돌리기) ──
+  const handleRevert = async (item: any) => {
+    try {
+      const res = await fetch('/api/finance/classify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queue_id: item.id,
+          final_category: '기타',
+          final_related_type: null,
+          final_related_id: null,
+          save_as_rule: false,
+        }),
+      })
+      if (res.ok) {
+        setItems(prev => prev.filter(i => i.id !== item.id))
+        setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  // ── 카테고리 변경 (확정된 건) ──
+  const handleChangeCategory = async (item: any, newCategory: string) => {
+    try {
+      const res = await fetch('/api/finance/classify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queue_id: item.id,
+          final_category: newCategory,
+          final_related_type: item.ai_related_type,
+          final_related_id: item.ai_related_id,
+          save_as_rule: false,
+        }),
+      })
+      if (res.ok) {
+        // 목록 내에서 카테고리만 업데이트
+        setItems(prev => prev.map(i => i.id === item.id ? { ...i, ai_category: newCategory, final_category: newCategory } : i))
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  // ── 카테고리 그룹 일괄 확정 ──
+  const handleConfirmGroup = async (category: string) => {
+    const groupItems = items.filter(i => (i.ai_category || '미분류') === category)
+    if (!confirm(`"${category}" ${groupItems.length}건을 일괄 확정하시겠습니까?`)) return
+    for (const item of groupItems) {
+      await handleConfirm(item, { category })
     }
-    setSelectedIds(new Set())
     fetchItems()
   }
 
-  // ── 전체 자동 확정 (AI 추천 그대로) ──
-  const handleAutoConfirmAll = async () => {
-    if (!confirm(`AI 추천 기준으로 ${items.length}건을 일괄 확정하시겠습니까?`)) return
+  // ── 카테고리 그룹 일괄 되돌리기 ──
+  const handleRevertGroup = async (category: string) => {
+    const groupItems = items.filter(i => (i.ai_category || '미분류') === category)
+    if (!confirm(`"${category}" ${groupItems.length}건을 대기중으로 되돌리시겠습니까?`)) return
+    for (const item of groupItems) {
+      await handleRevert(item)
+    }
+    fetchItems()
+  }
+
+  // ── 전체 되돌리기 ──
+  const handleRevertAll = async () => {
+    if (!confirm(`현재 조회된 ${items.length}건 전체를 대기중으로 되돌리시겠습니까?`)) return
     for (const item of items) {
+      await handleRevert(item)
+    }
+    fetchItems()
+  }
+
+  // ── 전체 자동 확정 ──
+  const handleAutoConfirmAll = async () => {
+    const pendingItems = items.filter(i => i.status === 'pending')
+    if (!confirm(`AI 추천 기준으로 ${pendingItems.length}건을 일괄 확정하시겠습니까?`)) return
+    for (const item of pendingItems) {
       await handleConfirm(item)
     }
     fetchItems()
   }
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
+  // ── AI 자동 재분류 ──
+  const handleAiReclassify = async () => {
+    if (!companyId) return
+    if (!confirm('미분류/기타 거래를 AI로 자동 분류하시겠습니까?\nGPT가 거래 내용을 분석하여 계정과목을 추천합니다.')) return
+    setAiClassifying(true)
+    setAiResult(null)
+    try {
+      const res = await fetch('/api/finance/reclassify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: companyId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAiResult({ updated: data.updated, total: data.total })
+        fetchItems()
+      } else {
+        const err = await res.json()
+        alert('AI 분류 실패: ' + (err.error || '알 수 없는 오류'))
+      }
+    } catch (e) { console.error(e); alert('AI 분류 요청 중 오류가 발생했습니다.') }
+    setAiClassifying(false)
+  }
+
+  // ── 중복 체크 & 삭제 ──
+  const handleCheckDuplicates = async () => {
+    if (!companyId) return
+    setDuplicateInfo({ count: 0, checking: true })
+    try {
+      const res = await fetch(`/api/finance/dedup?company_id=${companyId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDuplicateInfo({ count: data.duplicateCount, checking: false })
+        if (data.duplicateCount === 0) {
+          alert('✅ 중복 거래가 없습니다!')
+        } else if (confirm(`⚠️ ${data.duplicateCount}건의 중복 거래가 발견되었습니다.\n(${data.groupCount}개 그룹)\n\n중복 건을 삭제하시겠습니까? (먼저 저장된 1건만 유지)`)) {
+            const delRes = await fetch('/api/finance/dedup', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ company_id: companyId }),
+            })
+            if (delRes.ok) {
+              const delData = await delRes.json()
+              alert(`✅ ${delData.deleted}건 중복 삭제 완료! (${delData.remaining}건 남음)`)
+              fetchItems()
+            }
+        }
+      }
+    } catch (e) { console.error(e) }
+    setDuplicateInfo(prev => ({ ...prev, checking: false }))
+  }
+
+  const toggleGroup = (cat: string) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
       return next
     })
   }
 
-  const toggleAll = () => {
-    if (selectedIds.size === items.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(items.map(i => i.id)))
-    }
-  }
-
-  const getConfidenceColor = (conf: number) => {
-    if (conf >= 80) return 'bg-emerald-50 text-emerald-600'
-    if (conf >= 60) return 'bg-amber-50 text-amber-600'
-    return 'bg-red-50 text-red-500'
-  }
-
-  const getConfidenceBar = (conf: number) => {
-    if (conf >= 80) return 'bg-emerald-500'
-    if (conf >= 60) return 'bg-amber-400'
-    return 'bg-red-400'
-  }
-
-  if (!companyId && !loading) {
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🤖 AI 분류 검토</h1>
-            <p className="text-gray-500 text-sm mt-1">AI가 분류한 거래를 검토하고 확정합니다 · 확정 결과는 자동으로 장부에 반영됩니다</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
-          <p className="text-4xl mb-3">🏢</p>
-          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p className="text-xs text-slate-400 mt-1">회사 선택 후 AI 분류 검토를 진행할 수 있습니다</p>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 16px', minHeight: '100vh', background: '#f8fafc' }}>
+        <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🏢</span>
+          <p style={{ fontWeight: 700, color: '#475569', fontSize: 14 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* 헤더 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🤖 AI 분류 검토</h1>
-          <p className="text-gray-500 text-sm mt-1">AI가 분류한 거래를 검토하고 확정합니다 · 확정 결과는 자동으로 장부에 반영됩니다</p>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>AI 분류 검토</h1>
+          <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>AI가 분류한 거래를 카테고리별로 검토하고 확정합니다</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={handleCheckDuplicates} disabled={duplicateInfo.checking}
+            style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontWeight: 700, fontSize: 12, color: '#64748b', cursor: 'pointer' }}>
+            {duplicateInfo.checking ? '🔍 확인 중...' : '🔄 중복 체크'}
+          </button>
+          <button onClick={handleAiReclassify} disabled={aiClassifying}
+            style={{ background: aiClassifying ? '#94a3b8' : 'linear-gradient(135deg, #7c3aed, #6366f1)', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: aiClassifying ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }}>
+            {aiClassifying ? '🔄 AI 분류 중...' : '🤖 AI 자동분류'}
+          </button>
+          {filter === 'pending' && items.length > 0 && (
+            <button onClick={handleAutoConfirmAll}
+              style={{ background: '#0f172a', color: '#fff', padding: '8px 14px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer' }}>
+              ✅ 전체 확정
+            </button>
+          )}
+          {filter === 'confirmed' && items.length > 0 && (
+            <button onClick={handleRevertAll}
+              style={{ background: '#fef2f2', color: '#dc2626', padding: '8px 14px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: '1px solid #fecaca', cursor: 'pointer' }}>
+              ↩ 전체 되돌리기
+            </button>
+          )}
         </div>
       </div>
 
       {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">검토 대기</p>
-          <p className="text-xl font-bold text-amber-600">{stats.pending}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">확정 완료</p>
-          <p className="text-xl font-bold text-emerald-600">{stats.confirmed}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">현재 조회</p>
-          <p className="text-xl font-bold text-slate-900">{total}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">선택됨</p>
-          <p className="text-xl font-bold text-slate-900">{selectedIds.size}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
-        </div>
-      </div>
-
-      {/* 탭 + 액션 바 */}
-      <div className="flex flex-col md:flex-row gap-3 mb-5">
-        <div className="flex gap-1 bg-white p-1 rounded-xl border border-slate-200/80 shadow-sm">
-          {FILTER_TABS.map(tab => (
-            <button key={tab.key} onClick={() => { setFilter(tab.key); setSelectedIds(new Set()) }}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                filter === tab.key ? 'bg-steel-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-              }`}>
-              <span className="text-xs">{tab.icon}</span>{tab.label}
-            </button>
-          ))}
-        </div>
-
-        {filter === 'pending' && items.length > 0 && (
-          <div className="flex gap-2 items-center ml-auto">
-            <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all">
-              <option value="">AI 추천 그대로</option>
-              {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <button onClick={handleBulkConfirm} disabled={selectedIds.size === 0}
-              className="bg-steel-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-steel-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              선택 확정 ({selectedIds.size})
-            </button>
-            <button onClick={handleAutoConfirmAll}
-              className="bg-steel-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-steel-700 transition-colors">
-              전체 AI확정
-            </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: '검토 대기', value: stats.pending, color: '#f59e0b', icon: '⏳' },
+          { label: '확정 완료', value: stats.confirmed, color: '#10b981', icon: '✅' },
+          { label: '현재 조회', value: total, color: '#0f172a', icon: '📋' },
+          { label: '카테고리', value: groupedItems.length, color: '#6366f1', icon: '🏷️' },
+        ].map((s, i) => (
+          <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '14px 16px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 14 }}>{s.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>{s.label}</span>
+            </div>
+            <p style={{ fontSize: 22, fontWeight: 900, color: s.color, margin: 0 }}>{s.value}<span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8', marginLeft: 2 }}>건</span></p>
           </div>
-        )}
+        ))}
       </div>
 
-      {/* 리스트 */}
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 16, width: 'fit-content' }}>
+        {[
+          { key: 'pending' as const, label: '⏳ 대기중' },
+          { key: 'confirmed' as const, label: '✅ 확정됨' },
+          { key: 'all' as const, label: '◎ 전체' },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => { setFilter(tab.key); setExpandedGroups(new Set()) }}
+            style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
+              background: filter === tab.key ? '#0f172a' : 'transparent', color: filter === tab.key ? '#fff' : '#94a3b8' }}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* AI 분류 결과 배너 */}
+      {aiResult && (
+        <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)', border: '1px solid #bbf7d0', borderRadius: 14, padding: '14px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 22 }}>🎉</span>
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 13, color: '#166534', margin: 0 }}>AI 자동분류 완료</p>
+            <p style={{ fontSize: 11, color: '#15803d', marginTop: 2 }}>총 {aiResult.total}건 중 {aiResult.updated}건이 AI에 의해 분류되었습니다</p>
+          </div>
+          <button onClick={() => setAiResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
+      {/* AI 분류 진행 중 */}
+      {aiClassifying && (
+        <div style={{ background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)', border: '1px solid #c7d2fe', borderRadius: 14, padding: 20, marginBottom: 16, textAlign: 'center' }}>
+          <div style={{ width: 28, height: 28, border: '3px solid #e0e7ff', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ fontWeight: 800, fontSize: 13, color: '#4338ca', margin: 0 }}>🤖 GPT가 거래 내역을 분석하고 있습니다...</p>
+          <p style={{ fontSize: 11, color: '#6366f1', marginTop: 4 }}>세무 전문가 수준의 AI가 계정과목을 자동 분류합니다</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      )}
+
+      {/* 카테고리별 그룹 뷰 */}
       {loading ? (
-        <div className="min-h-[300px] flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-7 h-7 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin mx-auto" />
-            <p className="mt-3 text-sm text-slate-400 font-medium">로딩 중...</p>
+        <div style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 28, height: 28, border: '2px solid #e2e8f0', borderTopColor: '#475569', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+            <p style={{ marginTop: 12, fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>로딩 중...</p>
           </div>
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-20">
-          <svg className="w-12 h-12 text-slate-200 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <p className="font-semibold text-sm text-slate-500">
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>✅</span>
+          <p style={{ fontWeight: 700, fontSize: 14, color: '#475569' }}>
             {filter === 'pending' ? '검토 대기 항목이 없습니다' : '조회된 항목이 없습니다'}
           </p>
-          <p className="text-xs text-slate-400 mt-1">업로드된 거래가 AI 분류되면 여기에 표시됩니다</p>
+          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>업로드된 거래가 AI 분류되면 여기에 표시됩니다</p>
         </div>
       ) : (
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          {/* 전체 선택 헤더 */}
-          {filter === 'pending' && (
-            <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={selectedIds.size === items.length && items.length > 0}
-                  onChange={toggleAll} className="w-4 h-4 rounded border-slate-300 text-steel-600 focus:ring-steel-500" />
-                <span className="text-xs font-semibold text-slate-500">전체 선택</span>
-              </label>
-              <span className="text-[11px] text-slate-400">{items.length}건</span>
-            </div>
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {groupedItems.map(([category, group]) => {
+            const isExpanded = expandedGroups.has(category)
+            const icon = CATEGORY_ICONS[category] || '📋'
+            const groupName = getCategoryGroup(category)
+            const groupColor = CATEGORY_COLORS[groupName] || '#64748b'
+            const isIncome = group.type === 'income'
 
-          <div className="divide-y divide-slate-50">
-            {items.map(item => {
-              const src = item.source_data || {}
-              const conf = item.ai_confidence || 0
-              const isSelected = selectedIds.has(item.id)
-              const isConfirmed = item.status === 'confirmed'
+            return (
+              <div key={category} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', transition: 'all 0.2s' }}>
+                {/* 그룹 헤더 (접기/펼치기) */}
+                <div onClick={() => toggleGroup(category)}
+                  style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', cursor: 'pointer', gap: 12, borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none' }}>
 
-              return (
-                <div key={item.id}
-                  className={`px-6 py-4 transition-colors ${isSelected ? 'bg-slate-50' : 'hover:bg-slate-50/50'} ${isConfirmed ? 'opacity-60' : ''}`}>
+                  {/* 카테고리 색상 바 */}
+                  <div style={{ width: 4, height: 36, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
 
-                  <div className="flex items-start gap-3">
-                    {/* 체크박스 */}
-                    {!isConfirmed && (
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-steel-600 focus:ring-steel-500 mt-1 flex-none" />
-                    )}
-
-                    {/* 메인 정보 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="font-semibold text-slate-900">{src.client_name || '(미상)'}</span>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${src.type === 'income' ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100' : 'bg-red-50 text-red-500 ring-1 ring-red-100'}`}>
-                          {src.type === 'income' ? '입금' : '출금'}
-                        </span>
-                        <span className="text-xs text-slate-400">{src.transaction_date}</span>
-                        {src.payment_method && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">{src.payment_method}</span>
-                        )}
-                      </div>
-
-                      {src.description && (
-                        <p className="text-xs text-slate-400 mb-2 truncate">{src.description}</p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        {/* AI 추천 카테고리 */}
-                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md text-[11px] font-semibold">
-                          {item.ai_category || '미분류'}
-                        </span>
-
-                        {/* 신뢰도 */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${getConfidenceBar(conf)}`} style={{ width: `${conf}%` }} />
-                          </div>
-                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${getConfidenceColor(conf)}`}>
-                            {conf}%
-                          </span>
-                        </div>
-
-                        {/* 연결 대상 */}
-                        {item.ai_related_type && (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${TYPE_COLORS[item.ai_related_type] || 'bg-slate-100 text-slate-600'}`}>
-                            {TYPE_LABELS[item.ai_related_type] || item.ai_related_type}
-                          </span>
-                        )}
-
-                        {/* 확정 카테고리 */}
-                        {isConfirmed && item.final_category && (
-                          <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-emerald-100">
-                            확정: {item.final_category}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 대안 제시 */}
-                      {!isConfirmed && (item.alternatives || []).length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className="text-[10px] text-slate-400 leading-6">대안:</span>
-                          {(item.alternatives || []).slice(0, 3).map((alt: any, i: number) => (
-                            <button key={i}
-                              onClick={() => handleConfirm(item, { category: alt.category, related_type: alt.related_type, related_id: alt.related_id })}
-                              className="text-[10px] font-medium bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                              {alt.category} ({alt.confidence}%)
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 금액 */}
-                    <div className="text-right flex-none">
-                      <p className={`text-base font-bold ${src.type === 'income' ? 'text-blue-600' : 'text-red-500'}`}>
-                        {src.type === 'income' ? '+' : '-'}{nf(src.amount)}
-                      </p>
+                  {/* 아이콘 + 카테고리명 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 20 }}>{icon}</span>
+                    <div>
+                      <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
+                      <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{groupName}</p>
                     </div>
                   </div>
 
-                  {/* 액션 버튼 */}
-                  {!isConfirmed && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
-                      <button onClick={() => handleConfirm(item)}
-                        className="bg-steel-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-steel-700 transition-colors">
-                        AI 추천 확정
-                      </button>
+                  {/* 건수 + 금액 */}
+                  <div style={{ textAlign: 'right', marginRight: 12 }}>
+                    <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#3b82f6' : '#ef4444', margin: 0 }}>
+                      {nf(group.totalAmount)}원
+                    </p>
+                    <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{group.items.length}건</p>
+                  </div>
 
-                      <button onClick={() => handleConfirmWithRule(item, item.ai_category)}
-                        className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-200 transition-colors">
-                        규칙 학습 + 확정
-                      </button>
-
-                      <select
-                        defaultValue=""
-                        onChange={e => {
-                          if (e.target.value) handleConfirm(item, { category: e.target.value })
-                        }}
-                        className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white text-slate-500">
-                        <option value="" disabled>카테고리 변경 확정...</option>
-                        {CATEGORIES.map(g => (
-                          <optgroup key={g.group} label={g.group}>
-                            {g.items.map(c => <option key={c} value={c}>{c}</option>)}
-                          </optgroup>
-                        ))}
-                      </select>
-
-                      <select
-                        defaultValue=""
-                        onChange={e => {
-                          if (!e.target.value) return
-                          const [type, id] = e.target.value.split('_')
-                          handleConfirm(item, { related_type: type, related_id: id })
-                        }}
-                        className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white text-slate-500">
-                        <option value="" disabled>연결 변경...</option>
-                        <optgroup label="지입">
-                          {jiips.map(j => <option key={j.id} value={`jiip_${j.id}`}>{j.investor_name || j.contractor_name}</option>)}
-                        </optgroup>
-                        <optgroup label="투자">
-                          {investors.map(i => <option key={i.id} value={`invest_${i.id}`}>{i.investor_name}</option>)}
-                        </optgroup>
-                        <optgroup label="프리랜서">
-                          {freelancers.map(f => <option key={f.id} value={`freelancer_${f.id}`}>{f.name}</option>)}
-                        </optgroup>
-                        <optgroup label="직원">
-                          {employees.map(e => <option key={e.id} value={`salary_${e.id}`}>{e.name}</option>)}
-                        </optgroup>
-                      </select>
-                    </div>
+                  {/* 확정 버튼 (pending만) */}
+                  {filter === 'pending' && category !== '미분류' && category !== '기타' && (
+                    <button onClick={(e) => { e.stopPropagation(); handleConfirmGroup(category) }}
+                      style={{ background: '#10b981', color: '#fff', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                      일괄확정
+                    </button>
                   )}
+
+                  {/* 되돌리기 버튼 (confirmed만) */}
+                  {filter === 'confirmed' && (
+                    <button onClick={(e) => { e.stopPropagation(); handleRevertGroup(category) }}
+                      style={{ background: '#fef2f2', color: '#dc2626', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', cursor: 'pointer', flexShrink: 0 }}>
+                      ↩ 일괄되돌리기
+                    </button>
+                  )}
+
+                  {/* 펼치기 화살표 */}
+                  <span style={{ fontSize: 14, color: '#94a3b8', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </div>
-              )
-            })}
-          </div>
-        </section>
+
+                {/* 그룹 내 거래 목록 */}
+                {isExpanded && (
+                  <div>
+                    {group.items.map((item: any) => {
+                      const src = item.source_data || {}
+                      const isConfirmed = item.status === 'confirmed'
+
+                      return (
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 48px', borderBottom: '1px solid #f8fafc', gap: 12, opacity: isConfirmed ? 0.5 : 1 }}>
+                          {/* 날짜 */}
+                          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, width: 80, flexShrink: 0 }}>{src.transaction_date}</span>
+
+                          {/* 입출금 */}
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                            background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b82f6' : '#ef4444' }}>
+                            {src.type === 'income' ? '입금' : '출금'}
+                          </span>
+
+                          {/* 결제수단 */}
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', flexShrink: 0 }}>
+                            {src.payment_method || '통장'}
+                          </span>
+
+                          {/* 거래처 */}
+                          <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {src.client_name || '(미상)'}
+                          </span>
+
+                          {/* 비고 */}
+                          <span style={{ fontSize: 11, color: '#94a3b8', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {src.description || ''}
+                          </span>
+
+                          {/* 연결대상 */}
+                          {item.ai_related_type && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#f0fdf4', color: '#16a34a', flexShrink: 0 }}>
+                              {TYPE_LABELS[item.ai_related_type] || ''}
+                            </span>
+                          )}
+
+                          {/* 금액 */}
+                          <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#3b82f6' : '#ef4444', textAlign: 'right', width: 100, flexShrink: 0 }}>
+                            {src.type === 'income' ? '+' : '-'}{nf(src.amount)}
+                          </span>
+
+                          {/* 액션 - 대기중 */}
+                          {!isConfirmed && filter === 'pending' && (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <button onClick={() => handleConfirm(item)}
+                                style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
+                                확정
+                              </button>
+                              <select defaultValue="" onChange={e => { if (e.target.value) handleConfirm(item, { category: e.target.value }) }}
+                                style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 10, background: '#fff', color: '#64748b', maxWidth: 90 }}>
+                                <option value="" disabled>변경</option>
+                                {CATEGORIES.map(g => (
+                                  <optgroup key={g.group} label={g.group}>
+                                    {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </optgroup>
+                                ))}
+                              </select>
+                              <button onClick={() => handleConfirmWithRule(item, item.ai_category)}
+                                style={{ background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}
+                                title="이 거래처를 규칙으로 학습합니다">
+                                📚
+                              </button>
+                            </div>
+                          )}
+
+                          {/* 액션 - 확정됨 (수정/되돌리기) */}
+                          {isConfirmed && filter !== 'pending' && (
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <select defaultValue="" onChange={e => { if (e.target.value) handleChangeCategory(item, e.target.value) }}
+                                style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 10, background: '#fff', color: '#64748b', maxWidth: 90 }}>
+                                <option value="" disabled>수정</option>
+                                {CATEGORIES.map(g => (
+                                  <optgroup key={g.group} label={g.group}>
+                                    {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </optgroup>
+                                ))}
+                              </select>
+                              <button onClick={() => handleRevert(item)}
+                                style={{ background: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: '1px solid #fecaca', cursor: 'pointer' }}
+                                title="대기중으로 되돌립니다">
+                                ↩ 되돌리기
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )

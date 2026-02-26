@@ -490,15 +490,18 @@ export default function OrgManagementPage() {
       <div className="max-w-7xl mx-auto">
 
         {/* 헤더 */}
-        <div className="mb-5 md:mb-6">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">조직/권한 관리</h1>
-          {role === 'god_admin' && !adminSelectedCompanyId && (
-            <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">
-              <p className="text-sm font-bold text-steel-700">사이드바에서 회사를 선택해주세요.</p>
-              <p className="text-xs text-steel-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
-            </div>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏢 조직/권한 관리</h1>
+            <p className="text-gray-500 text-sm mt-1">직원 관리 및 페이지 권한 설정</p>
+          </div>
         </div>
+        {role === 'god_admin' && !adminSelectedCompanyId && (
+          <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">
+            <p className="text-sm font-bold text-steel-700">사이드바에서 회사를 선택해주세요.</p>
+            <p className="text-xs text-steel-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
+          </div>
+        )}
 
         {role === 'god_admin' && !adminSelectedCompanyId ? null : (
           <>

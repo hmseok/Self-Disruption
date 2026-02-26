@@ -101,25 +101,37 @@ const { company, role, adminSelectedCompanyId } = useApp()
   // 운용률 계산
   const utilizationRate = stats.total > 0 ? Math.round(((stats.rented) / stats.total) * 100) : 0
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50 animate-fade-in">
 
       {/* 상단 헤더 영역 */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-3 md:gap-4">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 전체 차량 대장</h1>
-          <p className="text-gray-500 mt-1 md:mt-2 text-sm">
+          <p className="text-gray-500 text-sm mt-1">
             총 보유: <span className="font-bold text-steel-600">{cars.length}</span>대 /
             검색됨: {filteredCars.length}대
           </p>
         </div>
 
-        <div className="flex gap-2 md:gap-3 w-full md:w-auto items-center">
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
             {/* 검색창 */}
             <input
                 type="text"
                 placeholder="🔍 검색..."
-                className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl flex-1 md:flex-none md:min-w-[250px] focus:outline-none focus:border-steel-500 shadow-sm text-sm"
+                className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-steel-500 shadow-sm text-sm"
+                style={{ minWidth: '180px' }}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -133,7 +145,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                 }
                 router.push('/cars/new')
               }}
-              className="bg-steel-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-center whitespace-nowrap text-sm flex-shrink-0"
+              className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
             >
               + 등록
             </button>

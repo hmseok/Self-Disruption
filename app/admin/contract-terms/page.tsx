@@ -659,11 +659,11 @@ export default function ContractTermsPage() {
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       {/* 헤더 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {CONTRACT_CATEGORIES[selectedCategory]?.emoji} {CONTRACT_CATEGORIES[selectedCategory]?.label} 관리
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📜 계약 약관 관리</h1>
+          <p className="text-gray-500 text-sm mt-1">표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
+        </div>
       </div>
 
       {/* 계약 유형 선택 탭 */}

@@ -192,12 +192,24 @@ export default function LoanListPage() {
     c.number.includes(carSearchTerm) || (c.brand || '').includes(carSearchTerm) || (c.model || '').includes(carSearchTerm)
   )
 
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+          <span className="text-4xl block mb-3">🏢</span>
+          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 md:mb-8">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'left' }}>
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏦 대출/금융사 관리</h1>
+          <p className="text-gray-500 text-sm mt-1">대출 현황 및 금융사 계약 관리</p>
         </div>
         <div className="flex gap-3">
           <button

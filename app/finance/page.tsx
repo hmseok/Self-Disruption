@@ -142,7 +142,7 @@ const router = useRouter()
                   newTxs.push({
                       transaction_date: `${filterDate}-${jiip.payout_day?.toString().padStart(2,'0') || '10'}`,
                       type: 'expense', status: 'pending', category: '지입정산금',
-                      client_name: `${jiip.contractor_name} (정산)`, description: `${filterDate}월 운송료 정산`,
+                      client_name: `${jiip.investor_name} (정산)`, description: `${filterDate}월 운송료 정산`,
                       amount: 0, payment_method: '통장', related_type: 'jiip', related_id: String(jiip.id)
                   })
               }
@@ -187,18 +187,36 @@ const router = useRouter()
   const nf = (num: number) => num ? num.toLocaleString() : '0'
   const filteredList = list.filter(item => activeTab === 'ledger' ? item.status === 'completed' : item.status === 'pending')
 
+  if (!effectiveCompanyId && !loading) {
+    return (
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
+            <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+          <p className="text-4xl mb-3">🏢</p>
+          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-400 mt-1">회사 선택 후 자금 장부를 이용할 수 있습니다</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 pb-20 md:pb-40 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
       {/* 1. 상단 헤더 (제목 + 날짜) */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b pb-6 gap-4">
-          <div>
-              <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
-                  <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-                         className="border border-gray-200 rounded-lg px-3 py-1 font-bold text-lg bg-gray-50 hover:bg-white focus:border-steel-500 transition-colors cursor-pointer text-gray-700" />
-              </div>
-              <p className="text-gray-500 text-sm">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
+              <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
+          </div>
+          <div className="flex items-center gap-3">
+              <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
+                     className="border border-gray-200 rounded-lg px-3 py-1.5 font-bold text-sm bg-gray-50 hover:bg-white focus:border-steel-500 transition-colors cursor-pointer text-gray-700" />
           </div>
 
           {/* 우측 상단 요약 (간단 버전) */}
@@ -235,10 +253,10 @@ const router = useRouter()
       <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-1.5 rounded-2xl mb-6 gap-2">
           {/* 좌측: 탭 스위처 */}
           <div className="flex bg-white rounded-xl shadow-sm p-1 w-full md:w-auto">
-              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
                   📊 확정된 장부
               </button>
-              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
                   🗓️ 예정 스케줄
               </button>
           </div>
@@ -246,14 +264,14 @@ const router = useRouter()
           {/* 우측: 액션 버튼 그룹 */}
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
               {activeTab === 'schedule' && (
-                  <button onClick={generateMonthlySchedule} className="whitespace-nowrap px-4 py-2 bg-yellow-400 text-black rounded-xl font-bold text-sm shadow-sm hover:bg-yellow-500 flex items-center gap-2">
+                  <button onClick={generateMonthlySchedule} className="whitespace-nowrap px-4 py-2.5 bg-yellow-400 text-black rounded-xl font-bold text-sm shadow-sm hover:bg-yellow-500 flex items-center gap-2">
                       ⚡️ 정기 지출 생성
                   </button>
               )}
-              <button onClick={() => router.push('/finance/upload')} className="whitespace-nowrap px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-sm hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 shadow-sm">
+              <button onClick={() => router.push('/finance/upload')} className="whitespace-nowrap px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 shadow-sm">
                   📂 엑셀 등록
               </button>
-              <button onClick={scrollToForm} className="whitespace-nowrap px-4 py-2 bg-steel-600 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-steel-700 flex items-center gap-2">
+              <button onClick={scrollToForm} className="whitespace-nowrap px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10">
                   ✏️ 직접 입력
               </button>
           </div>
@@ -357,7 +375,7 @@ const router = useRouter()
                                       <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
                                           {item.status === 'pending' ? (
                                               <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                  <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-steel-700 shadow-sm">
+                                                  <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-steel-700 shadow-sm">
                                                       승인
                                                   </button>
                                                   <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5">🗑️</button>
@@ -395,7 +413,7 @@ const router = useRouter()
                                   </div>
                                   {item.status === 'pending' ? (
                                       <div className="flex gap-2">
-                                          <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-steel-700">
+                                          <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-steel-700 shadow-sm">
                                               승인
                                           </button>
                                           <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-lg">🗑️</button>

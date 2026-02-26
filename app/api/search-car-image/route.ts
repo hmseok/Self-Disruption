@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
-import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../../utils/auth-guard'
 
@@ -15,44 +14,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '브랜드와 모델명이 필요합니다.' }, { status: 400 })
     }
 
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API 키가 없습니다. (.env.local 확인)' }, { status: 500 })
+      return NextResponse.json({ error: 'Gemini API 키가 없습니다. (.env.local 확인)' }, { status: 500 })
     }
 
     console.log(`🎨 [AI 가동] ${brand} ${model} 공식 카탈로그 스타일 생성 중...`)
 
-    // 💡 [핵심 수정] 프롬프트를 "공식 브로슈어/프레스킷" 스타일로 강력하게 변경
-    // 1. "Official factory press release photo" -> 공식 보도자료 사진
-    // 2. "Front 3/4 view" -> 자동차 얼짱 각도 (앞측면)
-    // 3. "OEM stock condition" -> 튜닝 없는 순정 상태 강조
-    // 4. "Clean studio background" -> 배경 깔끔하게
     const prompt = `Official factory press release photo of the ${brand} ${model}.
     Angle: Front 3/4 view (best angle).
     Background: Clean, soft grey or white studio background with realistic floor reflections.
     Condition: 100% OEM factory stock, standard original grill and wheels. No tuning, no body kits, no futuristic modifications.
     Style: Hyper-realistic, 8k resolution, sharp focus, professional automotive photography, car brochure style.`
 
-    const openai = new OpenAI({ apiKey })
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard", // standard가 더 자연스러운 경우가 많습니다.
-    })
+    // Gemini Imagen 3 이미지 생성
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: '1:1',
+          },
+        }),
+      }
+    )
 
-    const tempImageUrl = response.data[0].url
-    if (!tempImageUrl) throw new Error("이미지 생성 실패 (URL 없음)")
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('Gemini Imagen error:', res.status, errText)
+      throw new Error(`이미지 생성 실패: ${res.status}`)
+    }
+
+    const data = await res.json()
+    const base64Image = data.predictions?.[0]?.bytesBase64Encoded
+    if (!base64Image) throw new Error("이미지 생성 실패 (데이터 없음)")
+
+    const buffer = Buffer.from(base64Image, 'base64')
 
     console.log(`✅ [생성 성공] Supabase 저장 시도...`)
 
-    // 2. 이미지 다운로드
-    const imageRes = await fetch(tempImageUrl)
-    const imageBlob = await imageRes.blob()
-    const buffer = await imageBlob.arrayBuffer()
-
-    // 3. Supabase 업로드 (안전한 파일명 사용)
+    // Supabase 업로드 (안전한 파일명 사용)
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

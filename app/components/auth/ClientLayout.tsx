@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { usePermission } from '../../hooks/usePermission'
+import { UploadProvider, useUpload } from '@/app/context/UploadContext'
 
 // ============================================
 // 아이콘
@@ -48,7 +49,11 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/invest': '일반투자',
   '/jiip': '지입투자',
   '/insurance': '보험/가입',
+  '/finance/upload': '카드/통장 관리',
 }
+
+// 숨길 메뉴 경로
+const HIDDEN_PATHS = new Set(['/finance/review'])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [
@@ -107,6 +112,14 @@ function MenuItem({ item, pathname, accent }: { item: { name: string; path: stri
 // ClientLayout
 // ============================================
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <UploadProvider>
+      <ClientLayoutInner>{children}</ClientLayoutInner>
+    </UploadProvider>
+  )
+}
+
+function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, company, role, position, permissions, loading, allCompanies, adminSelectedCompanyId, setAdminSelectedCompanyId, menuRefreshKey } = useApp()
@@ -158,6 +171,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               data
                 .filter((item: any) => {
                   if (seen.has(item.module.path)) return false
+                  if (HIDDEN_PATHS.has(item.module.path)) return false
                   seen.add(item.module.path)
                   return true
                 })
@@ -177,6 +191,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             const seen = new Set<string>()
             const unique = data.filter((item: any) => {
               if (seen.has(item.path)) return false
+              if (HIDDEN_PATHS.has(item.path)) return false
               seen.add(item.path)
               return true
             })
@@ -203,6 +218,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         const allMenus = data
           .filter((item: any) => {
             if (seen.has(item.module.path)) return false
+            if (HIDDEN_PATHS.has(item.module.path)) return false
             seen.add(item.module.path)
             return true
           })
@@ -493,6 +509,58 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           {children}
         </div>
       </main>
+
+      {/* 플로팅 업로드 진행률 위젯 */}
+      <UploadProgressWidget />
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 플로팅 업로드 진행률 위젯 (페이지 이동 시에도 유지)
+// ═══════════════════════════════════════════════════════════════
+function UploadProgressWidget() {
+  const pathname = usePathname()
+  let uploadContext: ReturnType<typeof useUpload> | null = null
+  try { uploadContext = useUpload() } catch { return null }
+  if (!uploadContext) return null
+
+  const { status, progress, currentFileIndex, totalFiles, currentFileName, logs } = uploadContext
+
+  // 업로드 페이지에서는 위젯 숨기기 (페이지 자체에 진행률 표시)
+  if (pathname === '/finance/upload') return null
+
+  // 처리 중이 아니면 숨기기
+  if (status !== 'processing' && status !== 'paused') return null
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      background: '#fff', borderRadius: 16, padding: '16px 20px', width: 320,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {status === 'processing' ? (
+            <div style={{ width: 18, height: 18, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <span style={{ fontSize: 16 }}>⏸️</span>
+          )}
+          <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+            {status === 'processing' ? '파일 분석 중' : '일시정지'}
+          </span>
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eff6ff', padding: '3px 8px', borderRadius: 6 }}>
+          {totalFiles > 0 ? `${currentFileIndex + 1}/${totalFiles}` : `${progress}%`}
+        </span>
+      </div>
+      <div style={{ background: '#f1f5f9', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+        <div style={{ height: '100%', background: 'linear-gradient(90deg, #2d5fa8, #60a5fa)', borderRadius: 6, transition: 'width 0.5s', width: `${progress}%` }} />
+      </div>
+      <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {logs || currentFileName || '처리 중...'}
+      </p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
