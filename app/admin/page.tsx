@@ -145,10 +145,8 @@ export default function AdminDashboard() {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
 
-  // 클라이언트 회사 (god_admin 전용 회사 제외)
-  const clientCompanies = role === 'god_admin'
-    ? companies.filter(c => !c.users.some(u => u.role === 'god_admin'))
-    : companies
+  // 클라이언트 회사 (플랫폼 전용 회사 제외)
+  const clientCompanies = companies.filter((c: any) => !c.is_platform)
 
   const filteredCompanies = clientCompanies.filter(c => {
     if (activeFilter === 'pending') return !c.is_active

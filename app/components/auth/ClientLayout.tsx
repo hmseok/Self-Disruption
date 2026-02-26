@@ -333,9 +333,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
                 <div className="text-white font-bold text-sm truncate">
-                  {role === 'god_admin' ? 'Platform Admin' : (company?.name || '회사 미배정')}
+                  {company?.is_platform ? 'Platform Admin' : (company?.name || '회사 미배정')}
                 </div>
-                {role !== 'god_admin' && company?.plan && (
+                {!company?.is_platform && company?.plan && (
                   <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0 ${
                     company.plan === 'max' ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white' :
                     company.plan === 'pro' ? 'bg-blue-500 text-white' :
@@ -345,7 +345,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                     {company.plan === 'max' ? 'MAX' : company.plan === 'pro' ? 'PRO' : company.plan === 'basic' ? 'BASIC' : 'FREE'}
                   </span>
                 )}
-                {role === 'god_admin' && (
+                {company?.is_platform && (
                   <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-600 text-white flex-shrink-0">
                     ADMIN
                   </span>
@@ -373,7 +373,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   <span className="text-[10px] font-bold text-yellow-400">승인 대기중</span>
                 </div>
               )}
-              {/* 회사 미배정 안내 */}
+              {/* 회사 미배정 안내 (god_admin은 플랫폼 회사가 있으므로 해당 없음) */}
               {!company && role !== 'god_admin' && !loading && (
                 <p className="mt-2 text-[10px] text-yellow-400">관리자에게 회사 배정을 요청하세요</p>
               )}

@@ -114,36 +114,27 @@ export default function DashboardPage() {
 
       if (showPlatformView) {
         // ========================================
-        // god_admin: 플랫폼 통계만 로드
+        // god_admin: 플랫폼 통계 — 전부 병렬 로드
         // ========================================
-        const { count: companyCount } = await supabase
-          .from('companies').select('id', { count: 'exact', head: true })
-        const { count: activeCount } = await supabase
-          .from('companies').select('id', { count: 'exact', head: true }).eq('is_active', true)
-        const { count: pendingCount } = await supabase
-          .from('companies').select('id', { count: 'exact', head: true }).eq('is_active', false)
-        const { count: userCount } = await supabase
-          .from('profiles').select('id', { count: 'exact', head: true })
+        const [
+          { count: companyCount },
+          { count: activeCount },
+          { count: pendingCount },
+          { count: userCount },
+          { data: moduleData },
+          { data: pendingData },
+          { data: allCompanies },
+        ] = await Promise.all([
+          supabase.from('companies').select('id', { count: 'exact', head: true }).neq('is_platform', true),
+          supabase.from('companies').select('id', { count: 'exact', head: true }).eq('is_active', true).neq('is_platform', true),
+          supabase.from('companies').select('id', { count: 'exact', head: true }).eq('is_active', false),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.rpc('get_all_company_modules'),
+          supabase.from('companies').select('id, name, business_number, business_registration_url, plan, created_at').eq('is_active', false).order('created_at', { ascending: false }),
+          supabase.from('companies').select('id, name, plan, is_active, created_at, business_registration_url, is_platform').eq('is_active', true).order('created_at', { ascending: false }),
+        ])
 
-        // 활성 모듈 총 수 (RPC 사용)
-        const { data: moduleData } = await supabase.rpc('get_all_company_modules')
         const activeModuleCount = moduleData?.filter((m: any) => m.is_active).length || 0
-
-        // 승인 대기 회사 목록
-        const { data: pendingData } = await supabase
-          .from('companies')
-          .select('id, name, business_number, business_registration_url, plan, created_at')
-          .eq('is_active', false)
-          .order('created_at', { ascending: false })
-
-        // 전체 회사 목록 (활성 모듈 수 포함)
-        const { data: allCompanies } = await supabase
-          .from('companies')
-          .select('id, name, plan, is_active, created_at, business_registration_url')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-
-        // 회사별 활성 모듈 수 계산
         const companyModuleCounts: Record<string, number> = {}
         if (moduleData) {
           moduleData.forEach((m: any) => {
@@ -160,7 +151,7 @@ export default function DashboardPage() {
           totalUsers: userCount || 0,
           totalActiveModules: activeModuleCount,
           pendingList: pendingData || [],
-          companyList: (allCompanies || []).map(c => ({
+          companyList: ((allCompanies || []) as any[]).filter((c: any) => !c.is_platform).map(c => ({
             ...c,
             moduleCount: companyModuleCounts[c.id] || 0,
           })),
@@ -168,66 +159,51 @@ export default function DashboardPage() {
 
       } else {
         // ========================================
-        // 회사 사용자: 비즈니스 통계 로드
+        // 회사 사용자: 비즈니스 통계 — 전부 병렬 로드
         // ========================================
+        const eq = (q: any) => companyId ? q.eq('company_id', companyId) : q
 
-        // 활성 모듈 목록
-        setActiveModules(new Set()) // 초기화
-        if (companyId) {
-          const { data: companyModules } = await supabase
-            .from('company_modules')
-            .select('module:system_modules(path)')
-            .eq('company_id', companyId)
-            .eq('is_active', true)
-          if (companyModules) {
-            setActiveModules(new Set(companyModules.map((m: any) => m.module?.path).filter(Boolean)))
-          }
+        // ★ 1차 병렬: 핵심 KPI 8개 + 모듈 동시 로드
+        const [
+          { data: compModules },
+          { data: carData },
+          { count: custCount },
+          { data: investData },
+          { count: jiipCount },
+          { data: revenueData },
+          { data: financeData },
+          { data: insuranceData },
+        ] = await Promise.all([
+          companyId
+            ? supabase.from('company_modules').select('module:system_modules(path)').eq('company_id', companyId).eq('is_active', true)
+            : Promise.resolve({ data: [] }),
+          eq(supabase.from('cars').select('id, status', { count: 'exact' })),
+          eq(supabase.from('customers').select('id', { count: 'exact', head: true })),
+          eq(supabase.from('general_investments').select('invest_amount')),
+          eq(supabase.from('jiip_contracts').select('id', { count: 'exact', head: true })),
+          eq(supabase.from('quotes').select('rent_fee').eq('status', 'active')),
+          eq(supabase.from('financial_products').select('monthly_payment')),
+          eq(supabase.from('insurance_contracts').select('total_premium')),
+        ])
+
+        // 모듈 설정
+        if (compModules) {
+          setActiveModules(new Set(compModules.map((m: any) => m.module?.path).filter(Boolean)))
+        } else {
+          setActiveModules(new Set())
         }
 
-        // 차량 통계
-        let carQuery = supabase.from('cars').select('id, status', { count: 'exact' })
-        if (companyId) carQuery = carQuery.eq('company_id', companyId)
-        const { data: carData } = await carQuery
         const cars = carData || []
-
-        // 고객 수
-        let custQuery = supabase.from('customers').select('id', { count: 'exact' })
-        if (companyId) custQuery = custQuery.eq('company_id', companyId)
-        const { count: custCount } = await custQuery
-
-        // 일반투자 통계
-        let investQuery = supabase.from('general_investments').select('invest_amount')
-        if (companyId) investQuery = investQuery.eq('company_id', companyId)
-        const { data: investData } = await investQuery
-        const totalInvest = (investData || []).reduce((sum, i) => sum + (i.invest_amount || 0), 0)
-
-        // 지입 계약 수
-        let jiipQuery = supabase.from('jiip_contracts').select('id', { count: 'exact' })
-        if (companyId) jiipQuery = jiipQuery.eq('company_id', companyId)
-        const { count: jiipCount } = await jiipQuery
-
-        // 월 매출
-        let revenueQuery = supabase.from('quotes').select('rent_fee').eq('status', 'active')
-        if (companyId) revenueQuery = revenueQuery.eq('company_id', companyId)
-        const { data: revenueData } = await revenueQuery
+        const totalInvest = (investData || []).reduce((sum: number, i: any) => sum + (i.invest_amount || 0), 0)
         const monthlyRevenue = (revenueData || []).reduce((sum: number, q: any) => sum + (q.rent_fee || 0), 0)
-
-        // 월 지출
-        let financeQuery = supabase.from('financial_products').select('monthly_payment')
-        if (companyId) financeQuery = financeQuery.eq('company_id', companyId)
-        const { data: financeData } = await financeQuery
         const totalFinance = (financeData || []).reduce((sum: number, f: any) => sum + (f.monthly_payment || 0), 0)
-
-        let insuranceQuery = supabase.from('insurance_contracts').select('total_premium')
-        if (companyId) insuranceQuery = insuranceQuery.eq('company_id', companyId)
-        const { data: insuranceData } = await insuranceQuery
         const totalInsurance = (insuranceData || []).reduce((sum: number, i: any) => sum + Math.round((i.total_premium || 0) / 12), 0)
 
         setStats({
           totalCars: cars.length,
-          availableCars: cars.filter(c => c.status === 'available').length,
-          rentedCars: cars.filter(c => c.status === 'rented').length,
-          maintenanceCars: cars.filter(c => c.status === 'maintenance').length,
+          availableCars: cars.filter((c: any) => c.status === 'available').length,
+          rentedCars: cars.filter((c: any) => c.status === 'rented').length,
+          maintenanceCars: cars.filter((c: any) => c.status === 'maintenance').length,
           totalCustomers: custCount || 0,
           activeInvestments: (investData || []).length,
           totalInvestAmount: totalInvest,
@@ -237,15 +213,18 @@ export default function DashboardPage() {
           netProfit: monthlyRevenue - (totalFinance + totalInsurance),
         })
 
-        // ── 차량운영 통계 ──
+        // ★ 2차 병렬: 차량운영 + 수금 (companyId 필요)
         if (companyId) {
           const today = new Date().toISOString().split('T')[0]
           const weekAgo = new Date()
           weekAgo.setDate(weekAgo.getDate() + 7)
           const weekLater = weekAgo.toISOString().split('T')[0]
           const monthStart = today.substring(0, 7) + '-01'
+          const nowMonth = new Date().toISOString().slice(0, 7)
+          const [yr, mo] = nowMonth.split('-').map(Number)
+          const lastDayOfMonth = new Date(yr, mo, 0).getDate()
 
-          const [delivRes, retRes, maintRes, maintShopRes, inspDueRes, inspOverRes, accActiveRes, accMonthRes] = await Promise.all([
+          const [delivRes, retRes, maintRes, maintShopRes, inspDueRes, inspOverRes, accActiveRes, accMonthRes, { data: schedData }] = await Promise.all([
             supabase.from('vehicle_operations').select('id, scheduled_date, scheduled_time, status, operation_type, car:cars(number,brand,model), customer:customers(name)').eq('company_id', companyId).eq('operation_type', 'delivery').eq('scheduled_date', today).order('scheduled_time'),
             supabase.from('vehicle_operations').select('id, scheduled_date, scheduled_time, status, operation_type, car:cars(number,brand,model), customer:customers(name)').eq('company_id', companyId).eq('operation_type', 'return').eq('scheduled_date', today).order('scheduled_time'),
             supabase.from('maintenance_records').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('status', ['requested', 'approved']),
@@ -254,6 +233,7 @@ export default function DashboardPage() {
             supabase.from('inspection_records').select('id', { count: 'exact', head: true }).eq('company_id', companyId).lt('due_date', today).in('status', ['scheduled', 'in_progress', 'overdue']),
             supabase.from('accident_records').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('status', ['reported', 'insurance_filed', 'repairing']),
             supabase.from('accident_records').select('id, accident_date, accident_type, status, car:cars(number,brand,model)').eq('company_id', companyId).gte('accident_date', monthStart).order('accident_date', { ascending: false }).limit(3),
+            supabase.from('expected_payment_schedules').select('status, expected_amount, actual_amount, payment_date').eq('company_id', companyId).gte('payment_date', `${nowMonth}-01`).lte('payment_date', `${nowMonth}-${String(lastDayOfMonth).padStart(2, '0')}`),
           ])
 
           setOpsStats({
@@ -267,29 +247,18 @@ export default function DashboardPage() {
             accidentsThisMonth: accMonthRes.data || [],
           })
 
-          // ── 수금 현황 통계 ──
-          const nowMonth = new Date().toISOString().slice(0, 7)
-          const [yr, mo] = nowMonth.split('-').map(Number)
-          const lastDayOfMonth = new Date(yr, mo, 0).getDate()
-          const { data: schedData } = await supabase
-            .from('expected_payment_schedules')
-            .select('status, expected_amount, actual_amount, payment_date')
-            .eq('company_id', companyId)
-            .gte('payment_date', `${nowMonth}-01`)
-            .lte('payment_date', `${nowMonth}-${String(lastDayOfMonth).padStart(2, '0')}`)
-
           if (schedData) {
-            const pending = schedData.filter(s => s.status === 'pending' && s.payment_date >= today)
-            const overdue = schedData.filter(s => s.status === 'pending' && s.payment_date < today)
-            const completed = schedData.filter(s => s.status === 'completed' || s.status === 'partial')
-            const totalExpected = schedData.reduce((a, s) => a + Number(s.expected_amount || 0), 0)
-            const totalActual = completed.reduce((a, s) => a + Number(s.actual_amount || s.expected_amount || 0), 0)
+            const pending = schedData.filter((s: any) => s.status === 'pending' && s.payment_date >= today)
+            const overdue = schedData.filter((s: any) => s.status === 'pending' && s.payment_date < today)
+            const completed = schedData.filter((s: any) => s.status === 'completed' || s.status === 'partial')
+            const totalExpected = schedData.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0)
+            const totalActual = completed.reduce((a: number, s: any) => a + Number(s.actual_amount || s.expected_amount || 0), 0)
             setCollectionStats({
-              pendingAmount: pending.reduce((a, s) => a + Number(s.expected_amount || 0), 0),
+              pendingAmount: pending.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0),
               pendingCount: pending.length,
               completedAmount: totalActual,
               completedCount: completed.length,
-              overdueAmount: overdue.reduce((a, s) => a + Number(s.expected_amount || 0), 0),
+              overdueAmount: overdue.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0),
               overdueCount: overdue.length,
               collectionRate: totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0,
             })

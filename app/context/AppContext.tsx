@@ -121,12 +121,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (profileData.role === 'god_admin') {
+          // ★ god_admin: 실제 고객사 목록만 로드 (is_platform 제외)
           const { data: companiesData } = await supabase
             .from('companies')
-            .select('id, name, plan, is_active')
+            .select('id, name, plan, is_active, is_platform')
             .eq('is_active', true)
             .order('name')
-          setAllCompanies(companiesData || [])
+          // 플랫폼 회사는 선택 목록에서 제외
+          setAllCompanies((companiesData || []).filter((c: any) => !c.is_platform))
         }
       } else {
         setRole('user')
