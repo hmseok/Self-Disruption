@@ -41,6 +41,9 @@ export default function CorporateCardsPage() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [assignReasonInput, setAssignReasonInput] = useState('')
 
+  // 검색
+  const [searchTerm, setSearchTerm] = useState('')
+
   // 그룹 모드: 부서별 / 카드사별 / 종류별 / 차량배치 / 전체
   const [groupMode, setGroupMode] = useState<'dept' | 'company' | 'type' | 'car' | 'all'>('dept')
 
@@ -302,6 +305,25 @@ export default function CorporateCardsPage() {
 
   const handleSave = async () => {
     if (!form.card_company) return alert('카드사를 선택해주세요.')
+
+    // 카드번호 중복 체크
+    if (form.card_number) {
+      const cleanNum = form.card_number.replace(/[^0-9]/g, '')
+      const duplicate = cards.find(c => {
+        if (editingId && c.id === editingId) return false  // 자기 자신은 제외
+        const existingClean = (c.card_number || '').replace(/[^0-9]/g, '')
+        return existingClean === cleanNum && cleanNum.length >= 4
+      })
+      if (duplicate) {
+        const proceed = confirm(
+          `동일한 카드번호가 이미 등록되어 있습니다.\n\n` +
+          `기존 카드: ${duplicate.card_company} ${duplicate.card_number} (${duplicate.holder_name || '명의자 없음'})\n\n` +
+          `그래도 등록하시겠습니까?`
+        )
+        if (!proceed) return
+      }
+    }
+
     const payload = {
       ...form,
       company_id: companyId,
@@ -428,12 +450,19 @@ export default function CorporateCardsPage() {
       const findCol = (keywords: string[]) => headers.findIndex(h =>
         keywords.some(k => h.includes(k))
       )
-      const colCompany = findCol(['카드사', '카드회사', '발급사', '제휴카드종류', '제휴카드', '카드종류', 'card_company', 'company'])
+      const colCompany = findCol(['카드사', '카드회사', '발급사', '구분', 'card_company', 'company'])
       const colNumber = findCol(['카드번호', '카드 번호', 'card_number', 'number'])
-      const colHolder = findCol(['명의자', '소유자', '이름', 'holder', 'name', '성명'])
-      const colAlias = findCol(['별칭', '별명', 'alias', '카드명', '카드이름', '부서명'])
+      const colHolder = findCol(['명의자', '소유자', '소지자명', '소지자', 'holder', 'name', '성명', '이름'])
+      const colAlias = findCol(['별칭', '별명', 'alias', '카드이름'])
       const colLimit = findCol(['한도', 'limit', '월한도', '사용한도', '카드한도'])
       const colMemo = findCol(['메모', 'memo', '비고', '참고'])
+      const colExpiry = findCol(['유효기간', '만료일', '만료', 'expiry', '유효일'])
+      const colCardType = findCol(['제휴카드종류', '카드종류', 'card_type'])
+      const colCardName = findCol(['카드명', '카드이름', 'card_name'])
+      const colPrevCard = findCol(['직전카드번호', '이전카드번호', '구카드번호', '이전번호'])
+      const colDeptName = findCol(['부서명', '부서', 'department'])
+      const colStatus = findCol(['상태코드', '상태', 'status', '유효'])
+      const colBrand = findCol(['브랜드', 'brand', 'visa', 'master'])
 
       const parsed: any[] = []
       for (let i = 1; i < rows.length; i++) {
@@ -446,27 +475,120 @@ export default function CorporateCardsPage() {
         const cardAlias = colAlias >= 0 ? String(row[colAlias] || '') : ''
         const monthlyLimit = colLimit >= 0 ? String(row[colLimit] || '').replace(/[^0-9]/g, '') : ''
         const memo = colMemo >= 0 ? String(row[colMemo] || '') : ''
+        const expiryRaw = colExpiry >= 0 ? String(row[colExpiry] || '') : ''
+        const cardTypeRaw = colCardType >= 0 ? String(row[colCardType] || '') : ''
+        const cardNameRaw = colCardName >= 0 ? String(row[colCardName] || '') : ''
+        const prevCardRaw = colPrevCard >= 0 ? String(row[colPrevCard] || '') : ''
+        const deptName = colDeptName >= 0 ? String(row[colDeptName] || '') : ''
+        const statusRaw = colStatus >= 0 ? String(row[colStatus] || '') : ''
+        const brandRaw = colBrand >= 0 ? String(row[colBrand] || '') : ''
+
+        // 유효기간 정규화: 20320731 → 2032-07, 2030-08 → 2030-08, 202508 → 2025-08
+        let expiryDate = ''
+        if (expiryRaw) {
+          const cleaned = String(expiryRaw).replace(/[^0-9\-]/g, '')
+          if (/^\d{4}-\d{2}$/.test(cleaned)) {
+            expiryDate = cleaned  // 2030-08 형식 그대로
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+            expiryDate = cleaned.slice(0, 7)  // 2030-08-01 → 2030-08
+          } else if (/^\d{8}$/.test(cleaned)) {
+            expiryDate = cleaned.slice(0, 4) + '-' + cleaned.slice(4, 6)  // 20320731 → 2032-07
+          } else if (/^\d{6}$/.test(cleaned)) {
+            expiryDate = cleaned.slice(0, 4) + '-' + cleaned.slice(4, 6)  // 203207 → 2032-07
+          }
+        }
+
+        // 카드종류 (제휴카드종류 > 카드명 우선)
+        const cardType = cardTypeRaw || cardNameRaw || ''
+
+        // 카드사 추출: 직접 컬럼 > 카드종류에서 추출 > 카드명에서 추출 > 브랜드에서 추출
+        let cardCompany = matchCardCompany(cardCompanyRaw) || ''
+        if (!cardCompany && cardTypeRaw) {
+          cardCompany = matchCardCompany(cardTypeRaw) || ''
+        }
+        if (!cardCompany && cardNameRaw) {
+          cardCompany = matchCardCompany(cardNameRaw) || ''
+        }
+        if (!cardCompany && brandRaw) {
+          cardCompany = matchCardCompany(brandRaw) || ''
+        }
+        if (!cardCompany) cardCompany = cardCompanyRaw || ''
+
+        // 카드명/카드종류에서 카드사 이름 제거하여 순수 카드명만 별칭으로 사용
+        // 예: "우리카드 CORPORATE Classic" → "CORPORATE Classic"
+        const stripCompanyName = (name: string): string => {
+          if (!name) return ''
+          let stripped = name
+          const companyKeywords = ['신한카드', '신한', '삼성카드', '삼성', '현대카드', '현대', 'KB국민카드', 'KB국민', '국민카드', '국민', '하나카드', '하나', '롯데카드', '롯데', 'BC카드', 'BC', 'NH농협카드', 'NH농협', '농협카드', '농협', '우리카드', '우리', 'IBK기업은행', 'IBK기업', 'IBK']
+          for (const kw of companyKeywords) {
+            if (stripped.includes(kw)) {
+              stripped = stripped.replace(kw, '').trim()
+              break
+            }
+          }
+          return stripped
+        }
+        const cleanCardName = cardType ? stripCompanyName(cardType) : ''
+
+        // 별칭: 직접 별칭 > 부서명 > 카드사 제거한 카드명
+        const alias = cardAlias || deptName || cleanCardName || ''
+
+        // 상태 판단: 정상/유효/사용/active → true, 해지/폐기/정지/분실 → false
+        let isActive = true
+        if (statusRaw) {
+          const sl = statusRaw.toLowerCase()
+          if (sl.includes('해지') || sl.includes('폐기') || sl.includes('정지') || sl.includes('분실') || sl.includes('만료') || sl === 'n' || sl === 'inactive') {
+            isActive = false
+          }
+        }
+
+        // 직전카드번호 배열 처리
+        const previousCardNumbers: string[] = []
+        if (prevCardRaw.trim()) {
+          previousCardNumbers.push(prevCardRaw.trim().replace(/\s/g, ''))
+        }
+
+        // 메모 보강: 브랜드 정보 추가
+        let memoText = memo
+        if (brandRaw && !memoText.includes(brandRaw)) {
+          memoText = memoText ? `${memoText} / ${brandRaw}` : brandRaw
+        }
 
         // 카드번호 또는 카드사가 있어야 유효한 행
-        if (!cardNumber && !cardCompanyRaw) continue
+        if (!cardNumber && !cardCompanyRaw && !cardType) continue
 
         parsed.push({
-          card_company: matchCardCompany(cardCompanyRaw) || cardCompanyRaw || '',
+          card_company: cardCompany,
           card_number: cardNumber.replace(/\s/g, ''),
           holder_name: holderName,
-          card_alias: cardAlias,
+          card_alias: alias,
           monthly_limit: monthlyLimit,
-          memo,
-          is_active: true,
+          memo: memoText,
+          expiry_date: expiryDate || null,
+          card_type: cardType || null,
+          previous_card_numbers: previousCardNumbers.length > 0 ? previousCardNumbers : [],
+          is_active: isActive,
           _selected: true,
         })
+      }
+
+      // 기존 등록 카드와 중복 체크
+      const existingNums = new Set(cards.map(c => (c.card_number || '').replace(/[^0-9]/g, '')).filter(n => n.length >= 4))
+      let dupCount = 0
+      for (const p of parsed) {
+        const cleanNum = (p.card_number || '').replace(/[^0-9]/g, '')
+        if (cleanNum.length >= 4 && existingNums.has(cleanNum)) {
+          p._duplicate = true
+          dupCount++
+        }
       }
 
       if (parsed.length === 0) {
         setBulkLogs(prev => [...prev, `⚠️ ${file.name}: 카드 정보를 찾을 수 없습니다`])
       } else {
         setBulkCards(prev => [...prev, ...parsed])
-        setBulkLogs(prev => [...prev, `✅ ${file.name}: ${parsed.length}장 카드 인식`])
+        const dupMsg = dupCount > 0 ? ` (⚠️ ${dupCount}장 중복)` : ''
+        setBulkLogs(prev => [...prev, `✅ ${file.name}: ${parsed.length}장 카드 인식${dupMsg}`])
       }
     } catch (e: any) {
       setBulkLogs(prev => [...prev, `❌ ${file.name}: ${e.message}`])
@@ -517,18 +639,27 @@ export default function CorporateCardsPage() {
   const handleBulkSave = async () => {
     const selected = bulkCards.filter(c => c._selected)
     if (selected.length === 0) return alert('등록할 카드를 선택해주세요.')
-    if (!confirm(`${selected.length}장의 카드를 일괄 등록하시겠습니까?`)) return
+
+    // 중복 카드 체크
+    const dupCards = selected.filter(c => c._duplicate)
+    let confirmMsg = `${selected.length}장의 카드를 일괄 등록하시겠습니까?`
+    if (dupCards.length > 0) {
+      confirmMsg = `${selected.length}장 중 ${dupCards.length}장이 기존 등록 카드와 중복됩니다.\n\n중복 카드도 포함하여 등록하시겠습니까?`
+    }
+    if (!confirm(confirmMsg)) return
 
     setBulkProcessing(true)
     let success = 0, fail = 0
 
     for (const card of selected) {
-      const { _selected, ...payload } = card
+      const { _selected, _duplicate, card_type, ...payload } = card
       const { error } = await supabase.from('corporate_cards').insert({
         ...payload,
         company_id: companyId,
         monthly_limit: payload.monthly_limit ? Number(payload.monthly_limit) : null,
         assigned_car_id: payload.assigned_car_id || null,
+        expiry_date: payload.expiry_date || null,
+        previous_card_numbers: (payload.previous_card_numbers && payload.previous_card_numbers.length > 0) ? payload.previous_card_numbers : [],
       })
       if (error) { fail++; console.error('bulk insert error:', error.message) }
       else success++
@@ -590,7 +721,10 @@ export default function CorporateCardsPage() {
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>💳 법인카드 관리</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+            법인카드 관리
+          </h1>
             <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
           </div>
         </div>
@@ -609,7 +743,10 @@ export default function CorporateCardsPage() {
       {/* ══════ 헤더 — 보험 페이지 스타일 ══════ */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>💳 법인카드 관리</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+            법인카드 관리
+          </h1>
           <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -716,7 +853,8 @@ export default function CorporateCardsPage() {
                       <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>카드사</th>
                       <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>카드번호</th>
                       <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>명의자</th>
-                      <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>별칭</th>
+                      <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>별칭/카드종류</th>
+                      <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>유효기간</th>
                       <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>배치 차량</th>
                       <th style={{ padding: 12, textAlign: 'left' as const, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>월한도</th>
                       <th style={{ padding: 12, textAlign: 'center' as const, width: 40, fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>삭제</th>
@@ -724,7 +862,7 @@ export default function CorporateCardsPage() {
                   </thead>
                   <tbody>
                     {bulkCards.map((card, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f8fafc', opacity: card._selected ? 1 : 0.4 }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid #f8fafc', opacity: card._selected ? 1 : 0.4, background: !card.is_active ? '#fef2f2' : 'transparent' }}>
                         <td style={{ padding: 12, textAlign: 'center' as const }}>
                           <input type="checkbox" checked={card._selected}
                             onChange={e => setBulkCards(bulkCards.map((c, i) => i === idx ? { ...c, _selected: e.target.checked } : c))} />
@@ -742,6 +880,17 @@ export default function CorporateCardsPage() {
                             value={card.card_number}
                             onChange={e => setBulkCards(bulkCards.map((c, i) => i === idx ? { ...c, card_number: e.target.value } : c))}
                             placeholder="0000-0000-0000-0000" />
+                          {card.previous_card_numbers?.length > 0 && (
+                            <p style={{ margin: '2px 0 0', fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>
+                              이전: {card.previous_card_numbers.join(', ')}
+                            </p>
+                          )}
+                          {card._duplicate && (
+                            <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>중복</span>
+                          )}
+                          {!card.is_active && (
+                            <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700, marginLeft: card._duplicate ? 4 : 0 }}>비활성</span>
+                          )}
                         </td>
                         <td style={{ padding: 12 }}>
                           <input style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', fontSize: 12, width: '100%' }}
@@ -752,6 +901,12 @@ export default function CorporateCardsPage() {
                           <input style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', fontSize: 12, width: '100%' }}
                             value={card.card_alias}
                             onChange={e => setBulkCards(bulkCards.map((c, i) => i === idx ? { ...c, card_alias: e.target.value } : c))} />
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <input style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', fontSize: 12, width: 88, fontFamily: 'monospace' }}
+                            value={card.expiry_date || ''}
+                            onChange={e => setBulkCards(bulkCards.map((c, i) => i === idx ? { ...c, expiry_date: e.target.value } : c))}
+                            placeholder="YYYY-MM" />
                         </td>
                         <td style={{ padding: 12 }}>
                           <select style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', fontSize: 12, fontWeight: 500, background: '#fff', width: '100%' }}
@@ -833,6 +988,24 @@ export default function CorporateCardsPage() {
             {tab.icon} {tab.label}
           </button>
         ))}
+        {/* 검색창 */}
+        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+          <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: '#9ca3af' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="카드번호 · 이름 · 차량번호"
+            style={{ padding: '7px 12px 7px 32px', borderRadius: 20, border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 500, width: 220, background: '#fff', outline: 'none' }}
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')}
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 14, fontWeight: 700, padding: 2 }}>
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 카드 목록 - 그룹별 분류 */}
@@ -876,9 +1049,23 @@ export default function CorporateCardsPage() {
           return 'bg-slate-700'
         }
 
+        // 검색 필터링
+        const filteredCards = searchTerm.trim() ? cards.filter(c => {
+          const term = searchTerm.trim().toLowerCase()
+          const cardNum = (c.card_number || '').toLowerCase()
+          const cardAlias = (c.card_alias || '').toLowerCase()
+          const cardCompany = (c.card_company || '').toLowerCase()
+          const holderName = (c.holder_name || '').toLowerCase()
+          const cardType = (c.card_type || '').toLowerCase()
+          const carNumber = c.assigned_car_id ? (carsList.find((v: any) => v.id === c.assigned_car_id)?.number || '').toLowerCase() : ''
+          const empName = c.assigned_employee_id ? (employees.find((e: any) => e.id === c.assigned_employee_id)?.employee_name || '').toLowerCase() : ''
+          return cardNum.includes(term) || cardAlias.includes(term) || cardCompany.includes(term) ||
+            holderName.includes(term) || cardType.includes(term) || carNumber.includes(term) || empName.includes(term)
+        }) : cards
+
         // 그룹핑 로직
         const grouped: Record<string, any[]> = {}
-        cards.forEach(c => {
+        filteredCards.forEach(c => {
           let key = ''
           if (groupMode === 'dept') key = c.card_alias || '기타 (미분류)'
           else if (groupMode === 'company') key = c.card_company || '기타'
@@ -901,6 +1088,16 @@ export default function CorporateCardsPage() {
               <div style={{ fontSize: 48, marginBottom: 12 }}>💳</div>
               <p style={{ fontWeight: 700, fontSize: 15, color: '#64748b' }}>등록된 법인카드가 없습니다</p>
               <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>위 영역에 카드 이미지나 엑셀 파일을 드래그하여 등록하세요</p>
+            </div>
+          )
+        }
+
+        if (filteredCards.length === 0 && searchTerm.trim()) {
+          return (
+            <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
+              <p style={{ fontWeight: 700, fontSize: 14, color: '#64748b' }}>"{searchTerm}" 검색 결과가 없습니다</p>
+              <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>카드번호, 카드이름, 차량번호, 명의자 등으로 검색해보세요</p>
             </div>
           )
         }
