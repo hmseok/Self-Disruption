@@ -739,7 +739,7 @@ function AuthPage() {
   return (
     <div className="flex min-h-screen w-full font-sans overflow-x-hidden">
 
-      {/* ========== LEFT PANEL - Brand ========== */}
+      {/* ========== LEFT PANEL - Brand (모바일 숨김) ========== */}
       <div className="hidden lg:flex w-[480px] min-w-[480px] bg-gradient-to-br from-slate-950 via-steel-900 to-steel-800 text-white flex-col justify-between p-14 relative overflow-hidden">
 
         {/* 배경 장식 */}
