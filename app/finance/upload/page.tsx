@@ -141,20 +141,24 @@ function UploadContent() {
 
   const fetchBasicData = async () => {
     if (!effectiveCompanyId) return
-    const [c, i, j, cc, lo, ins] = await Promise.all([
-      supabase.from('cars').select('id, number, model').eq('company_id', effectiveCompanyId),
-      supabase.from('general_investments').select('id, investor_name').eq('company_id', effectiveCompanyId),
-      supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', effectiveCompanyId),
-      supabase.from('corporate_cards').select('id, card_alias, card_company, card_number, holder_name, status').eq('company_id', effectiveCompanyId).eq('status', 'active'),
-      supabase.from('loans').select('id, finance_name, monthly_payment').eq('company_id', effectiveCompanyId).eq('status', 'active'),
-      supabase.from('insurance_contracts').select('id, company, product_name').eq('company_id', effectiveCompanyId),
-    ])
-    setCars(c.data || [])
-    setInvestors(i.data || [])
-    setJiips(j.data || [])
-    setCorpCards(cc.data || [])
-    setLoans(lo.data || [])
-    setInsurances(ins.data || [])
+    try {
+      const [c, i, j, cc, lo, ins] = await Promise.all([
+        supabase.from('cars').select('id, number, model').eq('company_id', effectiveCompanyId),
+        supabase.from('general_investments').select('id, investor_name').eq('company_id', effectiveCompanyId),
+        supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', effectiveCompanyId),
+        supabase.from('corporate_cards').select('*').eq('company_id', effectiveCompanyId).eq('status', 'active'),
+        supabase.from('loans').select('id, finance_name, monthly_payment').eq('company_id', effectiveCompanyId).eq('status', 'active'),
+        supabase.from('insurance_contracts').select('id, company, product_name').eq('company_id', effectiveCompanyId),
+      ])
+      setCars(c.data || [])
+      setInvestors(i.data || [])
+      setJiips(j.data || [])
+      setCorpCards(cc.data || [])
+      setLoans(lo.data || [])
+      setInsurances(ins.data || [])
+    } catch (err) {
+      console.error('[fetchBasicData] error:', err)
+    }
   }
 
   const fetchReviewItems = useCallback(async () => {
@@ -536,6 +540,110 @@ function UploadContent() {
     })
   }
 
+  // ── Upload Results Sub-filter & Grouping ──
+  const [uploadSubFilter, setUploadSubFilter] = useState<'all' | 'card' | 'bank'>('all')
+  const [uploadGroupBy, setUploadGroupBy] = useState<'none' | 'card_number' | 'category' | 'vehicle'>('none')
+
+  // 업로드 결과 필터링
+  const filteredResults = useMemo(() => {
+    if (uploadSubFilter === 'all') return results
+    if (uploadSubFilter === 'card') return results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
+    if (uploadSubFilter === 'bank') return results.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
+    return results
+  }, [results, uploadSubFilter])
+
+  // 카드번호별 그룹핑 (법인카드 사용자 매칭 포함)
+  const groupedByCard = useMemo(() => {
+    if (uploadGroupBy !== 'card_number') return null
+    const groups: Record<string, { items: typeof filteredResults; cardInfo: any; totalAmount: number }> = {}
+    for (const item of filteredResults) {
+      const cardNum = item.card_number || '(카드번호 없음)'
+      const key = cardNum.length >= 3 ? cardNum : '(카드번호 없음)'
+      if (!groups[key]) {
+        // 법인카드 정보 매칭
+        const matchedCard = corpCards.find(cc => {
+          if (!item.card_number) return false
+          const ccDigits = (cc.card_number || '').replace(/\D/g, '')
+          const itemDigits = item.card_number.replace(/\D/g, '')
+          if (itemDigits.length >= 4 && ccDigits.endsWith(itemDigits.slice(-4))) return true
+          if (itemDigits.length >= 3 && ccDigits.includes(itemDigits)) return true
+          return false
+        })
+        groups[key] = { items: [], cardInfo: matchedCard || null, totalAmount: 0 }
+      }
+      groups[key].items.push(item)
+      groups[key].totalAmount += item.amount || 0
+    }
+    return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
+  }, [filteredResults, uploadGroupBy, corpCards])
+
+  // 차량별 그룹핑 (유류비, 정비비 등 차량 관련 거래)
+  const groupedByVehicle = useMemo(() => {
+    if (uploadGroupBy !== 'vehicle') return null
+    const vehicleCategories = ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료']
+    const groups: Record<string, { items: typeof filteredResults; carInfo: any; totalAmount: number }> = {}
+    for (const item of filteredResults) {
+      if (!vehicleCategories.includes(item.category || '') && !item.related_type?.includes('car')) {
+        // 차량 관련이 아닌 거래는 '기타' 그룹
+        const key = '🏢 차량 외 거래'
+        if (!groups[key]) groups[key] = { items: [], carInfo: null, totalAmount: 0 }
+        groups[key].items.push(item)
+        groups[key].totalAmount += item.amount || 0
+        continue
+      }
+      // 연결된 차량 정보로 그룹핑
+      const carId = item.related_type === 'car' ? item.related_id : null
+      const car = carId ? cars.find(c => c.id === carId) : null
+      const key = car ? `🚛 ${car.number} (${car.model || ''})` : '🚛 미배정 차량'
+      if (!groups[key]) groups[key] = { items: [], carInfo: car, totalAmount: 0 }
+      groups[key].items.push(item)
+      groups[key].totalAmount += item.amount || 0
+    }
+    return Object.entries(groups).sort((a, b) => {
+      // 차량 외 거래는 맨 뒤로
+      if (a[0].includes('차량 외')) return 1
+      if (b[0].includes('차량 외')) return -1
+      return b[1].items.length - a[1].items.length
+    })
+  }, [filteredResults, uploadGroupBy, cars])
+
+  // 카테고리별 그룹핑
+  const groupedByCategory = useMemo(() => {
+    if (uploadGroupBy !== 'category') return null
+    const groups: Record<string, { items: typeof filteredResults; totalAmount: number }> = {}
+    for (const item of filteredResults) {
+      const cat = item.category || '미분류'
+      if (!groups[cat]) groups[cat] = { items: [], totalAmount: 0 }
+      groups[cat].items.push(item)
+      groups[cat].totalAmount += item.amount || 0
+    }
+    return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
+  }, [filteredResults, uploadGroupBy])
+
+  // 업로드 결과 요약 통계
+  const uploadStats = useMemo(() => {
+    const cardItems = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
+    const bankItems = results.filter(r => r.payment_method !== '카드' && r.payment_method !== 'Card')
+    const classifiedCount = results.filter(r => r.category && r.category !== '미분류' && r.category !== '기타').length
+    const cardMatchedCount = results.filter(r => r.card_id).length
+    return { cardCount: cardItems.length, bankCount: bankItems.length, classifiedCount, cardMatchedCount }
+  }, [results])
+
+  // 법인카드→사용자 이름 매핑 헬퍼
+  const getCardUserName = useCallback((cardId: string | null | undefined) => {
+    if (!cardId) return null
+    const card = corpCards.find(c => c.id === cardId)
+    if (!card) return null
+    return card.holder_name || card.card_alias || null
+  }, [corpCards])
+
+  const getCardDisplayInfo = useCallback((cardId: string | null | undefined) => {
+    if (!cardId) return null
+    const card = corpCards.find(c => c.id === cardId)
+    if (!card) return null
+    return { company: card.card_company, last4: (card.card_number || '').slice(-4), holder: card.holder_name || card.card_alias || '공용' }
+  }, [corpCards])
+
   // ── Guard: Company Selection ──
   if (role === 'god_admin' && !adminSelectedCompanyId) {
     return (
@@ -712,81 +820,325 @@ function UploadContent() {
       {/* Content Area Based on Active Tab */}
       {activeTab === 'upload' && (
         <>
-          {/* Upload Results Table */}
+          {/* Upload Results */}
           {results.length > 0 && (
             <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              <div style={{ padding: 16, background: '#f3f4f6', borderBottom: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <h3 style={{ fontWeight: 700, fontSize: 14, color: '#1f2937', margin: 0 }}>✅ 분석 결과 ({results.length}건)</h3>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: '#fff', padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                    <input type="checkbox" checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>⚡️ 동일 내역 일괄 변경</span>
-                  </label>
+              {/* Header with controls */}
+              <div style={{ padding: '12px 16px', background: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <h3 style={{ fontWeight: 700, fontSize: 14, color: '#1f2937', margin: 0 }}>분석 결과 ({filteredResults.length}건{uploadSubFilter !== 'all' ? ` / 전체 ${results.length}건` : ''})</h3>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', background: '#fff', padding: '4px 10px', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                      <input type="checkbox" checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} style={{ width: 14, height: 14, cursor: 'pointer' }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#374151' }}>동일 내역 일괄 변경</span>
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={clearResults} style={{ color: '#ef4444', fontWeight: 700, padding: '6px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>전체 취소</button>
+                    <button onClick={handleBulkSave} style={{ background: '#4f46e5', color: '#fff', padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>💾 전체 저장</button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={clearResults} style={{ color: '#ef4444', fontWeight: 700, padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>전체 취소</button>
-                  <button onClick={handleBulkSave} style={{ background: '#4f46e5', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>💾 전체 저장</button>
+
+                {/* Sub-filter: 전체/카드/통장 + 그룹핑 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* 결제수단 필터 */}
+                  {[
+                    { key: 'all' as const, label: '전체', count: results.length, icon: '📋' },
+                    { key: 'card' as const, label: '카드', count: uploadStats.cardCount, icon: '💳' },
+                    { key: 'bank' as const, label: '통장', count: uploadStats.bankCount, icon: '🏦' },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => { setUploadSubFilter(f.key); if (f.key === 'bank') setUploadGroupBy('none') }}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                        background: uploadSubFilter === f.key ? '#2d5fa8' : '#fff',
+                        color: uploadSubFilter === f.key ? '#fff' : '#6b7280',
+                        border: uploadSubFilter === f.key ? 'none' : '1px solid #e5e7eb',
+                      }}>
+                      {f.icon} {f.label} ({f.count})
+                    </button>
+                  ))}
+
+                  <span style={{ color: '#d1d5db', margin: '0 4px' }}>|</span>
+
+                  {/* 그룹핑 */}
+                  {[
+                    { key: 'none' as const, label: '목록', icon: '📄' },
+                    { key: 'card_number' as const, label: '카드번호별', icon: '💳', onlyCard: true },
+                    { key: 'category' as const, label: '계정과목별', icon: '📊' },
+                    { key: 'vehicle' as const, label: '차량별', icon: '🚛' },
+                  ].filter(g => !g.onlyCard || uploadSubFilter !== 'bank').map(g => (
+                    <button key={g.key} onClick={() => setUploadGroupBy(g.key)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                        background: uploadGroupBy === g.key ? '#1e293b' : '#fff',
+                        color: uploadGroupBy === g.key ? '#fff' : '#6b7280',
+                        border: uploadGroupBy === g.key ? 'none' : '1px solid #e5e7eb',
+                      }}>
+                      {g.icon} {g.label}
+                    </button>
+                  ))}
+
+                  {/* 매칭 요약 */}
+                  {uploadStats.cardMatchedCount > 0 && (
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                      법인카드 매칭 {uploadStats.cardMatchedCount}건 · 분류 완료 {uploadStats.classifiedCount}건
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto', maxHeight: '65vh' }}>
-                <table style={{ width: '100%', textAlign: 'left', fontSize: 13, borderCollapse: 'collapse' }}>
-                  <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, position: 'sticky', top: 0, zIndex: 10 }}>
-                    <tr>
-                      <th style={{ padding: 12, textAlign: 'center', width: 40 }}>규칙</th>
-                      <th style={{ padding: 12 }}>날짜</th>
-                      <th style={{ padding: 12 }}>결제수단</th>
-                      <th style={{ padding: 12 }}>거래처 (가맹점)</th>
-                      <th style={{ padding: 12 }}>상세정보 (비고)</th>
-                      <th style={{ padding: 12 }}>계정과목</th>
-                      <th style={{ padding: 12, width: 192 }}>연결 대상</th>
-                      <th style={{ padding: 12, textAlign: 'right' }}>금액</th>
-                      <th style={{ padding: 12, textAlign: 'center' }}>삭제</th>
-                    </tr>
-                  </thead>
-                  <tbody style={{ borderTop: '1px solid #f3f4f6' }}>
-                    {results.map((item) => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', background: 'transparent', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.03)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding: 12, textAlign: 'center' }}><button onClick={() => saveRuleToDb(item)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontSize: 16, cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#eab308'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>⭐</button></td>
-                        <td style={{ padding: 12 }}><input value={item.transaction_date || ''} onChange={e => handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} style={{ background: 'transparent', width: 96, outline: 'none', color: '#1f2937', fontSize: 13 }} /></td>
-                        <td style={{ padding: 12 }}>
-                          {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
-                            <span style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#b45309' }}>💳 카드</span>
-                          ) : (
-                            <span style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b' }}>
-                              {item.type === 'income' ? '🔵 통장입금' : '🔴 통장출금'}
-                            </span>
+              {/* ═══ 그룹 뷰: 카드번호별 ═══ */}
+              {uploadGroupBy === 'card_number' && groupedByCard && (
+                <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                  {groupedByCard.map(([cardNum, group]) => (
+                    <div key={cardNum} style={{ borderBottom: '2px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
+                        onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(cardNum) ? n.delete(cardNum) : n.add(cardNum); return n })}>
+                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.cardInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
+                        <span style={{ fontSize: 16 }}>💳</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>
+                            {group.cardInfo ? `${group.cardInfo.card_company} ****${(group.cardInfo.card_number || '').slice(-4)}` : cardNum}
+                          </p>
+                          {group.cardInfo && (
+                            <p style={{ fontSize: 11, color: '#64748b', margin: 0, marginTop: 1 }}>
+                              사용자: <b style={{ color: '#0f172a' }}>{group.cardInfo.holder_name || group.cardInfo.card_alias || '공용'}</b>
+                              {group.cardInfo.card_alias && group.cardInfo.card_alias !== group.cardInfo.holder_name ? ` (${group.cardInfo.card_alias})` : ''}
+                            </p>
                           )}
-                        </td>
-                        <td style={{ padding: 12 }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 13 }} /></td>
-                        <td style={{ padding: 12 }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 4, padding: '4px 8px', outline: 'none', fontSize: 12, color: '#4b5563' }} /></td>
-                        <td style={{ padding: 12 }}>
-                          <select value={item.category || '기타'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '4px 8px', borderRadius: 4, color: '#374151', fontWeight: 700, width: 128, fontSize: 11, outline: 'none' }}>
-                            <option value="기타">기타</option>
-                            {DEFAULT_RULES.map((r, i) => <option key={i} value={r.label}>{r.label}</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: 12 }}>
-                          <select value={item.related_id ? `${item.related_type}_${item.related_id}` : ''} onChange={e => handleUpdateItem(item.id, 'related_composite', e.target.value, item)} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 8px', fontSize: 11, outline: 'none', background: '#fff', color: '#4b5563' }}>
-                            <option value="">- 연결 없음 -</option>
-                            {corpCards.length > 0 && <optgroup label="💳 법인카드">{corpCards.map(cc => <option key={cc.id} value={`card_${cc.id}`}>{cc.card_company} {(cc.card_number||'').slice(-4)} ({cc.holder_name || cc.card_alias})</option>)}</optgroup>}
-                            <optgroup label="🚛 지입 차주">{jiips.map(j => <option key={j.id} value={`jiip_${j.id}`}>{j.investor_name}</option>)}</optgroup>
-                            <optgroup label="💰 투자자">{investors.map(i => <option key={i.id} value={`invest_${i.id}`}>{i.investor_name}</option>)}</optgroup>
-                            <optgroup label="🚗 차량">{cars.map(c => <option key={c.id} value={`car_${c.id}`}>{c.number}</option>)}</optgroup>
-                            {loans.length > 0 && <optgroup label="🏦 대출">{loans.map(l => <option key={l.id} value={`loan_${l.id}`}>{l.finance_name} ({(l.monthly_payment||0).toLocaleString()}원/월)</option>)}</optgroup>}
-                            {insurances.length > 0 && <optgroup label="🛡️ 보험">{insurances.map(ins => <option key={ins.id} value={`insurance_${ins.id}`}>{ins.company} {ins.product_name}</option>)}</optgroup>}
-                          </select>
-                        </td>
-                        <td style={{ padding: 12, textAlign: 'right', fontWeight: 900, fontSize: 13, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
-                          {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
-                          {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
-                        </td>
-                        <td style={{ padding: 12, textAlign: 'center' }}><button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontWeight: 700, padding: 4, cursor: 'pointer', fontSize: 18 }} onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>×</button></td>
+                          {!group.cardInfo && <p style={{ fontSize: 11, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                        </div>
+                        <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cardNum) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                      </div>
+                      {expandedGroups.has(cardNum) && (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                            <tbody>
+                              {group.items.map(item => (
+                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <td style={{ padding: '8px 12px', width: 90, color: '#6b7280', fontSize: 12 }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                  <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <select value={item.category || '기타'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '3px 6px', borderRadius: 4, color: '#374151', fontWeight: 600, fontSize: 11, outline: 'none', width: 120 }}>
+                                      <option value="기타">기타</option>
+                                      {DEFAULT_RULES.map((r, i) => <option key={i} value={r.label}>{r.label}</option>)}
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
+                                    {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
+                                    {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
+                                    <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ═══ 그룹 뷰: 카테고리별 ═══ */}
+              {uploadGroupBy === 'category' && groupedByCategory && (
+                <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                  {groupedByCategory.map(([cat, group]) => {
+                    const icon = CATEGORY_ICONS[cat] || '📋'
+                    const groupName = getCategoryGroup(cat)
+                    const groupColor = CATEGORY_COLORS[groupName] || '#64748b'
+                    return (
+                      <div key={cat} style={{ borderBottom: '2px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
+                          onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n })}>
+                          <div style={{ width: 4, height: 32, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
+                          <span style={{ fontSize: 16 }}>{icon}</span>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{cat}</p>
+                            <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                            <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                          </div>
+                          <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cat) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                        </div>
+                        {expandedGroups.has(cat) && (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                              <tbody>
+                                {group.items.map(item => (
+                                  <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                    <td style={{ padding: '8px 12px', width: 90, color: '#6b7280' }}>{item.transaction_date}</td>
+                                    <td style={{ padding: '8px 12px' }}>
+                                      {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
+                                        <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#b45309' }}>💳</span>
+                                      ) : (
+                                        <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b' }}>
+                                          {item.type === 'income' ? '🔵' : '🔴'}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                    <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
+                                    {/* 카드 사용자 표시 */}
+                                    <td style={{ padding: '8px 12px', fontSize: 11 }}>
+                                      {item.card_id && getCardDisplayInfo(item.card_id) ? (
+                                        <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 10 }}>
+                                          {getCardDisplayInfo(item.card_id)!.holder}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
+                                      {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
+                                      {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
+                                      <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ═══ 그룹 뷰: 차량별 ═══ */}
+              {uploadGroupBy === 'vehicle' && groupedByVehicle && (
+                <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                  {groupedByVehicle.map(([label, group]) => (
+                    <div key={label} style={{ borderBottom: '2px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
+                        onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(label) ? n.delete(label) : n.add(label); return n })}>
+                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.carInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
+                        <span style={{ fontSize: 16 }}>{label.startsWith('🚛') ? '🚛' : '🏢'}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{label}</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                        </div>
+                        <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(label) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                      </div>
+                      {expandedGroups.has(label) && (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                            <tbody>
+                              {group.items.map(item => (
+                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <td style={{ padding: '8px 12px', width: 90, color: '#6b7280' }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>
+                                      {CATEGORY_ICONS[item.category || ''] || '📋'} {item.category || '미분류'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#111827' }}>{(item.amount || 0).toLocaleString()}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
+                                    <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ═══ 기본 목록 뷰 ═══ */}
+              {uploadGroupBy === 'none' && (
+                <div style={{ overflowX: 'auto', maxHeight: '65vh' }}>
+                  <table style={{ width: '100%', textAlign: 'left', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, position: 'sticky', top: 0, zIndex: 10 }}>
+                      <tr>
+                        <th style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>규칙</th>
+                        <th style={{ padding: '8px 12px' }}>날짜</th>
+                        <th style={{ padding: '8px 12px' }}>결제수단</th>
+                        <th style={{ padding: '8px 12px' }}>거래처</th>
+                        <th style={{ padding: '8px 12px' }}>비고</th>
+                        <th style={{ padding: '8px 12px' }}>계정과목</th>
+                        <th style={{ padding: '8px 12px' }}>카드사용자</th>
+                        <th style={{ padding: '8px 12px', width: 180 }}>연결 대상</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right' }}>금액</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>삭제</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody style={{ borderTop: '1px solid #f3f4f6' }}>
+                      {filteredResults.map((item) => {
+                        const cardInfo = getCardDisplayInfo(item.card_id)
+                        return (
+                          <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', background: 'transparent', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.03)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}><button onClick={() => saveRuleToDb(item)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontSize: 14, cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#eab308'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>⭐</button></td>
+                            <td style={{ padding: '8px 12px' }}><input value={item.transaction_date || ''} onChange={e => handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} style={{ background: 'transparent', width: 90, outline: 'none', color: '#1f2937', fontSize: 12 }} /></td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
+                                <div>
+                                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#b45309', display: 'inline-block' }}>💳 카드</span>
+                                  {item.card_number && <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0', fontFamily: 'monospace' }}>{item.card_number}</p>}
+                                </div>
+                              ) : (
+                                <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b' }}>
+                                  {item.type === 'income' ? '🔵 입금' : '🔴 출금'}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 12 }} /></td>
+                            <td style={{ padding: '8px 12px' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 4, padding: '3px 6px', outline: 'none', fontSize: 11, color: '#4b5563' }} /></td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <select value={item.category || '기타'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '3px 6px', borderRadius: 4, color: '#374151', fontWeight: 700, width: 120, fontSize: 11, outline: 'none' }}>
+                                <option value="기타">기타</option>
+                                {DEFAULT_RULES.map((r, i) => <option key={i} value={r.label}>{r.label}</option>)}
+                              </select>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {cardInfo ? (
+                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                  {cardInfo.holder} ({cardInfo.last4})
+                                </span>
+                              ) : (item.payment_method === '카드' || item.payment_method === 'Card') ? (
+                                <span style={{ fontSize: 10, color: '#d1d5db' }}>미매칭</span>
+                              ) : null}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <select value={item.related_id ? `${item.related_type}_${item.related_id}` : ''} onChange={e => handleUpdateItem(item.id, 'related_composite', e.target.value, item)} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 10, outline: 'none', background: '#fff', color: '#4b5563' }}>
+                                <option value="">- 연결 없음 -</option>
+                                {corpCards.length > 0 && <optgroup label="💳 법인카드">{corpCards.map(cc => <option key={cc.id} value={`card_${cc.id}`}>{cc.card_company} {(cc.card_number||'').slice(-4)} ({cc.holder_name || cc.card_alias})</option>)}</optgroup>}
+                                <optgroup label="🚛 지입 차주">{jiips.map(j => <option key={j.id} value={`jiip_${j.id}`}>{j.investor_name}</option>)}</optgroup>
+                                <optgroup label="💰 투자자">{investors.map(i => <option key={i.id} value={`invest_${i.id}`}>{i.investor_name}</option>)}</optgroup>
+                                <optgroup label="🚗 차량">{cars.map(c => <option key={c.id} value={`car_${c.id}`}>{c.number}</option>)}</optgroup>
+                                {loans.length > 0 && <optgroup label="🏦 대출">{loans.map(l => <option key={l.id} value={`loan_${l.id}`}>{l.finance_name} ({(l.monthly_payment||0).toLocaleString()}원/월)</option>)}</optgroup>}
+                                {insurances.length > 0 && <optgroup label="🛡️ 보험">{insurances.map(ins => <option key={ins.id} value={`insurance_${ins.id}`}>{ins.company} {ins.product_name}</option>)}</optgroup>}
+                              </select>
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: 13, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
+                              {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
+                              {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center' }}><button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontWeight: 700, padding: 4, cursor: 'pointer', fontSize: 16 }} onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>×</button></td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </>

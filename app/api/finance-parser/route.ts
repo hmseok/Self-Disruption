@@ -43,13 +43,22 @@ export async function POST(req: NextRequest) {
     };
     const hint = fileTypeHints[fileType || ''] || '';
 
+    // 현재 날짜 기반으로 연도 힌트 제공
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
     const prompt = `너는 한국 세무사 수준의 회계 데이터 분석 전문가야.
 입력된 CSV 데이터를 분석해서 JSON 배열을 반환해.
 
 ${hint}
 
+⚠️ 오늘 날짜: ${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}
+날짜에 연도가 없으면(예: 02.26, 01/15) 반드시 ${currentYear}년으로 설정하세요.
+데이터가 최근 1~2개월 내의 거래라고 가정하세요.
+
 [결과 필드 — 반드시 모든 필드를 포함]
-- transaction_date: YYYY-MM-DD 형식 (예: 2026-01-15)
+- transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15)
 - client_name: 거래처명/가맹점명/사람이름 (입금, 출금, 이체 같은 거래유형 단어 제외)
 - amount: 양수 숫자 (콤마 제거)
 - type: "income" 또는 "expense"
@@ -88,7 +97,8 @@ ${hint}
 - 취소 거래도 포함, description에 "취소" 명시
 - 잔액은 금액에 포함하지 않음
 - 같은 행에 입금/출금 둘 다 있으면 0이 아닌 쪽 사용
-- 날짜: 반드시 YYYY-MM-DD (예: 20260115 → 2026-01-15)
+- 날짜: 반드시 YYYY-MM-DD (예: 20260115 → ${currentYear}-01-15, 02.26 → ${currentYear}-02-26)
+- 연도가 없는 날짜(MM.DD, MM/DD)는 반드시 ${currentYear}년으로 설정
 - 헤더가 위 패턴과 다르더라도 맥락으로 판단
 
 [입력 데이터]
@@ -134,6 +144,20 @@ ${mimeType === 'text/csv' ? data : '(이미지 데이터)'}`;
         // amount 문자열이면 숫자로 변환
         if (typeof item.amount === 'string') {
           item.amount = Math.abs(Number(item.amount.replace(/[,\s]/g, '')) || 0);
+        }
+
+        // 날짜 연도 보정: 미래 3개월 이상이거나 2년 이상 과거면 현재 연도로 보정
+        if (item.transaction_date) {
+          const dateMatch = item.transaction_date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (dateMatch) {
+            const year = parseInt(dateMatch[1]);
+            const month = parseInt(dateMatch[2]);
+            const day = parseInt(dateMatch[3]);
+            // 연도가 현재 연도와 2년 이상 차이나면 보정
+            if (Math.abs(year - currentYear) >= 2) {
+              item.transaction_date = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+          }
         }
       }
     }

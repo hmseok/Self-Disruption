@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Admin API로 Auth 사용자 생성 (인증메일 발송 없음, 즉시 확인됨)
+  // ★ 메타데이터에 회사/역할 정보를 포함하여 handle_new_user 트리거에서 올바르게 처리
   const { data: authData, error: authError } = await sb.auth.admin.createUser({
     email: invite.email,
     password,
@@ -55,6 +56,10 @@ export async function POST(request: NextRequest) {
       full_name: name,
       phone,
       invite_token: token,
+      invite_company_id: invite.company_id,
+      role: invite.role,
+      position_id: invite.position_id || null,
+      department_id: invite.department_id || null,
     },
   })
 
@@ -79,39 +84,57 @@ export async function POST(request: NextRequest) {
     .eq('id', userId)
     .single()
 
-  if (existingProfile) {
+  // ★ 트리거가 profile을 이미 생성했을 수 있으므로 재확인 (최대 3회)
+  let profileExists = !!existingProfile
+  if (!profileExists) {
+    // 트리거 처리 대기 후 재확인
+    for (let retry = 0; retry < 3; retry++) {
+      await new Promise(r => setTimeout(r, 300))
+      const { data: retryCheck } = await sb.from('profiles').select('id').eq('id', userId).single()
+      if (retryCheck) { profileExists = true; break }
+    }
+  }
+
+  const profilePayload = {
+    email: invite.email,
+    company_id: invite.company_id,
+    role: invite.role,
+    position_id: invite.position_id,
+    department_id: invite.department_id,
+    employee_name: name,
+    phone: phone || null,
+    is_active: true,
+  }
+
+  if (profileExists) {
     const { error: updateErr } = await sb
       .from('profiles')
-      .update({
-        email: invite.email,
-        company_id: invite.company_id,
-        role: invite.role,
-        position_id: invite.position_id,
-        department_id: invite.department_id,
-        employee_name: name,
-        phone: phone || null,
-        is_active: true,
-      })
+      .update(profilePayload)
       .eq('id', userId)
 
     if (updateErr) {
       console.error('profile 업데이트 실패:', updateErr.message)
       return NextResponse.json({ error: 'profile 업데이트 실패: ' + updateErr.message }, { status: 500 })
     }
+
+    // ★ 업데이트 후 company_id가 실제로 반영되었는지 검증
+    const { data: verifyProfile } = await sb.from('profiles').select('company_id').eq('id', userId).single()
+    if (!verifyProfile?.company_id) {
+      console.error('profile company_id 반영 실패! 재시도합니다.', { userId, invite_company_id: invite.company_id })
+      // 강제 재시도
+      const { error: retryErr } = await sb
+        .from('profiles')
+        .update({ company_id: invite.company_id, role: invite.role, is_active: true })
+        .eq('id', userId)
+      if (retryErr) {
+        console.error('profile 재시도도 실패:', retryErr.message)
+        return NextResponse.json({ error: 'profile 회사 배정 실패. 관리자에게 문의하세요.' }, { status: 500 })
+      }
+    }
   } else {
     const { error: insertErr } = await sb
       .from('profiles')
-      .insert({
-        id: userId,
-        email: invite.email,
-        company_id: invite.company_id,
-        role: invite.role,
-        position_id: invite.position_id,
-        department_id: invite.department_id,
-        employee_name: name,
-        phone: phone || null,
-        is_active: true,
-      })
+      .insert({ id: userId, ...profilePayload })
 
     if (insertErr) {
       console.error('profile 생성 실패:', insertErr.message)

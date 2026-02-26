@@ -422,8 +422,9 @@ export default function OrgManagementPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #e2e8f0', borderTopColor: '#2d5fa8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     )
   }
@@ -442,281 +443,285 @@ export default function OrgManagementPage() {
   // ── 직원 카드 (공용 컴포넌트) ──
   const EmployeeCard = ({ emp }: { emp: any }) => {
     const r = ROLE_LABELS[emp.role] || ROLE_LABELS.user
+    const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
+      god_admin: { bg: '#e0f2fe', color: '#0369a1' },
+      master: { bg: '#e8eef7', color: '#2d5fa8' },
+      user: { bg: '#f1f5f9', color: '#64748b' },
+    }
+    const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
+    const avatarBg = emp.role === 'god_admin' ? '#0ea5e9' : emp.role === 'master' ? '#2d5fa8' : '#94a3b8'
     return (
       <div
-        className="flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50/70 transition-colors cursor-pointer group"
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
         onClick={() => openEditModal(emp)}
+        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
       >
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
-          emp.role === 'god_admin' ? 'bg-sky-500' :
-          emp.role === 'master' ? 'bg-steel-600' :
-          'bg-slate-400'
-        }`}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, flexShrink: 0, background: avatarBg }}>
           {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-sm text-slate-900 truncate">{emp.employee_name || '(이름 미설정)'}</span>
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${r.bg}`}>{r.label}</span>
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${emp.is_active !== false ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.employee_name || '(이름 미설정)'}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: rc.bg, color: rc.color }}>{r.label}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: emp.is_active !== false ? '#dcfce7' : '#fee2e2', color: emp.is_active !== false ? '#16a34a' : '#dc2626' }}>
               {emp.is_active !== false ? '활성' : '비활성'}
             </span>
           </div>
-          <div className="text-xs text-slate-400 mt-0.5 truncate">{emp.email}</div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {emp.position?.name && (
-              <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.position.name}</span>
-            )}
-            {emp.department?.name && (
-              <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{emp.department.name}</span>
-            )}
-            {emp.phone && (
-              <span className="text-xs text-slate-400">{emp.phone}</span>
-            )}
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' as const }}>
+            {emp.position?.name && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>{emp.position.name}</span>}
+            {emp.department?.name && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>{emp.department.name}</span>}
+            {emp.phone && <span style={{ fontSize: 11, color: '#94a3b8' }}>{emp.phone}</span>}
           </div>
         </div>
-        <div className="hidden md:block text-right flex-shrink-0">
-          <div className="text-xs text-slate-400">{formatDate(emp.created_at)}</div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(emp.created_at)}</div>
         </div>
-        <div className="text-slate-300 group-hover:text-steel-500 transition-colors flex-shrink-0">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </div>
+        <div style={{ color: '#d1d5db', flexShrink: 0, fontSize: 14 }}>›</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
 
-        {/* 헤더 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏢 조직/권한 관리</h1>
-            <p className="text-gray-500 text-sm mt-1">직원 관리 및 페이지 권한 설정</p>
-          </div>
+      {/* ═══ 헤더 — 등록/제원 페이지 스타일 ═══ */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' as const, gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>조직/권한 관리</h1>
+          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>직원 관리 및 페이지 권한 설정</p>
         </div>
-        {role === 'god_admin' && !adminSelectedCompanyId && (
-          <div className="mt-4 p-4 bg-steel-50 border border-steel-200 rounded-xl">
-            <p className="text-sm font-bold text-steel-700">사이드바에서 회사를 선택해주세요.</p>
-            <p className="text-xs text-steel-500 mt-1">조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
-          </div>
+        {activeCompanyId && (
+          <button onClick={() => setShowInviteModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2d5fa8', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            + 직원 초대
+          </button>
         )}
+      </div>
 
-        {role === 'god_admin' && !adminSelectedCompanyId ? null : (
-          <>
-            {/* 탭 */}
-            <div className="flex gap-1.5 md:gap-2 mb-5 md:mb-6">
-              {TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 md:gap-2 whitespace-nowrap ${
-                    activeTab === tab.key
-                      ? 'bg-steel-900 text-white'
-                      : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
-                  }`}>{tab.count}</span>
-                </button>
-              ))}
+      {role === 'god_admin' && !adminSelectedCompanyId && (
+        <div style={{ padding: 20, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 16, marginBottom: 24 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: 0 }}>사이드바에서 회사를 선택해주세요.</p>
+          <p style={{ fontSize: 12, color: '#3b82f6', marginTop: 4 }}>조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
+        </div>
+      )}
+
+      {role === 'god_admin' && !adminSelectedCompanyId ? null : (
+        <>
+          {/* ═══ 통계 카드 ═══ */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+            <div style={{ flex: 1, background: '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #e5e7eb', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>전체 직원</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#111827', margin: '4px 0 0' }}>{employees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#9ca3af', marginLeft: 2 }}>명</span></p>
             </div>
+            <div style={{ flex: 1, background: '#fffbeb', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#d97706', margin: 0 }}>대기중 초대</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#b45309', margin: '4px 0 0' }}>{pendingInvitationCount}<span style={{ fontSize: 14, fontWeight: 500, color: '#d97706', marginLeft: 2 }}>건</span></p>
+            </div>
+            <div style={{ flex: 1, background: '#f0fdf4', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', margin: 0 }}>직급/부서</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#15803d', margin: '4px 0 0' }}>{positions.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#16a34a', marginLeft: 2 }}>직급</span> · {departments.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#16a34a', marginLeft: 2 }}>부서</span></p>
+            </div>
+            <div style={{ flex: 1, background: '#eff6ff', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', cursor: 'pointer' }} onClick={() => setActiveTab('permissions')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', margin: 0 }}>권한 설정 대상</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#1d4ed8', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>명</span></p>
+            </div>
+          </div>
 
-            {/* ================================================================ */}
-            {/* Tab 1: 조직 관리 (직원, 직급, 부서, 초대) */}
-            {/* ================================================================ */}
-            {activeTab === 'organization' && (
-              <div className="space-y-4 md:space-y-6">
-                {/* 직원 목록 */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 md:p-5 border-b border-slate-100 flex justify-between items-center">
+          {/* ═══ 탭 ═══ */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {TABS.map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                  background: activeTab === tab.key ? '#2d5fa8' : '#fff',
+                  color: activeTab === tab.key ? '#fff' : '#6b7280',
+                  border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                {tab.label}
+                <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : '#f3f4f6', color: activeTab === tab.key ? '#fff' : '#9ca3af' }}>{tab.count}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ================================================================ */}
+          {/* Tab 1: 조직 관리 (직원, 직급, 부서, 초대) */}
+          {/* ================================================================ */}
+          {activeTab === 'organization' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* 직원 목록 */}
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>직원 목록</h2>
+                    <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>총 {employees.length}명 · 클릭하여 수정</p>
+                  </div>
+                </div>
+
+                {/* 테이블 헤더 */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                  <div style={{ width: 40, marginRight: 12 }}></div>
+                  <div style={{ flex: 1 }}>이름 / 이메일 / 소속</div>
+                  <div style={{ width: 96, textAlign: 'right', marginRight: 24 }}>가입일</div>
+                  <div style={{ width: 16 }}></div>
+                </div>
+
                 <div>
-                  <h2 className="text-base md:text-lg font-bold text-slate-900">직원 목록</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">총 {employees.length}명 · 클릭하여 수정</p>
-                </div>
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex items-center gap-2 active:scale-95"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                  초대
-                </button>
-                </div>
-
-                <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  <div className="w-10 mr-3"></div>
-                  <div className="flex-1">이름 / 이메일 / 소속</div>
-                  <div className="w-24 text-right mr-8">가입일</div>
-                  <div className="w-4"></div>
-                </div>
-
-                <div className="divide-y divide-slate-100">
-                  {employees.map(emp => (
-                    <EmployeeCard key={emp.id} emp={emp} />
-                  ))}
+                  {employees.map(emp => <EmployeeCard key={emp.id} emp={emp} />)}
                   {employees.length === 0 && (
-                    <div className="p-10 text-center text-slate-400 text-sm">등록된 직원이 없습니다.</div>
+                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>등록된 직원이 없습니다.</div>
                   )}
                 </div>
               </div>
 
-              {/* 직급 · 부서 관리 */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              {/* 직급 · 부서 관리 — 2열 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 {/* 직급 관리 */}
-                <div className="space-y-3 md:space-y-4">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-                    <h2 className="text-sm md:text-base font-bold mb-3">직급 추가</h2>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1 min-w-0">
-                        <label className="text-xs font-bold text-slate-400 block mb-1">직급명</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
+                    <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>직급 추가</h2>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>직급명</label>
                         <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
-                          className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 과장" />
+                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 과장" />
                       </div>
-                      <div className="w-20 md:w-24">
-                        <label className="text-xs font-bold text-slate-400 block mb-1">레벨</label>
+                      <div style={{ width: 80 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>레벨</label>
                         <input type="number" min={1} max={10} value={newPositionLevel}
                           onChange={e => setNewPositionLevel(Number(e.target.value))}
-                          className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" />
+                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                       </div>
-                      <button onClick={addPosition} className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex-shrink-0 active:scale-95">
-                        추가
-                      </button>
+                      <button onClick={addPosition} style={{ padding: '8px 16px', background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    <div className="p-3 md:p-4 border-b border-slate-100">
-                      <h3 className="text-xs md:text-sm font-bold text-slate-500">직급 목록 ({positions.length})</h3>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', margin: 0 }}>직급 목록 ({positions.length})</h3>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div>
                       {positions.map(pos => (
-                        <div key={pos.id} className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 hover:bg-slate-50/50">
-                          <div className="flex items-center gap-2 md:gap-3">
-                            <span className="bg-steel-100 text-steel-700 text-xs font-bold px-2 py-0.5 rounded w-12 text-center">Lv.{pos.level}</span>
-                            <span className="font-bold text-sm text-slate-800">{pos.name}</span>
+                        <div key={pos.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #f8fafc' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ background: '#e8eef7', color: '#2d5fa8', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, width: 48, textAlign: 'center', display: 'inline-block' }}>Lv.{pos.level}</span>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{pos.name}</span>
                           </div>
-                          <button onClick={() => deletePosition(pos.id)} className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all">삭제</button>
+                          <button onClick={() => deletePosition(pos.id)} style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
                         </div>
                       ))}
-                      {positions.length === 0 && (
-                        <div className="p-6 text-center text-slate-400 text-sm">직급이 없습니다.</div>
-                      )}
+                      {positions.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>직급이 없습니다.</div>}
                     </div>
                   </div>
                 </div>
 
                 {/* 부서 관리 */}
-                <div className="space-y-3 md:space-y-4">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-                    <h2 className="text-sm md:text-base font-bold mb-3">부서 추가</h2>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1 min-w-0">
-                        <label className="text-xs font-bold text-slate-400 block mb-1">부서명</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
+                    <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>부서 추가</h2>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>부서명</label>
                         <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
-                          className="w-full border rounded-xl px-3 py-2.5 text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="예: 영업팀" />
+                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 영업팀" />
                       </div>
-                      <button onClick={addDepartment} className="py-2.5 px-5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-colors flex-shrink-0 active:scale-95">
-                        추가
-                      </button>
+                      <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    <div className="p-3 md:p-4 border-b border-slate-100">
-                      <h3 className="text-xs md:text-sm font-bold text-slate-500">부서 목록 ({departments.length})</h3>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', margin: 0 }}>부서 목록 ({departments.length})</h3>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div>
                       {departments.map(dept => (
-                        <div key={dept.id} className="flex items-center justify-between px-3 md:px-4 py-2.5 md:py-3 hover:bg-slate-50/50">
-                          <span className="font-bold text-sm text-slate-800">{dept.name}</span>
-                          <button onClick={() => deleteDepartment(dept.id)} className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all">삭제</button>
+                        <div key={dept.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #f8fafc' }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{dept.name}</span>
+                          <button onClick={() => deleteDepartment(dept.id)} style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
                         </div>
                       ))}
-                      {departments.length === 0 && (
-                        <div className="p-6 text-center text-slate-400 text-sm">부서가 없습니다.</div>
-                      )}
+                      {departments.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>부서가 없습니다.</div>}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 초대 관리 */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 md:p-5 border-b border-slate-100">
-                  <h2 className="text-base md:text-lg font-bold text-slate-900">초대 관리</h2>
+              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>초대 관리</h2>
                   <p className="text-xs text-slate-400 mt-0.5">총 {invitations.length}개 · 대기중: {pendingInvitationCount}개</p>
                 </div>
 
                 {loadingInvitations ? (
-                  <div className="p-10 text-center">
-                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-steel-600"></div>
-                    <p className="text-slate-400 text-sm mt-2">초대 정보를 불러오는 중...</p>
+                  <div style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ display: 'inline-block', width: 24, height: 24, border: '2px solid #e2e8f0', borderTopColor: '#2d5fa8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>초대 정보를 불러오는 중...</p>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
                   </div>
                 ) : invitations.length === 0 ? (
-                  <div className="p-10 text-center text-slate-400 text-sm">초대된 회원이 없습니다.</div>
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>초대된 회원이 없습니다.</div>
                 ) : (
                   <>
-                    <div className="hidden md:flex items-center px-4 py-2 bg-slate-50/80 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      <div className="flex-1">이메일</div>
-                      <div className="w-24">부서</div>
-                      <div className="w-20">직급</div>
-                      <div className="w-16">역할</div>
-                      <div className="w-20">상태</div>
-                      <div className="w-28">생성일</div>
-                      <div className="w-28">만료일</div>
-                      <div className="w-16">작업</div>
+                    {/* 테이블 헤더 */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                      <div style={{ flex: 1 }}>이메일</div>
+                      <div style={{ width: 96 }}>부서</div>
+                      <div style={{ width: 80 }}>직급</div>
+                      <div style={{ width: 64 }}>역할</div>
+                      <div style={{ width: 80 }}>상태</div>
+                      <div style={{ width: 112 }}>생성일</div>
+                      <div style={{ width: 112 }}>만료일</div>
+                      <div style={{ width: 64 }}>작업</div>
                     </div>
 
-                    <div className="divide-y divide-slate-100">
+                    <div>
                       {invitations.map((inv: any) => {
-                        const STATUS_MAP: Record<string, { label: string; color: string }> = {
-                          pending: { label: '대기중', color: 'bg-yellow-100 text-yellow-700' },
-                          accepted: { label: '수락', color: 'bg-green-100 text-green-700' },
-                          expired: { label: '만료', color: 'bg-red-100 text-red-700' },
-                          canceled: { label: '취소', color: 'bg-gray-100 text-gray-700' },
+                        const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }> = {
+                          pending: { label: '대기중', bg: '#fef9c3', color: '#a16207' },
+                          accepted: { label: '수락', bg: '#dcfce7', color: '#15803d' },
+                          expired: { label: '만료', bg: '#fee2e2', color: '#b91c1c' },
+                          canceled: { label: '취소', bg: '#f3f4f6', color: '#6b7280' },
                         }
-                        const statusInfo = STATUS_MAP[inv.status] || { label: inv.status, color: 'bg-gray-100 text-gray-700' }
+                        const statusInfo = STATUS_STYLE[inv.status] || { label: inv.status, bg: '#f3f4f6', color: '#6b7280' }
                         return (
-                          <div key={inv.id} className="flex items-center gap-3 p-3 md:p-4 hover:bg-slate-50/70 transition-colors">
-                            {/* 모바일 */}
-                            <div className="md:hidden flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                <span className="font-bold text-sm text-slate-900 truncate">{inv.email}</span>
-                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusInfo.color}`}>{statusInfo.label}</span>
-                              </div>
-                              <div className="text-xs text-slate-600 space-y-1">
-                                {inv.department?.name && <div>부서: {inv.department.name}</div>}
-                                {inv.position?.name && <div>직급: {inv.position.name}</div>}
-                                <div>역할: {ROLE_LABELS[inv.role]?.label || inv.role}</div>
-                                <div className="text-slate-400">생성: {formatDate(inv.created_at)} · 만료: {formatDate(inv.expires_at)}</div>
-                              </div>
+                          <div key={inv.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #f1f5f9', gap: 8, transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{inv.email}</span>
+                            </div>
+                            <div style={{ width: 96 }}>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>{inv.department?.name || '-'}</span>
+                            </div>
+                            <div style={{ width: 80 }}>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>{inv.position?.name || '-'}</span>
+                            </div>
+                            <div style={{ width: 64 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#475569' }}>
+                                {ROLE_LABELS[inv.role]?.label || inv.role}
+                              </span>
+                            </div>
+                            <div style={{ width: 80 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: statusInfo.bg, color: statusInfo.color }}>
+                                {statusInfo.label}
+                              </span>
+                            </div>
+                            <div style={{ width: 112 }}>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>{formatDate(inv.created_at)}</span>
+                            </div>
+                            <div style={{ width: 112 }}>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>{formatDate(inv.expires_at)}</span>
+                            </div>
+                            <div style={{ width: 64 }}>
                               {inv.status === 'pending' && (
                                 <button onClick={() => cancelInvitation(inv.id)} disabled={cancelingId === inv.id}
-                                  className="mt-2 text-xs font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all disabled:opacity-50">
+                                  style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+                                  onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                   {cancelingId === inv.id ? '취소 중...' : '취소'}
                                 </button>
                               )}
-                            </div>
-                            {/* 데스크톱 */}
-                            <div className="hidden md:contents">
-                              <div className="flex-1"><span className="text-sm font-bold text-slate-900">{inv.email}</span></div>
-                              <div className="w-24"><span className="text-xs text-slate-600">{inv.department?.name || '-'}</span></div>
-                              <div className="w-20"><span className="text-xs text-slate-600">{inv.position?.name || '-'}</span></div>
-                              <div className="w-16"><span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{ROLE_LABELS[inv.role]?.label || inv.role}</span></div>
-                              <div className="w-20"><span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusInfo.color}`}>{statusInfo.label}</span></div>
-                              <div className="w-28"><span className="text-xs text-slate-600">{formatDate(inv.created_at)}</span></div>
-                              <div className="w-28"><span className="text-xs text-slate-600">{formatDate(inv.expires_at)}</span></div>
-                              <div className="w-16">
-                                {inv.status === 'pending' && (
-                                  <button onClick={() => cancelInvitation(inv.id)} disabled={cancelingId === inv.id}
-                                    className="text-xs font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg active:scale-95 transition-all disabled:opacity-50">
-                                    {cancelingId === inv.id ? '취소 중...' : '취소'}
-                                  </button>
-                                )}
-                              </div>
                             </div>
                           </div>
                         )
@@ -732,26 +737,26 @@ export default function OrgManagementPage() {
             {/* Tab 2: 페이지 권한 (좌우 분할 마스터-디테일) */}
             {/* ================================================================ */}
             {activeTab === 'permissions' && (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {assignableEmployees.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center">
-                    <p className="text-slate-400 text-sm">권한을 설정할 일반 직원이 없습니다.</p>
-                    <p className="text-xs text-slate-300 mt-1">관리자(master)와 GOD ADMIN은 항상 전체 접근 권한을 가집니다.</p>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '32px 48px', textAlign: 'center' }}>
+                    <p style={{ color: '#94a3b8', fontSize: 14 }}>권한을 설정할 일반 직원이 없습니다.</p>
+                    <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>관리자(master)와 GOD ADMIN은 항상 전체 접근 권한을 가집니다.</p>
                   </div>
                 ) : activeModules.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                    <p className="text-slate-400 text-sm">활성화된 모듈이 없습니다.</p>
+                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 32, textAlign: 'center' }}>
+                    <p style={{ color: '#94a3b8', fontSize: 14 }}>활성화된 모듈이 없습니다.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-0 lg:h-[calc(100vh-200px)]">
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 0, height: 'calc(100vh - 200px)' }}>
 
                     {/* ── 좌측: 직원 목록 (고정) ── */}
-                    <div className="lg:w-72 xl:w-80 flex-shrink-0 bg-white rounded-2xl lg:rounded-r-none border border-slate-200 overflow-hidden flex flex-col">
-                      <div className="p-4 border-b border-slate-100 flex-shrink-0">
-                        <h3 className="text-sm font-bold text-slate-900">직원 목록</h3>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{assignableEmployees.length}명 · 클릭하여 권한 설정</p>
+                    <div style={{ width: 288, flexShrink: 0, background: '#fff', borderRadius: '16px 0 0 16px', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ padding: 16, borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>직원 목록</h3>
+                        <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{assignableEmployees.length}명 · 클릭하여 권한 설정</p>
                       </div>
-                      <div className="flex-1 overflow-y-auto">
+                      <div style={{ flex: 1, overflowY: 'auto' }}>
                         {assignableEmployees.map(emp => {
                           const userMap = allUserPerms[emp.id] || {}
                           const enabledCount = Object.values(userMap).filter(p => p.can_view).length
@@ -760,35 +765,40 @@ export default function OrgManagementPage() {
                             <div
                               key={emp.id}
                               onClick={() => setSelectedPermUserId(emp.id)}
-                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all border-b border-slate-50 ${
-                                isSelected
-                                  ? 'bg-steel-50 border-l-[3px] border-l-steel-600'
-                                  : 'hover:bg-slate-50/70 border-l-[3px] border-l-transparent'
-                              }`}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
+                                borderBottom: '1px solid #f8fafc',
+                                borderLeft: isSelected ? '3px solid #2d5fa8' : '3px solid transparent',
+                                background: isSelected ? '#eef3fb' : 'transparent',
+                              }}
                             >
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-xs flex-shrink-0 ${
-                                isSelected ? 'bg-steel-600' : 'bg-slate-400'
-                              }`}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff', fontWeight: 900, fontSize: 12, flexShrink: 0,
+                                background: isSelected ? '#2d5fa8' : '#94a3b8'
+                              }}>
                                 {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`font-bold text-sm truncate ${isSelected ? 'text-steel-900' : 'text-slate-700'}`}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isSelected ? '#1e3a5f' : '#334155' }}>
                                     {emp.employee_name || '(미설정)'}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                   {emp.department?.name && (
-                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate max-w-[60px]">{emp.department.name}</span>
+                                    <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.department.name}</span>
                                   )}
                                   {emp.position?.name && (
-                                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded truncate max-w-[60px]">{emp.position.name}</span>
+                                    <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.position.name}</span>
                                   )}
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 ${
-                                enabledCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
-                              }`}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, flexShrink: 0,
+                                background: enabledCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                color: enabledCount > 0 ? '#15803d' : '#94a3b8'
+                              }}>
                                 {enabledCount}/{activeModules.length}
                               </span>
                             </div>
@@ -798,17 +808,17 @@ export default function OrgManagementPage() {
                     </div>
 
                     {/* ── 우측: 권한 설정 패널 (스크롤) ── */}
-                    <div className="flex-1 bg-white rounded-2xl lg:rounded-l-none border border-slate-200 lg:border-l-0 overflow-hidden flex flex-col">
+                    <div style={{ flex: 1, background: '#fff', borderRadius: '0 16px 16px 0', border: '1px solid #e2e8f0', borderLeft: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                       {!selectedPermUserId ? (
-                        <div className="flex-1 flex items-center justify-center p-8">
-                          <div className="text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                              <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ width: 64, height: 64, borderRadius: 16, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                              <svg style={{ width: 32, height: 32, color: '#cbd5e1' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
                               </svg>
                             </div>
-                            <p className="text-sm font-bold text-slate-400">좌측에서 직원을 선택하세요</p>
-                            <p className="text-xs text-slate-300 mt-1">페이지별 접근 권한을 설정할 수 있습니다</p>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8' }}>좌측에서 직원을 선택하세요</p>
+                            <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>페이지별 접근 권한을 설정할 수 있습니다</p>
                           </div>
                         </div>
                       ) : (() => {
@@ -820,71 +830,75 @@ export default function OrgManagementPage() {
                         return (
                           <>
                             {/* 선택된 직원 헤더 */}
-                            <div className="p-4 border-b border-slate-100 flex-shrink-0 bg-slate-50/50">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm bg-steel-600 flex-shrink-0">
+                            <div style={{ padding: 16, borderBottom: '1px solid #f1f5f9', flexShrink: 0, background: '#fafbfc' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, background: '#2d5fa8', flexShrink: 0 }}>
                                     {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                                   </div>
                                   <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-base text-slate-900">{emp.employee_name || '(이름 미설정)'}</span>
-                                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                                        enabledCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
-                                      }`}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>{emp.employee_name || '(이름 미설정)'}</span>
+                                      <span style={{
+                                        fontSize: 12, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                        background: enabledCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                        color: enabledCount > 0 ? '#15803d' : '#94a3b8'
+                                      }}>
                                         {enabledCount}/{activeModules.length} 페이지
                                       </span>
                                     </div>
-                                    <div className="text-xs text-slate-400 mt-0.5">{emp.email}</div>
+                                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{emp.email}</div>
                                   </div>
                                 </div>
                                 <button onClick={() => saveUserPerms(emp.id)}
                                   disabled={savingPermsFor === emp.id}
-                                  className="px-5 py-2 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 disabled:bg-slate-300 transition-colors active:scale-95">
+                                  style={{ padding: '8px 20px', background: savingPermsFor === emp.id ? '#cbd5e1' : '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPermsFor === emp.id ? 'not-allowed' : 'pointer' }}>
                                   {savingPermsFor === emp.id ? '저장 중...' : '저장'}
                                 </button>
                               </div>
                             </div>
 
                             {/* 권한 설정 영역 (스크롤) */}
-                            <div className="flex-1 overflow-y-auto">
+                            <div style={{ flex: 1, overflowY: 'auto' }}>
                               {moduleGroups.map(group => (
                                 <div key={group}>
-                                  <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{group}</span>
+                                  <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group}</span>
                                   </div>
-                                  <div className="divide-y divide-slate-50">
+                                  <div>
                                     {activeModules.filter(m => m.group === group).map(mod => {
                                       const perm = userMap[mod.path]
                                       const isOn = !!perm?.can_view
                                       return (
-                                        <div key={mod.path} className="px-4 py-3 hover:bg-slate-50/50 transition-colors">
-                                          <div className="flex items-center gap-3">
+                                        <div key={mod.path} style={{ padding: '12px 16px', borderBottom: '1px solid #f8fafc' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                             <button onClick={() => matrixTogglePage(emp.id, mod.path)}
-                                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
-                                                isOn ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                              }`}>
+                                              style={{
+                                                padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0,
+                                                background: isOn ? '#dcfce7' : '#f1f5f9',
+                                                color: isOn ? '#15803d' : '#94a3b8'
+                                              }}>
                                               {isOn ? 'ON' : 'OFF'}
                                             </button>
-                                            <span className="font-bold text-sm text-slate-800 flex-1">{mod.name}</span>
+                                            <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>{mod.name}</span>
                                           </div>
 
                                           {/* CRUD + 범위 (ON일 때 아래로) */}
                                           {isOn && (
-                                            <div className="flex items-center gap-3 mt-2 ml-[52px]">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, marginLeft: 52 }}>
                                               {(['can_view', 'can_create', 'can_edit', 'can_delete'] as const).map(f => (
-                                                <label key={f} className="flex items-center gap-1 cursor-pointer text-xs">
+                                                <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12 }}>
                                                   <input type="checkbox" checked={perm?.[f] || false}
                                                     onChange={() => matrixTogglePerm(emp.id, mod.path, f)}
-                                                    className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600" />
-                                                  <span className="font-bold text-slate-600">
+                                                    style={{ width: 14, height: 14, borderRadius: 4 }} />
+                                                  <span style={{ fontWeight: 700, color: '#475569' }}>
                                                     {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
                                                   </span>
                                                 </label>
                                               ))}
                                               <select value={perm?.data_scope || 'all'}
                                                 onChange={e => matrixChangeScope(emp.id, mod.path, e.target.value)}
-                                                className="text-xs border rounded-lg px-1.5 py-0.5 bg-white font-bold ml-auto">
+                                                style={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8, padding: '2px 6px', background: '#fff', fontWeight: 700, marginLeft: 'auto' }}>
                                                 {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                               </select>
                                             </div>
@@ -904,8 +918,8 @@ export default function OrgManagementPage() {
                 )}
 
                 {/* 안내 */}
-                <div className="p-3 md:p-4 bg-steel-50 rounded-xl border border-steel-100">
-                  <p className="text-[11px] md:text-xs text-steel-700">
+                <div style={{ padding: '12px 16px', background: '#eef3fb', borderRadius: 12, border: '1px solid #d4e0f0' }}>
+                  <p style={{ fontSize: 12, color: '#2d5fa8' }}>
                     <strong>권한 안내:</strong> GOD ADMIN과 관리자(master)는 이 설정과 무관하게 항상 전체 접근 권한을 가집니다.
                     일반 직원만 이 페이지에서 개별 권한을 설정할 수 있습니다.
                   </p>
@@ -915,7 +929,6 @@ export default function OrgManagementPage() {
 
           </>
         )}
-      </div>
 
       {/* 초대 모달 */}
       {activeCompanyId && (
@@ -930,91 +943,95 @@ export default function OrgManagementPage() {
 
       {/* 직원 수정 모달 */}
       {editingEmp && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeEditModal}>
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-5 border-b bg-slate-50 flex justify-between items-center">
+        <div onClick={closeEditModal}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 512, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">직원 정보 수정</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{editingEmp.email}</p>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 }}>직원 정보 수정</h3>
+                <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{editingEmp.email}</p>
               </div>
-              <button onClick={closeEditModal} className="text-2xl font-light text-slate-400 hover:text-slate-900 transition-colors">&times;</button>
+              <button onClick={closeEditModal} style={{ fontSize: 24, fontWeight: 300, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">이름</label>
-                <input value={editForm.employee_name} onChange={e => setEditForm({ ...editForm, employee_name: e.target.value })}
-                  className="w-full p-3 border rounded-xl text-sm font-bold focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="직원 이름" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">연락처</label>
-                <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                  className="w-full p-3 border rounded-xl text-sm focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors" placeholder="010-0000-0000" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+            <div style={{ padding: 24, maxHeight: '60vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">역할</label>
-                  <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors">
-                    <option value="user">직원</option>
-                    <option value="master">관리자</option>
-                    {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
-                  </select>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>이름</label>
+                  <input value={editForm.employee_name} onChange={e => setEditForm({ ...editForm, employee_name: e.target.value })}
+                    style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, fontWeight: 700, outline: 'none', boxSizing: 'border-box' as const }} placeholder="직원 이름" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">상태</label>
-                  <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
-                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors">
-                    <option value="active">활성</option>
-                    <option value="inactive">비활성</option>
-                  </select>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>연락처</label>
+                  <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} placeholder="010-0000-0000" />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">직급</label>
-                  <select value={editForm.position_id} onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
-                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors">
-                    <option value="">미지정</option>
-                    {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>역할</label>
+                    <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      <option value="user">직원</option>
+                      <option value="master">관리자</option>
+                      {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>상태</label>
+                    <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
+                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      <option value="active">활성</option>
+                      <option value="inactive">비활성</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">부서</label>
-                  <select value={editForm.department_id} onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
-                    className="w-full p-3 border rounded-xl text-sm bg-white focus:border-steel-400 focus:ring-1 focus:ring-steel-400 outline-none transition-colors">
-                    <option value="">미지정</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>직급</label>
+                    <select value={editForm.position_id} onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
+                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      <option value="">미지정</option>
+                      {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>부서</label>
+                    <select value={editForm.department_id} onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
+                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      <option value="">미지정</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">이메일</span>
-                  <span className="text-slate-600 font-medium">{editingEmp.email}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">가입일</span>
-                  <span className="text-slate-600 font-medium">{formatDate(editingEmp.created_at)}</span>
+                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: '#94a3b8' }}>이메일</span>
+                    <span style={{ color: '#475569', fontWeight: 500 }}>{editingEmp.email}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span style={{ color: '#94a3b8' }}>가입일</span>
+                    <span style={{ color: '#475569', fontWeight: 500 }}>{formatDate(editingEmp.created_at)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* 직원 탈퇴 */}
             {editingEmp.id !== user?.id && editingEmp.role !== 'god_admin' && (
-              <div className="px-6 py-3 border-t border-red-100 bg-red-50/50">
-                <div className="flex items-center justify-between">
+              <div style={{ padding: '12px 24px', borderTop: '1px solid #fecaca', background: '#fef2f2' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <p className="text-xs font-bold text-red-600">직원 탈퇴</p>
-                    <p className="text-xs text-red-400 mt-0.5">회사에서 직원을 제거합니다.</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', margin: 0 }}>직원 탈퇴</p>
+                    <p style={{ fontSize: 12, color: '#f87171', marginTop: 2 }}>회사에서 직원을 제거합니다.</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => withdrawEmployee(false)} disabled={withdrawing}
-                      className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 bg-white rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
+                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#dc2626', border: '1px solid #fecaca', background: '#fff', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '비활성화'}
                     </button>
                     <button onClick={() => withdrawEmployee(true)} disabled={withdrawing}
-                      className="px-3 py-1.5 text-xs font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors">
+                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#fff', background: '#ef4444', border: 'none', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '완전 삭제'}
                     </button>
                   </div>
@@ -1022,13 +1039,13 @@ export default function OrgManagementPage() {
               </div>
             )}
 
-            <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: 12 }}>
               <button onClick={closeEditModal}
-                className="flex-1 py-2.5 border border-gray-200 bg-white text-gray-600 rounded-xl hover:bg-gray-50 font-bold text-sm transition-colors">
+                style={{ flex: 1, padding: '10px 0', border: '1px solid #e5e7eb', background: '#fff', color: '#4b5563', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
               <button onClick={saveEdit} disabled={savingEdit}
-                className="flex-1 py-2.5 bg-steel-600 text-white rounded-xl hover:bg-steel-700 disabled:bg-slate-300 font-bold text-sm transition-colors">
+                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#cbd5e1' : '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
                 {savingEdit ? '저장 중...' : '저장'}
               </button>
             </div>

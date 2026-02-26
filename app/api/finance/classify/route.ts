@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     // ── 1. 모든 매칭 데이터 병렬 로딩 ──
     const [
       jiipRes, investRes, loanRes, rulesRes, scheduleRes,
-      salaryRes, freelancerRes, insuranceRes, carRes, cardRes
+      salaryRes, freelancerRes, insuranceRes, carRes, cardRes, cardHistoryRes
     ] = await Promise.all([
       // 기존 계약
       sb.from('jiip_contracts').select('id, investor_name, investor_name, admin_fee, payout_day, status')
@@ -306,8 +306,11 @@ export async function POST(request: NextRequest) {
       sb.from('cars').select('id, number, model, brand')
         .eq('company_id', company_id),
       // 법인카드
-      sb.from('corporate_cards').select('id, card_alias, card_company, card_number, assigned_employee_id, status')
+      sb.from('corporate_cards').select('id, card_alias, card_company, card_number, assigned_employee_id, status, previous_card_numbers')
         .eq('company_id', company_id).eq('status', 'active'),
+      // 카드 배정 이력 (날짜 기반 사용자 매칭용)
+      sb.from('card_assignment_history').select('card_id, employee_id, employee_name, assigned_at, unassigned_at')
+        .order('assigned_at', { ascending: false }),
     ])
 
     // ── 2. 통합 매칭 대상 생성 ──
@@ -429,39 +432,73 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // ── 3b. 카드 결제 매칭 (법인카드) — 다중 전략 ──
+      // ── 3b. 카드 결제 매칭 (법인카드) — 다중 전략 + 이전 카드번호 포함 ──
       const pmLower = (tx.payment_method || '').toLowerCase()
       if (pmLower === '카드' || pmLower === 'card' || pmLower.includes('카드') || pmLower.includes('card')) {
         const rawCardNum = (tx.card_number || '').replace(/[\s-]/g, '')
         const digitsOnly = rawCardNum.replace(/\D/g, '')
 
-        // 전략 1: 뒷4자리 매칭
+        // 카드의 모든 번호 (현재 + 이전) 가져오기
+        const getAllCardDigits = (c: any): string[] => {
+          const nums = [(c.card_number || '')]
+          const prev = c.previous_card_numbers || []
+          for (const p of prev) { if (p) nums.push(p) }
+          return nums.map((n: string) => n.replace(/\D/g, '')).filter((n: string) => n.length > 0)
+        }
+
+        // 전략 1: 뒷4자리 매칭 (현재 + 이전 번호)
         if (digitsOnly.length >= 4) {
           const last4 = digitsOnly.slice(-4)
-          const matchedCard = cards.find((c: any) => {
-            const cDigits = (c.card_number || '').replace(/\D/g, '')
-            return cDigits.endsWith(last4)
-          })
+          const matchedCard = cards.find((c: any) =>
+            getAllCardDigits(c).some((d: string) => d.endsWith(last4))
+          )
           if (matchedCard) tx.card_id = matchedCard.id
         }
 
-        // 전략 2: 뒷4자리가 마스킹됐을 때 → 앞4자리로 매칭
+        // 전략 2: 앞4자리로 매칭 (현재 + 이전 번호)
         if (!tx.card_id && digitsOnly.length >= 4) {
           const first4 = digitsOnly.slice(0, 4)
-          const matchedCard = cards.find((c: any) => {
-            const cDigits = (c.card_number || '').replace(/\D/g, '')
-            return cDigits.startsWith(first4)
-          })
+          const matchedCard = cards.find((c: any) =>
+            getAllCardDigits(c).some((d: string) => d.startsWith(first4))
+          )
           if (matchedCard) tx.card_id = matchedCard.id
         }
 
-        // 전략 3: 카드번호 일부분이라도 포함되면 매칭 (ex: report의 '4331')
+        // 전략 3: 부분 포함 매칭 (현재 + 이전 번호)
         if (!tx.card_id && rawCardNum.length >= 3) {
           const matchedCard = cards.find((c: any) => {
-            const cNum = (c.card_number || '').replace(/[\s-]/g, '')
-            return cNum.includes(rawCardNum) || rawCardNum.includes(cNum.slice(-4))
+            const allNums = [(c.card_number || ''), ...(c.previous_card_numbers || [])]
+              .map((n: string) => (n || '').replace(/[\s-]/g, '')).filter(Boolean)
+            return allNums.some((cNum: string) =>
+              cNum.includes(rawCardNum) || rawCardNum.includes(cNum.slice(-4))
+            )
           })
           if (matchedCard) tx.card_id = matchedCard.id
+        }
+      }
+
+      // ── 3b-2. 카드 배정 이력 기반 사용자 매칭 ──
+      if (tx.card_id) {
+        const cardHistory = (cardHistoryRes.data || []).filter((h: any) => h.card_id === tx.card_id)
+        const txDate = tx.transaction_date ? new Date(tx.transaction_date) : null
+        if (txDate && cardHistory.length > 0) {
+          // 거래 날짜가 어느 배정 기간에 속하는지 확인
+          const matchedHistory = cardHistory.find((h: any) => {
+            const assignedAt = new Date(h.assigned_at)
+            const unassignedAt = h.unassigned_at ? new Date(h.unassigned_at) : new Date('2099-12-31')
+            return txDate >= assignedAt && txDate <= unassignedAt
+          })
+          if (matchedHistory) {
+            tx.matched_employee_id = matchedHistory.employee_id
+            tx.matched_employee_name = matchedHistory.employee_name
+          }
+        }
+        // 히스토리에서 못 찾으면 현재 카드 배정자 사용
+        if (!tx.matched_employee_id) {
+          const card = cards.find((c: any) => c.id === tx.card_id)
+          if (card?.assigned_employee_id) {
+            tx.matched_employee_id = card.assigned_employee_id
+          }
         }
       }
 

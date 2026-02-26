@@ -95,8 +95,8 @@ function detectFileType(headerRow: any[]): FileCategory {
   const hasIyonggamaejeom = nonEmptyCells.some(c => c.includes('이용가맹점'));
   const hasSeungin = nonEmptyCells.some(c => c.includes('승인번호'));
   const hasMaechul = nonEmptyCells.some(c => c.includes('매출구분') || c.includes('매출'));
-  if (hasIyongiljja && hasIyongcard && hasIyonggamaejeom) return 'card_report'
-  if (hasIyongiljja && hasSeungin && hasIyongcard) return 'card_report'
+  if (hasIyongiljja && hasIyongcard && hasIyonggamaejeom) { console.log('[detectFileType] → card_report (셀 조합 1)'); return 'card_report' }
+  if (hasIyongiljja && hasSeungin && hasIyongcard) { console.log('[detectFileType] → card_report (셀 조합 2)'); return 'card_report' }
 
   // ── 카드 거래 — 셀 단위 조합 체크 ──
   const hasCardNum = nonEmptyCells.some(c => c.includes('카드번호'));
@@ -113,8 +113,9 @@ function detectFileType(headerRow: any[]): FileCategory {
   const hasGeorail = nonEmptyCells.some(c => c.includes('거래일'));
   const hasJeokyo = nonEmptyCells.some(c => c.includes('적요'));
   const hasInOut = nonEmptyCells.some(c => c.match(/입금|출금|지급|찾으신|맡기신/));
-  if (hasGeorail && hasJeokyo && hasInOut) return 'bank_statement'
+  if (hasGeorail && hasJeokyo && hasInOut) { console.log('[detectFileType] → bank_statement'); return 'bank_statement' }
 
+  console.log('[detectFileType] → unknown')
   return 'unknown'
 }
 
@@ -163,8 +164,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     return newId;
   }, []);
 
-  // 📥 파일 추가
+  // 📥 파일 추가 (새 파일 추가 시 기존 결과 자동 초기화)
   const addFiles = (newFiles: File[]) => {
+    // 기존 결과가 있으면 자동으로 초기화
+    if (results.length > 0 && status !== 'processing') {
+      setResults([]);
+      setCardRegistrationResults({ registered: 0, updated: 0, skipped: 0 });
+    }
     setFileQueue(prev => [...prev, ...newFiles]);
     if (status === 'completed' || status === 'error') setStatus('idle');
   };
@@ -349,6 +355,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         let newTransactions = batchResults.flat().map((item: any) => transformItem(item));
 
         // 자동 분류/매칭 API 호출
+        console.log(`[UploadContext] 분류 API 준비: ${newTransactions.length}건, companyId=${companyIdRef.current}, payment_methods=[${[...new Set(newTransactions.map(t => t.payment_method))].join(',')}]`);
         if (newTransactions.length > 0 && companyIdRef.current) {
           try {
             setLogs(`🔍 법인카드 매칭 & 세무 분류 중... (${newTransactions.length}건)`);

@@ -36,6 +36,11 @@ export default function CorporateCardsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [cardUsage, setCardUsage] = useState<Record<string, { count: number; total: number }>>({})
 
+  // 배정 이력
+  const [assignmentHistory, setAssignmentHistory] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [assignReasonInput, setAssignReasonInput] = useState('')
+
   // 그룹 모드: 부서별 / 카드사별 / 종류별 / 차량배치 / 전체
   const [groupMode, setGroupMode] = useState<'dept' | 'company' | 'type' | 'car' | 'all'>('dept')
 
@@ -95,6 +100,7 @@ export default function CorporateCardsPage() {
     holder_name: '', assigned_employee_id: '', assigned_car_id: '',
     monthly_limit: '', is_active: true, memo: '', card_type: '',
     expiry_date: '', // YYYY-MM
+    previous_card_numbers: [] as string[],
   }
   const [form, setForm] = useState<any>(emptyForm)
 
@@ -172,6 +178,24 @@ export default function CorporateCardsPage() {
       usage[t.card_id].total += Number(t.amount || 0)
     })
     setCardUsage(usage)
+  }
+
+  // ──── 배정 이력 조회 ────
+  const fetchAssignmentHistory = async (cardId: string) => {
+    setHistoryLoading(true)
+    try {
+      const { data, error } = await supabase.from('card_assignment_history')
+        .select('*')
+        .eq('card_id', cardId)
+        .order('assigned_at', { ascending: false })
+      if (error) console.error('assignment history fetch error:', error.message)
+      setAssignmentHistory(data || [])
+    } catch (e) {
+      console.error('assignment history exception:', e)
+      setAssignmentHistory([])
+    } finally {
+      setHistoryLoading(false)
+    }
   }
 
   // ──── 한도 설정 CRUD ────
@@ -286,17 +310,58 @@ export default function CorporateCardsPage() {
       assigned_car_id: form.assigned_car_id || null,
       card_type: form.card_type || null,
       expiry_date: form.expiry_date || null,
+      previous_card_numbers: form.previous_card_numbers.filter((n: string) => n.trim()),
     }
 
     if (editingId) {
+      // 배정자 변경 감지 → 히스토리 기록
+      const oldCard = cards.find(c => c.id === editingId)
+      const oldEmpId = oldCard?.assigned_employee_id || null
+      const newEmpId = payload.assigned_employee_id || null
+
       const { error } = await supabase.from('corporate_cards').update(payload).eq('id', editingId)
       if (error) return alert('수정 실패: ' + error.message)
+
+      // 배정자가 변경된 경우 히스토리 기록
+      if (oldEmpId !== newEmpId) {
+        // 이전 배정자의 현재 이력 종료
+        if (oldEmpId) {
+          await supabase.from('card_assignment_history')
+            .update({ unassigned_at: new Date().toISOString() })
+            .eq('card_id', editingId)
+            .eq('employee_id', oldEmpId)
+            .is('unassigned_at', null)
+        }
+        // 새 배정자 이력 추가
+        if (newEmpId) {
+          const empName = employees.find(e => e.id === newEmpId)?.employee_name || '(알 수 없음)'
+          await supabase.from('card_assignment_history').insert({
+            card_id: editingId,
+            employee_id: newEmpId,
+            employee_name: empName,
+            assigned_at: new Date().toISOString(),
+            reason: assignReasonInput.trim() || null,
+          })
+        }
+      }
     } else {
-      const { error } = await supabase.from('corporate_cards').insert(payload)
+      const { data: inserted, error } = await supabase.from('corporate_cards').insert(payload).select('id').single()
       if (error) return alert('등록 실패: ' + error.message)
+
+      // 신규 등록 시 배정자가 있으면 첫 히스토리 생성
+      if (inserted && payload.assigned_employee_id) {
+        const empName = employees.find(e => e.id === payload.assigned_employee_id)?.employee_name || '(알 수 없음)'
+        await supabase.from('card_assignment_history').insert({
+          card_id: inserted.id,
+          employee_id: payload.assigned_employee_id,
+          employee_name: empName,
+          assigned_at: new Date().toISOString(),
+          reason: '신규 등록',
+        })
+      }
     }
     alert('저장되었습니다.')
-    setShowForm(false); setEditingId(null); setForm(emptyForm)
+    setShowForm(false); setEditingId(null); setForm(emptyForm); setAssignReasonInput('')
     fetchCards()
   }
 
@@ -307,9 +372,11 @@ export default function CorporateCardsPage() {
       assigned_employee_id: c.assigned_employee_id || '',
       assigned_car_id: c.assigned_car_id || '',
       monthly_limit: c.monthly_limit || '', is_active: c.is_active, memo: c.memo || '',
-      card_type: c.card_type || '', expiry_date: c.expiry_date || ''
+      card_type: c.card_type || '', expiry_date: c.expiry_date || '',
+      previous_card_numbers: c.previous_card_numbers || [],
     })
-    setEditingId(c.id); setShowForm(true); setShowLimitModal(false)
+    setEditingId(c.id); setShowForm(true); setShowLimitModal(false); setAssignReasonInput('')
+    fetchAssignmentHistory(c.id)
   }
 
   const handleDelete = async (id: string) => {
@@ -1102,11 +1169,11 @@ export default function CorporateCardsPage() {
       {/* ──── 카드 등록/수정 모달 ──── */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 448, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: '16px 16px 0 0' }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 448, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column' as const }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: '16px 16px 0 0', flexShrink: 0 }}>
               <h3 style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', margin: 0 }}>{editingId ? '카드 수정' : '법인카드 등록'}</h3>
             </div>
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column' as const, gap: 16 }}>
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column' as const, gap: 16, overflowY: 'auto', flex: 1 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>카드사 <span style={{ color: '#f87171' }}>*</span></label>
@@ -1120,6 +1187,49 @@ export default function CorporateCardsPage() {
                   <input style={{ width: '100%', border: '1px solid #e2e8f0', padding: 12, borderRadius: 12, fontSize: 14, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' as const }} value={form.card_number} onChange={e => setForm({ ...form, card_number: e.target.value })} placeholder="0000-0000-0000-0000" />
                 </div>
               </div>
+
+              {/* 이전 카드번호 (분실/재발급 이력) */}
+              <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>이전 카드번호</span>
+                    <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 6 }}>분실/재발급 시 기존 번호 등록</span>
+                  </div>
+                  <button type="button" onClick={() => setForm({ ...form, previous_card_numbers: [...form.previous_card_numbers, ''] })}
+                    style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eef3fb', border: '1px solid #d4e0f0', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+                    + 추가
+                  </button>
+                </div>
+                {form.previous_card_numbers.length === 0 ? (
+                  <p style={{ fontSize: 11, color: '#cbd5e1', textAlign: 'center', padding: 4 }}>등록된 이전 번호 없음</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {form.previous_card_numbers.map((num: string, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          style={{ flex: 1, border: '1px solid #e2e8f0', padding: '8px 10px', borderRadius: 8, fontSize: 13, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' as const, background: '#fff' }}
+                          value={num}
+                          onChange={e => {
+                            const updated = [...form.previous_card_numbers]
+                            updated[idx] = e.target.value
+                            setForm({ ...form, previous_card_numbers: updated })
+                          }}
+                          placeholder="이전 카드번호"
+                        />
+                        <button type="button" onClick={() => {
+                          const updated = form.previous_card_numbers.filter((_: string, i: number) => i !== idx)
+                          setForm({ ...form, previous_card_numbers: updated })
+                        }}
+                          style={{ fontSize: 14, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', lineHeight: 1 }}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 6 }}>과거 거래 매칭 시 현재 번호 + 이전 번호 모두 사용됩니다</p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>부서</label>
@@ -1149,6 +1259,63 @@ export default function CorporateCardsPage() {
                   </select>
                 </div>
               </div>
+
+              {/* 배정 변경 사유 (수정 모드 + 배정자 변경 시) */}
+              {editingId && (() => {
+                const oldCard = cards.find(c => c.id === editingId)
+                const changed = (oldCard?.assigned_employee_id || '') !== (form.assigned_employee_id || '')
+                if (!changed) return null
+                return (
+                  <div style={{ background: '#eff6ff', borderRadius: 12, padding: 12, border: '1px solid #bfdbfe' }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#2563eb', marginBottom: 6 }}>배정 변경 사유 (선택)</label>
+                    <input style={{ width: '100%', border: '1px solid #93c5fd', padding: 10, borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, background: '#fff' }}
+                      value={assignReasonInput} onChange={e => setAssignReasonInput(e.target.value)}
+                      placeholder="예: 부서이동, 퇴사, 업무인수인계 등" />
+                  </div>
+                )
+              })()}
+
+              {/* 배정 이력 타임라인 (수정 모드에서만 표시) */}
+              {editingId && (
+                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>배정 이력</span>
+                    <span style={{ fontSize: 10, color: '#94a3b8' }}>{assignmentHistory.length}건</span>
+                  </div>
+                  {historyLoading ? (
+                    <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 8 }}>로딩 중...</p>
+                  ) : assignmentHistory.length === 0 ? (
+                    <p style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'center', padding: 8 }}>이력이 없습니다</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {assignmentHistory.map((h, idx) => (
+                        <div key={h.id} style={{ display: 'flex', gap: 10, padding: '6px 0', borderLeft: '2px solid #e2e8f0', marginLeft: 6, paddingLeft: 12, position: 'relative' }}>
+                          <div style={{ position: 'absolute', left: -5, top: 10, width: 8, height: 8, borderRadius: '50%', background: idx === 0 && !h.unassigned_at ? '#2d5fa8' : '#cbd5e1' }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: idx === 0 && !h.unassigned_at ? '#1e3a5f' : '#64748b' }}>
+                                {h.employee_name || '(알 수 없음)'}
+                              </span>
+                              {idx === 0 && !h.unassigned_at && (
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#dcfce7', color: '#15803d' }}>현재</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                              {new Date(h.assigned_at).toLocaleDateString('ko-KR')}
+                              {' ~ '}
+                              {h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('ko-KR') : '현재'}
+                            </div>
+                            {h.reason && (
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontStyle: 'italic' }}>사유: {h.reason}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>🚙 배치 차량</label>
                 <select style={{ width: '100%', border: '1px solid #e2e8f0', padding: 12, borderRadius: 12, fontSize: 14, background: '#fff', fontWeight: 500, outline: 'none' }} value={form.assigned_car_id} onChange={e => setForm({ ...form, assigned_car_id: e.target.value })}>
@@ -1176,7 +1343,7 @@ export default function CorporateCardsPage() {
                 <input style={{ width: '100%', border: '1px solid #e2e8f0', padding: 12, borderRadius: 12, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} />
               </div>
             </div>
-            <div style={{ padding: 24, borderTop: '1px solid #f1f5f9', display: 'flex', gap: 12 }}>
+            <div style={{ padding: 24, borderTop: '1px solid #f1f5f9', display: 'flex', gap: 12, flexShrink: 0 }}>
               <button onClick={() => { setShowForm(false); setEditingId(null) }} style={{ flex: 1, padding: 12, background: '#f1f5f9', borderRadius: 12, fontWeight: 600, fontSize: 14, color: '#475569', border: 'none', cursor: 'pointer' }}>취소</button>
               <button onClick={handleSave} style={{ flex: 2, padding: 12, background: '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>{editingId ? '수정 완료' : '등록 완료'}</button>
             </div>
