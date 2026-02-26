@@ -30,9 +30,12 @@ export interface Transaction {
   matched_schedule_id?: string | null;
   match_score?: number;
   matched_contract_name?: string | null;
+  matched_employee_id?: string | null;
+  matched_employee_name?: string | null;
   confidence?: number;
   classification_tier?: string;
   alternatives?: any[];
+  _queue_id?: string;
 }
 
 // ✅ Context 타입 정의
@@ -58,6 +61,7 @@ interface UploadContextType {
   updateTransaction: (id: number, field: string, value: any) => void;
   deleteTransaction: (id: number) => void;
   setCompanyId: (id: string) => void;
+  loadFromQueue: () => Promise<number>;
 }
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
@@ -654,6 +658,66 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // 📥 classification_queue에서 기존 데이터 로드 (새로고침/페이지 이동 후 복원)
+  const loadFromQueue = useCallback(async (): Promise<number> => {
+    if (!companyIdRef.current || isProcessingRef.current) return 0;
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/finance/classify?company_id=${companyIdRef.current}&status=pending&limit=500`, {
+        headers: authHeaders,
+      });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const queueItems = data.items || [];
+      if (queueItems.length === 0) return 0;
+
+      // classification_queue 응답을 Transaction 인터페이스로 변환
+      const transactions: Transaction[] = queueItems.map((q: any) => {
+        const sd = q.source_data || {};
+        // payment_method 정규화
+        const pm = String(sd.payment_method || '').toLowerCase().trim();
+        let paymentMethodKr = '기타';
+        if (pm === 'card' || pm === '카드' || pm.includes('card') || pm.includes('카드')) paymentMethodKr = '카드';
+        else if (pm === 'bank' || pm === '통장' || pm === '계좌' || pm.includes('bank') || pm.includes('통장')) paymentMethodKr = '통장';
+
+        return {
+          id: generateUniqueId(),
+          transaction_date: sd.transaction_date || '',
+          type: sd.type || 'expense',
+          client_name: sd.client_name || '',
+          description: sd.description || '',
+          amount: Math.abs(Number(sd.amount) || 0),
+          payment_method: paymentMethodKr,
+          category: q.ai_category || '미분류',
+          related_id: q.ai_related_id || null,
+          related_type: q.ai_related_type || null,
+          status: 'completed',
+          card_number: q.card_number || sd.card_number || '',
+          card_id: q.card_id || sd.card_id || null,
+          approval_number: sd.approval_number || '',
+          is_cancelled: q.is_cancel || sd.is_cancel || false,
+          matched_contract_name: q.matched_contract_name || q.ai_matched_name || null,
+          matched_employee_id: q.matched_employee_id || sd.matched_employee_id || null,
+          matched_employee_name: q.matched_employee_name || sd.matched_employee_name || null,
+          confidence: q.ai_confidence || 0,
+          classification_tier: q.ai_confidence >= 80 ? 'auto' : q.ai_confidence >= 60 ? 'review' : 'manual',
+          alternatives: q.alternatives || [],
+          // queue_id를 저장하여 나중에 업데이트/삭제 시 사용
+          _queue_id: q.id,
+        } as Transaction;
+      });
+
+      setResults(transactions);
+      setStatus('completed');
+      setLogs(`📂 저장된 분류 데이터 ${transactions.length}건 로드됨`);
+      console.log(`[UploadContext] loadFromQueue: ${transactions.length}건 로드`);
+      return transactions.length;
+    } catch (e) {
+      console.error('[UploadContext] loadFromQueue error:', e);
+      return 0;
+    }
+  }, [getAuthHeaders, generateUniqueId]);
+
   // 🎮 제어 함수들
   const pauseProcessing = () => { isPausedRef.current = true; setStatus('paused'); setLogs('⏸️ 일시 정지됨'); };
   const resumeProcessing = () => { isPausedRef.current = false; setStatus('processing'); startProcessing(); };
@@ -684,7 +748,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       status, progress, currentFileIndex, totalFiles: fileQueue.length,
       currentFileName, logs, results, cardRegistrationResults,
       addFiles, startProcessing, pauseProcessing, resumeProcessing, cancelProcessing,
-      clearResults, closeWidget, updateTransaction, deleteTransaction, setCompanyId
+      clearResults, closeWidget, updateTransaction, deleteTransaction, setCompanyId, loadFromQueue
     }}>
       {children}
     </UploadContext.Provider>

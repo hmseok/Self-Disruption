@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from '../../utils/supabase'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { useUpload } from '@/app/context/UploadContext'
@@ -97,6 +97,7 @@ function UploadContent() {
     clearResults,
     setCompanyId,
     cardRegistrationResults,
+    loadFromQueue,
   } = useUpload()
 
   // ── Upload UI State ──
@@ -135,10 +136,20 @@ function UploadContent() {
   const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   // ── Initialize ──
+  const hasLoadedFromQueue = useRef(false)
   useEffect(() => {
     fetchBasicData()
     fetchStats()  // 항상 통계 로드
-    if (effectiveCompanyId) setCompanyId(effectiveCompanyId)
+    if (effectiveCompanyId) {
+      setCompanyId(effectiveCompanyId)
+      // 결과가 비어있고 처리 중이 아닐 때 → classification_queue에서 복원
+      if (results.length === 0 && status !== 'processing' && !hasLoadedFromQueue.current) {
+        hasLoadedFromQueue.current = true
+        loadFromQueue().then(count => {
+          if (count > 0) console.log(`[Upload] classification_queue에서 ${count}건 복원됨`)
+        })
+      }
+    }
   }, [company, effectiveCompanyId])
 
   useEffect(() => {
