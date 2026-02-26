@@ -2,7 +2,7 @@
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 export default function FinancePage() {
   const { company, role, adminSelectedCompanyId } = useApp()
 
@@ -28,7 +28,16 @@ const router = useRouter()
     payment_method: '통장'
   })
 
-  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, adminSelectedCompanyId])
+  const pathname = usePathname()
+
+  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, adminSelectedCompanyId, pathname])
+
+  // 탭 포커스 시 자동 새로고침
+  useEffect(() => {
+    const onFocus = () => fetchTransactions()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [filterDate, company, adminSelectedCompanyId])
 
   const fetchTransactions = async () => {
     if (!company && role !== 'god_admin') return
@@ -192,7 +201,10 @@ const router = useRouter()
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              자금 장부 (입출금)
+            </h1>
             <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
           </div>
         </div>
@@ -211,7 +223,10 @@ const router = useRouter()
       {/* 1. 상단 헤더 (제목 + 날짜) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💰 자금 장부 (입출금)</h1>
+              <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              자금 장부 (입출금)
+            </h1>
               <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
           </div>
           <div className="flex items-center gap-3">

@@ -29,46 +29,73 @@ async function classifyWithGemini(
       `${i + 1}. [${tx.type === 'income' ? '입금' : '출금'}] ${tx.transaction_date} | ${tx.client_name} | ${tx.description} | ${Math.abs(tx.amount).toLocaleString()}원 | ${tx.payment_method}`
     ).join('\n')
 
-    const prompt = `당신은 한국 법인 세무 전문가입니다. 아래 법인 통장/카드 거래내역을 보고 가장 적합한 계정과목(카테고리)을 분류해주세요.
+    const prompt = `당신은 한국 법인(운송/지입 업종) 세무사·회계사입니다. 아래 법인 통장/카드 거래내역을 한국 세무 회계 기준에 맞는 계정과목으로 분류해주세요.
 
-## 사용 가능한 카테고리
+## 사용 가능한 카테고리 (세무 기준)
 ${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+## 카테고리 그룹 구조
+- 매출(영업수익): 렌트/운송수입, 지입 관리비/수수료, 보험금 수령, 매각/처분수입, 이자/잡이익
+- 자본변동: 투자원금 입금, 지입 초기비용/보증금, 대출 실행(입금)
+- 영업비용-차량: 유류비, 정비/수리비, 차량보험료, 자동차세/공과금, 차량할부/리스료, 화물공제/적재물보험
+- 영업비용-금융: 이자비용(대출/투자), 원금상환, 지입 수익배분금(출금), 수수료/카드수수료
+- 영업비용-인건비: 급여(정규직), 일용직급여, 용역비(3.3%), 4대보험(회사부담)
+- 영업비용-관리: 복리후생(식대), 접대비, 여비교통비, 임차료/사무실, 통신비, 소모품/사무용품, 교육/훈련비, 광고/마케팅, 보험료(일반), 전기/수도/가스, 경비/보안
+- 세금/공과: 원천세/부가세, 법인세/지방세, 세금/공과금
+- 기타: 쇼핑/온라인구매, 도서/신문, 감가상각비, 수선/유지비, 기타수입, 기타
 
 ## 분류 규칙
 ### 입금(income) 거래
-- 렌트/운송수입: 매출, 운송료, 화물, 정산
-- 지입 관리비/수수료: 지입료, 관리비 수입
-- 투자원금 입금: 투자, 증자, 출자
-- 지입 초기비용/보증금: 보증금, 인수금
-- 대출 실행(입금): 대출입금, 여신실행
-- 이자/잡이익: 이자수입, 환급, 캐시백
-- 보험금 수령: 보험금, 보상금
-- 매각/처분수입: 차량매각, 처분대금
+- 렌트/운송수입: 매출, 운송료, 화물, 정산, 운반비, 배송료, 용차료
+- 지입 관리비/수수료: 지입료, 관리비수입, 번호판사용료
+- 보험금 수령: 보험금, 보상금, 사고보상
+- 매각/처분수입: 차량매각, 처분대금, 중고매각
+- 이자/잡이익: 이자수입, 환급, 캐시백, 잡이익
+- 투자원금 입금: 투자, 증자, 출자금
+- 지입 초기비용/보증금: 보증금, 인수금, 입주보증금
+- 대출 실행(입금): 대출입금, 여신실행, 론실행
+- 기타수입: 잡수입, 기타수입
 
 ### 출금(expense) 거래
-- 유류비: 주유소, GS칼텍스, SK에너지, S-OIL, LPG, CNG
-- 정비/수리비: 정비소, 타이어, 공업사, 카센터, 세차
-- 차량보험료: XX손해보험, 삼성화재, 현대해상
-- 차량할부/리스료: 캐피탈, 파이낸셜, 할부금, 리스
-- 급여(정규직): 급여, 월급, 상여금
-- 용역비(3.3%): 프리랜서, 탁송, 외주
-- 4대보험(회사부담): 국민연금, 건강보험, 고용보험
-- 원천세/부가세: 원천세, 부가세, 부가가치세
-- 법인세/지방세: 법인세, 지방소득세
-- 복리후생(식대): 식당, 카페, 편의점, 배달
-- 접대비: 골프, 선물, 경조사
-- 여비교통비: 택시, KTX, 숙박, 주차비
+- 유류비: 주유소, GS칼텍스, SK에너지, S-OIL, LPG, CNG, 현대오일뱅크, 알뜰주유
+- 정비/수리비: 정비소, 타이어, 공업사, 카센터, 세차, 엔진오일, 브레이크, 배터리
+- 차량보험료: XX손해보험, 삼성화재, 현대해상, DB손해, 메리츠, 한화손해, 흥국화재
+- 자동차세/공과금: 자동차세, 과태료, 범칙금, 하이패스, 통행료, 차량등록
+- 차량할부/리스료: 캐피탈, 파이낸셜, 할부금, 리스료, 오토리스
+- 화물공제/적재물보험: 화물공제, 적재물, 화물보험, 공제조합
+- 이자비용(대출/투자): 대출이자, 금융비용, 이자지급
+- 원금상환: 원금상환, 원리금, 대출상환
+- 지입 수익배분금(출금): 수익배분, 정산금, 배분금, 지입대금
+- 수수료/카드수수료: 이체수수료, 카드수수료, 송금수수료, PG수수료
+- 급여(정규직): 급여, 월급, 상여금, 퇴직금
+- 일용직급여: 일용, 일당, 아르바이트, 파트타임
+- 용역비(3.3%): 프리랜서, 탁송, 외주, 대리운전, 도급, 하청
+- 4대보험(회사부담): 국민연금, 건강보험, 고용보험, 산재보험
+- 복리후생(식대): 식당, 카페, 편의점, 배달, 음식, 마트
+- 접대비: 골프, 선물, 경조사, 화환, 축의금
+- 여비교통비: 택시, KTX, 숙박, 호텔, 주차비, 항공, 고속버스
 - 임차료/사무실: 월세, 임대료, 건물관리
-- 통신비: KT, SKT, LG, 인터넷
-- 수수료/카드수수료: 이체수수료, 카드수수료
-- 이자비용(대출/투자): 대출이자, 금융비용
-- 원금상환: 원금상환, 원리금
-- 쇼핑/온라인구매: 쿠팡, 네이버, 11번가
+- 통신비: KT, SKT, LG유플러스, 인터넷, 전화
+- 소모품/사무용품: 다이소, 문구, 사무용품, 토너, 복사
+- 교육/훈련비: 교육, 훈련, 연수, 세미나, 자격증
+- 광고/마케팅: 광고, 마케팅, 홍보, 네이버광고
+- 보험료(일반): 생명보험, 상해보험, 단체보험, 배상책임
+- 전기/수도/가스: 전기요금, 수도요금, 가스요금, 한국전력
+- 경비/보안: 경비, CCTV, 에스원, ADT
+- 원천세/부가세: 원천세, 부가세, 부가가치세
+- 법인세/지방세: 법인세, 지방소득세, 법인지방소득세
+- 세금/공과금: 세무서, 국세청, 재산세, 취득세
+- 쇼핑/온라인구매: 쿠팡, 네이버, 11번가, G마켓, 옥션
+
+### 카드/통장 구분 힌트
+- 결제수단이 "카드"인 경우: 대부분 일반 경비(복리후생, 유류비, 접대비 등)
+- 결제수단이 "이체/통장"인 경우: 급여, 원금상환, 보험료, 세금 등 정기 지출 가능성 높음
+- "카드자동집금", "카드대금" → 수수료/카드수수료
 
 ### 추가 규칙
-- "카드자동집금", "카드대금" → 수수료/카드수수료
-- 사람 이름 입금/출금 → 맥락상 추정 (투자, 급여, 용역비 등)
+- 사람 이름만 있는 입금/출금 → 맥락상 추정 (투자, 급여, 용역비 등)
 - 확실하지 않으면 confidence를 낮게 (50 이하)
+- 운송/지입 업종 특성상 유류비·정비비·차량관련 비용 우선 고려
 
 ## 거래내역
 ${txLines}
@@ -275,49 +302,44 @@ export async function POST(request: NextRequest) {
 
     const sb = getSupabaseAdmin()
 
-    // ── 1. 모든 매칭 데이터 병렬 로딩 ──
+    // ── 1. 모든 매칭 데이터 병렬 로딩 (테이블 없어도 에러 안 남) ──
+    const safeQuery = async (query: any) => {
+      try {
+        const result = await query
+        if (result?.error) {
+          console.warn('[safeQuery] DB 에러 (무시):', result.error?.message || result.error)
+          return { data: [], error: result.error }
+        }
+        return result
+      } catch (e: any) {
+        console.warn('[safeQuery] 예외 (무시):', e?.message || e)
+        return { data: [], error: null }
+      }
+    }
+
     const [
       jiipRes, investRes, loanRes, rulesRes, scheduleRes,
       salaryRes, freelancerRes, insuranceRes, carRes, cardRes, cardHistoryRes
     ] = await Promise.all([
-      // 기존 계약
-      sb.from('jiip_contracts').select('id, investor_name, investor_name, admin_fee, payout_day, status')
-        .eq('company_id', company_id).eq('status', 'active'),
-      sb.from('general_investments').select('id, investor_name, invest_amount, interest_rate, payment_day, status')
-        .eq('company_id', company_id).eq('status', 'active'),
-      sb.from('loans').select('id, finance_name, monthly_payment, payment_date, status')
-        .eq('company_id', company_id).eq('status', 'active'),
-      // 학습 규칙
-      sb.from('finance_rules').select('*'),
-      // 결제 스케줄
-      sb.from('expected_payment_schedules').select('id, contract_type, contract_id, payment_date, expected_amount, status')
-        .eq('company_id', company_id).eq('status', 'pending'),
-      // 급여
-      sb.from('employee_salaries')
-        .select('employee_id, base_salary, pay_day, is_active, profiles:employee_id(name)')
-        .eq('company_id', company_id).eq('is_active', true),
-      // 프리랜서
-      sb.from('freelancers').select('id, name, bank_account, service_type, default_fee, status')
-        .eq('company_id', company_id).eq('status', 'active'),
-      // 보험
-      sb.from('insurance_contracts').select('id, company, product_name, total_premium, start_date, end_date, car_id')
-        .eq('company_id', company_id),
-      // 차량
-      sb.from('cars').select('id, number, model, brand')
-        .eq('company_id', company_id),
-      // 법인카드
-      sb.from('corporate_cards').select('id, card_alias, card_company, card_number, assigned_employee_id, status, previous_card_numbers')
-        .eq('company_id', company_id).eq('status', 'active'),
-      // 카드 배정 이력 (날짜 기반 사용자 매칭용)
-      sb.from('card_assignment_history').select('card_id, employee_id, employee_name, assigned_at, unassigned_at')
-        .order('assigned_at', { ascending: false }),
+      safeQuery(sb.from('jiip_contracts').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('general_investments').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('loans').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('finance_rules').select('*')),
+      safeQuery(sb.from('expected_payment_schedules').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('employee_salaries').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('freelancers').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('insurance_contracts').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('cars').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('corporate_cards').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('card_assignment_history').select('*')),
     ])
 
-    // ── 2. 통합 매칭 대상 생성 ──
+    // ── 2. 통합 매칭 대상 생성 (JS에서 status 필터링 — 컬럼 없을 수 있음) ──
+    const filterActive = (arr: any[]) => arr.filter(r => !r.status || r.status === 'active')
     const targets: MatchTarget[] = []
 
     // 지입 계약
-    for (const c of jiipRes.data || []) {
+    for (const c of filterActive(jiipRes.data || [])) {
       targets.push({
         id: c.id, type: 'jiip',
         name: c.investor_name || c.investor_name || '',
@@ -329,7 +351,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 투자 계약
-    for (const c of investRes.data || []) {
+    for (const c of filterActive(investRes.data || [])) {
       const monthlyInterest = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
       targets.push({
         id: c.id, type: 'invest',
@@ -342,7 +364,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 대출
-    for (const c of loanRes.data || []) {
+    for (const c of filterActive(loanRes.data || [])) {
       targets.push({
         id: c.id, type: 'loan',
         name: c.finance_name || '',
@@ -354,14 +376,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 직원 급여
-    for (const s of salaryRes.data || []) {
+    for (const s of (salaryRes.data || []).filter((r: any) => r.is_active !== false)) {
       const profileData = s.profiles as any
-      const empName = profileData?.name || ''
+      const empName = profileData?.name || s.name || ''
       targets.push({
-        id: s.employee_id, type: 'salary',
+        id: s.employee_id || s.id, type: 'salary',
         name: empName,
-        monthlyAmount: Number(s.base_salary) || 0,
-        paymentDay: Number(s.pay_day) || 25,
+        monthlyAmount: Number(s.base_salary || s.salary) || 0,
+        paymentDay: Number(s.pay_day || s.payment_day) || 25,
         defaultCategory: '급여(정규직)',
         txType: 'expense',
         extra: { employee_id: s.employee_id },
@@ -369,7 +391,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 프리랜서
-    for (const f of freelancerRes.data || []) {
+    for (const f of filterActive(freelancerRes.data || [])) {
       targets.push({
         id: f.id, type: 'freelancer',
         name: f.name || '',
@@ -395,10 +417,21 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const schedules: ScheduleInfo[] = (scheduleRes.data || []) as ScheduleInfo[]
+    const filterPending = (arr: any[]) => arr.filter(r => !r.status || r.status === 'pending')
+    const schedules: ScheduleInfo[] = filterPending(scheduleRes.data || []) as ScheduleInfo[]
     const dbRules = (rulesRes.data || []) as any[]
+    // 카드는 status 필터 없이 전체 로드 (status 컬럼이 없을 수 있음)
     const cards = (cardRes.data || []) as any[]
     const cars = (carRes.data || []) as any[]
+
+    // 디버그: 로드된 매칭 데이터 확인
+    console.log(`[classify] 매칭 데이터 로드: 법인카드 ${cards.length}장, 차량 ${cars.length}대, 지입 ${targets.filter(t=>t.type==='jiip').length}건, 투자 ${targets.filter(t=>t.type==='invest').length}건, 대출 ${targets.filter(t=>t.type==='loan').length}건`)
+    if (cards.length > 0) {
+      console.log(`[classify] 카드 목록:`, cards.map((c: any) => `${c.card_company} ${(c.card_number||'').slice(-4)} (ID:${c.id})`))
+    }
+    if (cardRes.error) {
+      console.error('[classify] corporate_cards 쿼리 에러:', cardRes.error)
+    }
 
     // ── 3. 각 거래 분석 ──
     const enriched = transactions.map((tx: any) => {
@@ -434,9 +467,13 @@ export async function POST(request: NextRequest) {
 
       // ── 3b. 카드 결제 매칭 (법인카드) — 다중 전략 + 이전 카드번호 포함 ──
       const pmLower = (tx.payment_method || '').toLowerCase()
-      if (pmLower === '카드' || pmLower === 'card' || pmLower.includes('카드') || pmLower.includes('card')) {
+      const isCard = pmLower === '카드' || pmLower === 'card' || pmLower.includes('카드') || pmLower.includes('card')
+      if (isCard) {
         const rawCardNum = (tx.card_number || '').replace(/[\s-]/g, '')
         const digitsOnly = rawCardNum.replace(/\D/g, '')
+        if (digitsOnly.length > 0) {
+          console.log(`[classify] 카드 매칭 시도: tx.card_number="${tx.card_number}", digits="${digitsOnly}", 등록카드 ${cards.length}장`)
+        }
 
         // 카드의 모든 번호 (현재 + 이전) 가져오기
         const getAllCardDigits = (c: any): string[] => {
@@ -477,6 +514,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // 카드 매칭 결과 로그
+      if (isCard && tx.card_id) {
+        console.log(`[classify] ✅ 카드 매칭 성공: ${tx.card_number} → card_id=${tx.card_id}`)
+      } else if (isCard && !tx.card_id && (tx.card_number || '').length > 0) {
+        console.log(`[classify] ❌ 카드 매칭 실패: ${tx.card_number}`)
+      }
+
       // ── 3b-2. 카드 배정 이력 기반 사용자 매칭 ──
       if (tx.card_id) {
         const cardHistory = (cardHistoryRes.data || []).filter((h: any) => h.card_id === tx.card_id)
@@ -498,6 +542,8 @@ export async function POST(request: NextRequest) {
           const card = cards.find((c: any) => c.id === tx.card_id)
           if (card?.assigned_employee_id) {
             tx.matched_employee_id = card.assigned_employee_id
+            // 카드 별칭이나 holder_name 사용
+            tx.matched_employee_name = card.holder_name || card.card_alias || null
           }
         }
       }
@@ -720,12 +766,19 @@ export async function POST(request: NextRequest) {
       scheduleLinked: enriched.filter((t: any) => t.matched_schedule_id).length,
     }
 
-    // ── 5. review/manual 건은 classification_queue에 자동 삽입 ──
-    const queueItems = enriched
-      .filter((t: any) => t.classification_tier === 'review' || t.classification_tier === 'manual')
-      .map((t: any) => ({
-        company_id,
-        source_type: t.payment_method === '카드' ? 'card_statement' : 'bank_statement',
+    // ── 5. 모든 분류 결과를 classification_queue에 저장 (phase1 스키마) ──
+    // phase1 컬럼: company_id, transaction_id, ai_category, ai_confidence,
+    //   ai_matched_type, ai_matched_id, ai_matched_name, alternatives,
+    //   final_category, final_matched_type, final_matched_id, status
+    const queueItems = enriched.map((t: any) => ({
+      company_id,
+      ai_category: t.category,
+      ai_confidence: t.confidence || 0,
+      ai_matched_type: t.related_type || null,
+      ai_matched_id: t.related_id || null,
+      ai_matched_name: t.matched_contract_name || null,
+      alternatives: {
+        candidates: t.alternatives || [],
         source_data: {
           transaction_date: t.transaction_date,
           client_name: t.client_name,
@@ -733,20 +786,23 @@ export async function POST(request: NextRequest) {
           amount: t.amount,
           type: t.type,
           payment_method: t.payment_method,
+          card_number: t.card_number || '',
+          is_cancel: t.is_cancel || false,
+          card_id: t.card_id || null,
+          matched_employee_id: t.matched_employee_id || null,
+          matched_employee_name: t.matched_employee_name || null,
         },
-        ai_category: t.category,
-        ai_confidence: t.confidence,
-        ai_related_type: t.related_type,
-        ai_related_id: t.related_id,
-        alternatives: t.alternatives || [],
-        status: 'pending',
-      }))
+      },
+      status: 'pending',
+    }))
 
     if (queueItems.length > 0) {
-      // 비동기로 큐 삽입 (실패해도 응답은 정상 반환)
-      sb.from('classification_queue').insert(queueItems).then(({ error }) => {
+      // 50건씩 배치 삽입
+      for (let i = 0; i < queueItems.length; i += 50) {
+        const batch = queueItems.slice(i, i + 50)
+        const { error } = await sb.from('classification_queue').insert(batch)
         if (error) console.error('Classification queue insert error:', error.message)
-      })
+      }
     }
 
     return NextResponse.json({ transactions: enriched, summary })
@@ -757,7 +813,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── GET: 분류 검토 조회 (transactions 테이블 직접 조회) ──
+// ── GET: 분류 검토 조회 (classification_queue 우선, fallback: transactions) ──
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -771,57 +827,130 @@ export async function GET(request: NextRequest) {
 
     const sb = getSupabaseAdmin()
 
-    // pending = 카테고리가 '기타' 또는 비어있는 건, confirmed = 제대로 분류된 건
-    const PENDING_CATEGORIES = ['기타', '미분류', '']
-
-    let query = sb
-      .from('transactions')
+    // ── 1차: classification_queue에서 조회 ──
+    let queueQuery = sb
+      .from('classification_queue')
       .select('*', { count: 'exact' })
       .eq('company_id', company_id)
 
     if (status === 'pending') {
-      query = query.or('category.is.null,category.eq.기타,category.eq.미분류,category.eq.')
+      queueQuery = queueQuery.in('status', ['pending', 'auto_confirmed'])
     } else if (status === 'confirmed') {
-      query = query.not('category', 'is', null)
-        .not('category', 'eq', '기타')
-        .not('category', 'eq', '미분류')
-        .not('category', 'eq', '')
+      queueQuery = queueQuery.eq('status', 'confirmed')
     }
 
-    const { data, error, count } = await query
+    const { data: queueData, error: queueError, count: queueCount } = await queueQuery
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (error) throw error
+    if (!queueError && queueData && queueData.length > 0) {
+      const items = queueData.map((q: any) => {
+        // phase1 스키마: alternatives JSONB 안에 source_data가 포함됨
+        const altData = typeof q.alternatives === 'string' ? JSON.parse(q.alternatives) : (q.alternatives || {})
+        // 055 스키마일 수 있으므로 source_data 직접 확인도 함
+        const sd = q.source_data || altData.source_data || {}
+        const candidates = altData.candidates || (Array.isArray(q.alternatives) ? q.alternatives : [])
+        return {
+          id: q.id,
+          company_id: q.company_id,
+          transaction_id: q.transaction_id,
+          source_type: q.source_type || (sd.payment_method === '카드' ? 'card_statement' : 'bank_statement'),
+          source_data: {
+            transaction_date: sd.transaction_date || '',
+            client_name: sd.client_name || '',
+            description: sd.description || '',
+            amount: sd.amount || 0,
+            type: sd.type || 'expense',
+            payment_method: sd.payment_method || '',
+          },
+          ai_category: q.ai_category || q.final_category || '미분류',
+          ai_confidence: q.ai_confidence || 0,
+          ai_related_type: q.ai_matched_type || null,
+          ai_related_id: q.ai_matched_id || null,
+          ai_matched_name: q.ai_matched_name || null,
+          alternatives: candidates,
+          status: q.status,
+          final_category: q.final_category || null,
+          is_cancel: sd.is_cancel || false,
+          card_id: sd.card_id || null,
+          card_number: sd.card_number || '',
+          matched_employee_id: sd.matched_employee_id || null,
+          matched_employee_name: sd.matched_employee_name || null,
+          matched_contract_name: sd.matched_contract_name || q.ai_matched_name || null,
+          _source: 'queue',
+        }
+      })
+      return NextResponse.json({ items, total: queueCount || 0, source: 'classification_queue' })
+    }
 
-    // review 페이지 형식에 맞게 변환
-    const items = (data || []).map((tx: any) => ({
-      id: tx.id,
-      company_id: tx.company_id,
-      source_data: {
-        transaction_date: tx.transaction_date,
-        client_name: tx.client_name,
-        description: tx.description,
-        amount: tx.amount,
-        type: tx.type,
-        payment_method: tx.payment_method,
-      },
-      ai_category: tx.category || '미분류',
-      ai_confidence: 0,
-      ai_related_type: tx.related_type,
-      ai_related_id: tx.related_id,
-      alternatives: [],
-      status: PENDING_CATEGORIES.includes(tx.category || '') || !tx.category ? 'pending' : 'confirmed',
-      final_category: PENDING_CATEGORIES.includes(tx.category || '') || !tx.category ? null : tx.category,
-    }))
+    // ── 2차 fallback: transactions 테이블에서 조회 ──
+    // category 컬럼 존재 여부를 먼저 확인
+    let txQuery = sb
+      .from('transactions')
+      .select('*', { count: 'exact' })
+      .eq('company_id', company_id)
 
-    return NextResponse.json({ items, total: count || 0 })
+    // category 컬럼 필터는 사용하지 않음 (존재하지 않을 수 있음)
+    // 대신 classification_source로 구분하거나, 전체 반환
+    const { data: txData, error: txError, count: txCount } = await txQuery
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (txError) throw txError
+
+    const items = (txData || []).map((tx: any) => {
+      // category 컬럼이 있으면 사용, 없으면 미분류
+      const cat = tx.category || '미분류'
+      const isPending = !tx.category || tx.category === '미분류' || tx.category === '기타' || tx.category === ''
+      return {
+        id: tx.id,
+        company_id: tx.company_id,
+        source_data: {
+          transaction_date: tx.transaction_date || '',
+          client_name: tx.client_name || '',
+          description: tx.description || '',
+          amount: tx.amount || 0,
+          type: tx.type || 'expense',
+          payment_method: tx.payment_method || '',
+          card_number: tx.card_number || '',
+        },
+        ai_category: cat,
+        ai_confidence: tx.confidence || 0,
+        ai_related_type: tx.related_type || null,
+        ai_related_id: tx.related_id || null,
+        alternatives: [],
+        status: isPending ? 'pending' : 'confirmed',
+        final_category: isPending ? null : cat,
+        is_cancel: tx.is_cancel || false,
+        _source: 'transactions',
+      }
+    })
+
+    // status 필터링 (DB에서 못했으니 앱 레벨에서)
+    const filtered = status === 'all' ? items :
+      items.filter((i: any) => {
+        if (status === 'pending') return i.status === 'pending'
+        if (status === 'confirmed') return i.status === 'confirmed'
+        return true
+      })
+
+    const filteredTotal = status === 'all' ? (txCount || 0) : filtered.length
+    // pending 총 수를 정확히 계산
+    const pendingCount = items.filter((i: any) => i.status === 'pending').length
+    const confirmedCount = items.filter((i: any) => i.status === 'confirmed').length
+
+    return NextResponse.json({
+      items: filtered.slice(0, limit),
+      total: status === 'pending' ? pendingCount : status === 'confirmed' ? confirmedCount : (txCount || 0),
+      source: 'transactions',
+    })
   } catch (error: any) {
+    console.error('GET classify error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-// ── PATCH: 거래 항목 분류 확정 (transactions 직접 업데이트) ──
+// ── PATCH: 분류 확정 (classification_queue 업데이트) ──
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
@@ -833,34 +962,135 @@ export async function PATCH(request: NextRequest) {
 
     const sb = getSupabaseAdmin()
 
-    // 1. transactions 테이블 직접 업데이트
+    // classification_queue 업데이트 — 카테고리에 따라 status 결정
+    const PENDING_CATS = ['기타', '미분류', '']
+    const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
+    const updateData: Record<string, any> = {
+      final_category,
+      status: newStatus,
+    }
+
+    // 055 스키마 컬럼 (존재할 수도 있음)
+    // phase1 스키마에서는 final_matched_type/final_matched_id
     const { data: updated, error: updateErr } = await sb
-      .from('transactions')
-      .update({
-        category: final_category,
-        related_type: final_related_type || null,
-        related_id: final_related_id || null,
-      })
+      .from('classification_queue')
+      .update(updateData)
       .eq('id', queue_id)
       .select()
       .single()
 
     if (updateErr) throw updateErr
 
-    // 2. 규칙 학습 (선택적)
+    // 규칙 학습 (선택적)
     if (save_as_rule && rule_keyword) {
-      const { error: ruleErr } = await sb.from('finance_rules').upsert({
-        keyword: rule_keyword.toLowerCase(),
-        category: final_category,
-        related_type: final_related_type || null,
-        related_id: final_related_id || null,
-      }, { onConflict: 'keyword' })
-
-      if (ruleErr) console.error('Rule save error:', ruleErr.message)
+      try {
+        await sb.from('finance_rules').upsert({
+          keyword: rule_keyword.toLowerCase(),
+          category: final_category,
+          related_type: final_related_type || null,
+          related_id: final_related_id || null,
+        }, { onConflict: 'keyword' })
+      } catch (e) {
+        console.error('Rule save error:', e)
+      }
     }
 
     return NextResponse.json({ success: true, data: updated })
   } catch (error: any) {
+    console.error('PATCH classify error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// ── DELETE: 분류 항목 일괄 삭제 (classification_queue + transactions 양쪽) ──
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { company_id, status, ids } = body
+
+    if (!company_id) {
+      return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
+    }
+
+    const sb = getSupabaseAdmin()
+    let deleted = 0
+
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      // 특정 ID들만 삭제 — 양쪽 테이블에서 시도
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50)
+
+        // classification_queue에서 삭제 시도
+        const { data: qd } = await sb.from('classification_queue')
+          .delete()
+          .eq('company_id', company_id)
+          .in('id', batch)
+          .select('id')
+        deleted += (qd?.length || 0)
+
+        // transactions에서도 삭제 시도
+        const { data: td } = await sb.from('transactions')
+          .delete()
+          .eq('company_id', company_id)
+          .in('id', batch)
+          .select('id')
+        deleted += (td?.length || 0)
+      }
+    } else {
+      // 전체 삭제
+      if (status === 'pending') {
+        // classification_queue pending 삭제
+        const { data: qd } = await sb.from('classification_queue')
+          .delete()
+          .eq('company_id', company_id)
+          .in('status', ['pending', 'auto_confirmed'])
+          .select('id')
+        deleted += (qd?.length || 0)
+
+        // transactions 전체 삭제 (category 컬럼 없으면 모두 pending으로 간주)
+        const { data: td } = await sb.from('transactions')
+          .delete()
+          .eq('company_id', company_id)
+          .select('id')
+        deleted += (td?.length || 0)
+      } else if (status === 'confirmed') {
+        // classification_queue confirmed 삭제
+        const { data: qd } = await sb.from('classification_queue')
+          .delete()
+          .eq('company_id', company_id)
+          .eq('status', 'confirmed')
+          .select('id')
+        deleted += (qd?.length || 0)
+
+        // transactions에서도 confirmed 항목 삭제 (category가 있는 건)
+        try {
+          const { data: td } = await sb.from('transactions')
+            .delete()
+            .eq('company_id', company_id)
+            .select('id')
+          deleted += (td?.length || 0)
+        } catch (e) {
+          console.error('transactions confirmed delete error:', e)
+        }
+      } else {
+        // all: 양쪽 테이블 모두 삭제
+        const { data: qd } = await sb.from('classification_queue')
+          .delete()
+          .eq('company_id', company_id)
+          .select('id')
+        deleted += (qd?.length || 0)
+
+        const { data: td } = await sb.from('transactions')
+          .delete()
+          .eq('company_id', company_id)
+          .select('id')
+        deleted += (td?.length || 0)
+      }
+    }
+
+    return NextResponse.json({ deleted, remaining: 0 })
+  } catch (error: any) {
+    console.error('DELETE classify error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

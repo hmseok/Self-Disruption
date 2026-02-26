@@ -380,6 +380,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                   classification_tier: item.classification_tier || 'manual',
                   alternatives: item.alternatives || [],
                   card_id: item.card_id || null,
+                  matched_employee_id: item.matched_employee_id || null,
+                  matched_employee_name: item.matched_employee_name || null,
                 }));
               }
             }

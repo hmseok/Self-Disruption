@@ -54,8 +54,11 @@ export async function POST(req: NextRequest) {
 ${hint}
 
 ⚠️ 오늘 날짜: ${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}
-날짜에 연도가 없으면(예: 02.26, 01/15) 반드시 ${currentYear}년으로 설정하세요.
-데이터가 최근 1~2개월 내의 거래라고 가정하세요.
+⚠️ 날짜 연도 결정 규칙 (우선순위):
+1. 파일 헤더/상단에 기간 정보가 있으면(예: "2025.10.01 ~ 2025.10.31") 그 연도를 사용하세요!
+2. 날짜에 연도가 포함되어 있으면(예: 2025-01-15, 20250115) 그대로 사용
+3. 연도가 없는 경우(예: 02.26, 01/15, 10.31)만 ${currentYear}년으로 설정
+데이터의 실제 기간을 반드시 확인하세요. 미래 날짜가 되면 안 됩니다.
 
 [결과 필드 — 반드시 모든 필드를 포함]
 - transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15)
@@ -146,15 +149,25 @@ ${mimeType === 'text/csv' ? data : '(이미지 데이터)'}`;
           item.amount = Math.abs(Number(item.amount.replace(/[,\s]/g, '')) || 0);
         }
 
-        // 날짜 연도 보정: 미래 3개월 이상이거나 2년 이상 과거면 현재 연도로 보정
+        // 날짜 연도 보정
         if (item.transaction_date) {
           const dateMatch = item.transaction_date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
           if (dateMatch) {
             const year = parseInt(dateMatch[1]);
             const month = parseInt(dateMatch[2]);
             const day = parseInt(dateMatch[3]);
-            // 연도가 현재 연도와 2년 이상 차이나면 보정
-            if (Math.abs(year - currentYear) >= 2) {
+            const txDate = new Date(year, month - 1, day);
+            const today = new Date();
+            const monthsDiff = (txDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30);
+
+            // 미래 3개월 이상이면 → 1년 전으로 보정 (2026-10-31 → 2025-10-31)
+            if (monthsDiff > 3) {
+              const correctedYear = year - 1;
+              item.transaction_date = `${correctedYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              console.log(`[finance-parser] 날짜 보정: ${year}-${month}-${day} → ${correctedYear}-${month}-${day} (미래 날짜)`);
+            }
+            // 연도가 현재 연도와 3년 이상 차이나면 보정
+            else if (Math.abs(year - currentYear) >= 3) {
               item.transaction_date = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             }
           }

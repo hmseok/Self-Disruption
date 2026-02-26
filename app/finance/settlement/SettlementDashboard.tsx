@@ -3,7 +3,7 @@
 import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 
 // ============================================
 // 타입 정의
@@ -135,8 +135,17 @@ export default function SettlementDashboard() {
   // ============================================
   // 데이터 로드
   // ============================================
+  const pathname = usePathname()
+
   useEffect(() => {
     fetchAllData()
+  }, [filterDate, company, adminSelectedCompanyId, pathname])
+
+  // 탭 포커스 시 자동 새로고침
+  useEffect(() => {
+    const onFocus = () => fetchAllData()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [filterDate, company, adminSelectedCompanyId])
 
   const fetchAllData = async () => {
@@ -464,7 +473,10 @@ export default function SettlementDashboard() {
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 매출 회계 정산</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+              매출 회계 정산
+            </h1>
             <p className="text-gray-500 text-sm mt-1">매출 분석, 정산 현황, 손익계산서를 한눈에 관리합니다.</p>
           </div>
         </div>
