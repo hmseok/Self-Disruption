@@ -452,6 +452,7 @@ export default function QuoteListPage() {
   const [shortStatusFilter, setShortStatusFilter] = useState<ShortStatusFilter>('all')
   const [customers, setCustomers] = useState<Map<string, any>>(new Map())
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const f = (n: number) => Math.round(n || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
@@ -465,8 +466,9 @@ export default function QuoteListPage() {
 
       try {
         // Quotes
-        const { data: quotesData } = await supabase
+        const { data: quotesData, error: quotesError } = await supabase
           .from('quotes').select('*').eq('company_id', companyId).order('id', { ascending: false })
+        if (quotesError) console.error('견적 목록 로드 실패:', quotesError.message)
 
         // Cars
         const carIds = (quotesData || []).map((q) => q.car_id).filter(Boolean)
@@ -486,8 +488,9 @@ export default function QuoteListPage() {
         setShortQuotes(stQuotesData || [])
 
         // All contracts (for contracts tab)
-        const { data: allContracts } = await supabase
+        const { data: allContracts, error: contractsError } = await supabase
           .from('contracts').select('*').eq('company_id', companyId).order('id', { ascending: false })
+        if (contractsError) console.error('계약 목록 로드 실패:', contractsError.message)
 
         // Payment schedules for contracts
         const contractIds = (allContracts || []).map(c => c.id)
@@ -578,14 +581,27 @@ export default function QuoteListPage() {
 
   const filteredQuotes = useCallback(() => {
     const base = mainTab === 'long_term' ? longTermQuotes : shortTermQuotes
+    let result: any[]
     switch (statusFilter) {
-      case 'draft': return base.filter(q => !q.contract && !q.shared_at && q.status !== 'archived')
-      case 'shared': return base.filter(q => (q.shared_at || q.signed_at) && !q.contract && q.status !== 'archived')
-      case 'confirmed': return base.filter(q => q.contract)
-      case 'archived': return base.filter(q => q.status === 'archived')
-      default: return base.filter(q => q.status !== 'archived')
+      case 'draft': result = base.filter(q => !q.contract && !q.shared_at && q.status !== 'archived'); break
+      case 'shared': result = base.filter(q => (q.shared_at || q.signed_at) && !q.contract && q.status !== 'archived'); break
+      case 'confirmed': result = base.filter(q => q.contract); break
+      case 'archived': result = base.filter(q => q.status === 'archived'); break
+      default: result = base.filter(q => q.status !== 'archived')
     }
-  }, [mainTab, statusFilter, longTermQuotes, shortTermQuotes])
+    // 검색어 필터
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(q =>
+        (q.customer_name || '').toLowerCase().includes(term) ||
+        (q.car?.number || '').toLowerCase().includes(term) ||
+        (q.car?.brand || '').toLowerCase().includes(term) ||
+        (q.car?.model || '').toLowerCase().includes(term) ||
+        (q.customer?.phone || '').includes(term)
+      )
+    }
+    return result
+  }, [mainTab, statusFilter, longTermQuotes, shortTermQuotes, searchTerm])
 
   const mainTabCounts: Record<MainTab, number> = {
     long_term: longTermQuotes.filter(q => q.status !== 'archived').length,
@@ -608,11 +624,65 @@ export default function QuoteListPage() {
 
   const handleDelete = useCallback(async (quoteId: string) => {
     try {
+      console.log('[DELETE] 견적 삭제 시작:', quoteId)
+
+      // 1. 연결된 contracts 조회
+      const { data: linkedContracts } = await supabase
+        .from('contracts').select('id').eq('quote_id', quoteId)
+
+      // 2. 연결된 payment_schedules 삭제
+      if (linkedContracts && linkedContracts.length > 0) {
+        const contractIds = linkedContracts.map(c => c.id)
+        await supabase.from('payment_schedules').delete().in('contract_id', contractIds)
+      }
+
+      // 3. 연결된 contracts 삭제
       await supabase.from('contracts').delete().eq('quote_id', quoteId)
-      const { error } = await supabase.from('quotes').delete().eq('id', quoteId)
-      if (error) throw error
+
+      // 4. quote_shares 삭제
+      await supabase.from('quote_shares').delete().eq('quote_id', quoteId)
+
+      // 5. customer_signatures 삭제 (RLS에 DELETE 정책이 없으면 실패 → RPC로 우회)
+      const { error: sigErr } = await supabase.from('customer_signatures').delete().eq('quote_id', quoteId)
+      if (sigErr) {
+        console.warn('[DELETE] 서명 직접 삭제 실패 (RLS 제한), RPC 시도:', sigErr.message)
+        // RPC 함수로 우회 삭제 시도
+        const { error: rpcErr } = await supabase.rpc('delete_quote_cascade', { p_quote_id: quoteId })
+        if (rpcErr) {
+          console.error('[DELETE] RPC 우회도 실패:', rpcErr.message)
+          // quote_share_tokens도 삭제 시도 (customer_signatures.token_id FK)
+          await supabase.from('quote_share_tokens').delete().eq('quote_id', quoteId)
+          // 다시 시도
+          const { error: sigErr2 } = await supabase.from('customer_signatures').delete().eq('quote_id', quoteId)
+          if (sigErr2) {
+            throw new Error(
+              `고객 서명 데이터 삭제 실패 (RLS 정책 없음)\n\n` +
+              `Supabase SQL Editor에서 아래 SQL을 실행해주세요:\n` +
+              `DELETE FROM customer_signatures WHERE quote_id = ${quoteId};\n\n` +
+              `또는 sql/065_signature_delete_policy.sql 마이그레이션을 실행하세요.`
+            )
+          }
+        } else {
+          console.log('[DELETE] RPC 우회 삭제 성공')
+        }
+      }
+
+      // 6. quote_share_tokens 삭제 (customer_signatures 삭제 후)
+      await supabase.from('quote_share_tokens').delete().eq('quote_id', quoteId)
+
+      // 7. 견적서 삭제
+      const { error: qErr } = await supabase.from('quotes').delete().eq('id', quoteId)
+      if (qErr) throw new Error(`견적서 삭제 실패: ${qErr.message}`)
+
       setQuotes(prev => prev.filter(q => q.id !== quoteId))
-    } catch { alert('삭제 중 오류가 발생했습니다.') }
+      if (linkedContracts && linkedContracts.length > 0) {
+        const contractIds = linkedContracts.map(c => c.id)
+        setContracts(prev => prev.filter(c => !contractIds.includes(c.id)))
+      }
+    } catch (err: any) {
+      console.error('[DELETE] 최종 에러:', err)
+      alert(`삭제 중 오류:\n${err?.message || JSON.stringify(err)}`)
+    }
   }, [])
 
   // Short-term handlers
@@ -635,437 +705,420 @@ export default function QuoteListPage() {
   const displayedQuotes = filteredQuotes()
   const displayedShortQuotes = filteredShortQuotes()
 
+  // 계약 목록에도 검색어 필터 적용
+  const filteredContracts = searchTerm
+    ? contracts.filter(c => {
+        const term = searchTerm.toLowerCase()
+        return (
+          (c.customer?.name || c.customer_name || '').toLowerCase().includes(term) ||
+          (c.car?.number || '').toLowerCase().includes(term) ||
+          (c.car?.brand || '').toLowerCase().includes(term) ||
+          (c.car?.model || '').toLowerCase().includes(term)
+        )
+      })
+    : contracts
+
+  // KPI 통계
+  const kpiStats = {
+    totalQuotes: quotes.filter(q => q.status !== 'archived').length,
+    draftQuotes: quotes.filter(q => !q.contract && !q.shared_at && q.status !== 'archived').length,
+    sharedQuotes: quotes.filter(q => (q.shared_at || q.signed_at) && !q.contract && q.status !== 'archived').length,
+    confirmedQuotes: quotes.filter(q => q.contract).length,
+    totalContracts: contracts.length,
+    activeContracts: contracts.filter(c => c.status !== 'completed').length,
+    completedContracts: contracts.filter(c => c.status === 'completed').length,
+    totalMonthlyRent: contracts.filter(c => c.status !== 'completed').reduce((s, c) => s + (c.monthly_rent || 0), 0),
+    shortQuotes: shortQuotes.length,
+  }
+
   // ============================================================================
   // RENDER
   // ============================================================================
   if (role === 'god_admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+        <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af', fontSize: 14, background: '#fff', borderRadius: 16 }}>
+          <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>🏢</span>
+          <p style={{ fontWeight: 700, color: '#4b5563' }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📑 견적/계약 관리</h1>
-          <p className="text-gray-500 text-sm mt-1">견적 작성·발송 및 계약 체결 관리</p>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>📑 견적/계약 관리</h1>
+          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>견적 작성·발송 및 계약 체결 관리</p>
         </div>
         <NewQuoteButton />
       </div>
 
-      {/* ── Main Tabs ── */}
-      <div className="mb-5">
-        <MainTabBar activeTab={mainTab} onTabChange={(tab) => { setMainTab(tab); setStatusFilter('all'); setShortStatusFilter('all') }} counts={mainTabCounts} />
+      {/* ── KPI 대시보드 ── */}
+      {!loading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={{ background: '#fff', padding: '12px 16px', borderRadius: 12, border: '1px solid #e5e7eb', cursor: 'pointer' }}
+            onClick={() => { setMainTab('long_term'); setStatusFilter('all') }}>
+            <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700 }}>장기견적</p>
+            <p style={{ fontSize: 22, fontWeight: 900, color: '#111827', marginTop: 4 }}>{kpiStats.totalQuotes}<span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 2 }}>건</span></p>
+          </div>
+          <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #bfdbfe', cursor: 'pointer' }}
+            onClick={() => { setMainTab('long_term'); setStatusFilter('shared') }}>
+            <p style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>발송됨</p>
+            <p style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>{kpiStats.sharedQuotes}<span style={{ fontSize: 13, color: '#60a5fa', marginLeft: 2 }}>건</span></p>
+          </div>
+          <div style={{ background: '#f0fdf4', padding: '12px 16px', borderRadius: 12, border: '1px solid #bbf7d0', cursor: 'pointer' }}
+            onClick={() => { setMainTab('long_term'); setStatusFilter('confirmed') }}>
+            <p style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>계약확정</p>
+            <p style={{ fontSize: 22, fontWeight: 900, color: '#15803d', marginTop: 4 }}>{kpiStats.confirmedQuotes}<span style={{ fontSize: 13, color: '#4ade80', marginLeft: 2 }}>건</span></p>
+          </div>
+          <div style={{ background: '#faf5ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #e9d5ff', cursor: 'pointer' }}
+            onClick={() => { setMainTab('contracts'); }}>
+            <p style={{ fontSize: 11, color: '#7c3aed', fontWeight: 700 }}>진행중 계약</p>
+            <p style={{ fontSize: 22, fontWeight: 900, color: '#6d28d9', marginTop: 4 }}>{kpiStats.activeContracts}<span style={{ fontSize: 13, color: '#a78bfa', marginLeft: 2 }}>건</span></p>
+          </div>
+          <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+            <p style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>월 렌트수익</p>
+            <p style={{ fontSize: 18, fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>{f(Math.round(kpiStats.totalMonthlyRent * 1.1))}<span style={{ fontSize: 12, color: '#60a5fa', marginLeft: 2 }}>원</span></p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Tabs (보험 페이지 스타일 인라인) ── */}
+      <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', padding: 4, borderRadius: 12, marginBottom: 20 }}>
+        {[
+          { value: 'long_term' as MainTab, label: '장기렌트', icon: '📋', count: mainTabCounts.long_term },
+          { value: 'short_term' as MainTab, label: '단기렌트', icon: '⏱️', count: mainTabCounts.short_term },
+          { value: 'contracts' as MainTab, label: '계약', icon: '✅', count: mainTabCounts.contracts },
+        ].map(tab => (
+          <button
+            key={tab.value}
+            onClick={() => { setMainTab(tab.value); setStatusFilter('all'); setShortStatusFilter('all'); setSearchTerm('') }}
+            style={{
+              flex: 1, padding: '10px 16px', borderRadius: 10, fontWeight: 700, fontSize: 14,
+              transition: 'all 0.15s', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+              background: mainTab === tab.value ? '#fff' : 'transparent',
+              color: mainTab === tab.value ? '#111827' : '#6b7280',
+              boxShadow: mainTab === tab.value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            {tab.icon} {tab.label}
+            <span style={{ marginLeft: 6, fontSize: 12, color: mainTab === tab.value ? '#2d5fa8' : undefined, opacity: mainTab === tab.value ? 1 : 0.6 }}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* ── Content by Tab ── */}
-      {mainTab === 'contracts' ? (
-        /* ======================== CONTRACTS TAB ======================== */
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-20 text-center text-gray-400">로딩 중...</div>
-          ) : contracts.length === 0 ? (
-            <div className="p-20 text-center text-gray-400">계약 내역이 없습니다.</div>
-          ) : (
-            <>
-              {/* Desktop */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full min-w-[800px] text-left text-sm">
-                  <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200">
-                    <tr>
-                      <th className="p-4 pl-6">상태</th>
-                      <th className="p-4">고객명</th>
-                      <th className="p-4">차량</th>
-                      <th className="p-4">계약기간</th>
-                      <th className="p-4 text-right">보증금</th>
-                      <th className="p-4 text-right">월 렌트료</th>
-                      <th className="p-4 text-center">수납</th>
-                      <th className="p-4 text-center">계약일</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {contracts.map(c => (
-                      <tr
-                        key={c.id}
-                        onClick={() => router.push(`/contracts/${c.id}`)}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        <td className="p-4 pl-6"><ContractStatusBadge contract={c} /></td>
-                        <td className="p-4 font-bold text-gray-900">{c.customer?.name || c.customer_name}</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
-                              {c.car?.image_url ? (
-                                <img src={c.car.image_url} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="text-[9px] text-gray-300 flex items-center justify-center h-full">No Img</span>
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-bold text-gray-900 text-xs">{c.car?.number || '-'}</div>
-                              <div className="text-[11px] text-gray-500">{c.car?.brand} {c.car?.model}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4 text-gray-600 text-sm">
-                          {formatDate(c.start_date)} ~ {formatDate(c.end_date)}
-                        </td>
-                        <td className="p-4 text-right text-gray-500 text-sm">{f(c.deposit)}원</td>
-                        <td className="p-4 text-right">
-                          <span className="font-black text-steel-700">{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
-                          <div className="text-[10px] text-gray-400">/월 (VAT포함)</div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-green-500 rounded-full transition-all"
-                                style={{ width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-gray-500 font-bold">{c.paidCount}/{c.totalCount}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center text-gray-400 text-xs">{formatDate(c.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {/* Mobile */}
-              <div className="md:hidden divide-y divide-gray-100">
-                {contracts.map(c => (
-                  <div
-                    key={c.id}
-                    onClick={() => router.push(`/contracts/${c.id}`)}
-                    className="p-4 cursor-pointer active:bg-gray-50"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <ContractStatusBadge contract={c} />
-                      <span className="text-xs text-gray-400">{formatDate(c.created_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
-                        {c.car?.image_url ? (
-                          <img src={c.car.image_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[9px] text-gray-300 flex items-center justify-center h-full">No Img</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-gray-900 text-sm">{c.customer?.name || c.customer_name}</div>
-                        <div className="text-xs text-gray-500">{c.car?.number} · {c.car?.brand} {c.car?.model}</div>
-                      </div>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="text-xs text-gray-500 mb-2">{formatDate(c.start_date)} ~ {formatDate(c.end_date)}</div>
-                      <div className="flex justify-between items-center mb-2">
-                        <div><div className="text-[10px] text-gray-400">보증금</div><div className="font-bold text-sm">{f(c.deposit)}원</div></div>
-                        <div className="text-right"><div className="text-[10px] text-gray-400">월 렌트료</div><div className="font-black text-steel-700 text-lg">{f(Math.round((c.monthly_rent || 0) * 1.1))}원</div></div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
-                        </div>
-                        <span className="text-xs text-gray-500 font-bold">{c.paidCount}/{c.totalCount}회</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        /* ======================== QUOTES TAB (long/short) ======================== */
-        <>
-          {/* Status sub-filter */}
-          {!loading && mainTab === 'long_term' && (
-            <div className="mb-4">
-              <StatusFilterTabs activeFilter={statusFilter} onFilterChange={setStatusFilter} counts={statusCounts} />
+      {/* ── Sub-filter + 검색 바 ── */}
+      {!loading && (
+        <div style={{ display: 'flex', flexDirection: 'row', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Status sub-filters */}
+          {mainTab === 'long_term' && (
+            <div style={{ display: 'flex', gap: 6, overflow: 'auto', paddingBottom: 2 }}>
+              {[
+                { value: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
+                { value: 'draft' as StatusFilter, label: '견적단계', count: statusCounts.draft },
+                { value: 'shared' as StatusFilter, label: '발송됨', count: statusCounts.shared },
+                { value: 'confirmed' as StatusFilter, label: '계약확정', count: statusCounts.confirmed },
+                { value: 'archived' as StatusFilter, label: '보관', count: statusCounts.archived },
+              ].map(tab => (
+                <button
+                  key={tab.value}
+                  onClick={() => setStatusFilter(tab.value)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    border: statusFilter === tab.value ? 'none' : '1px solid #e5e7eb',
+                    background: statusFilter === tab.value ? '#2d5fa8' : '#fff',
+                    color: statusFilter === tab.value ? '#fff' : '#6b7280',
+                    cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  }}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
             </div>
           )}
-          {!loading && mainTab === 'short_term' && (
-            <div className="mb-4">
-              <ShortStatusFilterTabs activeFilter={shortStatusFilter} onFilterChange={setShortStatusFilter} counts={shortStatusCounts} />
+          {mainTab === 'short_term' && (
+            <div style={{ display: 'flex', gap: 6, overflow: 'auto', paddingBottom: 2 }}>
+              {[
+                { value: 'all' as ShortStatusFilter, label: '전체', count: shortStatusCounts.all },
+                { value: 'draft' as ShortStatusFilter, label: '작성중', count: shortStatusCounts.draft },
+                { value: 'sent' as ShortStatusFilter, label: '발송됨', count: shortStatusCounts.sent },
+                { value: 'accepted' as ShortStatusFilter, label: '수락됨', count: shortStatusCounts.accepted },
+                { value: 'contracted' as ShortStatusFilter, label: '계약완료', count: shortStatusCounts.contracted },
+                { value: 'cancelled' as ShortStatusFilter, label: '취소', count: shortStatusCounts.cancelled },
+              ].map(tab => (
+                <button
+                  key={tab.value}
+                  onClick={() => setShortStatusFilter(tab.value)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    border: shortStatusFilter === tab.value ? 'none' : '1px solid #e5e7eb',
+                    background: shortStatusFilter === tab.value ? '#f59e0b' : '#fff',
+                    color: shortStatusFilter === tab.value ? '#fff' : '#6b7280',
+                    cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                  }}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
             </div>
           )}
-
-          {/* Short-term detail modal */}
-          {selectedShortQuote && (
-            <ShortTermDetailModal
-              quote={selectedShortQuote}
-              onClose={() => setSelectedShortQuote(null)}
-              onStatusChange={handleShortStatusChange}
-              onDelete={handleShortDelete}
+          {/* 검색바 */}
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <input
+              type="text"
+              placeholder="고객명, 차량번호, 브랜드 검색..."
+              style={{
+                width: '100%', padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8,
+                fontSize: 14, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              }}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
             />
-          )}
+          </div>
+        </div>
+      )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            {loading ? (
-              <div className="p-20 text-center text-gray-400">로딩 중...</div>
-            ) : mainTab === 'short_term' ? (
-              /* Short-term quotes list */
-              displayedShortQuotes.length === 0 ? (
-                <div className="p-16 text-center">
-                  <p className="text-4xl mb-4">⏱️</p>
-                  <p className="text-gray-500 text-sm mb-4">
-                    {shortStatusFilter === 'all' ? '단기렌트 견적이 없습니다.' : `${shortStatusFilter === 'draft' ? '작성중' : shortStatusFilter === 'sent' ? '발송됨' : shortStatusFilter === 'accepted' ? '수락됨' : shortStatusFilter === 'contracted' ? '계약완료' : '취소'} 상태의 견적이 없습니다.`}
-                  </p>
-                  <Link href="/quotes/short-term" className="inline-block px-6 py-3 bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 transition-colors">
-                    단기렌트 견적 작성하기
-                  </Link>
-                </div>
-              ) : (
-                <>
-                  {/* Desktop */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full min-w-[800px] text-left text-sm">
-                      <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200">
-                        <tr>
-                          <th className="p-4 pl-6">상태</th>
-                          <th className="p-4">견적번호</th>
-                          <th className="p-4">고객/업체</th>
-                          <th className="p-4">연락처</th>
-                          <th className="p-4">차종 구성</th>
-                          <th className="p-4 text-right">합계</th>
-                          <th className="p-4 text-center">할인</th>
-                          <th className="p-4 text-center">작성일</th>
-                          <th className="p-4 text-center">액션</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {displayedShortQuotes.map(sq => {
-                          const detail = sq.quote_detail || {}
-                          const items = detail.items || []
-                          const total = detail.totalWithVat || detail.total || 0
-                          const vehicleSummary = items.length > 0
-                            ? items.slice(0, 2).map((it: any) => it.vehicleClass || it.group).join(', ') + (items.length > 2 ? ` 외 ${items.length - 2}건` : '')
-                            : '-'
-                          return (
-                            <tr key={sq.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedShortQuote(sq)}>
-                              <td className="p-4 pl-6"><ShortTermStatusBadge status={sq.status} /></td>
-                              <td className="p-4 font-bold text-gray-900 font-mono text-xs">{sq.quote_number || '-'}</td>
-                              <td className="p-4 font-bold text-gray-900">{sq.customer_name}</td>
-                              <td className="p-4 text-gray-600 text-sm">{sq.customer_phone || '-'}</td>
-                              <td className="p-4 text-xs text-gray-500">{vehicleSummary}</td>
-                              <td className="p-4 text-right">
-                                <span className="font-black text-amber-700">{f(total)}원</span>
-                              </td>
-                              <td className="p-4 text-center">
-                                <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">{sq.discount_percent || 0}%</span>
-                              </td>
-                              <td className="p-4 text-center text-gray-400 text-xs">{formatDate(sq.created_at)}</td>
-                              <td className="p-4 text-center" onClick={e => e.stopPropagation()}>
-                                <div className="flex gap-1 justify-center">
-                                  {sq.status === 'draft' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-blue-100">발송</button>
-                                  )}
-                                  {sq.status === 'sent' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-green-100">수락</button>
-                                  )}
-                                  {sq.status === 'accepted' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-lg font-bold hover:bg-purple-100">계약</button>
-                                  )}
-                                  {sq.status !== 'cancelled' && sq.status !== 'contracted' && (
-                                    <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="text-xs bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded-lg font-bold hover:bg-gray-100">취소</button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Mobile */}
-                  <div className="md:hidden divide-y divide-gray-100">
-                    {displayedShortQuotes.map(sq => {
-                      const detail = sq.quote_detail || {}
-                      const items = detail.items || []
-                      const total = detail.totalWithVat || detail.total || 0
-                      return (
-                        <div key={sq.id} className="p-4 cursor-pointer active:bg-gray-50" onClick={() => setSelectedShortQuote(sq)}>
-                          <div className="flex justify-between items-start mb-2">
-                            <ShortTermStatusBadge status={sq.status} />
-                            <span className="text-xs text-gray-400">{formatDate(sq.created_at)}</span>
-                          </div>
-                          <div className="mb-3">
-                            <p className="font-bold text-gray-900 text-sm">{sq.customer_name}</p>
-                            <p className="text-xs text-gray-500">{sq.quote_number}</p>
-                            {sq.customer_phone && <p className="text-xs text-gray-400 mt-0.5">{sq.customer_phone}</p>}
-                          </div>
-                          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100">
-                            <div className="flex justify-between items-center mb-1.5">
-                              <span className="text-xs text-gray-500 font-bold">할인 {sq.discount_percent || 0}%</span>
-                              <span className="text-lg font-black text-amber-700">{f(total)}원</span>
-                            </div>
-                            {items.length > 0 && (
-                              <p className="text-[11px] text-gray-500">
-                                {items.slice(0, 3).map((it: any) => it.vehicleClass || it.group).join(' · ')}
-                                {items.length > 3 && ` 외 ${items.length - 3}건`}
-                              </p>
+      {/* Short-term detail modal */}
+      {selectedShortQuote && (
+        <ShortTermDetailModal
+          quote={selectedShortQuote}
+          onClose={() => setSelectedShortQuote(null)}
+          onStatusChange={handleShortStatusChange}
+          onDelete={handleShortDelete}
+        />
+      )}
+
+      {/* ── Content by Tab ── */}
+      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+        {loading ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
+        ) : mainTab === 'contracts' ? (
+          /* ======================== CONTRACTS TAB ======================== */
+          filteredContracts.length === 0 ? (
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
+              {contracts.length === 0 ? '계약 내역이 없습니다.' : '해당 조건의 계약이 없습니다.'}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>계약기간</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>수납</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>계약일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredContracts.map((c, idx) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => router.push(`/contracts/${c.id}`)}
+                      style={{ cursor: 'pointer', borderBottom: idx < filteredContracts.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <td style={{ padding: '12px 16px', paddingLeft: 24 }}><ContractStatusBadge contract={c} /></td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{c.customer?.name || c.customer_name}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f3f4f6', overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            {c.car?.image_url ? (
+                              <img src={c.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: 9, color: '#d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
                             )}
                           </div>
-                          {/* Inline actions */}
-                          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#111827', fontSize: 12 }}>{c.car?.number || '-'}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{c.car?.brand} {c.car?.model}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>
+                        {formatDate(c.start_date)} ~ {formatDate(c.end_date)}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280', fontSize: 13 }}>{f(c.deposit)}원</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
+                        <div style={{ fontSize: 10, color: '#9ca3af' }}>/월 (VAT포함)</div>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <div style={{ width: 60, height: 6, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', background: '#22c55e', borderRadius: 999, transition: 'all 0.3s', width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
+                          </div>
+                          <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>{c.paidCount}/{c.totalCount}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(c.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : mainTab === 'short_term' ? (
+          /* ======================== SHORT-TERM TAB ======================== */
+          displayedShortQuotes.length === 0 ? (
+            <div style={{ padding: '64px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 48, marginBottom: 16 }}>⏱️</p>
+              <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 16 }}>
+                {shortStatusFilter === 'all' ? '단기렌트 견적이 없습니다.' : '해당 상태의 견적이 없습니다.'}
+              </p>
+              <Link href="/quotes/short-term" style={{ display: 'inline-block', padding: '12px 24px', background: '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, textDecoration: 'none', fontSize: 14 }}>
+                단기렌트 견적 작성하기
+              </Link>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적번호</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객/업체</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>연락처</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종 구성</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>합계</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>할인</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>액션</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedShortQuotes.map((sq, idx) => {
+                    const detail = sq.quote_detail || {}
+                    const items = detail.items || []
+                    const total = detail.totalWithVat || detail.total || 0
+                    const vehicleSummary = items.length > 0
+                      ? items.slice(0, 2).map((it: any) => it.vehicleClass || it.group).join(', ') + (items.length > 2 ? ` 외 ${items.length - 2}건` : '')
+                      : '-'
+                    return (
+                      <tr key={sq.id}
+                        onClick={() => setSelectedShortQuote(sq)}
+                        style={{ cursor: 'pointer', borderBottom: idx < displayedShortQuotes.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <td style={{ padding: '12px 16px', paddingLeft: 24 }}><ShortTermStatusBadge status={sq.status} /></td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827', fontFamily: 'monospace', fontSize: 12 }}>{sq.quote_number || '-'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{sq.customer_name}</td>
+                        <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>{sq.customer_phone || '-'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{vehicleSummary}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <span style={{ fontWeight: 900, color: '#b45309' }}>{f(total)}원</span>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706', background: '#fffbeb', padding: '2px 8px', borderRadius: 4 }}>{sq.discount_percent || 0}%</span>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(sq.created_at)}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                             {sq.status === 'draft' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'sent')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-blue-100 text-blue-600 font-bold hover:bg-blue-200 transition-colors">📤 발송</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'sent')} style={{ fontSize: 11, background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>발송</button>
                             )}
                             {sq.status === 'sent' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-green-100 text-green-600 font-bold hover:bg-green-200 transition-colors">✅ 수락</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} style={{ fontSize: 11, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>수락</button>
                             )}
                             {sq.status === 'accepted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} className="flex-1 px-3 py-2 text-xs rounded-lg bg-purple-100 text-purple-600 font-bold hover:bg-purple-200 transition-colors">📝 계약</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} style={{ fontSize: 11, background: '#faf5ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>계약</button>
                             )}
                             {sq.status !== 'cancelled' && sq.status !== 'contracted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} className="px-3 py-2 text-xs rounded-lg bg-gray-100 text-gray-500 font-bold hover:bg-gray-200 transition-colors">취소</button>
+                              <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} style={{ fontSize: 11, background: '#f3f4f6', color: '#9ca3af', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>취소</button>
                             )}
-                            <button onClick={() => { if (confirm('삭제하시겠습니까?')) handleShortDelete(sq.id) }} className="px-3 py-2 text-xs rounded-lg bg-red-50 text-red-500 font-bold hover:bg-red-100 transition-colors">🗑️</button>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )
-            ) : displayedQuotes.length === 0 ? (
-              <div className="p-20 text-center text-gray-400 font-medium">
-                {statusFilter === 'all' && '발행된 견적서가 없습니다.'}
-                {statusFilter === 'draft' && '견적 단계의 견적서가 없습니다.'}
-                {statusFilter === 'shared' && '발송된 견적서가 없습니다.'}
-                {statusFilter === 'confirmed' && '계약확정된 견적서가 없습니다.'}
-                {statusFilter === 'archived' && '보관된 견적서가 없습니다.'}
-              </div>
-            ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full min-w-[900px] text-left text-sm">
-                    <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200">
-                      <tr>
-                        <th className="p-4 pl-6">상태</th>
-                        <th className="p-4">고객명</th>
-                        <th className="p-4">연락처</th>
-                        <th className="p-4">대상 차량</th>
-                        <th className="p-4">계약 기간</th>
-                        <th className="p-4 text-right">보증금</th>
-                        <th className="p-4 text-right">월 렌트료</th>
-                        <th className="p-4 text-center">작성일</th>
-                        <th className="p-4 text-center">작업</th>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {displayedQuotes.map((quote) => (
-                        <tr
-                          key={quote.id}
-                          onClick={() => {
-                            if (quote.contract) router.push(`/contracts/${quote.contract.id}`)
-                            else router.push(`/quotes/${quote.id}`)
-                          }}
-                          className={`transition-colors cursor-pointer group ${
-                            quote.contract ? 'bg-steel-50/30 hover:bg-steel-50' : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          <td className="p-4 pl-6"><QuoteStatusBadge quote={quote} /></td>
-                          <td className="p-4"><div className="font-bold text-gray-900">{quote.customer_name}</div></td>
-                          <td className="p-4"><div className="text-sm text-gray-600">{quote.customer?.phone || '-'}</div></td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
-                                {quote.car?.image_url ? (
-                                  <img src={quote.car.image_url} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-xs text-gray-300 flex items-center justify-center h-full">No Img</span>
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-bold text-gray-900">{quote.car?.number || '-'}</div>
-                                <div className="text-xs text-gray-500">{quote.car?.brand} {quote.car?.model}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4 text-gray-600 font-medium text-sm">{formatDate(quote.start_date)} ~ {formatDate(quote.end_date)}</td>
-                          <td className="p-4 text-right text-gray-500 text-sm">{f(quote.deposit)}원</td>
-                          <td className="p-4 text-right">
-                            <span className="font-black text-steel-700 text-base">{f(quote.rent_fee + quote.rent_fee * 0.1)}원</span>
-                            <div className="text-xs text-gray-400">/월</div>
-                          </td>
-                          <td className="p-4 text-center text-gray-400 text-xs">{formatDate(quote.created_at)}</td>
-                          <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                            <DesktopRowActions quote={quote} onEdit={handleEdit} onArchive={handleArchive} onDelete={handleDelete} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {displayedQuotes.map((quote) => (
-                    <div
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          /* ======================== LONG-TERM QUOTES TAB ======================== */
+          displayedQuotes.length === 0 ? (
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af', fontWeight: 500 }}>
+              {quotes.length === 0 ? '발행된 견적서가 없습니다.' : '해당 조건의 견적서가 없습니다.'}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="w-full text-left text-sm" style={{ minWidth: 900 }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>연락처</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대상 차량</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>계약 기간</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedQuotes.map((quote, idx) => (
+                    <tr
                       key={quote.id}
                       onClick={() => {
                         if (quote.contract) router.push(`/contracts/${quote.contract.id}`)
                         else router.push(`/quotes/${quote.id}`)
                       }}
-                      className={`p-4 cursor-pointer active:bg-gray-50 transition-colors ${quote.contract ? 'bg-steel-50/30' : ''}`}
+                      style={{
+                        cursor: 'pointer', transition: 'background 0.15s',
+                        borderBottom: idx < displayedQuotes.length - 1 ? '1px solid #f3f4f6' : 'none',
+                        background: quote.contract ? 'rgba(45,95,168,0.03)' : 'transparent',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = quote.contract ? 'rgba(45,95,168,0.06)' : '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = quote.contract ? 'rgba(45,95,168,0.03)' : 'transparent')}
                     >
-                      <div className="flex justify-between items-start mb-3">
-                        <QuoteStatusBadge quote={quote} />
-                        <span className="text-xs text-gray-400">{formatDate(quote.created_at)}</span>
-                      </div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
-                          {quote.car?.image_url ? (
-                            <img src={quote.car.image_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-xs text-gray-300 flex items-center justify-center h-full">No Img</span>
-                          )}
+                      <td style={{ padding: '12px 16px', paddingLeft: 24 }}><QuoteStatusBadge quote={quote} /></td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{quote.customer_name}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#4b5563' }}>{quote.customer?.phone || '-'}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f3f4f6', overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            {quote.car?.image_url ? (
+                              <img src={quote.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: 11, color: '#d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 900, color: '#111827', fontSize: 15 }}>{quote.car?.number || '-'}</div>
+                            <div style={{ fontSize: 11, color: '#6b7280' }}>{quote.car?.brand} {quote.car?.model}</div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-gray-900 text-sm">{quote.customer_name}</div>
-                          <div className="text-xs text-gray-500">{quote.car?.number} · {quote.car?.brand} {quote.car?.model}</div>
-                          {quote.customer?.phone && <div className="text-xs text-gray-500 mt-1">{quote.customer.phone}</div>}
-                        </div>
-                      </div>
-                      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="text-xs text-gray-500 mb-2">{formatDate(quote.start_date)} ~ {formatDate(quote.end_date)}</div>
-                        <div className="flex justify-between items-center">
-                          <div><div className="text-xs text-gray-500">보증금</div><div className="font-bold text-gray-900">{f(quote.deposit)}원</div></div>
-                          <div className="text-right"><div className="text-xs text-gray-500">월 렌트료</div><div className="font-black text-steel-700 text-lg">{f(quote.rent_fee + quote.rent_fee * 0.1)}원</div></div>
-                        </div>
-                      </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                          <button onClick={(e) => { e.stopPropagation(); handleEdit(quote.id) }} className="flex-1 px-3 py-2 text-xs rounded-lg bg-steel-100 text-steel-600 font-bold hover:bg-steel-200 transition-colors">✏️ 수정</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleArchive(quote.id) }} className="flex-1 px-3 py-2 text-xs rounded-lg bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">📦 보관</button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const msg = quote.contract ? '⚠️ 연결된 계약도 함께 삭제됩니다.' : '이 견적서를 삭제하시겠습니까?'
-                              if (confirm(msg)) handleDelete(quote.id)
-                            }}
-                            className="flex-1 px-3 py-2 text-xs rounded-lg bg-red-100 text-red-600 font-bold hover:bg-red-200 transition-colors"
-                          >🗑️ 삭제</button>
-                        </div>
-                      </div>
-                    </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#4b5563', fontWeight: 500, fontSize: 13 }}>{formatDate(quote.start_date)} ~ {formatDate(quote.end_date)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280', fontSize: 13 }}>{f(quote.deposit)}원</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(quote.rent_fee + quote.rent_fee * 0.1)}원</span>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>/월</div>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(quote.created_at)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <DesktopRowActions quote={quote} onEdit={handleEdit} onArchive={handleArchive} onDelete={handleDelete} />
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+      </div>
     </div>
   )
 }

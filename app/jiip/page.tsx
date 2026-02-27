@@ -4,10 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 
-export default function JiipListPage() {
-const router = useRouter()
+const f = (n: number) => n ? n.toLocaleString() : '0'
+const formatSimpleMoney = (num: number) => {
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '억'
+  if (num >= 10000) return (num / 10000).toFixed(0) + '만'
+  return num.toLocaleString()
+}
 
-  // ✅ [핵심 1] 전역 상태에서 '현재 선택된 회사' 가져오기
+export default function JiipListPage() {
+  const router = useRouter()
   const { company: currentCompany, role, adminSelectedCompanyId } = useApp()
 
   const [contracts, setContracts] = useState<any[]>([])
@@ -15,22 +20,14 @@ const router = useRouter()
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // 데이터 불러오기
   const fetchContracts = async () => {
-    // god_admin이 아닌데 회사가 없으면 로딩 안 함
     if (!currentCompany?.id && role !== 'god_admin') return
-
     setLoading(true)
 
-    // 차량 정보(cars)도 같이 가져오기 (Join)
     let query = supabase
       .from('jiip_contracts')
-      .select(`
-        *,
-        car:cars ( number, model )
-      `)
+      .select(`*, car:cars ( number, model )`)
 
-    // god_admin은 전체 데이터 조회, 일반 사용자는 본인 회사만
     if (role === 'god_admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (currentCompany?.id) {
@@ -38,19 +35,12 @@ const router = useRouter()
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('데이터 로딩 실패 원인:', error.message)
-    } else {
-      setContracts(data || [])
-    }
+    if (error) console.error('데이터 로딩 실패:', error.message)
+    else setContracts(data || [])
     setLoading(false)
   }
 
-  // 회사 또는 역할이 바뀌면 데이터를 다시 불러옵니다.
-  useEffect(() => {
-    fetchContracts()
-  }, [currentCompany, role, adminSelectedCompanyId])
+  useEffect(() => { fetchContracts() }, [currentCompany, role, adminSelectedCompanyId])
 
   // 통계 계산
   const totalInvest = contracts.reduce((sum, item) => sum + (item.invest_amount || 0), 0)
@@ -87,46 +77,48 @@ const router = useRouter()
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 상단 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🤝 위수탁(지입) 정산</h1>
-          <p className="text-gray-500 text-sm mt-1">지입 차량 정산 및 수익 배분 관리</p>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>🤝 위수탁(지입) 정산</h1>
+          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>지입 차량 정산 및 수익 배분 관리</p>
         </div>
-        <button
-          onClick={() => router.push('/jiip/new')}
-          className="py-2.5 px-5 bg-steel-600 text-white text-sm md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors"
-        >
-          + 신규 계약 등록
-        </button>
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+          <button
+            onClick={() => router.push('/jiip/new')}
+            className="flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors"
+          >
+            + 신규 계약 등록
+          </button>
+        </div>
       </div>
 
-      {/* 요약 대시보드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
-        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
+      {/* 📊 KPI 대시보드 */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
           <p className="text-xs text-gray-400 font-bold">전체 계약</p>
-          <p className="text-lg md:text-xl font-black text-gray-800 mt-1">{contracts.length}<span className="text-xs text-gray-400 ml-0.5">건</span></p>
+          <p className="text-xl md:text-2xl font-black text-gray-900 mt-1">{contracts.length}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
         </div>
-        <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100 cursor-pointer hover:shadow-md" onClick={() => setStatusFilter('active')}>
+        <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('active')}>
           <p className="text-xs text-green-600 font-bold">운영 중</p>
-          <p className="text-lg md:text-xl font-black text-green-700 mt-1">{activeContracts.length}<span className="text-xs text-green-500 ml-0.5">건</span></p>
+          <p className="text-xl md:text-2xl font-black text-green-700 mt-1">{activeContracts.length}<span className="text-sm text-green-500 ml-0.5">건</span></p>
         </div>
-        <div className="bg-steel-50 p-3 md:p-4 rounded-xl border border-steel-100">
-          <p className="text-xs text-steel-500 font-bold">총 투자 유치금</p>
-          <p className="text-lg md:text-xl font-black text-steel-700 mt-1">{totalInvest.toLocaleString()}<span className="text-xs text-steel-400 ml-0.5">원</span></p>
+        <div className="bg-blue-50 p-3 md:p-4 rounded-xl border border-blue-100">
+          <p className="text-xs text-blue-500 font-bold">총 투자 유치금</p>
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>{formatSimpleMoney(totalInvest)}<span className="text-sm text-blue-400 ml-0.5">원</span></p>
         </div>
         <div className="bg-red-50 p-3 md:p-4 rounded-xl border border-red-100">
           <p className="text-xs text-red-500 font-bold">월 관리비 합계</p>
-          <p className="text-lg md:text-xl font-black text-red-600 mt-1">{monthlyPayout.toLocaleString()}<span className="text-xs text-red-400 ml-0.5">원</span></p>
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#dc2626', marginTop: 4 }}>{formatSimpleMoney(monthlyPayout)}<span className="text-sm text-red-400 ml-0.5">원</span></p>
         </div>
-        <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200 cursor-pointer hover:shadow-md" onClick={() => setStatusFilter('ended')}>
+        <div className="bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-200 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('ended')}>
           <p className="text-xs text-gray-500 font-bold">종료 계약</p>
-          <p className="text-lg md:text-xl font-black text-gray-500 mt-1">{endedContracts.length}<span className="text-xs text-gray-400 ml-0.5">건</span></p>
+          <p className="text-xl md:text-2xl font-black text-gray-500 mt-1">{endedContracts.length}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
         </div>
       </div>
 
       {/* 필터 + 검색 */}
-      <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <div className="flex gap-1 overflow-x-auto pb-1">
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
           {[
             { key: 'all', label: '전체', count: contracts.length },
             { key: 'active', label: '운영 중', count: activeContracts.length },
@@ -135,11 +127,13 @@ const router = useRouter()
             <button
               key={tab.key}
               onClick={() => setStatusFilter(tab.key)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                statusFilter === tab.key
-                  ? 'bg-steel-600 text-white shadow'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
-              }`}
+              style={{
+                padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                background: statusFilter === tab.key ? '#2d5fa8' : '#fff',
+                color: statusFilter === tab.key ? '#fff' : '#6b7280',
+                border: statusFilter === tab.key ? 'none' : '1px solid #e5e7eb',
+                boxShadow: statusFilter === tab.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}
             >
               {tab.label} ({tab.count})
             </button>
@@ -148,64 +142,71 @@ const router = useRouter()
         <input
           type="text"
           placeholder="차량번호, 차주명, 연락처 검색..."
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex-1 focus:outline-none focus:border-steel-500 shadow-sm"
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, flex: 1, minWidth: 150, outline: 'none' }}
         />
       </div>
 
       {/* 리스트 테이블 */}
-      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
         {loading ? (
-           <div className="p-20 text-center text-gray-400 font-bold animate-pulse">데이터를 불러오는 중...</div>
+          <div style={{ padding: 80, textAlign: 'center', color: '#9ca3af', fontWeight: 700 }}>데이터를 불러오는 중...</div>
         ) : filteredContracts.length === 0 ? (
-           <div className="p-20 text-center flex flex-col items-center justify-center">
-             <div className="text-5xl mb-4">🚛</div>
-             <p className="text-gray-900 font-bold text-lg">등록된 지입 계약이 없습니다.</p>
-             <p className="text-gray-500 text-sm mt-2">우측 상단 버튼을 눌러 첫 번째 계약을 등록해보세요.</p>
-           </div>
+          <div style={{ padding: 80, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🚛</div>
+            <p style={{ color: '#111827', fontWeight: 700, fontSize: 18 }}>등록된 지입 계약이 없습니다.</p>
+            <p style={{ color: '#6b7280', fontSize: 14, marginTop: 8 }}>우측 상단 버튼을 눌러 첫 번째 계약을 등록해보세요.</p>
+          </div>
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[600px]">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
                 <thead>
-                  <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="p-3 md:p-5 font-bold">계약 차량</th>
-                    <th className="p-3 md:p-5 font-bold">투자자(차주)</th>
-                    <th className="p-3 md:p-5 font-bold">투자금 / 수익률</th>
-                    <th className="p-3 md:p-5 font-bold">월 관리비</th>
-                    <th className="p-3 md:p-5 font-bold">지급일</th>
-                    <th className="p-3 md:p-5 font-bold text-center">상태</th>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>계약 차량</th>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>투자자(차주)</th>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>투자금 / 수익률</th>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>월 관리비</th>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>지급일</th>
+                    <th style={{ padding: '14px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>상태</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredContracts.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => router.push(`/jiip/${item.id}`)}>
-                      <td className="p-3 md:p-5">
-                        <div className="font-bold text-gray-900">{item.car?.number || '차량 미지정'}</div>
-                        <div className="text-xs text-gray-400">{item.car?.model}</div>
+                <tbody>
+                  {filteredContracts.map((item, idx) => (
+                    <tr
+                      key={item.id}
+                      onClick={() => router.push(`/jiip/${item.id}`)}
+                      style={{ borderBottom: idx < filteredContracts.length - 1 ? '1px solid #f3f4f6' : 'none', cursor: 'pointer' }}
+                      className="hover:bg-steel-50/30 transition-colors"
+                    >
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ fontWeight: 800, color: '#111827', fontSize: 15 }}>{item.car?.number || '차량 미지정'}</div>
+                        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{item.car?.model}</div>
                       </td>
-                      <td className="p-3 md:p-5">
-                        <div className="font-bold text-gray-700">{item.investor_name}</div>
-                        <div className="text-xs text-gray-400">{item.investor_phone}</div>
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ fontWeight: 700, color: '#374151' }}>{item.investor_name}</div>
+                        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{item.investor_phone}</div>
                       </td>
-                      <td className="p-3 md:p-5">
-                        <div className="font-bold text-steel-600">{item.invest_amount.toLocaleString()}원</div>
-                        <span className="text-xs bg-steel-50 text-steel-600 px-1.5 py-0.5 rounded font-bold">
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ fontWeight: 800, color: '#2d5fa8' }}>{f(item.invest_amount)}원</div>
+                        <span style={{ fontSize: 11, background: '#eff6ff', color: '#2d5fa8', padding: '2px 6px', borderRadius: 4, fontWeight: 700, marginTop: 2, display: 'inline-block' }}>
                           {item.share_ratio}% 배분
                         </span>
                       </td>
-                      <td className="p-3 md:p-5 text-sm font-bold text-gray-600">
-                        {item.admin_fee.toLocaleString()}원
+                      <td style={{ padding: '14px 20px', fontWeight: 700, color: '#4b5563', fontSize: 14 }}>
+                        {f(item.admin_fee)}원
                       </td>
-                      <td className="p-3 md:p-5 text-sm font-bold text-gray-500">
+                      <td style={{ padding: '14px 20px', fontWeight: 700, color: '#6b7280', fontSize: 14 }}>
                         매월 {item.payout_day}일
                       </td>
-                      <td className="p-3 md:p-5 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          item.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                        }`}>
+                      <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                          background: item.status === 'active' ? '#dcfce7' : '#f3f4f6',
+                          color: item.status === 'active' ? '#16a34a' : '#9ca3af',
+                        }}>
                           {item.status === 'active' ? '운영 중' : '종료'}
                         </span>
                       </td>
@@ -213,47 +214,6 @@ const router = useRouter()
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filteredContracts.map((item) => (
-                <div key={item.id} onClick={() => router.push(`/jiip/${item.id}`)} className="p-4 hover:bg-gray-50/50 transition-colors cursor-pointer">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="font-bold text-gray-900 text-base">{item.car?.number || '차량 미지정'}</div>
-                      <div className="text-xs text-gray-500 mt-1">{item.car?.model}</div>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap ml-2 ${
-                      item.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {item.status === 'active' ? '운영 중' : '종료'}
-                    </span>
-                  </div>
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-600 font-bold mb-1">차주명</div>
-                    <div className="font-bold text-gray-900">{item.investor_name}</div>
-                    <div className="text-xs text-gray-500">{item.investor_phone}</div>
-                  </div>
-                  <div className="mb-3 pb-3 border-b border-gray-200">
-                    <div className="text-xs text-gray-600 font-bold mb-1">투자금</div>
-                    <div className="text-xl font-black text-steel-600">{item.invest_amount.toLocaleString()}원</div>
-                    <span className="text-xs bg-steel-50 text-steel-600 px-1.5 py-0.5 rounded font-bold mt-1 inline-block">
-                      {item.share_ratio}% 배분
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">월 관리비</div>
-                      <div className="font-bold text-gray-900">{item.admin_fee.toLocaleString()}원</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">지급일</div>
-                      <div className="font-bold text-gray-900">매월 {item.payout_day}일</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </>
         )}

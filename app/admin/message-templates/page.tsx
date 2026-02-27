@@ -805,7 +805,7 @@ export default function MessageTemplatesPage() {
             ) : (
               <>
                 {/* 데스크탑 테이블 */}
-                <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase">
                       <tr>
@@ -840,39 +840,6 @@ export default function MessageTemplatesPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-
-                {/* 모바일 카드 */}
-                <div className="md:hidden grid gap-3">
-                  {logs.map((log) => (
-                    <div key={log.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {getChannelBadge(log.channel)}
-                          <span className={`text-[10px] font-black px-2 py-1 rounded border ${STATUS_COLORS[log.status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                            {log.status === 'sent' ? '전송됨' : log.status === 'failed' ? '실패' : '대기중'}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {new Date(log.sent_at).toLocaleString('ko-KR')}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-black">수신자</p>
-                        <p className="text-xs text-slate-700 font-mono">{log.recipient}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-black">템플릿</p>
-                        <p className="text-xs text-slate-700 font-mono">{log.template_key || '-'}</p>
-                      </div>
-                      {(log.error_detail || log.result_message) && (
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-black">결과</p>
-                          <p className="text-xs text-slate-700">{log.error_detail || log.result_message}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </>
             )}

@@ -50,10 +50,11 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/jiip': '지입투자',
   '/insurance': '보험/가입',
   '/finance/upload': '카드/통장 관리',
+  '/admin/payroll': '급여 관리',
 }
 
-// 숨길 메뉴 경로
-const HIDDEN_PATHS = new Set(['/finance/review'])
+// 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
+const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers'])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [

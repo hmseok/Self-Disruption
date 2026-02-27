@@ -36,6 +36,9 @@ export interface Transaction {
   classification_tier?: string;
   alternatives?: any[];
   _queue_id?: string;
+  // 외화 관련
+  currency?: string;          // KRW, USD, JPY, EUR 등
+  original_amount?: number;   // 외화 원금액
 }
 
 // ✅ Context 타입 정의
@@ -168,13 +171,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     return newId;
   }, []);
 
-  // 📥 파일 추가 (새 파일 추가 시 기존 결과 자동 초기화)
+  // 📥 파일 추가 (기존 결과 유지하면서 새 파일 추가)
   const addFiles = (newFiles: File[]) => {
-    // 기존 결과가 있으면 자동으로 초기화
-    if (results.length > 0 && status !== 'processing') {
-      setResults([]);
-      setCardRegistrationResults({ registered: 0, updated: 0, skipped: 0 });
-    }
+    // 기존 결과를 유지하고 새 파일만 큐에 추가
+    // (사용자가 카드 파일 업로드 후 통장 파일을 추가로 업로드하는 케이스 대응)
     setFileQueue(prev => [...prev, ...newFiles]);
     if (status === 'completed' || status === 'error') setStatus('idle');
   };
@@ -301,7 +301,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // B) 카드 거래 / 통장 거래 / 카드 리포트 → AI 분석
       // ═════════════════════════════════════════
       const BATCH_SIZE = 30;
-      const CONCURRENCY_LIMIT = 5;
+      const CONCURRENCY_LIMIT = 2; // 429 방지: 동시 요청 제한
 
       const chunks = [];
       for (let j = 0; j < bodyRows.length; j += BATCH_SIZE) {
@@ -324,35 +324,54 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           const miniData = [headerRow, ...chunk];
           const miniCSV = XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(miniData));
 
-          try {
-            const res = await fetch('/api/finance-parser', {
-              method: 'POST',
-              headers: authHeaders,
-              body: JSON.stringify({
-                data: miniCSV,
-                mimeType: 'text/csv',
-                fileType,
-              })
-            });
+          // 429 재시도 로직 (최대 3회, 지수 백오프)
+          const MAX_RETRIES = 3;
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              const res = await fetch('/api/finance-parser', {
+                method: 'POST',
+                headers: authHeaders,
+                body: JSON.stringify({
+                  data: miniCSV,
+                  mimeType: 'text/csv',
+                  fileType,
+                })
+              });
 
-            if (!res.ok) {
-              const errBody = await res.text();
-              console.error(`[UploadContext] finance-parser error ${res.status}:`, errBody);
-              setLogs(`⚠️ AI API 오류 (${res.status}) — 재시도 중...`);
+              if (res.status === 429) {
+                const waitSec = Math.pow(2, attempt + 1); // 2, 4, 8초
+                console.warn(`[UploadContext] 429 Rate Limit — ${waitSec}초 후 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+                setLogs(`⏳ API 속도 제한 — ${waitSec}초 후 재시도... (${attempt + 1}/${MAX_RETRIES})`);
+                await new Promise(r => setTimeout(r, waitSec * 1000));
+                continue;
+              }
+
+              if (!res.ok) {
+                const errBody = await res.text();
+                console.error(`[UploadContext] finance-parser error ${res.status}:`, errBody);
+                setLogs(`⚠️ AI API 오류 (${res.status})`);
+                return [];
+              }
+              const part = await res.json();
+              if (part.error) {
+                console.error('[UploadContext] finance-parser returned error:', part.error);
+                return [];
+              }
+              console.log(`[UploadContext] ✅ chunk 파싱 완료: ${Array.isArray(part) ? part.length : 0}건`);
+              return Array.isArray(part) ? part : [];
+            } catch (fetchErr: any) {
+              console.error('[UploadContext] fetch error:', fetchErr);
+              if (attempt < MAX_RETRIES) {
+                const waitSec = Math.pow(2, attempt + 1);
+                setLogs(`❌ 네트워크 오류 — ${waitSec}초 후 재시도...`);
+                await new Promise(r => setTimeout(r, waitSec * 1000));
+                continue;
+              }
+              setLogs(`❌ 네트워크 오류: ${fetchErr.message}`);
               return [];
             }
-            const part = await res.json();
-            if (part.error) {
-              console.error('[UploadContext] finance-parser returned error:', part.error);
-              return [];
-            }
-            console.log(`[UploadContext] ✅ chunk 파싱 완료: ${Array.isArray(part) ? part.length : 0}건`);
-            return Array.isArray(part) ? part : [];
-          } catch (fetchErr: any) {
-            console.error('[UploadContext] fetch error:', fetchErr);
-            setLogs(`❌ 네트워크 오류: ${fetchErr.message}`);
-            return [];
           }
+          return []; // 모든 재시도 실패
         });
 
         const batchResults = await Promise.all(promises);
@@ -627,12 +646,45 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       paymentMethodKr = '통장';
     }
 
-    // amount 정규화
+    // 통화 감지 및 amount 정규화
+    let currency = (item.currency || 'KRW').toUpperCase();
+    let originalAmount: number | null = null;
+
+    // amount 문자열에서 달러/외화 기호 감지
+    const amountStr = String(item.amount || '');
+    if (amountStr.includes('$') || amountStr.includes('＄')) {
+      if (currency === 'KRW') currency = 'USD';
+    }
+    if (amountStr.includes('¥') || amountStr.includes('￥')) {
+      if (currency === 'KRW') currency = 'JPY';
+    }
+    if (amountStr.includes('€')) {
+      if (currency === 'KRW') currency = 'EUR';
+    }
+
+    // description에서 통화 감지 보강
+    const descStr = String(item.description || '').toLowerCase();
+    if (currency === 'KRW' && (descStr.includes('usd') || descStr.includes('달러') || descStr.includes('미화') || descStr.includes('us$'))) {
+      currency = 'USD';
+    }
+
     let amount = 0;
     if (typeof item.amount === 'string') {
-      amount = Math.abs(Number(item.amount.replace(/[,\s원]/g, '')) || 0);
+      amount = Math.abs(Number(item.amount.replace(/[,\s원$＄¥￥€]/g, '')) || 0);
     } else {
       amount = Math.abs(Number(item.amount) || 0);
+    }
+
+    // 외화인 경우 original_amount 설정
+    if (currency !== 'KRW') {
+      if (item.original_amount) {
+        originalAmount = Math.abs(Number(String(item.original_amount).replace(/[,\s$＄¥￥€]/g, '')) || 0);
+        // original_amount가 있으면 amount는 원화 결제금액
+      } else {
+        // original_amount가 없으면 amount가 외화금액 (원화 환산 안 됨)
+        originalAmount = amount;
+        // 금액을 그대로 두되 플래그로 표시 (나중에 환율 적용 필요)
+      }
     }
 
     // type 정규화
@@ -655,6 +707,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       status: 'completed',
       card_number: item.card_number || '',
       approval_number: item.approval_number || '',
+      currency: currency,
+      original_amount: originalAmount,
     };
   };
 
@@ -663,13 +717,27 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (!companyIdRef.current || isProcessingRef.current) return 0;
     try {
       const authHeaders = await getAuthHeaders();
-      const res = await fetch(`/api/finance/classify?company_id=${companyIdRef.current}&status=pending&limit=500`, {
+      const res = await fetch(`/api/finance/classify?company_id=${companyIdRef.current}&status=pending&limit=2000`, {
         headers: authHeaders,
       });
       if (!res.ok) return 0;
       const data = await res.json();
       const queueItems = data.items || [];
       if (queueItems.length === 0) return 0;
+
+      // 디버깅: API 응답 구조 확인
+      console.log('[loadFromQueue] API 응답:', {
+        source: data.source,
+        total: data.total,
+        itemCount: queueItems.length,
+        firstItem: queueItems[0] ? {
+          id: queueItems[0].id,
+          ai_category: queueItems[0].ai_category,
+          source_data: queueItems[0].source_data,
+          card_number: queueItems[0].card_number,
+          _source: queueItems[0]._source,
+        } : null,
+      });
 
       // classification_queue 응답을 Transaction 인터페이스로 변환
       const transactions: Transaction[] = queueItems.map((q: any) => {
@@ -704,6 +772,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           alternatives: q.alternatives || [],
           // queue_id를 저장하여 나중에 업데이트/삭제 시 사용
           _queue_id: q.id,
+          // 외화 관련
+          currency: sd.currency || 'KRW',
+          original_amount: sd.original_amount || null,
         } as Transaction;
       });
 

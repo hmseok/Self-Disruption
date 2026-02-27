@@ -160,21 +160,53 @@ export default function ContractTermsPage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newVersion, setNewVersion] = useState({ version: '', title: '자동차 장기대여 약관', description: '', effective_from: '' })
 
-  // god_admin은 회사가 없으므로 선택된 회사 또는 첫 번째 회사 사용
-  const companyId = company?.id || adminSelectedCompanyId || (role === 'god_admin' && allCompanies?.[0]?.id) || null
+  // god_admin은 선택된 회사 우선, 일반 admin은 본인 회사
+  const companyId = (role === 'god_admin')
+    ? (adminSelectedCompanyId || allCompanies?.[0]?.id || company?.id || null)
+    : (company?.id || null)
+
+  // ── 에러 상태 ──
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   /* ────────── 데이터 로드 ────────── */
   const fetchTermsSets = useCallback(async () => {
-    if (!companyId) return
+    if (!companyId) {
+      console.log('[약관] companyId가 없습니다. company:', company?.id, 'adminSelected:', adminSelectedCompanyId, 'allCompanies:', allCompanies?.length)
+      return
+    }
     setLoading(true)
+    setFetchError(null)
+
+    // 1차: contract_category 포함 쿼리
     const { data, error } = await supabase
       .from('contract_terms')
       .select('*')
       .eq('company_id', companyId)
       .eq('contract_category', selectedCategory)
       .order('created_at', { ascending: false })
-    if (!error && data) setTermsSets(data)
-    else if (error) console.error('[약관] 에러:', error)
+
+    if (!error && data) {
+      setTermsSets(data)
+    } else if (error) {
+      console.error('[약관] 1차 쿼리 에러:', error)
+      // contract_category 컬럼이 없는 경우 → fallback (카테고리 필터 없이)
+      if (error.message?.includes('contract_category') || error.code === '42703') {
+        console.log('[약관] contract_category 컬럼 없음 → fallback 쿼리')
+        const { data: fbData, error: fbErr } = await supabase
+          .from('contract_terms')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+        if (!fbErr && fbData) {
+          setTermsSets(fbData)
+          setFetchError('⚠️ contract_category 컬럼이 없습니다. SQL 052 마이그레이션을 실행해주세요. (카테고리 필터 미적용)')
+        } else {
+          setFetchError(`약관 조회 실패: ${fbErr?.message || '알 수 없는 에러'}`)
+        }
+      } else {
+        setFetchError(`약관 조회 실패: ${error.message}`)
+      }
+    }
     setLoading(false)
   }, [companyId, selectedCategory])
 
@@ -189,13 +221,25 @@ export default function ContractTermsPage() {
 
   const fetchSpecialTerms = useCallback(async () => {
     if (!companyId) return
-    const { data } = await supabase
+    // 1차: contract_category 포함 쿼리
+    const { data, error } = await supabase
       .from('contract_special_terms')
       .select('*')
       .eq('company_id', companyId)
       .eq('contract_category', selectedCategory)
       .order('sort_order', { ascending: true })
-    if (data) setSpecialTerms(data)
+    if (!error && data) {
+      setSpecialTerms(data)
+    } else if (error) {
+      console.error('[특약] 쿼리 에러:', error)
+      // fallback: contract_category 없이
+      const { data: fbData } = await supabase
+        .from('contract_special_terms')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('sort_order', { ascending: true })
+      if (fbData) setSpecialTerms(fbData)
+    }
   }, [companyId, selectedCategory])
 
   const fetchHistory = useCallback(async (termsId: number) => {
@@ -772,13 +816,25 @@ export default function ContractTermsPage() {
             </div>
           )}
 
+          {/* 에러 표시 */}
+          {fetchError && (
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <p style={{ color: '#92400e', fontSize: 14 }}>{fetchError}</p>
+            </div>
+          )}
+
           {/* 버전 목록 */}
           {loading ? (
             <div className="text-center py-12 text-gray-400">로딩 중...</div>
-          ) : termsSets.length === 0 ? (
+          ) : termsSets.length === 0 && !fetchError ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <p className="text-gray-500 mb-2">등록된 약관이 없습니다.</p>
-              <p className="text-sm text-gray-400">SQL 마이그레이션(030, 031)을 먼저 실행해주세요.</p>
+              <p className="text-sm text-gray-400">
+                {!companyId
+                  ? '회사를 먼저 선택해주세요.'
+                  : '약관 버전을 새로 생성하거나, SQL 마이그레이션(030, 031)을 실행해주세요.'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">company_id: {companyId || '없음'}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1588,446 +1644,365 @@ export default function ContractTermsPage() {
       {tab === 'params' && (
         <div>
           {!selectedTerms ? (
-            <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+            <div style={{ textAlign: 'center', padding: '48px 0', background: '#f9fafb', borderRadius: 12 }}>
+              <p style={{ color: '#6b7280' }}>"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* 선택된 약관 정보 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <div>
+              {/* 선택된 약관 헤더 + 저장 버튼 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, padding: '12px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
                     {STATUS_LABELS[selectedTerms.status]?.label}
                   </span>
-                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                  <span style={{ fontWeight: 700 }}>{selectedTerms.title}</span>
+                  <span style={{ color: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}>{selectedTerms.version}</span>
                 </div>
+                {selectedTerms.status !== 'archived' && (
+                  <button
+                    onClick={handleSaveCalcParamsToDb}
+                    style={{ background: '#2563eb', color: '#fff', padding: '8px 24px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                  >
+                    저장
+                  </button>
+                )}
               </div>
 
               {selectedTerms.status === 'archived' ? (
-                <div className="text-center py-8 bg-yellow-50 border border-yellow-200 rounded-xl">
-                  <p className="text-yellow-700">보관된 약관은 편집할 수 없습니다.</p>
+                <div style={{ textAlign: 'center', padding: '32px 0', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 12 }}>
+                  <p style={{ color: '#a16207' }}>보관된 약관은 편집할 수 없습니다.</p>
                 </div>
               ) : (
-                <>
-                  {/* 섹션 1: 기본 설정 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, basic: !s.basic }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">기본 설정</h3>
-                      <span className="text-gray-400">{expandedSections.basic ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.basic && (
-                      <div className="p-4 space-y-3 border-t">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">조기 해지 수수료율 (%)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                            value={calcParams.early_termination_rate || 0}
-                            onChange={e => updateParamValue('early_termination_rate', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">보험 관련 유의사항</label>
-                          <textarea
-                            rows={3}
-                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
-                            value={calcParams.insurance_note || ''}
-                            onChange={e => updateParamValue('insurance_note', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+                  {/* ── 카드 1: 기본 설정 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>기본 설정</h4>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: '8px 0', color: '#64748b', width: 140, verticalAlign: 'top' }}>조기해지 수수료율</td>
+                            <td style={{ padding: '8px 0' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <input type="number" step="0.01" value={calcParams.early_termination_rate || 0}
+                                  onChange={e => updateParamValue('early_termination_rate', parseFloat(e.target.value) || 0)}
+                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                <span style={{ color: '#9ca3af', fontSize: 12 }}>%</span>
+                              </div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '8px 0', color: '#64748b', verticalAlign: 'top' }}>보험 유의사항</td>
+                            <td style={{ padding: '8px 0' }}>
+                              <textarea rows={2} value={calcParams.insurance_note || ''}
+                                onChange={e => updateParamValue('insurance_note', e.target.value)}
+                                style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px', fontSize: 13, resize: 'vertical' }} />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  {/* 섹션 2: 보험 기본분담금 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, ins_base: !s.ins_base }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">보험 기본분담금 (연)</h3>
-                      <span className="text-gray-400">{expandedSections.ins_base ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.ins_base && (
-                      <div className="p-4 space-y-3 border-t">
-                        {['경형', '소형', '중형', '대형', '수입'].map(cls => (
-                          <div key={cls}>
-                            <label className="text-xs font-medium text-gray-600">{cls}</label>
-                            <input
-                              type="number"
-                              step="1"
-                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                              value={calcParams.ins_base_annual?.[cls] || 0}
-                              onChange={e => {
-                                if (!calcParams.ins_base_annual) updateParamValue('ins_base_annual', {})
-                                updateParamValue(`ins_base_annual.${cls}`, parseInt(e.target.value) || 0)
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {/* ── 카드 2: 비영업용 계수 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>비영업용 계수</h4>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: '8px 0', color: '#64748b', width: 140 }}>기본분담금 계수</td>
+                            <td style={{ padding: '8px 0' }}>
+                              <input type="number" step="0.01" value={calcParams.non_commercial_base_factor || 1}
+                                onChange={e => updateParamValue('non_commercial_base_factor', parseFloat(e.target.value) || 1)}
+                                style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '8px 0', color: '#64748b' }}>자차 계수</td>
+                            <td style={{ padding: '8px 0' }}>
+                              <input type="number" step="0.01" value={calcParams.non_commercial_own_factor || 1}
+                                onChange={e => updateParamValue('non_commercial_own_factor', parseFloat(e.target.value) || 1)}
+                                style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  {/* 섹션 3: 자차 요율 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, own_damage: !s.own_damage }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">자차 요율 (%)</h3>
-                      <span className="text-gray-400">{expandedSections.own_damage ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.own_damage && (
-                      <div className="p-4 space-y-3 border-t">
-                        {['경형', '소형', '중형', '대형', '수입'].map(cls => (
-                          <div key={cls}>
-                            <label className="text-xs font-medium text-gray-600">{cls}</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                              value={calcParams.ins_own_damage_rate?.[cls] || 0}
-                              onChange={e => {
-                                if (!calcParams.ins_own_damage_rate) updateParamValue('ins_own_damage_rate', {})
-                                updateParamValue(`ins_own_damage_rate.${cls}`, parseFloat(e.target.value) || 0)
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 섹션 4: 면책금 할인율 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, deductible_discount: !s.deductible_discount }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">면책금 할인율</h3>
-                      <span className="text-gray-400">{expandedSections.deductible_discount ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.deductible_discount && (
-                      <div className="p-4 space-y-2 border-t">
-                        {Object.entries(calcParams.deductible_discount || {}).map(([key, value]) => (
-                          <div key={key} className="flex items-end gap-2">
-                            <div className="flex-1">
-                              <label className="text-xs font-medium text-gray-600">{key}</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                                value={value as number}
-                                onChange={e => updateParamValue(`deductible_discount.${key}`, parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                            <button
-                              onClick={() => {
-                                const updated = { ...calcParams.deductible_discount }
-                                delete updated[key]
-                                updateParamValue('deductible_discount', updated)
-                              }}
-                              className="text-xs text-red-500 hover:bg-red-50 px-2 py-2 rounded"
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        ))}
-                        <input
-                          type="text"
-                          placeholder="새 면책금 값 (예: 500000)"
-                          className="w-full border rounded-lg px-3 py-2 text-sm"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 섹션 5: 운전자 연령 요율 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, driver_age: !s.driver_age }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">운전자 연령 요율</h3>
-                      <span className="text-gray-400">{expandedSections.driver_age ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.driver_age && (
-                      <div className="p-4 space-y-3 border-t">
-                        {Array.isArray(calcParams.driver_age_factors) && calcParams.driver_age_factors.map((factor: any, idx: number) => (
-                          <div key={idx} className="border-b pb-3 last:border-b-0">
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-xs font-medium text-gray-600">최소 연령</label>
-                                <input
-                                  type="number"
-                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                  value={factor.min_age || 0}
+                  {/* ── 카드 3: 보험 기본분담금 (연) + 자차 요율 (%) ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>차급별 보험 기본분담금 / 자차 요율</h4>
+                    </div>
+                    <div style={{ padding: 16, overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', textAlign: 'center' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{ padding: '8px 12px', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>차급</th>
+                            {['경형', '소형', '중형', '대형', '수입'].map(cls => (
+                              <th key={cls} style={{ padding: '8px 12px', color: '#374151', fontWeight: 600 }}>{cls}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '8px 12px', color: '#64748b', textAlign: 'left', fontWeight: 500 }}>기본분담금 (연)</td>
+                            {['경형', '소형', '중형', '대형', '수입'].map(cls => (
+                              <td key={cls} style={{ padding: '8px 4px' }}>
+                                <input type="number" step="1" value={calcParams.ins_base_annual?.[cls] || 0}
                                   onChange={e => {
-                                    const updated = [...(calcParams.driver_age_factors || [])]
-                                    updated[idx].min_age = parseInt(e.target.value) || 0
+                                    if (!calcParams.ins_base_annual) updateParamValue('ins_base_annual', {})
+                                    updateParamValue(`ins_base_annual.${cls}`, parseInt(e.target.value) || 0)
+                                  }}
+                                  style={{ width: 90, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
+                              </td>
+                            ))}
+                          </tr>
+                          <tr>
+                            <td style={{ padding: '8px 12px', color: '#64748b', textAlign: 'left', fontWeight: 500 }}>자차 요율 (%)</td>
+                            {['경형', '소형', '중형', '대형', '수입'].map(cls => (
+                              <td key={cls} style={{ padding: '8px 4px' }}>
+                                <input type="number" step="0.01" value={calcParams.ins_own_damage_rate?.[cls] || 0}
+                                  onChange={e => {
+                                    if (!calcParams.ins_own_damage_rate) updateParamValue('ins_own_damage_rate', {})
+                                    updateParamValue(`ins_own_damage_rate.${cls}`, parseFloat(e.target.value) || 0)
+                                  }}
+                                  style={{ width: 90, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ── 카드 4: 보험 담보별 비중 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>보험 담보별 비중</h4>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {['대물', '대인', '자차', '인명', '도난', '기타'].map((coverage, i) => (
+                            <tr key={coverage} style={{ borderBottom: i < 5 ? '1px solid #f3f4f6' : 'none' }}>
+                              <td style={{ padding: '6px 0', color: '#64748b', width: 80 }}>{coverage}</td>
+                              <td style={{ padding: '6px 0' }}>
+                                <input type="number" step="0.01" value={calcParams.ins_breakdown_ratios?.[coverage] || 0}
+                                  onChange={e => {
+                                    if (!calcParams.ins_breakdown_ratios) updateParamValue('ins_breakdown_ratios', {})
+                                    updateParamValue(`ins_breakdown_ratios.${coverage}`, parseFloat(e.target.value) || 0)
+                                  }}
+                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ── 카드 5: 면책금 할인율 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>면책금 할인율</h4>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {Object.entries(calcParams.deductible_discount || {}).map(([key, value], i, arr) => (
+                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                              <td style={{ padding: '6px 0', color: '#64748b', width: 120 }}>{Number(key).toLocaleString()}원</td>
+                              <td style={{ padding: '6px 0' }}>
+                                <input type="number" step="0.01" value={value as number}
+                                  onChange={e => updateParamValue(`deductible_discount.${key}`, parseFloat(e.target.value) || 0)}
+                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                              </td>
+                              <td style={{ padding: '6px 0', width: 40, textAlign: 'center' }}>
+                                <button onClick={() => {
+                                  const updated = { ...calcParams.deductible_discount }; delete updated[key]
+                                  updateParamValue('deductible_discount', updated)
+                                }} style={{ color: '#ef4444', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ── 카드 6: 초과주행 요금 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>초과주행 요금</h4>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {Object.entries(calcParams.excess_mileage_rates || {}).map(([key, value], i, arr) => (
+                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                              <td style={{ padding: '6px 0', color: '#64748b', width: 120 }}>{key}</td>
+                              <td style={{ padding: '6px 0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <input type="number" step="1" value={value as number}
+                                    onChange={e => updateParamValue(`excess_mileage_rates.${key}`, parseInt(e.target.value) || 0)}
+                                    style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                  <span style={{ color: '#9ca3af', fontSize: 11 }}>원/km</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '6px 0', width: 40, textAlign: 'center' }}>
+                                <button onClick={() => {
+                                  const updated = { ...calcParams.excess_mileage_rates }; delete updated[key]
+                                  updateParamValue('excess_mileage_rates', updated)
+                                }} style={{ color: '#ef4444', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ── 카드 7: 운전자 연령 요율 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>운전자 연령 요율</h4>
+                    </div>
+                    <div style={{ padding: 16, overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>구분</th>
+                            <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>최소 연령</th>
+                            <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>계수</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(calcParams.driver_age_factors) && calcParams.driver_age_factors.map((factor: any, idx: number) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '6px 8px', color: '#374151', fontWeight: 500 }}>{factor.label || `구간 ${idx + 1}`}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                <input type="number" value={factor.min_age || 0}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.driver_age_factors || [])]; updated[idx] = { ...updated[idx], min_age: parseInt(e.target.value) || 0 }
                                     updateParamValue('driver_age_factors', updated)
                                   }}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs font-medium text-gray-600">계수</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                  value={factor.factor || 1}
+                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                <input type="number" step="0.01" value={factor.factor || 1}
                                   onChange={e => {
-                                    const updated = [...(calcParams.driver_age_factors || [])]
-                                    updated[idx].factor = parseFloat(e.target.value) || 1
+                                    const updated = [...(calcParams.driver_age_factors || [])]; updated[idx] = { ...updated[idx], factor: parseFloat(e.target.value) || 1 }
                                     updateParamValue('driver_age_factors', updated)
                                   }}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs font-medium text-gray-600">설명</label>
-                                <input
-                                  type="text"
-                                  placeholder="예: 20대"
-                                  className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                  value={factor.label || ''}
+                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* ── 카드 8: 차령별 계수 ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>차령별 계수</h4>
+                    </div>
+                    <div style={{ padding: 16, overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>최대 차령 (년)</th>
+                            <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>계수</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(calcParams.car_age_factors) && calcParams.car_age_factors.map((factor: any, idx: number) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                <input type="number" value={factor.max_age || 0}
                                   onChange={e => {
-                                    const updated = [...(calcParams.driver_age_factors || [])]
-                                    updated[idx].label = e.target.value
-                                    updateParamValue('driver_age_factors', updated)
+                                    const updated = [...(calcParams.car_age_factors || [])]; updated[idx] = { ...updated[idx], max_age: parseInt(e.target.value) || 0 }
+                                    updateParamValue('car_age_factors', updated)
                                   }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                <input type="number" step="0.01" value={factor.factor || 1}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.car_age_factors || [])]; updated[idx] = { ...updated[idx], factor: parseFloat(e.target.value) || 1 }
+                                    updateParamValue('car_age_factors', updated)
+                                  }}
+                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  {/* 섹션 6: 차령별 계수 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, car_age: !s.car_age }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">차령별 계수</h3>
-                      <span className="text-gray-400">{expandedSections.car_age ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.car_age && (
-                      <div className="p-4 space-y-3 border-t">
-                        {Array.isArray(calcParams.car_age_factors) && calcParams.car_age_factors.map((factor: any, idx: number) => (
-                          <div key={idx} className="grid grid-cols-2 gap-2 pb-3 border-b last:border-b-0">
-                            <div>
-                              <label className="text-xs font-medium text-gray-600">최대 차령 (년)</label>
-                              <input
-                                type="number"
-                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                value={factor.max_age || 0}
-                                onChange={e => {
-                                  const updated = [...(calcParams.car_age_factors || [])]
-                                  updated[idx].max_age = parseInt(e.target.value) || 0
-                                  updateParamValue('car_age_factors', updated)
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600">계수</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                value={factor.factor || 1}
-                                onChange={e => {
-                                  const updated = [...(calcParams.car_age_factors || [])]
-                                  updated[idx].factor = parseFloat(e.target.value) || 1
-                                  updateParamValue('car_age_factors', updated)
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {/* ── 카드 9: 중도해지 기간별 수수료 (풀 와이드) ── */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>중도해지 기간별 수수료</h4>
+                    </div>
+                    <div style={{ padding: 16, overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', textAlign: 'center' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>시작 월</th>
+                            <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>종료 월</th>
+                            <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>수수료율 (%)</th>
+                            <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>설명</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(calcParams.early_termination_rates_by_period) && calcParams.early_termination_rates_by_period.map((period: any, idx: number) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '6px 12px' }}>
+                                <input type="number" value={period.months_from || 0}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], months_from: parseInt(e.target.value) || 0 }
+                                    updateParamValue('early_termination_rates_by_period', updated)
+                                  }}
+                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                              <td style={{ padding: '6px 12px' }}>
+                                <input type="number" value={period.months_to || 0}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], months_to: parseInt(e.target.value) || 0 }
+                                    updateParamValue('early_termination_rates_by_period', updated)
+                                  }}
+                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                              <td style={{ padding: '6px 12px' }}>
+                                <input type="number" step="0.01" value={period.rate || 0}
+                                  onChange={e => {
+                                    const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], rate: parseFloat(e.target.value) || 0 }
+                                    updateParamValue('early_termination_rates_by_period', updated)
+                                  }}
+                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                              </td>
+                              <td style={{ padding: '6px 12px', color: '#9ca3af', fontSize: 12 }}>
+                                {period.months_from}~{period.months_to}개월
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  {/* 섹션 7: 보험 담보별 비중 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, ins_breakdown: !s.ins_breakdown }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">보험 담보별 비중</h3>
-                      <span className="text-gray-400">{expandedSections.ins_breakdown ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.ins_breakdown && (
-                      <div className="p-4 space-y-3 border-t">
-                        {['대물', '대인', '자차', '인명', '도난', '기타'].map(coverage => (
-                          <div key={coverage}>
-                            <label className="text-xs font-medium text-gray-600">{coverage}</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                              value={calcParams.ins_breakdown_ratios?.[coverage] || 0}
-                              onChange={e => {
-                                if (!calcParams.ins_breakdown_ratios) updateParamValue('ins_breakdown_ratios', {})
-                                updateParamValue(`ins_breakdown_ratios.${coverage}`, parseFloat(e.target.value) || 0)
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 섹션 8: 비영업용 계수 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, non_commercial: !s.non_commercial }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">비영업용 계수</h3>
-                      <span className="text-gray-400">{expandedSections.non_commercial ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.non_commercial && (
-                      <div className="p-4 space-y-3 border-t">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">기본분담금 계수</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                            value={calcParams.non_commercial_base_factor || 1}
-                            onChange={e => updateParamValue('non_commercial_base_factor', parseFloat(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">자차 계수</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                            value={calcParams.non_commercial_own_factor || 1}
-                            onChange={e => updateParamValue('non_commercial_own_factor', parseFloat(e.target.value) || 1)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 섹션 9: 초과주행 요금 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, excess_mileage: !s.excess_mileage }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">초과주행 요금</h3>
-                      <span className="text-gray-400">{expandedSections.excess_mileage ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.excess_mileage && (
-                      <div className="p-4 space-y-2 border-t">
-                        {Object.entries(calcParams.excess_mileage_rates || {}).map(([key, value]) => (
-                          <div key={key} className="flex items-end gap-2">
-                            <div className="flex-1">
-                              <label className="text-xs font-medium text-gray-600">{key}</label>
-                              <input
-                                type="number"
-                                step="1"
-                                className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
-                                value={value as number}
-                                onChange={e => updateParamValue(`excess_mileage_rates.${key}`, parseInt(e.target.value) || 0)}
-                              />
-                            </div>
-                            <button
-                              onClick={() => {
-                                const updated = { ...calcParams.excess_mileage_rates }
-                                delete updated[key]
-                                updateParamValue('excess_mileage_rates', updated)
-                              }}
-                              className="text-xs text-red-500 hover:bg-red-50 px-2 py-2 rounded"
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 섹션 10: 중도해지 기간별 */}
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setExpandedSections(s => ({ ...s, early_termination: !s.early_termination }))}
-                      className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition"
-                    >
-                      <h3 className="font-bold text-gray-800">중도해지 기간별 수수료</h3>
-                      <span className="text-gray-400">{expandedSections.early_termination ? '▼' : '▶'}</span>
-                    </button>
-                    {expandedSections.early_termination && (
-                      <div className="p-4 space-y-3 border-t">
-                        {Array.isArray(calcParams.early_termination_rates_by_period) && calcParams.early_termination_rates_by_period.map((period: any, idx: number) => (
-                          <div key={idx} className="grid grid-cols-3 gap-2 pb-3 border-b last:border-b-0">
-                            <div>
-                              <label className="text-xs font-medium text-gray-600">시작 월</label>
-                              <input
-                                type="number"
-                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                value={period.months_from || 0}
-                                onChange={e => {
-                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
-                                  updated[idx].months_from = parseInt(e.target.value) || 0
-                                  updateParamValue('early_termination_rates_by_period', updated)
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600">종료 월</label>
-                              <input
-                                type="number"
-                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                value={period.months_to || 0}
-                                onChange={e => {
-                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
-                                  updated[idx].months_to = parseInt(e.target.value) || 0
-                                  updateParamValue('early_termination_rates_by_period', updated)
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-600">수수료율 (%)</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="w-full border rounded-lg px-2 py-2 text-sm mt-1"
-                                value={period.rate || 0}
-                                onChange={e => {
-                                  const updated = [...(calcParams.early_termination_rates_by_period || [])]
-                                  updated[idx].rate = parseFloat(e.target.value) || 0
-                                  updateParamValue('early_termination_rates_by_period', updated)
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 저장 버튼 */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleSaveCalcParamsToDb}
-                      className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition"
-                    >
-                      저장
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
             </div>
           )}

@@ -300,7 +300,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
+            <div style={{ overflowX: 'auto' }}>
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                     <tr>
@@ -378,33 +378,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
                     ))}
                 </tbody>
               </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filteredCars.map((car) => (
-                <div key={car.id} onClick={() => router.push(`/cars/${car.id}`)} className="p-4 active:bg-steel-50 cursor-pointer">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-black text-gray-900 text-base">{car.number}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        <span className="font-bold text-steel-600">{car.brand}</span> {car.model}
-                      </div>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                      car.status === 'available' ? 'bg-green-100 text-green-700' :
-                      car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
-                      'bg-red-100 text-red-600'
-                    }`}>
-                      {car.status === 'available' ? '대기' : car.status === 'rented' ? '대여' : car.status}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center mt-2 text-xs">
-                    <span className="text-gray-400">{car.year}년 · {car.fuel}</span>
-                    <span className="font-bold text-gray-700">{formatMoney(car.purchase_price)}원</span>
-                  </div>
-                </div>
-              ))}
             </div>
           </>
         )}

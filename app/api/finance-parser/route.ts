@@ -63,10 +63,12 @@ ${hint}
 [결과 필드 — 반드시 모든 필드를 포함]
 - transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15)
 - client_name: 거래처명/가맹점명/사람이름 (입금, 출금, 이체 같은 거래유형 단어 제외)
-- amount: 양수 숫자 (콤마 제거)
+- amount: 양수 숫자 (콤마 제거). 외화인 경우 원래 외화 금액 그대로 사용
+- currency: 통화코드 (기본값 "KRW"). 달러이면 "USD", 엔화이면 "JPY", 유로이면 "EUR" 등. $, ¥, €, US$ 등의 기호가 있거나 "달러", "USD", "미화" 등 표기가 있으면 해당 통화코드 사용
+- original_amount: 외화 원금액 (currency가 KRW가 아닌 경우에만 설정, 원화 결제금액이 별도로 있으면 amount에는 원화금액, original_amount에는 외화금액 설정)
 - type: "income" 또는 "expense"
 - payment_method: 반드시 "Card" 또는 "Bank" 중 하나만 사용
-- description: 적요, 업종, 주소, 할부정보 등을 " / "로 연결
+- description: 적요, 업종, 주소, 할부정보 등을 " / "로 연결. 외화 거래인 경우 통화정보 포함 (예: "USD 결제 / 환율 1,350")
 - card_number: 카드번호 문자열 (없으면 "")
 - approval_number: 승인번호 (없으면 "")
 

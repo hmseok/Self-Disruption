@@ -181,7 +181,7 @@ const CATEGORY_RULES = [
   // ═══ 지출 (매출원가/판관비/영업외비용) ═══
   // 운송업 원가
   { category: '지입 수익배분금(출금)', type: 'expense', keywords: ['수익배분', '정산금', '배분금', '지입대금', '지입정산'] },
-  { category: '유류비', type: 'expense', keywords: ['주유', '가스', '엘피지', 'gs칼텍스', 'sk에너지', 's-oil', '충전', '연료', 'lpg', 'cng', '알뜰주유', '현대오일뱅크', '에쓰오일', '셀프주유'] },
+  { category: '유류비', type: 'expense', keywords: ['주유', '가스', '엘피지', 'gs칼텍스', 'sk에너지', 's-oil', '충전', '연료', 'lpg', 'cng', '알뜰주유', '현대오일뱅크', '에쓰오일', '셀프주유', '에너지', '삼표에너지', '에너비즈', '가스충전', '오일뱅크'] },
   { category: '정비/수리비', type: 'expense', keywords: ['정비', '모터스', '타이어', '공업사', '수리', '부품', '오토', '정비소', '엔진오일', '세차', '카센터', '브레이크', '배터리'] },
   { category: '차량보험료', type: 'expense', keywords: ['손해보험', '화재보험', 'kb손해', '현대해상', 'db손해', '보험료', '자동차보험', '메리츠', '한화손해', '삼성화재', '흥국화재'] },
   { category: '자동차세/공과금', type: 'expense', keywords: ['자동차세', '과태료', '범칙금', '검사', '도로공사', '하이패스', '통행료', '교통벌금', '차량등록', '번호판'] },
@@ -203,12 +203,12 @@ const CATEGORY_RULES = [
   { category: '수수료/카드수수료', type: 'expense', keywords: ['수수료', '카드수수료', '송금수수료', '이체수수료', '중개수수료', 'pg수수료'] },
 
   // 일반관리비
-  { category: '임차료/사무실', type: 'expense', keywords: ['월세', '임대료', '관리비', '주차', '사무실', '임차', '부동산', '건물관리'] },
+  { category: '임차료/사무실', type: 'expense', keywords: ['월세', '임대료', '관리비', '사무실', '임차', '부동산', '건물관리'] },
   { category: '통신비', type: 'expense', keywords: ['kt', 'skt', 'lg유플러스', '인터넷', '통신', '전화', '알뜰폰', '티플러스'] },
   { category: '소모품/사무용품', type: 'expense', keywords: ['다이소', '문구', '사무용품', '토너', '복사', '프린터'] },
-  { category: '복리후생(식대)', type: 'expense', keywords: ['식당', '카페', '커피', '마트', '식사', '편의점', '배달', '음식', '도시락', '푸드', '치킨', '피자', '한식', '중식', '일식', '분식'] },
+  { category: '복리후생(식대)', type: 'expense', keywords: ['식당', '카페', '커피', '마트', '식사', '편의점', '배달', '음식', '도시락', '푸드', '치킨', '피자', '한식', '중식', '일식', '분식', '국밥', '해장국', '막국수', '냉면', '삼겹살', '고기', '백반', '김밥', '떡볶이', '라멘', '초밥', '돈까스', '짜장', '짬뽕', '족발', '보쌈', '갈비', '순대', '수제비', '칼국수', '설렁탕', '곰탕', '감자탕', '찌개', '정식', '뷔페', '횟집', '스시', '우동', '소바', '빵집', '베이커리', '아이스크림'] },
   { category: '접대비', type: 'expense', keywords: ['접대', '골프', '선물', '경조사', '화환', '축의금', '부조'] },
-  { category: '여비교통비', type: 'expense', keywords: ['택시', '기차', 'ktx', '고속버스', '시외버스', '항공', '비행기', '숙박', '호텔', '모텔', '주차비'] },
+  { category: '여비교통비', type: 'expense', keywords: ['택시', '기차', 'ktx', '고속버스', '시외버스', '항공', '비행기', '숙박', '호텔', '모텔', '주차비', '주차장', '주차', '파킹'] },
   { category: '교육/훈련비', type: 'expense', keywords: ['교육', '훈련', '연수', '세미나', '학원', '자격증'] },
   { category: '광고/마케팅', type: 'expense', keywords: ['광고', '마케팅', '홍보', '네이버광고', '구글애즈', '페이스북', '인스타그램'] },
   { category: '보험료(일반)', type: 'expense', keywords: ['생명보험', '상해보험', '단체보험', '배상책임'] },
@@ -793,6 +793,8 @@ export async function POST(request: NextRequest) {
           matched_employee_name: t.matched_employee_name || null,
           matched_contract_name: t.matched_contract_name || null,
           approval_number: t.approval_number || '',
+          currency: t.currency || 'KRW',
+          original_amount: t.original_amount || null,
         },
       },
       status: 'pending',
@@ -830,28 +832,124 @@ export async function GET(request: NextRequest) {
     const sb = getSupabaseAdmin()
 
     // ── 1차: classification_queue에서 조회 ──
-    let queueQuery = sb
-      .from('classification_queue')
-      .select('*', { count: 'exact' })
-      .eq('company_id', company_id)
+    // Supabase 기본 제한이 1000행이므로, limit > 1000이면 페이지네이션으로 가져옴
+    const fetchAllFromQueue = async () => {
+      let baseQuery = sb
+        .from('classification_queue')
+        .select('*', { count: 'exact' })
+        .eq('company_id', company_id)
 
-    if (status === 'pending') {
-      queueQuery = queueQuery.in('status', ['pending', 'auto_confirmed'])
-    } else if (status === 'confirmed') {
-      queueQuery = queueQuery.eq('status', 'confirmed')
+      if (status === 'pending') {
+        baseQuery = baseQuery.in('status', ['pending', 'auto_confirmed'])
+      } else if (status === 'confirmed') {
+        baseQuery = baseQuery.eq('status', 'confirmed')
+      }
+
+      if (limit <= 1000) {
+        const { data, error, count } = await baseQuery
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        return { data, error, count }
+      }
+
+      // 페이지네이션: 1000건씩 가져오기
+      let allData: any[] = []
+      let totalCount = 0
+      let page = 0
+      const pageSize = 1000
+
+      while (allData.length < limit) {
+        const from = page * pageSize
+        const to = Math.min(from + pageSize - 1, limit - 1)
+
+        let pageQuery = sb
+          .from('classification_queue')
+          .select('*', { count: 'exact' })
+          .eq('company_id', company_id)
+
+        if (status === 'pending') {
+          pageQuery = pageQuery.in('status', ['pending', 'auto_confirmed'])
+        } else if (status === 'confirmed') {
+          pageQuery = pageQuery.eq('status', 'confirmed')
+        }
+
+        const { data, error, count } = await pageQuery
+          .order('created_at', { ascending: false })
+          .range(from, to)
+
+        if (error) return { data: null, error, count: 0 }
+        totalCount = count || 0
+        if (!data || data.length === 0) break
+        allData = [...allData, ...data]
+        if (data.length < pageSize) break // 더 이상 데이터 없음
+        page++
+      }
+
+      return { data: allData, error: null, count: totalCount }
     }
 
-    const { data: queueData, error: queueError, count: queueCount } = await queueQuery
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    const { data: queueData, error: queueError, count: queueCount } = await fetchAllFromQueue()
 
     if (!queueError && queueData && queueData.length > 0) {
+      // 디버깅: 첫 번째 레코드의 alternatives 구조 확인
+      const firstQ = queueData[0]
+      console.log('[GET classify] 첫 번째 레코드 디버깅:')
+      console.log('  alternatives type:', typeof firstQ.alternatives)
+      console.log('  alternatives value (100자):', JSON.stringify(firstQ.alternatives)?.substring(0, 200))
+      console.log('  source_data 존재:', !!firstQ.source_data)
+      console.log('  컬럼 키 목록:', Object.keys(firstQ).join(', '))
+
       const items = queueData.map((q: any) => {
-        // phase1 스키마: alternatives JSONB 안에 source_data가 포함됨
-        const altData = typeof q.alternatives === 'string' ? JSON.parse(q.alternatives) : (q.alternatives || {})
-        // 055 스키마일 수 있으므로 source_data 직접 확인도 함
-        const sd = q.source_data || altData.source_data || {}
-        const candidates = altData.candidates || (Array.isArray(q.alternatives) ? q.alternatives : [])
+        // ── alternatives에서 source_data 추출 (다양한 형식 대응) ──
+        let altData: any = {}
+        let sd: any = {}
+        let candidates: any[] = []
+
+        // 1) alternatives 파싱
+        const rawAlt = q.alternatives
+        if (typeof rawAlt === 'string') {
+          try {
+            const parsed = JSON.parse(rawAlt)
+            // 2중 stringify 대비: 파싱 결과가 또 문자열이면 한번 더 파싱
+            altData = typeof parsed === 'string' ? JSON.parse(parsed) : parsed
+          } catch (e) {
+            console.warn('[GET classify] alternatives JSON.parse 실패:', e)
+            altData = {}
+          }
+        } else if (rawAlt && typeof rawAlt === 'object') {
+          altData = rawAlt
+        }
+
+        // 2) source_data 찾기 (여러 경로 시도)
+        if (q.source_data && typeof q.source_data === 'object' && Object.keys(q.source_data).length > 0) {
+          // 055 스키마: source_data 컬럼이 직접 존재
+          sd = q.source_data
+        } else if (altData.source_data && typeof altData.source_data === 'object') {
+          // phase1 스키마: alternatives.source_data
+          sd = altData.source_data
+        } else if (altData.transaction_date || altData.client_name || altData.amount) {
+          // alternatives 자체가 source_data인 경우
+          sd = altData
+        }
+
+        // 3) candidates 찾기
+        if (Array.isArray(altData.candidates)) {
+          candidates = altData.candidates
+        } else if (Array.isArray(altData)) {
+          candidates = altData
+        } else if (Array.isArray(q.alternatives)) {
+          candidates = q.alternatives
+        }
+
+        // 디버깅 (첫 건만)
+        if (q.id === firstQ.id) {
+          console.log('  추출된 sd 키:', Object.keys(sd).join(', '))
+          console.log('  sd.transaction_date:', sd.transaction_date)
+          console.log('  sd.client_name:', sd.client_name)
+          console.log('  sd.amount:', sd.amount)
+          console.log('  sd.payment_method:', sd.payment_method)
+        }
+
         return {
           id: q.id,
           company_id: q.company_id,

@@ -398,11 +398,47 @@ const MAINT_PACKAGE_DESC: Record<string, string> = {
   basic: '오일+에어필터+브레이크점검+순회정비 포함',
   full: '오일+필터+브레이크+타이어+배터리+와이퍼+냉각수 전항목 포함',
 }
-// 초과주행 km당 추가요금 fallback
+// 초과주행 km당 추가요금 fallback (약관 DB 미연동 시)
 const getExcessMileageRateFallback = (fp: number): number => {
   if (fp < 25000000) return 110; if (fp < 40000000) return 150
   if (fp < 60000000) return 200; if (fp < 80000000) return 250
   if (fp < 120000000) return 320; return 450
+}
+
+// 약관 DB excess_mileage_rates 키 매핑: 차량 보험등급 → DB 카테고리 키
+// DB 키: 국산_경소형, 국산_중형, 국산_대형, 수입_소중형, 수입_대형
+function getExcessMileageRateKey(vehicleClass: InsVehicleClass): string {
+  switch (vehicleClass) {
+    case '경형': return '국산_경소형'
+    case '소형': return '국산_경소형'
+    case '중형': return '국산_중형'
+    case '대형': return '국산_대형'
+    case '수입': return '수입_대형' // 기본값; 가격대별로 아래에서 세분화
+    default: return '국산_중형'
+  }
+}
+
+// 약관 DB에서 초과주행 요금 조회 (약관 우선, fallback 보조)
+function getExcessMileageRateFromTerms(
+  calcParams: Record<string, any> | undefined,
+  vehicleClass: InsVehicleClass,
+  purchasePrice: number
+): { rate: number; source: 'terms_db' | 'fallback'; key?: string } {
+  const rates = calcParams?.excess_mileage_rates
+  if (!rates || typeof rates !== 'object') {
+    return { rate: getExcessMileageRateFallback(purchasePrice), source: 'fallback' }
+  }
+  // 수입차는 가격대별 세분화: 5000만 이하 → 수입_소중형, 그 외 → 수입_대형
+  let key = getExcessMileageRateKey(vehicleClass)
+  if (vehicleClass === '수입' && purchasePrice < 50000000) {
+    key = '수입_소중형'
+  }
+  const dbRate = rates[key]
+  if (typeof dbRate === 'number' && dbRate > 0) {
+    return { rate: dbRate, source: 'terms_db', key }
+  }
+  // DB에 해당 키 없으면 fallback
+  return { rate: getExcessMileageRateFallback(purchasePrice), source: 'fallback' }
 }
 
 // ============================================
@@ -579,6 +615,51 @@ function getDepRateFromCurve(curve: number[], age: number, classMultiplier: numb
   return Math.min(raw * classMultiplier, 90)
 }
 
+
+// ============================================
+// IRR (내부수익률) 계산 — Newton-Raphson법
+// cashFlows: [t0, t1, t2, ...tN] 배열 (월 단위 현금흐름)
+// returns: 월 IRR → 연환산 IRR(%)
+// ============================================
+function calcMonthlyIRR(cashFlows: number[], maxIter = 200, tol = 1e-8): number | null {
+  // Newton-Raphson: NPV(r)=0 풀기
+  let r = 0.005 // 초기 추정 월 0.5%
+  for (let i = 0; i < maxIter; i++) {
+    let npv = 0, dnpv = 0
+    for (let t = 0; t < cashFlows.length; t++) {
+      const disc = Math.pow(1 + r, t)
+      npv += cashFlows[t] / disc
+      if (t > 0) dnpv -= t * cashFlows[t] / Math.pow(1 + r, t + 1)
+    }
+    if (Math.abs(dnpv) < 1e-15) break
+    const rNew = r - npv / dnpv
+    if (Math.abs(rNew - r) < tol) return rNew
+    r = rNew
+    // 발산 방지
+    if (r < -0.5 || r > 1) return null
+  }
+  return r
+}
+
+function calcIRR(initialInvestment: number, monthlyIncome: number, termMonths: number, terminalValue: number, depositReceived: number = 0, prepaymentReceived: number = 0): { monthlyIRR: number; annualIRR: number; totalReturn: number; multiple: number } | null {
+  if (initialInvestment <= 0 || monthlyIncome <= 0 || termMonths <= 0) return null
+  // 현금흐름 배열 구성 (월 단위)
+  // t=0: -투자금 + 보증금수취 + 선납금수취
+  // t=1~N-1: +월렌트료
+  // t=N: +월렌트료 + 잔존가치회수 - 보증금반환
+  const flows: number[] = []
+  flows[0] = -initialInvestment + depositReceived + prepaymentReceived
+  for (let t = 1; t < termMonths; t++) {
+    flows[t] = monthlyIncome
+  }
+  flows[termMonths] = monthlyIncome + terminalValue - depositReceived // 마지막 월: 렌트료 + 처분 - 보증금반환
+  const monthlyRate = calcMonthlyIRR(flows)
+  if (monthlyRate === null || isNaN(monthlyRate)) return null
+  const annualRate = (Math.pow(1 + monthlyRate, 12) - 1) * 100
+  const totalReturn = monthlyIncome * termMonths + terminalValue - initialInvestment + prepaymentReceived
+  const multiple = (monthlyIncome * termMonths + terminalValue + prepaymentReceived) / initialInvestment
+  return { monthlyIRR: monthlyRate * 100, annualIRR: annualRate, totalReturn, multiple }
+}
 
 // ============================================
 // 서브 컴포넌트 (렌더 밖에 정의 — 커서 이탈 방지)
@@ -906,18 +987,18 @@ export default function RentPricingBuilder() {
           }
         }
 
-        // 차량 목록 — 반드시 company_id 필터 적용 (타사 차량 표출 방지)
-        const filterCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
-        if (filterCompanyId) {
-          const { data: carsData } = await supabase
-            .from('cars')
-            .select('*')
-            .eq('company_id', filterCompanyId)
-            .in('status', ['available', 'rented'])
-            .order('created_at', { ascending: false })
+        // 차량 목록 — god_admin '전체 보기' 시 전체 조회 (보험 페이지와 동일)
+        {
+          let carQuery = supabase.from('cars').select('*').order('created_at', { ascending: false })
+          if (role === 'god_admin') {
+            if (adminSelectedCompanyId) carQuery = carQuery.eq('company_id', adminSelectedCompanyId)
+            // 전체 보기(미선택) 시 필터 없이 전체 조회
+          } else if (company?.id) {
+            carQuery = carQuery.eq('company_id', company.id)
+          }
+          const { data: carsData, error: carsError } = await carQuery
+          if (carsError) console.error('차량 목록 로드 실패:', carsError.message)
           setCars(carsData || [])
-        } else {
-          setCars([]) // 회사 미선택 시 차량 미표시
         }
 
         // 기준 테이블 일괄 로드 (개별 에러 허용)
@@ -2004,6 +2085,12 @@ export default function RentPricingBuilder() {
     setMonthlyInsuranceCost(est.totalMonthly)
   }, [selectedCar, factoryPrice, purchasePrice, engineCC, driverAgeGroup, deductible, carAgeMode, customCarAge, insAutoMode])
 
+  // 초과주행 요금: 사용자 수동 입력값 → 약관 DB → fallback 순서
+  const termsExcessInfo = useMemo(() => {
+    const vc = insEstimate?.vehicleClass || getInsVehicleClass(engineCC, selectedCar?.brand || '', factoryPrice || purchasePrice)
+    return getExcessMileageRateFromTerms(termsConfig?.calc_params, vc, factoryPrice || purchasePrice)
+  }, [termsConfig, insEstimate, engineCC, selectedCar, factoryPrice, purchasePrice])
+
   // ============================================
   // 자동 계산 로직
   // ============================================
@@ -2360,6 +2447,10 @@ export default function RentPricingBuilder() {
       discount: -totalDiscount,
     }
 
+    // 11. IRR (렌트사 투자 수익률)
+    // 현금흐름: t0=-취득원가+보증금+선납금, t1~N=월렌트료(공급가), tN+=잔존가치-보증금반환
+    const irrResult = calcIRR(costBase, suggestedRent, termMonths, residualValue, deposit, prepayment)
+
     return {
       carAge, mileage10k, termYears, isUsedCar,
       // 감가 — 현재
@@ -2401,6 +2492,8 @@ export default function RentPricingBuilder() {
       marketAvg, marketDiff, purchaseDiscount,
       // 비중
       costBreakdown,
+      // IRR
+      irrResult,
     }
   }, [
     selectedCar, factoryPrice, purchasePrice, carAgeMode, customCarAge, depCurvePreset, depCustomCurve, depClassOverride, depYear1Rate, depYear2Rate, annualMileage, baselineKm,
@@ -2582,7 +2675,7 @@ export default function RentPricingBuilder() {
 
     const calc = calculations
     const car = selectedCar
-    const resolvedExcessRate = excessMileageRate || getExcessMileageRateFallback(factoryPrice)
+    const resolvedExcessRate = excessMileageRate || termsExcessInfo.rate
 
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 30)
@@ -2636,6 +2729,14 @@ export default function RentPricingBuilder() {
       } : null,
       maint_package: maintPackage,
       excess_mileage_rate: resolvedExcessRate,
+      excess_mileage_source: excessMileageRate > 0 ? 'manual' : termsExcessInfo.source,
+      excess_mileage_terms_key: termsExcessInfo.key || null,
+      early_termination_rate: termsConfig?.calc_params?.early_termination_rate || 35,
+      early_termination_rates_by_period: termsConfig?.calc_params?.early_termination_rates_by_period || null,
+      insurance_coverage: termsConfig?.insurance_coverage || null,
+      quote_notices: termsConfig?.quote_notices || null,
+      insurance_note: termsConfig?.calc_params?.insurance_note || null,
+      terms_id: termsConfig?.id || null,
       dep_curve_preset: depCurvePreset,
       current_market_value: calc.currentMarketValue,
       end_market_value: calc.endMarketValue,
@@ -2760,7 +2861,7 @@ export default function RentPricingBuilder() {
     const d = new Date(startDate); d.setMonth(d.getMonth() + termMonths)
     return d.toISOString().split('T')[0]
   })()
-  const quoteExcessRate = excessMileageRate || getExcessMileageRateFallback(factoryPrice)
+  const quoteExcessRate = excessMileageRate || termsExcessInfo.rate
   const quoteTotalMileage = annualMileage * 10000 * (termMonths / 12)
 
   // ============================================
@@ -3176,7 +3277,18 @@ export default function RentPricingBuilder() {
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">중도해지</td>
-                      <td className="px-3 py-1.5">잔여 렌탈료의 <span className="font-bold text-red-500">{termsConfig?.calc_params?.early_termination_rate || 35}%</span> 위약금 발생</td>
+                      <td className="px-3 py-1.5">
+                        {(() => {
+                          // 기간별 차등 위약금율 (약관 DB)
+                          const periodRates = termsConfig?.calc_params?.early_termination_rates_by_period
+                          if (periodRates && Array.isArray(periodRates)) {
+                            const matched = periodRates.find((r: any) => termMonths >= r.months_from && termMonths <= r.months_to)
+                            const rate = matched?.rate || termsConfig?.calc_params?.early_termination_rate || 35
+                            return <>잔여 렌탈료의 <span className="font-bold text-red-500">{rate}%</span> 위약금 발생</>
+                          }
+                          return <>잔여 렌탈료의 <span className="font-bold text-red-500">{termsConfig?.calc_params?.early_termination_rate || 35}%</span> 위약금 발생</>
+                        })()}
+                      </td>
                     </tr>
                     <tr>
                       <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">반납 조건</td>
@@ -3197,7 +3309,7 @@ export default function RentPricingBuilder() {
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">세금</td>
-                      <td className="px-3 py-1 text-blue-600">자동차세·취득세 포함 (연 {f(annualTax)}원 상당)</td>
+                      <td className="px-3 py-1 text-blue-600">자동차세·취득세 렌탈료 포함</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">등록비용</td>
@@ -3267,6 +3379,7 @@ export default function RentPricingBuilder() {
                 </div>
               </div>
             </div>
+
 
             {/* 서명란 + 푸터 — 마지막 페이지 하단 고정 */}
             <div className="print:mt-auto">
@@ -3582,131 +3695,82 @@ export default function RentPricingBuilder() {
       </div>
       )}
 
-      {/* ===== 등록차량 선택 ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-steel-500" />
-          <h3 className="font-black text-gray-800 text-sm">🚗 등록차량 선택</h3>
+      {/* ===== 등록차량 선택 (보험/가입 페이지 디자인 기준) ===== */}
+      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', marginBottom: 24, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2d5fa8' }} />
+          <h3 style={{ fontWeight: 900, color: '#1f2937', fontSize: 14, margin: 0 }}>🚗 등록차량 선택</h3>
         </div>
-        <div className="p-6">
-        {(() => {
-          // 등록차량 모드 UI — 항상 표시
-          return (
-          <div>
-            <label className="block text-sm font-bold text-gray-500 mb-3">분석 대상 차량 선택</label>
-            {/* 선택된 차량 표시 */}
-            {selectedCar && (
-              <div className="flex items-center justify-between p-4 bg-steel-50 border-2 border-steel-400 rounded-xl mb-3">
-                <div>
-                  <span className="font-black text-steel-800 text-lg">{selectedCar.brand} {selectedCar.model}</span>
-                  <span className="ml-2 text-sm text-gray-500">{selectedCar.trim || ''}</span>
-                  {selectedCar.number && <span className="ml-3 text-sm font-bold text-steel-600">[{selectedCar.number}]</span>}
-                  <span className="ml-2 text-xs text-gray-400">{selectedCar.year}년식</span>
-                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                    selectedCar.is_used ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {selectedCar.is_used ? '🔄 중고' : '🆕 신차'}
-                  </span>
-                  <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${
-                    selectedCar.is_commercial === false ? 'bg-teal-100 text-teal-700' : 'bg-steel-100 text-steel-600'
-                  }`}>
-                    {selectedCar.is_commercial === false ? '🏠 비영업' : '🏢 영업'}
-                  </span>
-                  {selectedCar.is_used && selectedCar.purchase_mileage ? (
-                    <span className="ml-1 text-xs text-gray-400">구입시 {(selectedCar.purchase_mileage / 10000).toFixed(1)}만km</span>
-                  ) : null}
+
+        {/* 선택된 차량 표시 */}
+        {selectedCar && (
+          <div style={{ margin: '16px 24px', padding: 16, background: '#eff6ff', border: '2px solid #60a5fa', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 900, color: '#1e3a5f', fontSize: 18 }}>{selectedCar.brand} {selectedCar.model}</span>
+              <span style={{ fontSize: 13, color: '#6b7280' }}>{selectedCar.trim || ''}</span>
+              {selectedCar.number && <span style={{ fontSize: 13, fontWeight: 700, color: '#2d5fa8' }}>[{selectedCar.number}]</span>}
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>{selectedCar.year}년식</span>
+              <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 800, background: selectedCar.is_used ? '#fff7ed' : '#eff6ff', color: selectedCar.is_used ? '#c2410c' : '#1d4ed8' }}>
+                {selectedCar.is_used ? '중고' : '신차'}
+              </span>
+              <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 800, background: selectedCar.is_commercial === false ? '#f0fdfa' : '#f1f5f9', color: selectedCar.is_commercial === false ? '#0f766e' : '#475569' }}>
+                {selectedCar.is_commercial === false ? '비영업' : '영업'}
+              </span>
+              {selectedCar.is_used && selectedCar.purchase_mileage ? (
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>구입시 {(selectedCar.purchase_mileage / 10000).toFixed(1)}만km</span>
+              ) : null}
+            </div>
+            <button onClick={() => { setSelectedCar(null); setCarSearchQuery('') }}
+              style={{ fontSize: 13, color: '#9ca3af', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}>변경</button>
+          </div>
+        )}
+
+        {/* 차량 미선택 시: KPI + 필터 + 테이블 */}
+        {!selectedCar && (
+          <div style={{ padding: '16px 24px 24px' }}>
+            {/* KPI 카드 */}
+            {cars.length > 0 && (
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 100px', background: '#fff', padding: '12px 16px', borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+                  <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, margin: 0 }}>전체 차량</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#111827', margin: '4px 0 0' }}>{cars.length}<span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 2 }}>대</span></p>
                 </div>
-                <button onClick={() => { setSelectedCar(null); setCarSearchQuery('') }}
-                  className="text-sm text-gray-400 hover:text-red-500 font-bold">변경</button>
+                <div style={{ flex: '1 1 100px', background: '#f0fdf4', padding: '12px 16px', borderRadius: 12, border: '1px solid #dcfce7' }}>
+                  <p style={{ fontSize: 11, color: '#16a34a', fontWeight: 700, margin: 0 }}>대기</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#15803d', margin: '4px 0 0' }}>{cars.filter(c => c.status === 'available' || !c.status).length}<span style={{ fontSize: 12, color: '#86efac', marginLeft: 2 }}>대</span></p>
+                </div>
+                <div style={{ flex: '1 1 100px', background: '#eff6ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                  <p style={{ fontSize: 11, color: '#2563eb', fontWeight: 700, margin: 0 }}>렌트중</p>
+                  <p style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', margin: '4px 0 0' }}>{cars.filter(c => c.status === 'rented').length}<span style={{ fontSize: 12, color: '#93c5fd', marginLeft: 2 }}>대</span></p>
+                </div>
               </div>
             )}
-            {/* 차량 검색 + 리스트 */}
-            {!selectedCar && (
-              <>
-                <input
-                  type="text"
-                  placeholder="차량번호, 브랜드, 모델명으로 검색..."
-                  value={carSearchQuery}
-                  onChange={(e) => setCarSearchQuery(e.target.value)}
-                  className="w-full p-3 border border-gray-200 rounded-xl font-bold text-sm bg-white focus:border-steel-500 outline-none mb-3"
-                />
-                {/* 데스크톱: 테이블 형태 */}
-                <div className="hidden md:block max-h-[400px] overflow-y-auto border border-gray-200 rounded-xl">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 sticky top-0 z-[1]">
-                      <tr className="text-gray-400 text-xs font-bold border-b border-gray-200">
-                        <th className="text-left px-4 py-2.5">차량번호</th>
-                        <th className="text-left px-4 py-2.5">브랜드 / 모델</th>
-                        <th className="text-left px-4 py-2.5">트림</th>
-                        <th className="text-center px-4 py-2.5">연식</th>
-                        <th className="text-center px-4 py-2.5">구분</th>
-                        <th className="text-right px-4 py-2.5">출고가</th>
-                        <th className="text-right px-4 py-2.5">매입가</th>
-                        <th className="text-center px-4 py-2.5">상태</th>
-                        <th className="px-2 py-2.5"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {cars
-                        .filter(car => {
-                          if (!carSearchQuery.trim()) return true
-                          const q = carSearchQuery.toLowerCase()
-                          return (car.number || '').toLowerCase().includes(q) || (car.brand || '').toLowerCase().includes(q) || (car.model || '').toLowerCase().includes(q) || (car.trim || '').toLowerCase().includes(q)
-                        })
-                        .map(car => (
-                          <tr
-                            key={String(car.id)}
-                            onClick={() => { handleCarSelect(String(car.id)); setCarSearchQuery('') }}
-                            className="hover:bg-steel-50 transition-colors cursor-pointer"
-                          >
-                            <td className="px-4 py-2.5 font-bold text-steel-600 whitespace-nowrap">{car.number || '-'}</td>
-                            <td className="px-4 py-2.5 font-bold text-gray-800 whitespace-nowrap">{car.brand} {car.model}</td>
-                            <td className="px-4 py-2.5 text-gray-500 text-xs">{car.trim || '-'}</td>
-                            <td className="px-4 py-2.5 text-center text-gray-500">{car.year}년</td>
-                            <td className="px-4 py-2.5 text-center">
-                              <div className="flex flex-wrap justify-center gap-0.5">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  car.is_used ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
-                                }`}>
-                                  {car.is_used ? '중고' : '신차'}
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  car.is_commercial === false ? 'bg-teal-100 text-teal-600' : 'bg-steel-100 text-steel-500'
-                                }`}>
-                                  {car.is_commercial === false ? '비영업' : '영업'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-bold text-gray-700 whitespace-nowrap">
-                              {car.factory_price ? `${Math.round(car.factory_price / 10000).toLocaleString()}만` : '-'}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-bold text-steel-600 whitespace-nowrap">
-                              {car.purchase_price ? `${Math.round(car.purchase_price / 10000).toLocaleString()}만` : '-'}
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                              {car.status === 'rented'
-                                ? <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold">렌트중</span>
-                                : <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-bold">대기</span>
-                              }
-                            </td>
-                            <td className="px-2 py-2.5 text-gray-300">→</td>
-                          </tr>
-                        ))
-                      }
-                    </tbody>
-                  </table>
-                  {cars.filter(car => {
-                    if (!carSearchQuery.trim()) return true
-                    const q = carSearchQuery.toLowerCase()
-                    return (car.number || '').toLowerCase().includes(q) || (car.brand || '').toLowerCase().includes(q) || (car.model || '').toLowerCase().includes(q) || (car.trim || '').toLowerCase().includes(q)
-                  }).length === 0 && (
-                    <p className="text-center text-gray-400 py-6 text-sm">
-                      {carSearchQuery ? '검색 결과가 없습니다' : '등록된 차량이 없습니다'}
-                    </p>
-                  )}
-                </div>
-                {/* 모바일: 카드 형태 */}
-                <div className="md:hidden max-h-[320px] overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+
+            {/* 검색 바 */}
+            <input
+              type="text"
+              placeholder="차량번호, 브랜드, 모델명으로 검색..."
+              value={carSearchQuery}
+              onChange={(e) => setCarSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 13, fontWeight: 600, outline: 'none', marginBottom: 12, boxSizing: 'border-box' }}
+            />
+
+            {/* 차량 테이블 */}
+            <div style={{ maxHeight: 420, overflowY: 'auto', overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb', background: '#fff' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700, fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>차량번호</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>브랜드/모델</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>트림</th>
+                    <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>연식</th>
+                    <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>구분</th>
+                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>출고가</th>
+                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>매입가</th>
+                    <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {cars
                     .filter(car => {
                       if (!carSearchQuery.trim()) return true
@@ -3714,56 +3778,57 @@ export default function RentPricingBuilder() {
                       return (car.number || '').toLowerCase().includes(q) || (car.brand || '').toLowerCase().includes(q) || (car.model || '').toLowerCase().includes(q) || (car.trim || '').toLowerCase().includes(q)
                     })
                     .map(car => (
-                      <button
+                      <tr
                         key={String(car.id)}
                         onClick={() => { handleCarSelect(String(car.id)); setCarSearchQuery('') }}
-                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-steel-50 transition-colors text-left"
+                        style={{ cursor: 'pointer', borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '')}
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-800">{car.brand} {car.model}</span>
-                            <span className="text-xs text-gray-400">{car.trim || ''}</span>
-                            {car.status === 'rented' && (
-                              <span className="text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold">렌트중</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            {car.number && <span className="text-xs font-bold text-steel-600">{car.number}</span>}
-                            <span className="text-xs text-gray-400">{car.year}년식</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              car.is_used ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
-                            }`}>
-                              {car.is_used ? '중고' : '신차'}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              car.is_commercial === false ? 'bg-teal-100 text-teal-600' : 'bg-steel-100 text-steel-500'
-                            }`}>
-                              {car.is_commercial === false ? '비영업' : '영업'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            {car.purchase_price ? <span className="text-xs text-gray-500">매입가 <b className="text-steel-600">{Math.round(car.purchase_price / 10000).toLocaleString()}만원</b></span> : <span className="text-xs text-gray-400">가격 미등록</span>}
-                          </div>
-                        </div>
-                        <span className="text-gray-300 text-sm ml-2">→</span>
-                      </button>
+                        <td style={{ padding: '12px 16px', fontWeight: 900, fontSize: 15, color: '#111827', whiteSpace: 'nowrap', letterSpacing: 1 }}>{car.number || '-'}</td>
+                        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 800, color: '#2d5fa8' }}>{car.brand}</span>
+                          <span style={{ marginLeft: 4, fontWeight: 600, color: '#374151' }}>{car.model}</span>
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 12 }}>{car.trim || '-'}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#6b7280', fontFamily: 'monospace' }}>{car.year}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 800, marginRight: 2, background: car.is_used ? '#fff7ed' : '#eff6ff', color: car.is_used ? '#ea580c' : '#2563eb' }}>
+                            {car.is_used ? '중고' : '신차'}
+                          </span>
+                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 800, background: car.is_commercial === false ? '#f0fdfa' : '#f1f5f9', color: car.is_commercial === false ? '#0d9488' : '#64748b' }}>
+                            {car.is_commercial === false ? '비영업' : '영업'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                          {car.factory_price ? `${Math.round(car.factory_price / 10000).toLocaleString()}만` : '-'}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#2d5fa8', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                          {car.purchase_price ? `${Math.round(car.purchase_price / 10000).toLocaleString()}만` : '-'}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          {car.status === 'rented'
+                            ? <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 800, background: '#fef3c7', color: '#d97706' }}>렌트중</span>
+                            : <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 800, background: '#dcfce7', color: '#16a34a' }}>대기</span>
+                          }
+                        </td>
+                      </tr>
                     ))
                   }
-                  {cars.filter(car => {
-                    if (!carSearchQuery.trim()) return true
-                    const q = carSearchQuery.toLowerCase()
-                    return (car.number || '').toLowerCase().includes(q) || (car.brand || '').toLowerCase().includes(q) || (car.model || '').toLowerCase().includes(q) || (car.trim || '').toLowerCase().includes(q)
-                  }).length === 0 && (
-                    <p className="text-center text-gray-400 py-6 text-sm">
-                      {carSearchQuery ? '검색 결과가 없습니다' : '등록된 차량이 없습니다'}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
+                </tbody>
+              </table>
+              {cars.filter(car => {
+                if (!carSearchQuery.trim()) return true
+                const q = carSearchQuery.toLowerCase()
+                return (car.number || '').toLowerCase().includes(q) || (car.brand || '').toLowerCase().includes(q) || (car.model || '').toLowerCase().includes(q) || (car.trim || '').toLowerCase().includes(q)
+              }).length === 0 && (
+                <p style={{ textAlign: 'center', color: '#9ca3af', padding: '48px 0', fontSize: 13 }}>
+                  {carSearchQuery ? '검색 결과가 없습니다' : '등록된 차량이 없습니다'}
+                </p>
+              )}
+            </div>
           </div>
-        )})()}
-        </div>
+        )}
       </div>
 
         {/* ====== 공통 계층형 선택 UI: 개별소비세 → 유종 → 차종 그룹 → 트림 → 컬러 → 옵션 ====== */}
@@ -4864,6 +4929,34 @@ export default function RentPricingBuilder() {
                   ))}
                 </div>
 
+                {/* 약관 DB 기준값 안내 */}
+                {termsExcessInfo.source === 'terms_db' && (
+                  <div className="flex items-center gap-1.5 mb-2 text-[10px]">
+                    <span className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5 font-bold">
+                      약관 기준
+                    </span>
+                    <span className="text-gray-500">
+                      {termsExcessInfo.key}: <strong className="text-blue-700">{termsExcessInfo.rate.toLocaleString()}원/km</strong>
+                    </span>
+                    {excessMileageRate > 0 && excessMileageRate !== termsExcessInfo.rate && (
+                      <span className="text-amber-600 font-bold">
+                        (수동 {excessMileageRate.toLocaleString()}원 적용 중 · 약관과 {excessMileageRate > termsExcessInfo.rate ? '+' : ''}{excessMileageRate - termsExcessInfo.rate}원 차이)
+                      </span>
+                    )}
+                    {!excessMileageRate && (
+                      <span className="text-green-600 font-bold">(약관 자동적용)</span>
+                    )}
+                  </div>
+                )}
+                {termsExcessInfo.source === 'fallback' && (
+                  <div className="flex items-center gap-1.5 mb-2 text-[10px]">
+                    <span className="inline-flex items-center gap-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 font-bold">
+                      기본값
+                    </span>
+                    <span className="text-gray-400">약관 DB 미설정 — 출고가 기반 자동산출 {termsExcessInfo.rate.toLocaleString()}원/km</span>
+                  </div>
+                )}
+
                 {/* 원가 분석 상세 */}
                 <div className="bg-orange-50 rounded-lg p-3 space-y-0.5 mb-3">
                   <div className="flex justify-between text-xs">
@@ -5664,6 +5757,39 @@ export default function RentPricingBuilder() {
                       <span className="text-xs font-black text-steel-700">{purchasePrice > 0 ? ((margin * 12) / purchasePrice * 100).toFixed(1) : 0}%</span>
                     </div>
                   </div>
+                  {/* IRR 투자수익률 분석 */}
+                  {calculations.irrResult && (
+                    <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)', border: '1px solid #bfdbfe' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <span style={{ fontSize: 13 }}>📈</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#1e40af' }}>투자 IRR 분석</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ flex: 1, background: '#fff', borderRadius: 8, padding: '8px 10px', border: '1px solid #dbeafe', textAlign: 'center' }}>
+                          <p style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', margin: 0 }}>연 IRR</p>
+                          <p style={{ fontSize: 18, fontWeight: 900, color: calculations.irrResult.annualIRR >= 0 ? '#059669' : '#dc2626', margin: '2px 0 0', lineHeight: 1.1 }}>
+                            {calculations.irrResult.annualIRR.toFixed(1)}%
+                          </p>
+                        </div>
+                        <div style={{ flex: 1, background: '#fff', borderRadius: 8, padding: '8px 10px', border: '1px solid #dbeafe', textAlign: 'center' }}>
+                          <p style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', margin: 0 }}>투자배수</p>
+                          <p style={{ fontSize: 18, fontWeight: 900, color: '#1d4ed8', margin: '2px 0 0', lineHeight: 1.1 }}>
+                            {calculations.irrResult.multiple.toFixed(2)}x
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 10, color: '#6b7280', lineHeight: 1.4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>월 IRR</span>
+                          <span style={{ fontWeight: 700, color: '#374151' }}>{calculations.irrResult.monthlyIRR.toFixed(3)}%</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>총 투자수익</span>
+                          <span style={{ fontWeight: 700, color: calculations.irrResult.totalReturn >= 0 ? '#059669' : '#dc2626' }}>{calculations.irrResult.totalReturn >= 0 ? '+' : ''}{f(calculations.irrResult.totalReturn)}원</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 계약 유형별 수익 분석 */}

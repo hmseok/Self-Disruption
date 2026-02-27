@@ -123,7 +123,7 @@ export default function DeveloperPage() {
           ) : (
             <>
               {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
+              <div style={{ overflowX: 'auto' }}>
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-yellow-50/30">
@@ -158,28 +158,6 @@ export default function DeveloperPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              {/* Mobile Cards */}
-              <div className="md:hidden divide-y divide-yellow-100">
-                {godAdmins.map(admin => (
-                  <div key={admin.id} className="p-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-xs flex-shrink-0">
-                      {(admin.employee_name || admin.email)[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-bold text-slate-800">{admin.employee_name || '(미설정)'}</span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded ${
-                          admin.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${admin.is_active ? 'bg-green-500' : 'bg-red-400'}`}></span>
-                          {admin.is_active ? '활성' : '비활성'}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{admin.email}</div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </>
           )}

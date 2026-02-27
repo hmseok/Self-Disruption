@@ -114,11 +114,11 @@ function UploadContent() {
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'pending' | 'confirmed' | 'all'>('pending')
   const [stats, setStats] = useState({ pending: 0, confirmed: 0 })
   const [aiClassifying, setAiClassifying] = useState(false)
   const [aiResult, setAiResult] = useState<{ updated: number; total: number } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
 
   // ── Related Data (Review) ──
@@ -128,7 +128,8 @@ function UploadContent() {
   const [employees, setEmployees] = useState<any[]>([])
 
   // ── Tab State ──
-  const [activeTab, setActiveTab] = useState<'upload' | 'pending' | 'confirmed'>('upload')
+  const [activeTab, setActiveTab] = useState<'upload' | 'review'>('upload')
+  const [reviewFilter, setReviewFilter] = useState<'pending' | 'confirmed'>('pending')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user'>('category')
@@ -145,29 +146,36 @@ function UploadContent() {
       // 결과가 비어있고 처리 중이 아닐 때 → classification_queue에서 복원
       if (results.length === 0 && status !== 'processing' && !hasLoadedFromQueue.current) {
         hasLoadedFromQueue.current = true
-        loadFromQueue().then(count => {
-          if (count > 0) console.log(`[Upload] classification_queue에서 ${count}건 복원됨`)
-        })
+        // 약간의 딜레이를 줘서 auth session이 준비될 수 있도록
+        const timer = setTimeout(() => {
+          loadFromQueue().then(count => {
+            if (count > 0) {
+              console.log(`[Upload] classification_queue에서 ${count}건 복원됨`)
+              fetchStats() // 로드 후 통계도 갱신
+            }
+          })
+        }, 300)
+        return () => clearTimeout(timer)
       }
     }
   }, [company, effectiveCompanyId])
 
   useEffect(() => {
-    if (activeTab === 'pending' || activeTab === 'confirmed') {
+    if (activeTab === 'review') {
       fetchReviewItems()
       fetchReviewRelated()
     }
-  }, [activeTab, filter])
+  }, [activeTab, reviewFilter])
 
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
     const onFocus = () => {
       fetchStats()
-      if (activeTab === 'pending' || activeTab === 'confirmed') fetchReviewItems()
+      if (activeTab === 'review') fetchReviewItems()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [effectiveCompanyId, activeTab, filter])
+  }, [effectiveCompanyId, activeTab, reviewFilter])
 
   const fetchBasicData = async () => {
     if (!effectiveCompanyId) return
@@ -198,8 +206,8 @@ function UploadContent() {
         fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=pending&limit=1`),
         fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=confirmed&limit=1`),
       ])
-      const pData = await pRes.json()
-      const cData = await cRes.json()
+      const pData = pRes.ok ? await pRes.json() : { total: 0 }
+      const cData = cRes.ok ? await cRes.json() : { total: 0 }
       setStats({ pending: pData.total || 0, confirmed: cData.total || 0 })
     } catch (e) {
       console.error(e)
@@ -213,7 +221,7 @@ function UploadContent() {
     }
     setLoading(true)
     try {
-      const res = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${filter}&limit=500`)
+      const res = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${reviewFilter}&limit=2000`)
       if (res.ok) {
         const data = await res.json()
         setItems(data.items || [])
@@ -224,7 +232,7 @@ function UploadContent() {
       console.error(e)
     }
     setLoading(false)
-  }, [effectiveCompanyId, filter, fetchStats])
+  }, [effectiveCompanyId, reviewFilter, fetchStats])
 
   const fetchReviewRelated = useCallback(async () => {
     if (!effectiveCompanyId) return
@@ -240,6 +248,59 @@ function UploadContent() {
     setEmployees(e.data || [])
   }, [effectiveCompanyId])
 
+  // 법인카드 번호 매칭 헬퍼 (현재 + 과거 카드번호 모두 체크)
+  const findCardByNumber = useCallback((cardNumber: string | null | undefined) => {
+    if (!cardNumber) return null
+    const digits = (cardNumber || '').replace(/\D/g, '')
+    if (digits.length < 3) return null
+    const last4 = digits.slice(-4)
+
+    const getAllDigits = (c: any): string[] => {
+      const nums = [(c.card_number || '')]
+      const prev = c.previous_card_numbers || []
+      for (const p of prev) { if (p) nums.push(p) }
+      return nums.map((n: string) => n.replace(/\D/g, '')).filter((n: string) => n.length > 0)
+    }
+
+    if (last4.length === 4) {
+      const match = corpCards.find(c => getAllDigits(c).some(d => d.endsWith(last4)))
+      if (match) return match
+    }
+    if (digits.length >= 4) {
+      const first4 = digits.slice(0, 4)
+      const match = corpCards.find(c => getAllDigits(c).some(d => d.startsWith(first4)))
+      if (match) return match
+    }
+    const match = corpCards.find(c => {
+      const allNums = [(c.card_number || ''), ...(c.previous_card_numbers || [])].map((n: string) => (n || '').replace(/[\s-]/g, '')).filter(Boolean)
+      return allNums.some((cNum: string) => cNum.includes(cardNumber!.replace(/[\s-]/g, '')) || cardNumber!.replace(/[\s-]/g, '').includes(cNum.slice(-4)))
+    })
+    return match || null
+  }, [corpCards])
+
+  // 법인카드→사용자 이름 매핑 헬퍼 (assigned_employee_id → 직원명 우선)
+  const getCardUserName = useCallback((cardId: string | null | undefined) => {
+    if (!cardId) return null
+    const card = corpCards.find(c => c.id === cardId)
+    if (!card) return null
+    // assigned_employee_id가 있으면 직원명으로 표시
+    if (card.assigned_employee_id) {
+      const emp = employees.find((e: any) => e.id === card.assigned_employee_id)
+      if (emp?.name || emp?.employee_name) return emp.name || emp.employee_name
+    }
+    return card.holder_name || card.card_alias || null
+  }, [corpCards, employees])
+
+  // 카드 객체에서 표시할 사용자 이름 (assigned_employee 우선)
+  const getCardDisplayName = useCallback((card: any) => {
+    if (!card) return '공용'
+    if (card.assigned_employee_id) {
+      const emp = employees.find((e: any) => e.id === card.assigned_employee_id)
+      if (emp?.name || emp?.employee_name) return emp.name || emp.employee_name
+    }
+    return card.holder_name || card.card_alias || '공용'
+  }, [employees])
+
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: any[]; totalAmount: number; type: string }> = {}
     for (const item of items) {
@@ -251,8 +312,8 @@ function UploadContent() {
         const cardNum = sd.card_number || ''
         const last4 = cardNum.replace(/\D/g, '').slice(-4)
         if (last4 && sd.payment_method !== '통장') {
-          const matched = corpCards.find((c: any) => (c.card_number || '').replace(/\D/g, '').slice(-4) === last4)
-          key = matched ? `${matched.card_company} ****${last4} (${matched.holder_name || matched.card_alias || '공용'})` : `카드 ****${last4}`
+          const matched = findCardByNumber(cardNum)
+          key = matched ? `${matched.card_company} ****${last4} (${getCardDisplayName(matched)})` : `카드 ****${last4}`
         } else {
           key = sd.payment_method === '통장' ? '📋 통장 거래' : '💳 카드번호 없음'
         }
@@ -279,9 +340,8 @@ function UploadContent() {
         if (item.matched_employee_name) {
           key = `👤 ${item.matched_employee_name}`
         } else if (sd.card_number) {
-          const last4 = sd.card_number.replace(/\D/g, '').slice(-4)
-          const matched = corpCards.find((c: any) => (c.card_number || '').replace(/\D/g, '').slice(-4) === last4)
-          key = matched?.holder_name ? `👤 ${matched.holder_name}` : '👤 미확인'
+          const matched = findCardByNumber(sd.card_number)
+          key = matched ? `👤 ${getCardDisplayName(matched)}` : '👤 미확인'
         } else {
           key = '👤 미확인'
         }
@@ -293,12 +353,17 @@ function UploadContent() {
       if (item.source_data?.type === 'income') groups[key].type = 'income'
     }
     return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
-  }, [items, groupBy, corpCards, cars])
+  }, [items, groupBy, corpCards, cars, getCardDisplayName])
+
+  // ── 리뷰 탭 미분류 통계 ──
+  const reviewUnclassifiedCount = useMemo(() => {
+    return items.filter(i => !i.ai_category || i.ai_category === '미분류' || i.ai_category === '기타').length
+  }, [items])
 
   // ── 일괄 삭제 핸들러 ──
   const handleDeleteAll = async () => {
     if (!effectiveCompanyId) return
-    const statusLabel = activeTab === 'pending' ? '분류 대기' : '확정 완료'
+    const statusLabel = reviewFilter === 'pending' ? '분류 대기' : '확정 완료'
     if (!confirm(`${statusLabel} 항목 ${items.length}건을 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return
 
     setDeleting(true)
@@ -306,7 +371,7 @@ function UploadContent() {
       const res = await fetch('/api/finance/classify', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_id: effectiveCompanyId, status: activeTab === 'pending' ? 'pending' : 'confirmed' })
+        body: JSON.stringify({ company_id: effectiveCompanyId, status: reviewFilter === 'pending' ? 'pending' : 'confirmed' })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -438,8 +503,19 @@ function UploadContent() {
       if (item.matched_schedule_id) {
         scheduleLinks.push({ schedule_id: item.matched_schedule_id, tx_index: idx, amount: item.amount })
       }
-      const { id, matched_schedule_id, match_score, matched_contract_name, confidence, alternatives, classification_tier, card_number, approval_number, is_cancelled, cancel_pair_id, ...rest } = item
-      return { ...rest, company_id: effectiveCompanyId }
+      const { id, matched_schedule_id, match_score, matched_contract_name, confidence, alternatives, classification_tier, card_number, approval_number, is_cancelled, cancel_pair_id, _queue_id, matched_employee_id, matched_employee_name, ...rest } = item
+      // card_id가 있으면 해당 카드의 assigned_employee_id로 직원 매칭
+      let empId = matched_employee_id || null
+      let empName = matched_employee_name || null
+      if (!empId && rest.card_id) {
+        const card = corpCards.find(c => c.id === rest.card_id)
+        if (card?.assigned_employee_id) {
+          empId = card.assigned_employee_id
+          const emp = employees.find((e: any) => e.id === card.assigned_employee_id)
+          empName = emp?.name || emp?.employee_name || null
+        }
+      }
+      return { ...rest, company_id: effectiveCompanyId, employee_id: empId, employee_name: empName }
     })
 
     if (payload.length === 0) {
@@ -463,12 +539,116 @@ function UploadContent() {
           }
         }
       }
+
+      // classification_queue의 pending 항목도 confirmed로 업데이트
+      if (effectiveCompanyId) {
+        try {
+          // 저장된 항목의 _queue_id가 있으면 개별 업데이트, 없으면 전체 pending → confirmed
+          const queueIds = uniqueResults.map(r => (r as any)._queue_id).filter(Boolean)
+          if (queueIds.length > 0) {
+            await supabase.from('classification_queue')
+              .update({ status: 'confirmed' })
+              .in('id', queueIds)
+          } else {
+            // _queue_id 없으면 해당 회사의 pending 전체를 confirmed로
+            await supabase.from('classification_queue')
+              .update({ status: 'confirmed' })
+              .eq('company_id', effectiveCompanyId)
+              .in('status', ['pending', 'auto_confirmed'])
+          }
+        } catch (e) {
+          console.error('[handleBulkSave] classification_queue 상태 업데이트 실패:', e)
+        }
+      }
+
+      // ── 특이건 자동 플래그 ──
+      let flagCount = 0
+      if (inserted && inserted.length > 0) {
+        const flags: any[] = []
+        uniqueResults.forEach((item, idx) => {
+          const txId = inserted[idx]?.id
+          if (!txId) return
+
+          const baseFlag = {
+            transaction_id: txId,
+            transaction_date: item.transaction_date,
+            client_name: item.client_name,
+            amount: item.amount,
+            card_id: item.card_id || null,
+            employee_id: (item as any).matched_employee_id || null,
+            employee_name: (item as any).matched_employee_name || null,
+          }
+
+          // 1) AI 신뢰도 낮음 (< 50)
+          if ((item.confidence || 0) < 50) {
+            flags.push({ ...baseFlag, flag_type: 'low_confidence', flag_reason: `AI 신뢰도 ${item.confidence || 0}%`, severity: 'medium' })
+          }
+
+          // 2) 외화 결제
+          if ((item as any).currency && (item as any).currency !== 'KRW') {
+            flags.push({ ...baseFlag, flag_type: 'foreign_currency', flag_reason: `외화 결제 (${(item as any).currency})`, severity: 'medium' })
+          }
+
+          // 3) 고액 거래 (100만원 이상)
+          if (item.amount >= 1000000) {
+            flags.push({ ...baseFlag, flag_type: 'unusual_amount', flag_reason: `고액 거래 (${item.amount.toLocaleString()}원)`, severity: item.amount >= 5000000 ? 'high' : 'medium' })
+          }
+
+          // 4) 주말/심야 거래 (description에 시간 포함된 경우)
+          const desc = (item.description || '').toLowerCase()
+          const timeMatch = desc.match(/(\d{1,2}):(\d{2})/)
+          if (timeMatch) {
+            const hour = parseInt(timeMatch[1])
+            if (hour >= 22 || hour < 5) {
+              flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `심야 거래 (${timeMatch[0]})`, severity: 'medium' })
+            }
+          }
+          if (item.transaction_date) {
+            const dow = new Date(item.transaction_date).getDay()
+            if (dow === 0 || dow === 6) {
+              flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `주말 거래 (${dow === 0 ? '일' : '토'}요일)`, severity: 'low' })
+            }
+          }
+
+          // 5) 개인 사용 의심 키워드
+          const clientDesc = `${item.client_name || ''} ${item.description || ''}`.toLowerCase()
+          const personalKeywords = ['편의점', '치킨', '배달', '술집', '노래방', '주점', '카페', '스타벅스', '이디야', '쿠팡', '배민', '요기요']
+          const matchedKw = personalKeywords.find(kw => clientDesc.includes(kw))
+          if (matchedKw && item.amount >= 30000) {
+            flags.push({ ...baseFlag, flag_type: 'personal_use', flag_reason: `개인 사용 의심 (${matchedKw}, ${item.amount.toLocaleString()}원)`, severity: 'medium' })
+          }
+        })
+
+        if (flags.length > 0) {
+          try {
+            const { data: { session: flagSession } } = await supabase.auth.getSession()
+            const flagHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+            if (flagSession?.access_token) flagHeaders['Authorization'] = `Bearer ${flagSession.access_token}`
+            const flagRes = await fetch('/api/finance/flags', {
+              method: 'POST',
+              headers: flagHeaders,
+              body: JSON.stringify({ company_id: effectiveCompanyId, flags }),
+            })
+            if (flagRes.ok) {
+              const flagData = await flagRes.json()
+              flagCount = flagData.created || 0
+            }
+          } catch (e) {
+            console.error('[handleBulkSave] 특이건 플래그 생성 오류:', e)
+          }
+        }
+      }
+
       let msg = `✅ ${uniqueResults.length}건 저장 완료!`
       if (duplicateCount > 0) msg += ` (${duplicateCount}건 중복 제외)`
       if (linkedCount > 0) msg += ` (${linkedCount}건 스케줄 자동 연결)`
+      if (flagCount > 0) msg += `\n⚠️ ${flagCount}건 특이건 감지됨 → 법인카드관리에서 확인 가능`
       alert(msg)
       clearResults()
-      router.push('/finance')
+      // 통계 새로고침 & 확정 완료 필터로 전환
+      fetchStats()
+      setActiveTab('review')
+      setReviewFilter('confirmed')
     }
   }
 
@@ -674,50 +854,191 @@ function UploadContent() {
     setDuplicateInfo(prev => ({ ...prev, checking: false }))
   }
 
+  const GROUP_PAGE_SIZE = 50
   const toggleGroup = (cat: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev)
-      if (next.has(cat)) next.delete(cat)
-      else next.add(cat)
+      if (next.has(cat)) {
+        next.delete(cat)
+        // Reset pagination when collapsing
+        setGroupItemLimits(prev => { const n = { ...prev }; delete n[cat]; return n })
+      } else {
+        next.add(cat)
+        // Start with first page only
+        setGroupItemLimits(prev => ({ ...prev, [cat]: GROUP_PAGE_SIZE }))
+      }
       return next
     })
   }
 
   // ── Upload Results Sub-filter & Grouping ──
-  const [uploadSubFilter, setUploadSubFilter] = useState<'all' | 'card' | 'bank'>('all')
+  const [uploadSubFilter, setUploadSubFilter] = useState<'all' | 'card' | 'bank' | 'unclassified'>('all')
   const [uploadGroupBy, setUploadGroupBy] = useState<'none' | 'card_number' | 'category' | 'vehicle'>('none')
+  // 카드 전용 서브필터
+  const [cardSubFilter, setCardSubFilter] = useState<'all' | 'matched' | 'unmatched' | 'by_company' | 'by_user'>('all')
+  // 통장 전용 서브필터
+  const [bankSubFilter, setBankSubFilter] = useState<'all' | 'income' | 'expense' | 'auto_transfer' | 'salary_tax'>('all')
 
-  // 업로드 결과 필터링
-  const filteredResults = useMemo(() => {
+  // 업로드 결과 필터링 (1차: 결제수단)
+  const filteredByPayment = useMemo(() => {
     if (uploadSubFilter === 'all') return results
     if (uploadSubFilter === 'card') return results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
     if (uploadSubFilter === 'bank') return results.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
+    if (uploadSubFilter === 'unclassified') return results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
     return results
   }, [results, uploadSubFilter])
 
-  // 카드번호별 그룹핑 (법인카드 사용자 매칭 포함)
+  // 2차 필터: 카드/통장 전용 서브필터 적용
+  const filteredResults = useMemo(() => {
+    let items = filteredByPayment
+    // 카드 서브필터
+    if (uploadSubFilter === 'card' && cardSubFilter !== 'all') {
+      if (cardSubFilter === 'matched') {
+        items = items.filter(r => {
+          if (!r.card_number) return false
+          return corpCards.some(cc => {
+            const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
+            const rNum = (r.card_number || '').replace(/\D/g, '')
+            return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
+          })
+        })
+      } else if (cardSubFilter === 'unmatched') {
+        items = items.filter(r => {
+          if (!r.card_number) return true
+          return !corpCards.some(cc => {
+            const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
+            const rNum = (r.card_number || '').replace(/\D/g, '')
+            return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
+          })
+        })
+      }
+    }
+    // 통장 서브필터
+    if (uploadSubFilter === 'bank' && bankSubFilter !== 'all') {
+      if (bankSubFilter === 'income') {
+        items = items.filter(r => r.type === 'income' || (r.amount && r.amount > 0))
+      } else if (bankSubFilter === 'expense') {
+        items = items.filter(r => r.type === 'expense' || (r.amount && r.amount < 0))
+      } else if (bankSubFilter === 'auto_transfer') {
+        items = items.filter(r => {
+          const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
+          return desc.includes('자동이체') || desc.includes('cms') || desc.includes('자동납부') || desc.includes('자동') || desc.includes('정기')
+        })
+      } else if (bankSubFilter === 'salary_tax') {
+        items = items.filter(r => {
+          const cat = r.category || ''
+          const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
+          return cat.includes('급여') || cat.includes('세금') || cat.includes('원천세') || cat.includes('부가세') || cat.includes('4대보험') || desc.includes('급여') || desc.includes('세금') || desc.includes('국세') || desc.includes('연금') || desc.includes('건강보험') || desc.includes('고용보험')
+        })
+      }
+    }
+    return items
+  }, [filteredByPayment, uploadSubFilter, cardSubFilter, bankSubFilter, corpCards])
+
+  // 카드 서브필터 통계
+  const cardSubStats = useMemo(() => {
+    if (uploadSubFilter !== 'card') return { all: 0, matched: 0, unmatched: 0, companies: [] as { name: string; count: number }[], users: [] as { name: string; count: number }[] }
+    const cardItems = filteredByPayment
+    const matched = cardItems.filter(r => {
+      if (!r.card_number) return false
+      return corpCards.some(cc => {
+        const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
+        const rNum = (r.card_number || '').replace(/\D/g, '')
+        return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
+      })
+    })
+    // 카드사별 집계
+    const companyMap: Record<string, number> = {}
+    for (const r of cardItems) {
+      const card = findCardByNumber(r.card_number)
+      const company = card?.card_company || '미등록'
+      companyMap[company] = (companyMap[company] || 0) + 1
+    }
+    // 사용자별 집계 (assigned_employee 우선)
+    const userMap: Record<string, number> = {}
+    for (const r of cardItems) {
+      const card = findCardByNumber(r.card_number)
+      let user = '미매칭'
+      if (card) {
+        if (card.assigned_employee_id) {
+          const emp = employees.find((e: any) => e.id === card.assigned_employee_id)
+          user = emp?.name || emp?.employee_name || card.holder_name || card.card_alias || '공용'
+        } else {
+          user = card.holder_name || card.card_alias || '공용'
+        }
+      }
+      userMap[user] = (userMap[user] || 0) + 1
+    }
+    return {
+      all: cardItems.length,
+      matched: matched.length,
+      unmatched: cardItems.length - matched.length,
+      companies: Object.entries(companyMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      users: Object.entries(userMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    }
+  }, [filteredByPayment, uploadSubFilter, corpCards])
+
+  // 통장 서브필터 통계
+  const bankSubStats = useMemo(() => {
+    if (uploadSubFilter !== 'bank') return { all: 0, income: 0, expense: 0, autoTransfer: 0, salaryTax: 0, incomeAmount: 0, expenseAmount: 0 }
+    const bankItems = filteredByPayment
+    const income = bankItems.filter(r => r.type === 'income' || (r.amount && r.amount > 0))
+    const expense = bankItems.filter(r => r.type === 'expense' || (r.amount && r.amount < 0))
+    const autoTransfer = bankItems.filter(r => {
+      const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
+      return desc.includes('자동이체') || desc.includes('cms') || desc.includes('자동납부') || desc.includes('자동') || desc.includes('정기')
+    })
+    const salaryTax = bankItems.filter(r => {
+      const cat = r.category || ''
+      const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
+      return cat.includes('급여') || cat.includes('세금') || cat.includes('원천세') || cat.includes('부가세') || cat.includes('4대보험') || desc.includes('급여') || desc.includes('세금') || desc.includes('국세') || desc.includes('연금') || desc.includes('건강보험') || desc.includes('고용보험')
+    })
+    return {
+      all: bankItems.length,
+      income: income.length,
+      expense: expense.length,
+      autoTransfer: autoTransfer.length,
+      salaryTax: salaryTax.length,
+      incomeAmount: income.reduce((s, r) => s + Math.abs(r.amount || 0), 0),
+      expenseAmount: expense.reduce((s, r) => s + Math.abs(r.amount || 0), 0),
+    }
+  }, [filteredByPayment, uploadSubFilter])
+
+  // 카드번호별 그룹핑 (법인카드 사용자 매칭 포함, 통장거래 별도 분리)
   const groupedByCard = useMemo(() => {
     if (uploadGroupBy !== 'card_number') return null
-    const groups: Record<string, { items: typeof filteredResults; cardInfo: any; totalAmount: number }> = {}
+    const groups: Record<string, { items: typeof filteredResults; cardInfo: any; totalAmount: number; isBank?: boolean }> = {}
     for (const item of filteredResults) {
+      // 통장/이체 거래는 별도 그룹
+      const pm = (item.payment_method || '').toLowerCase()
+      const isBank = pm.includes('통장') || pm.includes('이체') || pm === 'bank' || pm === 'transfer'
+      if (isBank && !item.card_number) {
+        const key = '🏦 통장/이체 거래'
+        if (!groups[key]) groups[key] = { items: [], cardInfo: null, totalAmount: 0, isBank: true }
+        groups[key].items.push(item)
+        groups[key].totalAmount += item.amount || 0
+        continue
+      }
       const cardNum = item.card_number || '(카드번호 없음)'
       const key = cardNum.length >= 3 ? cardNum : '(카드번호 없음)'
       if (!groups[key]) {
-        // 법인카드 정보 매칭
-        const matchedCard = corpCards.find(cc => {
-          if (!item.card_number) return false
-          const ccDigits = (cc.card_number || '').replace(/\D/g, '')
-          const itemDigits = item.card_number.replace(/\D/g, '')
-          if (itemDigits.length >= 4 && ccDigits.endsWith(itemDigits.slice(-4))) return true
-          if (itemDigits.length >= 3 && ccDigits.includes(itemDigits)) return true
-          return false
-        })
+        // 법인카드 정보 매칭 (과거 카드번호 포함)
+        const matchedCard = findCardByNumber(item.card_number)
         groups[key] = { items: [], cardInfo: matchedCard || null, totalAmount: 0 }
       }
       groups[key].items.push(item)
       groups[key].totalAmount += item.amount || 0
     }
-    return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
+    // 정렬: 카드 매칭된 것 → 미등록 카드 → 통장 → 카드번호 없음 순
+    return Object.entries(groups).sort((a, b) => {
+      const aIsBank = a[1].isBank ? 1 : 0
+      const bIsBank = b[1].isBank ? 1 : 0
+      const aNoCard = a[0] === '(카드번호 없음)' ? 1 : 0
+      const bNoCard = b[0] === '(카드번호 없음)' ? 1 : 0
+      if (aIsBank !== bIsBank) return aIsBank - bIsBank
+      if (aNoCard !== bNoCard) return aNoCard - bNoCard
+      return b[1].items.length - a[1].items.length
+    })
   }, [filteredResults, uploadGroupBy, corpCards])
 
   // 차량별 그룹핑 (유류비, 정비비 등 차량 관련 거래)
@@ -768,24 +1089,23 @@ function UploadContent() {
     const cardItems = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
     const bankItems = results.filter(r => r.payment_method !== '카드' && r.payment_method !== 'Card')
     const classifiedCount = results.filter(r => r.category && r.category !== '미분류' && r.category !== '기타').length
-    const cardMatchedCount = results.filter(r => r.card_id).length
-    return { cardCount: cardItems.length, bankCount: bankItems.length, classifiedCount, cardMatchedCount }
-  }, [results])
+    const unclassifiedCount = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타').length
+    // card_id가 있고 실제 corpCards에 매칭되는 건만 카운트
+    const cardMatchedCount = cardItems.filter(r => {
+      if (!r.card_id) return false
+      return corpCards.some(cc => cc.id === r.card_id)
+    }).length
+    return { cardCount: cardItems.length, bankCount: bankItems.length, classifiedCount, unclassifiedCount, cardMatchedCount }
+  }, [results, corpCards])
 
-  // 법인카드→사용자 이름 매핑 헬퍼
-  const getCardUserName = useCallback((cardId: string | null | undefined) => {
-    if (!cardId) return null
-    const card = corpCards.find(c => c.id === cardId)
-    if (!card) return null
-    return card.holder_name || card.card_alias || null
-  }, [corpCards])
+  // (findCardByNumber & getCardUserName moved before groupedItems useMemo)
 
   const getCardDisplayInfo = useCallback((cardId: string | null | undefined) => {
     if (!cardId) return null
     const card = corpCards.find(c => c.id === cardId)
     if (!card) return null
-    return { company: card.card_company, last4: (card.card_number || '').slice(-4), holder: card.holder_name || card.card_alias || '공용' }
-  }, [corpCards])
+    return { company: card.card_company, last4: (card.card_number || '').slice(-4), holder: getCardDisplayName(card) }
+  }, [corpCards, getCardDisplayName])
 
   // 연결 대상 표시 헬퍼
   const getRelatedDisplay = useCallback((type: string | null, id: string | null) => {
@@ -793,7 +1113,7 @@ function UploadContent() {
     if (type === 'card') {
       const c = corpCards.find(cc => cc.id === id)
       if (!c) return { icon: '💳', label: '카드', detail: id.slice(0, 8) }
-      return { icon: '💳', label: `${c.card_company || ''} ****${(c.card_number || '').slice(-4)}`, detail: c.holder_name || c.card_alias || '', color: '#f59e0b' }
+      return { icon: '💳', label: `${c.card_company || ''} ****${(c.card_number || '').slice(-4)}`, detail: getCardDisplayName(c), color: '#f59e0b' }
     }
     if (type === 'jiip') {
       const j = jiips.find(jj => jj.id === id)
@@ -957,34 +1277,35 @@ function UploadContent() {
         <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>엑셀(통장/카드), 영수증 사진, PDF 문서 지원</p>
       </div>
 
-      {/* 📊 통계 카드 — 보험 페이지 스타일 (컬러 배경) */}
+      {/* 📊 통계 카드 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <div style={{ flex: 1, background: '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #e5e7eb', minWidth: 0, cursor: 'pointer' }} onClick={() => { setActiveTab('upload'); setExpandedGroups(new Set()) }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0, whiteSpace: 'nowrap' as const }}>업로드 결과</p>
-          <p style={{ fontSize: 28, fontWeight: 900, color: '#111827', margin: '4px 0 0', whiteSpace: 'nowrap' as const }}>{results.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#9ca3af', marginLeft: 2 }}>건</span></p>
-        </div>
-        <div style={{ flex: 1, background: '#fffbeb', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', minWidth: 0, cursor: 'pointer' }} onClick={() => { setActiveTab('pending'); setFilter('pending'); setExpandedGroups(new Set()) }}>
+        <div style={{ flex: 1, background: '#fffbeb', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', minWidth: 0, cursor: 'pointer' }}
+          onClick={() => { setActiveTab('review'); setReviewFilter('pending'); setExpandedGroups(new Set()) }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#d97706', margin: 0, whiteSpace: 'nowrap' as const }}>검토 대기</p>
           <p style={{ fontSize: 28, fontWeight: 900, color: '#b45309', margin: '4px 0 0', whiteSpace: 'nowrap' as const }}>{stats.pending}<span style={{ fontSize: 14, fontWeight: 500, color: '#d97706', marginLeft: 2 }}>건</span></p>
         </div>
-        <div style={{ flex: 1, background: '#f0fdf4', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0', minWidth: 0, cursor: 'pointer' }} onClick={() => { setActiveTab('confirmed'); setFilter('confirmed'); setExpandedGroups(new Set()) }}>
+        <div style={{ flex: 1, background: '#f0fdf4', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0', minWidth: 0, cursor: 'pointer' }}
+          onClick={() => { setActiveTab('review'); setReviewFilter('confirmed'); setExpandedGroups(new Set()) }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', margin: 0, whiteSpace: 'nowrap' as const }}>확정 완료</p>
           <p style={{ fontSize: 28, fontWeight: 900, color: '#15803d', margin: '4px 0 0', whiteSpace: 'nowrap' as const }}>{stats.confirmed}<span style={{ fontSize: 14, fontWeight: 500, color: '#16a34a', marginLeft: 2 }}>건</span></p>
         </div>
-        <div style={{ flex: 1, background: '#eff6ff', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', minWidth: 0 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', margin: 0, whiteSpace: 'nowrap' as const }}>카테고리</p>
-          <p style={{ fontSize: 28, fontWeight: 900, color: '#1d4ed8', margin: '4px 0 0', whiteSpace: 'nowrap' as const }}>{groupedItems.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>건</span></p>
+        <div style={{ flex: 1, background: activeTab === 'upload' && uploadSubFilter === 'unclassified' ? '#fef2f2' : '#fef2f2', borderRadius: 12, padding: '16px 20px', border: '1px solid #fecaca', minWidth: 0, cursor: 'pointer' }}
+          onClick={() => { setActiveTab('upload'); setUploadSubFilter('unclassified'); setUploadGroupBy('none'); setCardSubFilter('all'); setBankSubFilter('all'); setExpandedGroups(new Set()) }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', margin: 0, whiteSpace: 'nowrap' as const }}>미분류</p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#b91c1c', margin: '4px 0 0', whiteSpace: 'nowrap' as const }}>
+            {results.length > 0 ? uploadStats.unclassifiedCount : reviewUnclassifiedCount}
+            <span style={{ fontSize: 14, fontWeight: 500, color: '#dc2626', marginLeft: 2 }}>건</span>
+          </p>
         </div>
       </div>
 
-      {/* 필터 탭 — 보험 페이지 pill 스타일 */}
+      {/* 탭 네비게이션 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' as const }}>
         {[
-          { key: 'upload' as const, label: '업로드 결과', count: results.length },
-          { key: 'pending' as const, label: '분류 대기', count: stats.pending },
-          { key: 'confirmed' as const, label: '확정 완료', count: stats.confirmed },
+          { key: 'upload' as const, label: '📂 업로드', icon: '' },
+          { key: 'review' as const, label: `📋 분류/확정 (${stats.pending + stats.confirmed})`, icon: '' },
         ].map(tab => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFilter(tab.key === 'upload' ? 'pending' : (tab.key === 'pending' ? 'pending' : 'confirmed')); setExpandedGroups(new Set()) }}
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()) }}
             style={{
               padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
               background: activeTab === tab.key ? '#2d5fa8' : '#fff',
@@ -992,7 +1313,8 @@ function UploadContent() {
               border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',
               boxShadow: activeTab === tab.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}>
-            {tab.label} ({tab.count})
+            {tab.label}
+            {tab.key === 'review' && ` (${stats.pending + stats.confirmed})`}
           </button>
         ))}
       </div>
@@ -1078,52 +1400,147 @@ function UploadContent() {
                   </div>
                 </div>
 
-                {/* Sub-filter: 전체/카드/통장 + 그룹핑 */}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* 결제수단 필터 */}
+                {/* ── 1행: 결제수단 메인 탭 ── */}
+                <div style={{ display: 'flex', gap: 0, alignItems: 'stretch', marginBottom: 0 }}>
                   {[
-                    { key: 'all' as const, label: '전체', count: results.length, icon: '📋' },
-                    { key: 'card' as const, label: '카드', count: uploadStats.cardCount, icon: '💳' },
-                    { key: 'bank' as const, label: '통장', count: uploadStats.bankCount, icon: '🏦' },
-                  ].map(f => (
-                    <button key={f.key} onClick={() => { setUploadSubFilter(f.key); if (f.key === 'bank') setUploadGroupBy('none') }}
-                      style={{
-                        padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
-                        background: uploadSubFilter === f.key ? '#2d5fa8' : '#fff',
-                        color: uploadSubFilter === f.key ? '#fff' : '#6b7280',
-                        border: uploadSubFilter === f.key ? 'none' : '1px solid #e5e7eb',
-                      }}>
-                      {f.icon} {f.label} ({f.count})
-                    </button>
-                  ))}
-
-                  <span style={{ color: '#d1d5db', margin: '0 4px' }}>|</span>
-
-                  {/* 그룹핑 */}
-                  {[
-                    { key: 'none' as const, label: '목록', icon: '📄' },
-                    { key: 'card_number' as const, label: '카드번호별', icon: '💳', onlyCard: true },
-                    { key: 'category' as const, label: '계정과목별', icon: '📊' },
-                    { key: 'vehicle' as const, label: '차량별', icon: '🚛' },
-                  ].filter(g => !g.onlyCard || uploadSubFilter !== 'bank').map(g => (
-                    <button key={g.key} onClick={() => setUploadGroupBy(g.key)}
-                      style={{
-                        padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
-                        background: uploadGroupBy === g.key ? '#1e293b' : '#fff',
-                        color: uploadGroupBy === g.key ? '#fff' : '#6b7280',
-                        border: uploadGroupBy === g.key ? 'none' : '1px solid #e5e7eb',
-                      }}>
-                      {g.icon} {g.label}
-                    </button>
-                  ))}
-
-                  {/* 매칭 요약 */}
-                  {uploadStats.cardMatchedCount > 0 && (
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
-                      법인카드 매칭 {uploadStats.cardMatchedCount}건 · 분류 완료 {uploadStats.classifiedCount}건
-                    </span>
-                  )}
+                    { key: 'all' as const, label: '전체', count: results.length, icon: '📋', color: '#2d5fa8', bg: '#eff6ff' },
+                    { key: 'card' as const, label: '💳 카드', count: uploadStats.cardCount, color: '#d97706', bg: '#fffbeb' },
+                    { key: 'bank' as const, label: '🏦 통장', count: uploadStats.bankCount, color: '#2d5fa8', bg: '#eff6ff' },
+                    { key: 'unclassified' as const, label: '❓ 미분류', count: uploadStats.unclassifiedCount, color: '#dc2626', bg: '#fef2f2' },
+                  ].map(f => {
+                    const active = uploadSubFilter === f.key
+                    return (
+                      <button key={f.key} onClick={() => {
+                        setUploadSubFilter(f.key)
+                        setCardSubFilter('all')
+                        setBankSubFilter('all')
+                        if (f.key === 'card') setUploadGroupBy('card_number')
+                        else if (f.key === 'bank') setUploadGroupBy('none')
+                        else if (f.key === 'unclassified') setUploadGroupBy('none')
+                        setExpandedGroups(new Set())
+                      }}
+                        style={{
+                          flex: 1, padding: '10px 12px', cursor: 'pointer', border: 'none', borderBottom: active ? `3px solid ${f.color}` : '3px solid transparent',
+                          background: active ? f.bg : 'transparent', transition: 'all 0.15s',
+                        }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: active ? f.color : '#94a3b8', marginBottom: 2 }}>{f.label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: active ? f.color : '#6b7280' }}>{f.count}<span style={{ fontSize: 11, fontWeight: 500, marginLeft: 1 }}>건</span></div>
+                      </button>
+                    )
+                  })}
                 </div>
+
+                {/* ── 2행: 카드 전용 서브필터 ── */}
+                {uploadSubFilter === 'card' && (
+                  <div style={{ padding: '8px 12px', background: '#fffbeb', borderTop: '1px solid #fef3c7', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'all' as const, label: '전체 카드', count: cardSubStats.all },
+                      { key: 'matched' as const, label: '매칭 완료', count: cardSubStats.matched },
+                      { key: 'unmatched' as const, label: '미등록 카드', count: cardSubStats.unmatched },
+                    ].map(f => (
+                      <button key={f.key} onClick={() => setCardSubFilter(f.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          background: cardSubFilter === f.key ? '#d97706' : '#fff',
+                          color: cardSubFilter === f.key ? '#fff' : '#92400e',
+                          border: cardSubFilter === f.key ? '1px solid #d97706' : '1px solid #fde68a',
+                        }}>
+                        {f.label} ({f.count})
+                      </button>
+                    ))}
+                    <span style={{ color: '#fde68a', margin: '0 2px' }}>|</span>
+                    {/* 카드 전용 그룹핑 */}
+                    {[
+                      { key: 'card_number' as const, label: '카드번호별', icon: '💳' },
+                      { key: 'category' as const, label: '계정과목별', icon: '📊' },
+                      { key: 'none' as const, label: '목록', icon: '📄' },
+                    ].map(g => (
+                      <button key={g.key} onClick={() => setUploadGroupBy(g.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          background: uploadGroupBy === g.key ? '#92400e' : '#fff',
+                          color: uploadGroupBy === g.key ? '#fff' : '#92400e',
+                          border: uploadGroupBy === g.key ? '1px solid #92400e' : '1px solid #fde68a',
+                        }}>
+                        {g.icon} {g.label}
+                      </button>
+                    ))}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                      법인카드 매칭 {cardSubStats.matched}/{cardSubStats.all}건
+                    </span>
+                  </div>
+                )}
+
+                {/* ── 2행: 통장 전용 서브필터 ── */}
+                {uploadSubFilter === 'bank' && (
+                  <div style={{ padding: '8px 12px', background: '#eff6ff', borderTop: '1px solid #dbeafe', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'all' as const, label: '전체', count: bankSubStats.all },
+                      { key: 'income' as const, label: '📥 입금', count: bankSubStats.income },
+                      { key: 'expense' as const, label: '📤 출금', count: bankSubStats.expense },
+                      { key: 'auto_transfer' as const, label: '🔄 자동이체', count: bankSubStats.autoTransfer },
+                      { key: 'salary_tax' as const, label: '🏛️ 급여/세금', count: bankSubStats.salaryTax },
+                    ].map(f => (
+                      <button key={f.key} onClick={() => setBankSubFilter(f.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          background: bankSubFilter === f.key ? '#2d5fa8' : '#fff',
+                          color: bankSubFilter === f.key ? '#fff' : '#1e40af',
+                          border: bankSubFilter === f.key ? '1px solid #2d5fa8' : '1px solid #bfdbfe',
+                        }}>
+                        {f.label} ({f.count})
+                      </button>
+                    ))}
+                    <span style={{ color: '#bfdbfe', margin: '0 2px' }}>|</span>
+                    {/* 통장 전용 그룹핑 */}
+                    {[
+                      { key: 'none' as const, label: '목록', icon: '📄' },
+                      { key: 'category' as const, label: '계정과목별', icon: '📊' },
+                    ].map(g => (
+                      <button key={g.key} onClick={() => setUploadGroupBy(g.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          background: uploadGroupBy === g.key ? '#1e3a5f' : '#fff',
+                          color: uploadGroupBy === g.key ? '#fff' : '#1e40af',
+                          border: uploadGroupBy === g.key ? '1px solid #1e3a5f' : '1px solid #bfdbfe',
+                        }}>
+                        {g.icon} {g.label}
+                      </button>
+                    ))}
+                    {/* 통장 입출금 합계 */}
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, fontSize: 11, fontWeight: 700 }}>
+                      <span style={{ color: '#2563eb' }}>입금 {nf(bankSubStats.incomeAmount)}원</span>
+                      <span style={{ color: '#dc2626' }}>출금 {nf(bankSubStats.expenseAmount)}원</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── 2행: 전체/미분류 기본 그룹핑 ── */}
+                {(uploadSubFilter === 'all' || uploadSubFilter === 'unclassified') && (
+                  <div style={{ padding: '8px 12px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'none' as const, label: '목록', icon: '📄' },
+                      { key: 'card_number' as const, label: '카드번호별', icon: '💳' },
+                      { key: 'category' as const, label: '계정과목별', icon: '📊' },
+                      { key: 'vehicle' as const, label: '차량별', icon: '🚛' },
+                    ].map(g => (
+                      <button key={g.key} onClick={() => setUploadGroupBy(g.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                          background: uploadGroupBy === g.key ? '#1e293b' : '#fff',
+                          color: uploadGroupBy === g.key ? '#fff' : '#6b7280',
+                          border: uploadGroupBy === g.key ? 'none' : '1px solid #e5e7eb',
+                        }}>
+                        {g.icon} {g.label}
+                      </button>
+                    ))}
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                      {uploadStats.cardCount > 0 && `법인카드 매칭 ${uploadStats.cardMatchedCount}/${uploadStats.cardCount}건`}
+                      {uploadStats.cardCount > 0 && uploadStats.classifiedCount > 0 && ' · '}
+                      {uploadStats.classifiedCount > 0 && `분류 완료 ${uploadStats.classifiedCount}/${results.length}건`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* ═══ 그룹 뷰: 카드번호별 ═══ */}
@@ -1132,20 +1549,28 @@ function UploadContent() {
                   {groupedByCard.map(([cardNum, group]) => (
                     <div key={cardNum} style={{ borderBottom: '2px solid #e5e7eb' }}>
                       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
-                        onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(cardNum) ? n.delete(cardNum) : n.add(cardNum); return n })}>
-                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.cardInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
-                        <span style={{ fontSize: 16 }}>💳</span>
+                        onClick={() => toggleGroup(cardNum)}>
+                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.isBank ? '#2d5fa8' : group.cardInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
+                        <span style={{ fontSize: 16 }}>{group.isBank ? '🏦' : '💳'}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>
-                            {group.cardInfo ? `${group.cardInfo.card_company} ****${(group.cardInfo.card_number || '').slice(-4)}` : cardNum}
+                            {group.isBank ? '통장/이체 거래' : group.cardInfo ? `${group.cardInfo.card_company} ****${(group.cardInfo.card_number || '').slice(-4)}` : cardNum}
                           </p>
-                          {group.cardInfo && (
+                          {group.isBank && (
+                            <p style={{ fontSize: 11, color: '#2d5fa8', margin: 0, marginTop: 1 }}>계좌이체, 자동이체, CMS 등 통장 거래 내역</p>
+                          )}
+                          {!group.isBank && group.cardInfo && (
                             <p style={{ fontSize: 11, color: '#64748b', margin: 0, marginTop: 1 }}>
-                              사용자: <b style={{ color: '#0f172a' }}>{group.cardInfo.holder_name || group.cardInfo.card_alias || '공용'}</b>
-                              {group.cardInfo.card_alias && group.cardInfo.card_alias !== group.cardInfo.holder_name ? ` (${group.cardInfo.card_alias})` : ''}
+                              사용자: <b style={{ color: '#0f172a' }}>{getCardDisplayName(group.cardInfo)}</b>
+                              {group.cardInfo.assigned_employee_id ? (() => {
+                                const emp = employees.find((e: any) => e.id === group.cardInfo.assigned_employee_id)
+                                const empName = emp?.name || emp?.employee_name
+                                const companyInfo = group.cardInfo.card_alias || group.cardInfo.holder_name
+                                return companyInfo && companyInfo !== empName ? <span style={{ color: '#94a3b8' }}> ({companyInfo})</span> : null
+                              })() : group.cardInfo.card_alias && group.cardInfo.card_alias !== group.cardInfo.holder_name ? <span style={{ color: '#94a3b8' }}> ({group.cardInfo.card_alias})</span> : null}
                             </p>
                           )}
-                          {!group.cardInfo && <p style={{ fontSize: 11, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
+                          {!group.isBank && !group.cardInfo && <p style={{ fontSize: 11, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
@@ -1153,29 +1578,77 @@ function UploadContent() {
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cardNum) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                       </div>
-                      {expandedGroups.has(cardNum) && (
+                      {expandedGroups.has(cardNum) && (() => {
+                        const cardLimit = groupItemLimits[cardNum] || GROUP_PAGE_SIZE
+                        const cardVisibleItems = group.items.slice(0, cardLimit)
+                        const cardHasMore = group.items.length > cardLimit
+                        return (
                         <div style={{ overflowX: 'auto' }}>
                           <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
                             <tbody>
-                              {group.items.map(item => (
+                              {cardVisibleItems.map(item => (
                                 <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                   <td style={{ padding: '8px 12px', width: 90, color: '#6b7280', fontSize: 12 }}>{item.transaction_date}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
                                   <td style={{ padding: '8px 12px' }}>
-                                    <select value={item.category || '기타'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '3px 6px', borderRadius: 4, color: '#374151', fontWeight: 600, fontSize: 11, outline: 'none', width: 120 }}>
-                                      <option value="기타">기타</option>
-                                      {DEFAULT_RULES.map((r, i) => <option key={i} value={r.label}>{r.label}</option>)}
+                                    <select value={item.category || '미분류'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '3px 6px', borderRadius: 4, color: '#374151', fontWeight: 600, fontSize: 11, outline: 'none', width: 130 }}>
+                                      {CATEGORIES.map(g => (
+                                        <optgroup key={g.group} label={g.group}>
+                                          {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </optgroup>
+                                      ))}
+                                      <option value="미분류">미분류</option>
                                     </select>
                                   </td>
-                                  <td style={{ padding: '4px 8px' }}>
+                                  <td style={{ padding: '4px 8px', position: 'relative' }}>
                                     {(() => {
                                       const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                      if (!rd) return <span style={{ fontSize: 9, color: '#d1d5db' }}>-</span>
+                                      const isOpen = openRelatedId === item.id
                                       return (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                          <span style={{ fontSize: 10 }}>{rd.icon}</span>
-                                          <span style={{ fontSize: 10, fontWeight: 600, color: rd.color }}>{rd.label}</span>
+                                        <div style={{ position: 'relative' }}>
+                                          <button onClick={() => setOpenRelatedId(isOpen ? null : item.id)} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                            {rd ? (
+                                              <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                  <span>{rd.icon}</span>
+                                                  <span style={{ fontWeight: 700, fontSize: 10, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
+                                                </div>
+                                                {rd.detail && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                              </div>
+                                            ) : (
+                                              <span style={{ flex: 1, color: '#d1d5db', fontSize: 10 }}>연결 없음</span>
+                                            )}
+                                            <span style={{ fontSize: 8, color: '#9ca3af', flexShrink: 0 }}>▼</span>
+                                          </button>
+                                          {isOpen && (
+                                            <>
+                                              <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpenRelatedId(null)} />
+                                              <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 99, marginTop: 2, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
+                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                                  <span style={{ fontSize: 12 }}>✕</span> 연결 해제
+                                                </button>
+                                                {relatedOptions.map(group => (
+                                                  <div key={group.group}>
+                                                    <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                    {group.items.map(opt => {
+                                                      const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
+                                                      return (
+                                                        <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
+                                                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                            <div style={{ fontSize: 9, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                          </div>
+                                                          {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                        </button>
+                                                      )
+                                                    })}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </>
+                                          )}
                                         </div>
                                       )
                                     })()}
@@ -1191,8 +1664,20 @@ function UploadContent() {
                               ))}
                             </tbody>
                           </table>
+                          {cardHasMore && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
+                              <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: cardLimit + GROUP_PAGE_SIZE })) }}
+                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                더보기 ({cardLimit}/{group.items.length}건)
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: group.items.length })) }}
+                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                전체보기
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                        )})()}
                     </div>
                   ))}
                 </div>
@@ -1208,7 +1693,7 @@ function UploadContent() {
                     return (
                       <div key={cat} style={{ borderBottom: '2px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
-                          onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n })}>
+                          onClick={() => toggleGroup(cat)}>
                           <div style={{ width: 4, height: 32, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
                           <span style={{ fontSize: 16 }}>{icon}</span>
                           <div style={{ flex: 1 }}>
@@ -1221,11 +1706,15 @@ function UploadContent() {
                           </div>
                           <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cat) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                         </div>
-                        {expandedGroups.has(cat) && (
+                        {expandedGroups.has(cat) && (() => {
+                          const catLimit = groupItemLimits[cat] || GROUP_PAGE_SIZE
+                          const catVisibleItems = group.items.slice(0, catLimit)
+                          const catHasMore = group.items.length > catLimit
+                          return (
                           <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
                               <tbody>
-                                {group.items.map(item => (
+                                {catVisibleItems.map(item => (
                                   <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                     <td style={{ padding: '8px 12px', width: 90, color: '#6b7280' }}>{item.transaction_date}</td>
                                     <td style={{ padding: '8px 12px' }}>
@@ -1252,17 +1741,54 @@ function UploadContent() {
                                       ) : null}
                                     </td>
                                     {/* 연결 대상 */}
-                                    <td style={{ padding: '4px 8px' }}>
+                                    <td style={{ padding: '4px 8px', position: 'relative' }}>
                                       {(() => {
                                         const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                        if (!rd) return null
+                                        const isOpen = openRelatedId === item.id
                                         return (
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                            <span style={{ fontSize: 10 }}>{rd.icon}</span>
-                                            <div>
-                                              <span style={{ fontSize: 10, fontWeight: 600, color: rd.color }}>{rd.label}</span>
-                                              {rd.detail && <div style={{ fontSize: 8, color: '#9ca3af' }}>{rd.detail}</div>}
-                                            </div>
+                                          <div style={{ position: 'relative' }}>
+                                            <button onClick={() => setOpenRelatedId(isOpen ? null : item.id)} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                              {rd ? (
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                    <span>{rd.icon}</span>
+                                                    <span style={{ fontWeight: 700, fontSize: 10, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
+                                                  </div>
+                                                  {rd.detail && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                                </div>
+                                              ) : (
+                                                <span style={{ flex: 1, color: '#d1d5db', fontSize: 10 }}>연결 없음</span>
+                                              )}
+                                              <span style={{ fontSize: 8, color: '#9ca3af', flexShrink: 0 }}>▼</span>
+                                            </button>
+                                            {isOpen && (
+                                              <>
+                                                <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpenRelatedId(null)} />
+                                                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 99, marginTop: 2, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
+                                                  <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                                    <span style={{ fontSize: 12 }}>✕</span> 연결 해제
+                                                  </button>
+                                                  {relatedOptions.map(group => (
+                                                    <div key={group.group}>
+                                                      <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                      {group.items.map(opt => {
+                                                        const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
+                                                        return (
+                                                          <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
+                                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                              <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                              <div style={{ fontSize: 9, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                            </div>
+                                                            {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                          </button>
+                                                        )
+                                                      })}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </>
+                                            )}
                                           </div>
                                         )
                                       })()}
@@ -1278,8 +1804,20 @@ function UploadContent() {
                                 ))}
                               </tbody>
                             </table>
+                            {catHasMore && (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
+                                <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: catLimit + GROUP_PAGE_SIZE })) }}
+                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                  더보기 ({catLimit}/{group.items.length}건)
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: group.items.length })) }}
+                                  style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                  전체보기
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
+                          )})()}
                       </div>
                     )
                   })}
@@ -1292,7 +1830,7 @@ function UploadContent() {
                   {groupedByVehicle.map(([label, group]) => (
                     <div key={label} style={{ borderBottom: '2px solid #e5e7eb' }}>
                       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
-                        onClick={() => setExpandedGroups(prev => { const n = new Set(prev); n.has(label) ? n.delete(label) : n.add(label); return n })}>
+                        onClick={() => toggleGroup(label)}>
                         <div style={{ width: 4, height: 32, borderRadius: 4, background: group.carInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
                         <span style={{ fontSize: 16 }}>{label.startsWith('🚛') ? '🚛' : '🏢'}</span>
                         <div style={{ flex: 1 }}>
@@ -1304,11 +1842,15 @@ function UploadContent() {
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(label) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                       </div>
-                      {expandedGroups.has(label) && (
+                      {expandedGroups.has(label) && (() => {
+                        const vLimit = groupItemLimits[label] || GROUP_PAGE_SIZE
+                        const vVisibleItems = group.items.slice(0, vLimit)
+                        const vHasMore = group.items.length > vLimit
+                        return (
                         <div style={{ overflowX: 'auto' }}>
                           <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
                             <tbody>
-                              {group.items.map(item => (
+                              {vVisibleItems.map(item => (
                                 <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                   <td style={{ padding: '8px 12px', width: 90, color: '#6b7280' }}>{item.transaction_date}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
@@ -1318,6 +1860,58 @@ function UploadContent() {
                                     </span>
                                   </td>
                                   <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
+                                  <td style={{ padding: '4px 8px', position: 'relative' }}>
+                                    {(() => {
+                                      const rd = getRelatedDisplay(item.related_type, item.related_id)
+                                      const isOpen = openRelatedId === item.id
+                                      return (
+                                        <div style={{ position: 'relative' }}>
+                                          <button onClick={() => setOpenRelatedId(isOpen ? null : item.id)} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                            {rd ? (
+                                              <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                  <span>{rd.icon}</span>
+                                                  <span style={{ fontWeight: 700, fontSize: 10, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
+                                                </div>
+                                                {rd.detail && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                              </div>
+                                            ) : (
+                                              <span style={{ flex: 1, color: '#d1d5db', fontSize: 10 }}>연결 없음</span>
+                                            )}
+                                            <span style={{ fontSize: 8, color: '#9ca3af', flexShrink: 0 }}>▼</span>
+                                          </button>
+                                          {isOpen && (
+                                            <>
+                                              <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpenRelatedId(null)} />
+                                              <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 99, marginTop: 2, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
+                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                                  <span style={{ fontSize: 12 }}>✕</span> 연결 해제
+                                                </button>
+                                                {relatedOptions.map(group => (
+                                                  <div key={group.group}>
+                                                    <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                    {group.items.map(opt => {
+                                                      const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
+                                                      return (
+                                                        <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
+                                                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                            <div style={{ fontSize: 9, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                          </div>
+                                                          {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                        </button>
+                                                      )
+                                                    })}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      )
+                                    })()}
+                                  </td>
                                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#111827' }}>{(item.amount || 0).toLocaleString()}</td>
                                   <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
                                     <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
@@ -1326,10 +1920,125 @@ function UploadContent() {
                               ))}
                             </tbody>
                           </table>
+                          {vHasMore && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
+                              <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: vLimit + GROUP_PAGE_SIZE })) }}
+                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                더보기 ({vLimit}/{group.items.length}건)
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: group.items.length })) }}
+                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                전체보기
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                        )})()}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* ═══ 통장 거래 요약 패널 ═══ */}
+              {uploadSubFilter === 'bank' && bankSubStats.all > 0 && (
+                <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)', borderBottom: '1px solid #bfdbfe' }}>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 140, background: '#fff', borderRadius: 10, padding: '10px 14px', border: '1px solid #dbeafe' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#2563eb', margin: 0 }}>📥 입금 합계</p>
+                      <p style={{ fontSize: 18, fontWeight: 900, color: '#1d4ed8', margin: '4px 0 0' }}>{nf(bankSubStats.incomeAmount)}<span style={{ fontSize: 11, fontWeight: 500, color: '#60a5fa' }}>원</span></p>
+                      <p style={{ fontSize: 10, color: '#93c5fd', margin: '2px 0 0' }}>{bankSubStats.income}건</p>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 140, background: '#fff', borderRadius: 10, padding: '10px 14px', border: '1px solid #fecaca' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', margin: 0 }}>📤 출금 합계</p>
+                      <p style={{ fontSize: 18, fontWeight: 900, color: '#b91c1c', margin: '4px 0 0' }}>{nf(bankSubStats.expenseAmount)}<span style={{ fontSize: 11, fontWeight: 500, color: '#f87171' }}>원</span></p>
+                      <p style={{ fontSize: 10, color: '#fca5a5', margin: '2px 0 0' }}>{bankSubStats.expense}건</p>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 140, background: '#fff', borderRadius: 10, padding: '10px 14px', border: '1px solid #e5e7eb' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', margin: 0 }}>💰 잔액 차이</p>
+                      <p style={{ fontSize: 18, fontWeight: 900, color: bankSubStats.incomeAmount - bankSubStats.expenseAmount >= 0 ? '#059669' : '#dc2626', margin: '4px 0 0' }}>
+                        {bankSubStats.incomeAmount - bankSubStats.expenseAmount >= 0 ? '+' : ''}{nf(bankSubStats.incomeAmount - bankSubStats.expenseAmount)}<span style={{ fontSize: 11, fontWeight: 500 }}>원</span>
+                      </p>
+                      <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>입금 - 출금</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ 미분류 수동 정리 배너 ═══ */}
+              {uploadSubFilter === 'unclassified' && uploadStats.unclassifiedCount > 0 && (
+                <div style={{ padding: '14px 16px', background: 'linear-gradient(135deg, #fef2f2, #fff1f2)', borderBottom: '1px solid #fecaca', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <p style={{ fontWeight: 800, fontSize: 14, color: '#991b1b', margin: 0 }}>
+                      ❓ 미분류 거래 {uploadStats.unclassifiedCount}건
+                    </p>
+                    <p style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, margin: '2px 0 0' }}>
+                      아래 계정과목 드롭다운에서 직접 변경하거나, AI 재분류를 시도하세요
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('미분류 거래를 AI로 재분류하시겠습니까?')) return
+                        // 미분류 거래만 모아서 classify API로 보내기
+                        const unclassifiedItems = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
+                        if (unclassifiedItems.length === 0) return alert('미분류 거래가 없습니다.')
+
+                        try {
+                          const { data: { session } } = await supabase.auth.getSession()
+                          for (const item of unclassifiedItems) {
+                            const payload = {
+                              company_id: effectiveCompanyId,
+                              items: [{
+                                transaction_date: item.transaction_date,
+                                type: item.type,
+                                client_name: item.client_name,
+                                description: item.description,
+                                amount: item.amount,
+                                payment_method: item.payment_method,
+                                card_number: item.card_number,
+                              }],
+                            }
+                            const res = await fetch('/api/finance/classify', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+                              },
+                              body: JSON.stringify(payload),
+                            })
+                            if (res.ok) {
+                              const data = await res.json()
+                              if (data.results?.[0]?.category) {
+                                updateTransaction(item.id, 'category', data.results[0].category)
+                              }
+                            }
+                          }
+                          alert(`AI 재분류 완료! ${unclassifiedItems.length}건 처리됨`)
+                        } catch (e) {
+                          console.error('AI 재분류 오류:', e)
+                          alert('AI 재분류 중 오류가 발생했습니다.')
+                        }
+                      }}
+                      style={{ padding: '8px 16px', borderRadius: 8, background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      🤖 AI 재분류
+                    </button>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {['유류비', '복리후생(식대)', '수수료/카드수수료', '소모품/사무용품', '접대비'].map(cat => (
+                        <button key={cat} onClick={() => {
+                          const items = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
+                          // 미분류 전체에 적용하지 않고, 빠른 선택용 도구
+                          if (items.length > 0 && confirm(`미분류 전체 ${items.length}건을 "${cat}"로 일괄 변경하시겠습니까?`)) {
+                            items.forEach(item => updateTransaction(item.id, 'category', cat))
+                          }
+                        }}
+                          style={{ padding: '4px 8px', borderRadius: 6, background: '#fff', border: '1px solid #e5e7eb', fontSize: 10, fontWeight: 700, color: '#4b5563', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          {CATEGORY_ICONS[cat] || '📋'} {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1355,7 +2064,7 @@ function UploadContent() {
                       {filteredResults.map((item) => {
                         const cardInfo = getCardDisplayInfo(item.card_id)
                         return (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', background: 'transparent', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.03)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                          <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', background: (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = (!item.category || item.category === '미분류' || item.category === '기타') ? '#fee2e2' : 'rgba(79, 70, 229, 0.03)'} onMouseLeave={(e) => e.currentTarget.style.background = (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent'}>
                             <td style={{ padding: '8px 12px', textAlign: 'center' }}><button onClick={() => saveRuleToDb(item)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontSize: 14, cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#eab308'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>⭐</button></td>
                             <td style={{ padding: '8px 12px' }}><input value={item.transaction_date || ''} onChange={e => handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} style={{ background: 'transparent', width: 90, outline: 'none', color: '#1f2937', fontSize: 12 }} /></td>
                             <td style={{ padding: '8px 12px' }}>
@@ -1373,9 +2082,20 @@ function UploadContent() {
                             <td style={{ padding: '8px 12px' }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 12 }} /></td>
                             <td style={{ padding: '8px 12px' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 4, padding: '3px 6px', outline: 'none', fontSize: 11, color: '#4b5563' }} /></td>
                             <td style={{ padding: '8px 12px' }}>
-                              <select value={item.category || '기타'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '3px 6px', borderRadius: 4, color: '#374151', fontWeight: 700, width: 120, fontSize: 11, outline: 'none' }}>
-                                <option value="기타">기타</option>
-                                {DEFAULT_RULES.map((r, i) => <option key={i} value={r.label}>{r.label}</option>)}
+                              <select value={item.category || '미분류'} onChange={e => handleUpdateItem(item.id, 'category', e.target.value, item)}
+                                style={{
+                                  background: (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : '#fff',
+                                  border: (!item.category || item.category === '미분류' || item.category === '기타') ? '2px solid #f87171' : '1px solid #e5e7eb',
+                                  padding: '3px 6px', borderRadius: 4,
+                                  color: (!item.category || item.category === '미분류' || item.category === '기타') ? '#dc2626' : '#374151',
+                                  fontWeight: 700, width: 130, fontSize: 11, outline: 'none',
+                                }}>
+                                {CATEGORIES.map(g => (
+                                  <optgroup key={g.group} label={g.group}>
+                                    {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </optgroup>
+                                ))}
+                                <option value="미분류">미분류</option>
                               </select>
                             </td>
                             <td style={{ padding: '8px 12px' }}>
@@ -1475,7 +2195,17 @@ function UploadContent() {
                             </td>
                             <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: 13, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
                               {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
+                              {(item as any).currency && (item as any).currency !== 'KRW' && (
+                                <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>
+                                  {(item as any).currency}
+                                </span>
+                              )}
                               {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                              {(item as any).currency && (item as any).currency !== 'KRW' && (item as any).original_amount && (
+                                <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>
+                                  ({(item as any).currency} {((item as any).original_amount || 0).toLocaleString()})
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '8px 12px', textAlign: 'center' }}><button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontWeight: 700, padding: 4, cursor: 'pointer', fontSize: 16 }} onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>×</button></td>
                           </tr>
@@ -1490,13 +2220,34 @@ function UploadContent() {
         </>
       )}
 
-      {/* Pending & Confirmed Tabs */}
-      {(activeTab === 'pending' || activeTab === 'confirmed') && (
+      {/* Review Tab (분류/확정 통합) */}
+      {activeTab === 'review' && (
         <>
-          {/* 그룹뷰 셀렉터 + 삭제 도구 바 */}
+          {/* 상태 필터 + 그룹뷰 + 삭제 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            {/* 그룹 뷰 탭 */}
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* 상태 필터 (pending/confirmed) */}
+              {([
+                { key: 'pending' as const, label: '검토 대기', count: stats.pending, color: '#d97706', bg: '#fffbeb' },
+                { key: 'confirmed' as const, label: '확정 완료', count: stats.confirmed, color: '#16a34a', bg: '#f0fdf4' },
+              ]).map(f => (
+                <button key={f.key} onClick={() => { setReviewFilter(f.key); setExpandedGroups(new Set()); setSelectedIds(new Set()) }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    background: reviewFilter === f.key ? f.bg : '#fff',
+                    color: reviewFilter === f.key ? f.color : '#9ca3af',
+                    border: reviewFilter === f.key ? `1.5px solid ${f.color}` : '1px solid #e5e7eb',
+                  }}>
+                  {f.label} ({f.count})
+                </button>
+              ))}
+              {reviewUnclassifiedCount > 0 && (
+                <span style={{ padding: '4px 10px', borderRadius: 8, background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', whiteSpace: 'nowrap' }}>
+                  ❓ 미분류 {reviewUnclassifiedCount}건
+                </span>
+              )}
+              <div style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 4px' }} />
+              {/* 그룹 뷰 탭 */}
               {([
                 { key: 'category' as const, label: '카테고리별', icon: '📂' },
                 { key: 'card' as const, label: '카드별', icon: '💳' },
@@ -1541,7 +2292,7 @@ function UploadContent() {
             <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>✅</span>
               <p style={{ fontWeight: 700, fontSize: 14, color: '#475569', margin: 0 }}>
-                {activeTab === 'pending' ? '분류 대기 항목이 없습니다' : '확정된 항목이 없습니다'}
+                {reviewFilter === 'pending' ? '분류 대기 항목이 없습니다' : '확정된 항목이 없습니다'}
               </p>
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>업로드된 거래가 AI 분류되면 여기에 표시됩니다</p>
             </div>
@@ -1555,12 +2306,22 @@ function UploadContent() {
                 const isIncome = group.type === 'income'
 
                 return (
-                  <div key={category} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden', transition: 'all 0.2s' }}>
+                  <div key={category} style={{
+                    background: (category === '미분류' || category === '기타') ? '#fff5f5' : '#fff',
+                    borderRadius: 16,
+                    border: (category === '미분류' || category === '기타') ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                    overflow: 'hidden', transition: 'all 0.2s',
+                  }}>
                     {/* Group Header */}
                     <div onClick={() => toggleGroup(category)}
-                      style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', cursor: 'pointer', gap: 12, borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none', background: '#fafbfc', transition: 'background 0.2s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = '#fafbfc'}>
+                      style={{
+                        display: 'flex', alignItems: 'center', padding: '14px 20px', cursor: 'pointer', gap: 12,
+                        borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
+                        background: (category === '미분류' || category === '기타') ? '#fef2f2' : '#fafbfc',
+                        transition: 'background 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fee2e2' : '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fef2f2' : '#fafbfc'}>
 
                       {/* Color Bar */}
                       <div style={{ width: 4, height: 36, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
@@ -1583,14 +2344,19 @@ function UploadContent() {
                       </div>
 
                       {/* Group Actions */}
-                      {activeTab === 'pending' && category !== '미분류' && category !== '기타' && (
+                      {reviewFilter === 'pending' && category !== '미분류' && category !== '기타' && (
                         <button onClick={(e) => { e.stopPropagation(); handleConfirmGroup(category) }}
                           style={{ background: '#10b981', color: '#fff', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                           일괄확정
                         </button>
                       )}
+                      {reviewFilter === 'pending' && (category === '미분류' || category === '기타') && (
+                        <span style={{ padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', flexShrink: 0 }}>
+                          ⚠ 분류 후 확정 가능
+                        </span>
+                      )}
 
-                      {activeTab === 'confirmed' && (
+                      {reviewFilter === 'confirmed' && (
                         <button onClick={(e) => { e.stopPropagation(); handleRevertGroup(category) }}
                           style={{ background: '#fef2f2', color: '#dc2626', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', cursor: 'pointer', flexShrink: 0 }}>
                           ↩ 일괄되돌리기
@@ -1601,10 +2367,14 @@ function UploadContent() {
                       <span style={{ fontSize: 14, color: '#94a3b8', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                     </div>
 
-                    {/* Group Items */}
-                    {isExpanded && (
+                    {/* Group Items (paginated to prevent crash on large groups) */}
+                    {isExpanded && (() => {
+                      const limit = groupItemLimits[category] || GROUP_PAGE_SIZE
+                      const visibleItems = group.items.slice(0, limit)
+                      const hasMore = group.items.length > limit
+                      return (
                       <div>
-                        {group.items.map((item: any) => {
+                        {visibleItems.map((item: any) => {
                           const src = item.source_data || {}
                           const isConfirmed = item.status === 'confirmed'
 
@@ -1659,15 +2429,25 @@ function UploadContent() {
                               </span>
 
                               {/* Actions - Pending */}
-                              {!isConfirmed && activeTab === 'pending' && (
+                              {!isConfirmed && reviewFilter === 'pending' && (
                                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                                  <button onClick={() => handleConfirm(item)}
-                                    style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
-                                    확정
-                                  </button>
+                                  {(category !== '미분류' && category !== '기타') ? (
+                                    <button onClick={() => handleConfirm(item)}
+                                      style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
+                                      확정
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: 9, color: '#dc2626', fontWeight: 700, padding: '4px 6px', background: '#fef2f2', borderRadius: 4 }}>분류필요</span>
+                                  )}
                                   <select defaultValue="" onChange={e => { if (e.target.value) handleConfirm(item, { category: e.target.value }) }}
-                                    style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 10, background: '#fff', color: '#64748b', maxWidth: 90, cursor: 'pointer' }}>
-                                    <option value="" disabled>변경</option>
+                                    style={{
+                                      border: (category === '미분류' || category === '기타') ? '2px solid #f87171' : '1px solid #e2e8f0',
+                                      borderRadius: 6, padding: '3px 4px', fontSize: 10,
+                                      background: (category === '미분류' || category === '기타') ? '#fef2f2' : '#fff',
+                                      color: (category === '미분류' || category === '기타') ? '#dc2626' : '#64748b',
+                                      maxWidth: 100, cursor: 'pointer', fontWeight: (category === '미분류' || category === '기타') ? 700 : 400,
+                                    }}>
+                                    <option value="" disabled>{(category === '미분류' || category === '기타') ? '⚠ 분류 선택' : '변경'}</option>
                                     {CATEGORIES.map(g => (
                                       <optgroup key={g.group} label={g.group}>
                                         {g.items.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1683,7 +2463,7 @@ function UploadContent() {
                               )}
 
                               {/* Actions - Confirmed */}
-                              {isConfirmed && activeTab !== 'pending' && (
+                              {isConfirmed && reviewFilter !== 'pending' && (
                                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                   <select defaultValue="" onChange={e => { if (e.target.value) handleChangeCategory(item, e.target.value) }}
                                     style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 10, background: '#fff', color: '#64748b', maxWidth: 90, cursor: 'pointer' }}>
@@ -1704,8 +2484,20 @@ function UploadContent() {
                             </div>
                           )
                         })}
+                        {hasMore && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
+                            <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: limit + GROUP_PAGE_SIZE })) }}
+                              style={{ background: '#2d5fa8', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
+                              더보기 ({limit}/{group.items.length}건)
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: group.items.length })) }}
+                              style={{ background: '#fff', color: '#64748b', padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                              전체보기
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      )})()}
                   </div>
                 )
               })}

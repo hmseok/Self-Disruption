@@ -65,7 +65,7 @@ export async function POST(
       .single()
 
     if (existingToken) {
-      const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || ''
+      const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
       return NextResponse.json({
         token: existingToken.token,
         shareUrl: `${origin}/public/quote/${existingToken.token}`,
@@ -99,7 +99,7 @@ export async function POST(
       .update({ shared_at: new Date().toISOString() })
       .eq('id', quoteId)
 
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || ''
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
     const shareUrl = `${origin}/public/quote/${token}`
 
     return NextResponse.json({

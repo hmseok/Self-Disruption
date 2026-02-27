@@ -913,8 +913,8 @@ export default function ShortTermReplacementBuilder() {
                     </div>
                   </div>
 
-                  {/* 상세 내역 — 데스크톱 테이블 */}
-                  <div className="hidden sm:block px-4 py-3">
+                  {/* 상세 내역 테이블 */}
+                  <div style={{ padding: '12px 16px' }}>
                     <table className="w-full">
                       <thead>
                         <tr className="text-xs text-gray-400 font-bold">
@@ -938,22 +938,6 @@ export default function ShortTermReplacementBuilder() {
                       </tbody>
                     </table>
                   </div>
-                  {/* 상세 내역 — 모바일 카드 */}
-                  <div className="sm:hidden px-3 py-2.5 space-y-2">
-                    {qcResult.lines.map((line, li) => (
-                      <div key={li} className="bg-white/60 rounded-lg px-3 py-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-bold text-gray-700">{line.label} 요율 ×{line.qty}{line.qty > 1 ? '일' : ''}</span>
-                          <span className="text-sm font-bold text-gray-800">{f(line.subtotalDisc)}원</span>
-                        </div>
-                        <div className="flex gap-2 text-[11px]">
-                          <span className="text-red-400 line-through">롯데 {f(line.unitBase)}원</span>
-                          <span className="text-steel-600 font-bold">→ {f(line.unitDisc)}원</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
                   {/* 합계 영역 */}
                   <div className="px-4 py-3 border-t border-steel-200/50 bg-white/30 space-y-1.5">
                     <div className="flex justify-between text-sm">
@@ -1197,8 +1181,8 @@ export default function ShortTermReplacementBuilder() {
             })}
           </div>
 
-          {/* 데스크톱: 테이블 */}
-          <div className="hidden lg:block overflow-x-auto">
+          {/* 테이블 (반응형 스크롤) */}
+          <div style={{ overflowX: 'auto' }}>
             <table className="w-full">
               <thead><tr className="text-gray-400 whitespace-nowrap">
                 <th className="py-2 px-3 pl-4 text-left text-sm font-bold">카테고리</th>
@@ -1272,29 +1256,6 @@ export default function ShortTermReplacementBuilder() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          {/* 모바일: 카드형 */}
-          <div className="lg:hidden divide-y divide-gray-100">
-            {filteredLotteRates.map((lr, i) => (
-              <div key={lr.id || i} className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-red-50 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded">{lr.lotte_category}</span>
-                  <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1.5 py-0.5 rounded">{lr.service_group}</span>
-                </div>
-                <p className="text-sm text-gray-700 font-bold mb-2 leading-snug">{lr.vehicle_names}</p>
-                <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-orange-400">6h</span><span className="font-bold text-orange-500">{f(lr.rate_6hrs)}</span></div>
-                  <div className="flex justify-between"><span className="text-orange-400">10h</span><span className="font-bold text-orange-500">{f(lr.rate_10hrs)}</span></div>
-                  <div className="flex justify-between"><span className="text-orange-500">12h</span><span className="font-bold text-orange-500">{f(lr.rate_12hrs)}</span></div>
-                  <div className="flex justify-between"><span className="text-red-400">1~3일</span><span className="font-bold text-red-600">{f(lr.rate_1_3days)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">4일</span><span className="font-bold text-gray-600">{f(lr.rate_4days)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">5~6일</span><span className="font-bold text-gray-600">{f(lr.rate_5_6days)}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">7일+</span><span className="font-bold text-gray-600">{f(lr.rate_7plus_days)}</span></div>
-                  <div className="flex justify-between col-span-2"><span className="text-steel-500">롯데 할인({globalDiscount}%)</span><span className="font-black text-steel-600">{f(calcRate(lr.rate_1_3days, globalDiscount))}원</span></div>
-                </div>
-              </div>
-            ))}
           </div>
 
           <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
@@ -1490,7 +1451,7 @@ export default function ShortTermReplacementBuilder() {
                 <colgroup>
                   <col style={{ width: '56px' }} />
                   <col />
-                  <col className="hidden sm:table-column" style={{ width: '100px' }} />
+                  <col style={{ width: '100px' }} />
                   <col style={{ width: '86px' }} />
                   {selectedDaysList.map(d => (
                     <col key={d} style={{ width: '88px' }} />
@@ -1500,7 +1461,7 @@ export default function ShortTermReplacementBuilder() {
                   <tr className="bg-steel-900 text-white text-sm">
                     <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-800">등급</th>
                     <th className="py-2.5 px-2 text-left font-bold border-r border-steel-800">차종</th>
-                    <th className="py-2.5 px-2 text-center font-bold hidden sm:table-cell whitespace-nowrap border-r border-steel-800">배기량</th>
+                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-800">배기량</th>
                     <th className="py-2.5 px-2 text-right font-bold whitespace-nowrap border-r border-steel-800">일단가</th>
                     {selectedDaysList.map((d, idx) => (
                       <th key={d} className={`py-2.5 px-2 text-right font-bold text-yellow-300 whitespace-nowrap ${idx < selectedDaysList.length - 1 ? 'border-r border-steel-800' : ''}`}>
@@ -1525,7 +1486,7 @@ export default function ShortTermReplacementBuilder() {
                             <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">{r.service_group}</span>
                           </td>
                           <td className="py-2 px-2 font-bold text-gray-800 truncate border-r border-gray-100" title={r.vehicle_class}>{r.vehicle_class}</td>
-                          <td className="py-2 px-2 text-center text-gray-500 font-bold hidden sm:table-cell truncate border-r border-gray-100">{r.displacement_range}</td>
+                          <td className="py-2 px-2 text-center text-gray-500 font-bold truncate border-r border-gray-100">{r.displacement_range}</td>
                           <td className="py-2 px-2 text-right font-bold text-steel-700 whitespace-nowrap tabular-nums border-r border-gray-100">{f(r.dailyRate)}</td>
                           {selectedDaysList.map((d, idx) => (
                             <td key={d} className={`py-2 px-2 text-right font-black text-steel-600 whitespace-nowrap tabular-nums ${idx < selectedDaysList.length - 1 ? 'border-r border-gray-100' : ''}`}>{f(r.byDays[d].monthly)}</td>

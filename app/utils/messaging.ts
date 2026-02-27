@@ -391,17 +391,39 @@ export async function sendWithTemplate(params: SendWithTemplateParams): Promise<
   try {
     const sb = getSupabaseAdmin()
 
-    // 1. DB에서 템플릿 로드
+    // 1. DB에서 템플릿 로드 (회사별 우선 → 시스템 공통 fallback)
     console.log('[sendWithTemplate] 템플릿 조회 중...')
-    const { data: template, error: dbError } = await sb
+    let template: any = null
+    let dbError: any = null
+
+    // 1-1. 회사별 템플릿 조회
+    const { data: companyTemplate, error: compErr } = await sb
       .from('message_templates')
       .select('*')
       .eq('company_id', companyId)
       .eq('template_key', templateKey)
       .eq('channel', channel)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
-    if (dbError || !template) {
+    if (companyTemplate) {
+      template = companyTemplate
+    } else {
+      // 1-2. 시스템 공통 템플릿 (company_id IS NULL) 조회
+      const { data: sysTemplate, error: sysErr } = await sb
+        .from('message_templates')
+        .select('*')
+        .is('company_id', null)
+        .eq('template_key', templateKey)
+        .eq('channel', channel)
+        .limit(1)
+        .maybeSingle()
+
+      template = sysTemplate
+      dbError = sysErr || compErr
+    }
+
+    if (!template) {
       const error = `템플릿을 찾을 수 없음 (${templateKey}/${channel}): ${dbError?.message || 'Not found'}`
       console.error('[sendWithTemplate] 템플릿 로드 실패:', error)
 

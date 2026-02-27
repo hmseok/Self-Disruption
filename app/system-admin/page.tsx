@@ -225,7 +225,7 @@ export default function SystemAdminPage() {
                 ) : (
                   <>
                     {/* Desktop: 테이블 형태 */}
-                    <div className="hidden md:block overflow-x-auto">
+                    <div style={{ overflowX: 'auto' }}>
                       <table className="w-full text-left">
                         <thead>
                           <tr className="border-b border-slate-200">
@@ -284,27 +284,6 @@ export default function SystemAdminPage() {
                         </tbody>
                       </table>
                     </div>
-
-                    {/* Mobile: 카드 형태 */}
-                    <div className="md:hidden space-y-2">
-                      {modules.map(mod => {
-                        const modPlan = getPlanInfo(mod.plan_group || 'free')
-                        return (
-                          <div key={mod.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${modPlan.color}`}>
-                                <span className="text-[11px] font-black">{mod.icon_key?.slice(0, 2) || '?'}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-bold text-slate-800">{mod.name}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{mod.path}</div>
-                              </div>
-                              <button
-                                onClick={() => startEditModule(mod)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 flex-shrink-0"
-                                title="모듈 수정"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                 </svg>
                               </button>

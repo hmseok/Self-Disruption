@@ -91,6 +91,72 @@ export default function CorporateCardsPage() {
     blockedMCC: ['유흥주점', '골프장', '성형외과', '피부과', '카지노', '노래방', '안마', '사우나'],
   }
 
+  // ── 메인 탭 (카드관리 / 특이건 검토 / 급여 반영) ──
+  const [mainTab, setMainTab] = useState<'cards' | 'flags' | 'salary'>('cards')
+  const [flagItems, setFlagItems] = useState<any[]>([])
+  const [flagSummary, setFlagSummary] = useState<any>({})
+  const [flagFilter, setFlagFilter] = useState<string>('unresolved')
+  const [flagLoading, setFlagLoading] = useState(false)
+  const [salaryAdjustments, setSalaryAdjustments] = useState<any[]>([])
+  const [salaryMonth, setSalaryMonth] = useState(() => {
+    const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [salarySummary, setSalarySummary] = useState<Record<string, any>>({})
+
+  // 특이건 데이터 로드
+  const fetchFlags = async () => {
+    if (!companyId) return
+    setFlagLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      const res = await fetch(`/api/finance/flags?company_id=${companyId}&status=${flagFilter}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setFlagItems(data.items || [])
+        setFlagSummary(data.summary || {})
+      }
+    } catch (e) { console.error('fetchFlags error:', e) }
+    setFlagLoading(false)
+  }
+
+  // 급여 조정 데이터 로드
+  const fetchSalaryAdjustments = async () => {
+    if (!companyId) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      const res = await fetch(`/api/finance/salary-adjustments?company_id=${companyId}&year_month=${salaryMonth}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setSalaryAdjustments(data.items || [])
+        setSalarySummary(data.summaryByEmployee || {})
+      }
+    } catch (e) { console.error('fetchSalaryAdj error:', e) }
+  }
+
+  // 특이건 상태 업데이트
+  const updateFlagStatus = async (flagIds: string[], newStatus: string) => {
+    if (!companyId) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      const res = await fetch('/api/finance/flags', {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ flag_ids: flagIds, status: newStatus, create_salary_adjustment: newStatus === 'personal_confirmed' }),
+      })
+      if (res.ok) fetchFlags()
+    } catch (e) { console.error('updateFlag error:', e) }
+  }
+
+  useEffect(() => {
+    if (mainTab === 'flags') fetchFlags()
+    if (mainTab === 'salary') fetchSalaryAdjustments()
+  }, [mainTab, companyId, flagFilter, salaryMonth])
+
   // 일괄 등록 상태
   const [isDragging, setIsDragging] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -750,31 +816,59 @@ export default function CorporateCardsPage() {
           <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2d5fa8', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-            <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            카드 등록
-          </button>
-          <button onClick={() => {
-            const rows = [['카드사', '카드번호', '명의자', '부서', '종류', '한도', '이번달사용', '사용률%', '배치차량', '유효기간', '상태']]
-            cards.forEach((c: any) => {
-              const u = cardUsage[c.id] || { count: 0, total: 0 }
-              const rate = c.monthly_limit ? Math.round((u.total / c.monthly_limit) * 100) : 0
-              const car = c.assigned_car_id ? carsList.find((v: any) => v.id === c.assigned_car_id) : null
-              rows.push([c.card_company, c.card_number, c.holder_name || '공용', c.card_alias || '', c.card_type || '', c.monthly_limit || 0, u.total, rate, car?.number || '', c.expiry_date || '', c.is_active ? '활성' : '비활성'])
-            })
-            const wb = XLSX.utils.book_new()
-            const ws = XLSX.utils.aoa_to_sheet(rows)
-            ws['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 6 }]
-            XLSX.utils.book_append_sheet(wb, ws, '법인카드현황')
-            const now = new Date()
-            XLSX.writeFile(wb, `법인카드현황_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`)
-          }}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', color: '#374151', border: '1px solid #e5e7eb', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}>
-            📤 엑셀 내보내기
-          </button>
+          {mainTab === 'cards' && <>
+            <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2d5fa8', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+              <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              카드 등록
+            </button>
+            <button onClick={() => {
+              const rows = [['카드사', '카드번호', '명의자', '부서', '종류', '한도', '이번달사용', '사용률%', '배치차량', '유효기간', '상태']]
+              cards.forEach((c: any) => {
+                const u = cardUsage[c.id] || { count: 0, total: 0 }
+                const rate = c.monthly_limit ? Math.round((u.total / c.monthly_limit) * 100) : 0
+                const car = c.assigned_car_id ? carsList.find((v: any) => v.id === c.assigned_car_id) : null
+                rows.push([c.card_company, c.card_number, c.holder_name || '공용', c.card_alias || '', c.card_type || '', c.monthly_limit || 0, u.total, rate, car?.number || '', c.expiry_date || '', c.is_active ? '활성' : '비활성'])
+              })
+              const wb = XLSX.utils.book_new()
+              const ws = XLSX.utils.aoa_to_sheet(rows)
+              ws['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 6 }]
+              XLSX.utils.book_append_sheet(wb, ws, '법인카드현황')
+              const now = new Date()
+              XLSX.writeFile(wb, `법인카드현황_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`)
+            }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', color: '#374151', border: '1px solid #e5e7eb', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}>
+              📤 엑셀 내보내기
+            </button>
+          </>}
         </div>
       </div>
+
+      {/* ══════ 메인 탭 (카드관리 / 특이건 검토 / 급여 반영) ══════ */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e5e7eb', paddingBottom: 0 }}>
+        {[
+          { key: 'cards' as const, label: '💳 카드 관리', badge: null },
+          { key: 'flags' as const, label: '⚠️ 특이건 검토', badge: flagSummary.pending ? flagSummary.pending : null },
+          { key: 'salary' as const, label: '💰 급여 반영', badge: null },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setMainTab(tab.key)}
+            style={{
+              padding: '10px 20px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              background: 'transparent', border: 'none', borderBottom: mainTab === tab.key ? '3px solid #2d5fa8' : '3px solid transparent',
+              color: mainTab === tab.key ? '#2d5fa8' : '#6b7280', position: 'relative',
+            }}>
+            {tab.label}
+            {tab.badge && tab.badge > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {tab.badge > 99 ? '99+' : tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════ 카드 관리 탭 콘텐츠 ══════ */}
+      {mainTab === 'cards' && <>
 
       {/* ══════ 드래그앤드롭 업로드 영역 ══════ */}
       <div
@@ -2106,6 +2200,227 @@ export default function CorporateCardsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      </>}
+
+      {/* ══════ 특이건 검토 탭 ══════ */}
+      {mainTab === 'flags' && (
+        <div>
+          {/* 필터 바 */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            {[
+              { key: 'unresolved', label: '미처리', count: (flagSummary.pending || 0) + (flagSummary.reviewing || 0) },
+              { key: 'approved', label: '정상 확인', count: flagSummary.approved || 0 },
+              { key: 'personal_confirmed', label: '개인사용 확정', count: flagSummary.personal_confirmed || 0 },
+              { key: 'dismissed', label: '무시', count: flagSummary.dismissed || 0 },
+            ].map(f => (
+              <button key={f.key} onClick={() => setFlagFilter(f.key)}
+                style={{
+                  padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  background: flagFilter === f.key ? '#1e293b' : '#fff',
+                  color: flagFilter === f.key ? '#fff' : '#6b7280',
+                  border: flagFilter === f.key ? 'none' : '1px solid #e5e7eb',
+                }}>
+                {f.label} ({f.count})
+              </button>
+            ))}
+          </div>
+
+          {/* 특이건 목록 */}
+          {flagLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>로딩 중...</div>
+          ) : flagItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+              <p style={{ fontSize: 16, fontWeight: 700 }}>특이건이 없습니다</p>
+              <p style={{ fontSize: 13, marginTop: 4 }}>카드/통장 업로드 후 저장 시 자동으로 감지됩니다</p>
+            </div>
+          ) : (
+            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>유형</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>날짜</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>거래처</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#6b7280' }}>금액</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>사용자</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>사유</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#6b7280' }}>처리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flagItems.map((flag: any) => {
+                    const typeConfig: Record<string, { icon: string; label: string; color: string }> = {
+                      low_confidence: { icon: '🤖', label: 'AI 불확실', color: '#f59e0b' },
+                      personal_use: { icon: '🏠', label: '개인사용 의심', color: '#ef4444' },
+                      unusual_amount: { icon: '💰', label: '고액 거래', color: '#8b5cf6' },
+                      unusual_time: { icon: '🌙', label: '비정상 시간', color: '#6366f1' },
+                      foreign_currency: { icon: '💱', label: '외화 결제', color: '#0ea5e9' },
+                      no_receipt: { icon: '🧾', label: '영수증 없음', color: '#64748b' },
+                      card_user_mismatch: { icon: '👤', label: '사용자 불일치', color: '#dc2626' },
+                      duplicate_suspect: { icon: '📋', label: '중복 의심', color: '#f97316' },
+                      manual_review: { icon: '✋', label: '수동 검토', color: '#374151' },
+                      other: { icon: '❓', label: '기타', color: '#9ca3af' },
+                    }
+                    const tc = typeConfig[flag.flag_type] || typeConfig.other
+                    return (
+                      <tr key={flag.id} style={{ borderBottom: '1px solid #f3f4f6' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: `${tc.color}15`, color: tc.color }}>
+                            {tc.icon} {tc.label}
+                          </span>
+                          {flag.severity === 'high' && <span style={{ marginLeft: 4, fontSize: 10, color: '#ef4444', fontWeight: 800 }}>!</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#6b7280', fontSize: 11 }}>{flag.transaction_date || '-'}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#1f2937' }}>{flag.client_name || '-'}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800 }}>{(flag.amount || 0).toLocaleString()}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {flag.employee_name ? (
+                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontSize: 10, fontWeight: 600 }}>
+                              {flag.employee_name}
+                            </span>
+                          ) : <span style={{ fontSize: 10, color: '#d1d5db' }}>-</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontSize: 11, color: '#6b7280', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {flag.flag_reason || '-'}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          {flag.status === 'pending' || flag.status === 'reviewing' ? (
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                              <button onClick={() => updateFlagStatus([flag.id], 'approved')}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #16a34a', background: '#f0fdf4', color: '#16a34a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                ✓ 정상
+                              </button>
+                              <button onClick={() => updateFlagStatus([flag.id], 'personal_confirmed')}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #dc2626', background: '#fef2f2', color: '#dc2626', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                ✕ 개인사용
+                              </button>
+                              <button onClick={() => updateFlagStatus([flag.id], 'dismissed')}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #9ca3af', background: '#f9fafb', color: '#9ca3af', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                무시
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: flag.status === 'approved' ? '#16a34a' : flag.status === 'personal_confirmed' ? '#dc2626' : '#9ca3af' }}>
+                              {flag.status === 'approved' ? '✅ 정상' : flag.status === 'personal_confirmed' ? '🔴 개인사용' : '⏭️ 무시'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════ 급여 반영 탭 ══════ */}
+      {mainTab === 'salary' && (
+        <div>
+          {/* 월 선택 */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+            <input type="month" value={salaryMonth} onChange={e => setSalaryMonth(e.target.value)}
+              style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 700 }} />
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              총 {salaryAdjustments.length}건의 조정 내역
+            </span>
+          </div>
+
+          {/* 직원별 요약 카드 */}
+          {Object.keys(salarySummary).length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {Object.entries(salarySummary).map(([empId, summary]: [string, any]) => {
+                const emp = employees.find(e => e.id === empId)
+                return (
+                  <div key={empId} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#1e40af' }}>
+                        {(emp?.employee_name || summary.name || '?')[0]}
+                      </div>
+                      <div>
+                        <p style={{ fontWeight: 800, fontSize: 13, color: '#1f2937', margin: 0 }}>{emp?.employee_name || summary.name || empId.slice(0, 8)}</p>
+                        <p style={{ fontSize: 10, color: '#9ca3af', margin: 0 }}>{emp?.position?.name || ''} · {emp?.department?.name || ''}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <div>
+                        <p style={{ color: '#dc2626', fontWeight: 700, margin: 0 }}>차감: -{summary.deduct.toLocaleString()}원</p>
+                        <p style={{ color: '#16a34a', fontWeight: 700, margin: 0 }}>가산: +{summary.add.toLocaleString()}원</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 10, color: '#9ca3af', margin: 0 }}>순 조정액</p>
+                        <p style={{ fontWeight: 900, fontSize: 16, color: summary.net >= 0 ? '#16a34a' : '#dc2626', margin: 0 }}>
+                          {summary.net >= 0 ? '+' : ''}{summary.net.toLocaleString()}원
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* 조정 내역 목록 */}
+          {salaryAdjustments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>💰</div>
+              <p style={{ fontSize: 16, fontWeight: 700 }}>이번 달 급여 조정 내역이 없습니다</p>
+              <p style={{ fontSize: 13, marginTop: 4 }}>특이건 검토에서 "개인사용 확정" 시 자동으로 생성됩니다</p>
+            </div>
+          ) : (
+            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>직원</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>유형</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#6b7280' }}>금액</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 800, color: '#6b7280' }}>사유</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#6b7280' }}>상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salaryAdjustments.map((adj: any) => {
+                    const emp = employees.find(e => e.id === adj.employee_id)
+                    return (
+                      <tr key={adj.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>{emp?.employee_name || adj.employee_id?.slice(0, 8) || '-'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{
+                            padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                            background: adj.adjustment_type === 'deduct' ? '#fef2f2' : '#f0fdf4',
+                            color: adj.adjustment_type === 'deduct' ? '#dc2626' : '#16a34a',
+                          }}>
+                            {adj.adjustment_type === 'deduct' ? '➖ 차감' : '➕ 가산'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: adj.adjustment_type === 'deduct' ? '#dc2626' : '#16a34a' }}>
+                          {adj.adjustment_type === 'deduct' ? '-' : '+'}{(adj.amount || 0).toLocaleString()}원
+                        </td>
+                        <td style={{ padding: '10px 12px', fontSize: 11, color: '#6b7280', maxWidth: 300 }}>{adj.reason}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                            background: adj.status === 'applied' ? '#f0fdf4' : adj.status === 'approved' ? '#dbeafe' : adj.status === 'cancelled' ? '#f9fafb' : '#fef3c7',
+                            color: adj.status === 'applied' ? '#16a34a' : adj.status === 'approved' ? '#1e40af' : adj.status === 'cancelled' ? '#9ca3af' : '#92400e',
+                          }}>
+                            {adj.status === 'pending' ? '⏳ 대기' : adj.status === 'approved' ? '✅ 승인' : adj.status === 'applied' ? '💰 반영완료' : '❌ 취소'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

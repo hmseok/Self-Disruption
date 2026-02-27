@@ -346,7 +346,7 @@ function DesktopPaymentTable({
   const f = (n: number) => Math.round(n || 0).toLocaleString()
 
   return (
-    <div className="hidden md:block max-h-[700px] overflow-y-auto">
+    <div style={{ maxHeight: 700, overflowY: 'auto', overflowX: 'auto' }}>
       <table className="w-full text-left text-sm">
         <thead className="bg-gray-50 text-gray-500 text-xs sticky top-0 z-10 border-b">
           <tr>
@@ -432,87 +432,6 @@ function DesktopPaymentTable({
 }
 
 // Sub-component: Payment Schedule Cards (Mobile)
-function MobilePaymentCards({
-  schedules,
-  onTogglePayment,
-}: {
-  schedules: any[]
-  onTogglePayment: (scheduleId: string, currentStatus: string) => void
-}) {
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
-
-  return (
-    <div className="md:hidden divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-      {schedules.map((item) => {
-        const isOverdue = new Date(item.due_date) < new Date() && item.status === 'unpaid'
-        const isDeposit = item.round_number === 0
-        const supplyPrice = Math.round((item.amount || 0) / 1.1)
-        const vatAmount = item.amount - supplyPrice
-
-        return (
-          <div
-            key={item.id}
-            className={`p-4 ${
-              isDeposit
-                ? 'bg-steel-50 border-l-4 border-steel-600'
-                : item.status === 'paid'
-                  ? 'bg-green-50/30'
-                  : isOverdue
-                    ? 'bg-red-50/30'
-                    : ''
-            }`}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-700 text-sm">
-                  {isDeposit ? '💳 보증금' : `${item.round_number}회차`}
-                </span>
-                {item.status === 'paid' ? (
-                  <span className="px-2 py-0.5 rounded bg-green-100 text-green-700 text-[10px] font-bold">
-                    완납
-                  </span>
-                ) : isOverdue ? (
-                  <span className="px-2 py-0.5 rounded bg-red-100 text-red-600 text-[10px] font-bold">
-                    연체
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-bold">
-                    미납
-                  </span>
-                )}
-              </div>
-              <span className="text-xs text-gray-400">{item.due_date}</span>
-            </div>
-            <div className="flex flex-col gap-2 mb-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-500">공급가</span>
-                <span className="font-bold text-gray-800">{f(supplyPrice)}원</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-500">VAT</span>
-                <span className="font-bold text-gray-800">{f(vatAmount)}원</span>
-              </div>
-              <div className="flex justify-between items-center font-bold">
-                <span className="text-gray-700">합계</span>
-                <span className="text-gray-900">{f(item.amount)}원</span>
-              </div>
-            </div>
-            <button
-              onClick={() => onTogglePayment(item.id, item.status)}
-              className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                item.status === 'paid'
-                  ? 'border border-gray-200 text-gray-400'
-                  : 'bg-steel-600 text-white shadow-sm'
-              }`}
-            >
-              {item.status === 'paid' ? '취소' : '수납확인'}
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 // Main Component
 export default function ContractDetailPage() {

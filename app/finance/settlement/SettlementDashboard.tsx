@@ -837,7 +837,7 @@ function SettlementTab({ items, summary }: {
         ) : (
           <>
             {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
+            <div style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b">
                   <tr>
@@ -874,29 +874,6 @@ function SettlementTab({ items, summary }: {
                   })}
                 </tbody>
               </table>
-            </div>
-
-            {/* Mobile */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filtered.map(item => {
-                const tl = typeLabels[item.type]
-                const sl = statusLabels[item.status]
-                return (
-                  <div key={item.id} className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tl.color}`}>{tl.icon} {tl.label}</span>
-                        <div className="font-bold text-gray-800 mt-1">{item.name}</div>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sl.color}`}>{sl.label}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-400 text-xs">{item.dueDate.slice(5)} {item.carNumber ? `· ${item.carNumber}` : ''}</span>
-                      <span className="font-black text-gray-900">{nf(item.amount)}원</span>
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           </>
         )}
@@ -1134,7 +1111,7 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
         ) : (
           <>
             {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
+            <div style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b">
                   <tr>
@@ -1179,42 +1156,6 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {pendingItems.map(item => {
-                const tl = typeLabels[item.type]
-                const isSelected = selectedIds.has(item.id)
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => toggleSelect(item.id)}
-                    className={`p-4 cursor-pointer transition-colors ${isSelected ? 'bg-steel-50' : 'active:bg-gray-50'}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(item.id)}
-                        className="w-4 h-4 mt-1 text-steel-600 rounded focus:ring-steel-500 flex-shrink-0"
-                      />
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tl.color}`}>{tl.icon} {tl.label}</span>
-                            <div className="font-bold text-gray-800 mt-1">{item.name}</div>
-                          </div>
-                          <span className="font-black text-red-600 text-sm">{nf(item.amount)}원</span>
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {item.dueDate.slice(5)} {item.carNumber ? `· ${item.carNumber}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           </>
         )}
       </div>
@@ -1227,7 +1168,7 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
             <span className="text-xs text-gray-400">정산서 발송 시 체크박스로 선택하세요</span>
           </div>
 
-          <div className="hidden md:block overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b">
                 <tr>
@@ -1260,23 +1201,6 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                 })}
               </tbody>
             </table>
-          </div>
-
-          <div className="md:hidden divide-y divide-gray-100">
-            {paidItems.map(item => {
-              const tl = typeLabels[item.type]
-              return (
-                <div key={item.id} className="p-4 opacity-60">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tl.color}`}>{tl.icon} {tl.label}</span>
-                      <div className="font-bold text-gray-600 mt-1">{item.name}</div>
-                    </div>
-                    <span className="font-bold text-gray-500 text-sm">{nf(item.amount)}원</span>
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
       )}

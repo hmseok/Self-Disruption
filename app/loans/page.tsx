@@ -360,7 +360,7 @@ export default function LoanListPage() {
         ) : (
           <>
             {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
+            <div style={{ overflowX: 'auto' }}>
               <table className="w-full text-left min-w-[700px]">
                 <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs tracking-wider font-bold">
                   <tr>
@@ -410,50 +410,6 @@ export default function LoanListPage() {
               </table>
             </div>
 
-            {/* Mobile */}
-            <div className="md:hidden divide-y divide-gray-100">
-              {filteredLoans.map((loan) => {
-                const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
-                return (
-                  <div key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)} className="p-4 hover:bg-steel-50/30 transition-colors cursor-pointer">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="font-bold text-gray-900">{loan.cars?.number || '차량 정보 없음'}</div>
-                        <div className="text-xs text-gray-500 mt-1">{loan.cars?.brand} {loan.cars?.model}</div>
-                      </div>
-                      <button onClick={(e) => handleDelete(e, loan.id)} className="text-gray-300 hover:text-red-500 p-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-                    <div className="mb-3 pb-3 border-b border-gray-200">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800">{loan.finance_name}</span>
-                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{loan.type}</span>
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <div className="text-xs text-gray-600 font-bold mb-1">대출 원금</div>
-                      <div className="text-xl font-black text-gray-900">{f(loan.total_amount)}원</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-xs text-gray-600 font-bold mb-1">월 납입금</div>
-                        <div className="font-bold text-red-500 text-base">{f(loan.monthly_payment)}원</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-600 font-bold mb-1">기간</div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold text-gray-700">{loan.months}개월</span>
-                          {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${daysLeft <= 30 ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'}`}>D-{daysLeft}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           </>
         )}
       </div>

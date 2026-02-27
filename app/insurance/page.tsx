@@ -442,25 +442,65 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-            isDragging
-              ? 'border-steel-500 bg-steel-50 scale-[1.01]'
-              : 'border-gray-300 bg-white hover:border-steel-400 hover:bg-steel-50/30'
-          }`}
+          style={{
+            marginBottom: 24,
+            border: isDragging ? '2px solid #3b82f6' : '2px dashed #d1d5db',
+            borderRadius: 16,
+            padding: '32px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 20,
+            cursor: 'pointer',
+            background: isDragging ? '#eff6ff' : '#fafbfc',
+            transition: 'all 0.2s ease',
+            minHeight: 120,
+          }}
         >
           <input
             ref={fileInputRef}
             type="file"
             multiple
             accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf"
-            className="hidden"
+            style={{ display: 'none' }}
             onChange={handleBulkUpload}
           />
-          <div className="text-3xl mb-2">{isDragging ? '📥' : '📄'}</div>
-          <p className="text-sm font-bold text-gray-700">
-            {isDragging ? '여기에 파일을 놓으세요' : '청약서/증권 파일을 드래그하여 업로드'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
+
+          {/* 좌측: 아이콘 */}
+          <div style={{
+            width: 56, height: 56, borderRadius: 14,
+            background: isDragging ? '#dbeafe' : '#f1f5f9',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, transition: 'all 0.2s',
+          }}>
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke={isDragging ? '#2563eb' : '#94a3b8'} strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 16v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2" />
+            </svg>
+          </div>
+
+          {/* 중앙: 텍스트 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: isDragging ? '#1d4ed8' : '#374151', margin: 0, transition: 'color 0.2s' }}>
+              {isDragging ? '여기에 파일을 놓으세요' : '청약서/증권 파일을 드래그하여 업로드'}
+            </p>
+            <p style={{ fontSize: 13, color: '#9ca3af', margin: '4px 0 0', lineHeight: 1.4 }}>
+              이미지 또는 PDF 파일 지원 · 여러 파일 동시 업로드 가능
+            </p>
+          </div>
+
+          {/* 우측: 파일 선택 버튼 */}
+          <div
+            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+            style={{
+              padding: '8px 18px', borderRadius: 8,
+              background: '#2563eb', color: '#fff',
+              fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            파일 선택
+          </div>
         </div>
       )}
 

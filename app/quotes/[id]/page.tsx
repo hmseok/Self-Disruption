@@ -35,6 +35,28 @@ const MAINT_ITEMS_MAP: Record<string, string[]> = {
   full: ['엔진오일+필터', '에어컨필터', '에어클리너', '와이퍼', '점화플러그', '순회정비(방문점검)', '브레이크패드(전/후)', '타이어(4본)', '배터리', '미션오일', '냉각수/부동액'],
 }
 
+// 기본 보험 보장내역 (약관 데이터 없을 때 fallback)
+const DEFAULT_INSURANCE_COVERAGE = [
+  { label: '대인배상 I (책임)', description: '자배법 의무보험 · 사망/부상 한도 무제한' },
+  { label: '대인배상 II (종합)', description: '대인 1 초과분 무한 보장' },
+  { label: '대물배상', description: '1억원 한도 (상대방 차량·재물 손해)' },
+  { label: '자기신체사고', description: '사망 1.5억 / 부상·휴유장해 3천만원 한도' },
+  { label: '무보험차상해', description: '2억원 한도' },
+  { label: '자기차량손해 (자차)', description: '차량가격 기준 전손/분손 보장 · 면책금 {deductible}원' },
+]
+
+// 기본 유의사항 (약관 데이터 없을 때 fallback)
+const DEFAULT_QUOTE_NOTICES = [
+  '본 견적서는 발행일로부터 30일간 유효하며, 차량 재고 및 시장 상황에 따라 변동될 수 있습니다.',
+  '보증금은 계약 종료 시 차량 상태 확인 후 손해액을 공제한 잔액을 환불합니다.',
+  '약정주행거리 초과 시 계약 종료 시점에 km당 {excessRate}원의 추가 요금이 정산됩니다.',
+  '사고 발생 시 자차 면책금 {deductible}원은 임차인이 부담하며, 초과 수리비는 보험 처리됩니다.',
+  '중도해지 시 잔여 렌탈료의 {earlyTerminationRate}%에 해당하는 위약금이 발생합니다.',
+  '렌탈 차량은 타인에게 전대·양도할 수 없으며 임대인의 사전 동의 없이 차량 개조 불가합니다.',
+  '자동차 정기검사(종합검사)는 관련법의 일정에 맞추어 실시하여야 하며, 검사비용은 렌탈료에 포함됩니다.',
+  { text: '인수 시 소유권 이전에 필요한 취득세 및 수수료는 임차인 부담입니다.', condition: 'buyout' },
+]
+
 // CostBar 컴포넌트
 const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
   const pct = total > 0 ? Math.abs(value) / total * 100 : 0
@@ -75,12 +97,17 @@ export default function QuoteDetailPage() {
   const [creating, setCreating] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [viewMode, setViewMode] = useState<'quote' | 'analysis'>('quote')
-  // 공유 관련
+  // 공유/발송 관련
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
   const [shareLoading, setShareLoading] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [shareStatus, setShareStatus] = useState<'none' | 'shared' | 'signed'>('none')
+  const [sendChannel, setSendChannel] = useState<'copy' | 'sms' | 'kakao' | 'email'>('copy')
+  const [sendPhone, setSendPhone] = useState('')
+  const [sendEmail, setSendEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null)
 
   useEffect(() => {
     const fetchQuoteDetail = async () => {
@@ -118,6 +145,10 @@ export default function QuoteDetailPage() {
 
       setQuote({ ...quoteData, car: carData, customer: customerData })
       if (contractData) setLinkedContract(contractData)
+      // 고객 연락처 자동 세팅
+      const cust = customerData || quoteData.quote_detail?.manual_customer
+      if (cust?.phone) setSendPhone(cust.phone)
+      if (cust?.email) setSendEmail(cust.email)
       setLoading(false)
     }
     fetchQuoteDetail()
@@ -134,9 +165,15 @@ export default function QuoteDetailPage() {
     setShareLoading(true)
     setShowShareModal(true)
     try {
+      // Supabase 세션에서 access_token 가져오기
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
       const res = await fetch(`/api/quotes/${quoteId}/share`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ expiryDays: 7 })
       })
       const data = await res.json()
@@ -197,12 +234,58 @@ export default function QuoteDetailPage() {
   const handleRevokeShare = useCallback(async () => {
     if (!confirm('공유 링크를 비활성화하시겠습니까?')) return
     try {
-      await fetch(`/api/quotes/${quoteId}/share`, { method: 'DELETE' })
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+      await fetch(`/api/quotes/${quoteId}/share`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      })
       setShareUrl('')
       setShareStatus('none')
       setShowShareModal(false)
     } catch { alert('오류') }
   }, [quoteId])
+
+  // 견적서 직접 발송 (SMS/카카오톡/이메일)
+  const handleDirectSend = useCallback(async () => {
+    if (!shareUrl) return alert('먼저 공유 링크를 생성해주세요.')
+    if (sendChannel === 'copy') return // 복사 모드에선 미사용
+
+    const recipient = sendChannel === 'email' ? sendEmail : sendPhone
+    if (!recipient || recipient.trim().length < 3) {
+      return alert(sendChannel === 'email' ? '이메일 주소를 입력해주세요.' : '전화번호를 입력해주세요.')
+    }
+
+    setSending(true)
+    setSendResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || ''
+      const res = await fetch(`/api/quotes/${quoteId}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          channel: sendChannel,
+          phone: sendChannel !== 'email' ? sendPhone : undefined,
+          email: sendChannel === 'email' ? sendEmail : undefined,
+          shareUrl,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSendResult({ success: true, message: '발송 완료!' })
+        setShareStatus('shared')
+      } else {
+        setSendResult({ success: false, message: data.error || '발송 실패' })
+      }
+    } catch (err: any) {
+      setSendResult({ success: false, message: err?.message || '서버 오류' })
+    }
+    setSending(false)
+  }, [quoteId, shareUrl, sendChannel, sendPhone, sendEmail])
 
   const handleArchiveQuote = async () => {
     if (!confirm('이 견적을 보관하시겠습니까?')) return
@@ -286,6 +369,23 @@ export default function QuoteDetailPage() {
   const deductible = detail.deductible || 0
   const totalWithDeposit = totalPayments + depositAmt + prepaymentAmt
   const totalWithBuyout = contractType === 'buyout' ? totalWithDeposit + buyoutPrice : totalWithDeposit
+
+  // 약관 데이터 (저장된 값 사용)
+  const earlyTerminationRate = detail.early_termination_rate || 35
+  const earlyTerminationRatesByPeriod = detail.early_termination_rates_by_period || null
+  const savedInsuranceCoverage = detail.insurance_coverage || null
+  const savedQuoteNotices = detail.quote_notices || null
+  const savedInsuranceNote = detail.insurance_note || null
+
+  // 중도해지 위약금율 계산
+  const getEarlyTerminationDisplay = () => {
+    if (earlyTerminationRatesByPeriod && Array.isArray(earlyTerminationRatesByPeriod)) {
+      const matched = earlyTerminationRatesByPeriod.find((r: any) => termMonths >= r.months_from && termMonths <= r.months_to)
+      const rate = matched?.rate || earlyTerminationRate
+      return `잔여 렌탈료의 ${rate}% 위약금 발생`
+    }
+    return `잔여 렌탈료의 ${earlyTerminationRate}% 위약금 발생`
+  }
 
   // 원가 데이터
   const monthlyDep = costBreakdown.depreciation || worksheet?.monthly_depreciation || 0
@@ -585,55 +685,55 @@ export default function QuoteDetailPage() {
                 </div>
               </div>
 
-              {/* ── 5. 렌탈료 포함 서비스 ── */}
+              {/* ── 5. 자동차보험 보장내역 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">렌탈료 포함 서비스</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">자동차보험 보장내역</p>
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-3 py-1.5 text-left font-bold text-gray-500 w-24">항목</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-gray-500 w-10">포함</th>
-                        <th className="px-3 py-1.5 text-left font-bold text-gray-500">상세 내용</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 font-bold">자동차보험</td>
-                        <td className="px-2 py-1.5 text-center text-green-600 font-bold">O</td>
+                  <table className="w-full text-xs"><tbody>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <td className="px-3 py-1 font-bold text-gray-500 w-36">보장항목</td>
+                      <td className="px-3 py-1 font-bold text-gray-500">보장내용</td>
+                    </tr>
+                    {(savedInsuranceCoverage || DEFAULT_INSURANCE_COVERAGE).map((item: any, idx: number) => (
+                      <tr key={idx} className={idx < (savedInsuranceCoverage || DEFAULT_INSURANCE_COVERAGE).length - 1 ? 'border-b border-gray-100' : ''}>
+                        <td className="px-3 py-1.5 font-bold text-gray-700">{item.label}</td>
                         <td className="px-3 py-1.5 text-gray-600">
-                          종합 (대인∞ / 대물1억 / 자손1억) · {deductible > 0 ? `자차 면책 ${f(deductible)}원` : '완전자차'} · 만 {driverAgeGroup}
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 font-bold">자동차세</td>
-                        <td className="px-2 py-1.5 text-center text-green-600 font-bold">O</td>
-                        <td className="px-3 py-1.5 text-gray-600">계약기간 내 전액 포함 (월 {f(monthlyTax)}원 상당)</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 font-bold">정비</td>
-                        <td className="px-2 py-1.5 text-center font-bold">
-                          {maintPackage === 'self' ? <span className="text-red-400">X</span> : <span className="text-green-600">O</span>}
-                        </td>
-                        <td className="px-3 py-1.5 text-gray-600">
-                          <span className="font-bold text-gray-800">{MAINT_PACKAGE_LABELS[maintPackage]}</span> — {MAINT_PACKAGE_DESC[maintPackage]}
-                          {maintPackage !== 'self' && MAINT_ITEMS_MAP[maintPackage] && (
-                            <span className="ml-1 text-[10px] text-green-600">({MAINT_ITEMS_MAP[maintPackage].join(' · ')})</span>
+                          {(item.description || '').replace(/\{deductible\}/g, f(deductible))}
+                          {(item.description || '').includes('{deductible}') && deductible === 0 && (
+                            <span className="text-green-600 font-bold ml-1">(완전면책)</span>
                           )}
                         </td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 font-bold">취득세</td>
-                        <td className="px-2 py-1.5 text-center text-green-600 font-bold">O</td>
-                        <td className="px-3 py-1.5 text-gray-600">영업용 차량 취득세 4% 포함</td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-1.5 font-bold">등록비용</td>
-                        <td className="px-2 py-1.5 text-center text-green-600 font-bold">O</td>
-                        <td className="px-3 py-1.5 text-gray-600">번호판(영업용) · 인지세 · 등록대행비 · 탁송비 포함</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody></table>
+                </div>
+                <p className="text-[8px] text-gray-400 mt-1">※ {savedInsuranceNote || '렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함'}</p>
+              </div>
+
+              {/* ── 5-1. 렌탈료 포함 서비스 ── */}
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">렌탈료 포함 서비스</p>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs"><tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700 w-28">자동차보험</td>
+                      <td className="px-3 py-1 text-blue-600">
+                        종합 (대인II·대물1억·자손·무보험차·자차) · {deductible > 0 ? `면책 ${f(deductible)}원` : '완전자차'} · 만 {driverAgeGroup}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">세금</td>
+                      <td className="px-3 py-1 text-blue-600">자동차세·취득세 렌탈료 포함</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">등록비용</td>
+                      <td className="px-3 py-1 text-blue-600">번호판·인지세·공채·등록대행</td>
+                    </tr>
+                    <tr>
+                      <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">{maintPackage !== 'self' ? MAINT_PACKAGE_LABELS[maintPackage] || '정비' : '정기검사'}</td>
+                      <td className="px-3 py-1 text-blue-600">{maintPackage !== 'self' ? (MAINT_PACKAGE_DESC[maintPackage] || '정비 포함') : '자동차 정기검사(종합검사) 포함'}</td>
+                    </tr>
+                  </tbody></table>
                 </div>
               </div>
 
@@ -657,7 +757,7 @@ export default function QuoteDetailPage() {
                       <TRow label="보험 조건" value={`종합보험 포함 · 만 ${driverAgeGroup} · 자차면책 ${deductible === 0 ? '완전자차' : `${f(deductible)}원`}`} />
                       <TRow label="정비 조건" value={`${MAINT_PACKAGE_LABELS[maintPackage]} — ${MAINT_PACKAGE_DESC[maintPackage]}`} />
                       <TRow label="자동차세" value="렌탈료에 포함 (별도 부담 없음)" />
-                      <TRow label="중도해지" value="잔여 렌탈료의 30~40% 위약금 발생 (잔여기간에 따라 차등)" />
+                      <TRow label="중도해지" value={getEarlyTerminationDisplay()} />
                       <TRow label="반납 조건" value={contractType === 'buyout'
                         ? '만기 시 인수 또는 반납 선택 가능 (반납 시 차량 상태 평가 후 보증금 정산)'
                         : '만기 시 차량 반납 (차량 상태 평가 후 보증금 정산)'
@@ -736,19 +836,22 @@ export default function QuoteDetailPage() {
               {/* ── 10. 유의사항 ── */}
               <div className="border-t border-gray-200 pt-3">
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">유의사항 및 특약</p>
-                <div className="text-[11px] text-gray-500 space-y-0.5 leading-relaxed">
-                  <p>1. 본 견적서는 발행일로부터 30일간 유효하며, 차량 재고 및 시장 상황에 따라 변동될 수 있습니다.</p>
-                  <p>2. 보증금은 계약 종료 시 차량 상태 확인 후 손해액을 공제한 잔액을 환불합니다.</p>
-                  {excessMileageRate > 0 && (
-                    <p>3. 약정주행거리 초과 시 계약 종료 시점에 km당 {f(excessMileageRate)}원의 추가 요금이 정산됩니다.</p>
-                  )}
-                  <p>{excessMileageRate > 0 ? '4' : '3'}. 사고 발생 시 자차 면책금 {deductible === 0 ? '없음(완전자차)' : `${f(deductible)}원은 임차인 부담`}이며, 면책금 초과 수리비는 보험 처리됩니다.</p>
-                  <p>{excessMileageRate > 0 ? '5' : '4'}. 중도해지 시 잔여 렌탈료 기준 위약금이 발생하며, 상세 기준은 계약서를 따릅니다.</p>
-                  <p>{excessMileageRate > 0 ? '6' : '5'}. 렌탈 차량은 타인에게 전대, 양도할 수 없으며 임대인의 사전 동의 없이 차량 개조 불가합니다.</p>
-                  <p>{excessMileageRate > 0 ? '7' : '6'}. 운전자 범위는 만 {driverAgeGroup} 기준이며, 미만 연령 운전 시 보험 보장이 제한될 수 있습니다.</p>
-                  {contractType === 'buyout' && (
-                    <p>{excessMileageRate > 0 ? '8' : '7'}. 인수 시 소유권 이전에 필요한 취득세(비영업용 7%) 및 수수료는 임차인 부담입니다.</p>
-                  )}
+                <div className="text-[10px] text-gray-500 space-y-1 leading-relaxed">
+                  {(savedQuoteNotices || DEFAULT_QUOTE_NOTICES).map((item: any, idx: number) => {
+                    // 조건부 항목 처리
+                    if (item?.condition === 'buyout' && contractType !== 'buyout') return null
+
+                    // 플레이스홀더 치환
+                    let text = item?.text || item
+                    if (typeof text === 'string') {
+                      text = text
+                        .replace(/\{deductible\}/g, f(deductible))
+                        .replace(/\{excessRate\}/g, f(excessMileageRate))
+                        .replace(/\{earlyTerminationRate\}/g, String(earlyTerminationRate))
+                    }
+
+                    return <p key={idx}>{idx + 1}. {text}</p>
+                  })}
                 </div>
               </div>
 
@@ -1002,13 +1105,13 @@ export default function QuoteDetailPage() {
         </div>
       )}
 
-      {/* ===== 공유 모달 ===== */}
+      {/* ===== 견적서 발송 모달 ===== */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print" onClick={() => setShowShareModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print" onClick={() => { setShowShareModal(false); setSendResult(null) }}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-black text-gray-900">견적서 발송</h3>
-              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+              <button onClick={() => { setShowShareModal(false); setSendResult(null) }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
             </div>
 
             {shareLoading ? (
@@ -1017,49 +1120,116 @@ export default function QuoteDetailPage() {
                 <p className="text-gray-500 text-sm">링크 생성 중...</p>
               </div>
             ) : shareUrl ? (
-              <div className="space-y-4">
-                {/* 메시지 미리보기 */}
+              <div className="space-y-3">
+                {/* 메시지 미리보기 (축소) */}
                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">발송 메시지 미리보기</p>
-                  <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">
-                    <p className="font-bold">📋 장기렌트 견적서</p>
-                    <p className="mt-1">🚗 {(quote?.car?.brand || quote?.quote_detail?.car_info?.brand || '')} {(quote?.car?.model || quote?.quote_detail?.car_info?.model || '')}{(quote?.car?.trim || quote?.quote_detail?.car_info?.trim) ? ` ${quote?.car?.trim || quote?.quote_detail?.car_info?.trim}` : ''}</p>
-                    <p className="text-gray-500">{(quote?.car?.year || quote?.quote_detail?.car_info?.year || '')}년식 · {(quote?.quote_detail?.contract_type === 'buyout' ? '인수형' : '반납형')} · {(quote?.quote_detail?.term_months || 36)}개월</p>
-                    <p className="mt-1 font-black text-gray-900">💰 월 {Math.round(quote?.rent_fee || 0).toLocaleString()}원 <span className="font-normal text-gray-400">(VAT포함 {Math.round((quote?.rent_fee || 0) * 1.1).toLocaleString()}원)</span></p>
-                    <p className="mt-1 text-gray-400 text-[10px] truncate">{shareUrl}</p>
+                  <div className="text-xs text-gray-700 leading-relaxed">
+                    <span className="font-bold">{(quote?.car?.brand || quote?.quote_detail?.car_info?.brand || '')} {(quote?.car?.model || quote?.quote_detail?.car_info?.model || '')}</span>
+                    <span className="text-gray-400 ml-2">{(quote?.quote_detail?.contract_type === 'buyout' ? '인수형' : '반납형')} · {(quote?.quote_detail?.term_months || 36)}개월</span>
+                    <span className="font-black text-blue-700 ml-2">월 {Math.round((quote?.rent_fee || 0) * 1.1).toLocaleString()}원</span>
+                    <span className="text-gray-400 text-[10px] ml-1">(VAT포함)</span>
                   </div>
                 </div>
 
-                {/* 복사 버튼들 */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleCopyShareUrl('message')}
-                    className={`py-3 rounded-xl text-sm font-bold transition-all ${
-                      shareCopied
-                        ? 'bg-green-500 text-white'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    {shareCopied ? '복사됨!' : '💬 메시지 복사'}
-                  </button>
-                  <button
-                    onClick={() => handleCopyShareUrl('link')}
-                    className="py-3 rounded-xl text-sm font-bold transition-all bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  >
-                    🔗 링크만 복사
-                  </button>
+                {/* 발송 채널 선택 */}
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-2">발송 방법</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {([
+                      { key: 'copy', icon: '📋', label: '복사' },
+                      { key: 'kakao', icon: '💬', label: '카카오톡' },
+                      { key: 'sms', icon: '📱', label: '문자' },
+                      { key: 'email', icon: '📧', label: '이메일' },
+                    ] as const).map(ch => (
+                      <button
+                        key={ch.key}
+                        onClick={() => { setSendChannel(ch.key); setSendResult(null) }}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border-2 ${
+                          sendChannel === ch.key
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-base block mb-0.5">{ch.icon}</span>
+                        {ch.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="bg-blue-50 rounded-xl p-3">
-                  <p className="text-xs text-blue-700 font-bold mb-1">사용 방법</p>
-                  <ul className="text-xs text-blue-600 space-y-0.5">
-                    <li>1. 메시지 복사를 클릭합니다 (차량정보+링크 포함)</li>
-                    <li>2. 카카오톡/문자에 붙여넣기하여 고객에게 전송합니다</li>
-                    <li>3. 고객이 견적을 확인하고 서명하면 계약이 자동 생성됩니다</li>
-                  </ul>
-                </div>
+                {/* 채널별 입력 폼 */}
+                {sendChannel === 'copy' ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleCopyShareUrl('message')}
+                        className={`py-3 rounded-xl text-sm font-bold transition-all ${
+                          shareCopied ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        {shareCopied ? '복사됨!' : '💬 메시지 복사'}
+                      </button>
+                      <button
+                        onClick={() => handleCopyShareUrl('link')}
+                        className="py-3 rounded-xl text-sm font-bold bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      >
+                        🔗 링크만 복사
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400">복사한 내용을 카카오톡/문자에 붙여넣기하여 전송하세요.</p>
+                  </div>
+                ) : sendChannel === 'email' ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500">수신 이메일</label>
+                    <input
+                      type="email"
+                      value={sendEmail}
+                      onChange={e => setSendEmail(e.target.value)}
+                      placeholder="customer@example.com"
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleDirectSend}
+                      disabled={sending || !sendEmail}
+                      className="w-full py-3 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {sending ? '발송 중...' : '📧 이메일 발송'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500">수신 전화번호</label>
+                    <input
+                      type="tel"
+                      value={sendPhone}
+                      onChange={e => setSendPhone(e.target.value)}
+                      placeholder="010-1234-5678"
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={handleDirectSend}
+                      disabled={sending || !sendPhone}
+                      className="w-full py-3 rounded-xl text-sm font-bold bg-yellow-400 text-gray-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {sending ? '발송 중...' : sendChannel === 'kakao' ? '💬 카카오 알림톡 발송' : '📱 문자(SMS) 발송'}
+                    </button>
+                    {sendChannel === 'kakao' && (
+                      <p className="text-[10px] text-gray-400">* 카카오 알림톡 발송 실패 시 자동으로 SMS로 대체 발송됩니다.</p>
+                    )}
+                  </div>
+                )}
 
-                <div className="flex justify-between items-center text-xs text-gray-400">
+                {/* 발송 결과 */}
+                {sendResult && (
+                  <div className={`rounded-xl p-3 text-sm font-bold text-center ${
+                    sendResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {sendResult.success ? '✅ ' : '❌ '}{sendResult.message}
+                  </div>
+                )}
+
+                {/* 하단 정보 */}
+                <div className="flex justify-between items-center text-xs text-gray-400 pt-1 border-t border-gray-100">
                   <span>유효기간: 7일</span>
                   <button onClick={handleRevokeShare} className="text-red-400 hover:text-red-600 font-bold">링크 비활성화</button>
                 </div>

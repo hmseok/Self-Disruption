@@ -358,7 +358,7 @@ const router = useRouter()
           ) : (
               <>
                   {/* Desktop Table View */}
-                  <div className="hidden md:block overflow-x-auto">
+                  <div style={{ overflowX: 'auto' }}>
                       <table className="w-full text-left min-w-[600px]">
                           <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
                               <tr>
@@ -405,42 +405,6 @@ const router = useRouter()
                               ))}
                           </tbody>
                       </table>
-                  </div>
-
-                  {/* Mobile Card View */}
-                  <div className="md:hidden divide-y divide-gray-100">
-                      {filteredList.map((item) => (
-                          <div key={item.id} className="p-4 hover:bg-steel-50/30 transition-colors">
-                              <div className="flex justify-between items-start mb-3">
-                                  <div>
-                                      <div className="text-sm font-bold text-gray-600 mb-1">{item.transaction_date.slice(5)}</div>
-                                      <div className="font-bold text-gray-900">{item.client_name}</div>
-                                  </div>
-                                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-steel-50 text-steel-600' : 'bg-red-50 text-red-600'}`}>
-                                      {item.type === 'income' ? '수입' : '지출'}
-                                  </span>
-                              </div>
-                              <div className="text-xs text-gray-500 mb-2">{item.category}</div>
-                              <div className="text-xs text-gray-400 mb-3">{item.description}</div>
-                              <div className="flex justify-between items-center">
-                                  <div className={`text-lg font-black ${item.type === 'income' ? 'text-steel-600' : 'text-red-600'}`}>
-                                      {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
-                                  </div>
-                                  {item.status === 'pending' ? (
-                                      <div className="flex gap-2">
-                                          <button onClick={() => handleConfirm(item.id)} className="bg-steel-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-steel-700 shadow-sm">
-                                              승인
-                                          </button>
-                                          <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-lg">🗑️</button>
-                                      </div>
-                                  ) : (
-                                      <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 text-sm font-bold">
-                                          삭제
-                                      </button>
-                                  )}
-                              </div>
-                          </div>
-                      ))}
                   </div>
               </>
           )}

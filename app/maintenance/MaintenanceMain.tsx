@@ -679,7 +679,7 @@ export default function MaintenanceMainPage() {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
+                <div style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                       <tr>
@@ -758,65 +758,6 @@ export default function MaintenanceMainPage() {
                     </tbody>
                   </table>
                 </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {filteredMaintenanceRecords.map(maint => (
-                    <div key={maint.id} className="p-4 active:bg-steel-50">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="font-black text-gray-900">{maint.requested_date}</div>
-                          <div className="text-sm text-gray-500 mt-1">{getCar(maint.car_id)?.number}</div>
-                        </div>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${MAINT_STATUS[maint.status]?.color}`}>
-                          {MAINT_STATUS[maint.status]?.label}
-                        </span>
-                      </div>
-                      <div className="text-sm mb-3">
-                        <div className="font-bold text-gray-800">
-                          {getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {MAINT_TYPE[maint.maintenance_type]}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">{maint.shop_name}</div>
-                        <div className="text-sm font-bold text-gray-900 mt-2">{maint.estimated_cost?.toLocaleString()}원</div>
-                      </div>
-                      <div className="flex gap-2 overflow-x-auto">
-                        <button
-                          onClick={() => openEditMaintenanceModal(maint)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 flex-shrink-0"
-                        >
-                          수정
-                        </button>
-                        {maint.status === 'requested' && (
-                          <button
-                            onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 flex-shrink-0"
-                          >
-                            승인
-                          </button>
-                        )}
-                        {maint.status === 'approved' && (
-                          <button
-                            onClick={() => handleMaintenanceStatusChange(maint.id, 'in_shop')}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 flex-shrink-0"
-                          >
-                            입고
-                          </button>
-                        )}
-                        {maint.status === 'in_shop' && (
-                          <button
-                            onClick={() => handleMaintenanceStatusChange(maint.id, 'completed')}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 flex-shrink-0"
-                          >
-                            출고완료
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </>
             )}
           </div>
@@ -866,7 +807,7 @@ export default function MaintenanceMainPage() {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div className="hidden md:block overflow-x-auto">
+                <div style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                       <tr>
@@ -947,72 +888,6 @@ export default function MaintenanceMainPage() {
                       })}
                     </tbody>
                   </table>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden divide-y divide-gray-100">
-                  {filteredInspectionRecords.map(insp => {
-                    const daysLeft = getDDay(insp.due_date)
-                    return (
-                      <div key={insp.id} className="p-4 active:bg-steel-50">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="font-black text-gray-900">{insp.due_date}</div>
-                            <div className="text-sm text-gray-500 mt-1">{getCar(insp.car_id)?.number}</div>
-                          </div>
-                          <div className="text-right">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${INSP_STATUS[insp.status]?.color}`}>
-                              {INSP_STATUS[insp.status]?.label}
-                            </span>
-                            <div className={`text-sm mt-2 ${getDDayColor(daysLeft)}`}>
-                              {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-sm mb-3">
-                          <div className="font-bold text-gray-800">
-                            {getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {INSP_TYPE[insp.inspection_type]}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">{insp.center_name}</div>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto">
-                          <button
-                            onClick={() => openEditInspectionModal(insp)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 flex-shrink-0"
-                          >
-                            수정
-                          </button>
-                          {insp.status === 'scheduled' && (
-                            <button
-                              onClick={() => handleInspectionStatusChange(insp.id, 'in_progress')}
-                              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 flex-shrink-0"
-                            >
-                              진행
-                            </button>
-                          )}
-                          {insp.status === 'in_progress' && (
-                            <>
-                              <button
-                                onClick={() => handleInspectionStatusChange(insp.id, 'passed')}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 flex-shrink-0"
-                              >
-                                합격
-                              </button>
-                              <button
-                                onClick={() => handleInspectionStatusChange(insp.id, 'failed')}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 flex-shrink-0"
-                              >
-                                불합격
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
                 </div>
               </>
             )}

@@ -521,7 +521,7 @@ export default function OperationsMainPage() {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                 <tr>
@@ -614,58 +614,6 @@ export default function OperationsMainPage() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden divide-y divide-gray-100">
-            {filteredOperations.map(op => {
-              const car = getCar(op.car_id)
-              const cust = getCustomer(op.customer_id)
-              const cat = op.dispatch_category || 'regular'
-              const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
-              const isInsuranceOp = ['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat)
-              return (
-                <div key={op.id} className="p-4 active:bg-steel-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="font-black text-gray-900 text-sm">{op.scheduled_date} {op.scheduled_time}</div>
-                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {op.operation_type === 'delivery' ? '출고' : '반납'}
-                        </span>
-                        {cat !== 'regular' && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>
-                            {catInfo.label}
-                          </span>
-                        )}
-                        <span>{car?.number || '-'}</span>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${OP_STATUS[op.status]?.color}`}>
-                      {OP_STATUS[op.status]?.label}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-2">
-                    {car?.brand} {car?.model} {cust?.name ? `· ${cust.name}` : ''} {op.location ? `· ${op.location}` : ''}
-                  </div>
-                  {isInsuranceOp && (
-                    <div className="text-[10px] text-gray-400 mb-2 flex items-center gap-2 flex-wrap">
-                      {op.insurance_company_billing && <span>{op.insurance_company_billing}</span>}
-                      {op.fault_ratio != null && <span>과실 {op.fault_ratio}%</span>}
-                      {op.insurance_billing_status && op.insurance_billing_status !== 'none' && (
-                        <span className={`px-1.5 py-0.5 rounded font-bold ${BILLING_STATUS[op.insurance_billing_status]?.color}`}>
-                          {BILLING_STATUS[op.insurance_billing_status]?.label}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-1.5 overflow-x-auto">
-                    <button onClick={() => openEditModal(op)} className="px-2 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 flex-shrink-0">수정</button>
-                    {renderStatusButtons(op)}
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </>
       )}

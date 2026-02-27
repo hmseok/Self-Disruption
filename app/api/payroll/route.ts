@@ -76,6 +76,18 @@ export async function POST(request: NextRequest) {
     account_number,
     account_holder,
     is_active = true,
+    // ── 확장 필드 (064_payroll_enhanced) ──
+    employment_type = '정규직',
+    salary_type = '월급제',
+    annual_salary,
+    hourly_rate,
+    daily_rate,
+    working_hours_per_week = 40,
+    dependents_count = 1,
+    net_salary_mode = false,
+    target_net_salary,
+    custom_deductions = {},
+    expanded_allowances = {},
   } = body
 
   if (!company_id || !employee_id) {
@@ -101,6 +113,18 @@ export async function POST(request: NextRequest) {
       account_number: account_number || null,
       account_holder: account_holder || null,
       is_active,
+      // ── 확장 필드 ──
+      employment_type,
+      salary_type,
+      annual_salary: annual_salary || null,
+      hourly_rate: hourly_rate || null,
+      daily_rate: daily_rate || null,
+      working_hours_per_week,
+      dependents_count,
+      net_salary_mode,
+      target_net_salary: target_net_salary || null,
+      custom_deductions,
+      expanded_allowances,
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'company_id,employee_id',

@@ -314,7 +314,7 @@ export default function AdminDashboard() {
       {comp.users.length > 0 && (
         <div className="border-t border-slate-100">
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50">
@@ -337,21 +337,6 @@ export default function AdminDashboard() {
                 ))}
               </tbody>
             </table>
-          </div>
-          {/* Mobile Cards */}
-          <div className="md:hidden divide-y divide-slate-100">
-            {comp.users.map(u => (
-              <div key={u.id} className="p-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</span>
-                    {roleBadge(u.role)}
-                  </div>
-                  <div className="text-[11px] text-slate-400 truncate mt-0.5">{u.email}</div>
-                </div>
-                {activeToggle(u)}
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -393,7 +378,7 @@ export default function AdminDashboard() {
               미배정 사용자 ({unassignedUsers.length})
             </h2>
             <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-              <div className="hidden md:block overflow-x-auto">
+              <div style={{ overflowX: 'auto' }}>
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-red-50/50">
@@ -416,20 +401,6 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="md:hidden divide-y divide-red-100">
-                {unassignedUsers.map(u => (
-                  <div key={u.id} className="p-3 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</span>
-                        {roleBadge(u.role)}
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{u.email}</div>
-                    </div>
-                    {activeToggle(u)}
-                  </div>
-                ))}
               </div>
             </div>
           </div>
