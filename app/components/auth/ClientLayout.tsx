@@ -286,7 +286,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const showSettings = !isPendingApproval && (role === 'god_admin' || role === 'master')
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden print:!h-auto print:!overflow-visible print:!block" style={{ height: '100dvh' }}>
+    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f9fafb', overflowX: 'hidden', overflowY: 'hidden' }}>
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
         <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-steel-900/95 backdrop-blur-sm border-b border-steel-700/50 safe-top">
@@ -505,8 +505,29 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* 메인 콘텐츠 — 앱 셸: 내부 스크롤 */}
-      <main className="flex-1 transition-all duration-300 ml-0 lg:ml-60 overflow-hidden w-full min-w-0 h-screen print:!ml-0 print:!h-auto print:!overflow-visible print:!block" style={{ height: '100dvh' }}>
-        <div className="h-full pt-12 lg:pt-0 overflow-y-auto overflow-x-hidden overscroll-none max-w-full print:!pt-0 print:!h-auto print:!overflow-visible print:!block">
+      <main
+        className="flex-1 transition-all duration-300 print:!ml-0 print:!h-auto print:!overflow-visible print:!block"
+        style={{
+          height: '100dvh',
+          overflow: 'hidden',
+          width: '100%',
+          minWidth: 0,
+          marginLeft: isSidebarOpen ? 240 : 0,
+        }}
+      >
+        <div
+          className="print:!pt-0 print:!h-auto print:!overflow-visible print:!block"
+          style={{
+            height: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            overscrollBehavior: 'none',
+            maxWidth: '100%',
+            paddingTop: isSidebarOpen ? 0 : 48,
+            paddingBottom: 24,
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {children}
         </div>
       </main>
@@ -531,8 +552,15 @@ function UploadProgressWidget() {
   // 업로드 페이지에서는 위젯 숨기기 (페이지 자체에 진행률 표시)
   if (pathname === '/finance/upload') return null
 
-  // 처리 중이 아니면 숨기기
-  if (status !== 'processing' && status !== 'paused') return null
+  // 처리 중 또는 결과가 있으면 표시
+  const hasResults = uploadContext.results && uploadContext.results.length > 0
+  const totalResultCount = hasResults ? uploadContext.results.length : 0
+  const isProcessing = status === 'processing' || status === 'paused'
+
+  // 처리 중도 아니고 분류 대기 건도 없으면 숨기기
+  if (!isProcessing && !hasResults) return null
+  // 업로드/분류 확정 페이지에서는 숨기기
+  if (pathname === '/finance/review' || pathname === '/finance/upload') return null
 
   return (
     <div style={{
@@ -540,27 +568,49 @@ function UploadProgressWidget() {
       background: '#fff', borderRadius: 16, padding: '16px 20px', width: 320,
       boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {status === 'processing' ? (
-            <div style={{ width: 18, height: 18, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          ) : (
-            <span style={{ fontSize: 16 }}>⏸️</span>
-          )}
-          <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
-            {status === 'processing' ? '파일 분석 중' : '일시정지'}
-          </span>
-        </div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eff6ff', padding: '3px 8px', borderRadius: 6 }}>
-          {totalFiles > 0 ? `${currentFileIndex + 1}/${totalFiles}` : `${progress}%`}
-        </span>
-      </div>
-      <div style={{ background: '#f1f5f9', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 8 }}>
-        <div style={{ height: '100%', background: 'linear-gradient(90deg, #2d5fa8, #60a5fa)', borderRadius: 6, transition: 'width 0.5s', width: `${progress}%` }} />
-      </div>
-      <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {logs || currentFileName || '처리 중...'}
-      </p>
+      {/* 업로드 처리 중 */}
+      {isProcessing && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {status === 'processing' ? (
+                <div style={{ width: 18, height: 18, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <span style={{ fontSize: 16 }}>⏸️</span>
+              )}
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+                {status === 'processing' ? '파일 분석 중' : '일시정지'}
+              </span>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eff6ff', padding: '3px 8px', borderRadius: 6 }}>
+              {totalFiles > 0 ? `${currentFileIndex + 1}/${totalFiles}` : `${progress}%`}
+            </span>
+          </div>
+          <div style={{ background: '#f1f5f9', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg, #2d5fa8, #60a5fa)', borderRadius: 6, transition: 'width 0.5s', width: `${progress}%` }} />
+          </div>
+          <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {logs || currentFileName || '처리 중...'}
+          </p>
+        </>
+      )}
+      {/* 분류 확정 대기 알림 */}
+      {!isProcessing && hasResults && (
+        <a href="/finance/review" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📋</span>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>분류 확정 대기</span>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '3px 8px', borderRadius: 6 }}>
+              {totalResultCount}건
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0 0' }}>
+            클릭하여 분류/확정 페이지로 이동
+          </p>
+        </a>
+      )}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )

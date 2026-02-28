@@ -4,6 +4,7 @@ import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
   sendWithTemplate, buildEmailHTML, buildInfoTableHTML,
 } from '../../../../utils/messaging'
+import { recordLifecycleEvent, maskRecipient } from '@/app/utils/lifecycle-events'
 
 // ============================================
 // 견적서 발송 API (SMS / 카카오 알림톡 / 이메일)
@@ -38,7 +39,7 @@ function getQuoteEmailFallback(vars: Record<string, string>) {
     { label: '차종', value: `${vars.brand} ${vars.model}${vars.trim ? ` ${vars.trim}` : ''}` },
     { label: '계약유형', value: `${vars.contractType} · ${vars.termMonths}개월` },
     { label: '약정주행', value: `연 ${vars.annualMileage}km` },
-    { label: '월 렌탈료', value: `${vars.rentFee}원 (VAT포함 ${vars.rentWithVAT}원)` },
+    { label: '월 렌탈료', value: `${vars.rentWithVAT}원 (VAT포함) · 공급가 ${vars.rentFee}원` },
     ...(Number(vars.depositRaw) > 0 ? [{ label: '보증금', value: `${vars.deposit}원` }] : []),
   ]
   return buildEmailHTML({
@@ -210,6 +211,17 @@ export async function POST(
         .from('quotes')
         .update({ shared_at: new Date().toISOString() })
         .eq('id', quoteId)
+
+      // 라이프사이클 이벤트 기록
+      recordLifecycleEvent({
+        companyId: quote.company_id || user.company_id,
+        quoteId,
+        eventType: 'sent',
+        channel,
+        recipient: maskRecipient(recipient),
+        actorId: user.id,
+        metadata: { method: result?.method || channel },
+      })
     }
 
     return NextResponse.json({

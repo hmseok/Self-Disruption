@@ -81,6 +81,119 @@ const TRow = ({ label, value, bold = false }: { label: string; value: string; bo
 )
 
 // ============================================
+// 타임라인 컴포넌트
+// ============================================
+const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
+  created:          { icon: '📄', label: '견적 생성',   color: '#6b7280', bg: '#f3f4f6' },
+  shared:           { icon: '🔗', label: '링크 공유',   color: '#2563eb', bg: '#eff6ff' },
+  sent:             { icon: '📤', label: '견적 발송',   color: '#7c3aed', bg: '#f5f3ff' },
+  viewed:           { icon: '👁️', label: '고객 열람',   color: '#0891b2', bg: '#ecfeff' },
+  signed:           { icon: '✍️', label: '고객 서명',   color: '#059669', bg: '#ecfdf5' },
+  contract_created: { icon: '📋', label: '계약 생성',   color: '#059669', bg: '#ecfdf5' },
+  revoked:          { icon: '🚫', label: '링크 비활성화', color: '#dc2626', bg: '#fef2f2' },
+  pdf_stored:       { icon: '💾', label: 'PDF 저장',    color: '#0369a1', bg: '#f0f9ff' },
+}
+
+function QuoteTimeline({ quoteId }: { quoteId?: string }) {
+  const [events, setEvents] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!quoteId) return
+    setLoading(true)
+    const token = sessionStorage.getItem('supabase_access_token') || ''
+    fetch(`/api/quotes/${quoteId}/timeline`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => setEvents(d.events || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [quoteId])
+
+  if (!quoteId || (events.length === 0 && !loading)) return null
+
+  const fTime = (iso: string) => {
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  const getDesc = (e: any) => {
+    const ch = e.channel === 'sms' ? 'SMS' : e.channel === 'kakao' ? '카카오' : e.channel === 'email' ? '이메일' : e.channel === 'link' ? '링크' : ''
+    if (e.event_type === 'sent' && ch) return `${ch}로 ${e.recipient || '고객'}에게 발송`
+    if (e.event_type === 'shared') return '공유 링크 생성'
+    if (e.event_type === 'viewed') return '고객이 견적서를 열람'
+    if (e.event_type === 'signed') return `${e.metadata?.customer_name || '고객'}이 서명 완료`
+    if (e.event_type === 'contract_created') return '계약이 자동 생성됨'
+    if (e.event_type === 'revoked') return '공유 링크 비활성화'
+    if (e.event_type === 'pdf_stored') return '계약서 PDF 저장 완료'
+    return EVENT_CONFIG[e.event_type]?.label || e.event_type
+  }
+
+  const displayed = expanded ? events : events.slice(0, 5)
+
+  return (
+    <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px 24px' }}>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>📋 활동 타임라인</h3>
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>{events.length}건</span>
+        </div>
+        <div style={{ padding: '16px 20px' }}>
+          {loading ? (
+            <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, padding: 16 }}>불러오는 중...</p>
+          ) : events.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, padding: 16 }}>기록된 활동이 없습니다.</p>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              {/* 세로 선 */}
+              <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 2, background: '#e5e7eb' }} />
+              {displayed.map((ev: any, i: number) => {
+                const cfg = EVENT_CONFIG[ev.event_type] || EVENT_CONFIG.created
+                return (
+                  <div key={ev.id} style={{ display: 'flex', gap: 12, marginBottom: i < displayed.length - 1 ? 16 : 0, position: 'relative' }}>
+                    {/* 점 */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', background: cfg.bg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 14, flexShrink: 0, zIndex: 1, border: `2px solid ${cfg.color}20`,
+                    }}>
+                      {cfg.icon}
+                    </div>
+                    {/* 내용 */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+                        <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{fTime(ev.created_at)}</span>
+                      </div>
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>{getDesc(ev)}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {events.length > 5 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              style={{
+                display: 'block', width: '100%', marginTop: 12, padding: '8px 0',
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 12, color: '#2563eb', fontWeight: 600,
+              }}
+            >
+              {expanded ? '접기' : `전체 ${events.length}건 보기`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // 메인 컴포넌트
 // ============================================
 export default function QuoteDetailPage() {
@@ -668,11 +781,14 @@ export default function QuoteDetailPage() {
                         <td className="px-3 py-1.5 font-bold text-gray-800">{f(prepaymentAmt)}원 <span className="text-[10px] text-gray-400">(계약 시 1회)</span></td>
                       </tr>
                     )}
-                    <tr className="border-b border-gray-100 bg-blue-50">
-                      <td className="px-3 py-2 font-bold text-blue-600">월 렌탈료<br/><span className="text-[9px] font-normal">(VAT 포함)</span></td>
-                      <td className="px-3 py-2">
-                        <span className="text-lg font-black text-blue-700">{f(rentWithVAT)}<span className="text-[10px]">원</span></span>
-                        <span className="text-[10px] text-blue-400 ml-2">공급가 {f(rentFee)} + VAT {f(rentVAT)}</span>
+                    <tr style={{ borderBottom: '1px solid #dbeafe', background: '#eff6ff' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#1d4ed8', verticalAlign: 'middle' }}>
+                        월 렌탈료<br/><span style={{ fontSize: 9, fontWeight: 400, color: '#60a5fa' }}>(VAT 포함)</span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', letterSpacing: '-0.5px' }}>{f(rentWithVAT)}<span style={{ fontSize: 12, fontWeight: 600 }}>원</span></span>
+                        <br/>
+                        <span style={{ fontSize: 10, color: '#93c5fd' }}>공급가 {f(rentFee)} + VAT {f(rentVAT)}</span>
                       </td>
                     </tr>
                     {contractType === 'buyout' && (
@@ -1122,12 +1238,16 @@ export default function QuoteDetailPage() {
             ) : shareUrl ? (
               <div className="space-y-3">
                 {/* 메시지 미리보기 (축소) */}
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                  <div className="text-xs text-gray-700 leading-relaxed">
-                    <span className="font-bold">{(quote?.car?.brand || quote?.quote_detail?.car_info?.brand || '')} {(quote?.car?.model || quote?.quote_detail?.car_info?.model || '')}</span>
-                    <span className="text-gray-400 ml-2">{(quote?.quote_detail?.contract_type === 'buyout' ? '인수형' : '반납형')} · {(quote?.quote_detail?.term_months || 36)}개월</span>
-                    <span className="font-black text-blue-700 ml-2">월 {Math.round((quote?.rent_fee || 0) * 1.1).toLocaleString()}원</span>
-                    <span className="text-gray-400 text-[10px] ml-1">(VAT포함)</span>
+                <div style={{ background: '#f8fafc', borderRadius: 12, padding: '12px 16px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{(quote?.car?.brand || quote?.quote_detail?.car_info?.brand || '')} {(quote?.car?.model || quote?.quote_detail?.car_info?.model || '').split('(')[0]}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>{(quote?.quote_detail?.contract_type === 'buyout' ? '인수형' : '반납형')} · {(quote?.quote_detail?.term_months || 36)}개월</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 900, fontSize: 18, color: '#1d4ed8' }}>월 {Math.round((quote?.rent_fee || 0) * 1.1).toLocaleString()}원</span>
+                      <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 4 }}>(VAT포함)</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1240,6 +1360,9 @@ export default function QuoteDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ======================== 타임라인 섹션 ======================== */}
+      <QuoteTimeline quoteId={quote?.id} />
 
       <style jsx global>{`
         @media print {

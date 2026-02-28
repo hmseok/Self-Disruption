@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/app/utils/auth-guard'
 import { createClient } from '@supabase/supabase-js'
+import { recordLifecycleEvent } from '@/app/utils/lifecycle-events'
 
 /**
  * 견적서 공유 링크 생성 API (인증 필요)
@@ -66,6 +67,15 @@ export async function POST(
 
     if (existingToken) {
       const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
+      // 기존 토큰 재사용 시에도 shared 이벤트 기록
+      recordLifecycleEvent({
+        companyId: quote.company_id,
+        quoteId,
+        eventType: 'shared',
+        channel: 'link',
+        actorId: auth.user?.id || null,
+        metadata: { reused_token: true },
+      })
       return NextResponse.json({
         token: existingToken.token,
         shareUrl: `${origin}/public/quote/${existingToken.token}`,
@@ -101,6 +111,15 @@ export async function POST(
 
     const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
     const shareUrl = `${origin}/public/quote/${token}`
+
+    // 라이프사이클 이벤트 기록
+    recordLifecycleEvent({
+      companyId: quote.company_id,
+      quoteId,
+      eventType: 'shared',
+      channel: 'link',
+      actorId: auth.user?.id || null,
+    })
 
     return NextResponse.json({
       token,
@@ -169,6 +188,18 @@ export async function DELETE(
       .update({ status: 'revoked' })
       .eq('quote_id', quoteId)
       .eq('status', 'active')
+
+    // 라이프사이클 이벤트 기록
+    // company_id를 조회하기 위해 quote 확인
+    const { data: rQuote } = await supabase.from('quotes').select('company_id').eq('id', quoteId).single()
+    if (rQuote) {
+      recordLifecycleEvent({
+        companyId: rQuote.company_id,
+        quoteId,
+        eventType: 'revoked',
+        actorId: auth.user?.id || null,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (e: any) {

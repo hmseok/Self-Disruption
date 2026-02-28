@@ -10,6 +10,7 @@ import { useUpload } from '@/app/context/UploadContext'
 // 분류 카테고리 & 상수 (Both files)
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
+// ═══ 회계 기준 카테고리 (DB 저장용, select 드롭다운용) ═══
 const CATEGORIES = [
   { group: '매출(영업수익)', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익'] },
   { group: '자본변동', items: ['투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)'] },
@@ -19,6 +20,19 @@ const CATEGORIES = [
   { group: '영업비용-관리', items: ['복리후생(식대)', '접대비', '여비교통비', '임차료/사무실', '통신비', '소모품/사무용품', '교육/훈련비', '광고/마케팅', '보험료(일반)', '전기/수도/가스', '경비/보안'] },
   { group: '세금/공과', items: ['원천세/부가세', '법인세/지방세', '세금/공과금'] },
   { group: '기타', items: ['쇼핑/온라인구매', '도서/신문', '감가상각비', '수선/유지비', '기타수입', '기타'] },
+]
+
+// ═══ 용도별 카테고리 (사용자 화면 표시용 — 같은 업종/종류끼리 묶기) ═══
+const DISPLAY_CATEGORIES = [
+  { group: '💰 돈 들어오는 것', icon: '💰', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익', '기타수입'] },
+  { group: '🏦 투자/대출 입출금', icon: '🏦', items: ['투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)'] },
+  { group: '🚛 차량 운영', icon: '🚛', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험'] },
+  { group: '👨‍💼 급여/인건비', icon: '👨‍💼', items: ['급여(정규직)', '일용직급여', '용역비(3.3%)', '4대보험(회사부담)'] },
+  { group: '🏢 사무실/운영비', icon: '🏢', items: ['임차료/사무실', '통신비', '소모품/사무용품', '전기/수도/가스', '경비/보안', '수선/유지비'] },
+  { group: '🍽️ 식비/접대/출장', icon: '🍽️', items: ['복리후생(식대)', '접대비', '여비교통비'] },
+  { group: '💳 수수료/카드', icon: '💳', items: ['수수료/카드수수료'] },
+  { group: '🏛️ 세금/공과금', icon: '🏛️', items: ['원천세/부가세', '법인세/지방세', '세금/공과금'] },
+  { group: '📦 기타 지출', icon: '📦', items: ['쇼핑/온라인구매', '도서/신문', '교육/훈련비', '광고/마케팅', '보험료(일반)', '감가상각비', '기타'] },
 ]
 
 const ALL_CATEGORIES = CATEGORIES.flatMap(g => g.items)
@@ -36,19 +50,56 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
+  // 회계 기준
   '매출(영업수익)': '#3b82f6', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
   '영업비용-인건비': '#10b981', '영업비용-관리': '#ec4899', '세금/공과': '#ef4444', '기타': '#94a3b8',
+  // 용도별
+  '💰 돈 들어오는 것': '#3b82f6', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
+  '👨‍💼 급여/인건비': '#10b981', '🏢 사무실/운영비': '#8b5cf6', '🍽️ 식비/접대/출장': '#ec4899',
+  '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
 }
 
 const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량' }
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
-function getCategoryGroup(cat: string): string {
-  for (const g of CATEGORIES) {
+// 카드 vs 통장 금액 표시 헬퍼
+const isCardItem = (item: any) => {
+  const pm = (item.payment_method || item.source_data?.payment_method || '').toLowerCase()
+  return pm === '카드' || pm === 'card' || !!item.card_number || !!item.card_id
+}
+// 카드: 결제=검정 양수, 취소=빨간 음수(-) | 통장: 입금=파란(+), 출금=빨간(-)
+// + 외화: currency 뱃지 + 원금 서브텍스트
+const getAmountDisplay = (item: any) => {
+  const amt = item.amount || item.source_data?.amount || 0
+  const absAmt = Math.abs(amt).toLocaleString()
+  const currency = item.currency || item.source_data?.currency || 'KRW'
+  const originalAmt = item.original_amount || item.source_data?.original_amount || null
+  const isForeign = currency !== 'KRW'
+
+  let text = '', color = '', prefix = '', prefixColor = ''
+  if (isCardItem(item)) {
+    if (item.is_cancelled) { text = `-${absAmt}`; color = '#dc2626'; prefix = '취소 '; prefixColor = '#dc2626' }
+    else { text = absAmt; color = '#111827' }
+  } else {
+    const isIncome = item.type === 'income' || amt > 0
+    if (isIncome) { text = `+${absAmt}`; color = '#2563eb' }
+    else { text = `-${absAmt}`; color = '#dc2626' }
+  }
+
+  return {
+    text, color, prefix, prefixColor,
+    isForeign, currency,
+    originalText: isForeign && originalAmt ? `${currency} ${Math.abs(originalAmt).toLocaleString()}` : null,
+  }
+}
+
+function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'accounting'): string {
+  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
+  for (const g of source) {
     if (g.items.includes(cat)) return g.group
   }
-  return '기타'
+  return mode === 'display' ? '📦 기타 지출' : '기타'
 }
 
 const DEFAULT_RULES = [
@@ -120,6 +171,8 @@ function UploadContent() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
+  // 카테고리 뷰 모드: 회계 기준 vs 용도별
+  const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>('display')
 
   // ── Related Data (Review) ──
   const [reviewJiips, setReviewJiips] = useState<any[]>([])
@@ -133,6 +186,12 @@ function UploadContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user'>('category')
+  const [linkPopoverId, setLinkPopoverId] = useState<string | null>(null)
+  const [linkPopoverTab, setLinkPopoverTab] = useState<'car' | 'jiip' | 'invest' | 'loan'>('car')
+  const [linkPopoverSearch, setLinkPopoverSearch] = useState('')
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance'>('car')
+  const [linkModalSelectedId, setLinkModalSelectedId] = useState<string | null>(null)
 
   const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
@@ -176,6 +235,17 @@ function UploadContent() {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [effectiveCompanyId, activeTab, reviewFilter])
+
+  // 팝오버 외부 클릭 시 닫기
+  useEffect(() => {
+    if (!linkPopoverId) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-link-popover]')) setLinkPopoverId(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [linkPopoverId])
 
   const fetchBasicData = async () => {
     if (!effectiveCompanyId) return
@@ -302,11 +372,19 @@ function UploadContent() {
   }, [employees])
 
   const groupedItems = useMemo(() => {
-    const groups: Record<string, { items: any[]; totalAmount: number; type: string }> = {}
+    const groups: Record<string, { items: any[]; totalAmount: number; type: string; subGroups?: Record<string, { items: any[]; totalAmount: number }> }> = {}
+    // 용도별 모드 매핑
+    const catMap: Record<string, string> = {}
+    if (categoryMode === 'display') {
+      for (const dg of DISPLAY_CATEGORIES) {
+        for (const it of dg.items) catMap[it] = dg.group
+      }
+    }
     for (const item of items) {
       let key = ''
       if (groupBy === 'category') {
-        key = item.ai_category || '미분류'
+        const rawCat = item.ai_category || '미분류'
+        key = categoryMode === 'display' ? (catMap[rawCat] || '📦 기타 지출') : rawCat
       } else if (groupBy === 'card') {
         const sd = item.source_data || {}
         const cardNum = sd.card_number || ''
@@ -351,9 +429,25 @@ function UploadContent() {
       groups[key].items.push(item)
       groups[key].totalAmount += Math.abs(item.source_data?.amount || 0)
       if (item.source_data?.type === 'income') groups[key].type = 'income'
+      // 용도별 모드: 서브그룹 추적
+      if (categoryMode === 'display' && groupBy === 'category') {
+        const rawCat = item.ai_category || '미분류'
+        if (!groups[key].subGroups) groups[key].subGroups = {}
+        if (!groups[key].subGroups![rawCat]) groups[key].subGroups![rawCat] = { items: [], totalAmount: 0 }
+        groups[key].subGroups![rawCat].items.push(item)
+        groups[key].subGroups![rawCat].totalAmount += Math.abs(item.source_data?.amount || 0)
+      }
+    }
+    // 용도별 모드: DISPLAY_CATEGORIES 순서 정렬
+    if (categoryMode === 'display' && groupBy === 'category') {
+      const order = DISPLAY_CATEGORIES.map(d => d.group)
+      return Object.entries(groups).sort((a, b) => {
+        const ai = order.indexOf(a[0]); const bi = order.indexOf(b[0])
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+      })
     }
     return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
-  }, [items, groupBy, corpCards, cars, getCardDisplayName])
+  }, [items, groupBy, corpCards, cars, getCardDisplayName, categoryMode])
 
   // ── 리뷰 탭 미분류 통계 ──
   const reviewUnclassifiedCount = useMemo(() => {
@@ -421,6 +515,93 @@ function UploadContent() {
     if (checked) setSelectedIds(new Set(items.map(i => i.id)))
     else setSelectedIds(new Set())
   }
+
+  const toggleSelectGroup = (category: string) => {
+    const groupItemIds = items.filter(i => {
+      if (groupBy === 'category') return (i.ai_category || '미분류') === category
+      if (groupBy === 'card') return (i.card_number || i.source_data?.payment_method || '기타') === category
+      if (groupBy === 'bank') return (i.source_data?.payment_method || '기타') === category
+      if (groupBy === 'vehicle') return (i.matched_car_number || '미배정') === category
+      if (groupBy === 'user') return (i.matched_employee_name || '미배정') === category
+      return (i.ai_category || '미분류') === category
+    }).map(i => i.id)
+    const allSelected = groupItemIds.length > 0 && groupItemIds.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) groupItemIds.forEach(id => next.delete(id))
+      else groupItemIds.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  // ── 연결 처리 (단건/일괄) ──
+  const handleLinkItem = async (itemId: string, relatedType: string, relatedId: string) => {
+    try {
+      const res = await fetch('/api/finance/classify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queue_id: itemId,
+          final_related_type: relatedType,
+          final_related_id: relatedId,
+          save_as_rule: false,
+        }),
+      })
+      if (res.ok) {
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, ai_related_type: relatedType, ai_related_id: relatedId } : i))
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  const handleBulkLink = async (relatedType: string, relatedId: string) => {
+    const targetItems = items.filter(i => selectedIds.has(i.id))
+    for (const item of targetItems) {
+      await handleLinkItem(item.id, relatedType, relatedId)
+    }
+    setSelectedIds(new Set())
+    setLinkModalOpen(false)
+    setLinkModalSelectedId(null)
+  }
+
+  // 연결 대상 표시 (리뷰탭용)
+  const getReviewLinkDisplay = useCallback((item: any) => {
+    const type = item.ai_related_type
+    const id = item.ai_related_id
+    if (!type || !id) return null
+    if (type === 'car') {
+      const c = cars.find(cc => cc.id === id)
+      return c ? { icon: '🚗', label: c.number || '차량', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' } : null
+    }
+    if (type === 'jiip') {
+      const j = (jiips || []).find((jj: any) => jj.id === id)
+      return j ? { icon: '🚛', label: j.investor_name || '지입', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' } : null
+    }
+    if (type === 'invest') {
+      const inv = (investors || []).find((ii: any) => ii.id === id)
+      return inv ? { icon: '💰', label: inv.investor_name || '투자', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' } : null
+    }
+    if (type === 'loan') {
+      const l = (loans || []).find((ll: any) => ll.id === id)
+      return l ? { icon: '🏦', label: l.finance_name || '대출', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' } : null
+    }
+    if (type === 'insurance') {
+      const ins = (insurances || []).find((ii: any) => ii.id === id)
+      return ins ? { icon: '🛡️', label: ins.company || '보험', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' } : null
+    }
+    return { icon: '🔗', label: type, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' }
+  }, [cars, jiips, investors, loans, insurances])
+
+  // 연결 팝오버용 옵션 (검색 포함)
+  const linkOptions = useMemo(() => {
+    const s = linkPopoverSearch.toLowerCase()
+    return {
+      car: cars.filter(c => !s || (c.number || '').toLowerCase().includes(s) || (c.brand || '').toLowerCase().includes(s) || (c.model || '').toLowerCase().includes(s)),
+      jiip: (jiips || []).filter((j: any) => !s || (j.investor_name || '').toLowerCase().includes(s) || (j.vehicle_number || j.car_number || '').toLowerCase().includes(s)),
+      invest: (investors || []).filter((i: any) => !s || (i.investor_name || '').toLowerCase().includes(s)),
+      loan: (loans || []).filter((l: any) => !s || (l.finance_name || '').toLowerCase().includes(s)),
+      insurance: (insurances || []).filter((i: any) => !s || (i.company || '').toLowerCase().includes(s)),
+    }
+  }, [cars, jiips, investors, loans, insurances, linkPopoverSearch])
 
   // ── Drag & Drop ──
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1074,6 +1255,34 @@ function UploadContent() {
   // 카테고리별 그룹핑
   const groupedByCategory = useMemo(() => {
     if (uploadGroupBy !== 'category') return null
+
+    if (categoryMode === 'display') {
+      // 용도별 그룹핑: DISPLAY_CATEGORIES 순서대로 2단계 (그룹 > 세부항목)
+      const result: [string, { items: typeof filteredResults; totalAmount: number; subGroups: Record<string, { items: typeof filteredResults; totalAmount: number }> }][] = []
+      const catMap: Record<string, string> = {} // 세부항목 → 그룹명 매핑
+      for (const dg of DISPLAY_CATEGORIES) {
+        for (const item of dg.items) catMap[item] = dg.group
+      }
+      const groupData: Record<string, { items: typeof filteredResults; totalAmount: number; subGroups: Record<string, { items: typeof filteredResults; totalAmount: number }> }> = {}
+      for (const item of filteredResults) {
+        const cat = item.category || '미분류'
+        const groupName = catMap[cat] || '📦 기타 지출'
+        if (!groupData[groupName]) groupData[groupName] = { items: [], totalAmount: 0, subGroups: {} }
+        groupData[groupName].items.push(item)
+        groupData[groupName].totalAmount += item.amount || 0
+        if (!groupData[groupName].subGroups[cat]) groupData[groupName].subGroups[cat] = { items: [], totalAmount: 0 }
+        groupData[groupName].subGroups[cat].items.push(item)
+        groupData[groupName].subGroups[cat].totalAmount += item.amount || 0
+      }
+      // DISPLAY_CATEGORIES 순서대로 정렬
+      const order = DISPLAY_CATEGORIES.map(d => d.group)
+      return Object.entries(groupData).sort((a, b) => {
+        const ai = order.indexOf(a[0]); const bi = order.indexOf(b[0])
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+      })
+    }
+
+    // 회계 기준 (기존)
     const groups: Record<string, { items: typeof filteredResults; totalAmount: number }> = {}
     for (const item of filteredResults) {
       const cat = item.category || '미분류'
@@ -1082,7 +1291,7 @@ function UploadContent() {
       groups[cat].totalAmount += item.amount || 0
     }
     return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
-  }, [filteredResults, uploadGroupBy])
+  }, [filteredResults, uploadGroupBy, categoryMode])
 
   // 업로드 결과 요약 통계
   const uploadStats = useMemo(() => {
@@ -1573,7 +1782,16 @@ function UploadContent() {
                           {!group.isBank && !group.cardInfo && <p style={{ fontSize: 11, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                          {group.isBank ? (() => {
+                            const inc = group.items.filter(i => i.type === 'income' || (i.amount && i.amount > 0)).reduce((s, i) => s + Math.abs(i.amount || 0), 0)
+                            const exp = group.items.filter(i => i.type === 'expense' || (i.amount && i.amount < 0)).reduce((s, i) => s + Math.abs(i.amount || 0), 0)
+                            return (<>
+                              <p style={{ fontWeight: 800, fontSize: 13, color: '#2563eb', margin: 0 }}>+{inc.toLocaleString()}원</p>
+                              <p style={{ fontWeight: 800, fontSize: 13, color: '#dc2626', margin: 0 }}>-{exp.toLocaleString()}원</p>
+                            </>)
+                          })() : (
+                            <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
+                          )}
                           <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cardNum) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
@@ -1653,10 +1871,14 @@ function UploadContent() {
                                       )
                                     })()}
                                   </td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
-                                    {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
-                                    {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                                  {(() => { const ad = getAmountDisplay(item); return (
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
+                                    {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                    {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                    {ad.text}
+                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                   </td>
+                                  )})()}
                                   <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
                                     <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
                                   </td>
@@ -1686,35 +1908,85 @@ function UploadContent() {
               {/* ═══ 그룹 뷰: 카테고리별 ═══ */}
               {uploadGroupBy === 'category' && groupedByCategory && (
                 <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                  {/* 회계/용도 모드 토글 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 12px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 5 }}>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginRight: 4 }}>보기:</span>
+                    {([
+                      { key: 'display' as const, label: '📋 용도별', desc: '같은 종류끼리 묶기' },
+                      { key: 'accounting' as const, label: '📊 회계기준', desc: '계정과목 기준' },
+                    ]).map(m => (
+                      <button key={m.key} onClick={() => { setCategoryMode(m.key); setExpandedGroups(new Set()) }}
+                        style={{
+                          padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          background: categoryMode === m.key ? '#0f172a' : '#fff',
+                          color: categoryMode === m.key ? '#fff' : '#64748b',
+                          border: categoryMode === m.key ? 'none' : '1px solid #d1d5db',
+                        }}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {groupedByCategory.map(([cat, group]) => {
-                    const icon = CATEGORY_ICONS[cat] || '📋'
-                    const groupName = getCategoryGroup(cat)
-                    const groupColor = CATEGORY_COLORS[groupName] || '#64748b'
+                    const isDisplayMode = categoryMode === 'display'
+                    const groupColor = CATEGORY_COLORS[cat] || '#64748b'
+                    // 용도별 모드: cat은 DISPLAY_CATEGORIES의 그룹명 (이미 아이콘 포함)
+                    // 회계 모드: cat은 개별 카테고리명
+                    const icon = isDisplayMode ? '' : (CATEGORY_ICONS[cat] || '📋')
+                    const groupName = isDisplayMode ? '' : getCategoryGroup(cat, 'accounting')
+                    const subGroups = isDisplayMode && (group as any).subGroups ? Object.entries((group as any).subGroups as Record<string, { items: typeof filteredResults; totalAmount: number }>) : null
+
                     return (
                       <div key={cat} style={{ borderBottom: '2px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
                           onClick={() => toggleGroup(cat)}>
                           <div style={{ width: 4, height: 32, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
-                          <span style={{ fontSize: 16 }}>{icon}</span>
+                          {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
                           <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{cat}</p>
-                            <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>
+                            {groupName && <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>}
+                            {isDisplayMode && subGroups && (
+                              <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>
+                                {subGroups.map(([k]) => k).join(' · ')}
+                              </p>
+                            )}
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                            <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                             <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                           </div>
                           <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cat) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                         </div>
                         {expandedGroups.has(cat) && (() => {
                           const catLimit = groupItemLimits[cat] || GROUP_PAGE_SIZE
-                          const catVisibleItems = group.items.slice(0, catLimit)
-                          const catHasMore = group.items.length > catLimit
+                          // 용도별 모드: 서브그룹별로 정렬 후 표시
+                          const sortedItems = isDisplayMode && subGroups
+                            ? subGroups.flatMap(([, sg]) => sg.items)
+                            : group.items
+                          const catVisibleItems = sortedItems.slice(0, catLimit)
+                          const catHasMore = sortedItems.length > catLimit
+                          // 서브그룹 경계 인덱스 계산 (용도별 모드)
+                          const subGroupBounds: Record<number, { name: string; count: number; amount: number }> = {}
+                          if (isDisplayMode && subGroups) {
+                            let idx = 0
+                            for (const [sgName, sg] of subGroups) {
+                              if (idx < catLimit) subGroupBounds[idx] = { name: sgName, count: sg.items.length, amount: sg.totalAmount }
+                              idx += sg.items.length
+                            }
+                          }
                           return (
                           <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
                               <tbody>
-                                {catVisibleItems.map(item => (
+                                {catVisibleItems.map((item, rowIdx) => (<>
+                                  {subGroupBounds[rowIdx] && (
+                                    <tr key={`sub-${rowIdx}`} style={{ background: '#f0f4ff' }}>
+                                      <td colSpan={8} style={{ padding: '6px 16px', fontSize: 11, fontWeight: 800, color: '#475569' }}>
+                                        {CATEGORY_ICONS[subGroupBounds[rowIdx].name] || '📋'} {subGroupBounds[rowIdx].name}
+                                        <span style={{ fontWeight: 500, color: '#94a3b8', marginLeft: 8 }}>{subGroupBounds[rowIdx].count}건 · {Math.abs(subGroupBounds[rowIdx].amount).toLocaleString()}원</span>
+                                      </td>
+                                    </tr>
+                                  )}
                                   <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.03)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                     <td style={{ padding: '8px 12px', width: 90, color: '#6b7280' }}>{item.transaction_date}</td>
                                     <td style={{ padding: '8px 12px' }}>
@@ -1793,24 +2065,28 @@ function UploadContent() {
                                         )
                                       })()}
                                     </td>
-                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
-                                      {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
-                                      {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
+                                    {(() => { const ad = getAmountDisplay(item); return (
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
+                                      {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                      {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                      {ad.text}
+                                      {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                     </td>
+                                    )})()}
                                     <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
                                       <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
                                     </td>
                                   </tr>
-                                ))}
+                                </>))}
                               </tbody>
                             </table>
                             {catHasMore && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: catLimit + GROUP_PAGE_SIZE })) }}
                                   style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
-                                  더보기 ({catLimit}/{group.items.length}건)
+                                  더보기 ({catLimit}/{sortedItems.length}건)
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: group.items.length })) }}
+                                <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: sortedItems.length })) }}
                                   style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
                                   전체보기
                                 </button>
@@ -1837,7 +2113,7 @@ function UploadContent() {
                           <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{label}</p>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontWeight: 800, fontSize: 14, color: '#ef4444', margin: 0 }}>{group.totalAmount.toLocaleString()}원</p>
+                          <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                           <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(label) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
@@ -1912,7 +2188,14 @@ function UploadContent() {
                                       )
                                     })()}
                                   </td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#111827' }}>{(item.amount || 0).toLocaleString()}</td>
+                                  {(() => { const ad = getAmountDisplay(item); return (
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
+                                    {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                    {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                    {ad.text}
+                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                  </td>
+                                  )})()}
                                   <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
                                     <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
                                   </td>
@@ -2193,20 +2476,14 @@ function UploadContent() {
                                 )
                               })()}
                             </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: 13, color: item.is_cancelled ? '#dc2626' : '#111827' }}>
-                              {item.is_cancelled && <span style={{ fontSize: 10, color: '#dc2626', marginRight: 4 }}>취소</span>}
-                              {(item as any).currency && (item as any).currency !== 'KRW' && (
-                                <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>
-                                  {(item as any).currency}
-                                </span>
-                              )}
-                              {item.is_cancelled ? '-' : ''}{(item.amount || 0).toLocaleString()}
-                              {(item as any).currency && (item as any).currency !== 'KRW' && (item as any).original_amount && (
-                                <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>
-                                  ({(item as any).currency} {((item as any).original_amount || 0).toLocaleString()})
-                                </div>
-                              )}
+                            {(() => { const ad = getAmountDisplay(item); return (
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 900, fontSize: 13, color: ad.color }}>
+                              {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                              {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                              {ad.text}
+                              {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                             </td>
+                            )})()}
                             <td style={{ padding: '8px 12px', textAlign: 'center' }}><button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontWeight: 700, padding: 4, cursor: 'pointer', fontSize: 16 }} onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>×</button></td>
                           </tr>
                         )
@@ -2223,63 +2500,66 @@ function UploadContent() {
       {/* Review Tab (분류/확정 통합) */}
       {activeTab === 'review' && (
         <>
-          {/* 상태 필터 + 그룹뷰 + 삭제 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* 상태 필터 (pending/confirmed) */}
-              {([
-                { key: 'pending' as const, label: '검토 대기', count: stats.pending, color: '#d97706', bg: '#fffbeb' },
-                { key: 'confirmed' as const, label: '확정 완료', count: stats.confirmed, color: '#16a34a', bg: '#f0fdf4' },
-              ]).map(f => (
-                <button key={f.key} onClick={() => { setReviewFilter(f.key); setExpandedGroups(new Set()); setSelectedIds(new Set()) }}
-                  style={{
-                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    background: reviewFilter === f.key ? f.bg : '#fff',
-                    color: reviewFilter === f.key ? f.color : '#9ca3af',
-                    border: reviewFilter === f.key ? `1.5px solid ${f.color}` : '1px solid #e5e7eb',
-                  }}>
-                  {f.label} ({f.count})
-                </button>
-              ))}
-              {reviewUnclassifiedCount > 0 && (
-                <span style={{ padding: '4px 10px', borderRadius: 8, background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', whiteSpace: 'nowrap' }}>
-                  ❓ 미분류 {reviewUnclassifiedCount}건
-                </span>
-              )}
-              <div style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 4px' }} />
-              {/* 그룹 뷰 탭 */}
-              {([
-                { key: 'category' as const, label: '카테고리별', icon: '📂' },
-                { key: 'card' as const, label: '카드별', icon: '💳' },
-                { key: 'bank' as const, label: '통장별', icon: '🏦' },
-                { key: 'vehicle' as const, label: '차량별', icon: '🚙' },
-                { key: 'user' as const, label: '사용자별', icon: '👤' },
-              ]).map(v => (
-                <button key={v.key} onClick={() => setGroupBy(v.key)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none',
-                    background: groupBy === v.key ? '#0f172a' : '#f1f5f9', color: groupBy === v.key ? '#fff' : '#64748b',
-                  }}>
-                  {v.icon} {v.label}
-                </button>
-              ))}
-            </div>
-            {/* 삭제 버튼 그룹 */}
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {selectedIds.size > 0 && (
-                <button onClick={handleDeleteSelected} disabled={deleting}
-                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: '#fee2e2', color: '#dc2626' }}>
-                  선택 삭제 ({selectedIds.size})
-                </button>
-              )}
-              {items.length > 0 && (
-                <button onClick={handleDeleteAll} disabled={deleting}
-                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid #fecaca', background: '#fff', color: '#dc2626' }}>
-                  {deleting ? '삭제 중...' : `전체 삭제 (${items.length})`}
-                </button>
-              )}
-            </div>
+          {/* 1행: 상태 필터 + 그룹 뷰 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {([
+              { key: 'pending' as const, label: '검토 대기', count: stats.pending, color: '#d97706', bg: '#fffbeb' },
+              { key: 'confirmed' as const, label: '확정 완료', count: stats.confirmed, color: '#16a34a', bg: '#f0fdf4' },
+            ]).map(f => (
+              <button key={f.key} onClick={() => { setReviewFilter(f.key); setExpandedGroups(new Set()); setSelectedIds(new Set()) }}
+                style={{
+                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  background: reviewFilter === f.key ? f.bg : '#fff',
+                  color: reviewFilter === f.key ? f.color : '#9ca3af',
+                  border: reviewFilter === f.key ? `1.5px solid ${f.color}` : '1px solid #e5e7eb',
+                }}>
+                {f.label} ({f.count})
+              </button>
+            ))}
+            {reviewUnclassifiedCount > 0 && (
+              <span style={{ padding: '4px 10px', borderRadius: 8, background: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', whiteSpace: 'nowrap' }}>
+                ❓ 미분류 {reviewUnclassifiedCount}건
+              </span>
+            )}
+            <div style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 4px' }} />
+            {([
+              { key: 'category' as const, label: '카테고리별', icon: '📂' },
+              { key: 'card' as const, label: '카드별', icon: '💳' },
+              { key: 'bank' as const, label: '통장별', icon: '🏦' },
+              { key: 'vehicle' as const, label: '차량별', icon: '🚙' },
+              { key: 'user' as const, label: '사용자별', icon: '👤' },
+            ]).map(v => (
+              <button key={v.key} onClick={() => setGroupBy(v.key)}
+                style={{
+                  padding: '6px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none',
+                  background: groupBy === v.key ? '#0f172a' : '#f1f5f9', color: groupBy === v.key ? '#fff' : '#64748b',
+                }}>
+                {v.icon} {v.label}
+              </button>
+            ))}
           </div>
+
+          {/* 2행: 전체선택 체크박스 (심플하게 좌측 정렬) */}
+          {items.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={items.length > 0 && selectedIds.size === items.length}
+                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < items.length }}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 700, color: selectedIds.size > 0 ? '#0f172a' : '#94a3b8' }}>
+                  {selectedIds.size > 0 ? `${selectedIds.size}건 선택됨` : `전체 선택`}
+                </span>
+              </label>
+              <button onClick={handleDeleteAll} disabled={deleting}
+                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: '#dc2626' }}>
+                {deleting ? '삭제 중...' : `전체 삭제`}
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2298,11 +2578,32 @@ function UploadContent() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* 카테고리별 모드일 때 회계/용도별 토글 */}
+              {groupBy === 'category' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 14px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginRight: 4 }}>보기:</span>
+                  {([
+                    { key: 'display' as const, label: '📋 용도별' },
+                    { key: 'accounting' as const, label: '📊 회계기준' },
+                  ]).map(m => (
+                    <button key={m.key} onClick={() => { setCategoryMode(m.key); setExpandedGroups(new Set()) }}
+                      style={{
+                        padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        background: categoryMode === m.key ? '#0f172a' : '#fff',
+                        color: categoryMode === m.key ? '#fff' : '#64748b',
+                        border: categoryMode === m.key ? 'none' : '1px solid #d1d5db',
+                      }}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {groupedItems.map(([category, group]) => {
                 const isExpanded = expandedGroups.has(category)
-                const icon = CATEGORY_ICONS[category] || '📋'
-                const groupName = getCategoryGroup(category)
-                const groupColor = CATEGORY_COLORS[groupName] || '#64748b'
+                const isDisplayCat = categoryMode === 'display' && groupBy === 'category'
+                const icon = isDisplayCat ? '' : (CATEGORY_ICONS[category] || '📋')
+                const groupName = isDisplayCat ? '' : getCategoryGroup(category, 'accounting')
+                const groupColor = CATEGORY_COLORS[isDisplayCat ? category : groupName] || '#64748b'
                 const isIncome = group.type === 'income'
 
                 return (
@@ -2323,15 +2624,35 @@ function UploadContent() {
                       onMouseEnter={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fee2e2' : '#f3f4f6'}
                       onMouseLeave={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fef2f2' : '#fafbfc'}>
 
+                      {/* Group Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={group.items.every((i: any) => selectedIds.has(i.id))}
+                        ref={(el) => {
+                          if (el) {
+                            const checkedCount = group.items.filter((i: any) => selectedIds.has(i.id)).length
+                            el.indeterminate = checkedCount > 0 && checkedCount < group.items.length
+                          }
+                        }}
+                        onChange={(e) => { e.stopPropagation(); toggleSelectGroup(category) }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                      />
+
                       {/* Color Bar */}
                       <div style={{ width: 4, height: 36, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
 
                       {/* Category Name */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: 20 }}>{icon}</span>
+                        {!isDisplayCat && <span style={{ fontSize: 20 }}>{icon}</span>}
                         <div>
                           <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
-                          <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, margin: 0 }}>{groupName}</p>
+                          {!isDisplayCat && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, margin: 0 }}>{groupName}</p>}
+                          {isDisplayCat && group.subGroups && (
+                            <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, margin: 0 }}>
+                              {Object.keys(group.subGroups).join(' · ')}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -2370,15 +2691,35 @@ function UploadContent() {
                     {/* Group Items (paginated to prevent crash on large groups) */}
                     {isExpanded && (() => {
                       const limit = groupItemLimits[category] || GROUP_PAGE_SIZE
-                      const visibleItems = group.items.slice(0, limit)
-                      const hasMore = group.items.length > limit
+                      // 용도별 모드: 서브그룹별로 정렬
+                      const subGroups = isDisplayCat && group.subGroups ? Object.entries(group.subGroups) : null
+                      const sortedItems = subGroups ? subGroups.flatMap(([, sg]) => sg.items) : group.items
+                      const visibleItems = sortedItems.slice(0, limit)
+                      const hasMore = sortedItems.length > limit
+                      // 서브그룹 경계 인덱스
+                      const subGroupBounds: Record<number, { name: string; count: number; amount: number }> = {}
+                      if (subGroups) {
+                        let idx = 0
+                        for (const [sgName, sg] of subGroups) {
+                          if (idx < limit) subGroupBounds[idx] = { name: sgName, count: sg.items.length, amount: sg.totalAmount }
+                          idx += sg.items.length
+                        }
+                      }
                       return (
                       <div>
-                        {visibleItems.map((item: any) => {
+                        {visibleItems.map((item: any, itemIdx: number) => {
                           const src = item.source_data || {}
                           const isConfirmed = item.status === 'confirmed'
+                          const subHeader = subGroupBounds[itemIdx]
 
-                          return (
+                          return (<>
+                            {subHeader && (
+                              <div key={`sub-${itemIdx}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 20px 6px 36px', background: '#f0f4ff', borderBottom: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 13 }}>{CATEGORY_ICONS[subHeader.name] || '📋'}</span>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{subHeader.name}</span>
+                                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{subHeader.count}건 · {Math.abs(subHeader.amount).toLocaleString()}원</span>
+                              </div>
+                            )}
                             <div key={item.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 36px', borderBottom: '1px solid #f8fafc', gap: 10, opacity: isConfirmed ? 0.5 : 1, background: selectedIds.has(item.id) ? 'rgba(59, 130, 246, 0.04)' : (item.source_data?.is_cancelled ? '#fef2f2' : 'transparent'), transition: 'background 0.2s' }}
                               onMouseEnter={(e) => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(79, 70, 229, 0.03)' }}
                               onMouseLeave={(e) => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = item.source_data?.is_cancelled ? '#fef2f2' : 'transparent' }}>
@@ -2416,17 +2757,114 @@ function UploadContent() {
                                 {src.description || ''}
                               </span>
 
-                              {/* Related Type */}
-                              {item.ai_related_type && (
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#f0fdf4', color: '#16a34a', flexShrink: 0 }}>
-                                  {TYPE_LABELS[item.ai_related_type] || ''}
-                                </span>
-                              )}
+                              {/* 연결 뱃지 + 🔗 팝오버 */}
+                              {(() => {
+                                const ld = getReviewLinkDisplay(item)
+                                return (
+                                  <div data-link-popover style={{ position: 'relative', flexShrink: 0 }}>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setLinkPopoverId(linkPopoverId === item.id ? null : item.id); setLinkPopoverSearch(''); setLinkPopoverTab('car') }}
+                                      style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6,
+                                        fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                                        background: ld ? ld.bg : '#f8fafc', color: ld ? ld.color : '#94a3b8',
+                                        ...(ld ? {} : { borderStyle: 'dashed' as const, borderWidth: 1, borderColor: '#cbd5e1' }),
+                                      }}>
+                                      {ld ? `${ld.icon} ${ld.label}` : '🔗'}
+                                    </button>
+                                    {/* 팝오버 */}
+                                    {linkPopoverId === item.id && (
+                                      <div data-link-popover onClick={(e) => e.stopPropagation()} style={{
+                                        position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 260,
+                                        background: '#fff', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+                                        border: '1px solid #e2e8f0', zIndex: 60, overflow: 'hidden',
+                                      }}>
+                                        <input
+                                          placeholder="검색..." value={linkPopoverSearch}
+                                          onChange={e => setLinkPopoverSearch(e.target.value)}
+                                          onClick={e => e.stopPropagation()}
+                                          style={{ width: '100%', border: 'none', borderBottom: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 11, outline: 'none', background: '#fafbfc' }}
+                                        />
+                                        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+                                          {([
+                                            { key: 'car' as const, label: '🚗차량' },
+                                            { key: 'jiip' as const, label: '🚛지입' },
+                                            { key: 'invest' as const, label: '💰투자' },
+                                            { key: 'loan' as const, label: '🏦대출' },
+                                          ]).map(t => (
+                                            <button key={t.key} onClick={() => setLinkPopoverTab(t.key)}
+                                              style={{
+                                                flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer',
+                                                background: linkPopoverTab === t.key ? '#fff' : '#f8fafc',
+                                                color: linkPopoverTab === t.key ? '#0f172a' : '#94a3b8',
+                                                borderBottom: linkPopoverTab === t.key ? '2px solid #0f172a' : '2px solid transparent',
+                                              }}>{t.label}</button>
+                                          ))}
+                                        </div>
+                                        <div style={{ maxHeight: 180, overflowY: 'auto', padding: 6 }}>
+                                          {linkPopoverTab === 'car' && linkOptions.car.map((c: any) => (
+                                            <div key={c.id} onClick={() => { handleLinkItem(item.id, 'car', c.id); setLinkPopoverId(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>🚗</span>
+                                              <div><div style={{ fontWeight: 700 }}>{c.number}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{c.brand} {c.model}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'jiip' && linkOptions.jiip.map((j: any) => (
+                                            <div key={j.id} onClick={() => { handleLinkItem(item.id, 'jiip', j.id); setLinkPopoverId(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>🚛</span>
+                                              <div><div style={{ fontWeight: 700 }}>{j.investor_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{j.vehicle_number || j.car_number || ''}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'invest' && linkOptions.invest.map((inv: any) => (
+                                            <div key={inv.id} onClick={() => { handleLinkItem(item.id, 'invest', inv.id); setLinkPopoverId(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>💰</span>
+                                              <div><div style={{ fontWeight: 700 }}>{inv.investor_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{inv.invest_amount ? Number(inv.invest_amount).toLocaleString() + '원' : ''} · {inv.interest_rate || '-'}%</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'loan' && linkOptions.loan.map((l: any) => (
+                                            <div key={l.id} onClick={() => { handleLinkItem(item.id, 'loan', l.id); setLinkPopoverId(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>🏦</span>
+                                              <div><div style={{ fontWeight: 700 }}>{l.finance_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>월 {l.monthly_payment ? Number(l.monthly_payment).toLocaleString() + '원' : '-'}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkOptions[linkPopoverTab]?.length === 0 && (
+                                            <div style={{ padding: 16, textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>등록된 항목이 없습니다</div>
+                                          )}
+                                        </div>
+                                        {ld && (
+                                          <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
+                                            <button onClick={() => { handleLinkItem(item.id, '', ''); setLinkPopoverId(null) }}
+                                              style={{ width: '100%', padding: '6px', borderRadius: 6, border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                              연결 해제
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })()}
 
                               {/* Amount */}
-                              <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#3b82f6' : '#ef4444', textAlign: 'right', width: 100, flexShrink: 0 }}>
-                                {src.type === 'income' ? '+' : '-'}{nf(src.amount)}
-                              </span>
+                              {(() => {
+                                const reviewItem = { ...item, amount: src.amount, type: src.type, payment_method: src.payment_method, card_number: src.card_number, card_id: (item as any).card_id, is_cancelled: src.is_cancelled, currency: src.currency, original_amount: src.original_amount, source_data: src }
+                                const ad = getAmountDisplay(reviewItem)
+                                return (
+                                  <span style={{ fontWeight: 800, fontSize: 13, color: ad.color, textAlign: 'right', minWidth: 90, flexShrink: 0 }}>
+                                    {ad.prefix && <span style={{ fontSize: 10, marginRight: 2 }}>{ad.prefix}</span>}
+                                    {ad.isForeign && <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 3px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 3 }}>{ad.currency}</span>}
+                                    {ad.text}
+                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                  </span>
+                                )
+                              })()}
 
                               {/* Actions - Pending */}
                               {!isConfirmed && reviewFilter === 'pending' && (
@@ -2482,15 +2920,15 @@ function UploadContent() {
                                 </div>
                               )}
                             </div>
-                          )
+                          </>)
                         })}
                         {hasMore && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                             <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: limit + GROUP_PAGE_SIZE })) }}
                               style={{ background: '#2d5fa8', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
-                              더보기 ({limit}/{group.items.length}건)
+                              더보기 ({limit}/{sortedItems.length}건)
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: group.items.length })) }}
+                            <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: sortedItems.length })) }}
                               style={{ background: '#fff', color: '#64748b', padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
                               전체보기
                             </button>
@@ -2501,6 +2939,235 @@ function UploadContent() {
                   </div>
                 )
               })}
+            </div>
+          )}
+          {/* 선택 시 플로팅 액션 바 */}
+          {selectedIds.size > 0 && (
+            <div style={{
+              position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+              background: '#0f172a', color: '#fff', borderRadius: 14,
+              padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 50,
+            }}>
+              <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
+                {selectedIds.size}건 선택
+              </span>
+              <div style={{ width: 1, height: 20, background: '#334155' }} />
+              {reviewFilter === 'pending' && (
+                <button onClick={async () => {
+                  const selected = items.filter(i => selectedIds.has(i.id) && i.status !== 'confirmed')
+                  const confirmable = selected.filter(i => {
+                    const cat = i.ai_category || '미분류'
+                    return cat !== '미분류' && cat !== '기타'
+                  })
+                  if (confirmable.length === 0) return alert('확정 가능한 항목이 없습니다.\n(미분류/기타는 분류 후 확정 가능)')
+                  if (!confirm(`${confirmable.length}건을 일괄 확정하시겠습니까?`)) return
+                  for (const item of confirmable) {
+                    await handleConfirm(item, { category: item.ai_category })
+                  }
+                  setSelectedIds(new Set())
+                  fetchItems()
+                }}
+                  style={{ background: '#10b981', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  일괄 확정
+                </button>
+              )}
+              {reviewFilter === 'confirmed' && (
+                <button onClick={async () => {
+                  if (!confirm(`${selectedIds.size}건을 대기중으로 되돌리시겠습니까?`)) return
+                  const selected = items.filter(i => selectedIds.has(i.id))
+                  for (const item of selected) await handleRevert(item)
+                  setSelectedIds(new Set())
+                  fetchItems()
+                }}
+                  style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  되돌리기
+                </button>
+              )}
+              <button onClick={() => { setLinkModalOpen(true); setLinkModalTab('car'); setLinkModalSelectedId(null) }}
+                style={{ background: '#6366f1', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                🔗 일괄 연결
+              </button>
+              <button onClick={handleDeleteSelected} disabled={deleting}
+                style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                삭제
+              </button>
+              <button onClick={() => setSelectedIds(new Set())}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* 일괄 연결 모달 */}
+          {linkModalOpen && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={() => { setLinkModalOpen(false); setLinkModalSelectedId(null) }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+              <div style={{
+                position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 600, maxHeight: '80vh',
+                display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              }} onClick={e => e.stopPropagation()}>
+                {/* 모달 헤더 */}
+                <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+                      🔗 {selectedIds.size}건 일괄 연결
+                    </h3>
+                    <button onClick={() => { setLinkModalOpen(false); setLinkModalSelectedId(null) }}
+                      style={{ background: 'none', border: 'none', fontSize: 20, color: '#94a3b8', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
+                  </div>
+                  <p style={{ margin: '8px 0 0', fontSize: 13, color: '#64748b' }}>
+                    선택한 {selectedIds.size}건의 거래를 하나의 대상에 일괄 연결합니다
+                  </p>
+                </div>
+
+                {/* 타입 탭 */}
+                <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+                  {([
+                    { key: 'car', icon: '🚗', label: '차량', count: cars.length },
+                    { key: 'jiip', icon: '🚛', label: '지입', count: (jiips || []).length },
+                    { key: 'invest', icon: '💰', label: '투자자', count: (investors || []).length },
+                    { key: 'loan', icon: '🏦', label: '대출', count: (loans || []).length },
+                    { key: 'insurance', icon: '🛡️', label: '보험', count: (insurances || []).length },
+                  ] as const).map(tab => (
+                    <button key={tab.key} onClick={() => { setLinkModalTab(tab.key); setLinkModalSelectedId(null) }}
+                      style={{
+                        padding: '8px 14px', fontSize: 13, fontWeight: linkModalTab === tab.key ? 800 : 600,
+                        color: linkModalTab === tab.key ? '#4f46e5' : '#64748b',
+                        background: linkModalTab === tab.key ? '#eef2ff' : 'transparent',
+                        border: 'none', borderBottom: linkModalTab === tab.key ? '2px solid #4f46e5' : '2px solid transparent',
+                        borderRadius: '8px 8px 0 0', cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                      {tab.icon} {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+
+                {/* 검색 */}
+                <div style={{ padding: '12px 24px' }}>
+                  <input
+                    type="text"
+                    placeholder="검색어 입력..."
+                    value={linkPopoverSearch}
+                    onChange={e => setLinkPopoverSearch(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0',
+                      fontSize: 13, outline: 'none', boxSizing: 'border-box', background: '#f8fafc',
+                    }}
+                  />
+                </div>
+
+                {/* 카드 그리드 */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                    {linkModalTab === 'car' && linkOptions.car.map((c: any) => (
+                      <div key={c.id} onClick={() => setLinkModalSelectedId(c.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === c.id ? '2px solid #4f46e5' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === c.id ? '#eef2ff' : '#fff',
+                          boxShadow: linkModalSelectedId === c.id ? '0 2px 8px rgba(79,70,229,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>🚗</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{c.number || '번호없음'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{[c.brand, c.model].filter(Boolean).join(' ') || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'jiip' && linkOptions.jiip.map((j: any) => (
+                      <div key={j.id} onClick={() => setLinkModalSelectedId(j.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === j.id ? '2px solid #7c3aed' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === j.id ? '#f5f3ff' : '#fff',
+                          boxShadow: linkModalSelectedId === j.id ? '0 2px 8px rgba(124,58,237,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>🚛</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{j.investor_name || '미지정'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{j.vehicle_number || j.car_number || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'invest' && linkOptions.invest.map((inv: any) => (
+                      <div key={inv.id} onClick={() => setLinkModalSelectedId(inv.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === inv.id ? '2px solid #16a34a' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === inv.id ? '#f0fdf4' : '#fff',
+                          boxShadow: linkModalSelectedId === inv.id ? '0 2px 8px rgba(22,163,74,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>💰</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{inv.investor_name || '미지정'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{inv.investment_type || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'loan' && linkOptions.loan.map((l: any) => (
+                      <div key={l.id} onClick={() => setLinkModalSelectedId(l.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === l.id ? '2px solid #dc2626' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === l.id ? '#fef2f2' : '#fff',
+                          boxShadow: linkModalSelectedId === l.id ? '0 2px 8px rgba(220,38,38,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>🏦</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{l.finance_name || '미지정'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{l.loan_type || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'insurance' && linkOptions.insurance.map((ins: any) => (
+                      <div key={ins.id} onClick={() => setLinkModalSelectedId(ins.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === ins.id ? '2px solid #0891b2' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === ins.id ? '#ecfeff' : '#fff',
+                          boxShadow: linkModalSelectedId === ins.id ? '0 2px 8px rgba(8,145,178,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>🛡️</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ins.company || '미지정'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{ins.policy_type || '-'}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {linkOptions[linkModalTab]?.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8', fontSize: 13 }}>
+                      {linkPopoverSearch ? '검색 결과가 없습니다' : '등록된 항목이 없습니다'}
+                    </div>
+                  )}
+                </div>
+
+                {/* 하단 푸터 */}
+                <div style={{
+                  padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', background: '#f8fafc', borderRadius: '0 0 16px 16px',
+                }}>
+                  <div style={{ fontSize: 13, color: '#64748b' }}>
+                    {linkModalSelectedId ? (
+                      <span style={{ color: '#4f46e5', fontWeight: 700 }}>
+                        ✓ 1개 선택됨
+                      </span>
+                    ) : '대상을 선택하세요'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setLinkModalOpen(false); setLinkModalSelectedId(null); setLinkPopoverSearch('') }}
+                      style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                      취소
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!linkModalSelectedId) return
+                        handleBulkLink(linkModalTab, linkModalSelectedId)
+                        setLinkPopoverSearch('')
+                      }}
+                      disabled={!linkModalSelectedId}
+                      style={{
+                        padding: '10px 24px', borderRadius: 10, border: 'none', fontWeight: 800, fontSize: 13,
+                        background: linkModalSelectedId ? '#4f46e5' : '#cbd5e1', color: '#fff',
+                        cursor: linkModalSelectedId ? 'pointer' : 'not-allowed',
+                      }}>
+                      {selectedIds.size}건 연결
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </>

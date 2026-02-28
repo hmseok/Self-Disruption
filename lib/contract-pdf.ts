@@ -182,13 +182,15 @@ export function buildContractHtml(data: ContractPdfData): string {
   </table>
 
   <!-- ====== 3페이지: 약관 ====== -->
-  <h2 style="font-size:13px;font-weight:900;margin:28px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">3. 자동차 장기대여 약관</h2>
+  <div style="page-break-before:always;"></div>
+  <h2 style="font-size:13px;font-weight:900;margin:8px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">3. 자동차 장기대여 약관</h2>
   <div id="terms-section" style="font-size:9.5px;line-height:1.55;color:#333;">
     <!-- 약관은 별도 렌더링 -->
   </div>
 
   <!-- ====== 4페이지: 특약 + 서명 ====== -->
-  <h2 style="font-size:13px;font-weight:900;margin:28px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">4. 특약사항</h2>
+  <div style="page-break-before:always;"></div>
+  <h2 style="font-size:13px;font-weight:900;margin:8px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">4. 특약사항</h2>
   <div style="min-height:60px;padding:10px 14px;border:1px solid #ddd;border-radius:4px;font-size:10px;color:#555;margin-bottom:24px;">
     ${specialTerms || (terms.contractType === 'buyout'
       ? '본 계약은 인수형 장기렌트 계약으로, 계약 만기 시 고객은 상기 명시된 인수가격을 납부하고 차량 소유권을 이전받을 수 있습니다.'
@@ -282,25 +284,36 @@ export async function generatePdfFromElement(element: HTMLElement, filename: str
   })
 
   // 2. Canvas → PDF (A4)
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  const imgData = canvas.toDataURL('image/png')
   const pdf = new jsPDF('p', 'mm', 'a4')
   const pdfW = pdf.internal.pageSize.getWidth()
   const pdfH = pdf.internal.pageSize.getHeight()
-  const margin = 0  // 마진은 HTML에서 이미 포함
 
-  const imgW = pdfW - margin * 2
+  const imgW = pdfW
   const imgH = (canvas.height * imgW) / canvas.width
 
-  // 여러 페이지 분할
-  let position = 0
-  let remaining = imgH
+  // 여러 페이지 분할 (페이지 간 1px 오버랩으로 경계선 제거)
+  const totalPages = Math.ceil(imgH / pdfH)
 
-  while (remaining > 0) {
-    if (position > 0) pdf.addPage()
+  for (let page = 0; page < totalPages; page++) {
+    if (page > 0) pdf.addPage()
 
-    pdf.addImage(imgData, 'JPEG', margin, -position, imgW, imgH)
-    position += pdfH
-    remaining -= pdfH
+    // 각 페이지의 캔버스 영역을 별도 잘라서 추가 (경계 아티팩트 방지)
+    const srcY = (page * pdfH * canvas.width) / imgW
+    const srcH = Math.min((pdfH * canvas.width) / imgW, canvas.height - srcY)
+    if (srcH <= 0) break
+
+    const pageCanvas = document.createElement('canvas')
+    pageCanvas.width = canvas.width
+    pageCanvas.height = Math.ceil(srcH)
+    const ctx = pageCanvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+    ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH)
+
+    const pageImgData = pageCanvas.toDataURL('image/png')
+    const pageImgH = (srcH * imgW) / canvas.width
+    pdf.addImage(pageImgData, 'PNG', 0, 0, imgW, pageImgH)
   }
 
   return pdf.output('blob')
@@ -359,7 +372,7 @@ export function renderTermsHtml(
   let html = terms
     .map(
       t =>
-        `<div style="margin-bottom:8px;">
+        `<div style="margin-bottom:8px;page-break-inside:avoid;break-inside:avoid;">
           <p style="font-weight:700;margin:0 0 2px;font-size:10px;">${t.title}</p>
           <p style="margin:0;white-space:pre-line;">${t.content}</p>
         </div>`,

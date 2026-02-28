@@ -662,10 +662,21 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       if (currency === 'KRW') currency = 'EUR';
     }
 
-    // description에서 통화 감지 보강
+    // description + client_name에서 통화/해외 감지 보강
     const descStr = String(item.description || '').toLowerCase();
-    if (currency === 'KRW' && (descStr.includes('usd') || descStr.includes('달러') || descStr.includes('미화') || descStr.includes('us$'))) {
+    const clientStr = String(item.client_name || item.merchant || '').toLowerCase();
+    const allText = descStr + ' ' + clientStr;
+    if (currency === 'KRW' && (allText.includes('usd') || allText.includes('달러') || allText.includes('미화') || allText.includes('us$'))) {
       currency = 'USD';
+    }
+    if (currency === 'KRW' && (allText.includes('해외') || allText.includes('해외승인') || allText.includes('foreign') || allText.includes('overseas'))) {
+      currency = 'USD'; // 해외승인은 기본 USD로 마킹
+    }
+    if (currency === 'KRW' && (allText.includes('jpy') || allText.includes('엔화') || allText.includes('일본'))) {
+      currency = 'JPY';
+    }
+    if (currency === 'KRW' && (allText.includes('eur') || allText.includes('유로'))) {
+      currency = 'EUR';
     }
 
     let amount = 0;

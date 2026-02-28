@@ -58,6 +58,8 @@ export default function ClassificationReviewPage() {
   const [aiResult, setAiResult] = useState<{ updated: number; total: number } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProcessing, setBulkProcessing] = useState(false)
 
   // 연결 대상 조회용
   const [jiips, setJiips] = useState<any[]>([])
@@ -268,6 +270,83 @@ export default function ClassificationReviewPage() {
     setAiClassifying(false)
   }
 
+  // ── 선택 관련 헬퍼 ──
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map(i => i.id)))
+    }
+  }
+
+  const toggleSelectGroup = (category: string) => {
+    const groupItemIds = items.filter(i => (i.ai_category || '미분류') === category).map(i => i.id)
+    const allSelected = groupItemIds.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        groupItemIds.forEach(id => next.delete(id))
+      } else {
+        groupItemIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const handleBulkConfirmSelected = async () => {
+    if (selectedIds.size === 0) return
+    const selectedItems = items.filter(i => selectedIds.has(i.id))
+    if (!confirm(`선택한 ${selectedItems.length}건을 일괄 확정하시겠습니까?`)) return
+    setBulkProcessing(true)
+    for (const item of selectedItems) {
+      await handleConfirm(item)
+    }
+    setSelectedIds(new Set())
+    setBulkProcessing(false)
+    fetchItems()
+  }
+
+  const handleBulkRevertSelected = async () => {
+    if (selectedIds.size === 0) return
+    const selectedItems = items.filter(i => selectedIds.has(i.id))
+    if (!confirm(`선택한 ${selectedItems.length}건을 대기중으로 되돌리시겠습니까?`)) return
+    setBulkProcessing(true)
+    for (const item of selectedItems) {
+      await handleRevert(item)
+    }
+    setSelectedIds(new Set())
+    setBulkProcessing(false)
+    fetchItems()
+  }
+
+  const handleBulkDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return
+    setBulkProcessing(true)
+    try {
+      const res = await fetch('/api/finance/classify', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue_ids: Array.from(selectedIds) }),
+      })
+      if (res.ok) {
+        setItems(prev => prev.filter(i => !selectedIds.has(i.id)))
+        setSelectedIds(new Set())
+      }
+    } catch (e) { console.error(e) }
+    setBulkProcessing(false)
+    fetchItems()
+  }
+
   // ── 중복 체크 & 삭제 ──
   const handleCheckDuplicates = async () => {
     if (!companyId) return
@@ -367,19 +446,33 @@ export default function ClassificationReviewPage() {
         ))}
       </div>
 
-      {/* 탭 */}
-      <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 16, width: 'fit-content' }}>
-        {[
-          { key: 'pending' as const, label: '⏳ 대기중' },
-          { key: 'confirmed' as const, label: '✅ 확정됨' },
-          { key: 'all' as const, label: '◎ 전체' },
-        ].map(tab => (
-          <button key={tab.key} onClick={() => { setFilter(tab.key); setExpandedGroups(new Set()) }}
-            style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
-              background: filter === tab.key ? '#0f172a' : 'transparent', color: filter === tab.key ? '#fff' : '#94a3b8' }}>
-            {tab.label}
-          </button>
-        ))}
+      {/* 탭 + 전체선택 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 12, border: '1px solid #e2e8f0', width: 'fit-content' }}>
+          {[
+            { key: 'pending' as const, label: '⏳ 대기중' },
+            { key: 'confirmed' as const, label: '✅ 확정됨' },
+            { key: 'all' as const, label: '◎ 전체' },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => { setFilter(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()) }}
+              style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
+                background: filter === tab.key ? '#0f172a' : 'transparent', color: filter === tab.key ? '#fff' : '#94a3b8' }}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {items.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+            <input
+              type="checkbox"
+              checked={items.length > 0 && selectedIds.size === items.length}
+              onChange={toggleSelectAll}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
+            />
+            전체 선택 ({selectedIds.size}/{items.length})
+          </label>
+        )}
       </div>
 
       {/* AI 분류 결과 배너 */}
@@ -435,6 +528,15 @@ export default function ClassificationReviewPage() {
                 <div onClick={() => toggleGroup(category)}
                   style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', cursor: 'pointer', gap: 12, borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none' }}>
 
+                  {/* 그룹 체크박스 */}
+                  <input
+                    type="checkbox"
+                    checked={group.items.every((i: any) => selectedIds.has(i.id))}
+                    onChange={(e) => { e.stopPropagation(); toggleSelectGroup(category) }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                  />
+
                   {/* 카테고리 색상 바 */}
                   <div style={{ width: 4, height: 36, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
 
@@ -483,7 +585,14 @@ export default function ClassificationReviewPage() {
                       const isConfirmed = item.status === 'confirmed'
 
                       return (
-                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 48px', borderBottom: '1px solid #f8fafc', gap: 12, opacity: isConfirmed ? 0.5 : 1 }}>
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 48px', borderBottom: '1px solid #f8fafc', gap: 12, opacity: isConfirmed ? 0.5 : 1, background: selectedIds.has(item.id) ? '#f0f9ff' : 'transparent' }}>
+                          {/* 체크박스 */}
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(item.id)}
+                            onChange={() => toggleSelect(item.id)}
+                            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                          />
                           {/* 날짜 */}
                           <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, width: 80, flexShrink: 0 }}>{src.transaction_date}</span>
 
@@ -497,6 +606,13 @@ export default function ClassificationReviewPage() {
                           <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', flexShrink: 0 }}>
                             {src.payment_method || '통장'}
                           </span>
+
+                          {/* 해외/달러결제 뱃지 */}
+                          {src.currency && src.currency !== 'KRW' && (
+                            <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', flexShrink: 0 }}>
+                              {src.currency}{src.original_amount ? ` ${src.original_amount.toLocaleString()}` : ''}
+                            </span>
+                          )}
 
                           {/* 거래처 */}
                           <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -516,8 +632,8 @@ export default function ClassificationReviewPage() {
                           )}
 
                           {/* 금액 */}
-                          <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#3b82f6' : '#ef4444', textAlign: 'right', width: 100, flexShrink: 0 }}>
-                            {src.type === 'income' ? '+' : '-'}{nf(src.amount)}
+                          <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#3b82f6' : '#0f172a', textAlign: 'right', width: 100, flexShrink: 0 }}>
+                            {src.type === 'income' ? '+' : ''}{nf(src.amount)}
                           </span>
 
                           {/* 액션 - 대기중 */}
@@ -571,6 +687,41 @@ export default function ClassificationReviewPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* 선택 항목 플로팅 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#0f172a', color: '#fff', borderRadius: 16,
+          padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 16,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 320,
+        }}>
+          <span style={{ fontWeight: 800, fontSize: 13 }}>
+            {selectedIds.size}건 선택
+          </span>
+          <div style={{ width: 1, height: 20, background: '#334155' }} />
+          {filter === 'pending' && (
+            <button onClick={handleBulkConfirmSelected} disabled={bulkProcessing}
+              style={{ background: '#10b981', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+              {bulkProcessing ? '처리 중...' : '✅ 선택 확정'}
+            </button>
+          )}
+          {filter === 'confirmed' && (
+            <button onClick={handleBulkRevertSelected} disabled={bulkProcessing}
+              style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+              {bulkProcessing ? '처리 중...' : '↩ 선택 되돌리기'}
+            </button>
+          )}
+          <button onClick={handleBulkDeleteSelected} disabled={bulkProcessing}
+            style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+            {bulkProcessing ? '처리 중...' : '🗑 선택 삭제'}
+          </button>
+          <button onClick={() => setSelectedIds(new Set())}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '4px 8px', marginLeft: 'auto' }}>
+            ✕
+          </button>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { recordLifecycleEvent, maskRecipient } from '@/app/utils/lifecycle-events'
 
 /**
  * 공개 서명 제출 API (인증 불필요)
@@ -211,7 +212,32 @@ export async function POST(
       })
       .eq('id', quote.id)
 
-    // 10. 이메일 발송 (비동기 — 실패해도 계약 체결은 유지)
+    // 10. 라이프사이클 이벤트 기록 (signed + contract_created)
+    recordLifecycleEvent({
+      companyId: shareToken.company_id,
+      quoteId: quote.id,
+      contractId: contract.id,
+      eventType: 'signed',
+      metadata: {
+        customer_name,
+        ip,
+        user_agent: ua,
+        signature_id: signature.id,
+      },
+    })
+    recordLifecycleEvent({
+      companyId: shareToken.company_id,
+      quoteId: quote.id,
+      contractId: contract.id,
+      eventType: 'contract_created',
+      metadata: {
+        contract_id: contract.id,
+        term_months: termMonths,
+        monthly_rent: quote.rent_fee,
+      },
+    })
+
+    // 11. 이메일 발송 (비동기 — 실패해도 계약 체결은 유지)
     try {
       const resendKey = process.env.RESEND_API_KEY
       if (resendKey && customer_email) {

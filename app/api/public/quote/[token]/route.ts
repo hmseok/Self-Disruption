@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { recordViewedEvent } from '@/app/utils/lifecycle-events'
 
 /**
  * 공개 견적 조회 API (인증 불필요)
@@ -56,6 +57,19 @@ export async function GET(
         access_count: (shareToken.access_count || 0) + 1
       })
       .eq('id', shareToken.id)
+
+    // 3-1. 열람 이벤트 기록 (10분 이내 중복 방지)
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    recordViewedEvent({
+      companyId: shareToken.company_id,
+      quoteId: shareToken.quote_id,
+      eventType: 'viewed',
+      ip,
+      metadata: {
+        user_agent: req.headers.get('user-agent') || 'unknown',
+        access_count: (shareToken.access_count || 0) + 1,
+      },
+    })
 
     // 4. 견적 데이터 조회 (조인 대신 개별 조회 — FK 미설정 시에도 안전)
     const { data: quote, error: quoteErr } = await supabase

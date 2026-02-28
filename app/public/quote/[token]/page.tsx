@@ -127,6 +127,20 @@ export default function PublicQuotePage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+
+      // 서버에 PDF 자동 저장 (fire-and-forget)
+      try {
+        const reader = new FileReader()
+        reader.onload = async () => {
+          const base64 = reader.result as string
+          await fetch(`/api/contracts/${pdfData.contractId}/generate-pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdfBase64: base64, quoteId: quote?.id }),
+          }).catch(() => {})
+        }
+        reader.readAsDataURL(blob)
+      } catch { /* PDF 서버 저장 실패해도 다운로드는 이미 성공 */ }
     } catch (err) {
       console.error('PDF 생성 실패:', err)
       alert('계약서 PDF 생성에 실패했습니다. 잠시 후 다시 시도해주세요.')

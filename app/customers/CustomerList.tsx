@@ -228,13 +228,25 @@ export default function CustomerPage() {
   // ── 상세 데이터 조회 ──
   const fetchDetailData = useCallback(async (customerId: number) => {
     if (!effectiveCompanyId) return
-    // 계약 이력
+    // 계약 이력 (실제 contracts 테이블에서 조회)
     const { data: contractData } = await supabase
-      .from('quotes')
-      .select('*')
+      .from('contracts')
+      .select('id, customer_name, car_id, start_date, end_date, term_months, monthly_rent, deposit, status, created_at, quote_id')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
-    setContracts(contractData || [])
+    // 차량 정보 조회
+    const carIds = (contractData || []).map(c => c.car_id).filter(Boolean)
+    let carsMap: Record<string, any> = {}
+    if (carIds.length > 0) {
+      const { data: carData } = await supabase.from('cars').select('id, brand, model, number').in('id', carIds)
+      if (carData) carsMap = Object.fromEntries(carData.map(c => [c.id, c]))
+    }
+    setContracts((contractData || []).map(c => ({
+      ...c,
+      car_name: carsMap[c.car_id] ? `${carsMap[c.car_id].brand} ${carsMap[c.car_id].model} (${carsMap[c.car_id].number})` : '차량 미지정',
+      rental_period: c.term_months,
+      monthly_rental: c.monthly_rent,
+    })))
 
     // 결제 이력
     const { data: paymentData } = await supabase
@@ -931,7 +943,11 @@ export default function CustomerPage() {
                     ) : (
                       <div className="space-y-3">
                         {contracts.map((c: any) => (
-                          <div key={c.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50/50 transition-colors">
+                          <div
+                            key={c.id}
+                            className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                            onClick={() => window.open(`/contracts/${c.id}`, '_blank')}
+                          >
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -945,9 +961,12 @@ export default function CustomerPage() {
                                   {c.car_name || c.vehicle_name || '차량 미지정'}
                                 </span>
                               </div>
-                              <span className="text-xs text-gray-400">
-                                {c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : ''}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">
+                                  {c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : ''}
+                                </span>
+                                <span className="text-[10px] text-blue-500 font-bold">상세 →</span>
+                              </div>
                             </div>
                             <div className="flex items-center gap-4 text-xs text-gray-400">
                               {c.rental_period && <span>기간: {c.rental_period}개월</span>}

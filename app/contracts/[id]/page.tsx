@@ -166,9 +166,10 @@ function QuoteLinkSection({ contract }: { contract: any }) {
   )
 }
 
-// Sub-component: Contract PDF Download
+// Sub-component: Contract PDF Download (with auto-upload to server)
 function ContractPdfSection({ contract, schedules }: { contract: any; schedules: any[] }) {
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [savedPdfUrl, setSavedPdfUrl] = useState<string | null>(contract?.contract_pdf_url || null)
 
   const handleGeneratePdf = async () => {
     setPdfLoading(true)
@@ -286,6 +287,7 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
 
       const { blob, filename } = await generateContractPdf(pdfData, termsHtml)
 
+      // 다운로드
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -294,6 +296,27 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+
+      // 서버에 PDF 자동 저장 (아직 저장되지 않은 경우)
+      if (!savedPdfUrl) {
+        try {
+          const reader = new FileReader()
+          reader.onload = async () => {
+            const base64 = reader.result as string
+            const token = sessionStorage.getItem('supabase_access_token') || ''
+            const res = await fetch(`/api/contracts/${contract.id}/generate-pdf`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ pdfBase64: base64, quoteId: contract.quote_id }),
+            })
+            const data = await res.json()
+            if (data.success && data.pdf_url) {
+              setSavedPdfUrl(data.pdf_url)
+            }
+          }
+          reader.readAsDataURL(blob)
+        } catch { /* PDF 저장 실패해도 다운로드는 이미 성공 */ }
+      }
     } catch (err) {
       console.error('PDF 생성 실패:', err)
       alert('PDF 생성에 실패했습니다.')
@@ -309,6 +332,21 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
         </h3>
       </div>
       <div className="p-6 space-y-2">
+        {savedPdfUrl && (
+          <a
+            href={savedPdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '10px 16px', borderRadius: 12, fontWeight: 700, fontSize: 13,
+              background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0',
+              textDecoration: 'none', marginBottom: 8,
+            }}
+          >
+            ✅ 저장된 계약서 PDF 열기
+          </a>
+        )}
         <button
           onClick={handleGeneratePdf}
           disabled={pdfLoading}
@@ -324,12 +362,90 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
               생성 중...
             </>
           ) : (
-            <>📄 계약서 PDF 다운로드</>
+            <>📄 계약서 PDF {savedPdfUrl ? '재생성' : '다운로드'}</>
           )}
         </button>
         <p className="text-[10px] text-gray-400 text-center">
-          약관·서명·납부스케줄 포함 정식 계약서
+          약관·서명·납부스케줄 포함 정식 계약서 {savedPdfUrl ? '(서버에 저장됨)' : ''}
         </p>
+      </div>
+    </div>
+  )
+}
+
+// Sub-component: Contract Timeline
+function ContractTimeline({ quoteId }: { quoteId?: string }) {
+  const [events, setEvents] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!quoteId) return
+    setLoading(true)
+    const token = sessionStorage.getItem('supabase_access_token') || ''
+    fetch(`/api/quotes/${quoteId}/timeline`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => setEvents(d.events || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [quoteId])
+
+  if (!quoteId || (events.length === 0 && !loading)) return null
+
+  const EVENT_CFG: Record<string, { icon: string; label: string; color: string }> = {
+    created:          { icon: '📄', label: '견적 생성',   color: '#6b7280' },
+    shared:           { icon: '🔗', label: '링크 공유',   color: '#2563eb' },
+    sent:             { icon: '📤', label: '견적 발송',   color: '#7c3aed' },
+    viewed:           { icon: '👁️', label: '고객 열람',   color: '#0891b2' },
+    signed:           { icon: '✍️', label: '고객 서명',   color: '#059669' },
+    contract_created: { icon: '📋', label: '계약 생성',   color: '#059669' },
+    revoked:          { icon: '🚫', label: '링크 비활성화', color: '#dc2626' },
+    pdf_stored:       { icon: '💾', label: 'PDF 저장',    color: '#0369a1' },
+  }
+
+  const fTime = (iso: string) => {
+    const d = new Date(iso)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+          <span>📋</span> 활동 타임라인
+          <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400 }}>{events.length}건</span>
+        </h3>
+      </div>
+      <div className="p-6">
+        {loading ? (
+          <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>불러오는 중...</p>
+        ) : (
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 2, background: '#e5e7eb' }} />
+            {events.slice(0, 10).map((ev: any, i: number) => {
+              const cfg = EVENT_CFG[ev.event_type] || { icon: '•', label: ev.event_type, color: '#6b7280' }
+              return (
+                <div key={ev.id} style={{ display: 'flex', gap: 12, marginBottom: i < Math.min(events.length, 10) - 1 ? 14 : 0, position: 'relative' }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%', background: '#f9fafb',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, flexShrink: 0, zIndex: 1, border: `2px solid ${cfg.color}30`,
+                  }}>
+                    {cfg.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af' }}>{fTime(ev.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -532,10 +648,16 @@ export default function ContractDetailPage() {
         </div>
         <div className="flex gap-2">
           <Link
+            href="/admin/contracts"
+            className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50"
+          >
+            ← 계약 관리
+          </Link>
+          <Link
             href="/quotes"
             className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50"
           >
-            ← 목록으로
+            견적 목록
           </Link>
         </div>
       </div>
@@ -545,9 +667,10 @@ export default function ContractDetailPage() {
         <div className="lg:col-span-4 space-y-6">
           <ContractInfoCard contract={contract} />
           <VehicleInfoCard car={contract.car} />
-          <QuoteLinkSection contract={contract} />
           <ContractPdfSection contract={contract} schedules={schedules} />
           <CollectionStatusPanel schedules={schedules} />
+          <QuoteLinkSection contract={contract} />
+          <ContractTimeline quoteId={contract.quote_id} />
         </div>
 
         {/* Right: Payment Schedule Table */}
