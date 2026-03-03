@@ -194,31 +194,53 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
         termsArticles = CONTRACT_TERMS.map(t => ({ title: t.title, content: t.content }))
       }
 
-      // 회사 정보 조회
-      const { data: quote } = await supabase
-        .from('quotes')
-        .select('*, customer:customers(*)')
-        .eq('id', contract.quote_id)
-        .single()
+      // 견적/고객 정보 조회
+      let quote: any = null
+      if (contract.quote_id) {
+        const { data: qData, error: qErr } = await supabase
+          .from('quotes')
+          .select('*')
+          .eq('id', contract.quote_id)
+          .single()
+        if (qErr) console.error('Quote fetch error:', qErr.message, qErr.code)
+        quote = qData
+        // 고객 정보 별도 조회
+        if (qData?.customer_id) {
+          const { data: custData } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', qData.customer_id)
+            .single()
+          if (custData) quote = { ...quote, customer: custData }
+        }
+      }
 
-      const { data: company } = await supabase
-        .from('companies')
-        .select('*')
-        .single()
+      // 회사 정보 조회
+      let company: any = null
+      const companyId = contract.company_id || quote?.company_id
+      if (companyId) {
+        const { data: compData, error: compErr } = await supabase
+          .from('companies').select('*').eq('id', companyId).single()
+        if (compErr) console.error('Company fetch error:', compErr.message)
+        company = compData
+      }
 
       // 서명 데이터 조회
       let signatureData = null
       let signatureIp = null
       if (contract.signature_id) {
-        const { data: sig } = await supabase
+        const { data: sig, error: sigErr } = await supabase
           .from('customer_signatures')
-          .select('signature_data, ip_address, created_at')
+          .select('signature_data, ip_address')
           .eq('id', contract.signature_id)
           .single()
+        if (sigErr) console.error('Signature fetch error:', sigErr.message, sigErr.code)
         if (sig) {
           signatureData = sig.signature_data
           signatureIp = sig.ip_address
         }
+      } else {
+        console.warn('No signature_id on contract:', contract.id)
       }
 
       const detail = quote?.quote_detail || {}
@@ -462,7 +484,7 @@ function DesktopPaymentTable({
   const f = (n: number) => Math.round(n || 0).toLocaleString()
 
   return (
-    <div style={{ maxHeight: 700, overflowY: 'auto', overflowX: 'auto' }}>
+    <div className="hidden md:block" style={{ maxHeight: 700, overflowY: 'auto', overflowX: 'auto' }}>
       <table className="w-full text-left text-sm">
         <thead className="bg-gray-50 text-gray-500 text-xs sticky top-0 z-10 border-b">
           <tr>
@@ -548,6 +570,49 @@ function DesktopPaymentTable({
 }
 
 // Sub-component: Payment Schedule Cards (Mobile)
+function MobilePaymentCards({ schedules, onTogglePayment }: { schedules: any[], onTogglePayment: (id: string, status: string) => void }) {
+  const f = (n: number) => Math.round(n || 0).toLocaleString()
+  if (!schedules.length) return null
+  return (
+    <div className="md:hidden space-y-3">
+      {schedules.map((item: any) => {
+        const isOverdue = item.status !== 'paid' && new Date(item.due_date) < new Date()
+        return (
+          <div key={item.id} className={`p-4 rounded-xl border ${isOverdue ? 'border-red-200 bg-red-50' : item.status === 'paid' ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-bold text-sm">
+                {item.round_number === 0 ? '💳 보증금' : `${item.round_number}회차`}
+              </span>
+              {item.status === 'paid' ? (
+                <span className="px-2 py-0.5 rounded bg-green-100 text-green-700 text-xs font-bold">완납</span>
+              ) : isOverdue ? (
+                <span className="px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-bold">연체</span>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs font-bold">미납</span>
+              )}
+            </div>
+            <div className="flex justify-between text-sm text-gray-600 mb-1">
+              <span>납부일</span><span>{item.due_date}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold mb-3">
+              <span>금액</span><span>{f(item.amount)}원</span>
+            </div>
+            <button
+              onClick={() => onTogglePayment(item.id, item.status)}
+              className={`w-full py-2 rounded-lg text-xs font-bold ${
+                item.status === 'paid'
+                  ? 'border border-gray-200 text-gray-400'
+                  : 'bg-steel-600 text-white shadow-md'
+              }`}
+            >
+              {item.status === 'paid' ? '수납 취소' : '수납확인'}
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // Main Component
 export default function ContractDetailPage() {
@@ -565,11 +630,23 @@ export default function ContractDetailPage() {
   const fetchData = useCallback(async () => {
     if (!contractId) return
     try {
-      const { data: cData } = await supabase
+      let { data: cData, error: cErr } = await supabase
         .from('contracts')
-        .select('*, car:cars(*)')
+        .select('*, car:cars!car_id(*)')
         .eq('id', contractId)
         .single()
+
+      // car JOIN 실패 시 계약만 조회
+      if (cErr || !cData) {
+        console.error('Contract fetch failed:', cErr?.message, cErr?.code)
+        const { data: fallback } = await supabase
+          .from('contracts')
+          .select('*')
+          .eq('id', contractId)
+          .single()
+        cData = fallback ? { ...fallback, car: null } : null
+      }
+
       setContract(cData)
 
       const { data: sData } = await supabase
@@ -648,7 +725,7 @@ export default function ContractDetailPage() {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/admin/contracts"
+            href="/quotes"
             className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50"
           >
             ← 계약 관리

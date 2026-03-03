@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../../../utils/auth-guard'
-import { getSupabaseAdmin } from '../../../utils/supabase-admin'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // ═══ GET: 특이건 목록 조회 ═══
 export async function GET(request: NextRequest) {

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상단 헤더 디자인 옵션 비교</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;}
+
+/* Top control bar */
+.ctrl-bar{position:sticky;top:0;z-index:200;background:#0f172a;border-bottom:1px solid #1e293b;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.ctrl-bar h1{color:#fff;font-size:14px;font-weight:800;}
+.ctrl-bar .tag{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#2d5fa8;color:#fff;}
+.opt-btns{display:flex;gap:4px;margin-left:12px;}
+.opt-btns button{padding:7px 16px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e293b;color:#94a3b8;transition:all .15s;}
+.opt-btns button.active{background:#2d5fa8;color:#fff;}
+.opt-btns button:hover:not(.active){background:#334155;}
+
+/* Preview container */
+.preview-wrap{max-width:1100px;margin:24px auto;padding:0 20px;}
+.option-label{color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.option-label .num{background:#2d5fa8;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;}
+.option-label .rec{background:rgba(52,211,153,.15);color:#34d399;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;}
+
+/* Page wrapper */
+.page-wrapper{background:#f9fafb;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);overflow:hidden;margin-bottom:40px;}
+
+/* P3-C PageTitle */
+.page-title .bc-row{display:flex;align-items:center;gap:10px;padding:12px 20px;}
+.page-title .bc-dot{width:8px;height:8px;border-radius:50%;background:#2d5fa8;flex-shrink:0;box-shadow:0 0 0 3px rgba(45,95,168,0.15);}
+.page-title .bc-section{font-size:11px;color:#94a3b8;font-weight:500;}
+.page-title .bc-sep{color:#cbd5e1;font-size:11px;}
+.page-title .bc-name{font-size:15px;font-weight:800;color:#1e293b;}
+.page-title .bc-line{height:1.5px;background:#2d5fa8;}
+
+/* ═══ OPTION A: 다크 헤더 (현재 B안) ═══ */
+.hdr-dark{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:16px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;}
+.hdr-dark .h-left{flex:1;min-width:200px;}
+.hdr-dark .h-title{font-size:18px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px;}
+.hdr-dark .h-sub{font-size:11px;color:#64748b;margin-top:2px;}
+.hdr-dark .h-stats{display:flex;gap:6px;flex-wrap:wrap;}
+.h-stat-dk{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 14px;text-align:center;min-width:90px;}
+.h-stat-dk .sl{font-size:9px;color:rgba(255,255,255,.4);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.h-stat-dk .sv{font-size:16px;font-weight:900;color:#fff;margin-top:2px;}
+.hdr-dark .h-actions button{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#fff;color:#2d5fa8;}
+
+/* ═══ OPTION B: 라이트 프리미엄 (실제 DarkHeader 컴포넌트 스타일) ═══ */
+.hdr-light{border-radius:16px;overflow:hidden;margin:12px 16px;box-shadow:0 2px 16px rgba(45,95,168,0.08);}
+.hdr-light-actions{display:flex;gap:6px;justify-content:flex-end;padding:10px 20px 0;background:linear-gradient(135deg,#f8fafc 0%,#edf2f7 100%);}
+.hdr-light-actions button{padding:7px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.hdr-light-actions .pri{background:#2d5fa8;color:#fff;border:none;}
+.hdr-light-actions .sec{background:#fff;color:#334155;border:1px solid #d1d5db;}
+.hdr-light-stats{display:flex;gap:8px;padding:0 20px 12px;background:linear-gradient(135deg,#f8fafc 0%,#edf2f7 100%);}
+.h-stat-lt{flex:1;border-radius:10px;padding:9px 12px;text-align:center;transition:all .15s;}
+.h-stat-lt .sl{font-size:10px;font-weight:600;margin-bottom:3px;letter-spacing:.02em;}
+.h-stat-lt .sv{font-size:18px;font-weight:900;line-height:1;}
+/* 블루 탭바 */
+.hdr-light-tabs{background:#2d5fa8;padding:0 20px;display:flex;align-items:flex-end;}
+.hdr-light-tabs .tab-btn{padding:8px 16px;border:none;cursor:pointer;border-radius:8px 8px 0 0;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;transition:all .15s;background:transparent;color:rgba(255,255,255,0.7);}
+.hdr-light-tabs .tab-btn.active{background:#f1f5f9;font-weight:800;color:#1e293b;}
+.hdr-light-tabs .tab-btn .cnt{font-size:10px;font-weight:700;margin-left:2px;}
+.hdr-light-tabs .tab-btn.active .cnt{color:#2d5fa8;}
+
+/* ═══ OPTION C: 미니멀 (헤더 없음, 탭+인라인 통계) ═══ */
+.hdr-minimal-tabs{display:flex;align-items:center;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 24px;gap:0;}
+.hdr-minimal-tabs .tab-btn{padding:12px 20px;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;transition:all .15s;background:none;border-left:none;border-right:none;border-top:none;}
+.hdr-minimal-tabs .tab-btn.active{color:#0f172a;border-bottom-color:#2d5fa8;}
+.hdr-minimal-tabs .tab-btn .badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e2e8f0;color:#64748b;}
+.hdr-minimal-tabs .tab-btn.active .badge{background:rgba(45,95,168,0.1);color:#2d5fa8;}
+.hdr-minimal-stats{display:flex;align-items:center;gap:14px;margin-left:auto;padding:8px 0;}
+.hdr-minimal-stats .ms{font-size:11px;color:#94a3b8;font-weight:600;}
+.hdr-minimal-stats .ms b{font-weight:900;font-size:13px;}
+.hdr-minimal-stats .ms-div{width:1px;height:16px;background:#e2e8f0;}
+.hdr-minimal-stats .act-btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:#2d5fa8;color:#fff;}
+
+/* ═══ OPTION D: 컴팩트 요약바 (#2d5fa8 슬림 바 + 화이트 탭) ═══ */
+.hdr-compact{background:#2d5fa8;padding:10px 20px;display:flex;align-items:center;gap:14px;}
+.hdr-compact .cs{font-size:12px;color:rgba(255,255,255,0.8);}
+.hdr-compact .cs b{color:#fff;font-size:14px;font-weight:900;}
+.hdr-compact .cs-div{width:1px;height:18px;background:rgba(255,255,255,0.25);}
+.hdr-compact .act-area{margin-left:auto;display:flex;gap:6px;}
+.hdr-compact .act-area button{padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.hdr-compact .act-area .pri{background:#fff;color:#2d5fa8;border:none;font-weight:800;}
+.hdr-compact .act-area .sec{background:rgba(255,255,255,0.12);color:#e0ecf8;border:1px solid rgba(255,255,255,0.2);font-weight:600;}
+
+/* Shared: 탭바 (C, D 옵션용 공용) */
+.white-tabs{display:flex;gap:0;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 24px;}
+.white-tabs .tab-btn{padding:12px 20px;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;transition:all .15s;background:none;border-left:none;border-right:none;border-top:none;}
+.white-tabs .tab-btn.active{color:#0f172a;border-bottom-color:#2d5fa8;}
+.white-tabs .tab-btn .badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e2e8f0;color:#64748b;}
+.white-tabs .tab-btn.active .badge{background:rgba(45,95,168,0.1);color:#2d5fa8;}
+
+/* Filter bar */
+.filter-bar{display:flex;align-items:center;gap:6px;padding:10px 20px;flex-wrap:wrap;border-bottom:1px solid #f1f5f9;background:#fff;}
+.f-chip{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;}
+.f-chip.active{background:rgba(45,95,168,0.08);color:#2d5fa8;border-color:rgba(45,95,168,0.3);}
+.f-chip .cnt{font-size:9px;font-weight:800;margin-left:2px;}
+.f-search{margin-left:auto;padding:6px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:11px;width:200px;background:#f8fafc;color:#334155;}
+
+/* Table (truncated — same row for all options) */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e2e8f0;background:#f8fafc;}
+.data-table td{padding:12px 16px;border-bottom:1px solid #f1f5f9;color:#334155;}
+.data-table tr:hover{background:#f0f7ff;}
+.t-main{font-weight:700;font-size:14px;color:#111827;}
+.t-sub{font-size:11px;color:#94a3b8;margin-top:1px;}
+.t-money{font-weight:800;color:#111827;font-size:13px;}
+.t-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#eff6ff;color:#2563eb;}
+.t-status{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;}
+.t-status.active{background:#ecfdf5;color:#059669;}
+
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<!-- Top control bar -->
+<div class="ctrl-bar">
+  <h1>🎨 상단 헤더 디자인 옵션</h1>
+  <span class="tag">선택 비교</span>
+  <div class="opt-btns">
+    <button class="active" onclick="showOpt('all',this)">전체 비교</button>
+    <button onclick="showOpt('a',this)">A 다크</button>
+    <button onclick="showOpt('b',this)">B 라이트</button>
+    <button onclick="showOpt('c',this)">C 미니멀</button>
+    <button onclick="showOpt('d',this)">D 컴팩트</button>
+  </div>
+</div>
+
+<div class="preview-wrap">
+
+<!-- ═══════════════════════════════════════════════════════
+     OPTION A: 다크 헤더 (현재 B안 프리뷰)
+     ═══════════════════════════════════════════════════════ -->
+<div id="opt-a">
+  <div class="option-label"><span class="num">A</span> 다크 헤더 — 현재 프리뷰 스타일</div>
+  <div class="page-wrapper">
+    <div class="page-title">
+      <div class="bc-row"><div class="bc-dot"></div><span class="bc-section">투자</span><span class="bc-sep">›</span><span class="bc-name">투자 정산 관리</span></div>
+      <div class="bc-line"></div>
+    </div>
+    <!-- 다크 헤더 -->
+    <div class="hdr-dark">
+      <div class="h-left">
+        <div class="h-title">📊 투자 정산 관리</div>
+        <div class="h-sub">위수탁(지입) + 일반 투자 통합 관리</div>
+      </div>
+      <div class="h-stats">
+        <div class="h-stat-dk"><div class="sl">총 계약</div><div class="sv" style="color:#fff;">3건</div></div>
+        <div class="h-stat-dk"><div class="sl">운용 중</div><div class="sv" style="color:#34d399;">3건</div></div>
+        <div class="h-stat-dk"><div class="sl">총 투자금</div><div class="sv" style="color:#60a5fa;">1.5억</div></div>
+        <div class="h-stat-dk"><div class="sl">월 관리비</div><div class="sv" style="color:#fca5a5;">60만</div></div>
+      </div>
+      <div class="h-actions"><button>+ 신규 등록 ▾</button></div>
+    </div>
+    <!-- 탭 -->
+    <div class="white-tabs">
+      <button class="tab-btn active">🤝 위수탁(지입) <span class="badge">3</span></button>
+      <button class="tab-btn">💼 투자/펀딩 <span class="badge">0</span></button>
+    </div>
+    <!-- 필터 + 테이블 1행 -->
+    <div class="filter-bar">
+      <span class="f-chip active">전체 <span class="cnt">3</span></span>
+      <span class="f-chip">운영중 <span class="cnt">3</span></span>
+      <span class="f-chip">만기 <span class="cnt">0</span></span>
+      <input class="f-search" placeholder="차량번호, 차주명 검색...">
+    </div>
+    <table class="data-table">
+      <thead><tr><th>계약 차량</th><th>투자자(차주)</th><th>투자금 / 배분율</th><th>월 관리비</th><th>지급일</th><th style="text-align:center;">상태</th></tr></thead>
+      <tbody>
+        <tr><td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td><td><div style="font-weight:700;">정태영</div><div class="t-sub">010-8785-4252</div></td><td><div class="t-money">38,000,000원</div><div class="t-badge">48.8%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+        <tr><td><div class="t-main">47하9604</div><div class="t-sub">Model Y RWD</div></td><td><div style="font-weight:700;">성명호</div></td><td><div class="t-money">49,700,000원</div><div class="t-badge">77%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OPTION B: 라이트 프리미엄 (실제 DarkHeader 컴포넌트 매칭)
+     ═══════════════════════════════════════════════════════ -->
+<div id="opt-b">
+  <div class="option-label"><span class="num">B</span> 라이트 프리미엄 — 실제 DarkHeader 컴포넌트 스타일 <span class="rec">추천</span></div>
+  <div class="page-wrapper">
+    <div class="page-title">
+      <div class="bc-row"><div class="bc-dot"></div><span class="bc-section">투자</span><span class="bc-sep">›</span><span class="bc-name">투자 정산 관리</span></div>
+      <div class="bc-line"></div>
+    </div>
+    <!-- 라이트 헤더 -->
+    <div class="hdr-light">
+      <div class="hdr-light-actions">
+        <button class="sec">📥 엑셀 내보내기</button>
+        <button class="pri">+ 신규 등록 ▾</button>
+      </div>
+      <div class="hdr-light-stats">
+        <div class="h-stat-lt" style="background:#fff;border:1px solid #e2e8f0;"><div class="sl" style="color:#94a3b8;">총 계약</div><div class="sv" style="color:#334155;">3건</div></div>
+        <div class="h-stat-lt" style="background:#ecfdf5;border:1px solid #bbf7d0;"><div class="sl" style="color:#6ee7b7;">운용 중</div><div class="sv" style="color:#059669;">3건</div></div>
+        <div class="h-stat-lt" style="background:#eff6ff;border:1px solid #bfdbfe;"><div class="sl" style="color:#93c5fd;">총 투자금</div><div class="sv" style="color:#2563eb;">1.5억</div></div>
+        <div class="h-stat-lt" style="background:#fef2f2;border:1px solid #fecaca;"><div class="sl" style="color:#fca5a5;">월 관리비</div><div class="sv" style="color:#dc2626;">60만</div></div>
+      </div>
+      <!-- 블루 탭바 -->
+      <div class="hdr-light-tabs">
+        <button class="tab-btn active">🤝 위수탁(지입) <span class="cnt">(3)</span></button>
+        <button class="tab-btn">💼 투자/펀딩 <span class="cnt">(0)</span></button>
+      </div>
+    </div>
+    <!-- 필터 + 테이블 -->
+    <div class="filter-bar">
+      <span class="f-chip active">전체 <span class="cnt">3</span></span>
+      <span class="f-chip">운영중 <span class="cnt">3</span></span>
+      <span class="f-chip">만기 <span class="cnt">0</span></span>
+      <input class="f-search" placeholder="차량번호, 차주명 검색...">
+    </div>
+    <table class="data-table">
+      <thead><tr><th>계약 차량</th><th>투자자(차주)</th><th>투자금 / 배분율</th><th>월 관리비</th><th>지급일</th><th style="text-align:center;">상태</th></tr></thead>
+      <tbody>
+        <tr><td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td><td><div style="font-weight:700;">정태영</div><div class="t-sub">010-8785-4252</div></td><td><div class="t-money">38,000,000원</div><div class="t-badge">48.8%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+        <tr><td><div class="t-main">47하9604</div><div class="t-sub">Model Y RWD</div></td><td><div style="font-weight:700;">성명호</div></td><td><div class="t-money">49,700,000원</div><div class="t-badge">77%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OPTION C: 미니멀 (헤더 없음)
+     ═══════════════════════════════════════════════════════ -->
+<div id="opt-c">
+  <div class="option-label"><span class="num">C</span> 미니멀 — 헤더 없음, 탭 + 인라인 통계</div>
+  <div class="page-wrapper">
+    <div class="page-title">
+      <div class="bc-row"><div class="bc-dot"></div><span class="bc-section">투자</span><span class="bc-sep">›</span><span class="bc-name">투자 정산 관리</span></div>
+      <div class="bc-line"></div>
+    </div>
+    <!-- 탭 + 인라인 통계 한줄 -->
+    <div class="hdr-minimal-tabs">
+      <button class="tab-btn active">🤝 위수탁(지입) <span class="badge">3</span></button>
+      <button class="tab-btn">💼 투자/펀딩 <span class="badge">0</span></button>
+      <div class="hdr-minimal-stats">
+        <div class="ms">총 계약 <b style="color:#334155;">3건</b></div>
+        <div class="ms-div"></div>
+        <div class="ms">투자금 <b style="color:#2563eb;">1.5억</b></div>
+        <div class="ms-div"></div>
+        <div class="ms">월 관리비 <b style="color:#dc2626;">60만</b></div>
+        <button class="act-btn">+ 신규 등록</button>
+      </div>
+    </div>
+    <!-- 필터 + 테이블 -->
+    <div class="filter-bar">
+      <span class="f-chip active">전체 <span class="cnt">3</span></span>
+      <span class="f-chip">운영중 <span class="cnt">3</span></span>
+      <span class="f-chip">만기 <span class="cnt">0</span></span>
+      <input class="f-search" placeholder="차량번호, 차주명 검색...">
+    </div>
+    <table class="data-table">
+      <thead><tr><th>계약 차량</th><th>투자자(차주)</th><th>투자금 / 배분율</th><th>월 관리비</th><th>지급일</th><th style="text-align:center;">상태</th></tr></thead>
+      <tbody>
+        <tr><td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td><td><div style="font-weight:700;">정태영</div><div class="t-sub">010-8785-4252</div></td><td><div class="t-money">38,000,000원</div><div class="t-badge">48.8%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+        <tr><td><div class="t-main">47하9604</div><div class="t-sub">Model Y RWD</div></td><td><div style="font-weight:700;">성명호</div></td><td><div class="t-money">49,700,000원</div><div class="t-badge">77%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OPTION D: 컴팩트 요약바 (#2d5fa8 슬림 + 화이트 탭)
+     ═══════════════════════════════════════════════════════ -->
+<div id="opt-d">
+  <div class="option-label"><span class="num">D</span> 컴팩트 요약바 — 블루 슬림 바 + 화이트 탭</div>
+  <div class="page-wrapper">
+    <div class="page-title">
+      <div class="bc-row"><div class="bc-dot"></div><span class="bc-section">투자</span><span class="bc-sep">›</span><span class="bc-name">투자 정산 관리</span></div>
+      <div class="bc-line"></div>
+    </div>
+    <!-- 블루 요약 바 -->
+    <div class="hdr-compact">
+      <div class="cs">총 계약 <b>3건</b></div>
+      <div class="cs-div"></div>
+      <div class="cs">운용 중 <b style="color:#6ee7b7;">3건</b></div>
+      <div class="cs-div"></div>
+      <div class="cs">총 투자금 <b>1.5억</b></div>
+      <div class="cs-div"></div>
+      <div class="cs">월 관리비 <b style="color:#fca5a5;">60만</b></div>
+      <div class="act-area">
+        <button class="sec">📥 내보내기</button>
+        <button class="pri">+ 신규 등록</button>
+      </div>
+    </div>
+    <!-- 화이트 탭 -->
+    <div class="white-tabs">
+      <button class="tab-btn active">🤝 위수탁(지입) <span class="badge">3</span></button>
+      <button class="tab-btn">💼 투자/펀딩 <span class="badge">0</span></button>
+    </div>
+    <!-- 필터 + 테이블 -->
+    <div class="filter-bar">
+      <span class="f-chip active">전체 <span class="cnt">3</span></span>
+      <span class="f-chip">운영중 <span class="cnt">3</span></span>
+      <span class="f-chip">만기 <span class="cnt">0</span></span>
+      <input class="f-search" placeholder="차량번호, 차주명 검색...">
+    </div>
+    <table class="data-table">
+      <thead><tr><th>계약 차량</th><th>투자자(차주)</th><th>투자금 / 배분율</th><th>월 관리비</th><th>지급일</th><th style="text-align:center;">상태</th></tr></thead>
+      <tbody>
+        <tr><td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td><td><div style="font-weight:700;">정태영</div><div class="t-sub">010-8785-4252</div></td><td><div class="t-money">38,000,000원</div><div class="t-badge">48.8%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+        <tr><td><div class="t-main">47하9604</div><div class="t-sub">Model Y RWD</div></td><td><div style="font-weight:700;">성명호</div></td><td><div class="t-money">49,700,000원</div><div class="t-badge">77%</div></td><td style="font-weight:700;color:#4b5563;">200,000원</td><td style="color:#6b7280;">매월 10일</td><td style="text-align:center;"><span class="t-status active">운영중</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /.preview-wrap -->
+
+<script>
+function showOpt(id, btn) {
+  document.querySelectorAll('.opt-btns button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const ids = ['opt-a','opt-b','opt-c','opt-d'];
+  if (id === 'all') {
+    ids.forEach(x => document.getElementById(x).classList.remove('hidden'));
+  } else {
+    ids.forEach(x => {
+      document.getElementById(x).classList.toggle('hidden', x !== 'opt-' + id);
+    });
+  }
+}
+</script>
+</body>
+</html>

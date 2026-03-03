@@ -313,13 +313,13 @@ export default function QuoteDetailPage() {
       const model = car.model || carInfo.model || ''
       const trim = car.trim || carInfo.trim || ''
       const year = car.year || carInfo.year || ''
-      const fee = quote?.rent_fee || 0
+      const fee = Math.round((quote?.rent_fee || 0) / 1000) * 1000
       const dep = quote?.deposit || 0
       const term = detail.term_months || 36
       const type = detail.contract_type === 'buyout' ? '인수형' : '반납형'
       const mileage = detail.annualMileage || detail.baselineKm || 2
-      const feeF = Math.round(fee).toLocaleString()
-      const vatF = Math.round(fee * 1.1).toLocaleString()
+      const feeF = fee.toLocaleString()
+      const vatF = (Math.round(fee * 1.1 / 1000) * 1000).toLocaleString()
       const depF = Math.round(dep).toLocaleString()
 
       const msg = [
@@ -424,7 +424,8 @@ export default function QuoteDetailPage() {
       const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
         quote_id: quote.id, car_id: quote.car_id, customer_id: quote.customer_id || null,
         customer_name: quote.customer_name, start_date: quote.start_date, end_date: quote.end_date,
-        term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active'
+        term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active',
+        company_id: quote.company_id,
       }]).select().single()
       if (cErr) throw cErr
       const schedules = []
@@ -472,8 +473,8 @@ export default function QuoteDetailPage() {
   const totalMileageLimit = annualMileage * 10000 * (termMonths / 12)
   const maintPackage = detail.maint_package || 'basic'
   const excessMileageRate = detail.excess_mileage_rate || 0
-  const rentFee = quote.rent_fee || 0
-  const rentVAT = Math.round(rentFee * 0.1)
+  const rentFee = Math.round((quote.rent_fee || 0) / 1000) * 1000   // 천원단위 반올림
+  const rentVAT = Math.round(rentFee * 0.1 / 1000) * 1000           // 천원단위 반올림
   const rentWithVAT = rentFee + rentVAT
   const totalPayments = rentWithVAT * termMonths
   const buyoutPrice = detail.buyout_price || detail.residual_value || 0
@@ -566,7 +567,7 @@ export default function QuoteDetailPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white">인쇄</button>
-            <button onClick={() => router.push(`/quotes/pricing?quote_id=${quoteId}`)}
+            <button onClick={handleEditWorksheet}
               className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
               {worksheet ? '렌트가 산출 수정' : '견적서 수정'}
             </button>
@@ -1156,8 +1157,9 @@ export default function QuoteDetailPage() {
                   <div className="flex justify-between text-green-400"><span className="font-bold">+ 마진</span><span className="font-bold">{f(margin)}원</span></div>
                   <div className="border-t border-gray-500 my-2 pt-2">
                     <div className="text-right">
-                      <p className="text-[10px] text-yellow-400 font-bold mb-0.5">월 렌트료 (VAT별도)</p>
-                      <p className="text-2xl font-black tracking-tight">{f(suggestedRent)}<span className="text-sm ml-1">원</span></p>
+                      <p className="text-[10px] text-yellow-400 font-bold mb-0.5">월 렌트료 (VAT 포함)</p>
+                      <p className="text-2xl font-black tracking-tight">{f(rentWithVAT)}<span className="text-sm ml-1">원</span></p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">공급가 {f(suggestedRent)}원 + VAT {f(rentVAT)}원</p>
                     </div>
                   </div>
                 </div>
@@ -1245,7 +1247,7 @@ export default function QuoteDetailPage() {
                       <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>{(quote?.quote_detail?.contract_type === 'buyout' ? '인수형' : '반납형')} · {(quote?.quote_detail?.term_months || 36)}개월</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontWeight: 900, fontSize: 18, color: '#1d4ed8' }}>월 {Math.round((quote?.rent_fee || 0) * 1.1).toLocaleString()}원</span>
+                      <span style={{ fontWeight: 900, fontSize: 18, color: '#1d4ed8' }}>월 {(Math.round((quote?.rent_fee || 0) * 1.1 / 1000) * 1000).toLocaleString()}원</span>
                       <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 4 }}>(VAT포함)</span>
                     </div>
                   </div>

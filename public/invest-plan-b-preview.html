@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B안 탭 통합형 (D헤더) — 리스트 + 상세 프리뷰</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;}
+
+/* Top bar */
+.top-bar{position:sticky;top:0;z-index:200;background:#0f172a;border-bottom:1px solid #1e293b;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.top-bar h1{color:#fff;font-size:14px;font-weight:800;white-space:nowrap;}
+.top-bar .tag{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#059669;color:#fff;}
+.page-sw{display:flex;gap:4px;margin-left:12px;}
+.page-sw button{padding:6px 14px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e293b;color:#94a3b8;}
+.page-sw button.active{background:#2d5fa8;color:#fff;}
+.device-sw{margin-left:auto;display:flex;gap:4px;}
+.device-sw button{background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;}
+.device-sw button.active{background:#2d5fa8;color:#fff;border-color:#2d5fa8;}
+
+/* Layout */
+.main-wrap{display:flex;min-height:calc(100vh - 48px);}
+.sidebar{width:280px;background:#1e293b;border-right:1px solid #334155;padding:16px;overflow-y:auto;flex-shrink:0;position:sticky;top:48px;height:calc(100vh - 48px);}
+.preview-area{flex:1;padding:20px;overflow-y:auto;}
+.preview-frame{max-width:1100px;margin:0 auto;transition:max-width .3s;}
+.preview-frame.mobile{max-width:390px;}
+.preview-frame.tablet{max-width:768px;}
+
+/* Sidebar */
+.s-section{margin-bottom:18px;}
+.s-title{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;padding:4px 0 8px;display:flex;align-items:center;gap:6px;}
+.s-title .dot{width:8px;height:8px;border-radius:50%;}
+.s-note{font-size:9px;color:#475569;padding:2px 0 6px;line-height:1.5;}
+.s-note b{color:#94a3b8;}
+.s-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;}
+.s-badge.new{background:rgba(251,191,36,.15);color:#fbbf24;}
+.s-badge.same{background:rgba(52,211,153,.15);color:#34d399;}
+.s-badge.merged{background:rgba(96,165,250,.15);color:#60a5fa;}
+
+/* Page wrapper (outer background) */
+.page-wrapper{background:#f9fafb;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);overflow:hidden;}
+/* PageTitle — P3-C 브레드크럼 + 솔리드 라인 */
+.page-title{margin-bottom:0;}
+.page-title .bc-row{display:flex;align-items:center;gap:10px;padding:12px 20px;}
+.page-title .bc-dot{width:8px;height:8px;border-radius:50%;background:#2d5fa8;flex-shrink:0;box-shadow:0 0 0 3px rgba(45,95,168,0.15);}
+.page-title .bc-section{font-size:11px;color:#94a3b8;font-weight:500;}
+.page-title .bc-sep{color:#cbd5e1;font-size:11px;}
+.page-title .bc-name{font-size:15px;font-weight:800;color:#1e293b;}
+.page-title .bc-line{height:1.5px;background:#2d5fa8;}
+/* Page container */
+.page-container{background:#f8fafc;overflow:hidden;}
+.hidden{display:none !important;}
+
+/* ══════════════════════════════════════════
+   컴팩트 요약바 (D안)
+   ══════════════════════════════════════════ */
+.compact-bar{background:#2d5fa8;padding:10px 20px;display:flex;align-items:center;gap:14px;}
+.compact-bar .cs{font-size:12px;color:rgba(255,255,255,0.8);}
+.compact-bar .cs b{color:#fff;font-size:14px;font-weight:900;}
+.compact-bar .cs-div{width:1px;height:18px;background:rgba(255,255,255,0.25);}
+.compact-bar .act-area{margin-left:auto;display:flex;gap:6px;}
+.compact-bar .act-area button{padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.compact-bar .act-area .pri{background:#fff;color:#2d5fa8;border:none;font-weight:800;}
+.compact-bar .act-area .sec{background:rgba(255,255,255,0.12);color:#e0ecf8;border:1px solid rgba(255,255,255,0.2);font-weight:600;}
+
+/* ══════════════════════════════════════════
+   메인 탭 (위수탁 / 투자)
+   ══════════════════════════════════════════ */
+.main-tabs{display:flex;gap:0;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 24px;}
+.main-tab{padding:12px 20px;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;transition:all .15s;}
+.main-tab:hover{color:#64748b;}
+.main-tab.active{color:#0f172a;border-bottom-color:#2d5fa8;}
+.main-tab .badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e2e8f0;color:#64748b;}
+.main-tab.active .badge{background:#2d5fa8;color:#fff;}
+
+/* ══════════════════════════════════════════
+   필터바
+   ══════════════════════════════════════════ */
+.filter-bar{display:flex;align-items:center;padding:10px 24px;gap:8px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;background:#fff;}
+.f-chip{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.f-chip:hover{border-color:#94a3b8;}
+.f-chip.active{background:#0f172a;color:#fff;border-color:#0f172a;}
+.f-chip .cnt{font-weight:900;margin-left:3px;}
+.f-chip.active .cnt{color:#60a5fa;}
+.f-select{padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:700;color:#475569;background:#fff;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px;white-space:nowrap;}
+.f-select:focus{border-color:#2d5fa8;box-shadow:0 0 0 3px rgba(45,95,168,.1);}
+.f-toggle{display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #d1d5db;flex-shrink:0;}
+.f-toggle button{padding:6px 12px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#fff;color:#94a3b8;}
+.f-toggle button.active{background:#0f172a;color:#fff;}
+.f-search{padding:7px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;flex:1;min-width:140px;outline:none;background:#fff;color:#0f172a;}
+.f-search:focus{border-color:#2d5fa8;box-shadow:0 0 0 3px rgba(45,95,168,.1);}
+
+/* ══════════════════════════════════════════
+   테이블
+   ══════════════════════════════════════════ */
+.data-table{width:100%;border-collapse:collapse;background:#fff;}
+.data-table thead th{padding:12px 20px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;background:#f9fafb;border-bottom:1px solid #f3f4f6;text-align:left;}
+.data-table tbody tr{border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background .1s;}
+.data-table tbody tr:hover{background:#f0f7ff;}
+.data-table tbody td{padding:14px 20px;font-size:14px;color:#374151;}
+.t-main{font-weight:800;color:#111827;font-size:15px;}
+.t-sub{font-size:12px;color:#9ca3af;margin-top:2px;}
+.t-money{font-weight:800;color:#2d5fa8;}
+.t-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;background:#eff6ff;color:#2d5fa8;margin-top:2px;}
+.t-status{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.t-status.active{background:#dcfce7;color:#16a34a;}
+.t-status.expired{background:#fef3c7;color:#d97706;}
+.t-status.terminated{background:#f3f4f6;color:#9ca3af;}
+
+/* 하단바 */
+.bottom-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#fff;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;}
+.bottom-bar b{color:#0f172a;font-weight:800;}
+
+/* ══════════════════════════════════════════
+   상세 페이지
+   ══════════════════════════════════════════ */
+.detail-back{padding:10px 24px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.detail-back a{font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px;}
+.detail-back a:hover{color:#2d5fa8;}
+
+.detail-hdr{padding:16px 24px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.detail-hdr .type-tag{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:800;white-space:nowrap;}
+.detail-hdr .type-tag.jiip{background:#f0fdf4;color:#059669;border:1px solid #bbf7d0;}
+.detail-hdr .type-tag.invest{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;}
+.detail-hdr .info{flex:1;min-width:0;}
+.detail-hdr .title{font-size:20px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.detail-hdr .sub-info{font-size:12px;color:#94a3b8;margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.detail-hdr .actions{display:flex;gap:6px;flex-shrink:0;}
+.detail-hdr .actions button{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.detail-hdr .actions .sec{border:1px solid #e2e8f0;background:#fff;color:#475569;}
+.detail-hdr .actions .danger{border:1px solid #fecaca;background:#fff;color:#dc2626;}
+
+/* 대시보드 카드 */
+.dash-grid{display:grid;gap:10px;padding:16px 24px;background:#f8fafc;}
+.dash-grid.jiip{grid-template-columns:repeat(3,1fr);}
+.dash-grid.invest{grid-template-columns:repeat(4,1fr);}
+.d-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+.d-card .accent{position:absolute;top:0;left:0;width:4px;height:100%;border-radius:4px 0 0 4px;}
+.d-card .dl{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;}
+.d-card .dv{font-size:18px;font-weight:800;color:#0f172a;margin-top:4px;}
+.d-card .ds{font-size:10px;color:#94a3b8;margin-top:2px;}
+.pbar{height:4px;background:#f1f5f9;border-radius:4px;margin-top:8px;overflow:hidden;}
+.pbar .fill{height:100%;border-radius:4px;}
+
+/* 상세 탭 */
+.detail-tabs{display:flex;gap:1px;padding:4px 24px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.dt{padding:10px 16px;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;border-radius:8px;transition:all .15s;display:flex;align-items:center;gap:4px;}
+.dt:hover{background:#f8fafc;color:#64748b;}
+.dt.active{background:#0f172a;color:#fff;}
+.dt .badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#e2e8f0;color:#64748b;}
+.dt.active .badge{background:rgba(255,255,255,.2);color:#fff;}
+
+/* 폼 영역 */
+.form-section{margin:16px 24px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;}
+.form-hdr{padding:12px 16px;background:#f9fafb;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:8px;}
+.form-hdr .num{width:20px;height:20px;background:#0f172a;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;}
+.form-hdr .label{font-size:13px;font-weight:800;color:#0f172a;}
+.form-body{padding:16px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-field .fl{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+.form-field .fi{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#0f172a;font-size:13px;width:100%;display:block;}
+.form-field .fi.filled{background:#f8fafc;color:#334155;font-weight:600;}
+.form-field .fi-radio{display:flex;gap:8px;}
+.form-field .fi-radio label{padding:6px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:700;color:#94a3b8;cursor:pointer;}
+.form-field .fi-radio label.checked{border-color:#0f172a;background:#f8fafc;color:#0f172a;}
+
+@media(max-width:900px){
+  .main-wrap{flex-direction:column;}
+  .sidebar{width:100%;height:auto;position:relative;top:0;border-right:none;border-bottom:1px solid #334155;padding:8px 12px;}
+  .dash-grid.jiip,.dash-grid.invest{grid-template-columns:repeat(2,1fr);}
+  .form-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>B안 탭 통합형 프리뷰</h1>
+  <span class="tag">추천</span>
+  <div class="page-sw">
+    <button class="active" onclick="switchView('list',this)">📋 리스트</button>
+    <button onclick="switchView('detail-jiip',this)">🤝 지입 상세</button>
+    <button onclick="switchView('detail-invest',this)">💼 투자 상세</button>
+  </div>
+  <div class="device-sw">
+    <button class="active" onclick="setDev('desktop',this)">PC</button>
+    <button onclick="setDev('tablet',this)">Tablet</button>
+    <button onclick="setDev('mobile',this)">Mobile</button>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div id="side-list">
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#2d5fa8;"></span> 상단 PageTitle <span class="s-badge same">동일</span></div>
+        <div class="s-note">카드/통장 관리와 동일한 디자인<br><b>● 투자 › 투자 정산 관리</b> + 1.5px 블루라인</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#2d5fa8;"></span> 컴팩트 요약바 (D안) <span class="s-badge new">변경</span></div>
+        <div class="s-note">#2d5fa8 블루 슬림 바 한 줄<br><b>통계 + 내보내기 + 신규등록</b> 압축 배치</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#f59e0b;"></span> 메인 탭 <span class="s-badge new">신규</span></div>
+        <div class="s-note">🤝 위수탁(지입) / 💼 투자/펀딩<br>탭 전환으로 <b>같은 페이지</b>에서 관리<br>각 탭마다 <b>전용 필터+테이블</b></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 필터 개선 <span class="s-badge new">개선</span></div>
+        <div class="s-note">지입: 전체/운영중/<b>만기임박</b>/만기/해지/갱신<br>투자: 전체/운용중/만기임박/종료<br>→ DB 상태 4종 + 만기임박 필터 추가</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 하단 요약바 <span class="s-badge new">신규</span></div>
+        <div class="s-note">각 탭별 <b>총합 정보</b> 하단에 표시</div>
+      </div>
+    </div>
+
+    <div id="side-detail-jiip" class="hidden">
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 계약 유형 태그 <span class="s-badge new">신규</span></div>
+        <div class="s-note">헤더에 <b>🤝 위수탁</b> or <b>💼 투자</b> 태그 표시<br>→ 어떤 유형인지 즉시 구분</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#f59e0b;"></span> 대시보드 (6칸)</div>
+        <div class="s-note"><b>지입 전용:</b> 구입비/약정/입금률/배분율/관리비/비율<br>→ 기존과 동일 (디자인만 통일)</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 탭 구성 <span class="s-badge same">유지</span></div>
+        <div class="s-note">📋 계약정보 / 📄 계약서 / 💰 입금현황 / 📊 이력<br>→ <b>기존 4탭 그대로</b></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 뒤로가기 경로 <span class="s-badge new">개선</span></div>
+        <div class="s-note">목록 → <b>/invest (통합 리스트)</b> 으로 이동<br>해당 탭(위수탁) 자동 활성화</div>
+      </div>
+    </div>
+
+    <div id="side-detail-invest" class="hidden">
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#2563eb;"></span> 투자 상세 헤더</div>
+        <div class="s-note">💼 투자/펀딩 태그 + 투자자명 + 상태<br>+ 연이율/월이자 서브정보</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#f59e0b;"></span> 대시보드 (4칸)</div>
+        <div class="s-note"><b>투자 전용:</b> 약정금/입금률/연수익률/월이자<br>→ 지입과 <b>다른 항목</b> (이자율 중심)</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#34d399;"></span> 탭 구성 <span class="s-badge same">유지</span></div>
+        <div class="s-note">📋 계약정보 / 📄 계약서 / 💰 입금현황 / 📊 이력<br>→ <b>기존 4탭 그대로</b></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="dot" style="background:#f59e0b;"></span> 폼 차이점</div>
+        <div class="s-note">지입: 차량선택+배분율+관리비+지급일+근저당<br>투자: <b>이자율+이자지급일+만기일</b> (차량 없음)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview-area">
+    <div class="preview-frame" id="pf">
+
+      <!-- ═══════════════════════════════════════
+           리스트 페이지
+           ═══════════════════════════════════════ -->
+      <div id="v-list" class="page-wrapper">
+        <!-- P3-C PageTitle: 도트 + 브레드크럼 + 솔리드 라인 -->
+        <div class="page-title">
+          <div class="bc-row">
+            <div class="bc-dot"></div>
+            <span class="bc-section">투자</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-name">투자 정산 관리</span>
+          </div>
+          <div class="bc-line"></div>
+        </div>
+        <div class="page-container">
+        <!-- 컴팩트 요약바 (D안) -->
+        <div class="compact-bar">
+          <div class="cs">총 계약 <b>3건</b></div>
+          <div class="cs-div"></div>
+          <div class="cs">운용 중 <b style="color:#6ee7b7;">3건</b></div>
+          <div class="cs-div"></div>
+          <div class="cs">총 투자금 <b>1.5억</b></div>
+          <div class="cs-div"></div>
+          <div class="cs">월 관리비 <b style="color:#fca5a5;">60만</b></div>
+          <div class="act-area">
+            <button class="sec">📥 내보내기</button>
+            <button class="pri" id="add-btn">+ 신규 등록</button>
+          </div>
+        </div>
+
+        <!-- 메인 탭: 위수탁 / 투자 -->
+        <div class="main-tabs">
+          <div class="main-tab active" onclick="switchTab('jiip',this)">
+            🤝 위수탁(지입) <span class="badge">3</span>
+          </div>
+          <div class="main-tab" onclick="switchTab('invest',this)">
+            💼 투자/펀딩 <span class="badge">0</span>
+          </div>
+        </div>
+
+        <!-- 지입 탭 내용 -->
+        <div id="tab-jiip">
+          <div class="filter-bar">
+            <span class="f-chip active">전체 <span class="cnt">3</span></span>
+            <span class="f-chip">운영중 <span class="cnt">3</span></span>
+            <span class="f-chip">만기 <span class="cnt">0</span></span>
+            <span class="f-chip">해지 <span class="cnt">0</span></span>
+            <span class="f-chip">갱신 <span class="cnt">0</span></span>
+            <select class="f-select">
+              <option>🚙 차량별</option>
+              <option>👤 차주별</option>
+              <option>📂 세금유형별</option>
+              <option>📅 지급일별</option>
+            </select>
+            <div class="f-toggle">
+              <button class="active">용도별</button>
+              <button>배분율순</button>
+            </div>
+            <input class="f-search" placeholder="차량번호, 차주명, 연락처 검색...">
+            <span style="font-size:12px;color:#94a3b8;font-weight:600;white-space:nowrap;">계약 <b style="color:#2d5fa8;">3/3건</b></span>
+          </div>
+          <table class="data-table">
+            <thead><tr>
+              <th>계약 차량</th><th>투자자(차주)</th><th>투자금 / 배분율</th><th>월 관리비</th><th>지급일</th><th style="text-align:center;">상태</th>
+            </tr></thead>
+            <tbody>
+              <tr onclick="switchView('detail-jiip',document.querySelector('.page-sw button:nth-child(2)'))">
+                <td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td>
+                <td><div style="font-weight:700;">정태영</div><div class="t-sub">010-8785-4252</div></td>
+                <td><div class="t-money">38,000,000원</div><div class="t-badge">48.8% 배분</div></td>
+                <td style="font-weight:700;color:#4b5563;">200,000원</td>
+                <td style="font-weight:700;color:#6b7280;">매월 10일</td>
+                <td style="text-align:center;"><span class="t-status active">운영중</span></td>
+              </tr>
+              <tr>
+                <td><div class="t-main">47하9604</div><div class="t-sub">Model Y RWD</div></td>
+                <td><div style="font-weight:700;">성명호</div><div class="t-sub">010-4431-2999</div></td>
+                <td><div class="t-money">49,700,000원</div><div class="t-badge">77% 배분</div></td>
+                <td style="font-weight:700;color:#4b5563;">200,000원</td>
+                <td style="font-weight:700;color:#6b7280;">매월 10일</td>
+                <td style="text-align:center;"><span class="t-status active">운영중</span></td>
+              </tr>
+              <tr>
+                <td><div class="t-main">47하9603</div><div class="t-sub">Model Y Long Range</div></td>
+                <td><div style="font-weight:700;">임성민</div><div class="t-sub">010-6626-3690</div></td>
+                <td><div class="t-money">64,600,000원</div><div class="t-badge">72.4% 배분</div></td>
+                <td style="font-weight:700;color:#4b5563;">200,000원</td>
+                <td style="font-weight:700;color:#6b7280;">매월 10일</td>
+                <td style="text-align:center;"><span class="t-status active">운영중</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="bottom-bar">
+            <span>총 약정: <b>1.5억</b> · 월 관리비: <b>60만</b> · 평균 배분율: <b>66.1%</b></span>
+            <span>3건</span>
+          </div>
+        </div>
+
+        <!-- 투자 탭 내용 -->
+        <div id="tab-invest" class="hidden">
+          <div class="filter-bar">
+            <span class="f-chip active">전체 <span class="cnt">0</span></span>
+            <span class="f-chip">운용중 <span class="cnt">0</span></span>
+            <span class="f-chip">만기임박 <span class="cnt">0</span></span>
+            <span class="f-chip">종료 <span class="cnt">0</span></span>
+            <select class="f-select">
+              <option>👤 투자자별</option>
+              <option>📂 세금유형별</option>
+              <option>📊 이자율별</option>
+              <option>📅 지급일별</option>
+            </select>
+            <div class="f-toggle">
+              <button class="active">이자율순</button>
+              <button>만기일순</button>
+            </div>
+            <input class="f-search" placeholder="투자자명, 연락처 검색...">
+          </div>
+          <div style="padding:60px 20px;text-align:center;">
+            <div style="font-size:40px;margin-bottom:12px;">💼</div>
+            <p style="font-weight:700;color:#111827;font-size:16px;">아직 등록된 일반 투자가 없습니다.</p>
+            <p style="color:#6b7280;font-size:13px;margin-top:6px;">우측 상단 버튼을 눌러 첫 번째 투자를 등록해보세요.</p>
+          </div>
+        </div>
+
+        </div><!-- /.page-container (list) -->
+      </div><!-- /#v-list -->
+
+      <!-- ═══════════════════════════════════════
+           지입 상세 페이지
+           ═══════════════════════════════════════ -->
+      <div id="v-detail-jiip" class="page-wrapper hidden">
+        <!-- P3-C PageTitle -->
+        <div class="page-title">
+          <div class="bc-row">
+            <div class="bc-dot"></div>
+            <span class="bc-section">투자</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-section">투자 정산 관리</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-name">위수탁 계약 상세</span>
+          </div>
+          <div class="bc-line"></div>
+        </div>
+        <div class="detail-back"><a onclick="switchView('list',document.querySelector('.page-sw button:first-child'))">‹ 목록으로</a></div>
+
+        <div class="detail-hdr">
+          <span class="type-tag jiip">🤝 위수탁</span>
+          <div class="info">
+            <div class="title">
+              정태영 · 161허9826
+              <span class="t-status active">운영중</span>
+              <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:#ecfdf5;color:#059669;font-weight:700;">✓ 서명완료</span>
+            </div>
+            <div class="sub-info">
+              <span>카니발 하이브리드</span>
+              <span>·</span>
+              <span>주식회사에프엠아이</span>
+              <span>·</span>
+              <span>010-8785-4252</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="sec">상태 변경 ▾</button>
+            <button class="danger">삭제</button>
+          </div>
+        </div>
+
+        <!-- 대시보드: 지입 전용 6칸 -->
+        <div class="dash-grid jiip">
+          <div class="d-card"><div class="accent" style="background:#2d5fa8;"></div><div class="dl">차량 구입비용</div><div class="dv">55,000,000<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds">161허9826 (카니발)</div></div>
+          <div class="d-card"><div class="accent" style="background:#0f172a;"></div><div class="dl">약정금액</div><div class="dv">38,000,000<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds" style="color:#2563eb;font-weight:700;">구입비 대비 69.1%</div></div>
+          <div class="d-card"><div class="accent" style="background:#f59e0b;"></div><div class="dl">입금 진행률</div><div class="dv">67.3<span style="font-size:11px;color:#94a3b8;">%</span></div><div class="pbar"><div class="fill" style="width:67%;background:#f59e0b;"></div></div></div>
+          <div class="d-card"><div class="accent" style="background:#7c3aed;"></div><div class="dl">배분율</div><div class="dv" style="color:#7c3aed;">48.8<span style="font-size:11px;color:#94a3b8;">%</span></div></div>
+          <div class="d-card"><div class="accent" style="background:#64748b;"></div><div class="dl">관리비</div><div class="dv">200,000<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds">매월 15일 지급</div></div>
+          <div class="d-card"><div class="accent" style="background:#2563eb;"></div><div class="dl">약정/구입 비율</div><div class="dv" style="color:#2563eb;">69.1<span style="font-size:11px;color:#94a3b8;">%</span></div><div class="pbar"><div class="fill" style="width:69%;background:#2563eb;"></div></div></div>
+        </div>
+
+        <!-- 상세 탭 -->
+        <div class="detail-tabs">
+          <div class="dt active">📋 계약 정보</div>
+          <div class="dt">📄 계약서 관리</div>
+          <div class="dt">💰 입금 현황 <span class="badge">12</span></div>
+          <div class="dt">📊 이력</div>
+        </div>
+
+        <!-- 폼: 지입 전용 -->
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">1</span><span class="label">지급 및 세금 유형</span></div>
+          <div class="form-body">
+            <div class="form-field"><div class="fi-radio">
+              <label class="checked">세금계산서</label>
+              <label>사업소득(3.3%)</label>
+              <label>이자소득(27.5%)</label>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">2</span><span class="label">투자자(을) 상세 정보</span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">성명</div><div class="fi filled">정태영</div></div>
+              <div class="form-field"><div class="fl">연락처</div><div class="fi filled">010-1234-5678</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">사업자등록번호</div><div class="fi filled">123-45-67890</div></div>
+              <div class="form-field"><div class="fl">이메일</div><div class="fi filled">jung@example.com</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field" style="grid-column:1/3;"><div class="fl">주소</div><div class="fi filled">서울 강남구 테헤란로 123 (삼성동)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">3</span><span class="label">계약 조건 <span style="color:#2d5fa8;font-size:10px;font-weight:700;margin-left:8px;">지입 전용</span></span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">계약 차량</div><div class="fi filled">161허9826 (카니발 하이브리드)</div></div>
+              <div class="form-field"><div class="fl">약정금액</div><div class="fi filled">38,000,000원</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">배분율 (%)</div><div class="fi filled">48.8%</div></div>
+              <div class="form-field"><div class="fl">월 관리비</div><div class="fi filled">200,000원</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">지급일</div><div class="fi filled">매월 15일</div></div>
+              <div class="form-field"><div class="fl">근저당 설정</div><div class="fi filled">✓ 설정됨</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">계약 시작일</div><div class="fi filled">2023-06-15</div></div>
+              <div class="form-field"><div class="fl">계약 종료일</div><div class="fi filled">2026-06-14 (자동계산 3년)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">4</span><span class="label">계좌 정보</span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">은행</div><div class="fi filled">KB국민은행</div></div>
+              <div class="form-field"><div class="fl">계좌번호</div><div class="fi filled">123456-78-901234</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">예금주</div><div class="fi filled">정태영</div></div>
+              <div class="form-field"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-bar" style="border-radius:0 0 16px 16px;">
+          <span>마지막 수정: <b>2026.03.02</b> · 계약일: <b>2023.06.15</b></span>
+          <button style="padding:10px 24px;background:#0f172a;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">저장</button>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════
+           투자 상세 페이지
+           ═══════════════════════════════════════ -->
+      <div id="v-detail-invest" class="page-wrapper hidden">
+        <!-- P3-C PageTitle -->
+        <div class="page-title">
+          <div class="bc-row">
+            <div class="bc-dot"></div>
+            <span class="bc-section">투자</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-section">투자 정산 관리</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-name">투자 상세 정보</span>
+          </div>
+          <div class="bc-line"></div>
+        </div>
+        <div class="detail-back"><a onclick="switchView('list',document.querySelector('.page-sw button:first-child'))">‹ 목록으로</a></div>
+
+        <div class="detail-hdr">
+          <span class="type-tag invest">💼 투자/펀딩</span>
+          <div class="info">
+            <div class="title">
+              김서연
+              <span class="t-status active">운용중</span>
+            </div>
+            <div class="sub-info">
+              <span>연 8.5% · 월이자 354,167원</span>
+              <span>·</span>
+              <span style="color:#d97706;font-weight:700;">D-305</span>
+              <span>·</span>
+              <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:#ecfdf5;color:#059669;font-weight:700;">✓ 서명완료</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="sec">상태 변경 ▾</button>
+            <button class="danger">삭제</button>
+          </div>
+        </div>
+
+        <!-- 대시보드: 투자 전용 4칸 -->
+        <div class="dash-grid invest">
+          <div class="d-card"><div class="accent" style="background:#2d5fa8;"></div><div class="dl">약정금액</div><div class="dv">50,000,000<span style="font-size:11px;color:#94a3b8;">원</span></div></div>
+          <div class="d-card"><div class="accent" style="background:#f59e0b;"></div><div class="dl">입금 진행률</div><div class="dv">82.0<span style="font-size:11px;color:#94a3b8;">%</span></div><div class="pbar"><div class="fill" style="width:82%;background:#f59e0b;"></div></div></div>
+          <div class="d-card"><div class="accent" style="background:#7c3aed;"></div><div class="dl">연 수익률</div><div class="dv" style="color:#7c3aed;">8.5<span style="font-size:11px;color:#94a3b8;">%</span></div></div>
+          <div class="d-card"><div class="accent" style="background:#dc2626;"></div><div class="dl">월 이자</div><div class="dv" style="color:#dc2626;">354,167<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds">매월 10일 지급</div></div>
+        </div>
+
+        <!-- 상세 탭 -->
+        <div class="detail-tabs">
+          <div class="dt active">📋 계약 정보</div>
+          <div class="dt">📄 계약서 관리</div>
+          <div class="dt">💰 입금 현황 <span class="badge">8</span></div>
+          <div class="dt">📊 이력</div>
+        </div>
+
+        <!-- 폼: 투자 전용 -->
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">1</span><span class="label">투자자 상세 정보</span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">성명</div><div class="fi filled">김서연</div></div>
+              <div class="form-field"><div class="fl">연락처</div><div class="fi filled">010-2222-3333</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">이메일</div><div class="fi filled">kim@example.com</div></div>
+              <div class="form-field"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field" style="grid-column:1/3;"><div class="fl">주소</div><div class="fi filled">서울 서초구 반포대로 45 (반포동)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">2</span><span class="label">투자 조건 <span style="color:#2563eb;font-size:10px;font-weight:700;margin-left:8px;">투자 전용</span></span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">투자 원금</div><div class="fi filled">50,000,000원</div></div>
+              <div class="form-field"><div class="fl">연 이자율 (%)</div><div class="fi filled">8.5%</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">이자 지급일</div><div class="fi filled">매월 10일</div></div>
+              <div class="form-field"><div class="fl">월 예상 이자</div><div class="fi filled" style="color:#dc2626;">354,167원 (자동계산)</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">계약 시작일</div><div class="fi filled">2025-01-01</div></div>
+              <div class="form-field"><div class="fl">계약 종료일 (만기)</div><div class="fi filled">2025-12-31 (자동계산 1년)</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-hdr"><span class="num">3</span><span class="label">계좌 정보</span></div>
+          <div class="form-body">
+            <div class="form-row">
+              <div class="form-field"><div class="fl">은행</div><div class="fi filled">신한은행</div></div>
+              <div class="form-field"><div class="fl">계좌번호</div><div class="fi filled">110-123-456789</div></div>
+            </div>
+            <div class="form-row">
+              <div class="form-field"><div class="fl">예금주</div><div class="fi filled">김서연</div></div>
+              <div class="form-field"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-bar" style="border-radius:0 0 16px 16px;">
+          <span>마지막 수정: <b>2026.03.02</b> · 계약일: <b>2025.01.01</b></span>
+          <button style="padding:10px 24px;background:#0f172a;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">저장</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function switchView(view, btn) {
+  ['v-list','v-detail-jiip','v-detail-invest'].forEach(id => {
+    document.getElementById(id).classList.toggle('hidden', id !== 'v-'+view);
+  });
+  ['side-list','side-detail-jiip','side-detail-invest'].forEach(id => {
+    document.getElementById(id).classList.toggle('hidden', id !== 'side-'+view.replace('detail-','detail-'));
+  });
+  // Handle sidebar visibility
+  document.getElementById('side-list').classList.toggle('hidden', view !== 'list');
+  document.getElementById('side-detail-jiip').classList.toggle('hidden', view !== 'detail-jiip');
+  document.getElementById('side-detail-invest').classList.toggle('hidden', view !== 'detail-invest');
+
+  if(btn){
+    document.querySelectorAll('.page-sw button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+function switchTab(tab, el) {
+  document.getElementById('tab-jiip').classList.toggle('hidden', tab !== 'jiip');
+  document.getElementById('tab-invest').classList.toggle('hidden', tab !== 'invest');
+  el.closest('.main-tabs').querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setDev(mode, btn) {
+  const f = document.getElementById('pf');
+  f.classList.remove('mobile','tablet');
+  if(mode !== 'desktop') f.classList.add(mode);
+  btn.closest('.device-sw').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

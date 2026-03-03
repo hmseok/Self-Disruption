@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>분류 UX 개선안 프리뷰</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+  .nav { display: flex; gap: 0; background: #fff; border-bottom: 2px solid #e2e8f0; padding: 0 24px; position: sticky; top: 0; z-index: 50; }
+  .nav-btn { padding: 14px 24px; font-size: 14px; font-weight: 700; border: none; background: transparent; cursor: pointer; color: #94a3b8; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .nav-btn.active { color: #2d5fa8; border-bottom-color: #2d5fa8; }
+  .nav-btn:hover { color: #2d5fa8; background: #f8fafc; }
+
+  .panel { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .panel.active { display: block; }
+
+  .section-title { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+  .section-desc { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; margin-bottom: 20px; }
+
+  /* 테이블 */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f9fafb; color: #6b7280; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; text-align: left; position: sticky; top: 0; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  tr:hover { background: rgba(45, 95, 168, 0.02); }
+  tr.selected { background: rgba(59, 130, 246, 0.06); }
+  tr.unclassified { background: #fef2f2; }
+  tr.unclassified:hover { background: #fee2e2; }
+
+  /* 뱃지 */
+  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+  .badge-gray { background: #f1f5f9; color: #64748b; }
+
+  /* 드롭다운 셀렉트 */
+  .cell-select { background: #fff; border: 1px solid #e2e8f0; padding: 4px 6px; border-radius: 6px; font-size: 11px; font-weight: 600; color: #374151; outline: none; cursor: pointer; width: 100%; }
+  .cell-select:focus { border-color: #2d5fa8; box-shadow: 0 0 0 2px rgba(45,95,168,0.15); }
+  .cell-select.empty { border: 1.5px dashed #f87171; background: #fef2f2; color: #dc2626; }
+  .cell-select.partial { border: 1px dashed #f59e0b; background: #fffbeb; color: #92400e; }
+
+  /* 연결 버튼 */
+  .link-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; transition: all 0.15s; }
+  .link-btn:hover { background: #f8fafc; border-color: #2d5fa8; }
+  .link-btn.linked { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+  .link-btn.empty { background: #f8fafc; border: 1px dashed #cbd5e1; color: #94a3b8; }
+
+  /* 모달 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: #fff; border-radius: 16px; width: 520px; max-height: 80vh; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h3 { font-size: 16px; font-weight: 800; }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; justify-content: flex-end; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; display: block; }
+  .form-select { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 600; color: #1e293b; outline: none; background: #fff; }
+  .form-select:focus { border-color: #2d5fa8; box-shadow: 0 0 0 3px rgba(45,95,168,0.12); }
+
+  .btn { padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #2d5fa8; color: #fff; }
+  .btn-primary:hover { background: #1e4d8c; }
+  .btn-secondary { background: #f1f5f9; color: #475569; }
+  .btn-secondary:hover { background: #e2e8f0; }
+  .btn-sm { padding: 6px 12px; font-size: 11px; }
+
+  /* 플로팅 액션바 */
+  .floating-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; border-radius: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 40; }
+
+  .compare-box { display: flex; gap: 24px; margin-bottom: 24px; }
+  .compare-card { flex: 1; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+  .compare-card.recommended { border-color: #2d5fa8; }
+  .compare-label { padding: 10px 16px; font-size: 13px; font-weight: 800; text-align: center; }
+  .compare-label.before { background: #fee2e2; color: #991b1b; }
+  .compare-label.after { background: #dbeafe; color: #1e40af; }
+
+  /* 퀵분류 */
+  .quick-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .quick-chip { padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; transition: all 0.15s; }
+  .quick-chip:hover { border-color: #2d5fa8; background: #eff6ff; color: #2d5fa8; }
+  .quick-chip.active { border-color: #2d5fa8; background: #2d5fa8; color: #fff; }
+
+  .arrow { font-size: 20px; color: #94a3b8; text-align: center; padding: 8px; }
+
+  .hint { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #94a3b8; font-weight: 500; }
+
+  .amt-in { color: #2563eb; font-weight: 800; text-align: right; }
+  .amt-out { color: #dc2626; font-weight: 800; text-align: right; }
+
+  .chk { width: 14px; height: 14px; cursor: pointer; accent-color: #2d5fa8; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPanel('compare')">🔍 현재 vs 개선안</button>
+  <button class="nav-btn" onclick="showPanel('table')">📋 개선안 A: 2컬럼형</button>
+  <button class="nav-btn" onclick="showPanel('table-b')">📋 개선안 B: 통합 1컬럼형</button>
+  <button class="nav-btn" onclick="showPanel('bulk')">⚡ 일괄분류 모달</button>
+</nav>
+
+<!-- ═══ 패널 1: 비교 ═══ -->
+<div id="compare" class="panel active">
+  <h2 class="section-title">현재 문제점 vs 개선안</h2>
+  <p class="section-desc">실제 경리직원 입장에서 991건을 분류할 때의 작업 효율</p>
+
+  <div class="compare-box">
+    <!-- 현재 -->
+    <div class="compare-card">
+      <div class="compare-label before">❌ 현재 (3컬럼 분리형)</div>
+      <div style="padding: 16px;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px">✓</th>
+              <th>날짜</th>
+              <th>거래처</th>
+              <th style="background:#fee2e2">중그룹</th>
+              <th style="background:#fee2e2">하위그룹</th>
+              <th style="background:#fee2e2">연결</th>
+              <th>금액</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox" class="chk"></td>
+              <td style="font-size:11px; color:#6b7280">02-02</td>
+              <td style="font-weight:700">법원행정처</td>
+              <td>
+                <select class="cell-select" style="font-size:9px">
+                  <option>🏛️ 세금/공과금</option>
+                </select>
+              </td>
+              <td>
+                <select class="cell-select" style="font-size:9px">
+                  <option>세금/공과금</option>
+                </select>
+              </td>
+              <td>
+                <button class="link-btn empty" style="font-size:9px">연결없음 ▼</button>
+              </td>
+              <td class="amt-out" style="font-size:11px">1,000</td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" class="chk"></td>
+              <td style="font-size:11px; color:#6b7280">02-01</td>
+              <td style="font-weight:700">지에스차지비</td>
+              <td>
+                <select class="cell-select" style="font-size:9px">
+                  <option>🚛 차량 운영</option>
+                </select>
+              </td>
+              <td>
+                <select class="cell-select" style="font-size:9px">
+                  <option>유류비</option>
+                </select>
+              </td>
+              <td>
+                <button class="link-btn empty" style="font-size:9px">연결없음 ▼</button>
+              </td>
+              <td class="amt-out" style="font-size:11px">2,057</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding: 12px; background: #fef2f2; border-radius: 8px; margin-top: 12px;">
+          <p style="font-size: 11px; font-weight: 700; color: #991b1b;">🔴 문제점</p>
+          <ul style="font-size: 11px; color: #64748b; padding-left: 16px; margin-top: 6px; line-height: 1.8;">
+            <li><b>중그룹/하위그룹</b>이 의미상 중복 (차량운영→유류비 이미 뻔함)</li>
+            <li><b>연결</b> 컬럼이 대부분 "연결없음" — 공간 낭비</li>
+            <li>3개 드롭다운을 한 줄에서 조작 → <b>클릭 피로</b></li>
+            <li>일괄분류 시 텍스트 직접입력 → 오타/실수 유발</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 개선안 -->
+    <div class="compare-card recommended">
+      <div class="compare-label after">✅ 개선안 (실무 최적화)</div>
+      <div style="padding: 16px;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px">✓</th>
+              <th>날짜</th>
+              <th>거래처</th>
+              <th>비고</th>
+              <th style="background:#dbeafe">분류</th>
+              <th style="background:#dbeafe">연결</th>
+              <th>금액</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox" class="chk"></td>
+              <td style="font-size:11px; color:#6b7280">02-02</td>
+              <td style="font-weight:700">법원행정처</td>
+              <td style="font-size:11px; color:#94a3b8">국내 / 일시불</td>
+              <td>
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                  <span class="badge badge-purple" style="font-size:9px">🏛️ 세금/공과금</span>
+                  <span style="font-size:10px; font-weight:600; color:#374151; padding-left:2px;">세금/공과금</span>
+                </div>
+              </td>
+              <td><span style="font-size:10px; color:#cbd5e1;">—</span></td>
+              <td class="amt-out" style="font-size:11px">1,000</td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" class="chk"></td>
+              <td style="font-size:11px; color:#6b7280">02-01</td>
+              <td style="font-weight:700">지에스차지비</td>
+              <td style="font-size:11px; color:#94a3b8">국내 / 일시불</td>
+              <td>
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                  <span class="badge badge-amber" style="font-size:9px">🚛 차량 운영</span>
+                  <span style="font-size:10px; font-weight:600; color:#374151; padding-left:2px;">유류비</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-blue" style="font-size:9px;">🚗 12가3456</span>
+              </td>
+              <td class="amt-out" style="font-size:11px">2,057</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding: 12px; background: #eff6ff; border-radius: 8px; margin-top: 12px;">
+          <p style="font-size: 11px; font-weight: 700; color: #1e40af;">🔵 핵심 개선</p>
+          <ul style="font-size: 11px; color: #64748b; padding-left: 16px; margin-top: 6px; line-height: 1.8;">
+            <li><b>분류 = 1컬럼</b>에 중그룹 뱃지 + 하위항목 텍스트 2줄 표시</li>
+            <li>클릭하면 <b>2단계 드롭다운</b> 팝오버 (중그룹 선택 → 하위 자동필터)</li>
+            <li><b>연결</b>은 있을 때만 뱃지 표시, 없으면 "—"</li>
+            <li>일괄분류 모달에 <b>드롭다운 + 자주쓰는 조합</b> 제공</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 패널 2: 개선안 A — 2컬럼형 ═══ -->
+<div id="table" class="panel">
+  <h2 class="section-title">개선안 A: 분류 + 연결 2컬럼</h2>
+  <p class="section-desc">
+    "분류" 컬럼 1개에 중그룹(뱃지) + 하위항목(텍스트)을 같이 보여주고, 클릭 시 2단계 팝오버<br>
+    "연결" 컬럼에는 지입/투자/차량 등 연결정보만 — 대부분은 비어있어도 됨
+  </p>
+
+  <div class="card">
+    <!-- 상단 필터 바 -->
+    <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display:flex; align-items:center; gap:12px;">
+      <span style="font-weight:800; font-size:13px;">분석 결과 675건</span>
+      <span class="badge badge-green">카드매칭 675/675</span>
+      <span class="badge badge-blue">분류 988/991</span>
+      <div style="flex:1"></div>
+      <span class="hint">💡 셀 클릭으로 개별 수정 · 체크 후 일괄분류</span>
+    </div>
+
+    <!-- 카드 그룹 헤더 -->
+    <div style="padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display:flex; align-items:center; gap:12px;">
+      <input type="checkbox" class="chk">
+      <div style="width:4px; height:28px; border-radius:4px; background:#f59e0b;"></div>
+      <div>
+        <span style="font-weight:800; font-size:13px;">💳 우리카드 ****4331</span>
+        <span style="font-size:11px; color:#64748b; margin-left:8px;">사용자: 김준수 (일반)</span>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-weight:800; font-size:13px;">15,976,646원</span>
+      <span style="font-size:11px; color:#94a3b8;">336건</span>
+      <span style="font-size:12px; color:#94a3b8;">▼</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table>
+        <colgroup>
+          <col style="width:30px">
+          <col style="width:78px">
+          <col style="width:auto">
+          <col style="width:auto">
+          <col style="width:180px">
+          <col style="width:130px">
+          <col style="width:85px">
+          <col style="width:24px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="text-align:center">✓</th>
+            <th>날짜</th>
+            <th>거래처</th>
+            <th>비고</th>
+            <th>📂 분류</th>
+            <th>🔗 연결</th>
+            <th style="text-align:right">금액</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- 세금 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280; white-space:nowrap;">02-02</td>
+            <td style="font-weight:700; font-size:12px;">법원행정처</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;" onclick="this.querySelector('.popup')?.classList.toggle('show')">
+                <span style="font-size:12px;">🏛️</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#7c3aed; font-weight:700;">세금/공과금</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">세금/공과금</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td><span style="font-size:10px; color:#d1d5db;">—</span></td>
+            <td class="amt-out" style="font-size:12px;">1,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 세금 2 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">02-02</td>
+            <td style="font-weight:700; font-size:12px;">법원행정처</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🏛️</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#7c3aed; font-weight:700;">세금/공과금</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">세금/공과금</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td><span style="font-size:10px; color:#d1d5db;">—</span></td>
+            <td class="amt-out" style="font-size:12px;">1,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 부리나케 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">02-02</td>
+            <td style="font-weight:700; font-size:12px;">부리나케</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🍽️</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#db2777; font-weight:700;">식비/접대/출장</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">복리후생(식대)</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td><span style="font-size:10px; color:#d1d5db;">—</span></td>
+            <td class="amt-out" style="font-size:12px;">50,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 차량 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">02-01</td>
+            <td style="font-weight:700; font-size:12px;">지에스차지비 주식회사</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🚛</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#b45309; font-weight:700;">차량 운영</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">유류비</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td>
+              <div class="link-btn linked" style="font-size:10px;">🚗 12가3456</div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">2,057</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 지입 연결 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-30</td>
+            <td style="font-weight:700; font-size:12px;">지에스차지비 주식회사</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🚛</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#b45309; font-weight:700;">차량 운영</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">유류비</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td>
+              <div class="link-btn linked" style="font-size:10px;">🚛 지입:성명호</div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">6,981</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 코스모 정비 -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-30</td>
+            <td style="font-weight:700; font-size:12px;">코스모자동차오토서비스</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🚛</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#b45309; font-weight:700;">차량 운영</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">정비/수리비</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td>
+              <div class="link-btn linked" style="font-size:10px;">🚗 34나5678</div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">90,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 미분류 -->
+          <tr class="unclassified">
+            <td style="text-align:center"><input type="checkbox" class="chk" checked></td>
+            <td style="font-size:11px; color:#6b7280">01-28</td>
+            <td style="font-weight:700; font-size:12px; color:#dc2626;">미상 업체</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1.5px dashed #f87171; border-radius:6px; cursor:pointer; background:#fef2f2;">
+                <span style="font-size:12px;">❓</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:11px; font-weight:700; color:#dc2626;">미분류</div>
+                </div>
+                <span style="font-size:8px; color:#f87171;">▼</span>
+              </div>
+            </td>
+            <td><span style="font-size:10px; color:#d1d5db;">—</span></td>
+            <td class="amt-out" style="font-size:12px;">25,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <!-- 투자 입금 (통장) -->
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-25</td>
+            <td style="font-weight:700; font-size:12px;">홍길동</td>
+            <td style="font-size:11px; color:#94a3b8;">이자 입금</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:6px; padding:3px 6px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; background:#fff;">
+                <span style="font-size:12px;">🏦</span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:9px; color:#6366f1; font-weight:700;">투자/대출 입출금</div>
+                  <div style="font-size:11px; font-weight:600; color:#1e293b;">이자비용(대출/투자)</div>
+                </div>
+                <span style="font-size:8px; color:#94a3b8;">▼</span>
+              </div>
+            </td>
+            <td>
+              <div class="link-btn linked" style="font-size:10px;">💰 투자:홍길동</div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">500,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 하단 요약 -->
+    <div style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; display:flex; gap:16px; font-size:12px;">
+      <span style="font-weight:700;">조회 675건</span>
+      <span>입금 <b style="color:#2563eb">+0</b></span>
+      <span>출금 <b style="color:#dc2626">-29,305,681</b></span>
+      <span>순합계 <b style="color:#dc2626">-29,305,681</b></span>
+    </div>
+  </div>
+
+  <div style="padding: 12px 16px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #2d5fa8;">
+    <p style="font-size: 12px; font-weight: 700; color: #1e40af;">💡 분류 셀 클릭 시 동작</p>
+    <p style="font-size: 11px; color: #475569; margin-top: 4px; line-height: 1.7;">
+      1단계: 중그룹 목록 (🚛 차량운영, 🏦 투자/대출, 🍽️ 식비/접대 ...)<br>
+      2단계: 선택한 중그룹의 세부항목 자동 표시 (유류비, 정비/수리비 ...)<br>
+      ※ 미확인 시 1단계(중그룹)만 선택하고 닫기 가능
+    </p>
+  </div>
+</div>
+
+<!-- ═══ 패널 3: 개선안 B — 통합 1컬럼형 ═══ -->
+<div id="table-b" class="panel">
+  <h2 class="section-title">개선안 B: 분류+연결 통합 1컬럼</h2>
+  <p class="section-desc">
+    극단적으로 간결하게 — 분류와 연결을 하나의 셀에 다 보여주는 방식.<br>
+    "차량운영 → 유류비 → 🚗12가3456" 처럼 경로형으로 표시
+  </p>
+
+  <div class="card">
+    <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display:flex; align-items:center; gap:12px;">
+      <span style="font-weight:800; font-size:13px;">💳 우리카드 ****4331</span>
+      <span style="font-size:11px; color:#64748b;">김준수 (일반)</span>
+      <div style="flex:1"></div>
+      <span style="font-weight:800;">15,976,646원 · 336건</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <colgroup>
+          <col style="width:30px">
+          <col style="width:78px">
+          <col style="width:auto">
+          <col style="width:auto">
+          <col style="width:260px">
+          <col style="width:85px">
+          <col style="width:24px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="text-align:center">✓</th>
+            <th>날짜</th>
+            <th>거래처</th>
+            <th>비고</th>
+            <th>📂 분류 · 연결</th>
+            <th style="text-align:right">금액</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">02-02</td>
+            <td style="font-weight:700; font-size:12px;">법원행정처</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span class="badge badge-purple" style="font-size:9px;">🏛️ 세금</span>
+                <span style="color:#d1d5db;">›</span>
+                <span style="font-size:11px; font-weight:600;">세금/공과금</span>
+              </div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">1,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">02-01</td>
+            <td style="font-weight:700; font-size:12px;">지에스차지비</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span class="badge badge-amber" style="font-size:9px;">🚛 차량</span>
+                <span style="color:#d1d5db;">›</span>
+                <span style="font-size:11px; font-weight:600;">유류비</span>
+                <span style="color:#d1d5db;">›</span>
+                <span class="badge badge-blue" style="font-size:9px;">🚗 12가3456</span>
+              </div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">2,057</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-30</td>
+            <td style="font-weight:700; font-size:12px;">지에스차지비</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span class="badge badge-amber" style="font-size:9px;">🚛 차량</span>
+                <span style="color:#d1d5db;">›</span>
+                <span style="font-size:11px; font-weight:600;">유류비</span>
+                <span style="color:#d1d5db;">›</span>
+                <span class="badge badge-green" style="font-size:9px;">🚛 지입:성명호</span>
+              </div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">6,981</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <tr>
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-25</td>
+            <td style="font-weight:700; font-size:12px;">홍길동</td>
+            <td style="font-size:11px; color:#94a3b8;">이자 입금</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span class="badge badge-purple" style="font-size:9px;">🏦 투자</span>
+                <span style="color:#d1d5db;">›</span>
+                <span style="font-size:11px; font-weight:600;">이자비용</span>
+                <span style="color:#d1d5db;">›</span>
+                <span class="badge badge-blue" style="font-size:9px;">💰 투자:홍길동</span>
+              </div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">500,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+          <tr class="unclassified">
+            <td style="text-align:center"><input type="checkbox" class="chk"></td>
+            <td style="font-size:11px; color:#6b7280">01-28</td>
+            <td style="font-weight:700; font-size:12px; color:#dc2626;">미상 업체</td>
+            <td style="font-size:11px; color:#94a3b8;">국내 / 일시불</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px; padding:3px 6px; border:1.5px dashed #f87171; border-radius:6px; background:#fef2f2; cursor:pointer;">
+                <span style="font-size:12px;">❓</span>
+                <span style="font-size:11px; font-weight:700; color:#dc2626;">미분류 — 클릭하여 분류</span>
+              </div>
+            </td>
+            <td class="amt-out" style="font-size:12px;">25,000</td>
+            <td style="text-align:center"><span style="color:#d1d5db; cursor:pointer; font-size:14px;">×</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="padding: 12px 16px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e; margin-top: 16px;">
+    <p style="font-size: 12px; font-weight: 700; color: #166534;">✅ B안 장점</p>
+    <p style="font-size: 11px; color: #475569; margin-top: 4px; line-height: 1.7;">
+      경로형(breadcrumb) 표시로 한눈에 전체 맥락 파악<br>
+      컬럼 1개로 공간 절약 → 거래처/비고 열에 여유<br>
+      클릭 시 3단계 팝오버: 중그룹 → 하위항목 → 연결(선택)
+    </p>
+  </div>
+</div>
+
+<!-- ═══ 패널 4: 일괄분류 모달 ═══ -->
+<div id="bulk" class="panel">
+  <h2 class="section-title">일괄분류 모달 개선안</h2>
+  <p class="section-desc">
+    현재: 텍스트 입력창만 있어서 항목명을 정확히 타이핑해야 함 (오타 유발)<br>
+    개선: 드롭다운 + 자주쓰는 조합 + 연결까지 한 번에
+  </p>
+
+  <div class="compare-box">
+    <!-- 현재 -->
+    <div class="compare-card">
+      <div class="compare-label before">❌ 현재 — 텍스트 입력</div>
+      <div style="padding: 24px;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #fff;">
+          <p style="font-size:14px; font-weight:700; margin-bottom:12px;">일괄 분류할 카테고리를 입력하세요:</p>
+          <input type="text" placeholder="" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; outline:none;">
+          <div style="display:flex; gap:8px; margin-top:16px; justify-content:flex-end;">
+            <button class="btn btn-secondary">취소</button>
+            <button class="btn btn-primary">확인</button>
+          </div>
+        </div>
+        <div style="padding: 12px; background: #fef2f2; border-radius: 8px; margin-top: 12px;">
+          <p style="font-size: 11px; color: #991b1b; line-height: 1.6;">
+            😰 "유류비"를 "유류비"로 정확히 타이핑?<br>
+            😰 오타나면 미분류 처리됨<br>
+            😰 연결(지입/투자)은 별도 작업 필요<br>
+            😰 991건을 이렇게 하나씩?
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 개선 -->
+    <div class="compare-card recommended">
+      <div class="compare-label after">✅ 개선 — 드롭다운 + 자주쓰는 조합</div>
+      <div style="padding: 24px;">
+        <div style="border: 2px solid #2d5fa8; border-radius: 12px; padding: 0; background: #fff; overflow:hidden;">
+          <!-- 모달 헤더 -->
+          <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <h3 style="font-size:15px; font-weight:800;">📋 일괄 분류</h3>
+              <p style="font-size:11px; color:#64748b; margin-top:2px;">선택된 <b style="color:#2d5fa8;">3건</b> · 합계 <b>155,400원</b></p>
+            </div>
+            <span style="cursor:pointer; font-size:18px; color:#94a3b8;">✕</span>
+          </div>
+
+          <!-- 자주쓰는 조합 -->
+          <div style="padding:14px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+            <p style="font-size:10px; font-weight:700; color:#64748b; margin-bottom:8px;">⚡ 자주 쓰는 분류 (원클릭)</p>
+            <div class="quick-row">
+              <span class="quick-chip">🚛 유류비</span>
+              <span class="quick-chip">🔧 정비/수리비</span>
+              <span class="quick-chip">🍽️ 식대</span>
+              <span class="quick-chip active">🏛️ 세금/공과금</span>
+              <span class="quick-chip">💳 수수료</span>
+              <span class="quick-chip">🏢 임차료</span>
+            </div>
+          </div>
+
+          <!-- 본문 -->
+          <div style="padding:16px 20px;">
+            <div class="form-group">
+              <label class="form-label">① 중그룹 (대분류)</label>
+              <select class="form-select">
+                <option>🏛️ 세금/공과금</option>
+                <option>💰 돈 들어오는 것</option>
+                <option>🏦 투자/대출 입출금</option>
+                <option>🚛 차량 운영</option>
+                <option>👨‍💼 급여/인건비</option>
+                <option>🍽️ 식비/접대/출장</option>
+                <option>🏢 사무실/운영비</option>
+                <option>📦 기타 지출</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">② 세부항목 (선택사항 — 미지정 시 중그룹으로 분류)</label>
+              <select class="form-select">
+                <option value="" style="color:#94a3b8;">미지정 (중그룹만)</option>
+                <option selected>세금/공과금</option>
+                <option>원천세/부가세</option>
+                <option>법인세/지방세</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">③ 연결 (선택사항)</label>
+              <select class="form-select">
+                <option value="" style="color:#94a3b8;">연결 안함</option>
+                <optgroup label="🚗 차량">
+                  <option>12가3456 (스타렉스)</option>
+                  <option>34나5678 (포터)</option>
+                </optgroup>
+                <optgroup label="🚛 지입">
+                  <option>성명호 (12가3456)</option>
+                  <option>김영수 (34나5678)</option>
+                </optgroup>
+                <optgroup label="💰 투자">
+                  <option>홍길동 (2025-01)</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          <!-- 미리보기 -->
+          <div style="padding:12px 20px; background:#f0f9ff; border-top:1px solid #e2e8f0;">
+            <p style="font-size:10px; font-weight:700; color:#1e40af; margin-bottom:6px;">미리보기</p>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <span class="badge badge-purple" style="font-size:10px;">🏛️ 세금</span>
+              <span style="color:#d1d5db;">›</span>
+              <span style="font-size:12px; font-weight:700;">세금/공과금</span>
+              <span style="font-size:11px; color:#94a3b8; margin-left:8px;">연결 없음</span>
+            </div>
+          </div>
+
+          <div style="padding:14px 20px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end;">
+            <button class="btn btn-secondary">취소</button>
+            <button class="btn btn-primary">✅ 3건 일괄 분류</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 추가: 스마트 일괄분류 -->
+  <div class="card" style="margin-top: 8px;">
+    <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0;">
+      <h3 style="font-size: 14px; font-weight: 800;">🧠 추가 제안: 스마트 일괄분류</h3>
+      <p style="font-size: 11px; color: #64748b; margin-top: 4px;">
+        같은 거래처의 과거 분류 패턴을 학습하여 자동 추천
+      </p>
+    </div>
+    <div style="padding: 16px 20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>거래처</th>
+            <th>추천 분류</th>
+            <th>근거</th>
+            <th>건수</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700;">지에스차지비</td>
+            <td><span class="badge badge-amber">🚛 유류비</span></td>
+            <td style="font-size:11px; color:#64748b;">과거 48건 중 47건 동일 분류</td>
+            <td style="font-weight:700;">12건</td>
+            <td><button class="btn btn-primary btn-sm">일괄 적용</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;">코스모자동차오토서비스</td>
+            <td><span class="badge badge-amber">🚛 정비/수리비</span></td>
+            <td style="font-size:11px; color:#64748b;">과거 15건 중 15건 동일 분류</td>
+            <td style="font-weight:700;">4건</td>
+            <td><button class="btn btn-primary btn-sm">일괄 적용</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;">삼표에너지고덕</td>
+            <td><span class="badge badge-amber">🚛 유류비</span></td>
+            <td style="font-size:11px; color:#64748b;">과거 22건 중 22건 동일 분류</td>
+            <td style="font-weight:700;">8건</td>
+            <td><button class="btn btn-primary btn-sm">일괄 적용</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+  event.currentTarget.classList.add('active')
+}
+</script>
+</body>
+</html>

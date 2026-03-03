@@ -2,6 +2,7 @@
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import DarkHeader from '../components/DarkHeader'
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -708,37 +709,61 @@ export default function CustomerPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen animate-fade-in">
-      {/* 페이지 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 고객 관리</h1>
-          <p className="text-gray-500 text-sm mt-1">고객 정보 등록 및 계약 이력 관리</p>
-        </div>
-        <button
-          onClick={() => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) }}
-          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
-          + 신규 고객
-        </button>
-      </div>
-
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        {[
-          { label: '전체', value: stats.total, color: 'bg-gray-900', icon: '👥' },
-          { label: '개인', value: stats.personal, color: 'bg-emerald-600', icon: '🧑' },
-          { label: '법인', value: stats.corporate, color: 'bg-steel-600', icon: '🏢' },
-          { label: '외국인', value: stats.foreign, color: 'bg-violet-600', icon: '🌍' },
-          { label: 'VIP', value: stats.vip, color: 'bg-amber-500', icon: '⭐' },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 ${s.color} rounded-xl flex items-center justify-center text-white text-lg`}>{s.icon}</div>
-            <div>
-              <p className="text-[11px] text-gray-400 font-bold">{s.label}</p>
-              <p className="text-xl font-black text-gray-900">{s.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* DarkHeader with Stats and Action */}
+      <DarkHeader
+        icon="👥"
+        title="고객 관리"
+        subtitle="고객 정보 등록 및 계약 이력 관리"
+        stats={[
+          {
+            label: '전체',
+            value: stats.total,
+            color: '#334155',
+            bgColor: '#fff',
+            borderColor: '#e2e8f0',
+            labelColor: '#94a3b8',
+          },
+          {
+            label: '개인',
+            value: stats.personal,
+            color: '#2563eb',
+            bgColor: '#eff6ff',
+            borderColor: '#bfdbfe',
+            labelColor: '#93c5fd',
+          },
+          {
+            label: '법인',
+            value: stats.corporate,
+            color: '#059669',
+            bgColor: '#ecfdf5',
+            borderColor: '#bbf7d0',
+            labelColor: '#6ee7b7',
+          },
+          {
+            label: '외국인',
+            value: stats.foreign,
+            color: '#7c3aed',
+            bgColor: '#f5f3ff',
+            borderColor: '#ddd6fe',
+            labelColor: '#c4b5fd',
+          },
+          {
+            label: 'VIP',
+            value: stats.vip,
+            color: '#d97706',
+            bgColor: '#fffbeb',
+            borderColor: '#fde68a',
+            labelColor: '#fcd34d',
+          },
+        ]}
+        actions={[
+          {
+            label: '+ 신규 고객',
+            onClick: () => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) },
+            variant: 'primary',
+          },
+        ]}
+      />
 
       {/* 검색 + 필터 */}
       <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-6">

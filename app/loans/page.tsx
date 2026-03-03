@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import DarkHeader from '../components/DarkHeader'
 
 export default function LoanListPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
@@ -206,29 +207,68 @@ export default function LoanListPage() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🏦 대출/금융사 관리</h1>
-          <p className="text-gray-500 text-sm mt-1">대출 현황 및 금융사 계약 관리</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={ocrProcessing}
-            className={`flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${ocrProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            <span>{ocrProcessing ? '분석 중...' : '견적서 업로드'}</span>
-          </button>
-          <button
-            onClick={() => router.push('/loans/new')}
-            className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-            <span>직접 등록</span>
-          </button>
-        </div>
-      </div>
+      <DarkHeader
+        icon="🏦"
+        title="대출/금융사 관리"
+        subtitle="대출 현황 및 금융사 계약 관리"
+        stats={[
+          {
+            label: '총 대출 잔액',
+            value: f(totalDebt),
+            color: '#334155',
+            bgColor: '#fff',
+            borderColor: '#e2e8f0',
+            labelColor: '#94a3b8'
+          },
+          {
+            label: '월 고정 지출',
+            value: f(monthlyOut),
+            color: '#dc2626',
+            bgColor: '#fef2f2',
+            borderColor: '#fecaca',
+            labelColor: '#fca5a5'
+          },
+          {
+            label: '계약 건수',
+            value: loans.length.toString(),
+            color: '#334155',
+            bgColor: '#fff',
+            borderColor: '#e2e8f0',
+            labelColor: '#94a3b8'
+          },
+          {
+            label: '만기 임박 (90일)',
+            value: expiringCount.toString(),
+            color: expiringCount > 0 ? '#d97706' : '#94a3b8',
+            bgColor: expiringCount > 0 ? '#fffbeb' : '#fff',
+            borderColor: expiringCount > 0 ? '#fde68a' : '#e2e8f0',
+            labelColor: expiringCount > 0 ? '#fcd34d' : '#94a3b8'
+          },
+          {
+            label: '평균 이자율',
+            value: avgRate + '%',
+            color: '#2563eb',
+            bgColor: '#eff6ff',
+            borderColor: '#bfdbfe',
+            labelColor: '#93c5fd'
+          }
+        ]}
+        actions={[
+          {
+            label: ocrProcessing ? '분석 중...' : '견적서 업로드',
+            icon: '📄',
+            onClick: () => fileInputRef.current?.click(),
+            variant: 'primary',
+            disabled: ocrProcessing
+          },
+          {
+            label: '직접 등록',
+            icon: '➕',
+            onClick: () => router.push('/loans/new'),
+            variant: 'secondary'
+          }
+        ]}
+      />
 
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
@@ -271,31 +311,7 @@ export default function LoanListPage() {
         </div>
       )}
 
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
-        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs text-gray-400 font-bold">총 대출 잔액</p>
-          <p className="text-lg md:text-xl font-black text-steel-900 mt-1">{f(totalDebt)}<span className="text-xs text-gray-400 ml-0.5">원</span></p>
-        </div>
-        <div className="bg-red-50 p-3 md:p-4 rounded-xl border border-red-100">
-          <p className="text-xs text-red-500 font-bold">월 고정 지출</p>
-          <p className="text-lg md:text-xl font-black text-red-600 mt-1">{f(monthlyOut)}<span className="text-xs text-red-400 ml-0.5">원</span></p>
-        </div>
-        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-xs text-gray-400 font-bold">계약 건수</p>
-          <p className="text-lg md:text-xl font-black text-gray-800 mt-1">{loans.length}<span className="text-xs text-gray-400 ml-0.5">건</span></p>
-        </div>
-        <div className={`p-3 md:p-4 rounded-xl border ${expiringCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
-          <p className="text-xs text-amber-600 font-bold">만기 임박 (90일)</p>
-          <p className="text-lg md:text-xl font-black text-amber-700 mt-1">{expiringCount}<span className="text-xs text-amber-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-blue-50 p-3 md:p-4 rounded-xl border border-blue-100">
-          <p className="text-xs text-blue-500 font-bold">평균 이자율</p>
-          <p className="text-lg md:text-xl font-black text-blue-700 mt-1">{avgRate}<span className="text-xs text-blue-400 ml-0.5">%</span></p>
-        </div>
-      </div>
-
-      {/* 만기 임박 경고 배너 */}
+{/* 만기 임박 경고 배너 */}
       {expiringLoans.length > 0 && !ocrProcessing && (
         <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 md:p-5">
           <div className="flex items-center gap-2 mb-3">

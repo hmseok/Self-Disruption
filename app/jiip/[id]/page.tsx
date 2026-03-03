@@ -122,7 +122,7 @@ export default function JiipDetailPage() {
 
   // ── 데이터 조회 ──
   const fetchCars = async () => {
-    let query = supabase.from('cars').select('id, number, brand, model, company_id')
+    let query = supabase.from('cars').select('id, number, brand, model, company_id, purchase_price')
     if (role !== 'god_admin' && company?.id) query = query.eq('company_id', company.id)
     const { data } = await query.order('number', { ascending: true })
     setCars(data || [])
@@ -294,7 +294,7 @@ export default function JiipDetailPage() {
       : await supabase.from('jiip_contracts').update(payload).eq('id', jiipId)
 
     if (error) alert('저장 실패: ' + error.message)
-    else { alert('저장되었습니다!'); if (isNew) router.push('/jiip') }
+    else { alert('저장되었습니다!'); router.push('/jiip') }
   }
 
   const handleDelete = async () => {
@@ -361,6 +361,8 @@ export default function JiipDetailPage() {
   const statusInfo = STATUS_LABELS[item.status] || STATUS_LABELS.active
   const daysLeft = daysUntil(item.contract_end_date)
   const selectedCar = cars.find((c: any) => c.id == item.car_id)
+  const carPurchasePrice = selectedCar?.purchase_price || 0
+  const investToCarRatio = carPurchasePrice > 0 ? Math.round((item.invest_amount / carPurchasePrice) * 1000) / 10 : 0
   const depositRate = item.invest_amount > 0 ? Math.min(100, Math.round((realDepositTotal / item.invest_amount) * 100)) : 0
 
   const TABS = [
@@ -455,15 +457,33 @@ export default function JiipDetailPage() {
 
       {/* ── 요약 대시보드 (상세 모드) ── */}
       {!isNew && activeTab === 'info' && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
+            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">차량 구입비용</p>
+            <p className="text-lg font-bold text-slate-900">
+              {carPurchasePrice > 0 ? carPurchasePrice.toLocaleString() : '-'}
+              <span className="text-xs font-normal text-slate-400 ml-0.5">원</span>
+            </p>
+            {selectedCar && (
+              <p className="text-[10px] text-slate-400 mt-0.5">{selectedCar.number} ({selectedCar.brand} {selectedCar.model})</p>
+            )}
+          </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
             <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">약정금액</p>
             <p className="text-lg font-bold text-slate-900">{item.invest_amount.toLocaleString()}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
+            {carPurchasePrice > 0 && (
+              <p className="text-[10px] mt-0.5">
+                <span className={`font-bold ${investToCarRatio >= 100 ? 'text-red-500' : investToCarRatio >= 70 ? 'text-amber-500' : 'text-blue-500'}`}>
+                  구입비 대비 {investToCarRatio}%
+                </span>
+              </p>
+            )}
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
             <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">입금 진행률</p>
             <div className="flex items-end gap-2">
               <p className={`text-lg font-bold ${depositRate >= 100 ? 'text-emerald-600' : 'text-slate-900'}`}>{depositRate}%</p>
+              <span className="text-[10px] text-slate-400 mb-0.5">{realDepositTotal.toLocaleString()} / {item.invest_amount.toLocaleString()}원</span>
             </div>
             <div className="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all duration-500 ${depositRate >= 100 ? 'bg-emerald-500' : depositRate >= 50 ? 'bg-blue-500' : 'bg-amber-500'}`} style={{ width: `${depositRate}%` }} />
@@ -477,6 +497,19 @@ export default function JiipDetailPage() {
             <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">관리비</p>
             <p className="text-lg font-bold text-slate-900">{item.admin_fee.toLocaleString()}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
           </div>
+          {carPurchasePrice > 0 && item.invest_amount > 0 && (
+            <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
+              <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">약정/구입 비율</p>
+              <div className="flex items-end gap-2">
+                <p className={`text-lg font-bold ${investToCarRatio >= 100 ? 'text-red-600' : investToCarRatio >= 70 ? 'text-amber-600' : 'text-blue-600'}`}>
+                  {investToCarRatio}%
+                </p>
+              </div>
+              <div className="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${investToCarRatio >= 100 ? 'bg-red-500' : investToCarRatio >= 70 ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(investToCarRatio, 100)}%` }} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -676,6 +709,36 @@ export default function JiipDetailPage() {
                       <input type="number" className="w-full border border-slate-200 p-2.5 rounded-lg text-right font-semibold bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={item.share_ratio} onChange={e => setItem({ ...item, share_ratio: Number(e.target.value) })} />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
                     </div>
+                    {carPurchasePrice > 0 && item.invest_amount > 0 && (() => {
+                      const BASE_RATIO = 70
+                      const diffRatio = (item.invest_amount - carPurchasePrice) / carPurchasePrice
+                      const adjustedRatio = Math.round((BASE_RATIO + BASE_RATIO * diffRatio) * 10) / 10
+                      const diff = Math.round((adjustedRatio - item.share_ratio) * 10) / 10
+                      const isOver = item.invest_amount > carPurchasePrice
+                      const isUnder = item.invest_amount < carPurchasePrice
+                      return (
+                        <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] text-slate-400">기준 {BASE_RATIO}% × {isOver ? '초과' : isUnder ? '부족' : '동일'} {Math.abs(Math.round(diffRatio * 1000) / 10)}%</span>
+                            <span className={`text-[11px] font-bold ${isOver ? 'text-blue-600' : isUnder ? 'text-amber-600' : 'text-slate-500'}`}>
+                              추천 {adjustedRatio}%
+                            </span>
+                          </div>
+                          {diff !== 0 && (
+                            <button
+                              onClick={() => setItem((p: any) => ({ ...p, share_ratio: adjustedRatio }))}
+                              className={`w-full text-[10px] font-semibold py-1 rounded-md transition-colors ${
+                                isOver
+                                  ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
+                                  : 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200'
+                              }`}
+                            >
+                              {diff > 0 ? `+${diff}%p ↑` : `${diff}%p ↓`} 적용
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div>
                     <label className="block text-[11px] text-slate-400 mb-1">지급일</label>

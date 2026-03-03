@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import DarkHeader from '../components/DarkHeader'
 export default function FinancePage() {
   const { company, role, adminSelectedCompanyId } = useApp()
 
@@ -220,76 +221,52 @@ const router = useRouter()
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
-      {/* 1. 상단 헤더 (제목 + 날짜) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-              <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-              자금 장부 (입출금)
-            </h1>
-              <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
-          </div>
-          <div className="flex items-center gap-3">
-              <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-                     className="border border-gray-200 rounded-lg px-3 py-1.5 font-bold text-sm bg-gray-50 hover:bg-white focus:border-steel-500 transition-colors cursor-pointer text-gray-700" />
-          </div>
+      {/* DarkHeader with month picker in children */}
+      <DarkHeader
+        icon="📊"
+        title="장부/결산"
+        subtitle="회사의 모든 자금 흐름을 기록하고 예측합니다."
+        stats={[
+          { label: '총 수입', value: `${nf(summary.income)}원`, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
+          { label: '총 지출', value: `${nf(summary.expense)}원`, color: '#dc2626', bgColor: '#fef2f2', borderColor: '#fecaca', labelColor: '#fca5a5' },
+          { label: '손익', value: `${summary.profit > 0 ? '+' : ''}${nf(summary.profit)}원`, color: summary.profit >= 0 ? '#059669' : '#dc2626', bgColor: summary.profit >= 0 ? '#ecfdf5' : '#fef2f2', borderColor: summary.profit >= 0 ? '#bbf7d0' : '#fecaca', labelColor: summary.profit >= 0 ? '#6ee7b7' : '#fca5a5' },
+        ]}
+        actions={[
+          { label: '엑셀 등록', icon: '📂', onClick: () => router.push('/finance/upload'), variant: 'secondary' },
+          { label: '직접 입력', icon: '✏️', onClick: scrollToForm, variant: 'primary' }
+        ]}
+      >
+        {/* Month picker in DarkHeader children */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', gap: 8 }}>
+          <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
+            style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600 }} />
+        </div>
+      </DarkHeader>
 
-          {/* 우측 상단 요약 (간단 버전) */}
-          <div className="flex gap-4 text-right">
-              <div>
-                  <p className="text-xs text-gray-400 font-bold uppercase">손익</p>
-                  <p className={`text-xl font-black ${summary.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {summary.profit > 0 ? '+' : ''}{nf(summary.profit)}원
-                  </p>
-              </div>
-          </div>
-      </div>
-
-      {/* 2. 대시보드 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
-              <div><p className="text-gray-500 text-xs font-bold mb-1">총 수입 (+)</p><h3 className="text-xl md:text-2xl font-black text-steel-600">{nf(summary.income)}</h3></div>
-              <div className="w-10 h-10 rounded-full bg-steel-50 flex items-center justify-center text-xl">🔵</div>
-          </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
-              <div><p className="text-gray-500 text-xs font-bold mb-1">총 지출 (-)</p><h3 className="text-xl md:text-2xl font-black text-red-600">{nf(summary.expense)}</h3></div>
-              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-xl">🔴</div>
-          </div>
-          <div className="bg-gradient-to-br from-green-50 to-white p-4 md:p-6 rounded-2xl border border-green-100 shadow-sm flex justify-between items-center">
-              <div>
-                  <p className="text-green-800 text-xs font-bold mb-1">지출 예정</p>
-                  <h3 className="text-xl md:text-2xl font-black text-green-700">-{nf(summary.pendingExpense)}</h3>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">🔮</div>
-          </div>
-      </div>
-
-      {/* 3. ⭐ 컨트롤 바 (탭 & 액션 버튼) - 디자인 개선됨 */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-1.5 rounded-2xl mb-6 gap-2">
-          {/* 좌측: 탭 스위처 */}
-          <div className="flex bg-white rounded-xl shadow-sm p-1 w-full md:w-auto">
-              <button onClick={() => setActiveTab('ledger')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'ledger' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-                  📊 확정된 장부
-              </button>
-              <button onClick={() => setActiveTab('schedule')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'schedule' ? 'bg-steel-600 text-white shadow hover:bg-steel-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-                  🗓️ 예정 스케줄
-              </button>
-          </div>
-
-          {/* 우측: 액션 버튼 그룹 */}
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-              {activeTab === 'schedule' && (
-                  <button onClick={generateMonthlySchedule} className="whitespace-nowrap px-4 py-2.5 bg-yellow-400 text-black rounded-xl font-bold text-sm shadow-sm hover:bg-yellow-500 flex items-center gap-2">
-                      ⚡️ 정기 지출 생성
-                  </button>
-              )}
-              <button onClick={() => router.push('/finance/upload')} className="whitespace-nowrap px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center gap-2 shadow-sm">
-                  📂 엑셀 등록
-              </button>
-              <button onClick={scrollToForm} className="whitespace-nowrap px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10">
-                  ✏️ 직접 입력
-              </button>
-          </div>
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <button onClick={() => setActiveTab('ledger')} style={{
+          padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
+          background: activeTab === 'ledger' ? '#3b82f6' : '#fff', color: activeTab === 'ledger' ? '#fff' : '#6b7280',
+          border: activeTab === 'ledger' ? 'none' : '1px solid #e5e7eb', cursor: 'pointer'
+        }}>
+          📊 확정된 장부
+        </button>
+        <button onClick={() => setActiveTab('schedule')} style={{
+          padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
+          background: activeTab === 'schedule' ? '#3b82f6' : '#fff', color: activeTab === 'schedule' ? '#fff' : '#6b7280',
+          border: activeTab === 'schedule' ? 'none' : '1px solid #e5e7eb', cursor: 'pointer'
+        }}>
+          🗓️ 예정 스케줄
+        </button>
+        {activeTab === 'schedule' && (
+          <button onClick={generateMonthlySchedule} style={{
+            marginLeft: 'auto', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
+            background: '#f59e11', color: '#000', border: 'none', cursor: 'pointer'
+          }}>
+            ⚡ 정기 지출 생성
+          </button>
+        )}
       </div>
 
       {/* 4. 입력 폼 (Ref) */}

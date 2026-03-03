@@ -279,9 +279,11 @@ export default function ShortTermReplacementBuilder() {
   const fetchLotteRatesAuto = async () => {
     setLotteUpdating(true)
     try {
+      const { data: { session: _s } } = await supabase.auth.getSession()
+      const _tk = _s?.access_token
       const res = await fetch('/api/fetch-lotte-rates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(_tk ? { 'Authorization': `Bearer ${_tk}` } : {}) },
         body: JSON.stringify({ region: 'inland' }),
       })
       const result = await res.json()

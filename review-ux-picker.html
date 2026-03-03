@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>분류/확정 탭 UX 레이아웃 선택</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; padding: 20px; }
+  h1 { text-align: center; font-size: 20px; color: #0f172a; margin-bottom: 8px; }
+  .subtitle { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 24px; }
+
+  .option {
+    background: #fff; border-radius: 20px; padding: 24px; margin-bottom: 24px;
+    border: 2px solid #e2e8f0; cursor: pointer; transition: all 0.2s;
+    position: relative;
+  }
+  .option:hover { border-color: #2d5fa8; box-shadow: 0 4px 20px rgba(45,95,168,0.12); }
+  .option.selected { border-color: #2d5fa8; box-shadow: 0 4px 20px rgba(45,95,168,0.2); }
+  .option.selected::after {
+    content: '✅ 선택됨'; position: absolute; top: 16px; right: 16px;
+    background: #2d5fa8; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  }
+
+  .option-label {
+    display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 800;
+    background: #2d5fa8; color: #fff; margin-bottom: 12px;
+  }
+  .option-desc { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
+
+  /* Mock UI Styles */
+  .mock { background: #f8fafc; border-radius: 14px; overflow: hidden; border: 1px solid #e2e8f0; }
+  .mock-header { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+  .mock-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .mock-row + .mock-row { margin-top: 8px; }
+  .pill { padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; border: none; cursor: default; white-space: nowrap; }
+  .pill-active { background: #2d5fa8; color: #fff; }
+  .pill-inactive { background: #f1f5f9; color: #94a3b8; }
+  .pill-warn { background: #fffbeb; color: #d97706; border: 1.5px solid #d97706; }
+  .pill-success { background: #f0fdf4; color: #16a34a; border: 1px solid #e5e7eb; }
+  .pill-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .pill-dark { background: #0f172a; color: #fff; }
+  .pill-light { background: #fff; color: #64748b; border: 1px solid #d1d5db; }
+  .divider { width: 1px; height: 20px; background: #e5e7eb; margin: 0 2px; }
+  .sep-text { font-size: 10px; color: #94a3b8; font-weight: 600; }
+
+  /* Card Item */
+  .card-group { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; margin-top: 10px; }
+  .card-group-header { display: flex; align-items: center; padding: 12px 16px; gap: 10px; background: #fafbfc; border-bottom: 1px solid #f1f5f9; }
+  .color-bar { width: 4px; height: 32px; border-radius: 4px; }
+  .card-item { display: flex; align-items: center; padding: 8px 16px 8px 40px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; }
+  .card-item-date { color: #94a3b8; width: 70px; flex-shrink: 0; }
+  .badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+  .badge-out { background: #fef2f2; color: #ef4444; }
+  .badge-card { background: #f1f5f9; color: #64748b; }
+  .card-item-name { font-weight: 700; color: #0f172a; flex: 1; }
+  .card-item-cat { font-size: 10px; color: #94a3b8; }
+  .card-item-amount { font-weight: 800; color: #0f172a; width: 80px; text-align: right; }
+  .btn-confirm { background: #0f172a; color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; border: none; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .compare-label { font-size: 10px; color: #94a3b8; font-weight: 600; text-align: center; padding: 4px; }
+
+  .submit-area { text-align: center; margin-top: 30px; }
+  .submit-btn {
+    background: #2d5fa8; color: #fff; padding: 14px 40px; border-radius: 14px;
+    font-size: 15px; font-weight: 800; border: none; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(45,95,168,0.3);
+  }
+  .submit-btn:hover { background: #1e4f90; }
+  .result { display: none; text-align: center; margin-top: 20px; font-size: 14px; font-weight: 700; color: #2d5fa8; }
+</style>
+</head>
+<body>
+
+<h1>분류/확정 탭 UX 레이아웃 선택</h1>
+<p class="subtitle">각 레이아웃을 클릭하여 선택하세요. 현재 구조를 더 직관적으로 개선합니다.</p>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- OPTION A: 2줄 분리형 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="option" onclick="select('A')">
+  <span class="option-label">A. 2줄 분리형 (깔끔 정리)</span>
+  <div class="option-desc">
+    <b>1행:</b> 상태 필터 (검토대기/확정완료) + 용도별/회계기준 토글 (항상 표시)<br>
+    <b>2행:</b> 그룹 뷰 (카테고리별/카드별/통장별/차량별/사용자별)<br>
+    ✅ 용도별/회계기준이 항상 보여서 접근성 좋음 | 기존 구조와 유사해 학습비용 낮음
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="mock-row">
+        <span class="pill pill-warn">검토 대기 (991)</span>
+        <span class="pill pill-success">확정 완료 (0)</span>
+        <span class="pill pill-error">❓ 미분류 4건</span>
+        <div style="flex:1"></div>
+        <span class="sep-text">보기</span>
+        <span class="pill pill-dark">📋 용도별</span>
+        <span class="pill pill-light">📊 회계기준</span>
+      </div>
+      <div class="mock-row" style="margin-top: 10px;">
+        <span class="pill pill-active">📂 카테고리별</span>
+        <span class="pill pill-inactive">💳 카드별</span>
+        <span class="pill pill-inactive">🏦 통장별</span>
+        <span class="pill pill-inactive">🚙 차량별</span>
+        <span class="pill pill-inactive">👤 사용자별</span>
+        <div style="flex:1"></div>
+        <span style="font-size:11px; color:#94a3b8;">☐ 전체 선택</span>
+      </div>
+    </div>
+    <div style="padding: 8px;">
+      <div class="card-group">
+        <div class="card-group-header">
+          <div class="color-bar" style="background:#f59e0b"></div>
+          <span style="font-size:18">🚛</span>
+          <div>
+            <div style="font-weight:800; font-size:13px;">차량 운영</div>
+            <div style="font-size:10px; color:#94a3b8;">유류비 · 정비/수리비 · 차량보험료</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div style="font-weight:800; color:#ef4444; font-size:14px;">15,976,646원</div>
+            <div style="font-size:10px; color:#94a3b8;">336건</div>
+          </div>
+          <span style="color:#94a3b8; font-size:12px">▼</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- OPTION B: 탭 + 사이드 토글 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="option" onclick="select('B')">
+  <span class="option-label">B. 탭 통합형 (단순화)</span>
+  <div class="option-desc">
+    <b>1행:</b> 메인 탭 = 검토대기/확정완료 (기존 그대로)<br>
+    <b>2행:</b> 그룹 뷰 + 용도별/회계기준 = 하나의 라인에 통합 (좌: 그룹뷰, 우: 카테고리모드)<br>
+    ✅ 1줄 줄여서 더 심플 | 그룹뷰와 카테고리모드가 같은 높이에서 한눈에 보임
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="mock-row">
+        <span class="pill pill-warn">검토 대기 (991)</span>
+        <span class="pill pill-success">확정 완료 (0)</span>
+        <span class="pill pill-error">❓ 미분류 4건</span>
+      </div>
+      <div class="mock-row" style="margin-top: 10px; justify-content: space-between;">
+        <div style="display:flex; gap:4px; align-items:center;">
+          <span class="pill pill-active">📂 카테고리별</span>
+          <span class="pill pill-inactive">💳 카드별</span>
+          <span class="pill pill-inactive">🏦 통장별</span>
+          <span class="pill pill-inactive">🚙 차량별</span>
+          <span class="pill pill-inactive">👤 사용자별</span>
+        </div>
+        <div style="display:flex; gap:4px; align-items:center; background:#f1f5f9; padding:3px; border-radius:8px;">
+          <span class="pill pill-dark" style="padding:4px 10px;">📋 용도별</span>
+          <span class="pill" style="padding:4px 10px; background:transparent; color:#94a3b8;">📊 회계기준</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding: 8px;">
+      <div class="card-group">
+        <div class="card-group-header">
+          <div class="color-bar" style="background:#3b82f6"></div>
+          <div>
+            <div style="font-weight:800; font-size:13px;">💰 돈 들어오는 것</div>
+            <div style="font-size:10px; color:#94a3b8;">렌트/운송수입 · 지입관리비</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div style="font-weight:800; color:#3b82f6; font-size:14px;">+8,250,000원</div>
+            <div style="font-size:10px; color:#94a3b8;">42건</div>
+          </div>
+          <span class="pill" style="background:#10b981; color:#fff; font-size:10px;">일괄확정</span>
+          <span style="color:#94a3b8; font-size:12px">▼</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- OPTION C: 그룹뷰 축소 + 드롭다운 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="option" onclick="select('C')">
+  <span class="option-label">C. 드롭다운 축소형 (최소화)</span>
+  <div class="option-desc">
+    <b>1행:</b> 상태필터 + 그룹뷰 드롭다운(하나로 축소) + 용도별/회계기준<br>
+    ✅ 모든 필터가 1줄에 | 그룹뷰를 드롭다운으로 넣어 공간 절약 | 가장 깔끔
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="mock-row">
+        <span class="pill pill-warn">검토 대기 (991)</span>
+        <span class="pill pill-success">확정 완료 (0)</span>
+        <span class="pill pill-error">❓ 미분류 4건</span>
+        <div class="divider"></div>
+        <span class="pill" style="background:#fff; color:#0f172a; border:1.5px solid #2d5fa8; font-weight:800;">
+          📂 카테고리별 ▾
+        </span>
+        <div style="flex:1"></div>
+        <span class="pill pill-dark">📋 용도별</span>
+        <span class="pill pill-light">📊 회계기준</span>
+      </div>
+    </div>
+    <div style="padding: 8px;">
+      <div class="card-group">
+        <div class="card-group-header">
+          <input type="checkbox" style="width:14px; height:14px;">
+          <div class="color-bar" style="background:#ec4899"></div>
+          <div>
+            <div style="font-weight:800; font-size:13px;">🍽️ 식비/접대/출장</div>
+            <div style="font-size:10px; color:#94a3b8;">복리후생(식대) · 접대비 · 여비교통비</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div style="font-weight:800; color:#ef4444; font-size:14px;">2,340,000원</div>
+            <div style="font-size:10px; color:#94a3b8;">87건</div>
+          </div>
+          <span class="pill" style="background:#10b981; color:#fff; font-size:10px;">일괄확정</span>
+          <span style="color:#94a3b8; font-size:12px">▼</span>
+        </div>
+        <div class="card-item">
+          <input type="checkbox" style="width:12px; height:12px;">
+          <span class="card-item-date">2025-10-31</span>
+          <span class="badge badge-out">출금</span>
+          <span class="badge badge-card">카드</span>
+          <span class="card-item-name">스타벅스 강남역점</span>
+          <span class="card-item-cat">복리후생(식대)</span>
+          <span class="card-item-amount">12,500</span>
+          <span class="btn-confirm">확정</span>
+        </div>
+        <div class="card-item">
+          <input type="checkbox" style="width:12px; height:12px;">
+          <span class="card-item-date">2025-10-30</span>
+          <span class="badge badge-out">출금</span>
+          <span class="badge badge-card">카드</span>
+          <span class="card-item-name">본죽&비빔밥 역삼점</span>
+          <span class="card-item-cat">복리후생(식대)</span>
+          <span class="card-item-amount">8,000</span>
+          <span class="btn-confirm">확정</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- OPTION D: 세그먼트 + 인라인 -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="option" onclick="select('D')">
+  <span class="option-label">D. 세그먼트 컨트롤형 (모던)</span>
+  <div class="option-desc">
+    <b>1행:</b> 세그먼트 컨트롤로 검토대기/확정완료 + 미분류 뱃지<br>
+    <b>2행:</b> 좌측: 그룹뷰 세그먼트 / 우측: 용도별·회계기준 (슬라이더형)<br>
+    ✅ 세그먼트 컨트롤로 깔끔한 모던 디자인 | 모든 필터가 시각적으로 구분됨
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="mock-row">
+        <div style="display:flex; background:#f1f5f9; padding:3px; border-radius:10px; gap:2px;">
+          <span style="padding:6px 16px; border-radius:8px; font-size:12px; font-weight:700; background:#d97706; color:#fff;">검토 대기 991</span>
+          <span style="padding:6px 16px; border-radius:8px; font-size:12px; font-weight:700; color:#94a3b8;">확정 완료 0</span>
+        </div>
+        <span class="pill pill-error" style="margin-left:8px;">❓ 미분류 4</span>
+      </div>
+      <div class="mock-row" style="margin-top: 10px; justify-content: space-between;">
+        <div style="display:flex; background:#f1f5f9; padding:3px; border-radius:10px; gap:2px;">
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; background:#2d5fa8; color:#fff;">📂 카테고리</span>
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#94a3b8;">💳 카드</span>
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#94a3b8;">🏦 통장</span>
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#94a3b8;">🚙 차량</span>
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#94a3b8;">👤 사용자</span>
+        </div>
+        <div style="display:flex; background:#f1f5f9; padding:3px; border-radius:10px; gap:2px;">
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; background:#0f172a; color:#fff;">📋 용도별</span>
+          <span style="padding:5px 12px; border-radius:8px; font-size:11px; font-weight:700; color:#94a3b8;">📊 회계기준</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding: 8px;">
+      <div class="card-group">
+        <div class="card-group-header">
+          <input type="checkbox" style="width:14px; height:14px;">
+          <div class="color-bar" style="background:#6366f1"></div>
+          <div>
+            <div style="font-weight:800; font-size:13px;">🏦 투자/대출 입출금</div>
+            <div style="font-size:10px; color:#94a3b8;">투자원금입금 · 이자비용 · 원금상환</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div style="font-weight:800; color:#6366f1; font-size:14px;">45,300,000원</div>
+            <div style="font-size:10px; color:#94a3b8;">128건</div>
+          </div>
+          <span class="pill" style="background:#10b981; color:#fff; font-size:10px;">일괄확정</span>
+          <span style="color:#94a3b8; font-size:12px">▼</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="submit-area">
+  <button class="submit-btn" onclick="showResult()">선택 완료</button>
+</div>
+<div class="result" id="result"></div>
+
+<script>
+let selected = null;
+
+function select(opt) {
+  selected = opt;
+  document.querySelectorAll('.option').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+
+function showResult() {
+  if (!selected) { alert('레이아웃을 선택해주세요!'); return; }
+  const names = { A: '2줄 분리형', B: '탭 통합형', C: '드롭다운 축소형', D: '세그먼트 컨트롤형' };
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').textContent = `✅ "${selected}. ${names[selected]}" 선택 완료!`;
+}
+</script>
+
+</body>
+</html>

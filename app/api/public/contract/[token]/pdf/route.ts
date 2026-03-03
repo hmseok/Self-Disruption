@@ -188,7 +188,7 @@ export async function GET(
         termMonths: detail.term_months || 36,
         startDate: quote.start_date || '',
         endDate: quote.end_date || '',
-        monthlyRent: quote.rent_fee || 0,
+        monthlyRent: Math.round((quote.rent_fee || 0) / 1000) * 1000,  // 천원단위 반올림
         deposit: quote.deposit || 0,
         prepayment: detail.prepayment || 0,
         annualMileage: detail.annualMileage || detail.baselineKm || 2,

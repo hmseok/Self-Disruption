@@ -181,16 +181,18 @@ export function buildContractHtml(data: ContractPdfData): string {
     </tr>` : ''}
   </table>
 
-  <!-- ====== 3페이지: 약관 ====== -->
-  <div style="page-break-before:always;"></div>
-  <h2 style="font-size:13px;font-weight:900;margin:8px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">3. 자동차 장기대여 약관</h2>
-  <div id="terms-section" style="font-size:9.5px;line-height:1.55;color:#333;">
-    <!-- 약관은 별도 렌더링 -->
+  <!-- ====== 약관 섹션 ====== -->
+  <div style="margin-top:32px;padding-top:24px;border-top:3px solid #333;">
+    <h2 style="font-size:14px;font-weight:900;margin:0 0 16px;padding-bottom:8px;border-bottom:2px solid #333;">3. 자동차 장기대여 약관</h2>
+    <div id="terms-section" style="font-size:9.5px;line-height:1.7;color:#333;">
+      <!-- 약관은 별도 렌더링 -->
+    </div>
   </div>
 
-  <!-- ====== 4페이지: 특약 + 서명 ====== -->
-  <div style="page-break-before:always;"></div>
-  <h2 style="font-size:13px;font-weight:900;margin:8px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">4. 특약사항</h2>
+  <!-- ====== 특약 + 서명 섹션 ====== -->
+  <div style="margin-top:32px;padding-top:24px;border-top:3px solid #333;">
+    <h2 style="font-size:14px;font-weight:900;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #333;">4. 특약사항</h2>
+  </div>
   <div style="min-height:60px;padding:10px 14px;border:1px solid #ddd;border-radius:4px;font-size:10px;color:#555;margin-bottom:24px;">
     ${specialTerms || (terms.contractType === 'buyout'
       ? '본 계약은 인수형 장기렌트 계약으로, 계약 만기 시 고객은 상기 명시된 인수가격을 납부하고 차량 소유권을 이전받을 수 있습니다.'
@@ -198,37 +200,45 @@ export function buildContractHtml(data: ContractPdfData): string {
     )}
   </div>
 
-  <h2 style="font-size:13px;font-weight:900;margin:24px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;">5. 계약 당사자 서명</h2>
-  <p style="font-size:10px;color:#555;margin-bottom:16px;">
-    위 계약 내용을 충분히 확인하였으며, 약관 및 개인정보 수집·이용에 동의합니다.
-  </p>
+  <div style="margin-top:32px;padding-top:24px;border-top:3px solid #333;">
+    <h2 style="font-size:14px;font-weight:900;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #333;">5. 계약 당사자 서명</h2>
+    <p style="font-size:10px;color:#555;margin-bottom:16px;">
+      위 계약 내용을 충분히 확인하였으며, 약관 및 개인정보 수집·이용에 동의합니다.
+    </p>
 
-  <table style="width:100%;border-collapse:collapse;">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding-right:20px;">
-        <div style="border:1px solid #ddd;border-radius:8px;padding:16px;min-height:120px;">
-          <p style="font-size:10px;font-weight:700;color:#888;margin:0 0 8px;">임대인 (회사)</p>
-          <p style="font-size:12px;font-weight:800;margin:0 0 4px;">${company.name}</p>
-          <p style="font-size:10px;color:#888;margin:0;">${company.representative ? `대표이사 ${company.representative}` : ''}</p>
-          <div style="text-align:center;margin-top:12px;">
-            <span style="font-size:10px;color:#ccc;">(직인)</span>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="width:50%;vertical-align:top;padding-right:16px;">
+          <div style="border:1.5px solid #ccc;border-radius:8px;padding:20px;min-height:140px;">
+            <p style="font-size:10px;font-weight:700;color:#666;margin:0 0 12px;border-bottom:1px solid #eee;padding-bottom:6px;">임대인 (회사)</p>
+            <p style="font-size:13px;font-weight:900;margin:0 0 4px;">${company.name || '(회사명)'}</p>
+            <p style="font-size:10px;color:#555;margin:0 0 8px;">${company.representative ? `대표이사 ${company.representative}` : ''}</p>
+            ${company.logo_url ? `
+              <div style="text-align:center;margin-top:8px;">
+                <img src="${company.logo_url}" style="max-height:40px;opacity:0.8;" />
+              </div>
+            ` : `
+              <div style="text-align:center;margin-top:12px;">
+                <span style="font-size:10px;color:#aaa;border:1px dashed #ccc;padding:4px 12px;border-radius:4px;">(직인)</span>
+              </div>
+            `}
           </div>
-        </div>
-      </td>
-      <td style="width:50%;vertical-align:top;">
-        <div style="border:1px solid #ddd;border-radius:8px;padding:16px;min-height:120px;">
-          <p style="font-size:10px;font-weight:700;color:#888;margin:0 0 8px;">임차인 (고객)</p>
-          <p style="font-size:12px;font-weight:800;margin:0 0 4px;">${customer.name}</p>
-          <p style="font-size:10px;color:#888;margin:0;">${customer.phone || ''}</p>
-          ${signatureData ? `
-            <div style="text-align:center;margin-top:8px;">
-              <img src="${signatureData}" style="max-width:200px;max-height:60px;" />
-            </div>
-          ` : '<div style="text-align:center;margin-top:12px;"><span style="font-size:10px;color:#ccc;">(전자서명)</span></div>'}
-        </div>
-      </td>
-    </tr>
-  </table>
+        </td>
+        <td style="width:50%;vertical-align:top;">
+          <div style="border:1.5px solid #ccc;border-radius:8px;padding:20px;min-height:140px;">
+            <p style="font-size:10px;font-weight:700;color:#666;margin:0 0 12px;border-bottom:1px solid #eee;padding-bottom:6px;">임차인 (고객)</p>
+            <p style="font-size:13px;font-weight:900;margin:0 0 4px;">${customer.name}</p>
+            <p style="font-size:10px;color:#555;margin:0 0 8px;">${customer.phone || ''}</p>
+            ${signatureData ? `
+              <div style="text-align:center;margin-top:4px;padding:4px;border:1px solid #eee;border-radius:4px;background:#fafafa;">
+                <img src="${signatureData}" style="max-width:200px;max-height:70px;" />
+              </div>
+            ` : '<div style="text-align:center;margin-top:12px;"><span style="font-size:10px;color:#aaa;border:1px dashed #ccc;padding:4px 12px;border-radius:4px;">(전자서명)</span></div>'}
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
 
   <div style="margin-top:16px;padding:10px 14px;background:#f8f9fa;border-radius:6px;font-size:9px;color:#888;line-height:1.5;">
     <p style="margin:0;">본 전자계약서는 전자서명법 제3조 및 전자문서 및 전자거래 기본법에 의거하여 자필서명과 동일한 법적 효력을 가집니다.</p>
@@ -236,8 +246,10 @@ export function buildContractHtml(data: ContractPdfData): string {
   </div>
 
   ${paymentSchedule && paymentSchedule.length > 0 ? `
-  <!-- ====== 5페이지: 납부 스케줄 ====== -->
-  <h2 style="font-size:13px;font-weight:900;margin:28px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;page-break-before:always;">6. 납부 스케줄</h2>
+  <!-- ====== 납부 스케줄 섹션 ====== -->
+  <div style="margin-top:32px;padding-top:24px;border-top:3px solid #333;">
+    <h2 style="font-size:14px;font-weight:900;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #333;">6. 납부 스케줄</h2>
+  </div>
   <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;font-size:9.5px;">
     <tr style="background:#f1f3f5;">
       <th style="padding:6px 8px;border:1px solid #ddd;font-weight:700;text-align:center;">회차</th>
@@ -372,9 +384,9 @@ export function renderTermsHtml(
   let html = terms
     .map(
       t =>
-        `<div style="margin-bottom:8px;page-break-inside:avoid;break-inside:avoid;">
-          <p style="font-weight:700;margin:0 0 2px;font-size:10px;">${t.title}</p>
-          <p style="margin:0;white-space:pre-line;">${t.content}</p>
+        `<div style="margin-bottom:14px;">
+          <p style="font-weight:800;margin:0 0 4px;font-size:10.5px;color:#111;">${t.title}</p>
+          <p style="margin:0;white-space:pre-line;line-height:1.7;color:#333;font-size:9.5px;">${t.content}</p>
         </div>`,
     )
     .join('')

@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import DarkHeader from '../components/DarkHeader'
 
 // ✅ DB 컬럼명에 맞춰서 타입 정의 수정 (cars 테이블 기준)
 type Car = {
@@ -115,94 +116,85 @@ const { company, role, adminSelectedCompanyId } = useApp()
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50 animate-fade-in">
 
-      {/* 상단 헤더 영역 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 전체 차량 대장</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            총 보유: <span className="font-bold text-steel-600">{cars.length}</span>대 /
-            검색됨: {filteredCars.length}대
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-            {/* 검색창 */}
-            <input
-                type="text"
-                placeholder="🔍 검색..."
-                className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-steel-500 shadow-sm text-sm"
-                style={{ minWidth: '180px' }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            {/* 차량 등록 버튼 */}
-            <button
-              onClick={() => {
-                if (role === 'god_admin' && !adminSelectedCompanyId) {
-                  alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
-                  return
-                }
-                router.push('/cars/new')
-              }}
-              className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
-            >
-              + 등록
-            </button>
-
-        </div>
-      </div>
-
-      {/* 📊 대시보드 */}
+      {/* DarkHeader 컴포넌트로 대체 */}
       {cars.length > 0 && (
         <>
-          {/* 종합 현황 헤더 */}
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5 md:p-6 mb-4 shadow-xl text-white">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              <div>
-                <p className="text-gray-400 text-xs font-bold mb-1">총 보유 차량</p>
-                <p className="text-2xl md:text-3xl font-black">{stats.total}<span className="text-sm text-gray-400 ml-1">대</span></p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs font-bold mb-1">운용률 (대여/전체)</p>
-                <p className="text-2xl md:text-3xl font-black text-steel-400">{utilizationRate}<span className="text-sm text-gray-400 ml-0.5">%</span></p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs font-bold mb-1">총 자산가치</p>
-                <p className="text-xl md:text-2xl font-black">{formatMoney(stats.totalValue)}<span className="text-xs text-gray-400 ml-0.5">원</span></p>
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs font-bold mb-1">차량 평균가</p>
-                <p className="text-xl md:text-2xl font-black">{formatMoney(stats.avgValue)}<span className="text-xs text-gray-400 ml-0.5">원</span></p>
-              </div>
+          <DarkHeader
+            icon="🚙"
+            title="전체 차량 대장"
+            subtitle={`총 보유: ${cars.length}대 / 검색됨: ${filteredCars.length}대`}
+            stats={[
+              {
+                label: '전체',
+                value: stats.total,
+                color: '#334155',
+                bgColor: '#fff',
+                borderColor: '#e2e8f0',
+                labelColor: '#94a3b8',
+                onClick: () => setFilter('all'),
+              },
+              {
+                label: '대기중',
+                value: stats.available,
+                color: '#059669',
+                bgColor: '#ecfdf5',
+                borderColor: '#bbf7d0',
+                labelColor: '#6ee7b7',
+                onClick: () => setFilter('available'),
+              },
+              {
+                label: '대여중',
+                value: stats.rented,
+                color: '#2563eb',
+                bgColor: '#eff6ff',
+                borderColor: '#bfdbfe',
+                labelColor: '#93c5fd',
+                onClick: () => setFilter('rented'),
+              },
+              {
+                label: '정비/사고',
+                value: stats.maintenance,
+                color: '#d97706',
+                bgColor: '#fffbeb',
+                borderColor: '#fde68a',
+                labelColor: '#fcd34d',
+                onClick: () => setFilter('maintenance'),
+              },
+              ...(stats.consignment > 0 ? [{
+                label: '지입차량',
+                value: stats.consignment,
+                color: '#7c3aed',
+                bgColor: '#f5f3ff',
+                borderColor: '#ddd6fe',
+                labelColor: '#c4b5fd',
+                onClick: () => setFilter('consignment'),
+              }] : []),
+            ]}
+            actions={[
+              {
+                label: '+ 등록',
+                onClick: () => {
+                  if (role === 'god_admin' && !adminSelectedCompanyId) {
+                    alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
+                    return
+                  }
+                  router.push('/cars/new')
+                },
+                variant: 'primary',
+              },
+            ]}
+          >
+            {/* 검색창을 children으로 전달 */}
+            <div style={{ padding: '12px 20px', background: '#ffffff', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="🔍 검색..."
+                className="flex-1 px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-steel-500 shadow-sm text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          </div>
-
-          {/* KPI 카드 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <div className={`bg-white p-3 rounded-xl border shadow-sm cursor-pointer hover:shadow-md transition-shadow ${filter === 'all' ? 'border-steel-400 ring-1 ring-steel-200' : 'border-gray-200'}`} onClick={() => setFilter('all')}>
-              <p className="text-xs text-gray-400 font-bold">전체</p>
-              <p className="text-xl font-black text-gray-900 mt-1">{stats.total}<span className="text-sm text-gray-400 ml-0.5">대</span></p>
-            </div>
-            <div className={`bg-green-50 p-3 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${filter === 'available' ? 'border-green-400 ring-1 ring-green-200' : 'border-green-100'}`} onClick={() => setFilter('available')}>
-              <p className="text-xs text-green-600 font-bold">대기중</p>
-              <p className="text-xl font-black text-green-700 mt-1">{stats.available}<span className="text-sm text-green-500 ml-0.5">대</span></p>
-            </div>
-            <div className={`bg-blue-50 p-3 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${filter === 'rented' ? 'border-blue-400 ring-1 ring-blue-200' : 'border-blue-100'}`} onClick={() => setFilter('rented')}>
-              <p className="text-xs text-blue-500 font-bold">대여중</p>
-              <p className="text-xl font-black text-blue-700 mt-1">{stats.rented}<span className="text-sm text-blue-500 ml-0.5">대</span></p>
-            </div>
-            <div className={`bg-red-50 p-3 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${filter === 'maintenance' ? 'border-red-400 ring-1 ring-red-200' : 'border-red-100'}`} onClick={() => setFilter('maintenance')}>
-              <p className="text-xs text-red-500 font-bold">정비/사고</p>
-              <p className="text-xl font-black text-red-600 mt-1">{stats.maintenance}<span className="text-sm text-red-400 ml-0.5">대</span></p>
-            </div>
-            {stats.consignment > 0 && (
-              <div className={`bg-amber-50 p-3 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${filter === 'consignment' ? 'border-amber-400 ring-1 ring-amber-200' : 'border-amber-100'}`} onClick={() => setFilter('consignment')}>
-                <p className="text-xs text-amber-600 font-bold">지입차량</p>
-                <p className="text-xl font-black text-amber-700 mt-1">{stats.consignment}<span className="text-sm text-amber-500 ml-0.5">대</span></p>
-              </div>
-            )}
-          </div>
+          </DarkHeader>
 
           {/* ⚠️ 정비/사고 차량 경고 배너 */}
           {maintenanceCars.length > 0 && (

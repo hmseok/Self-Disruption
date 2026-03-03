@@ -139,13 +139,37 @@ ${txLines}
         parsed = JSON.parse(jsonMatch[0])
       }
 
+      // 수입 카테고리 목록 (입금 거래에만 허용)
+      const INCOME_CATEGORIES = [
+        '렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입',
+        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '기타수입'
+      ]
+
       for (const item of parsed) {
         const no = item.no - 1 // 0-indexed
         if (no >= 0 && no < batch.length && categoryList.includes(item.category)) {
+          const tx = batch[no]
+          let category = item.category
+          let confidence = Math.min(item.confidence || 60, 90)
+
+          // ★ 입출금 방향 검증: 출금인데 수입 카테고리이거나, 입금인데 지출 카테고리이면 보정
+          const isIncomeCat = INCOME_CATEGORIES.includes(category)
+          if (tx.type === 'expense' && isIncomeCat) {
+            // 출금인데 수입 카테고리 → 미분류로 강등
+            console.warn(`⚠️ [분류검증] 출금인데 수입 카테고리 감지: ${tx.client_name} → ${category} → 미분류 처리`)
+            category = '미분류'
+            confidence = 30
+          } else if (tx.type === 'income' && !isIncomeCat) {
+            // 입금인데 지출 카테고리 → 미분류로 강등
+            console.warn(`⚠️ [분류검증] 입금인데 지출 카테고리 감지: ${tx.client_name} → ${category} → 미분류 처리`)
+            category = '미분류'
+            confidence = 30
+          }
+
           allResults.push({
-            idx: batch[no].idx,
-            category: item.category,
-            confidence: Math.min(item.confidence || 60, 90), // AI 분류는 최대 90%
+            idx: tx.idx,
+            category,
+            confidence,
           })
         }
       }
@@ -454,10 +478,20 @@ export async function POST(request: NextRequest) {
       }
 
       // ── 3a. DB 학습 규칙 우선 적용 ──
+      const INCOME_CATS = [
+        '렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입',
+        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '기타수입'
+      ]
       for (const rule of dbRules) {
         const keyword = (rule.key || rule.keyword || '').toLowerCase()
         if (keyword && searchText.includes(keyword)) {
-          result.category = rule.value?.category || rule.category || result.category
+          const ruleCategory = rule.value?.category || rule.category || ''
+          // ★ 입출금 방향 검증: 학습 규칙도 txType과 일치하는지 확인
+          const isIncomeCat = INCOME_CATS.includes(ruleCategory)
+          if ((txType === 'expense' && isIncomeCat) || (txType === 'income' && !isIncomeCat && ruleCategory !== '미분류')) {
+            continue // 방향 불일치 규칙은 스킵
+          }
+          result.category = ruleCategory
           result.related_type = rule.related_type || null
           result.related_id = rule.related_id || null
           result.confidence = 95 // 학습된 규칙은 높은 신뢰도
@@ -800,12 +834,21 @@ export async function POST(request: NextRequest) {
       status: 'pending',
     }))
 
+    // queue에 저장하고 ID 반환
+    const insertedQueueIds: string[] = []
     if (queueItems.length > 0) {
-      // 50건씩 배치 삽입
       for (let i = 0; i < queueItems.length; i += 50) {
         const batch = queueItems.slice(i, i + 50)
-        const { error } = await sb.from('classification_queue').insert(batch)
+        const { data: inserted, error } = await sb.from('classification_queue').insert(batch).select('id')
         if (error) console.error('Classification queue insert error:', error.message)
+        if (inserted) insertedQueueIds.push(...inserted.map((r: any) => r.id))
+      }
+    }
+
+    // enriched에 queue_id 매핑
+    for (let i = 0; i < enriched.length; i++) {
+      if (insertedQueueIds[i]) {
+        enriched[i]._queue_id = insertedQueueIds[i]
       }
     }
 
@@ -1100,6 +1143,139 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // ★ 되돌리기(pending) 시 → transactions 테이블에서 매칭 거래 삭제 + 투자/지입 금액 재계산
+    if (newStatus === 'pending' && updated) {
+      // 되돌리기 대상의 related_type/related_id 파악 (ai_matched 또는 final_related)
+      const revertRelatedType = updated.ai_matched_type || final_related_type || null
+      const revertRelatedId = updated.ai_matched_id || final_related_id || null
+
+      try {
+        // alternatives에서 source_data 추출 (다양한 형식 대응)
+        let sd: any = {}
+        if (updated.source_data && typeof updated.source_data === 'object' && Object.keys(updated.source_data).length > 0) {
+          sd = updated.source_data
+        } else if (updated.alternatives) {
+          const alt = typeof updated.alternatives === 'string' ? JSON.parse(updated.alternatives) : updated.alternatives
+          if (alt?.source_data) sd = alt.source_data
+          else if (alt?.transaction_date) sd = alt
+        }
+
+        const txDate = sd?.transaction_date || updated.transaction_date
+        const clientName = sd?.client_name || updated.client_name
+        const amount = Math.abs(Number(sd?.amount || updated.amount || 0))
+        const companyId = updated.company_id
+
+        if (txDate && companyId) {
+          // 날짜+거래처+금액으로 매칭되는 transactions 삭제
+          // related_type/related_id가 있으면 더 정확한 매칭으로 삭제
+          let deleteQuery = sb
+            .from('transactions')
+            .delete()
+            .eq('company_id', companyId)
+            .eq('transaction_date', txDate)
+            .eq('client_name', clientName || '')
+            .eq('amount', amount)
+
+          if (revertRelatedType && revertRelatedId) {
+            deleteQuery = deleteQuery
+              .eq('related_type', revertRelatedType)
+              .eq('related_id', revertRelatedId)
+          }
+
+          const { error: delErr } = await deleteQuery
+
+          if (delErr) console.error('[classify PATCH] 되돌리기 transactions 삭제 오류:', delErr)
+          else console.log(`[classify PATCH] 되돌리기: transactions에서 ${txDate}/${clientName}/${amount} (${revertRelatedType || 'no-type'}/${revertRelatedId || 'no-id'}) 삭제`)
+        }
+      } catch (e) {
+        console.error('[classify PATCH] 되돌리기 transactions 삭제 처리 오류:', e)
+      }
+
+      // ★ 되돌리기 후 투자자 금액 재계산
+      if (revertRelatedType === 'invest' && revertRelatedId) {
+        try {
+          const { data: allTxs } = await sb
+            .from('transactions')
+            .select('amount, type')
+            .eq('related_type', 'invest')
+            .eq('related_id', revertRelatedId)
+          const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          }, 0)
+          await sb.from('general_investments')
+            .update({ invest_amount: netAmount })
+            .eq('id', revertRelatedId)
+          console.log(`[classify PATCH] 되돌리기: 투자자 ${revertRelatedId} 순합계 재계산: ${netAmount}`)
+        } catch (e) {
+          console.error('[classify PATCH] 되돌리기 투자자 금액 재계산 오류:', e)
+        }
+      }
+
+      // ★ 되돌리기 후 지입 계약 금액 재계산
+      if (revertRelatedType === 'jiip' && revertRelatedId) {
+        try {
+          const { data: allTxs } = await sb
+            .from('transactions')
+            .select('amount, type')
+            .eq('related_type', 'jiip')
+            .eq('related_id', revertRelatedId)
+          const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          }, 0)
+          await sb.from('jiip_contracts')
+            .update({ invest_amount: netAmount })
+            .eq('id', revertRelatedId)
+          console.log(`[classify PATCH] 되돌리기: 지입 ${revertRelatedId} 순합계 재계산: ${netAmount}`)
+        } catch (e) {
+          console.error('[classify PATCH] 되돌리기 지입 금액 재계산 오류:', e)
+        }
+      }
+    }
+
+    // ★ 투자 연결 거래 확정 시 → 투자자 순합계(입금-출금) 재계산
+    if (newStatus === 'confirmed' && final_related_type === 'invest' && final_related_id) {
+      try {
+        const { data: allTxs } = await sb
+          .from('transactions')
+          .select('amount, type')
+          .eq('related_type', 'invest')
+          .eq('related_id', final_related_id)
+        if (allTxs && allTxs.length > 0) {
+          const netAmount = allTxs.reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          }, 0)
+          await sb.from('general_investments')
+            .update({ invest_amount: netAmount })
+            .eq('id', final_related_id)
+          console.log(`[classify PATCH] 투자자 ${final_related_id} 순합계 업데이트: ${netAmount}`)
+        }
+      } catch (e) {
+        console.error('[classify PATCH] 투자자 금액 업데이트 오류:', e)
+      }
+    }
+
+    // ★ 지입 연결 거래 확정 시 → 지입 계약 순합계 재계산
+    if (newStatus === 'confirmed' && final_related_type === 'jiip' && final_related_id) {
+      try {
+        const { data: allTxs } = await sb
+          .from('transactions')
+          .select('amount, type')
+          .eq('related_type', 'jiip')
+          .eq('related_id', final_related_id)
+        if (allTxs && allTxs.length > 0) {
+          const netAmount = allTxs.reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          }, 0)
+          await sb.from('jiip_contracts')
+            .update({ invest_amount: netAmount })
+            .eq('id', final_related_id)
+          console.log(`[classify PATCH] 지입 ${final_related_id} 순합계 업데이트: ${netAmount}`)
+        }
+      } catch (e) {
+        console.error('[classify PATCH] 지입 금액 업데이트 오류:', e)
+      }
+    }
+
     return NextResponse.json({ success: true, data: updated })
   } catch (error: any) {
     console.error('PATCH classify error:', error)
@@ -1120,12 +1296,28 @@ export async function DELETE(request: NextRequest) {
     const sb = getSupabaseAdmin()
     let deleted = 0
 
+    // 삭제된 transactions의 related 정보를 수집하여 금액 재계산에 사용
+    const affectedRelated = new Map<string, { type: string; id: string }>()
+
     if (ids && Array.isArray(ids) && ids.length > 0) {
       // 특정 ID들만 삭제 — 양쪽 테이블에서 시도
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50)
 
-        // classification_queue에서 삭제 시도
+        // classification_queue에서 삭제 전 related 정보 수집
+        const { data: queueItems } = await sb.from('classification_queue')
+          .select('id, ai_matched_type, ai_matched_id')
+          .eq('company_id', company_id)
+          .in('id', batch)
+        if (queueItems) {
+          for (const q of queueItems) {
+            if (q.ai_matched_type && q.ai_matched_id && ['invest', 'jiip'].includes(q.ai_matched_type)) {
+              affectedRelated.set(`${q.ai_matched_type}:${q.ai_matched_id}`, { type: q.ai_matched_type, id: q.ai_matched_id })
+            }
+          }
+        }
+
+        // classification_queue에서 삭제
         const { data: qd } = await sb.from('classification_queue')
           .delete()
           .eq('company_id', company_id)
@@ -1133,7 +1325,20 @@ export async function DELETE(request: NextRequest) {
           .select('id')
         deleted += (qd?.length || 0)
 
-        // transactions에서도 삭제 시도
+        // transactions에서 삭제 전 related 정보 수집
+        const { data: txItems } = await sb.from('transactions')
+          .select('id, related_type, related_id')
+          .eq('company_id', company_id)
+          .in('id', batch)
+        if (txItems) {
+          for (const t of txItems) {
+            if (t.related_type && t.related_id && ['invest', 'jiip'].includes(t.related_type)) {
+              affectedRelated.set(`${t.related_type}:${t.related_id}`, { type: t.related_type, id: t.related_id })
+            }
+          }
+        }
+
+        // transactions에서 삭제
         const { data: td } = await sb.from('transactions')
           .delete()
           .eq('company_id', company_id)
@@ -1190,6 +1395,29 @@ export async function DELETE(request: NextRequest) {
           .eq('company_id', company_id)
           .select('id')
         deleted += (td?.length || 0)
+      }
+    }
+
+    // ★ 삭제 후 영향받은 투자/지입 금액 재계산
+    for (const [key, rel] of affectedRelated.entries()) {
+      try {
+        const { data: allTxs } = await sb
+          .from('transactions')
+          .select('amount, type')
+          .eq('related_type', rel.type)
+          .eq('related_id', rel.id)
+        const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
+          return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+        }, 0)
+        const table = rel.type === 'invest' ? 'general_investments' : 'jiip_contracts'
+        const updatePayload: Record<string, any> = { invest_amount: netAmount }
+        // jiip_contracts와 general_investments 모두 updated_at 컬럼 없음
+        await sb.from(table)
+          .update(updatePayload)
+          .eq('id', rel.id)
+        console.log(`[classify DELETE] ${rel.type} ${rel.id} 순합계 재계산: ${netAmount}`)
+      } catch (e) {
+        console.error(`[classify DELETE] ${rel.type} ${rel.id} 금액 재계산 오류:`, e)
       }
     }
 

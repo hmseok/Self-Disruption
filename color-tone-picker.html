@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>색상 톤 선택기</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0f1a; color: #e2e8f0; }
+
+  .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(10,15,26,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  .top-bar h1 { font-size: 16px; font-weight: 900; color: #fff; }
+  .top-bar h1 span { color: #2d5fa8; }
+  .top-bar .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: rgba(45,95,168,0.15); color: #93c5fd; }
+  .desc { font-size: 12px; color: #64748b; margin-left: auto; }
+
+  .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+  .sec-title { font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+  .sec-sub { font-size: 13px; color: #64748b; margin-bottom: 28px; }
+
+  .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media(min-width:900px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+  .card { border-radius: 16px; border: 2px solid rgba(255,255,255,0.06); overflow: hidden; cursor: pointer; transition: all 0.25s; position: relative; }
+  .card:hover { border-color: rgba(45,95,168,0.4); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+  .card.selected { border-color: #2d5fa8; box-shadow: 0 0 0 1px #2d5fa8, 0 8px 32px rgba(45,95,168,0.15); }
+  .card.selected::after { content: '✓ 선택됨'; position: absolute; top: 12px; right: 12px; background: #2d5fa8; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 6px; z-index: 5; }
+  .card-label { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.02); }
+  .tag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 3px 8px; border-radius: 5px; }
+  .card-label .name { font-size: 14px; font-weight: 800; color: #e2e8f0; }
+  .card-label .info { font-size: 11px; color: #64748b; margin-left: auto; }
+
+  /* Stat badge styles */
+  .st { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .st .v { font-size: 16px; font-weight: 900; }
+  .st .l { font-size: 10px; }
+
+  /* Table */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th { text-align: left; padding: 10px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tbl td { padding: 11px 10px; font-size: 13px; }
+  .tbl .nm { font-weight: 700; }
+  .tbl .am { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .bdg { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; display: inline-block; }
+
+  .divider { margin: 48px 0 28px; border: none; border-top: 1px solid rgba(255,255,255,0.06); }
+
+  .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,15,26,0.95); backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 24px; display: flex; align-items: center; z-index: 100; }
+  .bottom-bar .summary { font-size: 12px; color: #64748b; flex: 1; }
+  .bottom-bar .summary strong { color: #e2e8f0; }
+  .btn { padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; }
+  .btn-pri { background: #2d5fa8; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1><span>●</span> Color Tone Picker</h1>
+  <div class="badge">B·글래스 + C·다크연결 + A·테이블 + E·다크요약</div>
+  <span class="desc">선택한 레이아웃에 색상 톤을 적용합니다</span>
+</div>
+
+<div class="main">
+
+  <!-- =============== SECTION 1: FULL TONE =============== -->
+  <div class="sec-title">전체 색상 톤 선택</div>
+  <div class="sec-sub">동일한 레이아웃(B+C+A+E)에 5가지 색상 톤을 적용한 비교입니다. 하나를 선택해주세요.</div>
+
+  <div class="grid">
+
+    <!-- ─── TONE 1: DEEP DARK (현재) ─── -->
+    <div class="card" onclick="selectTone(this,0)">
+      <div class="card-label">
+        <span class="tag" style="background:rgba(45,95,168,0.15);color:#93c5fd;">TONE 1</span>
+        <span class="name">딥 다크 (현재)</span>
+        <span class="info">헤더 #0f172a~#1e3a5f · 리스트 #fff</span>
+      </div>
+      <div style="overflow:hidden;">
+        <!-- Header: Glass on deep dark -->
+        <div style="background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(26,46,74,0.9));backdrop-filter:blur(20px);padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:rgba(45,95,168,0.25);border:1px solid rgba(45,95,168,0.35);display:flex;align-items:center;justify-content:center;font-size:16px;">🚙</div>
+            <div><div style="font-size:15px;font-weight:900;color:#fff;">전체 차량 대장</div><div style="font-size:10px;color:#94a3b8;">Fleet Management</div></div>
+            <div style="margin-left:auto;display:flex;gap:5px;"><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.06);color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);">📥</button><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:rgba(45,95,168,0.5);color:#fff;border:1px solid rgba(45,95,168,0.7);">+ 등록</button></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <div class="st" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#f1f5f9;"><span class="l" style="color:#cbd5e1">전체</span><span class="v">48</span></div>
+            <div class="st" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="st" style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.15);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+          </div>
+        </div>
+        <!-- Dark-connect Tabs -->
+        <div style="background:linear-gradient(135deg,#0f172a,#1a2e4a);padding:0 18px;">
+          <div style="display:flex;gap:2px;padding-top:6px;">
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;background:#f1f5f9;color:#1e293b;">전체 (48)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#64748b;">운영중 (32)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#64748b;">정비중 (8)</div>
+          </div>
+        </div>
+        <!-- Filter -->
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;border-bottom:1px solid #e2e8f0;">
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(45,95,168,0.08);color:#2d5fa8;border:1px solid rgba(45,95,168,0.3);">전체</span>
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">리스</span>
+          <input style="margin-left:auto;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;width:140px;background:#f8fafc;" placeholder="🔍 검색..." />
+        </div>
+        <!-- Table -->
+        <div style="padding:0 18px;background:#fff;">
+          <table class="tbl">
+            <thead><tr style="border-bottom:2px solid #f1f5f9;"><th style="color:#94a3b8;">차량번호</th><th style="color:#94a3b8;">차종</th><th style="color:#94a3b8;">상태</th><th style="color:#94a3b8;">월 납입</th></tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">12가 3456</td><td style="color:#334155;">카니발</td><td><span class="bdg" style="background:#ecfdf5;color:#059669;">운영</span></td><td class="am" style="color:#1e293b;">1,250,000</td></tr>
+              <tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">34나 7890</td><td style="color:#334155;">스타리아</td><td><span class="bdg" style="background:#fffbeb;color:#d97706;">정비</span></td><td class="am" style="color:#1e293b;">980,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Dark Summary -->
+        <div style="background:linear-gradient(135deg,#0f172a,#1a2e4a);padding:10px 18px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:12px;color:#94a3b8;">총 <strong style="color:#fff;">48건</strong></span>
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.12);"></span>
+          <span style="font-size:12px;color:#94a3b8;">합계 <strong style="color:#93c5fd;">₩ 52.8M</strong></span>
+          <div style="margin-left:auto;"><button style="padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#2d5fa8;color:#fff;border:none;">✓ 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TONE 2: SOFT NAVY ─── -->
+    <div class="card" onclick="selectTone(this,1)">
+      <div class="card-label">
+        <span class="tag" style="background:rgba(99,147,211,0.15);color:#93b4e0;">TONE 2</span>
+        <span class="name">소프트 네이비</span>
+        <span class="info">헤더 #1e2d4a~#2a4a72 · 밝은 네이비</span>
+      </div>
+      <div style="overflow:hidden;">
+        <div style="background:linear-gradient(135deg,rgba(30,45,74,0.95),rgba(42,74,114,0.9));backdrop-filter:blur(20px);padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;">🚙</div>
+            <div><div style="font-size:15px;font-weight:900;color:#fff;">전체 차량 대장</div><div style="font-size:10px;color:#a8c4e0;">Fleet Management</div></div>
+            <div style="margin-left:auto;display:flex;gap:5px;"><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.08);color:#d4e3f5;border:1px solid rgba(255,255,255,0.12);">📥</button><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:#3b7dd8;color:#fff;border:none;">+ 등록</button></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <div class="st" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:#e8f0fa;"><span class="l" style="color:#b8cfe6">전체</span><span class="v">48</span></div>
+            <div class="st" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="st" style="background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.2);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#1e2d4a,#2a4a72);padding:0 18px;">
+          <div style="display:flex;gap:2px;padding-top:6px;">
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;background:#f1f5f9;color:#1e293b;">전체 (48)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#8baac8;">운영중 (32)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#8baac8;">정비중 (8)</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;border-bottom:1px solid #e2e8f0;">
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(59,125,216,0.08);color:#3b7dd8;border:1px solid rgba(59,125,216,0.25);">전체</span>
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">리스</span>
+          <input style="margin-left:auto;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;width:140px;background:#f8fafc;" placeholder="🔍 검색..." />
+        </div>
+        <div style="padding:0 18px;background:#fff;">
+          <table class="tbl"><thead><tr style="border-bottom:2px solid #f1f5f9;"><th style="color:#94a3b8;">차량번호</th><th style="color:#94a3b8;">차종</th><th style="color:#94a3b8;">상태</th><th style="color:#94a3b8;">월 납입</th></tr></thead>
+          <tbody><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">12가 3456</td><td style="color:#334155;">카니발</td><td><span class="bdg" style="background:#ecfdf5;color:#059669;">운영</span></td><td class="am" style="color:#1e293b;">1,250,000</td></tr><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">34나 7890</td><td style="color:#334155;">스타리아</td><td><span class="bdg" style="background:#fffbeb;color:#d97706;">정비</span></td><td class="am" style="color:#1e293b;">980,000</td></tr></tbody></table>
+        </div>
+        <div style="background:linear-gradient(135deg,#1e2d4a,#2a4a72);padding:10px 18px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:12px;color:#a8c4e0;">총 <strong style="color:#fff;">48건</strong></span>
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.15);"></span>
+          <span style="font-size:12px;color:#a8c4e0;">합계 <strong style="color:#7cb3f0;">₩ 52.8M</strong></span>
+          <div style="margin-left:auto;"><button style="padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#3b7dd8;color:#fff;border:none;">✓ 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TONE 3: STEEL BLUE ─── -->
+    <div class="card" onclick="selectTone(this,2)">
+      <div class="card-label">
+        <span class="tag" style="background:rgba(45,95,168,0.2);color:#6ba3e0;">TONE 3</span>
+        <span class="name">스틸 블루</span>
+        <span class="info">헤더 #253d5e~#345b8a · 브랜드 중심</span>
+      </div>
+      <div style="overflow:hidden;">
+        <div style="background:linear-gradient(135deg,rgba(37,61,94,0.96),rgba(52,91,138,0.92));backdrop-filter:blur(20px);padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.1);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:16px;">🚙</div>
+            <div><div style="font-size:15px;font-weight:900;color:#fff;">전체 차량 대장</div><div style="font-size:10px;color:#b8d4f0;">Fleet Management</div></div>
+            <div style="margin-left:auto;display:flex;gap:5px;"><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.1);color:#e0ecf8;border:1px solid rgba(255,255,255,0.15);">📥</button><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:#fff;color:#2d5fa8;border:none;font-weight:800;">+ 등록</button></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <div class="st" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#f0f6ff;"><span class="l" style="color:#c4dbf2">전체</span><span class="v">48</span></div>
+            <div class="st" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.22);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="st" style="background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.22);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#253d5e,#345b8a);padding:0 18px;">
+          <div style="display:flex;gap:2px;padding-top:6px;">
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;background:#f1f5f9;color:#1e293b;">전체 (48)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#9fc2e8;">운영중 (32)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#9fc2e8;">정비중 (8)</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;border-bottom:1px solid #e2e8f0;">
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(45,95,168,0.08);color:#2d5fa8;border:1px solid rgba(45,95,168,0.3);">전체</span>
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">리스</span>
+          <input style="margin-left:auto;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;width:140px;background:#f8fafc;" placeholder="🔍 검색..." />
+        </div>
+        <div style="padding:0 18px;background:#fff;">
+          <table class="tbl"><thead><tr style="border-bottom:2px solid #f1f5f9;"><th style="color:#94a3b8;">차량번호</th><th style="color:#94a3b8;">차종</th><th style="color:#94a3b8;">상태</th><th style="color:#94a3b8;">월 납입</th></tr></thead>
+          <tbody><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">12가 3456</td><td style="color:#334155;">카니발</td><td><span class="bdg" style="background:#ecfdf5;color:#059669;">운영</span></td><td class="am" style="color:#1e293b;">1,250,000</td></tr><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">34나 7890</td><td style="color:#334155;">스타리아</td><td><span class="bdg" style="background:#fffbeb;color:#d97706;">정비</span></td><td class="am" style="color:#1e293b;">980,000</td></tr></tbody></table>
+        </div>
+        <div style="background:linear-gradient(135deg,#253d5e,#345b8a);padding:10px 18px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:12px;color:#b8d4f0;">총 <strong style="color:#fff;">48건</strong></span>
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.15);"></span>
+          <span style="font-size:12px;color:#b8d4f0;">합계 <strong style="color:#8cc4ff;">₩ 52.8M</strong></span>
+          <div style="margin-left:auto;"><button style="padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#fff;color:#2d5fa8;border:none;font-weight:800;">✓ 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TONE 4: LIGHT PREMIUM ─── -->
+    <div class="card" onclick="selectTone(this,3)">
+      <div class="card-label">
+        <span class="tag" style="background:rgba(45,95,168,0.12);color:#5b94d4;">TONE 4</span>
+        <span class="name">라이트 프리미엄</span>
+        <span class="info">헤더 #f8fafc 위 #2d5fa8 강조 · 밝은 톤</span>
+      </div>
+      <div style="overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#f8fafc,#edf2f7);padding:14px 18px;border-bottom:2px solid #2d5fa8;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:#2d5fa8;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(45,95,168,0.3);">🚙</div>
+            <div><div style="font-size:15px;font-weight:900;color:#1e293b;">전체 차량 대장</div><div style="font-size:10px;color:#64748b;">Fleet Management</div></div>
+            <div style="margin-left:auto;display:flex;gap:5px;"><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:#fff;color:#334155;border:1px solid #d1d5db;">📥</button><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:#2d5fa8;color:#fff;border:none;">+ 등록</button></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <div class="st" style="background:#fff;border:1px solid #e2e8f0;color:#334155;"><span class="l" style="color:#94a3b8">전체</span><span class="v">48</span></div>
+            <div class="st" style="background:#ecfdf5;border:1px solid #bbf7d0;color:#059669;"><span class="l" style="color:#6ee7b7">운영</span><span class="v">32</span></div>
+            <div class="st" style="background:#fffbeb;border:1px solid #fde68a;color:#d97706;"><span class="l" style="color:#fcd34d">정비</span><span class="v">8</span></div>
+          </div>
+        </div>
+        <div style="background:#2d5fa8;padding:0 18px;">
+          <div style="display:flex;gap:2px;padding-top:6px;">
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;background:#f1f5f9;color:#1e293b;">전체 (48)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);">운영중 (32)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);">정비중 (8)</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;border-bottom:1px solid #e2e8f0;">
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(45,95,168,0.08);color:#2d5fa8;border:1px solid rgba(45,95,168,0.3);">전체</span>
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">리스</span>
+          <input style="margin-left:auto;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;width:140px;background:#f8fafc;" placeholder="🔍 검색..." />
+        </div>
+        <div style="padding:0 18px;background:#fff;">
+          <table class="tbl"><thead><tr style="border-bottom:2px solid #f1f5f9;"><th style="color:#94a3b8;">차량번호</th><th style="color:#94a3b8;">차종</th><th style="color:#94a3b8;">상태</th><th style="color:#94a3b8;">월 납입</th></tr></thead>
+          <tbody><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">12가 3456</td><td style="color:#334155;">카니발</td><td><span class="bdg" style="background:#ecfdf5;color:#059669;">운영</span></td><td class="am" style="color:#1e293b;">1,250,000</td></tr><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">34나 7890</td><td style="color:#334155;">스타리아</td><td><span class="bdg" style="background:#fffbeb;color:#d97706;">정비</span></td><td class="am" style="color:#1e293b;">980,000</td></tr></tbody></table>
+        </div>
+        <div style="background:#2d5fa8;padding:10px 18px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:12px;color:rgba(255,255,255,0.8);">총 <strong style="color:#fff;">48건</strong></span>
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.25);"></span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.8);">합계 <strong style="color:#fff;">₩ 52.8M</strong></span>
+          <div style="margin-left:auto;"><button style="padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#fff;color:#2d5fa8;border:none;font-weight:800;">✓ 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TONE 5: WARM SLATE ─── -->
+    <div class="card" onclick="selectTone(this,4)">
+      <div class="card-label">
+        <span class="tag" style="background:rgba(120,113,148,0.15);color:#a8a0c4;">TONE 5</span>
+        <span class="name">웜 슬레이트</span>
+        <span class="info">헤더 #1a1b2e~#2a2d48 · 따뜻한 어두운톤</span>
+      </div>
+      <div style="overflow:hidden;">
+        <div style="background:linear-gradient(135deg,rgba(26,27,46,0.96),rgba(42,45,72,0.92));backdrop-filter:blur(20px);padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;">🚙</div>
+            <div><div style="font-size:15px;font-weight:900;color:#fff;">전체 차량 대장</div><div style="font-size:10px;color:#a5a3c0;">Fleet Management</div></div>
+            <div style="margin-left:auto;display:flex;gap:5px;"><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.07);color:#d4d2ec;border:1px solid rgba(255,255,255,0.1);">📥</button><button style="padding:6px 10px;border-radius:7px;font-size:11px;font-weight:700;background:#6366f1;color:#fff;border:none;">+ 등록</button></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            <div class="st" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e8e6f8;"><span class="l" style="color:#bbb8d6">전체</span><span class="v">48</span></div>
+            <div class="st" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.18);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="st" style="background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.18);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#1a1b2e,#2a2d48);padding:0 18px;">
+          <div style="display:flex;gap:2px;padding-top:6px;">
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;background:#f1f5f9;color:#1e293b;">전체 (48)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#8886a8;">운영중 (32)</div>
+            <div style="padding:7px 14px;border-radius:7px 7px 0 0;font-size:11px;font-weight:700;color:#8886a8;">정비중 (8)</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 18px;background:#fff;border-bottom:1px solid #e2e8f0;">
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(99,102,241,0.08);color:#6366f1;border:1px solid rgba(99,102,241,0.25);">전체</span>
+          <span style="padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">리스</span>
+          <input style="margin-left:auto;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;width:140px;background:#f8fafc;" placeholder="🔍 검색..." />
+        </div>
+        <div style="padding:0 18px;background:#fff;">
+          <table class="tbl"><thead><tr style="border-bottom:2px solid #f1f5f9;"><th style="color:#94a3b8;">차량번호</th><th style="color:#94a3b8;">차종</th><th style="color:#94a3b8;">상태</th><th style="color:#94a3b8;">월 납입</th></tr></thead>
+          <tbody><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">12가 3456</td><td style="color:#334155;">카니발</td><td><span class="bdg" style="background:#ecfdf5;color:#059669;">운영</span></td><td class="am" style="color:#1e293b;">1,250,000</td></tr><tr style="border-bottom:1px solid #f8fafc;"><td class="nm" style="color:#1e293b;">34나 7890</td><td style="color:#334155;">스타리아</td><td><span class="bdg" style="background:#fffbeb;color:#d97706;">정비</span></td><td class="am" style="color:#1e293b;">980,000</td></tr></tbody></table>
+        </div>
+        <div style="background:linear-gradient(135deg,#1a1b2e,#2a2d48);padding:10px 18px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:12px;color:#a5a3c0;">총 <strong style="color:#fff;">48건</strong></span>
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.12);"></span>
+          <span style="font-size:12px;color:#a5a3c0;">합계 <strong style="color:#a5b4fc;">₩ 52.8M</strong></span>
+          <div style="margin-left:auto;"><button style="padding:5px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#6366f1;color:#fff;border:none;">✓ 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ─── COLOR SWATCH REFERENCE ─── -->
+  <div class="sec-title" style="font-size:18px;">색상 팔레트 비교</div>
+  <div class="sec-sub">각 톤의 핵심 색상값 비교표</div>
+
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+      <thead>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+          <th style="text-align:left;padding:10px;color:#64748b;font-size:10px;font-weight:800;">요소</th>
+          <th style="text-align:center;padding:10px;color:#93c5fd;font-size:10px;font-weight:800;">1·딥 다크</th>
+          <th style="text-align:center;padding:10px;color:#93b4e0;font-size:10px;font-weight:800;">2·소프트 네이비</th>
+          <th style="text-align:center;padding:10px;color:#6ba3e0;font-size:10px;font-weight:800;">3·스틸 블루</th>
+          <th style="text-align:center;padding:10px;color:#5b94d4;font-size:10px;font-weight:800;">4·라이트 프리미엄</th>
+          <th style="text-align:center;padding:10px;color:#a8a0c4;font-size:10px;font-weight:800;">5·웜 슬레이트</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:8px 10px;color:#94a3b8;font-weight:600;">헤더 배경</td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:linear-gradient(135deg,#0f172a,#1e3a5f);border:1px solid rgba(255,255,255,0.1);"></div><br><span style="font-size:10px;color:#64748b;">#0f172a</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:linear-gradient(135deg,#1e2d4a,#2a4a72);border:1px solid rgba(255,255,255,0.1);"></div><br><span style="font-size:10px;color:#64748b;">#1e2d4a</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:linear-gradient(135deg,#253d5e,#345b8a);border:1px solid rgba(255,255,255,0.1);"></div><br><span style="font-size:10px;color:#64748b;">#253d5e</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:linear-gradient(135deg,#f8fafc,#edf2f7);border:1px solid rgba(255,255,255,0.1);"></div><br><span style="font-size:10px;color:#64748b;">#f8fafc</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:linear-gradient(135deg,#1a1b2e,#2a2d48);border:1px solid rgba(255,255,255,0.1);"></div><br><span style="font-size:10px;color:#64748b;">#1a1b2e</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:8px 10px;color:#94a3b8;font-weight:600;">강조 색상</td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:#2d5fa8;"></div><br><span style="font-size:10px;color:#64748b;">#2d5fa8</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:#3b7dd8;"></div><br><span style="font-size:10px;color:#64748b;">#3b7dd8</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:#2d5fa8;"></div><br><span style="font-size:10px;color:#64748b;">#2d5fa8</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:#2d5fa8;"></div><br><span style="font-size:10px;color:#64748b;">#2d5fa8</span></td>
+          <td style="text-align:center;padding:8px;"><div style="display:inline-block;width:40px;height:20px;border-radius:4px;background:#6366f1;"></div><br><span style="font-size:10px;color:#64748b;">#6366f1</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:8px 10px;color:#94a3b8;font-weight:600;">어두운 정도</td>
+          <td style="text-align:center;padding:8px;color:#f1f5f9;font-weight:700;">■■■■■ 가장 어두움</td>
+          <td style="text-align:center;padding:8px;color:#93b4e0;font-weight:700;">■■■■□ 어두움</td>
+          <td style="text-align:center;padding:8px;color:#6ba3e0;font-weight:700;">■■■□□ 중간</td>
+          <td style="text-align:center;padding:8px;color:#5b94d4;font-weight:700;">■□□□□ 밝음</td>
+          <td style="text-align:center;padding:8px;color:#a8a0c4;font-weight:700;">■■■■□ 따뜻한 어두움</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px;color:#94a3b8;font-weight:600;">추천 상황</td>
+          <td style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">강한 대비 선호</td>
+          <td style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">부드러운 전문감</td>
+          <td style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">브랜드 강조</td>
+          <td style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">밝고 깔끔한 느낌</td>
+          <td style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">모던/크리에이티브</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="bottom-bar">
+  <div class="summary">선택한 톤: <strong id="toneName">아직 선택 안됨</strong></div>
+  <button class="btn btn-pri" id="confirmBtn" style="opacity:0.4;pointer-events:none;">✓ 이 톤으로 결정</button>
+</div>
+
+<script>
+let selectedTone = -1;
+const TONE_NAMES = ['1·딥 다크 (현재)', '2·소프트 네이비', '3·스틸 블루', '4·라이트 프리미엄', '5·웜 슬레이트'];
+function selectTone(el, idx) {
+  selectedTone = idx;
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('toneName').textContent = TONE_NAMES[idx];
+  document.getElementById('confirmBtn').style.opacity = '1';
+  document.getElementById('confirmBtn').style.pointerEvents = 'auto';
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>디자인 시스템 선택기</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0f1a; color: #e2e8f0; }
+
+  /* ── Navigation ── */
+  .top-bar { position: sticky; top: 0; z-index: 100; background: rgba(10,15,26,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 10px 24px; display: flex; align-items: center; gap: 12px; }
+  .top-bar .logo { font-size: 18px; font-weight: 900; color: #fff; }
+  .top-bar .logo span { color: #2d5fa8; }
+  .step-pills { display: flex; gap: 4px; margin-left: 24px; }
+  .step-pill { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.25s; border: 1px solid transparent; }
+  .step-pill.idle { background: rgba(255,255,255,0.04); color: #64748b; border-color: rgba(255,255,255,0.06); }
+  .step-pill.active { background: #2d5fa8; color: #fff; }
+  .step-pill.done { background: rgba(34,197,94,0.12); color: #86efac; border-color: rgba(34,197,94,0.2); }
+  .preview-toggle { margin-left: auto; padding: 6px 14px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .preview-toggle.on { background: rgba(45,95,168,0.2); color: #93c5fd; border-color: rgba(45,95,168,0.4); }
+
+  /* ── Section ── */
+  .section { display: none; max-width: 1200px; margin: 0 auto; padding: 32px 24px 60px; }
+  .section.active { display: block; }
+  .sec-head { margin-bottom: 28px; }
+  .sec-head h2 { font-size: 24px; font-weight: 900; color: #fff; margin-bottom: 4px; }
+  .sec-head p { font-size: 13px; color: #64748b; }
+  .sec-head .step-num { display: inline-block; font-size: 11px; font-weight: 800; background: #2d5fa8; color: #fff; padding: 2px 8px; border-radius: 6px; margin-bottom: 8px; }
+
+  /* ── Option Cards ── */
+  .options-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .opt-card { background: #131a2b; border-radius: 16px; border: 2px solid rgba(255,255,255,0.06); overflow: hidden; cursor: pointer; transition: all 0.25s; position: relative; }
+  .opt-card:hover { border-color: rgba(45,95,168,0.4); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+  .opt-card.selected { border-color: #2d5fa8; box-shadow: 0 0 0 1px #2d5fa8, 0 8px 32px rgba(45,95,168,0.2); }
+  .opt-card.selected::after { content: '✓ 선택됨'; position: absolute; top: 12px; right: 12px; background: #2d5fa8; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 6px; z-index: 5; }
+  .opt-header { padding: 14px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .opt-tag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #2d5fa8; background: rgba(45,95,168,0.12); padding: 3px 8px; border-radius: 5px; }
+  .opt-name { font-size: 15px; font-weight: 800; color: #e2e8f0; }
+  .opt-desc { font-size: 11px; color: #64748b; margin-left: auto; }
+  .opt-body { padding: 0; overflow: hidden; }
+
+  /* ── Mock Content Area ── */
+  .mock { background: #f1f5f9; overflow: hidden; }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,15,26,0.95); backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+  .bottom-nav .sel-summary { font-size: 12px; color: #64748b; }
+  .bottom-nav .sel-summary strong { color: #e2e8f0; }
+  .nav-btns { display: flex; gap: 8px; }
+  .nav-btn { padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; }
+  .nav-btn.secondary { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+  .nav-btn.primary { background: #2d5fa8; color: #fff; }
+
+  /* ── Preview Panel ── */
+  #previewPanel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 480px; background: #0f172a; border-left: 1px solid rgba(255,255,255,0.08); z-index: 200; overflow-y: auto; box-shadow: -8px 0 40px rgba(0,0,0,0.5); }
+  #previewPanel.open { display: block; }
+  .pv-head { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; }
+  .pv-head h3 { font-size: 16px; font-weight: 900; color: #fff; }
+  .pv-close { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.06); border: none; color: #94a3b8; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .pv-body { padding: 0; }
+
+  /* ===================== HEADER STYLES ===================== */
+  .hdr-dark { background: linear-gradient(135deg, #0f172a 0%, #1a2e4a 50%, #1e3a5f 100%); padding: 16px 20px; }
+  .hdr-glass { background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(26,46,74,0.9)); backdrop-filter: blur(20px); padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .hdr-gradient { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%); padding: 16px 20px; }
+  .hdr-row { display: flex; align-items: center; gap: 12px; }
+  .hdr-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .hdr-icon-blue { background: #2d5fa8; box-shadow: 0 4px 12px rgba(45,95,168,0.4); }
+  .hdr-icon-glass { background: rgba(45,95,168,0.25); border: 1px solid rgba(45,95,168,0.35); }
+  .hdr-icon-ring { background: transparent; border: 2px solid rgba(45,95,168,0.5); box-shadow: 0 0 16px rgba(45,95,168,0.2); }
+  .hdr-title { font-size: 17px; font-weight: 900; color: #fff; }
+  .hdr-sub { font-size: 11px; color: #94a3b8; }
+  .hdr-actions { margin-left: auto; display: flex; gap: 6px; }
+  .hdr-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+  .hdr-btn-pri { background: #2d5fa8; color: #fff; }
+  .hdr-btn-sec { background: rgba(255,255,255,0.08); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15); }
+  .hdr-btn-glass { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); }
+  .hdr-stats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .hdr-stat { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .hdr-stat .v { font-size: 16px; font-weight: 900; }
+  .hdr-stat .l { font-size: 10px; opacity: 0.7; }
+
+  /* Compact header */
+  .hdr-compact { background: linear-gradient(135deg, #0f172a, #1a2e4a); padding: 10px 20px; }
+  .hdr-compact .hdr-row { gap: 10px; }
+  .hdr-compact .hdr-icon { width: 30px; height: 30px; border-radius: 8px; font-size: 15px; }
+  .hdr-compact .hdr-title { font-size: 15px; }
+  .hdr-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.12); }
+  .inline-stats { display: flex; gap: 14px; align-items: center; }
+  .inline-stat { display: flex; align-items: baseline; gap: 3px; }
+  .inline-stat .l { font-size: 10px; color: #64748b; font-weight: 600; }
+  .inline-stat .v { font-size: 15px; font-weight: 900; }
+
+  /* ===================== TAB STYLES ===================== */
+  .tabs-underline { display: flex; gap: 0; background: #fff; border-bottom: 2px solid #e2e8f0; padding: 0 20px; }
+  .tab-u { padding: 10px 16px; font-size: 13px; font-weight: 700; color: #94a3b8; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab-u.on { color: #2d5fa8; border-bottom-color: #2d5fa8; }
+  .tab-u .cnt { font-size: 10px; background: #e2e8f0; color: #64748b; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+  .tab-u.on .cnt { background: rgba(45,95,168,0.1); color: #2d5fa8; }
+
+  .tabs-pill { display: flex; gap: 4px; padding: 12px 20px; background: #fff; }
+  .tab-p { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #64748b; background: #f1f5f9; }
+  .tab-p.on { background: #2d5fa8; color: #fff; }
+
+  .tabs-dark-connect { display: flex; gap: 2px; padding: 0 20px; padding-top: 8px; }
+  .tab-dc { padding: 8px 16px; border-radius: 8px 8px 0 0; font-size: 12px; font-weight: 700; color: #64748b; }
+  .tab-dc.on { background: #f1f5f9; color: #1e293b; }
+
+  .tabs-segment { display: flex; gap: 0; background: #f1f5f9; border-radius: 10px; padding: 3px; margin: 12px 20px; }
+  .tab-sg { flex: 1; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #64748b; text-align: center; }
+  .tab-sg.on { background: #fff; color: #1e293b; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+  /* ===================== FILTER STYLES ===================== */
+  .filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  .f-chip { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .f-chip.on { background: rgba(45,95,168,0.08); color: #2d5fa8; border-color: rgba(45,95,168,0.3); }
+  .f-search { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; background: #f8fafc; width: 180px; }
+
+  /* ===================== LIST STYLES ===================== */
+
+  /* Table */
+  .ls-table { padding: 0 20px 16px; background: #fff; }
+  .ls-table table { width: 100%; border-collapse: collapse; }
+  .ls-table th { text-align: left; padding: 10px 10px; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #f1f5f9; }
+  .ls-table td { padding: 11px 10px; font-size: 13px; color: #334155; border-bottom: 1px solid #f8fafc; }
+  .ls-table tr:hover td { background: #f8fafc; }
+  .ls-table .nm { font-weight: 700; color: #1e293b; }
+  .ls-table .am { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .bdg { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; display: inline-block; }
+  .bdg-g { background: #ecfdf5; color: #059669; }
+  .bdg-y { background: #fffbeb; color: #d97706; }
+  .bdg-r { background: #fef2f2; color: #dc2626; }
+  .bdg-b { background: #eff6ff; color: #2563eb; }
+
+  /* Card Rows */
+  .ls-cards { padding: 10px 20px 16px; background: #f8fafc; display: flex; flex-direction: column; gap: 8px; }
+  .crd-row { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+  .crd-row:hover { border-color: #2d5fa8; box-shadow: 0 2px 8px rgba(45,95,168,0.08); }
+  .crd-av { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .crd-info { flex: 1; }
+  .crd-nm { font-size: 14px; font-weight: 700; color: #1e293b; }
+  .crd-dt { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .crd-rt { text-align: right; }
+  .crd-am { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .crd-sub { font-size: 11px; color: #94a3b8; }
+  .crd-arrow { color: #cbd5e1; font-size: 18px; margin-left: 4px; }
+
+  /* Grouped */
+  .ls-grouped { padding: 10px 20px 16px; background: #f8fafc; }
+  .grp { margin-bottom: 14px; }
+  .grp-hd { display: flex; align-items: center; gap: 8px; padding: 6px 0; margin-bottom: 5px; }
+  .grp-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .grp-nm { font-size: 13px; font-weight: 800; color: #334155; }
+  .grp-cnt { font-size: 11px; color: #94a3b8; }
+  .grp-tot { margin-left: auto; font-size: 13px; font-weight: 800; color: #1e293b; }
+  .grp-body { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+  .grp-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .grp-item:last-child { border-bottom: none; }
+  .grp-item .em { font-size: 15px; }
+  .grp-item .nm { font-weight: 600; color: #334155; flex: 1; }
+  .grp-item .am { font-weight: 800; color: #1e293b; }
+
+  /* Dense */
+  .ls-dense { background: #fff; }
+  .dn-hdr { display: flex; padding: 7px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+  .dn-row { display: flex; align-items: center; padding: 9px 20px; border-bottom: 1px solid #f8fafc; gap: 10px; }
+  .dn-row:hover { background: #f8fafc; }
+  .dn-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dn-nm { font-size: 13px; font-weight: 600; color: #334155; width: 120px; }
+  .dn-meta { font-size: 12px; color: #64748b; flex: 1; }
+  .dn-am { font-size: 13px; font-weight: 800; color: #1e293b; width: 110px; text-align: right; }
+  .dn-date { font-size: 11px; color: #94a3b8; width: 70px; text-align: right; }
+
+  /* ===================== BOTTOM STYLES ===================== */
+  .bt-summary { background: #fff; border-top: 2px solid #e2e8f0; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  .bt-item { display: flex; align-items: baseline; gap: 4px; }
+  .bt-item .l { font-size: 11px; color: #94a3b8; font-weight: 600; }
+  .bt-item .v { font-size: 15px; font-weight: 900; color: #1e293b; }
+  .bt-div { width: 1px; height: 20px; background: #e2e8f0; }
+  .bt-acts { margin-left: auto; display: flex; gap: 6px; }
+
+  .bt-float { position: relative; height: 70px; background: #f8fafc; }
+  .bt-float .bar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: #0f172a; border-radius: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
+  .bt-float .bar .info { font-size: 12px; color: #94a3b8; }
+  .bt-float .bar .info strong { color: #fff; }
+  .bt-float .bar .dv { width: 1px; height: 24px; background: rgba(255,255,255,0.12); }
+
+  .bt-page { background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 20px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .pg-b { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #64748b; }
+  .pg-b.on { background: #2d5fa8; color: #fff; border-color: #2d5fa8; }
+  .pg-info { font-size: 12px; color: #94a3b8; margin: 0 12px; }
+
+  .bt-load { background: linear-gradient(to bottom, transparent, #f8fafc 40%); padding: 36px 20px 14px; text-align: center; }
+  .bt-load .btn { padding: 10px 28px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 700; color: #64748b; }
+  .bt-load .hint { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+
+  .bt-dark { background: linear-gradient(135deg, #0f172a, #1a2e4a); padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  .bt-dark .info { font-size: 12px; color: #94a3b8; }
+  .bt-dark .info strong { color: #fff; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <div class="logo"><span>●</span> Design Picker</div>
+  <div class="step-pills">
+    <div class="step-pill active" onclick="goStep(0)">① 헤더</div>
+    <div class="step-pill idle" onclick="goStep(1)">② 탭</div>
+    <div class="step-pill idle" onclick="goStep(2)">③ 리스트</div>
+    <div class="step-pill idle" onclick="goStep(3)">④ 하단바</div>
+    <div class="step-pill idle" onclick="goStep(4)">⑤ 조합 미리보기</div>
+  </div>
+  <button class="preview-toggle" onclick="togglePreview()">👁 실시간 미리보기</button>
+</div>
+
+<!-- ==================== STEP 0: HEADERS ==================== -->
+<div class="section active" id="step0">
+  <div class="sec-head">
+    <div class="step-num">STEP 1 / 5</div>
+    <h2>상단 헤더 스타일 선택</h2>
+    <p>모든 페이지 최상단에 적용될 헤더 디자인을 선택하세요. 클릭하면 선택됩니다.</p>
+  </div>
+  <div class="options-grid">
+
+    <!-- H-A -->
+    <div class="opt-card selected" onclick="select('header',0,this)" data-choice="header">
+      <div class="opt-header"><span class="opt-tag">A</span><span class="opt-name">다크 그라데이션 (현재)</span><span class="opt-desc">~120px · 2줄 · 안정적</span></div>
+      <div class="opt-body">
+        <div class="hdr-dark">
+          <div class="hdr-row">
+            <div class="hdr-icon hdr-icon-blue">🚙</div>
+            <div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management · 48대 등록</div></div>
+            <div class="hdr-actions"><button class="hdr-btn hdr-btn-sec">📥 엑셀</button><button class="hdr-btn hdr-btn-pri">+ 차량 등록</button></div>
+          </div>
+          <div class="hdr-stats">
+            <div class="hdr-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f1f5f9;"><span class="l" style="color:#cbd5e1">전체</span><span class="v">48</span></div>
+            <div class="hdr-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="hdr-stat" style="background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.25);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+            <div class="hdr-stat" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;"><span class="l" style="color:#fecaca">만료</span><span class="v">4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H-B -->
+    <div class="opt-card" onclick="select('header',1,this)" data-choice="header">
+      <div class="opt-header"><span class="opt-tag">B</span><span class="opt-name">글래스 모피즘</span><span class="opt-desc">~120px · 반투명 유리</span></div>
+      <div class="opt-body">
+        <div class="hdr-glass">
+          <div class="hdr-row">
+            <div class="hdr-icon hdr-icon-glass">🚙</div>
+            <div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management · 48대 등록</div></div>
+            <div class="hdr-actions"><button class="hdr-btn hdr-btn-glass">📥 엑셀</button><button class="hdr-btn" style="background:rgba(45,95,168,0.5);color:#fff;border:1px solid rgba(45,95,168,0.7);">+ 차량 등록</button></div>
+          </div>
+          <div class="hdr-stats">
+            <div class="hdr-stat" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#f1f5f9;"><span class="l" style="color:#cbd5e1">전체</span><span class="v">48</span></div>
+            <div class="hdr-stat" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="hdr-stat" style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.15);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+            <div class="hdr-stat" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#fca5a5;"><span class="l" style="color:#fecaca">만료</span><span class="v">4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H-C -->
+    <div class="opt-card" onclick="select('header',2,this)" data-choice="header">
+      <div class="opt-header"><span class="opt-tag">C</span><span class="opt-name">딥 네이비 그라데이션</span><span class="opt-desc">~120px · 더 깊은 컬러</span></div>
+      <div class="opt-body">
+        <div class="hdr-gradient">
+          <div class="hdr-row">
+            <div class="hdr-icon hdr-icon-ring">🚙</div>
+            <div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management · 48대 등록</div></div>
+            <div class="hdr-actions"><button class="hdr-btn hdr-btn-sec">📥 엑셀</button><button class="hdr-btn" style="background:linear-gradient(135deg,#2d5fa8,#1e40af);color:#fff;border:none;">+ 차량 등록</button></div>
+          </div>
+          <div class="hdr-stats">
+            <div class="hdr-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#f1f5f9;"><span class="l" style="color:#cbd5e1">전체</span><span class="v">48</span></div>
+            <div class="hdr-stat" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+            <div class="hdr-stat" style="background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.2);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+            <div class="hdr-stat" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#fca5a5;"><span class="l" style="color:#fecaca">만료</span><span class="v">4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H-D -->
+    <div class="opt-card" onclick="select('header',3,this)" data-choice="header">
+      <div class="opt-header"><span class="opt-tag">D</span><span class="opt-name">초컴팩트 인라인</span><span class="opt-desc">~50px · 1줄 · 최대 공간확보</span></div>
+      <div class="opt-body">
+        <div class="hdr-compact">
+          <div class="hdr-row">
+            <div class="hdr-icon hdr-icon-blue" style="width:30px;height:30px;border-radius:8px;font-size:15px;">🚙</div>
+            <div class="hdr-title" style="font-size:15px;">전체 차량 대장</div>
+            <div class="hdr-divider"></div>
+            <div class="inline-stats">
+              <div class="inline-stat"><span class="l">전체</span><span class="v" style="color:#f1f5f9;">48</span></div>
+              <div class="inline-stat"><span class="l">운영</span><span class="v" style="color:#86efac;">32</span></div>
+              <div class="inline-stat"><span class="l">정비</span><span class="v" style="color:#fcd34d;">8</span></div>
+              <div class="inline-stat"><span class="l">만료</span><span class="v" style="color:#fca5a5;">4</span></div>
+            </div>
+            <div class="hdr-actions"><button class="hdr-btn hdr-btn-sec" style="padding:6px 10px;font-size:11px;">📥</button><button class="hdr-btn hdr-btn-pri" style="padding:6px 12px;font-size:11px;">+ 등록</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STEP 1: TABS ==================== -->
+<div class="section" id="step1">
+  <div class="sec-head">
+    <div class="step-num">STEP 2 / 5</div>
+    <h2>탭 & 필터 스타일 선택</h2>
+    <p>헤더 아래 탭 전환 + 필터 영역의 디자인을 선택하세요.</p>
+  </div>
+  <div class="options-grid">
+
+    <div class="opt-card selected" onclick="select('tab',0,this)" data-choice="tab">
+      <div class="opt-header"><span class="opt-tag">A</span><span class="opt-name">언더라인 탭 + 필터 칩</span><span class="opt-desc">가장 표준적</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div class="tabs-underline"><div class="tab-u on">전체 <span class="cnt">48</span></div><div class="tab-u">운영중 <span class="cnt">32</span></div><div class="tab-u">정비중 <span class="cnt">8</span></div><div class="tab-u">만료 <span class="cnt">4</span></div></div>
+        <div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><div class="f-chip">할부</div><div class="f-chip">렌트</div><input class="f-search" placeholder="🔍 검색..." /></div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('tab',1,this)" data-choice="tab">
+      <div class="opt-header"><span class="opt-tag">B</span><span class="opt-name">필 (Pill) 탭</span><span class="opt-desc">부드러운 둥근형</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div class="tabs-pill"><div class="tab-p on">전체 48</div><div class="tab-p">운영중 32</div><div class="tab-p">정비중 8</div><div class="tab-p">만료 4</div><div style="margin-left:auto;padding-right:4px;"><input class="f-search" placeholder="🔍 검색..." style="margin:0;" /></div></div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('tab',2,this)" data-choice="tab">
+      <div class="opt-header"><span class="opt-tag">C</span><span class="opt-name">다크 연결 탭</span><span class="opt-desc">헤더와 자연스럽게 연결</span></div>
+      <div class="opt-body">
+        <div style="background:linear-gradient(135deg,#0f172a,#1a2e4a);padding-bottom:0;"><div class="tabs-dark-connect"><div class="tab-dc on">전체 (48)</div><div class="tab-dc">운영중 (32)</div><div class="tab-dc">정비중 (8)</div><div class="tab-dc">만료 (4)</div></div></div>
+        <div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><div class="f-chip">할부</div><input class="f-search" placeholder="🔍 검색..." /></div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('tab',3,this)" data-choice="tab">
+      <div class="opt-header"><span class="opt-tag">D</span><span class="opt-name">세그먼트 컨트롤</span><span class="opt-desc">iOS 스타일 토글</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div class="tabs-segment"><div class="tab-sg on">전체 48</div><div class="tab-sg">운영중 32</div><div class="tab-sg">정비중 8</div><div class="tab-sg">만료 4</div></div>
+        <div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><div class="f-chip">할부</div><input class="f-search" placeholder="🔍 검색..." /></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STEP 2: LISTS ==================== -->
+<div class="section" id="step2">
+  <div class="sec-head">
+    <div class="step-num">STEP 3 / 5</div>
+    <h2>리스트 스타일 선택</h2>
+    <p>메인 콘텐츠 영역의 리스트 표시 방식을 선택하세요. 페이지 특성에 따라 다르게 적용할 수 있습니다.</p>
+  </div>
+  <div class="options-grid">
+
+    <div class="opt-card selected" onclick="select('list',0,this)" data-choice="list">
+      <div class="opt-header"><span class="opt-tag">A</span><span class="opt-name">클린 테이블</span><span class="opt-desc">데이터 밀도 높은 페이지 (차량, 견적, 투자)</span></div>
+      <div class="opt-body">
+        <div class="ls-table">
+          <table><thead><tr><th>차량번호</th><th>차종</th><th>상태</th><th>월 납입</th><th>만기일</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">12가 3456</td><td>카니발 4세대</td><td><span class="bdg bdg-g">운영중</span></td><td class="am">1,250,000</td><td style="color:#94a3b8;">2026-08</td></tr>
+            <tr><td class="nm">34나 7890</td><td>스타리아</td><td><span class="bdg bdg-y">정비중</span></td><td class="am">980,000</td><td style="color:#94a3b8;">2026-03</td></tr>
+            <tr><td class="nm">56다 1234</td><td>쏘렌토</td><td><span class="bdg bdg-g">운영중</span></td><td class="am">1,150,000</td><td style="color:#94a3b8;">2027-01</td></tr>
+            <tr><td class="nm">78라 5678</td><td>포터2</td><td><span class="bdg bdg-r">만료</span></td><td class="am" style="color:#dc2626;">650,000</td><td style="color:#94a3b8;">2025-12</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('list',1,this)" data-choice="list">
+      <div class="opt-header"><span class="opt-tag">B</span><span class="opt-name">카드 로우</span><span class="opt-desc">엔터티 중심 (고객, 보험, 프리랜서)</span></div>
+      <div class="opt-body">
+        <div class="ls-cards">
+          <div class="crd-row"><div class="crd-av" style="background:#eff6ff;">🚙</div><div class="crd-info"><div class="crd-nm">12가 3456 · 카니발 4세대</div><div class="crd-dt">리스 · 현대캐피탈 · 김철수</div></div><div class="crd-rt"><div class="crd-am">1,250,000원</div><div class="crd-sub">2026-08 만기</div></div><span class="crd-arrow">›</span></div>
+          <div class="crd-row"><div class="crd-av" style="background:#fef3c7;">🔧</div><div class="crd-info"><div class="crd-nm">34나 7890 · 스타리아</div><div class="crd-dt">할부 · KB캐피탈 · 이영희</div></div><div class="crd-rt"><div class="crd-am">980,000원</div><div class="crd-sub">2026-03 만기</div></div><span class="crd-arrow">›</span></div>
+          <div class="crd-row"><div class="crd-av" style="background:#fef2f2;">⚠️</div><div class="crd-info"><div class="crd-nm">78라 5678 · 포터2</div><div class="crd-dt">렌트 · 만료됨 · 최지훈</div></div><div class="crd-rt"><div class="crd-am" style="color:#dc2626;">650,000원</div><div class="crd-sub">2025-12 만료</div></div><span class="crd-arrow">›</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('list',2,this)" data-choice="list">
+      <div class="opt-header"><span class="opt-tag">C</span><span class="opt-name">그룹 섹션</span><span class="opt-desc">분류별 집계 (장부, 수금, 거래분류)</span></div>
+      <div class="opt-body">
+        <div class="ls-grouped">
+          <div class="grp">
+            <div class="grp-hd"><div class="grp-dot" style="background:#22c55e;"></div><span class="grp-nm">운영중</span><span class="grp-cnt">32건</span><span class="grp-tot">₩ 38,400,000</span></div>
+            <div class="grp-body">
+              <div class="grp-item"><span class="em">🚙</span><span class="nm">12가 3456 · 카니발</span><span style="font-size:11px;color:#94a3b8;">리스</span><span class="am">1,250,000</span></div>
+              <div class="grp-item"><span class="em">🚙</span><span class="nm">56다 1234 · 쏘렌토</span><span style="font-size:11px;color:#94a3b8;">리스</span><span class="am">1,150,000</span></div>
+            </div>
+          </div>
+          <div class="grp">
+            <div class="grp-hd"><div class="grp-dot" style="background:#eab308;"></div><span class="grp-nm">정비중</span><span class="grp-cnt">8건</span><span class="grp-tot">₩ 7,840,000</span></div>
+            <div class="grp-body">
+              <div class="grp-item"><span class="em">🔧</span><span class="nm">34나 7890 · 스타리아</span><span style="font-size:11px;color:#94a3b8;">할부</span><span class="am">980,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('list',3,this)" data-choice="list">
+      <div class="opt-header"><span class="opt-tag">D</span><span class="opt-name">밀집 리스트</span><span class="opt-desc">스캔 중심 (거래내역, 카드내역, 로그)</span></div>
+      <div class="opt-body">
+        <div class="ls-dense">
+          <div class="dn-hdr"><span style="width:16px;"></span><span style="width:120px;">이름</span><span style="flex:1;">상세</span><span style="width:110px;text-align:right;">금액</span><span style="width:70px;text-align:right;">날짜</span></div>
+          <div class="dn-row"><div class="dn-dot" style="background:#22c55e;"></div><div class="dn-nm">12가 3456</div><div class="dn-meta">카니발 · 리스 · 현대캐피탈</div><div class="dn-am">1,250,000</div><div class="dn-date">2026-08</div></div>
+          <div class="dn-row"><div class="dn-dot" style="background:#eab308;"></div><div class="dn-nm">34나 7890</div><div class="dn-meta">스타리아 · 할부 · KB캐피탈</div><div class="dn-am">980,000</div><div class="dn-date">2026-03</div></div>
+          <div class="dn-row"><div class="dn-dot" style="background:#ef4444;"></div><div class="dn-nm">78라 5678</div><div class="dn-meta">포터2 · 렌트 · 만료</div><div class="dn-am" style="color:#dc2626;">650,000</div><div class="dn-date">2025-12</div></div>
+          <div class="dn-row"><div class="dn-dot" style="background:#22c55e;"></div><div class="dn-nm">56다 1234</div><div class="dn-meta">쏘렌토 · 리스 · 신한캐피탈</div><div class="dn-am">1,150,000</div><div class="dn-date">2027-01</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STEP 3: BOTTOMS ==================== -->
+<div class="section" id="step3">
+  <div class="sec-head">
+    <div class="step-num">STEP 4 / 5</div>
+    <h2>하단 바 스타일 선택</h2>
+    <p>리스트 아래에 표시될 하단 영역 디자인을 선택하세요.</p>
+  </div>
+  <div class="options-grid">
+
+    <div class="opt-card selected" onclick="select('bottom',0,this)" data-choice="bottom">
+      <div class="opt-header"><span class="opt-tag">A</span><span class="opt-name">요약 풋터</span><span class="opt-desc">합계 + 액션 버튼</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div style="height:40px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 15px);"></div>
+        <div class="bt-summary">
+          <div class="bt-item"><span class="l">총 건수</span><span class="v">48건</span></div>
+          <div class="bt-div"></div>
+          <div class="bt-item"><span class="l">총 금액</span><span class="v" style="color:#2d5fa8;">₩ 52.8M</span></div>
+          <div class="bt-acts"><button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px;">📥 내보내기</button><button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px;">✓ 일괄 확정</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('bottom',1,this)" data-choice="bottom">
+      <div class="opt-header"><span class="opt-tag">B</span><span class="opt-name">플로팅 액션 바</span><span class="opt-desc">선택 시 하단에서 올라옴</span></div>
+      <div class="opt-body">
+        <div class="bt-float">
+          <div class="bar">
+            <div class="info"><strong>3건</strong> 선택</div>
+            <div class="dv"></div>
+            <div class="info">합계 <strong>₩ 3.38M</strong></div>
+            <div class="dv"></div>
+            <button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px;">🗑 삭제</button>
+            <button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px;">✓ 확정</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('bottom',2,this)" data-choice="bottom">
+      <div class="opt-header"><span class="opt-tag">C</span><span class="opt-name">페이지네이션</span><span class="opt-desc">고정 페이지 전환</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div style="height:40px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 15px);"></div>
+        <div class="bt-page"><button class="pg-b">‹</button><button class="pg-b on">1</button><button class="pg-b">2</button><button class="pg-b">3</button><button class="pg-b">4</button><span class="pg-info">48건 중 1-10</span><button class="pg-b">›</button></div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('bottom',3,this)" data-choice="bottom">
+      <div class="opt-header"><span class="opt-tag">D</span><span class="opt-name">더 보기 (Load More)</span><span class="opt-desc">그라데이션 페이드 + 버튼</span></div>
+      <div class="opt-body" style="background:#fff;">
+        <div style="height:50px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 15px);"></div>
+        <div class="bt-load"><button class="btn">더 보기 (38건 남음)</button><div class="hint">스크롤 시 자동 로드</div></div>
+      </div>
+    </div>
+
+    <div class="opt-card" onclick="select('bottom',4,this)" data-choice="bottom">
+      <div class="opt-header"><span class="opt-tag">E</span><span class="opt-name">다크 요약 바</span><span class="opt-desc">헤더와 동일 톤 · 통일감</span></div>
+      <div class="opt-body">
+        <div style="height:40px;background:#fff;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 15px);"></div>
+        <div class="bt-dark">
+          <div class="info">총 <strong>48건</strong></div>
+          <div style="width:1px;height:20px;background:rgba(255,255,255,0.12);"></div>
+          <div class="info">합계 <strong style="color:#93c5fd;">₩ 52,840,000</strong></div>
+          <div style="width:1px;height:20px;background:rgba(255,255,255,0.12);"></div>
+          <div class="info">미수금 <strong style="color:#fca5a5;">₩ 3,200,000</strong></div>
+          <div style="margin-left:auto;display:flex;gap:6px;">
+            <button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px;">📥 내보내기</button>
+            <button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px;">✓ 확정</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STEP 4: PREVIEW ==================== -->
+<div class="section" id="step4">
+  <div class="sec-head">
+    <div class="step-num">STEP 5 / 5</div>
+    <h2>조합 미리보기</h2>
+    <p>선택하신 구성요소를 조합한 최종 결과입니다.</p>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+    <div style="padding:8px 14px;border-radius:8px;background:rgba(45,95,168,0.12);border:1px solid rgba(45,95,168,0.25);font-size:12px;font-weight:700;color:#93c5fd;">헤더: <span id="sel-header-name">A · 다크 그라데이션</span></div>
+    <div style="padding:8px 14px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);font-size:12px;font-weight:700;color:#86efac;">탭: <span id="sel-tab-name">A · 언더라인</span></div>
+    <div style="padding:8px 14px;border-radius:8px;background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.25);font-size:12px;font-weight:700;color:#fcd34d;">리스트: <span id="sel-list-name">A · 클린 테이블</span></div>
+    <div style="padding:8px 14px;border-radius:8px;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);font-size:12px;font-weight:700;color:#c4b5fd;">하단: <span id="sel-bottom-name">A · 요약 풋터</span></div>
+  </div>
+
+  <div class="opt-card" style="cursor:default;">
+    <div class="opt-header"><span class="opt-tag">FINAL</span><span class="opt-name">최종 조합 미리보기</span></div>
+    <div class="opt-body mock" id="finalPreview">
+      <!-- JS will build this -->
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="sel-summary" id="selSummary">헤더: <strong>A</strong> · 탭: <strong>A</strong> · 리스트: <strong>A</strong> · 하단: <strong>A</strong></div>
+  <div class="nav-btns">
+    <button class="nav-btn secondary" id="prevBtn" onclick="prevStep()" style="display:none;">← 이전</button>
+    <button class="nav-btn primary" id="nextBtn" onclick="nextStep()">다음 →</button>
+  </div>
+</div>
+
+<!-- Preview Panel -->
+<div id="previewPanel">
+  <div class="pv-head"><h3>실시간 미리보기</h3><button class="pv-close" onclick="togglePreview()">✕</button></div>
+  <div class="pv-body" id="pvBody"></div>
+</div>
+
+<script>
+const NAMES = {
+  header: ['A · 다크 그라데이션', 'B · 글래스 모피즘', 'C · 딥 네이비', 'D · 초컴팩트'],
+  tab: ['A · 언더라인', 'B · 필 (Pill)', 'C · 다크 연결', 'D · 세그먼트'],
+  list: ['A · 클린 테이블', 'B · 카드 로우', 'C · 그룹 섹션', 'D · 밀집 리스트'],
+  bottom: ['A · 요약 풋터', 'B · 플로팅 바', 'C · 페이지네이션', 'D · 더 보기', 'E · 다크 요약']
+};
+
+let selections = { header: 0, tab: 0, list: 0, bottom: 0 };
+let currentStep = 0;
+
+function select(type, idx, el) {
+  selections[type] = idx;
+  el.parentElement.querySelectorAll('.opt-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  updateSummary();
+  updatePreview();
+}
+
+function updateSummary() {
+  const letters = ['A','B','C','D','E'];
+  document.getElementById('selSummary').innerHTML =
+    `헤더: <strong>${letters[selections.header]}</strong> · 탭: <strong>${letters[selections.tab]}</strong> · 리스트: <strong>${letters[selections.list]}</strong> · 하단: <strong>${letters[selections.bottom]}</strong>`;
+  document.getElementById('sel-header-name').textContent = NAMES.header[selections.header];
+  document.getElementById('sel-tab-name').textContent = NAMES.tab[selections.tab];
+  document.getElementById('sel-list-name').textContent = NAMES.list[selections.list];
+  document.getElementById('sel-bottom-name').textContent = NAMES.bottom[selections.bottom];
+}
+
+function goStep(n) {
+  currentStep = n;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  document.querySelectorAll('.step-pill').forEach((p, i) => {
+    p.className = 'step-pill ' + (i < n ? 'done' : i === n ? 'active' : 'idle');
+  });
+  document.getElementById('prevBtn').style.display = n > 0 ? '' : 'none';
+  document.getElementById('nextBtn').textContent = n === 4 ? '✓ 선택 완료' : '다음 →';
+  if (n === 4) buildFinalPreview();
+  window.scrollTo(0, 0);
+}
+
+function nextStep() { if (currentStep < 4) goStep(currentStep + 1); }
+function prevStep() { if (currentStep > 0) goStep(currentStep - 1); }
+
+function togglePreview() {
+  const p = document.getElementById('previewPanel');
+  const t = document.querySelector('.preview-toggle');
+  p.classList.toggle('open');
+  t.classList.toggle('on');
+  if (p.classList.contains('open')) updatePreview();
+}
+
+function getHeaderHTML() {
+  const h = selections.header;
+  const stats = `<div class="hdr-stats">
+    <div class="hdr-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f1f5f9;"><span class="l" style="color:#cbd5e1">전체</span><span class="v">48</span></div>
+    <div class="hdr-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;"><span class="l" style="color:#bbf7d0">운영</span><span class="v">32</span></div>
+    <div class="hdr-stat" style="background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.25);color:#fcd34d;"><span class="l" style="color:#fde68a">정비</span><span class="v">8</span></div>
+  </div>`;
+  if (h === 0) return `<div class="hdr-dark"><div class="hdr-row"><div class="hdr-icon hdr-icon-blue">🚙</div><div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management</div></div><div class="hdr-actions"><button class="hdr-btn hdr-btn-sec">📥</button><button class="hdr-btn hdr-btn-pri">+ 등록</button></div></div>${stats}</div>`;
+  if (h === 1) return `<div class="hdr-glass"><div class="hdr-row"><div class="hdr-icon hdr-icon-glass">🚙</div><div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management</div></div><div class="hdr-actions"><button class="hdr-btn hdr-btn-glass">📥</button><button class="hdr-btn" style="background:rgba(45,95,168,0.5);color:#fff;border:1px solid rgba(45,95,168,0.7);">+ 등록</button></div></div>${stats}</div>`;
+  if (h === 2) return `<div class="hdr-gradient"><div class="hdr-row"><div class="hdr-icon hdr-icon-ring">🚙</div><div><div class="hdr-title">전체 차량 대장</div><div class="hdr-sub">Fleet Management</div></div><div class="hdr-actions"><button class="hdr-btn hdr-btn-sec">📥</button><button class="hdr-btn" style="background:linear-gradient(135deg,#2d5fa8,#1e40af);color:#fff;border:none;">+ 등록</button></div></div>${stats}</div>`;
+  return `<div class="hdr-compact"><div class="hdr-row"><div class="hdr-icon hdr-icon-blue" style="width:30px;height:30px;border-radius:8px;font-size:15px;">🚙</div><div class="hdr-title" style="font-size:15px;">전체 차량 대장</div><div class="hdr-divider"></div><div class="inline-stats"><div class="inline-stat"><span class="l">전체</span><span class="v" style="color:#f1f5f9;">48</span></div><div class="inline-stat"><span class="l">운영</span><span class="v" style="color:#86efac;">32</span></div><div class="inline-stat"><span class="l">정비</span><span class="v" style="color:#fcd34d;">8</span></div></div><div class="hdr-actions"><button class="hdr-btn hdr-btn-pri" style="padding:6px 12px;font-size:11px;">+ 등록</button></div></div></div>`;
+}
+
+function getTabHTML() {
+  const t = selections.tab;
+  if (t === 0) return `<div class="tabs-underline"><div class="tab-u on">전체 <span class="cnt">48</span></div><div class="tab-u">운영중 <span class="cnt">32</span></div><div class="tab-u">정비중 <span class="cnt">8</span></div></div><div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><div class="f-chip">할부</div><input class="f-search" placeholder="🔍 검색..." /></div>`;
+  if (t === 1) return `<div class="tabs-pill"><div class="tab-p on">전체 48</div><div class="tab-p">운영중 32</div><div class="tab-p">정비중 8</div><div style="margin-left:auto"><input class="f-search" placeholder="🔍 검색..." /></div></div>`;
+  if (t === 2) return `<div style="background:linear-gradient(135deg,#0f172a,#1a2e4a);padding-bottom:0;"><div class="tabs-dark-connect"><div class="tab-dc on">전체 (48)</div><div class="tab-dc">운영중 (32)</div><div class="tab-dc">정비중 (8)</div></div></div><div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><input class="f-search" placeholder="🔍 검색..." /></div>`;
+  return `<div class="tabs-segment"><div class="tab-sg on">전체 48</div><div class="tab-sg">운영중 32</div><div class="tab-sg">정비중 8</div></div><div class="filter-bar"><div class="f-chip on">전체</div><div class="f-chip">리스</div><input class="f-search" placeholder="🔍 검색..." /></div>`;
+}
+
+function getListHTML() {
+  const l = selections.list;
+  if (l === 0) return `<div class="ls-table"><table><thead><tr><th>차량번호</th><th>차종</th><th>상태</th><th>월 납입</th><th>만기</th></tr></thead><tbody><tr><td class="nm">12가 3456</td><td>카니발</td><td><span class="bdg bdg-g">운영</span></td><td class="am">1,250,000</td><td style="color:#94a3b8">2026-08</td></tr><tr><td class="nm">34나 7890</td><td>스타리아</td><td><span class="bdg bdg-y">정비</span></td><td class="am">980,000</td><td style="color:#94a3b8">2026-03</td></tr><tr><td class="nm">56다 1234</td><td>쏘렌토</td><td><span class="bdg bdg-g">운영</span></td><td class="am">1,150,000</td><td style="color:#94a3b8">2027-01</td></tr></tbody></table></div>`;
+  if (l === 1) return `<div class="ls-cards"><div class="crd-row"><div class="crd-av" style="background:#eff6ff">🚙</div><div class="crd-info"><div class="crd-nm">12가 3456 · 카니발</div><div class="crd-dt">리스 · 현대캐피탈</div></div><div class="crd-rt"><div class="crd-am">1,250,000원</div><div class="crd-sub">2026-08</div></div><span class="crd-arrow">›</span></div><div class="crd-row"><div class="crd-av" style="background:#fef3c7">🔧</div><div class="crd-info"><div class="crd-nm">34나 7890 · 스타리아</div><div class="crd-dt">할부 · KB캐피탈</div></div><div class="crd-rt"><div class="crd-am">980,000원</div><div class="crd-sub">2026-03</div></div><span class="crd-arrow">›</span></div><div class="crd-row"><div class="crd-av" style="background:#ecfdf5">✅</div><div class="crd-info"><div class="crd-nm">56다 1234 · 쏘렌토</div><div class="crd-dt">리스 · 신한캐피탈</div></div><div class="crd-rt"><div class="crd-am">1,150,000원</div><div class="crd-sub">2027-01</div></div><span class="crd-arrow">›</span></div></div>`;
+  if (l === 2) return `<div class="ls-grouped"><div class="grp"><div class="grp-hd"><div class="grp-dot" style="background:#22c55e"></div><span class="grp-nm">운영중</span><span class="grp-cnt">32건</span><span class="grp-tot">₩ 38.4M</span></div><div class="grp-body"><div class="grp-item"><span class="em">🚙</span><span class="nm">12가 3456 · 카니발</span><span class="am">1,250,000</span></div><div class="grp-item"><span class="em">🚙</span><span class="nm">56다 1234 · 쏘렌토</span><span class="am">1,150,000</span></div></div></div><div class="grp"><div class="grp-hd"><div class="grp-dot" style="background:#eab308"></div><span class="grp-nm">정비중</span><span class="grp-cnt">8건</span><span class="grp-tot">₩ 7.84M</span></div><div class="grp-body"><div class="grp-item"><span class="em">🔧</span><span class="nm">34나 7890 · 스타리아</span><span class="am">980,000</span></div></div></div></div>`;
+  return `<div class="ls-dense"><div class="dn-hdr"><span style="width:16px"></span><span style="width:120px">이름</span><span style="flex:1">상세</span><span style="width:110px;text-align:right">금액</span><span style="width:70px;text-align:right">날짜</span></div><div class="dn-row"><div class="dn-dot" style="background:#22c55e"></div><div class="dn-nm">12가 3456</div><div class="dn-meta">카니발 · 리스</div><div class="dn-am">1,250,000</div><div class="dn-date">2026-08</div></div><div class="dn-row"><div class="dn-dot" style="background:#eab308"></div><div class="dn-nm">34나 7890</div><div class="dn-meta">스타리아 · 할부</div><div class="dn-am">980,000</div><div class="dn-date">2026-03</div></div><div class="dn-row"><div class="dn-dot" style="background:#22c55e"></div><div class="dn-nm">56다 1234</div><div class="dn-meta">쏘렌토 · 리스</div><div class="dn-am">1,150,000</div><div class="dn-date">2027-01</div></div></div>`;
+}
+
+function getBottomHTML() {
+  const b = selections.bottom;
+  if (b === 0) return `<div class="bt-summary"><div class="bt-item"><span class="l">총 건수</span><span class="v">48건</span></div><div class="bt-div"></div><div class="bt-item"><span class="l">총 금액</span><span class="v" style="color:#2d5fa8">₩ 52.8M</span></div><div class="bt-acts"><button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px">📥</button><button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px">✓ 확정</button></div></div>`;
+  if (b === 1) return `<div class="bt-float"><div class="bar"><div class="info"><strong>3건</strong> 선택</div><div class="dv"></div><div class="info">합계 <strong>₩ 3.38M</strong></div><div class="dv"></div><button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px">🗑</button><button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px">✓ 확정</button></div></div>`;
+  if (b === 2) return `<div class="bt-page"><button class="pg-b">‹</button><button class="pg-b on">1</button><button class="pg-b">2</button><button class="pg-b">3</button><span class="pg-info">48건 중 1-10</span><button class="pg-b">›</button></div>`;
+  if (b === 3) return `<div class="bt-load"><button class="btn">더 보기 (38건)</button><div class="hint">스크롤 시 자동 로드</div></div>`;
+  return `<div class="bt-dark"><div class="info">총 <strong>48건</strong></div><div style="width:1px;height:20px;background:rgba(255,255,255,0.12)"></div><div class="info">합계 <strong style="color:#93c5fd">₩ 52.8M</strong></div><div style="margin-left:auto;display:flex;gap:6px"><button class="hdr-btn hdr-btn-sec" style="font-size:11px;padding:6px 12px">📥</button><button class="hdr-btn hdr-btn-pri" style="font-size:11px;padding:6px 12px">✓ 확정</button></div></div>`;
+}
+
+function buildFinalPreview() {
+  document.getElementById('finalPreview').innerHTML = getHeaderHTML() + getTabHTML() + getListHTML() + getBottomHTML();
+}
+
+function updatePreview() {
+  const pvBody = document.getElementById('pvBody');
+  if (pvBody) pvBody.innerHTML = getHeaderHTML() + getTabHTML() + getListHTML() + getBottomHTML();
+}
+
+updateSummary();
+</script>
+
+</body>
+</html>

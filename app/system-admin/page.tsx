@@ -284,28 +284,6 @@ export default function SystemAdminPage() {
                         </tbody>
                       </table>
                     </div>
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                </svg>
-                              </button>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              {mod.description && (
-                                <span className="text-[11px] text-slate-400 flex-1 mr-2">{mod.description}</span>
-                              )}
-                              <select
-                                value={mod.plan_group || 'free'}
-                                onChange={(e) => updateModulePlan(mod.id, e.target.value)}
-                                className={`text-[10px] font-black px-2.5 py-1.5 rounded-lg border cursor-pointer focus:outline-none ${modPlan.color} flex-shrink-0`}
-                              >
-                                {PLANS.map(p => (
-                                  <option key={p.key} value={p.key}>{p.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
                   </>
                 )}
               </div>

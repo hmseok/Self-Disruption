@@ -72,6 +72,7 @@ interface NewCarVariant {
 interface NewCarResult {
   brand: string
   model: string
+  model_detail?: string   // 상세모델명 (트림 포함, 예: "520i (Base, M Sport)")
   year: number
   variants: NewCarVariant[]
   available: boolean
@@ -294,6 +295,7 @@ function estimateInsurance(params: {
   deductible: number
   carAge: number
   isCommercial?: boolean  // true=영업용(기본), false=비영업용
+  ownDamageCoverageRatio?: number  // 자차보장비율 0~100% (기본 100 = 전액보장)
 }): {
   vehicleClass: InsVehicleClass
   basePremium: number        // 기본 공제료 (대인/대물/자손/무보험)
@@ -323,14 +325,15 @@ function estimateInsurance(params: {
   const nonCommercialBaseFactor = isNonCommercial ? 1.30 : 1.0  // 비영업용은 개인보험사 기준 ~30% 할증
   const basePremium = Math.round(rawBase * ageFactor * nonCommercialBaseFactor)
 
-  // 자차보험 = 차량가액 × 자차요율% × 면책금할인 × 차령계수
+  // 자차보험 = 차량가액 × 자차요율% × 면책금할인 × 차령계수 × 보장비율
   // 실데이터: 국산전기 1.79~1.96%, 수입전기 2.16~2.18%
   // 비영업용: 자차요율 약 15% 높음 (개인보험사 기준)
   const nonCommercialOwnFactor = isNonCommercial ? 1.15 : 1.0
   const ownDamageRate = (INS_OWN_DAMAGE_RATE[vehicleClass] / 100) * nonCommercialOwnFactor
   const vehicleValue = params.factoryPrice > 0 ? params.factoryPrice : params.purchasePrice
+  const coverageRatio = (params.ownDamageCoverageRatio ?? 100) / 100  // 자차보장비율 (60% → 0.6)
   const ownDamagePremium = Math.round(
-    vehicleValue * ownDamageRate * deductibleDiscount * carAgeFactor
+    vehicleValue * ownDamageRate * deductibleDiscount * carAgeFactor * coverageRatio
   )
 
   const totalAnnual = basePremium + ownDamagePremium
@@ -355,7 +358,7 @@ function estimateInsurance(params: {
       { label: '자기신체사고', annual: Math.round(basePremium * 0.032), monthly: Math.round(basePremium * 0.032 / 12) },
       { label: '무보험차상해', annual: Math.round(basePremium * 0.036), monthly: Math.round(basePremium * 0.036 / 12) },
       { label: '긴급출동+한도할증', annual: Math.round(basePremium * 0.041), monthly: Math.round(basePremium * 0.041 / 12) },
-      { label: `자차손해 (면책 ${(params.deductible / 10000).toFixed(0)}만)`, annual: ownDamagePremium, monthly: Math.round(ownDamagePremium / 12) },
+      { label: `자차손해 (면책 ${(params.deductible / 10000).toFixed(0)}만·보장${Math.round(coverageRatio * 100)}%)`, annual: ownDamagePremium, monthly: Math.round(ownDamagePremium / 12) },
     ],
   }
 }
@@ -830,7 +833,7 @@ export default function RentPricingBuilder() {
   // 감가 설정
   const [carAgeMode, setCarAgeMode] = useState<'new' | 'used'>('new')  // 신차 / 연식차량 구분
   const [customCarAge, setCustomCarAge] = useState(0)         // 수동 설정 차령 (연식차량 시)
-  const [depCurvePreset, setDepCurvePreset] = useState<DepCurvePreset>('db_based')  // 감가 곡선 프리셋 (기본: 기준표 기반)
+  const [depCurvePreset, setDepCurvePreset] = useState<DepCurvePreset>('optimistic')  // 감가 곡선 프리셋 (기본: 낙관적 — 실거래 기반)
   const [depCustomCurve, setDepCustomCurve] = useState<number[]>([0, 20, 32, 40, 48, 54, 59, 63, 66.5, 69.5, 72])  // 사용자 정의 곡선
   const [depClassOverride, setDepClassOverride] = useState<string>('')  // 차종 클래스 수동 오버라이드 (빈값 = 자동)
   const [depYear1Rate, setDepYear1Rate] = useState(15)      // 1년차 감가 % (레거시, custom 모드에서만)
@@ -854,6 +857,9 @@ export default function RentPricingBuilder() {
   const [insAutoMode, setInsAutoMode] = useState(true) // true=추정자동, false=직접입력
   const [annualTax, setAnnualTax] = useState(0)              // 연간 자동차세
   const [engineCC, setEngineCC] = useState(0)                // 배기량
+
+  // 자차보장
+  const [ownDamageCoverageRatio, setOwnDamageCoverageRatio] = useState(60)  // 자차보장비율 % (기본 60%, 100%=전액보장)
 
   // 리스크
   const [deductible, setDeductible] = useState(500000)       // 면책금
@@ -1439,9 +1445,11 @@ export default function RentPricingBuilder() {
 
     try {
       setLookupStage('🤖 AI가 가격 정보를 검색하고 있습니다...')
+      const { data: { session: sess } } = await supabase.auth.getSession()
+      const tkn = sess?.access_token
       const res = await fetch('/api/lookup-new-car', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(tkn ? { 'Authorization': `Bearer ${tkn}` } : {}) },
         body: JSON.stringify({ brand: newCarBrand.trim(), model: newCarModel.trim() }),
       })
       const data = await res.json()
@@ -1468,14 +1476,8 @@ export default function RentPricingBuilder() {
       .select('*')
       .eq('company_id', effectiveCompanyId)
       .order('created_at', { ascending: false })
-    // 프론트 중복 제거 (brand+model+year 기준, 최신 데이터만 유지)
-    const unique = (data || []).reduce((acc: any[], sp: any) => {
-      const key = `${sp.brand}|${sp.model}|${sp.year}`
-      const existing = acc.find((a: any) => `${a.brand}|${a.model}|${a.year}` === key)
-      if (!existing) acc.push(sp)
-      return acc
-    }, [])
-    setSavedCarPrices(unique)
+    // 상세모델명(model)이 다르면 별도 항목으로 유지
+    setSavedCarPrices(data || [])
   }, [effectiveCompanyId])
 
   // 🆕 저장된 산출 워크시트 조회
@@ -1545,6 +1547,7 @@ export default function RentPricingBuilder() {
       if (d.annualMileage) setAnnualMileage(d.annualMileage)
       if (d.baselineKm) setBaselineKm(d.baselineKm)
       if (d.deductible !== undefined) setDeductible(d.deductible)
+      if (d.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(d.own_damage_coverage_ratio)
       if (d.margin !== undefined) setMargin(d.margin)
       if (d.maint_package) setMaintPackage(d.maint_package)
       if (d.driver_age_group) setDriverAgeGroup(d.driver_age_group)
@@ -1650,6 +1653,53 @@ export default function RentPricingBuilder() {
           }
         }
       }
+      // 신차 견적 (car_id 없음): quote_detail.car_info에서 차량 데이터 복원
+      if (!q.car_id && d.car_info) {
+        const ci = d.car_info
+        const currentYear = new Date().getFullYear()
+        const tempCar: CarData = {
+          id: `restored-${quoteId}`,
+          number: ci.number || '',
+          brand: ci.brand || '',
+          model: ci.model || '',
+          trim: ci.trim || '',
+          year: ci.year || currentYear,
+          fuel: ci.fuel || '',
+          fuel_type: ci.fuel || '',
+          mileage: ci.mileage || 0,
+          purchase_price: d.purchase_price || ci.purchase_price || 0,
+          factory_price: d.factory_price || ci.factory_price || 0,
+          engine_cc: ci.engine_cc || 0,
+          status: 'new-car-pricing',
+        }
+        setSelectedCar(tempCar)
+        setLookupMode('newcar')
+        setFactoryPrice(d.factory_price || tempCar.factory_price || 0)
+        setPurchasePrice(d.purchase_price || tempCar.purchase_price || 0)
+        setEngineCC(ci.engine_cc || 0)
+        setCarAgeMode('new')
+        setCustomCarAge(0)
+        if (d.total_acquisition_cost > 0) {
+          setTotalAcquisitionCost(d.total_acquisition_cost)
+        }
+        // 기준 테이블 매핑 적용
+        applyReferenceTableMappings(
+          {
+            brand: ci.brand,
+            model: ci.model,
+            fuel_type: ci.fuel,
+            purchase_price: d.purchase_price || tempCar.purchase_price,
+            engine_cc: ci.engine_cc,
+            year: ci.year || currentYear,
+            factory_price: d.factory_price || tempCar.factory_price,
+          },
+          {}
+        )
+        if (d.total_acquisition_cost > 0) {
+          setTotalAcquisitionCost(d.total_acquisition_cost)
+        }
+      }
+
       // worksheet 연결 시 워크시트 데이터 완전 로드
       const wsId = searchParams.get('worksheet_id') || q.worksheet_id || d.worksheet_id
       if (wsId) {
@@ -1685,6 +1735,7 @@ export default function RentPricingBuilder() {
           if (ws.maint_package) setMaintPackage(ws.maint_package as MaintenancePackage)
           if (ws.oil_change_freq) setOilChangeFreq(ws.oil_change_freq as 1 | 2)
           setDeductible(ws.deductible ?? d.deductible ?? 500000)
+          if (ws.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(ws.own_damage_coverage_ratio)
           setDeposit(ws.deposit_amount ?? d.deposit ?? 0)
           setPrepayment(ws.prepayment_amount ?? d.prepayment ?? 0)
           if (ws.deposit_discount_rate !== undefined && ws.deposit_discount_rate !== null) setDepositDiscountRate(ws.deposit_discount_rate)
@@ -1716,19 +1767,6 @@ export default function RentPricingBuilder() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // 드래그앤드롭 핸들러
-  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
-  const onDragLeave = useCallback(() => setIsDragging(false), [])
-  const onDropFile = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0]
-      // handleQuoteUpload 호출을 위한 synthetic event 대신 직접 파일 처리
-      processUploadFile(file)
-    }
-  }, [])
-
   // 파일 처리 공통 함수
   const processUploadFile = useCallback(async (file: File) => {
     // 회사 미선택 시 업로드 차단
@@ -1746,8 +1784,13 @@ export default function RentPricingBuilder() {
       const formData = new FormData()
       formData.append('file', file)
 
+      // 인증 토큰 가져오기
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch('/api/parse-quote', {
         method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
       })
       const data = await res.json()
@@ -1764,21 +1807,24 @@ export default function RentPricingBuilder() {
 
       setParseStage('💾 저장 중...')
 
-      // 저장 목록에 바로 추가
+      // 저장 목록에 바로 추가 — 상세모델명(model_detail)을 가격표 제목으로 사용
+      const displayModel = data.model_detail || data.model
       const payload = {
         company_id: effectiveCompanyId,
         brand: data.brand,
-        model: data.model,
+        model: displayModel,
         year: data.year,
         source: data.source || '가격표 업로드',
         price_data: data,
       }
+      // brand + model(상세) + year + source(파일명)로 중복 체크
+      // → 같은 모델이라도 다른 파일이면 별도 저장
       const { data: existing, error: findErr } = await supabase
         .from('new_car_prices')
         .select('id')
         .eq('company_id', effectiveCompanyId)
         .eq('brand', data.brand)
-        .eq('model', data.model)
+        .eq('model', displayModel)
         .eq('year', data.year)
         .maybeSingle()
 
@@ -1806,7 +1852,7 @@ export default function RentPricingBuilder() {
       setParseStage('✅ 완료!')
       await fetchSavedPrices()
       setLookupMode('saved')
-      alert(`${data.brand} ${data.model} 가격표가 저장 목록에 추가되었습니다.`)
+      alert(`${data.brand} ${displayModel} 가격표가 저장 목록에 추가되었습니다.`)
     } catch (err: any) {
       console.error('[가격표 업로드] 실패:', err)
       alert(err.message || '가격표 분석/저장 중 오류가 발생했습니다.')
@@ -1816,6 +1862,18 @@ export default function RentPricingBuilder() {
       setParseStartTime(0)
     }
   }, [effectiveCompanyId, fetchSavedPrices])
+
+  // 드래그앤드롭 핸들러
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
+  const onDragLeave = useCallback(() => setIsDragging(false), [])
+  const onDropFile = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0]
+      processUploadFile(file)
+    }
+  }, [processUploadFile])
 
   // 파일 input onChange → processUploadFile 호출
   const handleQuoteUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1830,21 +1888,22 @@ export default function RentPricingBuilder() {
     if (!effectiveCompanyId) { alert('회사 정보를 불러올 수 없습니다. 다시 로그인해주세요.'); return }
     setIsSavingPrice(true)
     try {
+      const displayModel = newCarResult.model_detail || newCarResult.model
       const payload = {
         company_id: effectiveCompanyId,
         brand: newCarResult.brand,
-        model: newCarResult.model,
+        model: displayModel,
         year: newCarResult.year,
         source: newCarResult.source || 'AI 조회',
         price_data: newCarResult,
       }
-      // 같은 브랜드+모델+연식이면 업데이트, 없으면 신규 등록
+      // 같은 브랜드+상세모델+연식이면 업데이트, 없으면 신규 등록
       const { data: existing } = await supabase
         .from('new_car_prices')
         .select('id')
         .eq('company_id', effectiveCompanyId)
         .eq('brand', newCarResult.brand)
-        .eq('model', newCarResult.model)
+        .eq('model', displayModel)
         .eq('year', newCarResult.year)
         .maybeSingle()
 
@@ -1938,13 +1997,16 @@ export default function RentPricingBuilder() {
       : ''
 
     // selectedCar에 임시 데이터 설정 (기존 산출 로직 호환)
+    // 신차 조회이므로 연식은 현재 연도 이상으로 보정 (AI가 과거 연식을 반환할 수 있음)
+    const currentYear = new Date().getFullYear()
+    const newCarYear = Math.max(newCarResult.year || currentYear, currentYear)
     const tempCar: CarData = {
       id: `newcar-${Date.now()}`,
       number: '',
       brand: newCarResult.brand,
       model: newCarResult.model,
       trim: `${newCarSelectedVariant.variant_name} / ${newCarSelectedTrim.name}${optionNames}`,
-      year: newCarResult.year,
+      year: newCarYear,
       fuel: newCarSelectedVariant.fuel_type,
       mileage: 0,
       purchase_price: purchasePrice,
@@ -1972,7 +2034,7 @@ export default function RentPricingBuilder() {
       fuel_type: newCarSelectedVariant.fuel_type,
       purchase_price: purchasePrice,
       engine_cc: newCarSelectedVariant.engine_cc,
-      year: newCarResult.year,
+      year: newCarYear,
       factory_price: factoryTotal,
     })
   }, [newCarResult, newCarSelectedVariant, newCarSelectedTrim, newCarSelectedOptions, newCarPurchasePrice, applyReferenceTableMappings])
@@ -2080,10 +2142,11 @@ export default function RentPricingBuilder() {
       deductible: deductible,
       carAge: carAge,
       isCommercial: selectedCar.is_commercial,
+      ownDamageCoverageRatio: ownDamageCoverageRatio,
     })
     setInsEstimate(est)
     setMonthlyInsuranceCost(est.totalMonthly)
-  }, [selectedCar, factoryPrice, purchasePrice, engineCC, driverAgeGroup, deductible, carAgeMode, customCarAge, insAutoMode])
+  }, [selectedCar, factoryPrice, purchasePrice, engineCC, driverAgeGroup, deductible, carAgeMode, customCarAge, insAutoMode, ownDamageCoverageRatio])
 
   // 초과주행 요금: 사용자 수동 입력값 → 약관 DB → fallback 순서
   const termsExcessInfo = useMemo(() => {
@@ -2422,9 +2485,10 @@ export default function RentPricingBuilder() {
       totalDiscount
     )
 
-    // 7. 최종 렌트가
-    const suggestedRent = totalMonthlyCost + margin
-    const rentWithVAT = Math.round(suggestedRent * 1.1)
+    // 7. 최종 렌트가 (천원단위 반올림)
+    const rawSuggestedRent = totalMonthlyCost + margin
+    const suggestedRent = Math.round(rawSuggestedRent / 1000) * 1000
+    const rentWithVAT = Math.round(suggestedRent * 1.1 / 1000) * 1000
 
     // 8. 시장 비교
     const validComps = marketComps.filter(c => c.monthly_rent > 0)
@@ -2721,7 +2785,7 @@ export default function RentPricingBuilder() {
       },
       loan_amount: loanAmount, loan_rate: loanRate, investment_rate: investmentRate,
       term_months: termMonths, annualMileage, baselineKm,
-      deposit, prepayment, deductible, margin,
+      deposit, prepayment, deductible, margin, own_damage_coverage_ratio: ownDamageCoverageRatio,
       driver_age_group: driverAgeGroup,
       ins_estimate: insEstimate ? {
         vehicleClass: insEstimate.vehicleClass, basePremium: insEstimate.basePremium,
@@ -3033,7 +3097,7 @@ export default function RentPricingBuilder() {
   if (wizardStep === 'preview' && calculations && selectedCar) {
     const calc = calculations
     const car = selectedCar
-    const rentVAT = Math.round(calc.suggestedRent * 0.1)
+    const rentVAT = Math.round(calc.suggestedRent * 0.1 / 1000) * 1000  // 천원단위 반올림
 
     return (
       <div className="min-h-screen bg-gray-100 py-6 px-4 quote-print-wrapper">
@@ -3645,7 +3709,11 @@ export default function RentPricingBuilder() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {items.map((sp: any) => {
-                      const isSelected = newCarResult && newCarResult.brand === sp.brand && newCarResult.model === sp.model
+                      const isSelected = newCarResult && newCarResult.brand === sp.brand && (
+                        newCarResult.model === sp.model ||
+                        (newCarResult.model_detail || newCarResult.model) === sp.model ||
+                        sp.model?.startsWith(newCarResult.model)
+                      )
                       return (
                         <div key={`sp-${sp.id}`}
                           className={`flex items-center gap-3 px-4 py-3 border rounded-xl group cursor-pointer transition-all ${
@@ -5132,6 +5200,24 @@ export default function RentPricingBuilder() {
                     {info.label} <span className="text-[9px] opacity-70">{info.factor > 1.0 ? `+${((info.factor - 1) * 100).toFixed(0)}%` : '기준'}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* ①-2 자차보장비율 선택 */}
+              <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                <span className="text-xs font-bold text-gray-600 shrink-0">자차보장</span>
+                {[60, 70, 80, 90, 100].map(v => (
+                  <button key={v} onClick={() => setOwnDamageCoverageRatio(v)}
+                    className={`py-0.5 px-2 text-[11px] rounded-lg border font-bold transition-colors
+                      ${ownDamageCoverageRatio === v
+                        ? v <= 70 ? 'bg-green-600 text-white border-green-600'
+                          : v <= 90 ? 'bg-steel-600 text-white border-steel-600'
+                          : 'bg-orange-500 text-white border-orange-500'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                  >{v}%</button>
+                ))}
+                <span className="text-[10px] text-gray-400 ml-1">
+                  {ownDamageCoverageRatio < 100 ? `차량가액의 ${ownDamageCoverageRatio}%만 보장 → 보험료 절감` : '전액보장'}
+                </span>
               </div>
 
               {/* ② 직접입력 시 */}

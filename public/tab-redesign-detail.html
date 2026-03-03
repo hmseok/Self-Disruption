@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>옵션 A 상세 프리뷰 — 실제 화면 수준</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; }
+
+  /* Page Title (P3-C) */
+  .page-title { display: flex; align-items: center; gap: 10px; padding: 12px 20px; }
+  .page-dot { width: 8px; height: 8px; border-radius: 50%; background: #2d5fa8; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(45,95,168,0.15); }
+  .page-section { font-size: 11px; color: #94a3b8; font-weight: 500; }
+  .page-arrow { color: #cbd5e1; font-size: 11px; }
+  .page-name { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .page-line { height: 1.5px; background: #2d5fa8; }
+
+  /* Layout */
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px; background: #f9fafb; min-height: 100vh; }
+  .card { border-radius: 16px; overflow: hidden; box-shadow: 0 2px 16px rgba(45,95,168,0.08); background: #fff; margin-bottom: 16px; }
+
+  /* Tab Navigation */
+  .tab-nav { display: flex; align-items: center; background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 0 4px; position: sticky; top: 0; z-index: 10; }
+  .upload-area { padding: 6px 8px; margin: 6px 8px 6px 4px; cursor: pointer; }
+  .upload-inner { display: flex; align-items: center; gap: 5px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: #64748b; background: #fafbfc; border: 1.5px dashed #cbd5e1; border-radius: 8px; transition: all 0.2s; }
+  .upload-inner:hover { border-color: #2d5fa8; color: #2d5fa8; background: #eff6ff; }
+  .tab-btn { padding: 10px 18px; border: none; cursor: pointer; border-bottom: 3px solid transparent; background: transparent; font-size: 12px; font-weight: 600; color: #94a3b8; display: flex; align-items: center; gap: 4px; transition: all 0.15s; }
+  .tab-btn.active { font-weight: 800; color: #0f172a; border-bottom-color: #2d5fa8; background: #fff; }
+  .tab-btn .cnt { font-size: 10px; font-weight: 700; }
+  .tab-right { margin-left: auto; display: flex; gap: 6px; padding-right: 8px; }
+  .btn { padding: 5px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .btn-ghost { color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .btn-blue { color: #fff; background: #2d5fa8; box-shadow: 0 1px 4px rgba(45,95,168,0.3); }
+
+  /* Filter bar */
+  .filter-row { display: flex; align-items: center; padding: 10px 16px; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid #f1f5f9; }
+  .chip { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .chip-active { background: #fff7ed; color: #ea580c; border: 1.5px solid #fed7aa; }
+  .chip-new { background: #fef3c7; color: #b45309; border: 1.5px solid #fde68a; }
+  .chip-warn { background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; }
+  .chip-off { background: #fff; color: #9ca3af; border: 1px solid #e5e7eb; }
+  .sep { width: 1px; height: 20px; background: #e5e7eb; margin: 0 2px; flex-shrink: 0; }
+  .sel { padding: 6px 28px 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1.5px solid #2d5fa8; color: #0f172a; background: #fff; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%232d5fa8' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+  .toggle-wrap { display: flex; background: #f1f5f9; padding: 3px; border-radius: 8px; }
+  .toggle-btn { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; background: transparent; color: #64748b; }
+  .toggle-btn.on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* Stats */
+  .stats { display: flex; border-bottom: 1px solid #e2e8f0; }
+  .stat { flex: 1; padding: 10px 12px; text-align: center; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.15s; }
+  .stat.on { border-bottom-color: #2d5fa8; background: #eff6ff; }
+  .stat-lab { font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 2px; }
+  .stat-val { font-size: 18px; font-weight: 900; color: #1e293b; }
+  .stat.on .stat-lab, .stat.on .stat-val { color: #2d5fa8; }
+  .stat-unit { font-size: 11px; font-weight: 500; }
+
+  /* Group */
+  .grp { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; cursor: pointer; }
+  .grp:hover { background: #f1f5f9; }
+  .grp-cb { width: 15px; height: 15px; accent-color: #2d5fa8; }
+  .grp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .grp-name { font-size: 12px; font-weight: 800; color: #1e293b; }
+  .grp-meta { font-size: 10px; color: #94a3b8; font-weight: 500; }
+  .grp-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .btn-confirm { padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #fff; background: #16a34a; border: none; cursor: pointer; }
+  .btn-confirm:hover { background: #15803d; }
+  .arrow { font-size: 12px; color: #94a3b8; }
+
+  /* Sub group */
+  .sub-grp { display: flex; align-items: center; gap: 8px; padding: 6px 20px 6px 36px; background: #f0f4ff; border-bottom: 1px solid #e2e8f0; }
+  .sub-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .sub-name { font-size: 11px; font-weight: 800; color: #475569; }
+  .sub-meta { font-size: 10px; color: #94a3b8; font-weight: 500; }
+
+  /* Item rows */
+  .row { display: flex; align-items: center; padding: 8px 16px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; transition: background 0.1s; }
+  .row:hover { background: #fafbfc; }
+  .row-cb { width: 14px; height: 14px; accent-color: #2d5fa8; flex-shrink: 0; }
+  .row-date { color: #94a3b8; width: 76px; font-size: 10px; flex-shrink: 0; }
+  .badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .b-card { background: #fef3c7; color: #b45309; }
+  .b-bank { background: #e0f2fe; color: #0369a1; }
+  .b-out { background: #fef2f2; color: #ef4444; }
+  .b-in { background: #eff6ff; color: #2563eb; }
+  .b-auto { background: #f3e8ff; color: #7c3aed; }
+  .row-name { font-weight: 700; color: #0f172a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-desc { font-size: 10px; color: #94a3b8; width: 70px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-sel { font-size: 10px; color: #475569; padding: 3px 8px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .link-badge { font-size: 9px; color: #2d5fa8; background: #eff6ff; padding: 2px 8px; border-radius: 4px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .link-btn { font-size: 10px; color: #2d5fa8; background: #eff6ff; padding: 3px 8px; border-radius: 6px; font-weight: 600; border: 1px solid #bfdbfe; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .row-amt { font-weight: 800; font-size: 12px; text-align: right; width: 95px; flex-shrink: 0; }
+  .amt-out { color: #ef4444; }
+  .amt-in { color: #2563eb; }
+  .row-confirm { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #fff; background: #2d5fa8; border: none; cursor: pointer; flex-shrink: 0; }
+  .row-confirm:hover { background: #1e4f8f; }
+
+  /* Tab content sections */
+  .tab-content { display: none; }
+  .tab-content.show { display: block; }
+
+  /* Link cards grid */
+  .link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 16px; }
+  .lk-card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.15s; }
+  .lk-card:hover { border-color: #2d5fa8; box-shadow: 0 4px 16px rgba(45,95,168,0.1); transform: translateY(-1px); }
+  .lk-card.warn { border-color: #fecaca; }
+  .lk-card.done { border-color: #bbf7d0; }
+  .lk-card.active { border-color: #2d5fa8; background: #f8faff; box-shadow: 0 4px 16px rgba(45,95,168,0.12); }
+  .lk-icon { font-size: 28px; text-align: center; margin-bottom: 8px; }
+  .lk-name { font-size: 13px; font-weight: 800; color: #1e293b; text-align: center; margin-bottom: 8px; }
+  .lk-bar { height: 4px; background: #f1f5f9; border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+  .lk-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .lk-count { font-size: 10px; color: #64748b; font-weight: 600; text-align: center; }
+
+  /* Link detail */
+  .link-detail { border-top: 1px solid #e2e8f0; }
+  .link-detail-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .link-detail-header .back { font-size: 12px; color: #2d5fa8; cursor: pointer; font-weight: 700; }
+  .link-detail-header .title { font-size: 13px; font-weight: 800; color: #1e293b; }
+  .link-detail-header .meta { font-size: 10px; color: #94a3b8; margin-left: auto; }
+  .link-sub { padding: 8px 16px; background: #f0fdf4; border-bottom: 1px solid #dcfce7; font-size: 11px; font-weight: 700; color: #16a34a; }
+  .link-sub.unlinked { background: #fef3c7; border-color: #fde68a; color: #b45309; }
+  .link-row { display: flex; align-items: center; padding: 8px 16px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; }
+  .link-row:hover { background: #fafbfc; }
+  .link-row .linked-to { font-size: 9px; color: #16a34a; background: #f0fdf4; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .link-row .unlinked-badge { font-size: 9px; color: #d97706; background: #fffbeb; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+
+  /* Confirmed tab */
+  .period-bar { display: flex; gap: 4px; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .period-btn { padding: 6px 16px; border-radius: 6px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; }
+  .period-btn.on { background: #2d5fa8; color: #fff; }
+  .period-btn.off { background: #fff; color: #64748b; border: 1px solid #e5e7eb; }
+  .confirmed-row { display: flex; align-items: center; padding: 8px 16px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; }
+  .confirmed-row:hover { background: #fafbfc; }
+  .cat-badge { font-size: 10px; font-weight: 700; color: #16a34a; white-space: nowrap; }
+  .btn-revert { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #d97706; background: #fffbeb; border: 1px solid #fde68a; cursor: pointer; flex-shrink: 0; }
+
+  /* Summary stats for confirmed */
+  .conf-stats { display: flex; gap: 12px; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .conf-stat { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .conf-stat .label { color: #94a3b8; font-weight: 500; }
+  .conf-stat .value { font-weight: 800; color: #1e293b; }
+
+  /* Navigation switcher */
+  .nav-switch { display: flex; justify-content: center; gap: 8px; padding: 16px; background: #f1f5f9; }
+  .nav-btn { padding: 10px 24px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; border: 2px solid #e2e8f0; background: #fff; color: #475569; transition: all 0.15s; }
+  .nav-btn:hover { border-color: #2d5fa8; color: #2d5fa8; }
+  .nav-btn.active { border-color: #2d5fa8; background: #2d5fa8; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- 탭 전환 네비게이션 -->
+<div class="nav-switch">
+  <button class="nav-btn active" onclick="showView('classify')">📋 분류 관리 탭</button>
+  <button class="nav-btn" onclick="showView('link')">🔗 연결현황 탭</button>
+  <button class="nav-btn" onclick="showView('link-detail')">🔗 연결현황 → 상세</button>
+  <button class="nav-btn" onclick="showView('confirmed')">✅ 확정완료 탭</button>
+</div>
+
+<div class="page-wrap">
+
+  <!-- P3-C 페이지 타이틀 -->
+  <div style="margin-bottom:16px;">
+    <div class="page-title">
+      <div class="page-dot"></div>
+      <span class="page-section">재무</span>
+      <span class="page-arrow">&rsaquo;</span>
+      <span class="page-name">카드/통장 관리</span>
+    </div>
+    <div class="page-line"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- VIEW 1: 📋 분류 관리 -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="view-classify" class="tab-content show">
+    <div class="card">
+      <!-- 탭 바 -->
+      <div class="tab-nav">
+        <div class="upload-area"><div class="upload-inner">📂 파일 업로드</div></div>
+        <button class="tab-btn active">📋 분류 관리 <span class="cnt" style="color:#d97706;">991</span></button>
+        <button class="tab-btn" onclick="showView('link')">🔗 연결현황</button>
+        <button class="tab-btn" onclick="showView('confirmed')">✅ 확정완료 <span class="cnt" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-right">
+          <button class="btn btn-ghost">🔄 중복체크</button>
+          <button class="btn btn-blue">🤖 AI 자동분류</button>
+        </div>
+      </div>
+
+      <!-- 필터 -->
+      <div class="filter-row">
+        <span class="chip chip-active">검토 대기 (991)</span>
+        <span class="chip chip-new">🆕 최근 업로드 (0)</span>
+        <span class="chip chip-warn">❓ 미분류 (5)</span>
+        <div class="sep"></div>
+        <select class="sel">
+          <option>📂 카테고리별</option>
+          <option>💳 카드별</option>
+          <option>🏦 통장별</option>
+          <option>🚙 차량별</option>
+          <option>👤 사용자별</option>
+        </select>
+        <div style="margin-left:auto;">
+          <div class="toggle-wrap">
+            <button class="toggle-btn on">📋 용도별</button>
+            <button class="toggle-btn">📊 회계기준</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 통계 -->
+      <div class="stats">
+        <div class="stat on"><div class="stat-lab">📋 전체</div><div class="stat-val">991<span class="stat-unit">건</span></div></div>
+        <div class="stat"><div class="stat-lab">💳 카드</div><div class="stat-val">675<span class="stat-unit">건</span></div></div>
+        <div class="stat"><div class="stat-lab">🏦 통장</div><div class="stat-val">316<span class="stat-unit">건</span></div></div>
+        <div class="stat"><div class="stat-lab" style="color:#dc2626;">❓ 미분류</div><div class="stat-val" style="color:#dc2626;">5<span class="stat-unit">건</span></div></div>
+      </div>
+
+      <!-- 법인카드 매칭 정보 -->
+      <div style="padding:6px 16px; background:#eff6ff; border-bottom:1px solid #bfdbfe; font-size:10px; color:#2d5fa8; font-weight:600; display:flex; justify-content:flex-end;">
+        법인카드 매칭 675/675건 · 분류 완료 986/991건
+      </div>
+
+      <!-- 그룹: 차량 운영 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#ef4444;"></div>
+        <span class="grp-name">🚛 차량 운영</span>
+        <span class="grp-meta">245건 · 12,450,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▼</span></div>
+      </div>
+      <!-- 서브그룹 -->
+      <div class="sub-grp">
+        <div class="sub-dot" style="background:#f59e0b;"></div>
+        <span class="sub-name">유류비</span>
+        <span class="sub-meta">120건 · 5,230,000원</span>
+      </div>
+      <div class="row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-31</span>
+        <span class="badge b-card">카드 4331</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">우리유통 여산(삼)충전소</span>
+        <span class="row-desc">일시불</span>
+        <span class="cat-sel">유류비 ▾</span>
+        <span class="link-btn">🔗 연결</span>
+        <span class="row-amt amt-out">52,637</span>
+        <button class="row-confirm">확정</button>
+      </div>
+      <div class="row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-31</span>
+        <span class="badge b-card">카드 4331</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">우리유통 여산(삼)충전소</span>
+        <span class="row-desc">일시불 / 취소</span>
+        <span class="cat-sel">유류비 ▾</span>
+        <span class="link-btn">🔗 연결</span>
+        <span class="row-amt amt-out">42,637</span>
+        <button class="row-confirm">확정</button>
+      </div>
+      <div class="row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-30</span>
+        <span class="badge b-card">카드 4331</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">주식회사미성에너지</span>
+        <span class="row-desc">일시불</span>
+        <span class="cat-sel">유류비 ▾</span>
+        <span class="link-badge">🚛 12가3456</span>
+        <span class="row-amt amt-out">37,675</span>
+        <button class="row-confirm">확정</button>
+      </div>
+
+      <div class="sub-grp">
+        <div class="sub-dot" style="background:#ef4444;"></div>
+        <span class="sub-name">정비/수리비</span>
+        <span class="sub-meta">45건 · 3,200,000원</span>
+      </div>
+      <div class="row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-29</span>
+        <span class="badge b-card">카드 4331</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">카센타 정비소</span>
+        <span class="row-desc">일시불</span>
+        <span class="cat-sel">정비/수리비 ▾</span>
+        <span class="link-badge">🚛 34나5678</span>
+        <span class="row-amt amt-out">150,000</span>
+        <button class="row-confirm">확정</button>
+      </div>
+
+      <!-- 그룹: 투자/대출 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#2563eb;"></div>
+        <span class="grp-name">🏦 투자/대출 입출금</span>
+        <span class="grp-meta">58건 · 125,000,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▶</span></div>
+      </div>
+
+      <!-- 그룹: 급여/인건비 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#7c3aed;"></div>
+        <span class="grp-name">👨‍💼 급여/인건비</span>
+        <span class="grp-meta">42건 · 28,500,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▶</span></div>
+      </div>
+
+      <!-- 그룹: 사무실/운영비 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#0891b2;"></div>
+        <span class="grp-name">🏢 사무실/운영비</span>
+        <span class="grp-meta">86건 · 4,200,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▶</span></div>
+      </div>
+
+      <!-- 그룹: 식비/접대 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#ea580c;"></div>
+        <span class="grp-name">🍽️ 식비/접대/출장</span>
+        <span class="grp-meta">156건 · 3,800,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▶</span></div>
+      </div>
+
+      <!-- 그룹: 돈 들어오는 것 -->
+      <div class="grp">
+        <input type="checkbox" class="grp-cb">
+        <div class="grp-dot" style="background:#16a34a;"></div>
+        <span class="grp-name">💰 돈 들어오는 것</span>
+        <span class="grp-meta">320건 · 285,000,000원</span>
+        <div class="grp-right"><button class="btn-confirm">일괄확정</button><span class="arrow">▶</span></div>
+      </div>
+
+      <div style="padding:12px 16px; text-align:center; font-size:10px; color:#94a3b8;">
+        전체 991건 · 9개 카테고리 그룹
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- VIEW 2: 🔗 연결현황 (카드 요약) -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="view-link" class="tab-content">
+    <div class="card">
+      <div class="tab-nav">
+        <div class="upload-area"><div class="upload-inner">📂 파일 업로드</div></div>
+        <button class="tab-btn" onclick="showView('classify')">📋 분류 관리 <span class="cnt" style="color:#d97706;">991</span></button>
+        <button class="tab-btn active">🔗 연결현황</button>
+        <button class="tab-btn" onclick="showView('confirmed')">✅ 확정완료 <span class="cnt" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-right">
+          <button class="btn btn-ghost">🔄 전체 새로고침</button>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <span style="font-size:14px; font-weight:800; color:#1e293b;">엔티티별 연결 상태</span>
+          <span style="font-size:11px; color:#94a3b8; margin-left:8px;">전체 거래 중 연결된 항목 현황</span>
+        </div>
+        <div style="display:flex; gap:8px; font-size:10px;">
+          <span style="color:#16a34a; font-weight:700;">✓ 연결 완료 68건</span>
+          <span style="color:#d97706; font-weight:700;">⚠ 미연결 26건</span>
+        </div>
+      </div>
+
+      <div class="link-grid">
+        <div class="lk-card" onclick="showView('link-detail')">
+          <div class="lk-icon">🤝</div>
+          <div class="lk-name">지입</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:75%; background:#2d5fa8;"></div></div>
+          <div class="lk-count">15/20건 연결 (75%)</div>
+        </div>
+        <div class="lk-card">
+          <div class="lk-icon">💼</div>
+          <div class="lk-name">투자</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:80%; background:#16a34a;"></div></div>
+          <div class="lk-count">8/10건 연결 (80%)</div>
+        </div>
+        <div class="lk-card">
+          <div class="lk-icon">🏦</div>
+          <div class="lk-name">대출</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:62%; background:#d97706;"></div></div>
+          <div class="lk-count">5/8건 연결 (62%)</div>
+        </div>
+        <div class="lk-card">
+          <div class="lk-icon">👨‍💼</div>
+          <div class="lk-name">급여</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:100%; background:#16a34a;"></div></div>
+          <div class="lk-count" style="color:#16a34a;">✓ 20/20건 완료</div>
+        </div>
+        <div class="lk-card warn">
+          <div class="lk-icon">👷</div>
+          <div class="lk-name">프리랜서</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:0%; background:#ef4444;"></div></div>
+          <div class="lk-count" style="color:#ef4444;">0/3건 ⚠ 미연결</div>
+        </div>
+        <div class="lk-card done">
+          <div class="lk-icon">🛡️</div>
+          <div class="lk-name">보험</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:100%; background:#16a34a;"></div></div>
+          <div class="lk-count" style="color:#16a34a;">✓ 완료</div>
+        </div>
+        <div class="lk-card">
+          <div class="lk-icon">🚛</div>
+          <div class="lk-name">차량</div>
+          <div class="lk-bar"><div class="lk-fill" style="width:67%; background:#2d5fa8;"></div></div>
+          <div class="lk-count">20/30건 연결 (67%)</div>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px; text-align:center; font-size:10px; color:#94a3b8; border-top:1px solid #f1f5f9;">
+        카드를 클릭하면 해당 엔티티의 연결된 거래 + 미연결 거래를 상세로 확인할 수 있습니다
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- VIEW 3: 🔗 연결현황 → 지입 상세 -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="view-link-detail" class="tab-content">
+    <div class="card">
+      <div class="tab-nav">
+        <div class="upload-area"><div class="upload-inner">📂 파일 업로드</div></div>
+        <button class="tab-btn" onclick="showView('classify')">📋 분류 관리 <span class="cnt" style="color:#d97706;">991</span></button>
+        <button class="tab-btn active">🔗 연결현황</button>
+        <button class="tab-btn" onclick="showView('confirmed')">✅ 확정완료 <span class="cnt" style="color:#94a3b8;">1,247</span></button>
+      </div>
+
+      <!-- 뒤로가기 + 타이틀 -->
+      <div class="link-detail-header">
+        <span class="back" onclick="showView('link')">← 돌아가기</span>
+        <span style="font-size:20px;">🤝</span>
+        <span class="title">지입 연결 상세</span>
+        <span class="meta">15건 연결 · 5건 미연결 · 총 20건</span>
+      </div>
+
+      <!-- 연결된 거래 -->
+      <div class="link-sub">✓ 연결 완료 (15건)</div>
+
+      <div class="link-row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-31</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">지입수익배분금 - 김지입</span>
+        <span class="linked-to">🤝 지입 #5</span>
+        <span class="row-amt amt-out">1,200,000</span>
+      </div>
+      <div class="link-row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-30</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-in">입금</span>
+        <span class="row-name">지입 관리비 입금 - 박지입</span>
+        <span class="linked-to">🤝 지입 #3</span>
+        <span class="row-amt amt-in">850,000</span>
+      </div>
+      <div class="link-row">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-28</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">지입수익배분금 - 이지입</span>
+        <span class="linked-to">🤝 지입 #7</span>
+        <span class="row-amt amt-out">980,000</span>
+      </div>
+      <div style="padding:6px 16px; font-size:10px; color:#94a3b8; text-align:center;">... 12건 더 보기</div>
+
+      <!-- 미연결 거래 -->
+      <div class="link-sub unlinked">⚠ 미연결 (5건) — AI가 지입 관련으로 추정한 거래</div>
+
+      <div class="link-row" style="background:#fffbeb;">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-27</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-in">입금</span>
+        <span class="row-name">관리비 입금 - 최OO</span>
+        <span class="unlinked-badge">⚠ 미연결</span>
+        <span class="row-amt amt-in">500,000</span>
+        <button class="link-btn">🔗 연결</button>
+      </div>
+      <div class="link-row" style="background:#fffbeb;">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-25</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">지입보증금 반환</span>
+        <span class="unlinked-badge">⚠ 미연결</span>
+        <span class="row-amt amt-out">3,000,000</span>
+        <button class="link-btn">🔗 연결</button>
+      </div>
+      <div class="link-row" style="background:#fffbeb;">
+        <input type="checkbox" class="row-cb">
+        <span class="row-date">2025-10-22</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-in">입금</span>
+        <span class="row-name">미확인 입금건 #1</span>
+        <span class="unlinked-badge">⚠ 미연결</span>
+        <span class="row-amt amt-in">750,000</span>
+        <button class="link-btn">🔗 연결</button>
+      </div>
+
+      <div style="padding:10px 16px; display:flex; gap:8px; justify-content:center; border-top:1px solid #e2e8f0;">
+        <button class="btn btn-blue" style="padding:8px 20px; font-size:12px;">선택한 3건 일괄 연결</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- VIEW 4: ✅ 확정완료 -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="view-confirmed" class="tab-content">
+    <div class="card">
+      <div class="tab-nav">
+        <div class="upload-area"><div class="upload-inner">📂 파일 업로드</div></div>
+        <button class="tab-btn" onclick="showView('classify')">📋 분류 관리 <span class="cnt" style="color:#d97706;">991</span></button>
+        <button class="tab-btn" onclick="showView('link')">🔗 연결현황</button>
+        <button class="tab-btn active">✅ 확정완료 <span class="cnt" style="color:#16a34a;">1,247</span></button>
+        <div class="tab-right">
+          <button class="btn btn-ghost">📥 내보내기</button>
+        </div>
+      </div>
+
+      <!-- 기간 필터 -->
+      <div class="period-bar">
+        <button class="period-btn on">이번 달</button>
+        <button class="period-btn off">지난 달</button>
+        <button class="period-btn off">3개월</button>
+        <button class="period-btn off">전체</button>
+        <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+          <select class="sel" style="font-size:11px; padding:5px 24px 5px 10px; font-weight:600; border-color:#e2e8f0; color:#475569;">
+            <option>📂 전체 카테고리</option>
+            <option>🚛 차량 운영</option>
+            <option>🏦 투자/대출</option>
+            <option>💰 돈 들어오는 것</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 요약 -->
+      <div class="conf-stats">
+        <div class="conf-stat"><span class="label">확정 건수</span><span class="value">1,247건</span></div>
+        <div class="conf-stat"><span class="label">총 출금</span><span class="value" style="color:#ef4444;">-58,320,000원</span></div>
+        <div class="conf-stat"><span class="label">총 입금</span><span class="value" style="color:#2563eb;">+312,500,000원</span></div>
+      </div>
+
+      <!-- 확정 항목 리스트 -->
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-31</span>
+        <span class="badge b-card">카드</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">우리유통 여산(삼)충전소</span>
+        <span class="cat-badge">유류비</span>
+        <span class="link-badge">🚛 12가3456</span>
+        <span class="row-amt amt-out">52,637</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-31</span>
+        <span class="badge b-card">카드</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">주식회사 코페이</span>
+        <span class="cat-badge">수수료</span>
+        <span style="width:70px;"></span>
+        <span class="row-amt amt-out">300,000</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-30</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-in">입금</span>
+        <span class="row-name">투자원금 - 홍길동</span>
+        <span class="cat-badge">투자원금 입금</span>
+        <span class="link-badge">💼 투자 #3</span>
+        <span class="row-amt amt-in">5,000,000</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-30</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">지입수익배분금 - 김지입</span>
+        <span class="cat-badge">지입 수익배분금</span>
+        <span class="link-badge">🤝 지입 #5</span>
+        <span class="row-amt amt-out">1,200,000</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-29</span>
+        <span class="badge b-card">카드</span>
+        <span class="badge b-out">출금</span>
+        <span class="row-name">이마트24R구미옥계원룸점</span>
+        <span class="cat-badge">복리후생(식대)</span>
+        <span style="width:70px;"></span>
+        <span class="row-amt amt-out">10,300</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-28</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-auto">자동이체</span>
+        <span class="row-name">국민은행 대출이자</span>
+        <span class="cat-badge">이자비용</span>
+        <span class="link-badge">🏦 대출 #2</span>
+        <span class="row-amt amt-out">450,000</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+      <div class="confirmed-row">
+        <span class="row-date">2025-10-27</span>
+        <span class="badge b-bank">통장</span>
+        <span class="badge b-in">입금</span>
+        <span class="row-name">렌트수입 - (주)물류센터</span>
+        <span class="cat-badge">렌트/운송수입</span>
+        <span class="link-badge">🚛 56마7890</span>
+        <span class="row-amt amt-in">3,500,000</span>
+        <button class="btn-revert">↩ 되돌리기</button>
+      </div>
+
+      <div style="padding:12px 16px; text-align:center; font-size:10px; color:#94a3b8; border-top:1px solid #f1f5f9;">
+        이번 달 확정 1,247건 (총 254,180,000원)
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showView(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('show'));
+  document.getElementById('view-' + id).classList.add('show');
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

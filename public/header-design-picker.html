@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P3 변형 — 브레드크럼 + 제목 디자인</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; padding: 24px; }
+  h1 { text-align: center; font-size: 20px; color: #1e293b; margin-bottom: 6px; }
+  p.desc { text-align: center; font-size: 12px; color: #64748b; margin-bottom: 28px; }
+
+  .options { display: flex; flex-direction: column; gap: 28px; max-width: 1100px; margin: 0 auto; }
+  .option { background: #fff; border-radius: 16px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s; }
+  .option:hover { border-color: #2d5fa8; box-shadow: 0 8px 32px rgba(45,95,168,0.12); }
+  .option-label { padding: 12px 20px; background: #f8fafc; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #e2e8f0; }
+  .option-label h3 { font-size: 14px; font-weight: 800; color: #1e293b; }
+  .option-label .tag { font-size: 10px; color: #fff; background: #2d5fa8; padding: 3px 8px; border-radius: 6px; font-weight: 700; }
+  .option-label .desc-text { font-size: 11px; color: #94a3b8; margin-left: auto; }
+  .preview { padding: 16px; background: #f9fafb; }
+  .mock { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); background: #fff; }
+
+  .tab-bar { display: flex; align-items: center; background: #fff; padding: 0 4px; }
+  .tab-item { padding: 10px 16px; font-size: 12px; font-weight: 600; color: #94a3b8; border-bottom: 3px solid transparent; cursor: pointer; }
+  .tab-item.active { font-weight: 800; color: #0f172a; border-bottom-color: #2d5fa8; background: #fff; }
+  .upload-btn { padding: 10px 16px; font-size: 12px; font-weight: 700; color: #64748b; border-right: 1px solid #f1f5f9; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .actions { margin-left: auto; display: flex; gap: 6px; padding-right: 8px; }
+  .btn-secondary { padding: 5px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .btn-primary { padding: 5px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; color: #fff; background: #2d5fa8; box-shadow: 0 1px 4px rgba(45,95,168,0.3); }
+
+  .filter-bar { display: flex; align-items: center; padding: 8px 16px; gap: 6px; background: #fff; border-bottom: 1px solid #f1f5f9; }
+  .filter-chip { padding: 5px 12px; border-radius: 7px; font-size: 11px; font-weight: 700; }
+  .filter-chip.active { background: #fff7ed; color: #ea580c; border: 1.5px solid #fed7aa; }
+  .filter-chip.inactive { background: #fff; color: #9ca3af; border: 1px solid #e5e7eb; }
+
+  .item-row { display: flex; align-items: center; padding: 9px 16px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; }
+  .item-row .date { color: #94a3b8; width: 72px; font-size: 10px; }
+  .item-row .badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+  .item-row .badge.out { background: #fef2f2; color: #ef4444; }
+  .item-row .name { font-weight: 700; color: #0f172a; flex: 1; }
+  .item-row .amount { font-weight: 800; color: #ef4444; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>P3 변형 — 브레드크럼 + 제목 (정렬/폰트 조정)</h1>
+<p class="desc">P3 기반으로 정렬, 폰트 크기, 간격, 라인 스타일을 조정한 4가지 변형</p>
+
+<div class="options">
+
+  <!-- ═══ P3-A: 좌정렬 컴팩트 ═══ -->
+  <div class="option">
+    <div class="option-label">
+      <h3>P3-A. 좌정렬 컴팩트</h3>
+      <div class="tag">깔끔</div>
+      <div class="desc-text">브레드크럼 작게 + 제목 16px + 1행 느낌</div>
+    </div>
+    <div class="preview">
+      <div class="mock">
+        <div style="display:flex;align-items:baseline;gap:8px;padding:12px 20px;">
+          <span style="font-size:10px;color:#94a3b8;font-weight:500;">재무 ›</span>
+          <span style="font-size:16px;font-weight:800;color:#0f172a;">카드/통장 관리</span>
+        </div>
+        <div style="height:2px;background:#2d5fa8;"></div>
+        <div class="tab-bar" style="border-bottom:1px solid #e2e8f0;">
+          <div class="upload-btn"><span style="font-size:14px;">📂</span> 파일 업로드</div>
+          <div class="tab-item">📂 업로드</div>
+          <div class="tab-item active">📋 분류/확정 <span style="font-size:10px;color:#2d5fa8;">991</span></div>
+          <div class="actions"><div class="btn-secondary">🔄 중복체크</div><div class="btn-primary">🤖 AI 자동분류</div></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">검토 대기 (991)</div>
+          <div class="filter-chip inactive">확정 완료 (0)</div>
+        </div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">농협-주식회사차세대</div><div class="amount">52,637</div></div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">주식회사 코페이</div><div class="amount">300,000</div></div>
+      </div>
+      <!-- 다른 페이지 예시 -->
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:baseline;gap:6px;padding:10px 14px;">
+            <span style="font-size:9px;color:#94a3b8;">차량 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a;">등록/이전</span>
+          </div>
+          <div style="height:2px;background:#2d5fa8;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:baseline;gap:6px;padding:10px 14px;">
+            <span style="font-size:9px;color:#94a3b8;">차량운영 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a;">사고 관리</span>
+          </div>
+          <div style="height:2px;background:#2d5fa8;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:baseline;gap:6px;padding:10px 14px;">
+            <span style="font-size:9px;color:#94a3b8;">영업 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#0f172a;">장기렌터카 견적</span>
+          </div>
+          <div style="height:2px;background:#2d5fa8;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ P3-B: 2행 + 그라데이션 라인 ═══ -->
+  <div class="option">
+    <div class="option-label">
+      <h3>P3-B. 2행 + 그라데이션 페이드</h3>
+      <div class="tag">⭐ 추천</div>
+      <div class="desc-text">브레드크럼(작게) → 제목(크게) 2행, 라인 오른쪽 페이드</div>
+    </div>
+    <div class="preview">
+      <div class="mock">
+        <div style="padding:14px 20px 10px;">
+          <div style="font-size:10px;color:#94a3b8;font-weight:500;margin-bottom:2px;">
+            <span style="color:#64748b;font-weight:600;">재무</span>
+            <span style="color:#cbd5e1;margin:0 3px;">›</span>
+            <span>카드/통장</span>
+          </div>
+          <h1 style="font-size:17px;font-weight:800;color:#1e293b;letter-spacing:-0.02em;">카드/통장 관리</h1>
+        </div>
+        <div style="height:2px;background:linear-gradient(90deg,#2d5fa8 0%,#3b7dd8 50%,transparent 100%);"></div>
+        <div class="tab-bar" style="border-bottom:1px solid #e2e8f0;">
+          <div class="upload-btn"><span style="font-size:14px;">📂</span> 파일 업로드</div>
+          <div class="tab-item">📂 업로드</div>
+          <div class="tab-item active">📋 분류/확정 <span style="font-size:10px;color:#2d5fa8;">991</span></div>
+          <div class="actions"><div class="btn-secondary">🔄 중복체크</div><div class="btn-primary">🤖 AI 자동분류</div></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">검토 대기 (991)</div>
+          <div class="filter-chip inactive">확정 완료 (0)</div>
+        </div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">농협-주식회사차세대</div><div class="amount">52,637</div></div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">주식회사 코페이</div><div class="amount">300,000</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="padding:10px 14px 8px;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">차량</span> <span style="color:#cbd5e1;">›</span> 등록/이전</div>
+            <div style="font-size:14px;font-weight:800;color:#1e293b;">등록/이전</div>
+          </div>
+          <div style="height:2px;background:linear-gradient(90deg,#2d5fa8 0%,#3b7dd8 50%,transparent 100%);"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="padding:10px 14px 8px;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">차량운영</span> <span style="color:#cbd5e1;">›</span> 사고</div>
+            <div style="font-size:14px;font-weight:800;color:#1e293b;">사고 관리</div>
+          </div>
+          <div style="height:2px;background:linear-gradient(90deg,#2d5fa8 0%,#3b7dd8 50%,transparent 100%);"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="padding:10px 14px 8px;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">영업</span> <span style="color:#cbd5e1;">›</span> 장기렌터카</div>
+            <div style="font-size:14px;font-weight:800;color:#1e293b;">장기렌터카 견적</div>
+          </div>
+          <div style="height:2px;background:linear-gradient(90deg,#2d5fa8 0%,#3b7dd8 50%,transparent 100%);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ P3-C: 좌측 도트 + 1행 브레드크럼 ═══ -->
+  <div class="option">
+    <div class="option-label">
+      <h3>P3-C. 도트 마커 + 1행</h3>
+      <div class="tag">모던</div>
+      <div class="desc-text">블루 도트 + 브레드크럼/제목 1행 + 솔리드 라인</div>
+    </div>
+    <div class="preview">
+      <div class="mock">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 20px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#2d5fa8;flex-shrink:0;box-shadow:0 0 0 3px rgba(45,95,168,0.15);"></div>
+          <span style="font-size:11px;color:#94a3b8;font-weight:500;">재무</span>
+          <span style="color:#cbd5e1;font-size:11px;">›</span>
+          <span style="font-size:15px;font-weight:800;color:#1e293b;">카드/통장 관리</span>
+        </div>
+        <div style="height:1.5px;background:#2d5fa8;"></div>
+        <div class="tab-bar" style="border-bottom:1px solid #e2e8f0;">
+          <div class="upload-btn"><span style="font-size:14px;">📂</span> 파일 업로드</div>
+          <div class="tab-item">📂 업로드</div>
+          <div class="tab-item active">📋 분류/확정 <span style="font-size:10px;color:#2d5fa8;">991</span></div>
+          <div class="actions"><div class="btn-secondary">🔄 중복체크</div><div class="btn-primary">🤖 AI 자동분류</div></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">검토 대기 (991)</div>
+          <div class="filter-chip inactive">확정 완료 (0)</div>
+        </div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">농협-주식회사차세대</div><div class="amount">52,637</div></div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">주식회사 코페이</div><div class="amount">300,000</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#2d5fa8;flex-shrink:0;"></div>
+            <span style="font-size:9px;color:#94a3b8;">차량 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#1e293b;">등록/이전</span>
+          </div>
+          <div style="height:1.5px;background:#2d5fa8;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#2d5fa8;flex-shrink:0;"></div>
+            <span style="font-size:9px;color:#94a3b8;">차량운영 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#1e293b;">사고 관리</span>
+          </div>
+          <div style="height:1.5px;background:#2d5fa8;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#2d5fa8;flex-shrink:0;"></div>
+            <span style="font-size:9px;color:#94a3b8;">영업 ›</span>
+            <span style="font-size:13px;font-weight:800;color:#1e293b;">장기렌터카 견적</span>
+          </div>
+          <div style="height:1.5px;background:#2d5fa8;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ P3-D: 좌측 바 + 2행 ═══ -->
+  <div class="option">
+    <div class="option-label">
+      <h3>P3-D. 좌측 바 + 2행 브레드크럼</h3>
+      <div class="tag">견고한</div>
+      <div class="desc-text">좌측 4px 블루 바 + 브레드크럼/제목 2행 + 하단 라인</div>
+    </div>
+    <div class="preview">
+      <div class="mock">
+        <div style="display:flex;align-items:stretch;">
+          <div style="width:4px;background:#2d5fa8;flex-shrink:0;"></div>
+          <div style="padding:10px 18px;">
+            <div style="font-size:10px;color:#94a3b8;font-weight:500;margin-bottom:1px;">
+              <span style="color:#64748b;font-weight:600;">재무</span>
+              <span style="color:#cbd5e1;margin:0 3px;">›</span>
+              카드/통장
+            </div>
+            <h1 style="font-size:17px;font-weight:800;color:#1e293b;letter-spacing:-0.02em;">카드/통장 관리</h1>
+          </div>
+        </div>
+        <div style="height:1px;background:#e2e8f0;"></div>
+        <div class="tab-bar" style="border-bottom:1px solid #e2e8f0;">
+          <div class="upload-btn"><span style="font-size:14px;">📂</span> 파일 업로드</div>
+          <div class="tab-item">📂 업로드</div>
+          <div class="tab-item active">📋 분류/확정 <span style="font-size:10px;color:#2d5fa8;">991</span></div>
+          <div class="actions"><div class="btn-secondary">🔄 중복체크</div><div class="btn-primary">🤖 AI 자동분류</div></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">검토 대기 (991)</div>
+          <div class="filter-chip inactive">확정 완료 (0)</div>
+        </div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">농협-주식회사차세대</div><div class="amount">52,637</div></div>
+        <div class="item-row"><div class="date">2025-10-31</div><div class="badge out">출금</div><div class="name">주식회사 코페이</div><div class="amount">300,000</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:stretch;">
+            <div style="width:3px;background:#2d5fa8;flex-shrink:0;"></div>
+            <div style="padding:8px 12px;">
+              <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">차량</span> <span style="color:#cbd5e1;">›</span> 등록/이전</div>
+              <div style="font-size:14px;font-weight:800;color:#1e293b;">등록/이전</div>
+            </div>
+          </div>
+          <div style="height:1px;background:#e2e8f0;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:stretch;">
+            <div style="width:3px;background:#2d5fa8;flex-shrink:0;"></div>
+            <div style="padding:8px 12px;">
+              <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">차량운영</span> <span style="color:#cbd5e1;">›</span> 사고</div>
+              <div style="font-size:14px;font-weight:800;color:#1e293b;">사고 관리</div>
+            </div>
+          </div>
+          <div style="height:1px;background:#e2e8f0;"></div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;align-items:stretch;">
+            <div style="width:3px;background:#2d5fa8;flex-shrink:0;"></div>
+            <div style="padding:8px 12px;">
+              <div style="font-size:9px;color:#94a3b8;margin-bottom:1px;"><span style="color:#64748b;font-weight:600;">영업</span> <span style="color:#cbd5e1;">›</span> 장기렌터카</div>
+              <div style="font-size:14px;font-weight:800;color:#1e293b;">장기렌터카 견적</div>
+            </div>
+          </div>
+          <div style="height:1px;background:#e2e8f0;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

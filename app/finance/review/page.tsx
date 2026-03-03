@@ -30,20 +30,39 @@ const CATEGORY_ICONS: Record<string, string> = {
   '쇼핑/온라인구매': '🛒', '도서/신문': '📰', '감가상각비': '📉', '수선/유지비': '🔩', '기타수입': '📥', '기타': '📦', '미분류': '❓',
 }
 
+// ═══ 용도별 카테고리 (사용자 화면 표시용 — 같은 업종/종류끼리 묶기) ═══
+const DISPLAY_CATEGORIES = [
+  { group: '💰 돈 들어오는 것', icon: '💰', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익', '기타수입'] },
+  { group: '🏦 투자/대출 입출금', icon: '🏦', items: ['투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)'] },
+  { group: '🚛 차량 운영', icon: '🚛', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험'] },
+  { group: '👨‍💼 급여/인건비', icon: '👨‍💼', items: ['급여(정규직)', '일용직급여', '용역비(3.3%)', '4대보험(회사부담)'] },
+  { group: '🏢 사무실/운영비', icon: '🏢', items: ['임차료/사무실', '통신비', '소모품/사무용품', '전기/수도/가스', '경비/보안', '수선/유지비'] },
+  { group: '🍽️ 식비/접대/출장', icon: '🍽️', items: ['복리후생(식대)', '접대비', '여비교통비'] },
+  { group: '💳 수수료/카드', icon: '💳', items: ['수수료/카드수수료'] },
+  { group: '🏛️ 세금/공과금', icon: '🏛️', items: ['원천세/부가세', '법인세/지방세', '세금/공과금'] },
+  { group: '📦 기타 지출', icon: '📦', items: ['쇼핑/온라인구매', '도서/신문', '교육/훈련비', '광고/마케팅', '보험료(일반)', '감가상각비', '기타'] },
+]
+
 const CATEGORY_COLORS: Record<string, string> = {
+  // 회계 기준
   '매출(영업수익)': '#3b82f6', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
   '영업비용-인건비': '#10b981', '영업비용-관리': '#ec4899', '세금/공과': '#ef4444', '기타': '#94a3b8',
+  // 용도별
+  '💰 돈 들어오는 것': '#3b82f6', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
+  '👨‍💼 급여/인건비': '#10b981', '🏢 사무실/운영비': '#8b5cf6', '🍽️ 식비/접대/출장': '#ec4899',
+  '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
 }
 
 const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량' }
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
-function getCategoryGroup(cat: string): string {
-  for (const g of CATEGORIES) {
+function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'accounting'): string {
+  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
+  for (const g of source) {
     if (g.items.includes(cat)) return g.group
   }
-  return '기타'
+  return mode === 'display' ? '📦 기타 지출' : '기타'
 }
 
 export default function ClassificationReviewPage() {
@@ -60,6 +79,7 @@ export default function ClassificationReviewPage() {
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>('display')
 
   // 연결 대상 조회용
   const [jiips, setJiips] = useState<any[]>([])
@@ -97,7 +117,7 @@ export default function ClassificationReviewPage() {
       supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', companyId),
       supabase.from('general_investments').select('id, investor_name').eq('company_id', companyId),
       supabase.from('freelancers').select('id, name').eq('company_id', companyId),
-      supabase.from('profiles').select('id, name').eq('company_id', companyId),
+      supabase.from('profiles').select('id, employee_name, email, phone, position, department').eq('company_id', companyId),
     ])
     setJiips(j.data || [])
     setInvestors(i.data || [])
@@ -112,15 +132,37 @@ export default function ClassificationReviewPage() {
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: any[]; totalAmount: number; type: string }> = {}
     for (const item of items) {
-      const cat = item.ai_category || '미분류'
-      if (!groups[cat]) groups[cat] = { items: [], totalAmount: 0, type: 'expense' }
-      groups[cat].items.push(item)
-      groups[cat].totalAmount += Math.abs(item.source_data?.amount || 0)
-      if (item.source_data?.type === 'income') groups[cat].type = 'income'
+      const rawCat = item.ai_category || '미분류'
+      let key: string
+      if (categoryMode === 'display') {
+        // 용도별: DISPLAY_CATEGORIES 그룹명으로 묶기
+        const catMap: Record<string, string> = {}
+        for (const g of DISPLAY_CATEGORIES) {
+          for (const c of g.items) catMap[c] = g.group
+        }
+        key = catMap[rawCat] || '📦 기타 지출'
+        if (rawCat === '미분류') key = '❓ 미분류'
+      } else {
+        key = rawCat
+      }
+      if (!groups[key]) groups[key] = { items: [], totalAmount: 0, type: 'expense' }
+      groups[key].items.push(item)
+      groups[key].totalAmount += Math.abs(item.source_data?.amount || 0)
+      if (item.source_data?.type === 'income') groups[key].type = 'income'
     }
-    // 정렬: 건수 많은 순
+
+    // 정렬: 용도별이면 DISPLAY_CATEGORIES 순서대로, 회계기준이면 건수 많은 순
+    if (categoryMode === 'display') {
+      const order = DISPLAY_CATEGORIES.map(g => g.group)
+      order.push('❓ 미분류')
+      return Object.entries(groups).sort((a, b) => {
+        const ai = order.indexOf(a[0])
+        const bi = order.indexOf(b[0])
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+      })
+    }
     return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
-  }, [items])
+  }, [items, categoryMode])
 
   // ── 단건 확정 ──
   const handleConfirm = async (item: any, overrides?: { category?: string; related_type?: string; related_id?: string }) => {
@@ -288,9 +330,9 @@ export default function ClassificationReviewPage() {
     }
   }
 
-  const toggleSelectGroup = (category: string) => {
-    const groupItemIds = items.filter(i => (i.ai_category || '미분류') === category).map(i => i.id)
-    const allSelected = groupItemIds.every(id => selectedIds.has(id))
+  const toggleSelectGroup = (groupItems: any[]) => {
+    const groupItemIds = groupItems.map(i => i.id)
+    const allSelected = groupItemIds.length > 0 && groupItemIds.every(id => selectedIds.has(id))
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (allSelected) {
@@ -446,8 +488,9 @@ export default function ClassificationReviewPage() {
         ))}
       </div>
 
-      {/* 탭 + 전체선택 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* C타입: 드롭다운 축소형 - 모든 필터 1줄 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {/* 상태 필터 */}
         <div style={{ display: 'flex', gap: 4, background: '#fff', padding: 4, borderRadius: 12, border: '1px solid #e2e8f0', width: 'fit-content' }}>
           {[
             { key: 'pending' as const, label: '⏳ 대기중' },
@@ -462,15 +505,37 @@ export default function ClassificationReviewPage() {
           ))}
         </div>
 
+        {/* 용도별/회계기준 토글 (항상 표시) */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 8 }}>
+          {[
+            { key: 'display' as const, label: '📋 용도별' },
+            { key: 'accounting' as const, label: '📊 회계기준' },
+          ].map(m => (
+            <button key={m.key} onClick={() => { setCategoryMode(m.key); setExpandedGroups(new Set()) }}
+              style={{
+                padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
+                background: categoryMode === m.key ? '#0f172a' : 'transparent',
+                color: categoryMode === m.key ? '#fff' : '#94a3b8',
+                transition: 'all 0.15s',
+              }}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 전체선택 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         {items.length > 0 && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
             <input
               type="checkbox"
               checked={items.length > 0 && selectedIds.size === items.length}
+              ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < items.length }}
               onChange={toggleSelectAll}
               style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
             />
-            전체 선택 ({selectedIds.size}/{items.length})
+            {selectedIds.size > 0 ? `${selectedIds.size}건 선택됨` : `전체 선택 (${items.length})`}
           </label>
         )}
       </div>
@@ -517,9 +582,10 @@ export default function ClassificationReviewPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {groupedItems.map(([category, group]) => {
             const isExpanded = expandedGroups.has(category)
-            const icon = CATEGORY_ICONS[category] || '📋'
-            const groupName = getCategoryGroup(category)
-            const groupColor = CATEGORY_COLORS[groupName] || '#64748b'
+            const isDisplayMode = categoryMode === 'display'
+            const icon = isDisplayMode ? '' : (CATEGORY_ICONS[category] || '📋')
+            const groupName = isDisplayMode ? '' : getCategoryGroup(category, 'accounting')
+            const groupColor = CATEGORY_COLORS[isDisplayMode ? category : groupName] || '#64748b'
             const isIncome = group.type === 'income'
 
             return (
@@ -531,8 +597,14 @@ export default function ClassificationReviewPage() {
                   {/* 그룹 체크박스 */}
                   <input
                     type="checkbox"
-                    checked={group.items.every((i: any) => selectedIds.has(i.id))}
-                    onChange={(e) => { e.stopPropagation(); toggleSelectGroup(category) }}
+                    checked={group.items.length > 0 && group.items.every((i: any) => selectedIds.has(i.id))}
+                    ref={(el) => {
+                      if (el) {
+                        const checkedCount = group.items.filter((i: any) => selectedIds.has(i.id)).length
+                        el.indeterminate = checkedCount > 0 && checkedCount < group.items.length
+                      }
+                    }}
+                    onChange={(e) => { e.stopPropagation(); toggleSelectGroup(group.items) }}
                     onClick={(e) => e.stopPropagation()}
                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
                   />
@@ -542,10 +614,10 @@ export default function ClassificationReviewPage() {
 
                   {/* 아이콘 + 카테고리명 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 20 }}>{icon}</span>
+                    {!isDisplayMode && <span style={{ fontSize: 20 }}>{icon}</span>}
                     <div>
                       <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
-                      <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{groupName}</p>
+                      {!isDisplayMode && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{groupName}</p>}
                     </div>
                   </div>
 

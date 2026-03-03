@@ -147,6 +147,7 @@ export async function POST(
         deposit: quote.deposit,
         monthly_rent: quote.rent_fee,
         status: 'active',
+        company_id: shareToken.company_id,
         signature_id: signature.id,
         ...(termsVersionId ? { terms_version_id: termsVersionId } : {}),
         ...(specialTermsText ? { special_terms: specialTermsText } : {}),

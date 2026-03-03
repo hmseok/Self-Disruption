@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import DarkHeader from '../components/DarkHeader'
 
 // --- [아이콘] ---
 const Icons = {
@@ -402,27 +403,76 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
     )
   }
 
+  const handleUploadClick = () => fileInputRef.current?.click()
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>🛡️ 보험/사고/정비</h1>
-            <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>보험 가입·갱신 및 사고/정비 이력 관리</p>
-        </div>
-        <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-            <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={bulkProcessing}
-                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-                <Icons.Upload />
-                <span>{bulkProcessing ? '분석 및 병합 중...' : '증권 업로드'}</span>
-            </button>
-            <button onClick={openCarSelector} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
-                <Icons.Plus /> <span>신규보험등록</span>
-            </button>
-        </div>
-      </div>
+      <DarkHeader
+        icon="🛡️"
+        title="보험/사고/정비"
+        subtitle="보험 가입·갱신 및 사고/정비 이력 관리"
+        stats={list.length > 0 ? [
+          {
+            label: '전체 차량',
+            value: stats.total,
+            color: '#334155',
+            bgColor: '#fff',
+            borderColor: '#e2e8f0',
+            labelColor: '#94a3b8',
+            onClick: () => setStatusFilter('all'),
+          },
+          {
+            label: '가입중',
+            value: stats.active,
+            color: '#059669',
+            bgColor: '#ecfdf5',
+            borderColor: '#bbf7d0',
+            labelColor: '#6ee7b7',
+            onClick: () => setStatusFilter('active'),
+          },
+          {
+            label: '만기 임박',
+            value: stats.expiring,
+            color: '#d97706',
+            bgColor: '#fffbeb',
+            borderColor: '#fde68a',
+            labelColor: '#fcd34d',
+            onClick: () => setStatusFilter('expiring'),
+          },
+          {
+            label: '만료됨',
+            value: stats.expired,
+            color: '#dc2626',
+            bgColor: '#fef2f2',
+            borderColor: '#fecaca',
+            labelColor: '#fca5a5',
+            onClick: () => setStatusFilter('expired'),
+          },
+          {
+            label: '보험료',
+            value: `${f(stats.totalPremium)}원`,
+            color: '#2563eb',
+            bgColor: '#eff6ff',
+            borderColor: '#bfdbfe',
+            labelColor: '#93c5fd',
+          },
+        ] : undefined}
+        actions={[
+          {
+            label: bulkProcessing ? '분석 중...' : '증권 업로드',
+            icon: '📤',
+            onClick: handleUploadClick,
+            variant: 'primary',
+            disabled: bulkProcessing,
+          },
+          {
+            label: '신규보험등록',
+            icon: '➕',
+            onClick: openCarSelector,
+            variant: 'secondary',
+          },
+        ]}
+      />
 
       {bulkProcessing && (
          <div className="mb-10 bg-gray-900 rounded-2xl p-6 shadow-2xl ring-4 ring-steel-500/10 overflow-hidden relative">
@@ -504,31 +554,6 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
         </div>
       )}
 
-      {/* 📊 KPI 대시보드 */}
-      {list.length > 0 && !bulkProcessing && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('all')}>
-            <p className="text-xs text-gray-400 font-bold">전체 차량</p>
-            <p className="text-xl md:text-2xl font-black text-gray-900 mt-1">{stats.total}<span className="text-sm text-gray-400 ml-0.5">대</span></p>
-          </div>
-          <div className="bg-green-50 p-3 md:p-4 rounded-xl border border-green-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('active')}>
-            <p className="text-xs text-green-600 font-bold">가입중</p>
-            <p className="text-xl md:text-2xl font-black text-green-700 mt-1">{stats.active}<span className="text-sm text-green-500 ml-0.5">대</span></p>
-          </div>
-          <div className={`p-3 md:p-4 rounded-xl border cursor-pointer hover:shadow-md transition-shadow ${stats.expiring > 0 ? 'bg-amber-50 border-amber-200 animate-pulse' : 'bg-amber-50 border-amber-100'}`} onClick={() => setStatusFilter('expiring')}>
-            <p className="text-xs text-amber-600 font-bold">만기 임박 (30일)</p>
-            <p className="text-xl md:text-2xl font-black text-amber-700 mt-1">{stats.expiring}<span className="text-sm text-amber-500 ml-0.5">대</span></p>
-          </div>
-          <div className="bg-red-50 p-3 md:p-4 rounded-xl border border-red-100 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setStatusFilter('expired')}>
-            <p className="text-xs text-red-500 font-bold">만료됨</p>
-            <p className="text-xl md:text-2xl font-black text-red-600 mt-1">{stats.expired}<span className="text-sm text-red-400 ml-0.5">대</span></p>
-          </div>
-          <div className="bg-blue-50 p-3 md:p-4 rounded-xl border border-blue-100">
-            <p className="text-xs text-blue-500 font-bold">총 보험료</p>
-            <p className="text-lg md:text-xl font-black text-blue-700 mt-1">{f(stats.totalPremium)}<span className="text-sm text-blue-400 ml-0.5">원</span></p>
-          </div>
-        </div>
-      )}
 
       {/* ⚠️ 만기 임박 경고 배너 */}
       {expiringCars.length > 0 && !bulkProcessing && (

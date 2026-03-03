@@ -137,8 +137,15 @@ export default function GeneralInvestDetail() {
   }
 
   const fetchRealDeposit = async () => {
-    const { data } = await supabase.from('transactions').select('amount').eq('related_type', 'invest').eq('related_id', id).eq('type', 'income')
-    if (data) setRealDepositTotal(data.reduce((acc, cur) => acc + (cur.amount || 0), 0))
+    // 입금과 출금을 모두 가져와서 순합계(입금 - 출금) 계산
+    const { data } = await supabase.from('transactions').select('amount, type').eq('related_type', 'invest').eq('related_id', id)
+    if (data) {
+      const net = data.reduce((acc, cur) => {
+        const amt = Math.abs(cur.amount || 0)
+        return acc + (cur.type === 'income' ? amt : -amt)
+      }, 0)
+      setRealDepositTotal(net)
+    }
   }
 
   // ── API 호출 헬퍼 ──
@@ -253,7 +260,7 @@ export default function GeneralInvestDetail() {
       : await supabase.from('general_investments').update(payload).eq('id', id)
 
     if (error) alert('저장 실패: ' + error.message)
-    else { alert('저장되었습니다!'); if (isNew) router.push('/invest') }
+    else { alert('저장되었습니다!'); router.push('/invest') }
   }
 
   const handleDelete = async () => {

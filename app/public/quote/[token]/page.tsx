@@ -257,8 +257,8 @@ export default function PublicQuotePage() {
 
   // ── 유효한 견적 → 서명 폼 ──
   const car = quote.car || {}
-  const rentFee = quote.rent_fee || 0
-  const rentVAT = Math.round(rentFee * 0.1)
+  const rentFee = Math.round((quote.rent_fee || 0) / 1000) * 1000   // 천원단위 반올림
+  const rentVAT = Math.round(rentFee * 0.1 / 1000) * 1000           // 천원단위 반올림
   const termMonths = quote.term_months || 36
   const annualMileage = quote.annual_mileage || 2
   const totalMileageLimit = annualMileage * 10000 * (termMonths / 12)
@@ -346,10 +346,10 @@ export default function PublicQuotePage() {
 
       {/* 월 렌탈료 (핵심) */}
       <div className="bg-gray-900 text-white rounded-2xl shadow-xl p-5">
-        <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Monthly Rental</p>
+        <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Monthly Rental (VAT 포함)</p>
         <div className="text-center py-3">
-          <p className="text-3xl font-black tracking-tight">{f(rentFee)}<span className="text-base ml-1">원</span></p>
-          <p className="text-xs text-gray-400 mt-1">VAT 포함 시 {f(rentFee + rentVAT)}원/월</p>
+          <p className="text-3xl font-black tracking-tight">{f(rentFee + rentVAT)}<span className="text-base ml-1">원</span></p>
+          <p className="text-xs text-gray-400 mt-1">공급가 {f(rentFee)}원 + VAT {f(rentVAT)}원</p>
         </div>
         <div className="border-t border-gray-700 pt-3 mt-2 space-y-1.5 text-xs">
           {quote.deposit > 0 && (

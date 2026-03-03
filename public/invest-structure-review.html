@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>투자 페이지 구성 분석 & 개선안</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;}
+
+.top-bar{position:sticky;top:0;z-index:100;background:#0f172a;border-bottom:1px solid #1e293b;padding:12px 24px;display:flex;align-items:center;gap:12px;}
+.top-bar h1{color:#fff;font-size:15px;font-weight:800;}
+.top-bar .tag{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;background:#2d5fa8;color:#fff;}
+
+.wrap{display:flex;gap:0;min-height:calc(100vh - 50px);}
+.left{width:340px;background:#1e293b;border-right:1px solid #334155;padding:20px;overflow-y:auto;flex-shrink:0;position:sticky;top:50px;height:calc(100vh - 50px);}
+.right{flex:1;padding:24px;overflow-y:auto;}
+
+/* Sections */
+.sec{margin-bottom:24px;}
+.sec-title{font-size:11px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:1px;padding-bottom:8px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:6px;}
+.sec-title .icon{font-size:14px;}
+.issue{background:#dc2626;color:#fff;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px;}
+.good{background:#059669;color:#fff;font-size:8px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px;}
+
+.field-row{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.field-name{font-size:11px;font-weight:700;color:#94a3b8;}
+.field-val{font-size:12px;color:#e2e8f0;margin-top:2px;}
+.field-note{font-size:10px;color:#475569;margin-top:2px;line-height:1.4;}
+.field-note b{color:#f59e0b;}
+.field-note.red b{color:#ef4444;}
+.field-note.green b{color:#34d399;}
+
+/* Right content */
+.card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;margin-bottom:20px;}
+.card h2{font-size:16px;font-weight:800;margin-bottom:4px;color:#fff;}
+.card h3{font-size:13px;font-weight:800;color:#f59e0b;margin:16px 0 8px;display:flex;align-items:center;gap:6px;}
+.card .subtitle{font-size:12px;color:#64748b;margin-bottom:16px;}
+.card p{font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:8px;}
+
+/* Comparison table */
+.cmp{width:100%;border-collapse:collapse;margin:12px 0;}
+.cmp th,.cmp td{padding:10px 14px;text-align:left;border-bottom:1px solid #334155;font-size:12px;}
+.cmp th{color:#64748b;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
+.cmp td{color:#e2e8f0;}
+.cmp .label{font-weight:700;color:#94a3b8;width:140px;}
+.cmp .jiip{color:#34d399;}
+.cmp .invest{color:#60a5fa;}
+.cmp .same{color:#fbbf24;}
+.highlight{background:rgba(251,191,36,.08);border-left:3px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;}
+.highlight p{color:#fbbf24;font-weight:600;}
+.problem{background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;}
+.problem p{color:#fca5a5;font-weight:600;}
+
+/* Option cards */
+.opt-wrap{display:grid;grid-template-columns:1fr;gap:16px;margin:16px 0;}
+.opt{background:#0f172a;border:2px solid #334155;border-radius:14px;padding:20px;cursor:pointer;transition:all .15s;position:relative;}
+.opt:hover{border-color:#2d5fa8;transform:translateY(-2px);}
+.opt.selected{border-color:#2d5fa8;background:#1a2744;}
+.opt-label{font-size:14px;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.opt-label .num{background:#2d5fa8;color:#fff;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+.opt-label .rec{background:#059669;color:#fff;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;}
+.opt-desc{font-size:11px;color:#94a3b8;line-height:1.5;margin-bottom:10px;}
+.opt-preview{background:#1e293b;border:1px solid #334155;border-radius:10px;overflow:hidden;}
+.opt-preview .mock{padding:12px 16px;font-size:10px;color:#64748b;}
+
+/* Mock page previews */
+.mock-page{background:#f8fafc;border-radius:10px;overflow:hidden;font-family:-apple-system,sans-serif;}
+.mock-hdr{background:linear-gradient(135deg,#1e3a5f,#2d5fa8);padding:12px 16px;color:#fff;}
+.mock-hdr .h-title{font-size:14px;font-weight:800;}
+.mock-hdr .h-sub{font-size:9px;opacity:.6;margin-top:2px;}
+.mock-stats{display:flex;gap:6px;padding:10px 16px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.mock-stat{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;text-align:center;}
+.mock-stat .sl{font-size:8px;color:#94a3b8;font-weight:700;}
+.mock-stat .sv{font-size:13px;font-weight:900;color:#0f172a;margin-top:2px;}
+.mock-tabs{display:flex;gap:0;border-bottom:2px solid #e2e8f0;background:#fff;}
+.mock-tabs .t{padding:8px 14px;font-size:10px;font-weight:700;color:#94a3b8;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.mock-tabs .t.active{color:#0f172a;border-bottom-color:#2d5fa8;}
+.mock-filter{display:flex;gap:4px;padding:8px 16px;background:#fff;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}
+.mock-chip{padding:4px 10px;border-radius:6px;font-size:9px;font-weight:700;border:1px solid #e2e8f0;color:#64748b;background:#fff;}
+.mock-chip.active{background:#0f172a;color:#fff;border-color:#0f172a;}
+.mock-search{padding:4px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:9px;flex:1;min-width:80px;color:#94a3b8;background:#fff;}
+.mock-list{padding:0 16px;}
+.mock-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;gap:12px;}
+.mock-row .r-main{font-size:11px;font-weight:800;color:#111827;flex:1;}
+.mock-row .r-sub{font-size:9px;color:#94a3b8;}
+.mock-row .r-money{font-size:11px;font-weight:800;color:#2d5fa8;}
+.mock-row .r-badge{padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;background:#dcfce7;color:#16a34a;}
+.mock-bottom{display:flex;justify-content:space-between;padding:8px 16px;background:#fff;border-top:1px solid #e2e8f0;font-size:9px;color:#94a3b8;}
+.mock-bottom b{color:#0f172a;}
+
+/* new structure concepts */
+.struct-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin:8px 0;}
+.struct-row{display:flex;gap:4px;margin-bottom:4px;align-items:stretch;}
+.struct-block{padding:6px 10px;border-radius:6px;font-size:9px;font-weight:700;flex:1;text-align:center;display:flex;align-items:center;justify-content:center;}
+.struct-block.dark{background:#1e3a5f;color:#fff;}
+.struct-block.blue{background:#2d5fa8;color:#fff;}
+.struct-block.gray{background:#334155;color:#94a3b8;}
+.struct-block.white{background:#f8fafc;color:#334155;border:1px solid #475569;}
+.struct-block.yellow{background:#78350f;color:#fbbf24;}
+.struct-block.green{background:#064e3b;color:#34d399;}
+.struct-block.small{flex:0;padding:6px 8px;}
+
+.divider{border:none;border-top:1px solid #334155;margin:20px 0;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>📊 투자 페이지 구성 분석 & 개선안</h1>
+  <span class="tag">현재 DB 스키마 기반</span>
+</div>
+
+<div class="wrap">
+  <!-- LEFT: 현재 데이터 구조 분석 -->
+  <div class="left">
+    <div class="sec">
+      <div class="sec-title"><span class="icon">🔍</span> 현재 2개 페이지 비교</div>
+      <div class="field-row">
+        <div class="field-name">위수탁(지입) 정산 — /jiip</div>
+        <div class="field-val">jiip_contracts 테이블</div>
+        <div class="field-note">차량 기반 위수탁 계약. <b>차량ID</b>+투자자+배분율+관리비</div>
+      </div>
+      <div class="field-row">
+        <div class="field-name">투자자/펀딩 정산 — /invest</div>
+        <div class="field-val">general_investments 테이블</div>
+        <div class="field-note">순수 투자 계약. 투자자+원금+<b>이자율</b>+지급일</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span class="icon">⚠️</span> 핵심 차이점 <span class="issue">중요</span></div>
+
+      <div class="field-row">
+        <div class="field-name">지입 고유 필드</div>
+        <div class="field-note green"><b>car_id</b> (차량 연결), <b>share_ratio</b> (배분율), <b>admin_fee</b> (관리비), <b>payout_day</b> (지급일), <b>mortgage_setup</b> (근저당)</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-name">투자 고유 필드</div>
+        <div class="field-note green"><b>interest_rate</b> (연 이자율), <b>payment_day</b> (이자지급일), <b>contract_end_date</b> (만기일) 중심</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-name">공통 필드</div>
+        <div class="field-note"><b>investor_name</b>, investor_phone, invest_amount, status, contract_start_date, bank_name, tax_type, memo</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span class="icon">📋</span> 현재 리스트 컬럼 비교</div>
+
+      <div class="field-row">
+        <div class="field-name">/jiip 리스트 (6컬럼)</div>
+        <div class="field-note">계약차량 | 투자자(차주) | 투자금/수익률 | 월관리비 | 지급일 | 상태</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-name">/invest 리스트 (6컬럼)</div>
+        <div class="field-note">투자자정보 | 투자원금 | 이자율(연) | 이자지급일 | 계약기간 | 상태</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span class="icon">📊</span> 현재 DarkHeader 통계</div>
+
+      <div class="field-row">
+        <div class="field-name">/jiip 통계 (5개)</div>
+        <div class="field-note">전체계약 | 운영중 | 총투자유치금 | 월관리비합계 | 종료계약</div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-name">/invest 통계 (5개)</div>
+        <div class="field-note">총투자원금 | 운용중 | 월예상이자 | 만기임박(90일) | 평균연수익률</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span class="icon">🤔</span> 구성 이슈 <span class="issue">문제</span></div>
+
+      <div class="field-row">
+        <div class="field-note red"><b>이슈1:</b> 지입과 투자 페이지가 완전 분리되어 있어 통합 현황 파악이 어려움</div>
+      </div>
+      <div class="field-row">
+        <div class="field-note red"><b>이슈2:</b> DarkHeader 통계 뱃지가 5개로 많아 모바일에서 가독성 저하</div>
+      </div>
+      <div class="field-row">
+        <div class="field-note red"><b>이슈3:</b> 지입 리스트 상태필터가 전체/운영중/종료 3개뿐 — DB는 active/expired/terminated/renewed 4개 상태 지원</div>
+      </div>
+      <div class="field-row">
+        <div class="field-note red"><b>이슈4:</b> 투자 리스트에 만기임박 필터는 있지만 지입에는 없음</div>
+      </div>
+      <div class="field-row">
+        <div class="field-note red"><b>이슈5:</b> 두 페이지 모두 하단 요약바가 없음 (총합 정보 부재)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: 개선안 -->
+  <div class="right">
+
+    <!-- 구성안 1: 현재 유지 (분리형) -->
+    <div class="card">
+      <h2>구성안 비교</h2>
+      <div class="subtitle">현재 데이터 구조 기반으로 3가지 페이지 구성안을 제안합니다</div>
+
+      <hr class="divider">
+
+      <!-- OPTION A -->
+      <div class="opt" onclick="selectOpt(this,'a')">
+        <div class="opt-label">
+          <span class="num">A</span>
+          현재 구조 유지 + 디자인 개선
+        </div>
+        <div class="opt-desc">
+          /jiip과 /invest를 분리 유지하되, 같은 디자인 언어 적용. 통계·필터·테이블 스타일만 통일.
+          <br>• 장점: 변경 최소, 기존 로직 그대로
+          <br>• 단점: 통합 현황 확인 불가, 페이지 전환 필요
+        </div>
+        <div class="opt-preview">
+          <div class="struct-box">
+            <div style="font-size:8px;color:#64748b;margin-bottom:4px;font-weight:700;">사이드 메뉴</div>
+            <div class="struct-row">
+              <div class="struct-block gray">📊 대시보드</div>
+            </div>
+            <div class="struct-row">
+              <div class="struct-block blue">🤝 위수탁(지입)</div>
+              <div class="struct-block blue">💼 투자/펀딩</div>
+            </div>
+            <div class="struct-row">
+              <div class="struct-block gray">💳 카드/통장</div>
+            </div>
+          </div>
+          <div class="mock" style="padding:8px 12px;font-size:9px;color:#64748b;">
+            ✅ 각 페이지 독립 — /jiip, /invest 별도<br>
+            ✅ 같은 DarkHeader + 필터 + 테이블 디자인<br>
+            ❌ 전체 투자 현황을 한눈에 볼 수 없음
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION B -->
+      <div class="opt" onclick="selectOpt(this,'b')">
+        <div class="opt-label">
+          <span class="num">B</span>
+          탭 통합형 (하나의 페이지, 탭으로 구분)
+          <span class="rec">추천</span>
+        </div>
+        <div class="opt-desc">
+          /invest 하나의 페이지 내에서 "위수탁(지입)" / "투자/펀딩" 탭으로 전환. 상단 통합 통계 표시.
+          <br>• 장점: 한 페이지에서 전체 투자 현황 파악, 통합 통계 제공
+          <br>• 단점: 탭 전환 구현 필요
+        </div>
+        <div class="opt-preview">
+          <div class="mock-page">
+            <div class="mock-hdr">
+              <div class="h-title">📊 투자 정산 관리</div>
+              <div class="h-sub">위수탁(지입) + 일반 투자 통합 관리</div>
+            </div>
+            <div class="mock-stats">
+              <div class="mock-stat"><div class="sl">총 계약</div><div class="sv" style="color:#334155;">12건</div></div>
+              <div class="mock-stat"><div class="sl">운용 중</div><div class="sv" style="color:#059669;">9건</div></div>
+              <div class="mock-stat"><div class="sl">총 투자금</div><div class="sv" style="color:#2563eb;">8.2억</div></div>
+              <div class="mock-stat"><div class="sl">월 지출</div><div class="sv" style="color:#dc2626;">520만</div></div>
+            </div>
+            <div class="mock-tabs">
+              <div class="t active">🤝 위수탁(지입) <span style="background:#2d5fa8;color:#fff;padding:1px 5px;border-radius:8px;font-size:8px;margin-left:4px;">5</span></div>
+              <div class="t">💼 투자/펀딩 <span style="background:#e2e8f0;color:#64748b;padding:1px 5px;border-radius:8px;font-size:8px;margin-left:4px;">7</span></div>
+            </div>
+            <div class="mock-filter">
+              <span class="mock-chip active">전체 5</span>
+              <span class="mock-chip">운영중 4</span>
+              <span class="mock-chip">만기 1</span>
+              <span class="mock-chip">해지 0</span>
+              <span class="mock-search">🔍 검색...</span>
+            </div>
+            <div class="mock-list">
+              <div class="mock-row">
+                <div><div class="r-main">161허9826</div><div class="r-sub">정태영 · 카니발</div></div>
+                <div style="text-align:right;"><div class="r-money">3,800만</div><div class="r-sub">48.8% 배분 · 관리비 20만</div></div>
+                <div class="r-badge">운영중</div>
+              </div>
+              <div class="mock-row">
+                <div><div class="r-main">303가5577</div><div class="r-sub">이준혁 · 스타렉스</div></div>
+                <div style="text-align:right;"><div class="r-money">4,200만</div><div class="r-sub">52.3% 배분 · 관리비 25만</div></div>
+                <div class="r-badge">운영중</div>
+              </div>
+            </div>
+            <div class="mock-bottom">
+              <span>총 약정: <b>17.2억</b> · 월 관리비: <b>340만</b></span>
+              <span>5건</span>
+            </div>
+          </div>
+        </div>
+        <div class="struct-box" style="margin-top:10px;">
+          <div style="font-size:8px;color:#64748b;margin-bottom:4px;font-weight:700;">페이지 구조</div>
+          <div class="struct-row">
+            <div class="struct-block dark" style="flex:3;">통합 DarkHeader (전체 통계)</div>
+            <div class="struct-block blue small">+ 신규등록 ▾</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block yellow">🤝 위수탁 탭</div>
+            <div class="struct-block green">💼 투자 탭</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block gray" style="flex:3;">탭별 필터칩 + 검색</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block white" style="flex:3;">탭별 전용 테이블 (컬럼 다름)</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block gray" style="flex:3;">하단 요약바</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION C -->
+      <div class="opt" onclick="selectOpt(this,'c')">
+        <div class="opt-label">
+          <span class="num">C</span>
+          대시보드형 (통합 현황 + 빠른 접근)
+        </div>
+        <div class="opt-desc">
+          상단에 통합 대시보드 (전체 투자금, 월 지출, 만기 예정 등), 하단에 지입·투자 각 리스트를 카드형으로 간략 표시.
+          <br>• 장점: 전체 현황 한눈에 파악, 경영자 관점
+          <br>• 단점: 상세 리스트 확인하려면 클릭 필요, 구현 복잡도 높음
+        </div>
+        <div class="opt-preview">
+          <div class="mock-page">
+            <div class="mock-hdr">
+              <div class="h-title">📊 투자 현황 대시보드</div>
+              <div class="h-sub">전체 투자 포트폴리오 현황</div>
+            </div>
+            <div style="padding:12px 16px;background:#fff;">
+              <!-- 큰 통계 -->
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;border-left:3px solid #2d5fa8;">
+                  <div style="font-size:8px;color:#94a3b8;font-weight:700;">총 투자금</div>
+                  <div style="font-size:16px;font-weight:900;color:#2d5fa8;">8.2억</div>
+                </div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;border-left:3px solid #dc2626;">
+                  <div style="font-size:8px;color:#94a3b8;font-weight:700;">월 총 지출</div>
+                  <div style="font-size:16px;font-weight:900;color:#dc2626;">520만</div>
+                </div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;border-left:3px solid #d97706;">
+                  <div style="font-size:8px;color:#94a3b8;font-weight:700;">만기 임박</div>
+                  <div style="font-size:16px;font-weight:900;color:#d97706;">2건</div>
+                </div>
+              </div>
+              <!-- 두 섹션 -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                  <div style="padding:8px 10px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:10px;font-weight:800;color:#059669;">🤝 위수탁(지입)</span>
+                    <span style="font-size:8px;color:#94a3b8;">5건 →</span>
+                  </div>
+                  <div style="padding:6px 10px;font-size:9px;color:#374151;border-bottom:1px solid #f3f4f6;">161허9826 · 정태영 <span style="float:right;color:#2d5fa8;font-weight:700;">3,800만</span></div>
+                  <div style="padding:6px 10px;font-size:9px;color:#374151;border-bottom:1px solid #f3f4f6;">303가5577 · 이준혁 <span style="float:right;color:#2d5fa8;font-weight:700;">4,200만</span></div>
+                  <div style="padding:6px 10px;font-size:9px;color:#94a3b8;text-align:center;">+ 3건 더보기</div>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                  <div style="padding:8px 10px;background:#eff6ff;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:10px;font-weight:800;color:#2563eb;">💼 투자/펀딩</span>
+                    <span style="font-size:8px;color:#94a3b8;">7건 →</span>
+                  </div>
+                  <div style="padding:6px 10px;font-size:9px;color:#374151;border-bottom:1px solid #f3f4f6;">김서연 <span style="float:right;color:#2d5fa8;font-weight:700;">5,000만 · 8.5%</span></div>
+                  <div style="padding:6px 10px;font-size:9px;color:#374151;border-bottom:1px solid #f3f4f6;">박민수 <span style="float:right;color:#2d5fa8;font-weight:700;">3,000만 · 7.0%</span></div>
+                  <div style="padding:6px 10px;font-size:9px;color:#94a3b8;text-align:center;">+ 5건 더보기</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="struct-box" style="margin-top:10px;">
+          <div style="font-size:8px;color:#64748b;margin-bottom:4px;font-weight:700;">페이지 구조</div>
+          <div class="struct-row">
+            <div class="struct-block dark" style="flex:3;">통합 대시보드 헤더</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block blue">총 투자금</div>
+            <div class="struct-block blue">월 지출</div>
+            <div class="struct-block blue">만기임박</div>
+            <div class="struct-block blue">수익률</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block yellow">🤝 지입 미니리스트</div>
+            <div class="struct-block green">💼 투자 미니리스트</div>
+          </div>
+          <div class="struct-row">
+            <div class="struct-block gray" style="flex:3;">클릭 → 각 상세 리스트 페이지</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 상세 비교 -->
+    <div class="card">
+      <h2>구성안별 상세 비교</h2>
+
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th>항목</th>
+            <th>A. 분리 유지</th>
+            <th>B. 탭 통합 <span style="color:#059669;">추천</span></th>
+            <th>C. 대시보드형</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">통합 현황 확인</td>
+            <td style="color:#ef4444;">❌ 불가</td>
+            <td style="color:#34d399;">✅ 상단 통계</td>
+            <td style="color:#34d399;">✅ 풀 대시보드</td>
+          </tr>
+          <tr>
+            <td class="label">구현 난이도</td>
+            <td style="color:#34d399;">낮음 (디자인만)</td>
+            <td style="color:#fbbf24;">중간 (탭 로직)</td>
+            <td style="color:#ef4444;">높음 (새 구조)</td>
+          </tr>
+          <tr>
+            <td class="label">기존 코드 변경</td>
+            <td>스타일만</td>
+            <td>1개 페이지로 병합</td>
+            <td>대시보드 새로 제작</td>
+          </tr>
+          <tr>
+            <td class="label">상세 리스트 접근</td>
+            <td style="color:#34d399;">즉시 (현재 그대로)</td>
+            <td style="color:#34d399;">탭 클릭 즉시</td>
+            <td style="color:#fbbf24;">클릭 → 이동 필요</td>
+          </tr>
+          <tr>
+            <td class="label">모바일 UX</td>
+            <td style="color:#fbbf24;">보통</td>
+            <td style="color:#34d399;">좋음 (탭 스와이프)</td>
+            <td style="color:#fbbf24;">보통 (스크롤 길어짐)</td>
+          </tr>
+          <tr>
+            <td class="label">DB 변경 필요</td>
+            <td>없음</td>
+            <td>없음</td>
+            <td>없음</td>
+          </tr>
+          <tr>
+            <td class="label">상태 필터 개선</td>
+            <td>각 페이지 별도</td>
+            <td>탭별 전용 필터</td>
+            <td>각 섹션 간소화</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight">
+        <p>💡 추천: <b>B안 (탭 통합형)</b> — 지입과 투자는 데이터 구조가 다르지만 "정산 관리"라는 목적은 동일합니다. 한 페이지에서 탭으로 전환하면 전체 투자 현황을 빠르게 파악할 수 있고, 기존 DB 구조 변경 없이 구현 가능합니다.</p>
+      </div>
+    </div>
+
+    <!-- 추가 개선 사항 -->
+    <div class="card">
+      <h2>공통 개선 사항 (어떤 구성안이든 적용)</h2>
+
+      <h3>1. 상태 필터 확장</h3>
+      <p>현재 지입 필터: 전체/운영중/종료 (3개) → DB는 active/expired/terminated/renewed 4개 상태 지원<br>
+      <b style="color:#34d399;">개선:</b> 전체 / 운영중 / 만기 / 해지 / 갱신 으로 확장 + 만기임박(90일) 추가</p>
+
+      <div class="mock-filter" style="margin:8px 0;background:#1e293b;border:1px solid #334155;border-radius:8px;">
+        <span class="mock-chip active">전체 12</span>
+        <span class="mock-chip" style="border-color:#16a34a;color:#16a34a;">운영중 9</span>
+        <span class="mock-chip" style="border-color:#d97706;color:#d97706;">만기임박 2</span>
+        <span class="mock-chip" style="border-color:#ef4444;color:#ef4444;">만기 1</span>
+        <span class="mock-chip" style="border-color:#6b7280;color:#6b7280;">해지 0</span>
+        <span class="mock-chip" style="border-color:#2563eb;color:#2563eb;">갱신 0</span>
+      </div>
+
+      <h3>2. 하단 요약바 추가</h3>
+      <p>현재 두 페이지 모두 없음 → 총합 정보 표시</p>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;font-size:10px;color:#64748b;margin:8px 0;">
+        <span>총 투자금: <b style="color:#0f172a;">17.2억</b></span>
+        <span>월 관리비: <b style="color:#0f172a;">340만</b></span>
+        <span>평균 배분율: <b style="color:#0f172a;">54.2%</b></span>
+        <span>총 <b style="color:#0f172a;">12</b>건</span>
+      </div>
+
+      <h3>3. 통계 뱃지 최적화 (5 → 4)</h3>
+      <p>모바일에서 5개는 넘침 → 핵심 4개로 줄이고 나머지는 필터 클릭으로 대체</p>
+
+      <h3>4. 모바일 카드뷰</h3>
+      <p>현재 테이블만 존재 → 모바일에서는 카드형 리스트로 전환</p>
+      <div style="max-width:280px;margin:8px 0;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:800;color:#111827;">161허9826</span>
+            <span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:999px;background:#dcfce7;color:#16a34a;">운영중</span>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;">정태영 · 카니발 하이브리드</div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:#2d5fa8;font-weight:800;">3,800만원</span>
+            <span style="color:#64748b;">배분 48.8% · 관리비 20만</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let selected = null;
+function selectOpt(el, val) {
+  document.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selected = val;
+}
+</script>
+</body>
+</html>

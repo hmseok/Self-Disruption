@@ -6,6 +6,7 @@ import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { usePermission } from '../../hooks/usePermission'
 import { UploadProvider, useUpload } from '@/app/context/UploadContext'
+import PageTitle from '../PageTitle'
 
 // ============================================
 // 아이콘
@@ -46,15 +47,14 @@ const PATH_TO_GROUP: Record<string, string> = {
 
 // 메뉴명 오버라이드
 const NAME_OVERRIDES: Record<string, string> = {
-  '/invest': '일반투자',
-  '/jiip': '지입투자',
+  '/invest': '투자 정산 관리',
   '/insurance': '보험/가입',
   '/finance/upload': '카드/통장 관리',
   '/admin/payroll': '급여 관리',
 }
 
 // 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
-const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers'])
+const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip'])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [
@@ -528,6 +528,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
+          <PageTitle />
           {children}
         </div>
       </main>
@@ -596,7 +597,7 @@ function UploadProgressWidget() {
       )}
       {/* 분류 확정 대기 알림 */}
       {!isProcessing && hasResults && (
-        <a href="/finance/review" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+        <a href="/finance/upload" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16 }}>📋</span>
@@ -607,7 +608,7 @@ function UploadProgressWidget() {
             </span>
           </div>
           <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0 0' }}>
-            클릭하여 분류/확정 페이지로 이동
+            클릭하여 카드/통장 관리 페이지로 이동
           </p>
         </a>
       )}

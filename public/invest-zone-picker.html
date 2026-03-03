@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>투자 페이지 — 디자인 프리뷰</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;}
+
+/* Top Bar */
+.top-bar{position:sticky;top:0;z-index:200;background:#0f172a;border-bottom:1px solid #1e293b;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.top-bar h1{color:#fff;font-size:14px;font-weight:800;white-space:nowrap;}
+.page-tabs{display:flex;gap:4px;margin-left:12px;}
+.page-tabs button{padding:6px 14px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:#1e293b;color:#94a3b8;}
+.page-tabs button.active{background:#2d5fa8;color:#fff;}
+.device-sw{margin-left:auto;display:flex;gap:4px;}
+.device-sw button{background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;}
+.device-sw button.active{background:#2d5fa8;color:#fff;border-color:#2d5fa8;}
+
+/* Layout */
+.main-wrap{display:flex;gap:0;min-height:calc(100vh - 45px);}
+.sidebar{width:260px;background:#1e293b;border-right:1px solid #334155;padding:16px;overflow-y:auto;flex-shrink:0;position:sticky;top:45px;height:calc(100vh - 45px);}
+.preview-area{flex:1;padding:20px;overflow-y:auto;}
+.preview-frame{max-width:1100px;margin:0 auto;transition:max-width .3s;}
+.preview-frame.mobile{max-width:390px;}
+.preview-frame.tablet{max-width:768px;}
+
+/* Sidebar */
+.side-section{margin-bottom:20px;}
+.side-section h3{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;padding:4px 0 8px;display:flex;align-items:center;gap:6px;}
+.side-section h3 .dot{width:8px;height:8px;border-radius:50%;}
+.side-note{font-size:9px;color:#475569;padding:4px 2px;line-height:1.4;}
+.side-note b{color:#94a3b8;}
+.opt-btn{display:block;width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;font-size:11px;font-weight:600;cursor:pointer;text-align:left;background:transparent;color:#94a3b8;margin-bottom:2px;}
+.opt-btn:hover{background:#334155;color:#fff;}
+.opt-btn.active{background:#2d5fa8;color:#fff;border-color:#3b82f6;}
+.design-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:700;margin-left:4px;}
+.design-tag.same{background:rgba(52,211,153,.15);color:#34d399;}
+.design-tag.new{background:rgba(251,191,36,.15);color:#fbbf24;}
+
+/* Page */
+.page-container{background:#f8fafc;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.1);overflow:hidden;}
+.hidden{display:none !important;}
+
+/* ═══════════════════════════════════════
+   투자 페이지 고유 기능 영역
+   ═══════════════════════════════════════ */
+
+/* 상단 통계 — 현재 (DarkHeader) */
+.stats-current{background:linear-gradient(135deg,#f8fafc,#edf2f7);padding:12px 20px;border-bottom:1px solid #e2e8f0;}
+.stats-current .action-row{display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px;}
+.stats-current .action-btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #d1d5db;background:#fff;color:#334155;}
+.stats-current .action-btn.primary{background:#2d5fa8;color:#fff;border:none;}
+.stats-current .stat-row{display:flex;gap:8px;}
+.stat-badge{flex:1;background:#fff;border-radius:10px;padding:9px 12px;border:1px solid #e2e8f0;text-align:center;cursor:pointer;transition:all .15s;}
+.stat-badge:hover{box-shadow:0 2px 8px rgba(0,0,0,.05);transform:translateY(-1px);}
+.stat-badge .sl{font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:3px;}
+.stat-badge .sv{font-size:18px;font-weight:900;line-height:1;}
+
+/* 개선안 A: 인라인 요약 + 좌측 액센트 */
+.stats-a{background:#fff;padding:14px 20px;display:flex;align-items:center;gap:0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}
+.stats-a .s-item{display:flex;align-items:center;gap:6px;padding:0 16px;border-right:1px solid #e2e8f0;font-size:13px;color:#64748b;font-weight:600;}
+.stats-a .s-item:last-of-type{border-right:none;}
+.stats-a .s-item .s-val{font-weight:900;}
+.stats-a .s-actions{margin-left:auto;display:flex;gap:6px;}
+.stats-a .s-actions button{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.stats-a .s-actions .sec{border:1px solid #e2e8f0;background:#fff;color:#475569;}
+.stats-a .s-actions .pri{border:none;background:#2d5fa8;color:#fff;}
+
+/* 개선안 B: 미니 카드 그리드 */
+.stats-b{padding:12px 20px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.stats-b .s-top{display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px;}
+.stats-b .s-top button{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.stats-b .s-top .sec{border:1px solid #e2e8f0;background:#fff;color:#475569;}
+.stats-b .s-top .pri{border:none;background:#2d5fa8;color:#fff;}
+.stats-b .s-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.stats-b .s-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;cursor:pointer;transition:all .15s;}
+.stats-b .s-card:hover{border-color:#2d5fa8;box-shadow:0 2px 8px rgba(45,95,168,.08);}
+.stats-b .s-card .accent{position:absolute;top:0;left:0;width:3px;height:100%;border-radius:3px 0 0 3px;}
+.stats-b .s-card .sl{font-size:10px;color:#94a3b8;font-weight:700;}
+.stats-b .s-card .sv{font-size:17px;font-weight:900;margin-top:4px;}
+
+/* 개선안 C: 다크 블루 배너 */
+.stats-c{background:linear-gradient(135deg,#1e3a5f,#2d5fa8);padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative;overflow:hidden;}
+.stats-c::after{content:'';position:absolute;top:-50%;right:-5%;width:200px;height:200px;background:rgba(255,255,255,.03);border-radius:50%;}
+.stats-c .s-item{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;backdrop-filter:blur(10px);position:relative;z-index:1;}
+.stats-c .s-item .sl{font-size:9px;color:rgba(255,255,255,.5);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.stats-c .s-item .sv{font-size:17px;font-weight:900;color:#fff;margin-top:4px;}
+.stats-c .s-actions{margin-left:auto;display:flex;gap:6px;position:relative;z-index:1;}
+.stats-c .s-actions button{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.stats-c .s-actions .sec{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);}
+.stats-c .s-actions .pri{background:#fff;color:#2d5fa8;border:none;}
+
+/* 필터바 — 투자 고유 기능 (상태필터+검색) */
+.filter-bar{display:flex;align-items:center;padding:10px 20px;gap:8px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;background:#fff;}
+.f-chip{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;white-space:nowrap;}
+.f-chip.active{background:#0f172a;color:#fff;border-color:#0f172a;}
+.f-chip .cnt{font-weight:900;margin-left:3px;}
+.f-chip.active .cnt{color:#60a5fa;}
+.f-search{padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;flex:1;min-width:180px;outline:none;background:#fff;color:#0f172a;}
+.f-search:focus{border-color:#2d5fa8;box-shadow:0 0 0 3px rgba(45,95,168,.1);}
+
+/* 테이블 */
+.data-table{width:100%;border-collapse:collapse;background:#fff;}
+.data-table thead th{padding:12px 20px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;background:#f9fafb;border-bottom:1px solid #f3f4f6;text-align:left;}
+.data-table tbody tr{border-bottom:1px solid #f3f4f6;cursor:pointer;transition:background .1s;}
+.data-table tbody tr:hover{background:#f8fafc;}
+.data-table tbody td{padding:14px 20px;font-size:14px;color:#374151;}
+.t-main{font-weight:800;color:#111827;font-size:15px;}
+.t-sub{font-size:12px;color:#9ca3af;margin-top:2px;}
+.t-money{font-weight:800;color:#2d5fa8;}
+.t-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;background:#eff6ff;color:#2d5fa8;margin-top:2px;}
+.t-status{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.t-status.active{background:#dcfce7;color:#16a34a;}
+.t-status.ended{background:#f3f4f6;color:#9ca3af;}
+
+/* 하단바 */
+.bottom-bar{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:#fff;border-top:1px solid #e2e8f0;}
+.bottom-bar .b-info{font-size:12px;color:#94a3b8;display:flex;gap:16px;}
+.bottom-bar .b-val{font-weight:800;color:#0f172a;}
+
+/* ═══ DETAIL PAGE ═══ */
+/* 상세 헤더 */
+.detail-hdr{padding:16px 24px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.detail-hdr .back{font-size:12px;color:#94a3b8;cursor:pointer;flex-shrink:0;}
+.detail-hdr .info{flex:1;min-width:0;}
+.detail-hdr .title{font-size:18px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;}
+.detail-hdr .sub{font-size:12px;color:#94a3b8;margin-top:2px;}
+.detail-hdr .actions{display:flex;gap:6px;flex-shrink:0;}
+.detail-hdr .actions button{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.detail-hdr .actions .sec{border:1px solid #e2e8f0;background:#fff;color:#475569;}
+.detail-hdr .actions .danger{border:1px solid #fecaca;background:#fff;color:#dc2626;}
+
+/* 대시보드 — 현재 (라인 카드) */
+.dash-current{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px 24px;background:#f8fafc;}
+.dash-current .d-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;position:relative;overflow:hidden;}
+.dash-current .d-card .accent{position:absolute;top:0;left:0;width:4px;height:100%;border-radius:4px 0 0 4px;}
+.dash-current .d-card .dl{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;}
+.dash-current .d-card .dv{font-size:20px;font-weight:800;color:#0f172a;margin-top:4px;}
+.dash-current .d-card .ds{font-size:10px;color:#94a3b8;margin-top:2px;}
+.pbar{height:4px;background:#f1f5f9;border-radius:4px;margin-top:8px;overflow:hidden;}
+.pbar .fill{height:100%;border-radius:4px;}
+
+/* 대시보드 개선안 A: 아이콘+본문 */
+.dash-a{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 24px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.dash-a .d-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;display:flex;gap:12px;}
+.dash-a .d-card .d-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.dash-a .d-card .d-body{flex:1;min-width:0;}
+.dash-a .d-card .dl{font-size:10px;color:#94a3b8;font-weight:700;}
+.dash-a .d-card .dv{font-size:17px;font-weight:900;margin-top:2px;}
+.dash-a .d-card .ds{font-size:10px;margin-top:2px;}
+
+/* 대시보드 개선안 B: 컴팩트 바 */
+.dash-b{padding:16px 24px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.dash-b .bar{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.dash-b .bar .b-item .dl{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;}
+.dash-b .bar .b-item .dv{font-size:14px;font-weight:900;margin-top:2px;}
+.dash-b .bar .b-sep{width:1px;height:32px;background:#e2e8f0;}
+
+/* 상세 탭 */
+.detail-tabs{display:flex;gap:0;padding:0 24px;background:#fff;border-bottom:2px solid #e2e8f0;}
+.detail-tabs .dt{padding:12px 18px;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.detail-tabs .dt.active{color:#0f172a;border-bottom-color:#0f172a;}
+.detail-tabs .dt .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:4px;background:#eff6ff;color:#2d5fa8;}
+.detail-tabs .dt.active .badge{background:#0f172a;color:#fff;}
+
+/* Responsive */
+@media(max-width:900px){
+  .main-wrap{flex-direction:column;}
+  .sidebar{width:100%;height:auto;position:relative;top:0;border-right:none;border-bottom:1px solid #334155;padding:8px 12px;}
+  .stats-b .s-grid{grid-template-columns:repeat(3,1fr);}
+  .dash-current,.dash-a{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:480px){
+  .stats-b .s-grid{grid-template-columns:repeat(2,1fr);}
+  .dash-current,.dash-a{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>투자 페이지 디자인</h1>
+  <div class="page-tabs">
+    <button class="active" onclick="switchPage('list',this)">📋 리스트</button>
+    <button onclick="switchPage('detail',this)">📝 상세</button>
+  </div>
+  <div class="device-sw">
+    <button class="active" onclick="setDev('desktop',this)">PC</button>
+    <button onclick="setDev('tablet',this)">Tablet</button>
+    <button onclick="setDev('mobile',this)">Mobile</button>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div class="sidebar">
+
+    <!-- 리스트 사이드바 -->
+    <div id="side-list">
+      <div class="side-section">
+        <h3><span class="dot" style="background:#f59e0b;"></span> 상단 통계 영역</h3>
+        <div class="side-note"><b>투자 고유 기능:</b> DarkHeader 통계 뱃지 + 신규등록 버튼<br>→ 디자인만 개선, 기능은 그대로</div>
+        <button class="opt-btn active" onclick="pickStats('current',this)">현재 디자인 <span class="design-tag same">현행</span></button>
+        <button class="opt-btn" onclick="pickStats('a',this)">A. 인라인 요약바 <span class="design-tag new">개선</span></button>
+        <button class="opt-btn" onclick="pickStats('b',this)">B. 미니 카드 그리드 <span class="design-tag new">개선</span></button>
+        <button class="opt-btn" onclick="pickStats('c',this)">C. 다크 블루 배너 <span class="design-tag new">개선</span></button>
+      </div>
+
+      <div class="side-section">
+        <h3><span class="dot" style="background:#34d399;"></span> 필터 + 검색</h3>
+        <div class="side-note"><b>투자 고유 기능:</b> 상태 필터 (전체/운영중/종료) + 검색<br>→ 카드/통장의 <b>칩 스타일</b> 디자인 적용</div>
+      </div>
+
+      <div class="side-section">
+        <h3><span class="dot" style="background:#34d399;"></span> 리스트 테이블</h3>
+        <div class="side-note"><b>투자 고유 기능:</b> 차량·투자자·금액·관리비·상태 테이블<br>→ 카드/통장의 <b>폰트·여백·색상</b> 톤 적용</div>
+      </div>
+    </div>
+
+    <!-- 상세 사이드바 -->
+    <div id="side-detail" class="hidden">
+      <div class="side-section">
+        <h3><span class="dot" style="background:#f59e0b;"></span> 대시보드 (6칸)</h3>
+        <div class="side-note"><b>투자 고유 기능:</b> 구입비용/약정/입금률/배분율/관리비/비율<br>→ 디자인만 개선, 데이터는 동일</div>
+        <button class="opt-btn active" onclick="pickDash('current',this)">현재 디자인 <span class="design-tag same">현행</span></button>
+        <button class="opt-btn" onclick="pickDash('a',this)">A. 아이콘 + 카드 <span class="design-tag new">개선</span></button>
+        <button class="opt-btn" onclick="pickDash('b',this)">B. 컴팩트 수평 바 <span class="design-tag new">개선</span></button>
+      </div>
+
+      <div class="side-section">
+        <h3><span class="dot" style="background:#34d399;"></span> 상세 탭</h3>
+        <div class="side-note"><b>투자 고유 기능:</b> 계약정보 / 계약서 / 입금내역 / 정산이력<br>→ 카드/통장의 <b>탭 디자인 스타일</b> 적용</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-area">
+    <div class="preview-frame" id="preview-frame">
+
+      <!-- ====================== LIST PAGE ====================== -->
+      <div id="page-list" class="page-container">
+
+        <!-- 통계 영역: 현재 -->
+        <div id="stats-current" class="stats-current">
+          <div class="action-row">
+            <button class="action-btn">📊 통계</button>
+            <button class="action-btn primary">+ 신규 계약 등록</button>
+          </div>
+          <div class="stat-row">
+            <div class="stat-badge"><div class="sl">전체 계약</div><div class="sv" style="color:#334155;">45건</div></div>
+            <div class="stat-badge"><div class="sl">운영 중</div><div class="sv" style="color:#059669;">38건</div></div>
+            <div class="stat-badge"><div class="sl">총 투자 유치금</div><div class="sv" style="color:#2563eb;">17.2억</div></div>
+            <div class="stat-badge"><div class="sl">월 관리비 합계</div><div class="sv" style="color:#7c3aed;">340만</div></div>
+            <div class="stat-badge"><div class="sl">종료 계약</div><div class="sv" style="color:#dc2626;">5건</div></div>
+          </div>
+        </div>
+
+        <!-- 통계 개선안 A -->
+        <div id="stats-a" class="stats-a hidden">
+          <div class="s-item">전체 <span class="s-val" style="color:#334155;">45건</span></div>
+          <div class="s-item">운영 <span class="s-val" style="color:#059669;">38건</span></div>
+          <div class="s-item">유치금 <span class="s-val" style="color:#2563eb;">17.2억</span></div>
+          <div class="s-item">관리비 <span class="s-val" style="color:#7c3aed;">340만</span></div>
+          <div class="s-item">종료 <span class="s-val" style="color:#dc2626;">5건</span></div>
+          <div class="s-actions">
+            <button class="sec">📊 통계</button>
+            <button class="pri">+ 신규 등록</button>
+          </div>
+        </div>
+
+        <!-- 통계 개선안 B -->
+        <div id="stats-b" class="stats-b hidden">
+          <div class="s-top">
+            <button class="sec">📊 통계</button>
+            <button class="pri">+ 신규 계약 등록</button>
+          </div>
+          <div class="s-grid">
+            <div class="s-card"><div class="accent" style="background:#334155;"></div><div class="sl">전체 계약</div><div class="sv" style="color:#334155;">45건</div></div>
+            <div class="s-card"><div class="accent" style="background:#059669;"></div><div class="sl">운영 중</div><div class="sv" style="color:#059669;">38건</div></div>
+            <div class="s-card"><div class="accent" style="background:#2563eb;"></div><div class="sl">총 투자 유치금</div><div class="sv" style="color:#2563eb;">17.2억</div></div>
+            <div class="s-card"><div class="accent" style="background:#7c3aed;"></div><div class="sl">월 관리비 합계</div><div class="sv" style="color:#7c3aed;">340만</div></div>
+            <div class="s-card"><div class="accent" style="background:#dc2626;"></div><div class="sl">종료 계약</div><div class="sv" style="color:#dc2626;">5건</div></div>
+          </div>
+        </div>
+
+        <!-- 통계 개선안 C -->
+        <div id="stats-c" class="stats-c hidden">
+          <div class="s-item"><div class="sl">전체</div><div class="sv">45건</div></div>
+          <div class="s-item"><div class="sl">운영 중</div><div class="sv" style="color:#34d399;">38건</div></div>
+          <div class="s-item"><div class="sl">유치금</div><div class="sv">17.2억</div></div>
+          <div class="s-item"><div class="sl">관리비</div><div class="sv" style="color:#fbbf24;">340만</div></div>
+          <div class="s-item"><div class="sl">종료</div><div class="sv" style="color:#fca5a5;">5건</div></div>
+          <div class="s-actions">
+            <button class="sec">📊 통계</button>
+            <button class="pri">+ 신규 등록</button>
+          </div>
+        </div>
+
+        <!-- 필터 + 검색 (투자 고유: 상태 필터 + 검색) → 카드/통장 칩 스타일 적용 -->
+        <div class="filter-bar">
+          <span class="f-chip active">전체 <span class="cnt">45</span></span>
+          <span class="f-chip">운영 중 <span class="cnt">38</span></span>
+          <span class="f-chip">종료 <span class="cnt">5</span></span>
+          <span class="f-chip">해지 <span class="cnt">2</span></span>
+          <input class="f-search" placeholder="🔍 차량번호, 차주명, 연락처 검색...">
+        </div>
+
+        <!-- 리스트 테이블 (투자 고유 컬럼) → 카드/통장 폰트·여백 톤 적용 -->
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>계약 차량</th>
+              <th>투자자 (차주)</th>
+              <th>투자금 / 수익률</th>
+              <th>월 관리비</th>
+              <th>지급일</th>
+              <th style="text-align:center;">상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="t-main">161허9826</div><div class="t-sub">카니발 하이브리드</div></td>
+              <td><div style="font-weight:700;">정태영</div><div class="t-sub">010-1234-5678</div></td>
+              <td><div class="t-money">38,000,000원</div><div class="t-badge">48.8% 배분</div></td>
+              <td style="font-weight:700;color:#4b5563;">200,000원</td>
+              <td style="font-weight:700;color:#6b7280;">매월 15일</td>
+              <td style="text-align:center;"><span class="t-status active">운영 중</span></td>
+            </tr>
+            <tr>
+              <td><div class="t-main">303가5577</div><div class="t-sub">스타렉스</div></td>
+              <td><div style="font-weight:700;">이준혁</div><div class="t-sub">010-9876-5432</div></td>
+              <td><div class="t-money">42,000,000원</div><div class="t-badge">52.3% 배분</div></td>
+              <td style="font-weight:700;color:#4b5563;">250,000원</td>
+              <td style="font-weight:700;color:#6b7280;">매월 10일</td>
+              <td style="text-align:center;"><span class="t-status active">운영 중</span></td>
+            </tr>
+            <tr>
+              <td><div class="t-main">78허1234</div><div class="t-sub">포터2</div></td>
+              <td><div style="font-weight:700;">박민수</div><div class="t-sub">010-5555-1234</div></td>
+              <td><div class="t-money">28,500,000원</div><div class="t-badge">70.0% 배분</div></td>
+              <td style="font-weight:700;color:#4b5563;">180,000원</td>
+              <td style="font-weight:700;color:#6b7280;">매월 20일</td>
+              <td style="text-align:center;"><span class="t-status active">운영 중</span></td>
+            </tr>
+            <tr>
+              <td><div class="t-main">55나6789</div><div class="t-sub">봉고3</div></td>
+              <td><div style="font-weight:700;">김서연</div><div class="t-sub">010-3333-7890</div></td>
+              <td><div class="t-money">35,200,000원</div><div class="t-badge">65.5% 배분</div></td>
+              <td style="font-weight:700;color:#4b5563;">220,000원</td>
+              <td style="font-weight:700;color:#6b7280;">매월 25일</td>
+              <td style="text-align:center;"><span class="t-status active">운영 중</span></td>
+            </tr>
+            <tr>
+              <td><div class="t-main" style="color:#9ca3af;">92호3344</div><div class="t-sub">카니발</div></td>
+              <td><div style="font-weight:700;color:#9ca3af;">최동훈</div><div class="t-sub">010-7777-4321</div></td>
+              <td><div style="font-weight:800;color:#9ca3af;">31,000,000원</div><div class="t-badge" style="background:#f3f4f6;color:#9ca3af;">48.0% 배분</div></td>
+              <td style="font-weight:700;color:#9ca3af;">200,000원</td>
+              <td style="font-weight:700;color:#9ca3af;">매월 15일</td>
+              <td style="text-align:center;"><span class="t-status ended">종료</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="bottom-bar">
+          <div class="b-info">
+            <span>총 약정: <span class="b-val">17.2억</span></span>
+            <span>평균 입금률: <span class="b-val">67.3%</span></span>
+            <span>총 <span class="b-val">45</span>건</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================== DETAIL PAGE ====================== -->
+      <div id="page-detail" class="page-container hidden">
+
+        <!-- 상세 헤더 (투자 고유: 뒤로가기+제목+상태+액션) -->
+        <div class="detail-hdr">
+          <div class="back">‹ 목록으로</div>
+          <div class="info">
+            <div class="title">
+              정태영 · 161허9826
+              <span class="t-status active">운영 중</span>
+            </div>
+            <div class="sub">카니발 하이브리드 · 주식회사에프엠아이 · D-1043</div>
+          </div>
+          <div class="actions">
+            <button class="sec">상태 변경 ▾</button>
+            <button class="danger">삭제</button>
+          </div>
+        </div>
+
+        <!-- 대시보드: 현재 -->
+        <div id="dash-current" class="dash-current">
+          <div class="d-card"><div class="accent" style="background:#2d5fa8;"></div><div class="dl">차량 구입비용</div><div class="dv">55,000,000<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds">161허9826 (카니발)</div></div>
+          <div class="d-card"><div class="accent" style="background:#0f172a;"></div><div class="dl">약정금액</div><div class="dv">38,000,000<span style="font-size:11px;color:#94a3b8;">원</span></div><div class="ds" style="color:#2563eb;font-weight:700;">구입비 대비 69.1%</div></div>
+          <div class="d-card"><div class="accent" style="background:#f59e0b;"></div><div class="dl">입금 진행률</div><div class="dv">67.3<span style="font-size:11px;color:#94a3b8;">%</span></div><div class="pbar"><div class="fill" style="width:67%;background:#f59e0b;"></div></div></div>
+          <div class="d-card"><div class="accent" style="background:#7c3aed;"></div><div class="dl">배분율</div><div class="dv" style="color:#7c3aed;">48.8<span style="font-size:11px;color:#94a3b8;">%</span></div></div>
+          <div class="d-card"><div class="accent" style="background:#64748b;"></div><div class="dl">관리비</div><div class="dv">200,000<span style="font-size:11px;color:#94a3b8;">원</span></div></div>
+          <div class="d-card"><div class="accent" style="background:#2563eb;"></div><div class="dl">약정/구입 비율</div><div class="dv" style="color:#2563eb;">69.1<span style="font-size:11px;color:#94a3b8;">%</span></div><div class="pbar"><div class="fill" style="width:69%;background:#2563eb;"></div></div></div>
+        </div>
+
+        <!-- 대시보드 개선안 A -->
+        <div id="dash-a" class="dash-a hidden">
+          <div class="d-card"><div class="d-icon" style="background:#eff6ff;">🚗</div><div class="d-body"><div class="dl">차량 구입비용</div><div class="dv" style="color:#0f172a;">5,500만</div><div class="ds" style="color:#94a3b8;">161허9826 (카니발)</div></div></div>
+          <div class="d-card"><div class="d-icon" style="background:#f8fafc;">💰</div><div class="d-body"><div class="dl">약정금액</div><div class="dv" style="color:#0f172a;">3,800만</div><div class="ds" style="color:#2563eb;font-weight:700;">구입비 대비 69.1%</div></div></div>
+          <div class="d-card"><div class="d-icon" style="background:#fffbeb;">📊</div><div class="d-body"><div class="dl">입금 진행률</div><div class="dv" style="color:#d97706;">67.3%</div><div class="pbar" style="margin-top:6px;"><div class="fill" style="width:67%;background:#f59e0b;"></div></div></div></div>
+          <div class="d-card"><div class="d-icon" style="background:#f5f3ff;">📈</div><div class="d-body"><div class="dl">배분율</div><div class="dv" style="color:#7c3aed;">48.8%</div><div class="ds" style="color:#94a3b8;">추천 48.8%</div></div></div>
+          <div class="d-card"><div class="d-icon" style="background:#f1f5f9;">🏦</div><div class="d-body"><div class="dl">관리비</div><div class="dv" style="color:#0f172a;">20만</div><div class="ds" style="color:#94a3b8;">매월 15일</div></div></div>
+          <div class="d-card"><div class="d-icon" style="background:#eff6ff;">⚖️</div><div class="d-body"><div class="dl">약정/구입 비율</div><div class="dv" style="color:#2563eb;">69.1%</div><div class="pbar" style="margin-top:6px;"><div class="fill" style="width:69%;background:#2563eb;"></div></div></div></div>
+        </div>
+
+        <!-- 대시보드 개선안 B -->
+        <div id="dash-b" class="dash-b hidden">
+          <div class="bar">
+            <div class="b-item"><div class="dl">구입비용</div><div class="dv" style="color:#0f172a;">5,500만</div></div>
+            <div class="b-sep"></div>
+            <div class="b-item"><div class="dl">약정</div><div class="dv" style="color:#0f172a;">3,800만 <span style="font-size:10px;color:#2563eb;font-weight:700;">69.1%</span></div></div>
+            <div class="b-sep"></div>
+            <div class="b-item"><div class="dl">입금률</div><div class="dv" style="color:#d97706;">67.3%</div></div>
+            <div class="b-sep"></div>
+            <div class="b-item"><div class="dl">배분율</div><div class="dv" style="color:#7c3aed;">48.8%</div></div>
+            <div class="b-sep"></div>
+            <div class="b-item"><div class="dl">관리비</div><div class="dv" style="color:#0f172a;">20만</div></div>
+            <div class="b-sep"></div>
+            <div class="b-item"><div class="dl">약정/구입</div><div class="dv" style="color:#2563eb;">69.1%</div></div>
+          </div>
+        </div>
+
+        <!-- 상세 탭 (투자 고유: 계약정보/계약서/입금/정산) → 카드/통장 탭 스타일 적용 -->
+        <div class="detail-tabs">
+          <div class="dt active">📋 계약 정보</div>
+          <div class="dt">📄 계약서</div>
+          <div class="dt">💰 입금내역 <span class="badge">12</span></div>
+          <div class="dt">📊 정산이력</div>
+        </div>
+
+        <!-- 폼 영역 -->
+        <div style="margin:20px 24px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:40px;text-align:center;color:#94a3b8;">
+          <div style="font-size:28px;margin-bottom:8px;">📝</div>
+          <div style="font-weight:700;font-size:13px;">계약 정보 폼 영역</div>
+          <div style="font-size:11px;margin-top:4px;">(세금유형 · 투자자정보 · 계약조건 · 메모 섹션)</div>
+        </div>
+
+        <div class="bottom-bar">
+          <div class="b-info">
+            <span>마지막 수정: <span class="b-val">2026.03.02</span></span>
+            <span>계약일: <span class="b-val">2023.06.15</span></span>
+          </div>
+          <button style="padding:10px 24px;background:#0f172a;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">정보 수정 저장</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function pickStats(val, btn) {
+  btn.closest('.side-section').querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['current','a','b','c'].forEach(v => {
+    const el = document.getElementById('stats-'+v);
+    if (el) el.classList.toggle('hidden', val !== v);
+  });
+}
+
+function pickDash(val, btn) {
+  btn.closest('.side-section').querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['current','a','b'].forEach(v => {
+    const el = document.getElementById('dash-'+v);
+    if (el) el.classList.toggle('hidden', val !== v);
+  });
+}
+
+function switchPage(pg, btn) {
+  btn.closest('.page-tabs').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('page-list').classList.toggle('hidden', pg !== 'list');
+  document.getElementById('page-detail').classList.toggle('hidden', pg !== 'detail');
+  document.getElementById('side-list').classList.toggle('hidden', pg !== 'list');
+  document.getElementById('side-detail').classList.toggle('hidden', pg !== 'detail');
+}
+
+function setDev(mode, btn) {
+  const f = document.getElementById('preview-frame');
+  f.classList.remove('mobile','tablet');
+  if (mode !== 'desktop') f.classList.add(mode);
+  btn.closest('.device-sw').querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

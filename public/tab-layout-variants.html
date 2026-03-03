@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>필터/버튼 레이아웃 변형 비교</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #e2e8f0; }
+
+  /* Nav */
+  .nav { display: flex; justify-content: center; gap: 6px; padding: 16px 12px 12px; flex-wrap: wrap; position: sticky; top: 0; background: #e2e8f0; z-index: 99; border-bottom: 2px solid #cbd5e1; }
+  .nb { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; border: 2px solid #e2e8f0; background: #fff; color: #475569; white-space: nowrap; }
+  .nb:hover { border-color: #2d5fa8; color: #2d5fa8; }
+  .nb.on { border-color: #2d5fa8; background: #2d5fa8; color: #fff; }
+  .tag { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 4px; }
+  .tag-hot { background: #fef3c7; color: #b45309; }
+  .tag-new { background: #dcfce7; color: #16a34a; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  .card { border-radius: 14px; overflow: hidden; box-shadow: 0 2px 16px rgba(45,95,168,0.08); background: #fff; }
+
+  /* P3-C title */
+  .pt { display: flex; align-items: center; gap: 10px; padding: 12px 20px; }
+  .pt-dot { width: 8px; height: 8px; border-radius: 50%; background: #2d5fa8; box-shadow: 0 0 0 3px rgba(45,95,168,0.15); }
+  .pt-sec { font-size: 11px; color: #94a3b8; font-weight: 500; }
+  .pt-arr { color: #cbd5e1; font-size: 11px; }
+  .pt-name { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .pt-line { height: 1.5px; background: #2d5fa8; }
+
+  /* Common */
+  .tabs { display: flex; align-items: center; background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 0 4px; }
+  .up-wrap { padding: 6px 8px; margin: 6px 8px 6px 4px; cursor: pointer; }
+  .up-inner { display: flex; align-items: center; gap: 5px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: #64748b; background: #fafbfc; border: 1.5px dashed #cbd5e1; border-radius: 8px; }
+  .up-inner:hover { border-color: #2d5fa8; color: #2d5fa8; background: #eff6ff; }
+  .tab { padding: 10px 18px; border: none; cursor: pointer; border-bottom: 3px solid transparent; background: transparent; font-size: 12px; font-weight: 600; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+  .tab.on { font-weight: 800; color: #0f172a; border-bottom-color: #2d5fa8; background: #fff; }
+  .tab .c { font-size: 10px; font-weight: 700; }
+  .tab-r { margin-left: auto; display: flex; gap: 6px; padding-right: 8px; align-items: center; }
+  .b { padding: 5px 12px; border-radius: 7px; font-size: 10px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .b-g { color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .b-b { color: #fff; background: #2d5fa8; }
+  .b-gr { color: #fff; background: #16a34a; }
+
+  .sel { padding: 6px 28px 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1.5px solid #2d5fa8; color: #0f172a; background: #fff; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%232d5fa8' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+  .sel-sm { padding: 5px 24px 5px 8px; font-size: 10px; font-weight: 700; border: 1px solid #e2e8f0; color: #64748b; border-radius: 6px; }
+  .sep { width: 1px; height: 20px; background: #e5e7eb; flex-shrink: 0; }
+  .tog { display: flex; background: #f1f5f9; padding: 3px; border-radius: 8px; }
+  .tog-b { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; background: transparent; color: #64748b; white-space: nowrap; }
+  .tog-b.on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* Stats */
+  .stats { display: flex; border-bottom: 1px solid #e2e8f0; }
+  .st { flex: 1; padding: 10px 12px; text-align: center; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.15s; }
+  .st.on { border-bottom-color: #2d5fa8; background: #eff6ff; }
+  .st-l { font-size: 10px; font-weight: 600; color: #94a3b8; margin-bottom: 2px; }
+  .st-v { font-size: 17px; font-weight: 900; color: #1e293b; }
+  .st.on .st-l, .st.on .st-v { color: #2d5fa8; }
+  .st-u { font-size: 10px; font-weight: 500; }
+
+  /* Group & Row */
+  .grp { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; cursor: pointer; }
+  .grp-cb { width: 15px; height: 15px; accent-color: #2d5fa8; }
+  .grp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .grp-n { font-size: 12px; font-weight: 800; color: #1e293b; }
+  .grp-m { font-size: 10px; color: #94a3b8; }
+  .grp-r { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .b-cf { padding: 4px 12px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #fff; background: #16a34a; border: none; cursor: pointer; }
+  .arr { font-size: 12px; color: #94a3b8; }
+  .sgrp { display: flex; align-items: center; gap: 8px; padding: 6px 20px 6px 36px; background: #f0f4ff; border-bottom: 1px solid #e2e8f0; }
+  .sgrp-d { width: 6px; height: 6px; border-radius: 50%; }
+  .sgrp-n { font-size: 11px; font-weight: 800; color: #475569; }
+  .sgrp-m { font-size: 10px; color: #94a3b8; }
+
+  .row { display: flex; align-items: center; padding: 8px 16px; gap: 8px; border-bottom: 1px solid #f8fafc; font-size: 11px; }
+  .rcb { width: 14px; height: 14px; accent-color: #2d5fa8; flex-shrink: 0; }
+  .rdt { color: #94a3b8; width: 76px; font-size: 10px; flex-shrink: 0; }
+  .bg { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .bg-c { background: #fef3c7; color: #b45309; }
+  .bg-bk { background: #e0f2fe; color: #0369a1; }
+  .bg-o { background: #fef2f2; color: #ef4444; }
+  .bg-i { background: #eff6ff; color: #2563eb; }
+  .rn { font-weight: 700; color: #0f172a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat { font-size: 10px; color: #475569; padding: 3px 8px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .lk { font-size: 9px; color: #2d5fa8; background: #eff6ff; padding: 2px 8px; border-radius: 4px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .lk-btn { font-size: 10px; color: #2d5fa8; background: #eff6ff; padding: 3px 8px; border-radius: 6px; font-weight: 600; border: 1px solid #bfdbfe; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .ra { font-weight: 800; font-size: 12px; text-align: right; width: 90px; flex-shrink: 0; }
+  .ra-o { color: #ef4444; }
+  .ra-i { color: #2563eb; }
+  .rcf { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #fff; background: #2d5fa8; border: none; cursor: pointer; flex-shrink: 0; }
+
+  .info { font-size: 10px; color: #2d5fa8; font-weight: 600; }
+  .footer { padding: 10px 16px; text-align: center; font-size: 10px; color: #94a3b8; }
+
+  .tc { display: none; }
+  .tc.show { display: block; }
+
+  /* Layout label */
+  .ll { padding: 12px 16px 8px; }
+  .ll-t { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 4px; }
+  .ll-d { font-size: 11px; color: #64748b; line-height: 1.5; }
+
+  /* Stat chip (for inline stats) */
+  .sc { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f1f5f9; border-radius: 6px; font-size: 10px; font-weight: 700; color: #475569; cursor: pointer; border: 1.5px solid transparent; }
+  .sc.on { border-color: #2d5fa8; background: #eff6ff; color: #2d5fa8; }
+  .sc-v { font-weight: 900; }
+
+  /* Floating bar */
+  .float-bar { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #1e293b; border-radius: 12px; margin: 8px 16px; color: #fff; }
+  .float-bar .fb-info { font-size: 10px; color: #94a3b8; }
+  .float-bar .fb-strong { font-size: 11px; font-weight: 800; color: #fff; }
+  .float-bar .fb-r { margin-left: auto; display: flex; gap: 6px; }
+
+  /* Sidebar stats */
+  .side-wrap { display: flex; }
+  .side-main { flex: 1; min-width: 0; }
+  .side-panel { width: 180px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: #fafbfc; padding: 12px; }
+  .sp-item { padding: 8px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; }
+  .sp-item.on { background: #eff6ff; }
+  .sp-item:hover { background: #f1f5f9; }
+  .sp-l { font-size: 10px; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+  .sp-v { font-size: 16px; font-weight: 900; color: #1e293b; }
+  .sp-item.on .sp-l, .sp-item.on .sp-v { color: #2d5fa8; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <button class="nb on" onclick="sw('l1',this)">L1 기본형<span class="tag tag-hot">현재</span></button>
+  <button class="nb" onclick="sw('l2',this)">L2 인라인 칩</button>
+  <button class="nb" onclick="sw('l3',this)">L3 컴팩트 통합</button>
+  <button class="nb" onclick="sw('l4',this)">L4 플로팅 액션바</button>
+  <button class="nb" onclick="sw('l5',this)">L5 사이드 패널<span class="tag tag-new">NEW</span></button>
+</div>
+
+<div class="wrap">
+  <div style="margin-bottom:16px;">
+    <div class="pt"><div class="pt-dot"></div><span class="pt-sec">재무</span><span class="pt-arr">&rsaquo;</span><span class="pt-name">카드/통장 관리</span></div>
+    <div class="pt-line"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- L1: 기본형 (현재) — 툴바 + 통계 행 분리          -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="v-l1" class="tc show">
+    <div class="ll">
+      <div class="ll-t">L1 — 기본형 (현재 디자인)</div>
+      <div class="ll-d">툴바(그룹핑+토글)와 통계 필터가 별도 행으로 분리. 명확하지만 세로 공간을 많이 차지.</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="up-wrap"><div class="up-inner">📂 파일 업로드</div></div>
+        <button class="tab on">📋 분류 관리 <span class="c" style="color:#d97706;">991</span></button>
+        <button class="tab">✅ 확정완료 <span class="c" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-r">
+          <button class="b b-g">🔄 중복체크</button>
+          <button class="b b-b">🤖 AI 자동분류</button>
+        </div>
+      </div>
+      <!-- 툴바 행 -->
+      <div style="display:flex; align-items:center; padding:8px 16px; gap:8px; border-bottom:1px solid #e2e8f0;">
+        <select class="sel">
+          <option>📂 카테고리별</option><option>💳 카드별</option><option>🏦 통장별</option><option>🔗 연결별</option>
+        </select>
+        <div class="sep"></div>
+        <div class="tog">
+          <button class="tog-b on">📋 용도별</button>
+          <button class="tog-b">📊 회계기준</button>
+        </div>
+        <span class="info" style="margin-left:auto;">법인카드 매칭 675/675건 · 분류 완료 986/991건</span>
+      </div>
+      <!-- 통계 필터 행 -->
+      <div class="stats">
+        <div class="st on"><div class="st-l">📋 전체</div><div class="st-v">991<span class="st-u">건</span></div></div>
+        <div class="st"><div class="st-l">💳 카드</div><div class="st-v">675<span class="st-u">건</span></div></div>
+        <div class="st"><div class="st-l">🏦 통장</div><div class="st-v">316<span class="st-u">건</span></div></div>
+        <div class="st"><div class="st-l" style="color:#dc2626;">❓ 미분류</div><div class="st-v" style="color:#dc2626;">5<span class="st-u">건</span></div></div>
+      </div>
+      <!-- 샘플 데이터 -->
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#ef4444;"></div><span class="grp-n">🚛 차량 운영</span><span class="grp-m">245건 · 12,450,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▼</span></div></div>
+      <div class="sgrp"><div class="sgrp-d" style="background:#f59e0b;"></div><span class="sgrp-n">유류비</span><span class="sgrp-m">120건 · 5,230,000원</span></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-31</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우리유통 여산(삼)충전소</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">52,637</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">주식회사미성에너지</span><span class="cat">유류비 ▾</span><span class="lk">🚛 12가3456</span><span class="ra ra-o">37,675</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우림개발 ( 주 ) 오산휴</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">5,600</span><button class="rcf">확정</button></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#16a34a;"></div><span class="grp-n">💰 돈 들어오는 것</span><span class="grp-m">320건 · 285,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#2563eb;"></div><span class="grp-n">🏦 투자/대출 입출금</span><span class="grp-m">58건 · 125,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="footer">전체 991건 · 9개 그룹</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- L2: 인라인 칩 — 통계를 칩 형태로 툴바에 통합       -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="v-l2" class="tc">
+    <div class="ll">
+      <div class="ll-t">L2 — 인라인 칩 스타일</div>
+      <div class="ll-d">통계 필터를 작은 칩(pill) 형태로 축소해 툴바와 같은 줄에 배치. 세로 공간 절약, 한 줄로 모든 제어 가능.</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="up-wrap"><div class="up-inner">📂 파일 업로드</div></div>
+        <button class="tab on">📋 분류 관리 <span class="c" style="color:#d97706;">991</span></button>
+        <button class="tab">✅ 확정완료 <span class="c" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-r">
+          <button class="b b-g">🔄 중복체크</button>
+          <button class="b b-b">🤖 AI 자동분류</button>
+        </div>
+      </div>
+      <!-- 한 줄 통합: 칩 필터 + 그룹핑 + 토글 -->
+      <div style="display:flex; align-items:center; padding:8px 12px; gap:6px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
+        <span class="sc on">📋 전체 <span class="sc-v">991</span></span>
+        <span class="sc">💳 카드 <span class="sc-v">675</span></span>
+        <span class="sc">🏦 통장 <span class="sc-v">316</span></span>
+        <span class="sc" style="color:#dc2626;">❓ 미분류 <span class="sc-v">5</span></span>
+        <div class="sep"></div>
+        <select class="sel" style="font-size:10px; padding:5px 24px 5px 8px;">
+          <option>📂 카테고리별</option><option>💳 카드별</option><option>🏦 통장별</option><option>🔗 연결별</option>
+        </select>
+        <div class="sep"></div>
+        <div class="tog">
+          <button class="tog-b on" style="padding:4px 10px; font-size:10px;">📋 용도별</button>
+          <button class="tog-b" style="padding:4px 10px; font-size:10px;">📊 회계기준</button>
+        </div>
+      </div>
+      <!-- 샘플 데이터 -->
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#ef4444;"></div><span class="grp-n">🚛 차량 운영</span><span class="grp-m">245건 · 12,450,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▼</span></div></div>
+      <div class="sgrp"><div class="sgrp-d" style="background:#f59e0b;"></div><span class="sgrp-n">유류비</span><span class="sgrp-m">120건 · 5,230,000원</span></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-31</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우리유통 여산(삼)충전소</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">52,637</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">주식회사미성에너지</span><span class="cat">유류비 ▾</span><span class="lk">🚛 12가3456</span><span class="ra ra-o">37,675</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우림개발 ( 주 ) 오산휴</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">5,600</span><button class="rcf">확정</button></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#16a34a;"></div><span class="grp-n">💰 돈 들어오는 것</span><span class="grp-m">320건 · 285,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#2563eb;"></div><span class="grp-n">🏦 투자/대출 입출금</span><span class="grp-m">58건 · 125,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="footer">전체 991건 · 9개 그룹</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- L3: 컴팩트 통합 — 탭바에 필터와 액션 모두 통합     -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="v-l3" class="tc">
+    <div class="ll">
+      <div class="ll-t">L3 — 컴팩트 통합 (탭바 확장)</div>
+      <div class="ll-d">탭 바 자체를 2행으로 확장. 1행=탭+업로드, 2행=필터칩+그룹핑+액션버튼. 별도 툴바 행 없이 모든 제어를 탭 영역에 집중.</div>
+    </div>
+    <div class="card">
+      <!-- 탭 1행 -->
+      <div style="display:flex; align-items:center; background:#f8fafc; padding:0 4px; border-bottom:1px solid #e2e8f0;">
+        <div class="up-wrap"><div class="up-inner">📂 파일 업로드</div></div>
+        <button class="tab on" style="border-bottom-width:0;">📋 분류 관리 <span class="c" style="color:#d97706;">991</span></button>
+        <button class="tab" style="border-bottom-width:0;">✅ 확정완료 <span class="c" style="color:#94a3b8;">1,247</span></button>
+        <div style="margin-left:auto; padding-right:8px;">
+          <div class="tog">
+            <button class="tog-b on" style="padding:4px 10px; font-size:10px;">📋 용도별</button>
+            <button class="tog-b" style="padding:4px 10px; font-size:10px;">📊 회계기준</button>
+          </div>
+        </div>
+      </div>
+      <!-- 탭 2행: 필터 + 액션 -->
+      <div style="display:flex; align-items:center; padding:6px 12px; gap:6px; background:#fff; border-bottom:2px solid #2d5fa8;">
+        <span class="sc on">전체 <span class="sc-v">991</span></span>
+        <span class="sc">💳 카드 <span class="sc-v">675</span></span>
+        <span class="sc">🏦 통장 <span class="sc-v">316</span></span>
+        <span class="sc" style="color:#dc2626;">❓ 미분류 <span class="sc-v">5</span></span>
+        <div class="sep"></div>
+        <select class="sel" style="font-size:10px; padding:4px 22px 4px 8px;">
+          <option>📂 카테고리별</option><option>💳 카드별</option><option>🏦 통장별</option><option>🔗 연결별</option>
+        </select>
+        <div style="margin-left:auto; display:flex; gap:6px;">
+          <button class="b b-g">🔄 중복체크</button>
+          <button class="b b-b">🤖 AI 자동분류</button>
+        </div>
+      </div>
+      <!-- 샘플 데이터 (바로 시작) -->
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#ef4444;"></div><span class="grp-n">🚛 차량 운영</span><span class="grp-m">245건 · 12,450,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▼</span></div></div>
+      <div class="sgrp"><div class="sgrp-d" style="background:#f59e0b;"></div><span class="sgrp-n">유류비</span><span class="sgrp-m">120건 · 5,230,000원</span></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-31</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우리유통 여산(삼)충전소</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">52,637</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">주식회사미성에너지</span><span class="cat">유류비 ▾</span><span class="lk">🚛 12가3456</span><span class="ra ra-o">37,675</span><button class="rcf">확정</button></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우림개발 ( 주 ) 오산휴</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">5,600</span><button class="rcf">확정</button></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#16a34a;"></div><span class="grp-n">💰 돈 들어오는 것</span><span class="grp-m">320건 · 285,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#2563eb;"></div><span class="grp-n">🏦 투자/대출 입출금</span><span class="grp-m">58건 · 125,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+      <div class="footer">전체 991건 · 9개 그룹</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- L4: 플로팅 액션바 — 하단에 상태/액션 고정          -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="v-l4" class="tc">
+    <div class="ll">
+      <div class="ll-t">L4 — 플로팅 액션바 (하단 고정)</div>
+      <div class="ll-d">상단은 최소 필터(칩)만 배치. 선택 시 하단에 다크 톤 플로팅 바가 나타나 일괄 액션 제공. 작업 흐름에 집중하기 좋은 구조.</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="up-wrap"><div class="up-inner">📂 파일 업로드</div></div>
+        <button class="tab on">📋 분류 관리 <span class="c" style="color:#d97706;">991</span></button>
+        <button class="tab">✅ 확정완료 <span class="c" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-r">
+          <select class="sel" style="font-size:10px; padding:4px 22px 4px 8px;">
+            <option>📂 카테고리별</option><option>💳 카드별</option><option>🔗 연결별</option>
+          </select>
+          <div class="sep" style="height:16px;"></div>
+          <div class="tog">
+            <button class="tog-b on" style="padding:4px 10px; font-size:10px;">📋 용도별</button>
+            <button class="tog-b" style="padding:4px 10px; font-size:10px;">📊 회계기준</button>
+          </div>
+        </div>
+      </div>
+      <!-- 필터 칩만 간결하게 -->
+      <div style="display:flex; align-items:center; padding:6px 12px; gap:6px; border-bottom:1px solid #e2e8f0;">
+        <span class="sc on">📋 전체 <span class="sc-v">991</span></span>
+        <span class="sc">💳 카드 <span class="sc-v">675</span></span>
+        <span class="sc">🏦 통장 <span class="sc-v">316</span></span>
+        <span class="sc" style="color:#dc2626;">❓ 미분류 <span class="sc-v">5</span></span>
+        <span class="info" style="margin-left:auto;">분류 완료 986/991건</span>
+      </div>
+      <!-- 데이터 -->
+      <div class="grp" style="background:#e8f0fe;"><input type="checkbox" class="grp-cb" checked><div class="grp-dot" style="background:#ef4444;"></div><span class="grp-n">🚛 차량 운영</span><span class="grp-m">245건 · 12,450,000원</span><div class="grp-r"><span class="arr">▼</span></div></div>
+      <div class="sgrp"><div class="sgrp-d" style="background:#f59e0b;"></div><span class="sgrp-n">유류비</span><span class="sgrp-m">120건 · 5,230,000원</span></div>
+      <div class="row" style="background:#f0f4ff;"><input type="checkbox" class="rcb" checked><span class="rdt">2025-10-31</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우리유통 여산(삼)충전소</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">52,637</span></div>
+      <div class="row" style="background:#f0f4ff;"><input type="checkbox" class="rcb" checked><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">주식회사미성에너지</span><span class="cat">유류비 ▾</span><span class="lk">🚛 12가3456</span><span class="ra ra-o">37,675</span></div>
+      <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우림개발 ( 주 ) 오산휴</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">5,600</span></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#16a34a;"></div><span class="grp-n">💰 돈 들어오는 것</span><span class="grp-m">320건 · 285,000,000원</span><div class="grp-r"><span class="arr">▶</span></div></div>
+      <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#2563eb;"></div><span class="grp-n">🏦 투자/대출 입출금</span><span class="grp-m">58건 · 125,000,000원</span><div class="grp-r"><span class="arr">▶</span></div></div>
+      <!-- 플로팅 액션바 (선택 시 나타남) -->
+      <div class="float-bar">
+        <span class="fb-strong">✓ 2건 선택</span>
+        <span class="fb-info">합계: 90,312원</span>
+        <div class="fb-r">
+          <button class="b" style="background:#2d5fa8; color:#fff;">✅ 일괄확정</button>
+          <button class="b" style="background:#374151; color:#fff;">📂 카테고리 변경</button>
+          <button class="b" style="background:#374151; color:#fff;">🔗 일괄연결</button>
+          <button class="b" style="background:#374151; color:#fff;">🤖 AI 분류</button>
+          <button class="b" style="background:transparent; color:#94a3b8; border:1px solid #4b5563;">✕ 선택해제</button>
+        </div>
+      </div>
+      <div class="footer">전체 991건 · 9개 그룹</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- L5: 사이드 패널 — 우측에 통계/필터 패널            -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="v-l5" class="tc">
+    <div class="ll">
+      <div class="ll-t">L5 — 사이드 패널 (우측 통계)</div>
+      <div class="ll-d">통계 필터를 우측 패널로 분리. 리스트 영역이 넓어지고, 통계를 항상 볼 수 있음. 넓은 화면에 적합.</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="up-wrap"><div class="up-inner">📂 파일 업로드</div></div>
+        <button class="tab on">📋 분류 관리 <span class="c" style="color:#d97706;">991</span></button>
+        <button class="tab">✅ 확정완료 <span class="c" style="color:#94a3b8;">1,247</span></button>
+        <div class="tab-r">
+          <button class="b b-g">🔄 중복체크</button>
+          <button class="b b-b">🤖 AI 자동분류</button>
+        </div>
+      </div>
+      <!-- 간결한 상단 툴바 -->
+      <div style="display:flex; align-items:center; padding:6px 12px; gap:6px; border-bottom:1px solid #e2e8f0;">
+        <select class="sel" style="font-size:10px; padding:4px 22px 4px 8px;">
+          <option>📂 카테고리별</option><option>💳 카드별</option><option>🔗 연결별</option>
+        </select>
+        <div class="sep" style="height:16px;"></div>
+        <div class="tog">
+          <button class="tog-b on" style="padding:4px 10px; font-size:10px;">📋 용도별</button>
+          <button class="tog-b" style="padding:4px 10px; font-size:10px;">📊 회계기준</button>
+        </div>
+        <span class="info" style="margin-left:auto;">분류 완료 986/991건</span>
+      </div>
+      <!-- 본문: 리스트 + 사이드 패널 -->
+      <div class="side-wrap">
+        <div class="side-main">
+          <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#ef4444;"></div><span class="grp-n">🚛 차량 운영</span><span class="grp-m">245건 · 12,450,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▼</span></div></div>
+          <div class="sgrp"><div class="sgrp-d" style="background:#f59e0b;"></div><span class="sgrp-n">유류비</span><span class="sgrp-m">120건 · 5,230,000원</span></div>
+          <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-31</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우리유통 여산(삼)충전소</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">52,637</span><button class="rcf">확정</button></div>
+          <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">주식회사미성에너지</span><span class="cat">유류비 ▾</span><span class="lk">🚛 12가3456</span><span class="ra ra-o">37,675</span><button class="rcf">확정</button></div>
+          <div class="row"><input type="checkbox" class="rcb"><span class="rdt">2025-10-30</span><span class="bg bg-c">카드 4331</span><span class="bg bg-o">출금</span><span class="rn">우림개발 ( 주 ) 오산휴</span><span class="cat">유류비 ▾</span><span class="lk-btn">🔗 연결</span><span class="ra ra-o">5,600</span><button class="rcf">확정</button></div>
+          <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#16a34a;"></div><span class="grp-n">💰 돈 들어오는 것</span><span class="grp-m">320건 · 285,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+          <div class="grp"><input type="checkbox" class="grp-cb"><div class="grp-dot" style="background:#2563eb;"></div><span class="grp-n">🏦 투자/대출 입출금</span><span class="grp-m">58건 · 125,000,000원</span><div class="grp-r"><button class="b-cf">일괄확정</button><span class="arr">▶</span></div></div>
+          <div class="footer">전체 991건 · 9개 그룹</div>
+        </div>
+        <!-- 사이드 패널 -->
+        <div class="side-panel">
+          <div style="font-size:10px; font-weight:800; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">필터</div>
+          <div class="sp-item on">
+            <div class="sp-l">📋 전체</div>
+            <div class="sp-v">991<span style="font-size:10px; font-weight:500;">건</span></div>
+          </div>
+          <div class="sp-item">
+            <div class="sp-l">💳 카드</div>
+            <div class="sp-v">675<span style="font-size:10px; font-weight:500;">건</span></div>
+          </div>
+          <div class="sp-item">
+            <div class="sp-l">🏦 통장</div>
+            <div class="sp-v">316<span style="font-size:10px; font-weight:500;">건</span></div>
+          </div>
+          <div class="sp-item">
+            <div class="sp-l" style="color:#dc2626;">❓ 미분류</div>
+            <div class="sp-v" style="color:#dc2626;">5<span style="font-size:10px; font-weight:500;">건</span></div>
+          </div>
+          <div style="height:1px; background:#e2e8f0; margin:8px 0;"></div>
+          <div style="font-size:10px; font-weight:800; color:#94a3b8; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">요약</div>
+          <div style="font-size:10px; color:#64748b; line-height:1.8;">
+            <div>출금: <span style="font-weight:800; color:#ef4444;">-58,320,000</span></div>
+            <div>입금: <span style="font-weight:800; color:#2563eb;">+312,500,000</span></div>
+            <div style="border-top:1px solid #e2e8f0; margin-top:6px; padding-top:6px;">순합계: <span style="font-weight:800; color:#1e293b;">+254,180,000</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function sw(id, btn) {
+  document.querySelectorAll('.tc').forEach(e => e.classList.remove('show'));
+  document.getElementById('v-' + id).classList.add('show');
+  document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+}
+</script>
+
+</body>
+</html>

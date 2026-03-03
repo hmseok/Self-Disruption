@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>디자인 시스템 프리뷰</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(15,23,42,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .nav-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .nav-btn:hover { background: rgba(255,255,255,0.08); color: #e2e8f0; }
+  .nav-btn.active { background: #2d5fa8; color: #fff; border-color: #2d5fa8; }
+  .nav-sep { width: 1px; background: rgba(255,255,255,0.12); margin: 0 4px; }
+
+  .section { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+  .section-title { font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+  .section-sub { font-size: 14px; color: #64748b; margin-bottom: 32px; }
+  .section-label { display: inline-block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 4px 10px; border-radius: 6px; margin-bottom: 16px; }
+
+  .preview-card { background: #1e293b; border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; margin-bottom: 28px; }
+  .preview-label { padding: 14px 20px; background: rgba(45,95,168,0.1); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; }
+  .preview-label .tag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #2d5fa8; }
+  .preview-label .name { font-size: 15px; font-weight: 700; color: #e2e8f0; }
+  .preview-label .desc { font-size: 12px; color: #64748b; margin-left: auto; }
+  .preview-body { padding: 0; }
+
+  /* Mock page area */
+  .mock-page { background: #f1f5f9; min-height: 420px; overflow: hidden; }
+
+  /* =================== HEADER STYLES =================== */
+
+  /* H1: Current DarkHeader */
+  .h-dark { background: linear-gradient(135deg, #0f172a 0%, #1a2e4a 50%, #1e3a5f 100%); padding: 16px 20px; }
+  .h-dark .h-row { display: flex; align-items: center; gap: 12px; }
+  .h-dark .h-icon { width: 36px; height: 36px; border-radius: 10px; background: #2d5fa8; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 12px rgba(45,95,168,0.4); }
+  .h-dark .h-title { font-size: 17px; font-weight: 900; color: #fff; }
+  .h-dark .h-sub { font-size: 11px; color: #94a3b8; }
+  .h-dark .h-stats { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .h-dark .h-stat { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .h-dark .h-stat .val { font-size: 16px; font-weight: 900; }
+  .h-dark .h-stat .lbl { font-size: 10px; opacity: 0.7; }
+  .h-dark .h-actions { margin-left: auto; display: flex; gap: 6px; }
+  .h-dark .h-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+
+  /* H2: Glass Morphism Header */
+  .h-glass { background: linear-gradient(135deg, rgba(45,95,168,0.15), rgba(15,23,42,0.6)); backdrop-filter: blur(20px); padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .h-glass .h-row { display: flex; align-items: center; gap: 12px; }
+  .h-glass .h-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(45,95,168,0.3); border: 1px solid rgba(45,95,168,0.4); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .h-glass .h-title { font-size: 17px; font-weight: 900; color: #fff; }
+  .h-glass .h-sub { font-size: 11px; color: #94a3b8; }
+  .h-glass .h-stats { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .h-glass .h-stat { padding: 6px 12px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(8px); }
+  .h-glass .h-stat .val { font-size: 16px; font-weight: 900; }
+  .h-glass .h-stat .lbl { font-size: 10px; opacity: 0.7; }
+  .h-glass .h-actions { margin-left: auto; display: flex; gap: 6px; }
+  .h-glass .h-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+
+  /* H3: Compact Inline Header */
+  .h-compact { background: linear-gradient(135deg, #0f172a, #1a2e4a); padding: 12px 20px; }
+  .h-compact .h-row { display: flex; align-items: center; gap: 10px; }
+  .h-compact .h-icon { width: 30px; height: 30px; border-radius: 8px; background: #2d5fa8; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .h-compact .h-title { font-size: 15px; font-weight: 900; color: #fff; }
+  .h-compact .h-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.12); margin: 0 4px; }
+  .h-compact .h-stats { display: flex; gap: 12px; align-items: center; }
+  .h-compact .h-stat-inline { display: flex; align-items: baseline; gap: 4px; }
+  .h-compact .h-stat-inline .lbl { font-size: 10px; color: #64748b; font-weight: 600; }
+  .h-compact .h-stat-inline .val { font-size: 15px; font-weight: 900; }
+  .h-compact .h-actions { margin-left: auto; display: flex; gap: 6px; }
+  .h-compact .h-btn { padding: 6px 12px; border-radius: 7px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; }
+
+  /* =================== TAB STYLES =================== */
+  .tabs-bar { display: flex; gap: 0; background: #fff; border-bottom: 2px solid #e2e8f0; padding: 0 20px; }
+  .tab-item { padding: 10px 16px; font-size: 13px; font-weight: 700; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+  .tab-item.active { color: #2d5fa8; border-bottom-color: #2d5fa8; }
+  .tab-item .count { font-size: 10px; background: #e2e8f0; color: #64748b; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+  .tab-item.active .count { background: rgba(45,95,168,0.1); color: #2d5fa8; }
+
+  .tabs-pill { display: flex; gap: 4px; padding: 12px 20px; background: #fff; }
+  .pill-item { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #64748b; background: #f1f5f9; cursor: pointer; transition: all 0.2s; }
+  .pill-item.active { background: #2d5fa8; color: #fff; }
+
+  .tabs-dark { display: flex; gap: 2px; padding: 0 20px; padding-top: 8px; }
+  .dark-tab { padding: 8px 16px; border-radius: 8px 8px 0 0; font-size: 12px; font-weight: 700; color: #64748b; cursor: pointer; background: transparent; transition: all 0.2s; }
+  .dark-tab.active { background: #f1f5f9; color: #1e293b; }
+
+  /* =================== FILTER STYLES =================== */
+  .filter-bar { display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  .filter-chip { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; cursor: pointer; }
+  .filter-chip.active { background: rgba(45,95,168,0.08); color: #2d5fa8; border-color: rgba(45,95,168,0.3); }
+  .search-box { margin-left: auto; padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px; color: #334155; background: #f8fafc; width: 200px; }
+
+  /* =================== LIST STYLES =================== */
+
+  /* L1: Clean Table */
+  .list-table { padding: 0 20px 20px; background: #fff; }
+  .list-table table { width: 100%; border-collapse: collapse; }
+  .list-table th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #f1f5f9; }
+  .list-table td { padding: 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #f8fafc; }
+  .list-table tr:hover td { background: #f8fafc; }
+  .list-table .name { font-weight: 700; color: #1e293b; }
+  .list-table .badge { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+  .list-table .badge-green { background: #ecfdf5; color: #059669; }
+  .list-table .badge-yellow { background: #fffbeb; color: #d97706; }
+  .list-table .badge-red { background: #fef2f2; color: #dc2626; }
+  .list-table .badge-blue { background: #eff6ff; color: #2563eb; }
+  .list-table .amount { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .list-table .sub { font-size: 11px; color: #94a3b8; }
+
+  /* L2: Card Row List */
+  .list-cards { padding: 12px 20px 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 8px; }
+  .card-row { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.15s; }
+  .card-row:hover { border-color: #2d5fa8; box-shadow: 0 2px 8px rgba(45,95,168,0.08); transform: translateY(-1px); }
+  .card-row .avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .card-row .info { flex: 1; }
+  .card-row .info .name { font-size: 14px; font-weight: 700; color: #1e293b; }
+  .card-row .info .detail { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .card-row .right { text-align: right; }
+  .card-row .right .amount { font-size: 15px; font-weight: 800; color: #1e293b; }
+  .card-row .right .sub { font-size: 11px; color: #94a3b8; }
+  .card-row .arrow { color: #cbd5e1; font-size: 16px; }
+
+  /* L3: Grouped Section List */
+  .list-grouped { padding: 12px 20px 20px; background: #f8fafc; }
+  .group-section { margin-bottom: 16px; }
+  .group-header { display: flex; align-items: center; gap: 8px; padding: 8px 0; margin-bottom: 6px; }
+  .group-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .group-header .label { font-size: 13px; font-weight: 800; color: #334155; }
+  .group-header .count { font-size: 11px; color: #94a3b8; }
+  .group-header .total { margin-left: auto; font-size: 13px; font-weight: 800; color: #1e293b; }
+  .group-items { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+  .group-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .group-item:last-child { border-bottom: none; }
+  .group-item .emoji { font-size: 16px; }
+  .group-item .name { font-weight: 600; color: #334155; flex: 1; }
+  .group-item .amount { font-weight: 800; color: #1e293b; font-variant-numeric: tabular-nums; }
+  .group-item .sub { font-size: 11px; color: #94a3b8; }
+
+  /* L4: Compact Dense List */
+  .list-dense { padding: 0; background: #fff; }
+  .dense-header { display: flex; align-items: center; padding: 8px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .dense-header span { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+  .dense-row { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f8fafc; gap: 12px; transition: background 0.1s; cursor: pointer; }
+  .dense-row:hover { background: #f8fafc; }
+  .dense-row .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dense-row .name { font-size: 13px; font-weight: 600; color: #334155; width: 140px; }
+  .dense-row .meta { font-size: 12px; color: #64748b; flex: 1; }
+  .dense-row .amount { font-size: 13px; font-weight: 800; color: #1e293b; text-align: right; width: 120px; }
+  .dense-row .date { font-size: 11px; color: #94a3b8; width: 80px; text-align: right; }
+  .dense-row .action-btn { opacity: 0; padding: 4px 8px; border-radius: 6px; background: rgba(45,95,168,0.08); color: #2d5fa8; font-size: 10px; font-weight: 700; border: none; cursor: pointer; transition: opacity 0.15s; }
+  .dense-row:hover .action-btn { opacity: 1; }
+
+  /* =================== BOTTOM BAR STYLES =================== */
+
+  /* B1: Summary Footer */
+  .bottom-summary { background: #fff; border-top: 2px solid #e2e8f0; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  .bottom-summary .sum-item { display: flex; align-items: baseline; gap: 4px; }
+  .bottom-summary .sum-item .lbl { font-size: 11px; color: #94a3b8; font-weight: 600; }
+  .bottom-summary .sum-item .val { font-size: 15px; font-weight: 900; color: #1e293b; }
+  .bottom-summary .sum-divider { width: 1px; height: 20px; background: #e2e8f0; }
+  .bottom-summary .sum-actions { margin-left: auto; display: flex; gap: 6px; }
+  .bottom-summary .sum-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+
+  /* B2: Floating Action Bar */
+  .bottom-float { position: relative; }
+  .bottom-float .bar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: #0f172a; border-radius: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
+  .bottom-float .bar .info { font-size: 12px; color: #94a3b8; }
+  .bottom-float .bar .info strong { color: #fff; font-size: 14px; }
+  .bottom-float .bar .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.12); }
+  .bottom-float .bar .btn { padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+
+  /* B3: Pagination Bar */
+  .bottom-page { background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 20px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .bottom-page .pg-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; }
+  .bottom-page .pg-btn.active { background: #2d5fa8; color: #fff; border-color: #2d5fa8; }
+  .bottom-page .pg-info { font-size: 12px; color: #94a3b8; margin: 0 12px; }
+
+  /* B4: Load-More Gradient */
+  .bottom-loadmore { background: linear-gradient(to bottom, transparent, #fff 40%); padding: 40px 20px 16px; text-align: center; }
+  .bottom-loadmore .btn { padding: 10px 32px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; transition: all 0.2s; }
+  .bottom-loadmore .btn:hover { background: #e2e8f0; color: #334155; }
+  .bottom-loadmore .hint { font-size: 11px; color: #94a3b8; margin-top: 8px; }
+
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showSection('headers')">🎨 상단 헤더</button>
+  <button class="nav-btn" onclick="showSection('tabs')">📑 탭 스타일</button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" onclick="showSection('lists')">📋 리스트 스타일</button>
+  <button class="nav-btn" onclick="showSection('bottoms')">⬇️ 하단 바</button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" onclick="showSection('full')">🖥️ 풀 페이지 조합</button>
+</nav>
+
+<!-- ============ SECTION: HEADERS ============ -->
+<div id="sec-headers" class="view-section active">
+  <div class="section">
+    <div class="section-title">상단 헤더 스타일</div>
+    <div class="section-sub">다크헤더 기반의 3가지 변형 — 현재 적용된 스타일과 2가지 대안</div>
+
+    <!-- H1 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">H1 — 현재</span>
+        <span class="name">DarkHeader (기존)</span>
+        <span class="desc">높이 ~120px · 2줄 구조</span>
+      </div>
+      <div class="preview-body">
+        <div class="h-dark">
+          <div class="h-row">
+            <div class="h-icon">🚙</div>
+            <div>
+              <div class="h-title">전체 차량 대장</div>
+              <div class="h-sub">Fleet Management</div>
+            </div>
+            <div class="h-actions">
+              <button class="h-btn" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);">📥 엑셀</button>
+              <button class="h-btn" style="background:#2d5fa8;color:#fff;">+ 차량 등록</button>
+            </div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f1f5f9;">
+              <span class="lbl" style="color:#cbd5e1;">전체</span> <span class="val">48</span>
+            </div>
+            <div class="h-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;">
+              <span class="lbl" style="color:#bbf7d0;">운영중</span> <span class="val">32</span>
+            </div>
+            <div class="h-stat" style="background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.25);color:#fcd34d;">
+              <span class="lbl" style="color:#fde68a;">정비중</span> <span class="val">8</span>
+            </div>
+            <div class="h-stat" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;">
+              <span class="lbl" style="color:#fecaca;">만료</span> <span class="val">4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H2 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">H2 — 글래스</span>
+        <span class="name">Glass Morphism</span>
+        <span class="desc">높이 ~120px · 반투명 유리 효과</span>
+      </div>
+      <div class="preview-body" style="background: linear-gradient(135deg, #0f172a, #1a3a5c);">
+        <div class="h-glass">
+          <div class="h-row">
+            <div class="h-icon">🚙</div>
+            <div>
+              <div class="h-title">전체 차량 대장</div>
+              <div class="h-sub">Fleet Management</div>
+            </div>
+            <div class="h-actions">
+              <button class="h-btn" style="background:rgba(255,255,255,0.06);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(8px);">📥 엑셀</button>
+              <button class="h-btn" style="background:rgba(45,95,168,0.6);color:#fff;border:1px solid rgba(45,95,168,0.8);backdrop-filter:blur(8px);">+ 차량 등록</button>
+            </div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#f1f5f9;">
+              <span class="lbl" style="color:#cbd5e1;">전체</span> <span class="val">48</span>
+            </div>
+            <div class="h-stat" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#86efac;">
+              <span class="lbl" style="color:#bbf7d0;">운영중</span> <span class="val">32</span>
+            </div>
+            <div class="h-stat" style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.15);color:#fcd34d;">
+              <span class="lbl" style="color:#fde68a;">정비중</span> <span class="val">8</span>
+            </div>
+            <div class="h-stat" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:#fca5a5;">
+              <span class="lbl" style="color:#fecaca;">만료</span> <span class="val">4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H3 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">H3 — 초컴팩트</span>
+        <span class="name">Compact Inline</span>
+        <span class="desc">높이 ~54px · 1줄 통합형</span>
+      </div>
+      <div class="preview-body">
+        <div class="h-compact">
+          <div class="h-row">
+            <div class="h-icon">🚙</div>
+            <div class="h-title">전체 차량 대장</div>
+            <div class="h-divider"></div>
+            <div class="h-stats">
+              <div class="h-stat-inline"><span class="lbl">전체</span><span class="val" style="color:#f1f5f9;">48</span></div>
+              <div class="h-stat-inline"><span class="lbl">운영</span><span class="val" style="color:#86efac;">32</span></div>
+              <div class="h-stat-inline"><span class="lbl">정비</span><span class="val" style="color:#fcd34d;">8</span></div>
+              <div class="h-stat-inline"><span class="lbl">만료</span><span class="val" style="color:#fca5a5;">4</span></div>
+            </div>
+            <div class="h-actions">
+              <button class="h-btn" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);">📥</button>
+              <button class="h-btn" style="background:#2d5fa8;color:#fff;">+ 등록</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: TABS ============ -->
+<div id="sec-tabs" class="view-section">
+  <div class="section">
+    <div class="section-title">탭 & 필터 스타일</div>
+    <div class="section-sub">페이지 내 탭 전환과 필터 영역의 3가지 변형</div>
+
+    <!-- Tab Style 1 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">T1</span>
+        <span class="name">언더라인 탭 + 필터칩</span>
+        <span class="desc">가장 표준적</span>
+      </div>
+      <div class="preview-body" style="background:#fff;">
+        <div class="tabs-bar">
+          <div class="tab-item active">전체 <span class="count">48</span></div>
+          <div class="tab-item">운영중 <span class="count">32</span></div>
+          <div class="tab-item">정비중 <span class="count">8</span></div>
+          <div class="tab-item">만료 <span class="count">4</span></div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">전체</div>
+          <div class="filter-chip">리스 차량</div>
+          <div class="filter-chip">할부 차량</div>
+          <div class="filter-chip">렌트 차량</div>
+          <input class="search-box" placeholder="🔍 차량번호, 차종 검색..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Style 2 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">T2</span>
+        <span class="name">필 탭 (Pill)</span>
+        <span class="desc">부드러운 느낌</span>
+      </div>
+      <div class="preview-body" style="background:#fff;">
+        <div class="tabs-pill">
+          <div class="pill-item active">전체 48</div>
+          <div class="pill-item">운영중 32</div>
+          <div class="pill-item">정비중 8</div>
+          <div class="pill-item">만료 4</div>
+          <div style="margin-left:auto;"><input class="search-box" placeholder="🔍 검색..." style="margin:0;" /></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Style 3 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">T3</span>
+        <span class="name">다크 연결 탭</span>
+        <span class="desc">헤더에서 자연스럽게 이어짐</span>
+      </div>
+      <div class="preview-body">
+        <div style="background: linear-gradient(135deg, #0f172a, #1a2e4a); padding-bottom: 0;">
+          <div class="tabs-dark">
+            <div class="dark-tab active">전체 (48)</div>
+            <div class="dark-tab">운영중 (32)</div>
+            <div class="dark-tab">정비중 (8)</div>
+            <div class="dark-tab">만료 (4)</div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">전체</div>
+          <div class="filter-chip">리스</div>
+          <div class="filter-chip">할부</div>
+          <div class="filter-chip">렌트</div>
+          <input class="search-box" placeholder="🔍 검색..." />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: LISTS ============ -->
+<div id="sec-lists" class="view-section">
+  <div class="section">
+    <div class="section-title">리스트 스타일</div>
+    <div class="section-sub">메인 콘텐츠 영역의 4가지 변형</div>
+
+    <!-- L1: Table -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">L1</span>
+        <span class="name">클린 테이블</span>
+        <span class="desc">데이터 밀도 높은 페이지에 적합 (차량, 견적, 카드 등)</span>
+      </div>
+      <div class="preview-body">
+        <div class="list-table">
+          <table>
+            <thead>
+              <tr><th>차량번호</th><th>차종</th><th>상태</th><th>월 납입액</th><th>만기일</th><th>담당</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="name">12가 3456</td><td>카니발 4세대</td><td><span class="badge badge-green">운영중</span></td><td class="amount">1,250,000</td><td class="sub">2026-08-15</td><td>김철수</td></tr>
+              <tr><td class="name">34나 7890</td><td>스타리아</td><td><span class="badge badge-yellow">정비중</span></td><td class="amount">980,000</td><td class="sub">2026-03-22</td><td>이영희</td></tr>
+              <tr><td class="name">56다 1234</td><td>쏘렌토 MQ4</td><td><span class="badge badge-green">운영중</span></td><td class="amount">1,150,000</td><td class="sub">2027-01-10</td><td>박민수</td></tr>
+              <tr><td class="name">78라 5678</td><td>포터2</td><td><span class="badge badge-red">만료</span></td><td class="amount">650,000</td><td class="sub">2025-12-30</td><td>최지훈</td></tr>
+              <tr><td class="name">90마 9012</td><td>봉고3</td><td><span class="badge badge-blue">대기</span></td><td class="amount">780,000</td><td class="sub">2026-11-05</td><td>정서연</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2: Card Rows -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">L2</span>
+        <span class="name">카드 로우</span>
+        <span class="desc">고객, 보험, 프리랜서 등 엔터티 중심 페이지에 적합</span>
+      </div>
+      <div class="preview-body">
+        <div class="list-cards">
+          <div class="card-row">
+            <div class="avatar" style="background:#eff6ff;">🚙</div>
+            <div class="info"><div class="name">12가 3456 · 카니발 4세대</div><div class="detail">리스 · 현대캐피탈 · 김철수 담당</div></div>
+            <div class="right"><div class="amount">1,250,000원</div><div class="sub">2026-08-15 만기</div></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="card-row">
+            <div class="avatar" style="background:#fef3c7;">🔧</div>
+            <div class="info"><div class="name">34나 7890 · 스타리아</div><div class="detail">할부 · KB캐피탈 · 이영희 담당</div></div>
+            <div class="right"><div class="amount">980,000원</div><div class="sub">2026-03-22 만기</div></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="card-row">
+            <div class="avatar" style="background:#fef2f2;">⚠️</div>
+            <div class="info"><div class="name">78라 5678 · 포터2</div><div class="detail">렌트 · 만료됨 · 최지훈 담당</div></div>
+            <div class="right"><div class="amount" style="color:#dc2626;">650,000원</div><div class="sub">2025-12-30 만료</div></div>
+            <span class="arrow">›</span>
+          </div>
+          <div class="card-row">
+            <div class="avatar" style="background:#ecfdf5;">✅</div>
+            <div class="info"><div class="name">56다 1234 · 쏘렌토 MQ4</div><div class="detail">리스 · 신한캐피탈 · 박민수 담당</div></div>
+            <div class="right"><div class="amount">1,150,000원</div><div class="sub">2027-01-10 만기</div></div>
+            <span class="arrow">›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L3: Grouped -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">L3</span>
+        <span class="name">그룹 섹션</span>
+        <span class="desc">분류별 집계가 필요한 페이지에 적합 (장부, 수금 등)</span>
+      </div>
+      <div class="preview-body">
+        <div class="list-grouped">
+          <div class="group-section">
+            <div class="group-header">
+              <div class="dot" style="background:#22c55e;"></div>
+              <span class="label">운영중</span>
+              <span class="count">32건</span>
+              <span class="total">₩ 38,400,000</span>
+            </div>
+            <div class="group-items">
+              <div class="group-item"><span class="emoji">🚙</span><span class="name">12가 3456 · 카니발</span><span class="sub">리스 · 김철수</span><span class="amount">1,250,000</span></div>
+              <div class="group-item"><span class="emoji">🚙</span><span class="name">56다 1234 · 쏘렌토</span><span class="sub">리스 · 박민수</span><span class="amount">1,150,000</span></div>
+              <div class="group-item"><span class="emoji">🚙</span><span class="name">90마 9012 · 봉고3</span><span class="sub">렌트 · 정서연</span><span class="amount">780,000</span></div>
+            </div>
+          </div>
+          <div class="group-section">
+            <div class="group-header">
+              <div class="dot" style="background:#eab308;"></div>
+              <span class="label">정비중</span>
+              <span class="count">8건</span>
+              <span class="total">₩ 7,840,000</span>
+            </div>
+            <div class="group-items">
+              <div class="group-item"><span class="emoji">🔧</span><span class="name">34나 7890 · 스타리아</span><span class="sub">할부 · 이영희</span><span class="amount">980,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L4: Dense -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">L4</span>
+        <span class="name">밀집 리스트</span>
+        <span class="desc">데이터가 많고 스캔이 중요한 페이지에 적합 (거래내역, 로그 등)</span>
+      </div>
+      <div class="preview-body">
+        <div class="list-dense">
+          <div class="dense-header">
+            <span style="width:18px;"></span>
+            <span style="width:140px;">차량번호</span>
+            <span style="flex:1;">상세</span>
+            <span style="width:120px;text-align:right;">금액</span>
+            <span style="width:80px;text-align:right;">날짜</span>
+            <span style="width:50px;"></span>
+          </div>
+          <div class="dense-row">
+            <div class="status-dot" style="background:#22c55e;"></div>
+            <div class="name">12가 3456</div>
+            <div class="meta">카니발 4세대 · 리스 · 현대캐피탈</div>
+            <div class="amount">1,250,000</div>
+            <div class="date">2026-08</div>
+            <button class="action-btn">상세</button>
+          </div>
+          <div class="dense-row">
+            <div class="status-dot" style="background:#eab308;"></div>
+            <div class="name">34나 7890</div>
+            <div class="meta">스타리아 · 할부 · KB캐피탈</div>
+            <div class="amount">980,000</div>
+            <div class="date">2026-03</div>
+            <button class="action-btn">상세</button>
+          </div>
+          <div class="dense-row">
+            <div class="status-dot" style="background:#22c55e;"></div>
+            <div class="name">56다 1234</div>
+            <div class="meta">쏘렌토 MQ4 · 리스 · 신한캐피탈</div>
+            <div class="amount">1,150,000</div>
+            <div class="date">2027-01</div>
+            <button class="action-btn">상세</button>
+          </div>
+          <div class="dense-row">
+            <div class="status-dot" style="background:#ef4444;"></div>
+            <div class="name">78라 5678</div>
+            <div class="meta">포터2 · 렌트 · 만료됨</div>
+            <div class="amount" style="color:#dc2626;">650,000</div>
+            <div class="date">2025-12</div>
+            <button class="action-btn">상세</button>
+          </div>
+          <div class="dense-row">
+            <div class="status-dot" style="background:#3b82f6;"></div>
+            <div class="name">90마 9012</div>
+            <div class="meta">봉고3 · 렌트 · 정서연</div>
+            <div class="amount">780,000</div>
+            <div class="date">2026-11</div>
+            <button class="action-btn">상세</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: BOTTOMS ============ -->
+<div id="sec-bottoms" class="view-section">
+  <div class="section">
+    <div class="section-title">하단 바 스타일</div>
+    <div class="section-sub">리스트 아래에 배치될 하단 영역 디자인 — 현재는 대부분 없음</div>
+
+    <!-- B1 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">B1</span>
+        <span class="name">요약 풋터</span>
+        <span class="desc">합계 + 액션 버튼 · 수금/장부 페이지에 적합</span>
+      </div>
+      <div class="preview-body" style="background:#fff;">
+        <div style="height:60px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 20px);border-bottom:1px solid #e2e8f0;"></div>
+        <div class="bottom-summary">
+          <div class="sum-item"><span class="lbl">총 건수</span><span class="val">48건</span></div>
+          <div class="sum-divider"></div>
+          <div class="sum-item"><span class="lbl">총 금액</span><span class="val" style="color:#2d5fa8;">₩ 52,840,000</span></div>
+          <div class="sum-divider"></div>
+          <div class="sum-item"><span class="lbl">미수금</span><span class="val" style="color:#dc2626;">₩ 3,200,000</span></div>
+          <div class="sum-actions">
+            <button class="sum-btn" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;">📥 내보내기</button>
+            <button class="sum-btn" style="background:#2d5fa8;color:#fff;border:none;">✓ 일괄 확정</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B2 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">B2</span>
+        <span class="name">플로팅 액션 바</span>
+        <span class="desc">선택 시 나타나는 하단 바 · 다중 선택 작업에 적합</span>
+      </div>
+      <div class="preview-body bottom-float" style="background:#f8fafc;height:160px;">
+        <div style="padding:16px 20px;">
+          <div style="display:flex;gap:8px;">
+            <div style="width:16px;height:16px;border-radius:4px;background:#2d5fa8;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:10px;">✓</span></div>
+            <span style="font-size:13px;color:#334155;">12가 3456 · 카니발 4세대</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <div style="width:16px;height:16px;border-radius:4px;background:#2d5fa8;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:10px;">✓</span></div>
+            <span style="font-size:13px;color:#334155;">34나 7890 · 스타리아</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <div style="width:16px;height:16px;border-radius:4px;border:1.5px solid #cbd5e1;"></div>
+            <span style="font-size:13px;color:#94a3b8;">56다 1234 · 쏘렌토 MQ4</span>
+          </div>
+        </div>
+        <div class="bar">
+          <div class="info"><strong>2건</strong> 선택됨</div>
+          <div class="divider"></div>
+          <div class="info">합계 <strong>₩ 2,230,000</strong></div>
+          <div class="divider"></div>
+          <button class="btn" style="background:rgba(255,255,255,0.1);color:#e2e8f0;border:1px solid rgba(255,255,255,0.15);">🗑 삭제</button>
+          <button class="btn" style="background:#2d5fa8;color:#fff;border:none;">✓ 일괄확정</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- B3 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">B3</span>
+        <span class="name">페이지네이션</span>
+        <span class="desc">고정 페이지 수 · 데이터가 많은 테이블에 적합</span>
+      </div>
+      <div class="preview-body" style="background:#fff;">
+        <div style="height:60px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 20px);border-bottom:1px solid #e2e8f0;"></div>
+        <div class="bottom-page">
+          <button class="pg-btn">‹</button>
+          <button class="pg-btn active">1</button>
+          <button class="pg-btn">2</button>
+          <button class="pg-btn">3</button>
+          <button class="pg-btn">4</button>
+          <button class="pg-btn">5</button>
+          <span class="pg-info">48건 중 1-10</span>
+          <button class="pg-btn">›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- B4 -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">B4</span>
+        <span class="name">더 보기 그라데이션</span>
+        <span class="desc">무한스크롤 대체 · 간단한 리스트에 적합</span>
+      </div>
+      <div class="preview-body" style="background:#fff;">
+        <div style="height:80px;background:repeating-linear-gradient(0deg,#f8fafc,#f8fafc 1px,#fff 1px,#fff 20px);"></div>
+        <div class="bottom-loadmore">
+          <button class="btn">더 보기 (38건 남음)</button>
+          <div class="hint">스크롤하면 자동으로 로드됩니다</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: FULL PAGE COMBOS ============ -->
+<div id="sec-full" class="view-section">
+  <div class="section">
+    <div class="section-title">풀 페이지 조합 예시</div>
+    <div class="section-sub">각 페이지 유형별 추천 조합</div>
+
+    <!-- Combo 1: Table Page -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">조합 A</span>
+        <span class="name">테이블형 (차량, 견적, 카드)</span>
+        <span class="desc">H1 + T1 + L1 + B3</span>
+      </div>
+      <div class="preview-body mock-page" style="min-height:auto;">
+        <!-- Header -->
+        <div class="h-dark">
+          <div class="h-row">
+            <div class="h-icon">🚙</div>
+            <div><div class="h-title">전체 차량 대장</div><div class="h-sub">Fleet Management</div></div>
+            <div class="h-actions">
+              <button class="h-btn" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);">📥 엑셀</button>
+              <button class="h-btn" style="background:#2d5fa8;color:#fff;">+ 차량 등록</button>
+            </div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f1f5f9;"><span class="lbl" style="color:#cbd5e1;">전체</span><span class="val">48</span></div>
+            <div class="h-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;"><span class="lbl" style="color:#bbf7d0;">운영</span><span class="val">32</span></div>
+            <div class="h-stat" style="background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.25);color:#fcd34d;"><span class="lbl" style="color:#fde68a;">정비</span><span class="val">8</span></div>
+          </div>
+        </div>
+        <!-- Tabs + Filter -->
+        <div class="tabs-bar"><div class="tab-item active">전체 <span class="count">48</span></div><div class="tab-item">운영중 <span class="count">32</span></div><div class="tab-item">정비중 <span class="count">8</span></div></div>
+        <div class="filter-bar"><div class="filter-chip active">전체</div><div class="filter-chip">리스</div><div class="filter-chip">할부</div><input class="search-box" placeholder="🔍 검색..." /></div>
+        <!-- Table -->
+        <div class="list-table">
+          <table>
+            <thead><tr><th>차량번호</th><th>차종</th><th>상태</th><th>월 납입액</th><th>만기일</th></tr></thead>
+            <tbody>
+              <tr><td class="name">12가 3456</td><td>카니발 4세대</td><td><span class="badge badge-green">운영중</span></td><td class="amount">1,250,000</td><td class="sub">2026-08-15</td></tr>
+              <tr><td class="name">34나 7890</td><td>스타리아</td><td><span class="badge badge-yellow">정비중</span></td><td class="amount">980,000</td><td class="sub">2026-03-22</td></tr>
+              <tr><td class="name">56다 1234</td><td>쏘렌토</td><td><span class="badge badge-green">운영중</span></td><td class="amount">1,150,000</td><td class="sub">2027-01-10</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination -->
+        <div class="bottom-page"><button class="pg-btn">‹</button><button class="pg-btn active">1</button><button class="pg-btn">2</button><button class="pg-btn">3</button><span class="pg-info">48건 중 1-10</span><button class="pg-btn">›</button></div>
+      </div>
+    </div>
+
+    <!-- Combo 2: Card Page -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">조합 B</span>
+        <span class="name">카드형 (고객, 보험, 프리랜서)</span>
+        <span class="desc">H1 + T2 + L2 + B4</span>
+      </div>
+      <div class="preview-body mock-page" style="min-height:auto;">
+        <div class="h-dark">
+          <div class="h-row">
+            <div class="h-icon">👥</div>
+            <div><div class="h-title">고객 관리</div><div class="h-sub">Customer Management</div></div>
+            <div class="h-actions"><button class="h-btn" style="background:#2d5fa8;color:#fff;">+ 고객 등록</button></div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#f1f5f9;"><span class="lbl" style="color:#cbd5e1;">전체</span><span class="val">124</span></div>
+            <div class="h-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;"><span class="lbl" style="color:#bbf7d0;">활성</span><span class="val">98</span></div>
+          </div>
+        </div>
+        <div class="tabs-pill"><div class="pill-item active">전체 124</div><div class="pill-item">개인 72</div><div class="pill-item">법인 52</div><div style="margin-left:auto;"><input class="search-box" placeholder="🔍 고객 검색..." style="margin:0;" /></div></div>
+        <div class="list-cards">
+          <div class="card-row"><div class="avatar" style="background:#eff6ff;">👤</div><div class="info"><div class="name">홍길동</div><div class="detail">개인 · VIP · 010-1234-5678</div></div><div class="right"><div class="amount">계약 3건</div><div class="sub">최근 2026-02-15</div></div><span class="arrow">›</span></div>
+          <div class="card-row"><div class="avatar" style="background:#f0fdf4;">🏢</div><div class="info"><div class="name">(주)한국물류</div><div class="detail">법인 · 일반 · 02-555-1234</div></div><div class="right"><div class="amount">계약 12건</div><div class="sub">최근 2026-02-20</div></div><span class="arrow">›</span></div>
+          <div class="card-row"><div class="avatar" style="background:#fef3c7;">👤</div><div class="info"><div class="name">김영수</div><div class="detail">개인 · 신규 · 010-9876-5432</div></div><div class="right"><div class="amount">계약 1건</div><div class="sub">최근 2026-01-30</div></div><span class="arrow">›</span></div>
+        </div>
+        <div class="bottom-loadmore"><button class="btn">더 보기 (121건 남음)</button><div class="hint">스크롤하면 자동으로 로드됩니다</div></div>
+      </div>
+    </div>
+
+    <!-- Combo 3: Grouped Page -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">조합 C</span>
+        <span class="name">그룹형 (장부, 수금, 거래분류)</span>
+        <span class="desc">H1 + T3 + L3 + B1</span>
+      </div>
+      <div class="preview-body mock-page" style="min-height:auto;">
+        <div class="h-dark">
+          <div class="h-row">
+            <div class="h-icon">📊</div>
+            <div><div class="h-title">장부 / 결산</div><div class="h-sub">Accounting & Settlement</div></div>
+            <div class="h-actions"><button class="h-btn" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);">◀ 1월</button><button class="h-btn" style="background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:900;">2026년 2월</button><button class="h-btn" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);">3월 ▶</button></div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat" style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.25);color:#93c5fd;"><span class="lbl" style="color:#bfdbfe;">수입</span><span class="val">52,840,000</span></div>
+            <div class="h-stat" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;"><span class="lbl" style="color:#fecaca;">지출</span><span class="val">41,200,000</span></div>
+            <div class="h-stat" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);color:#86efac;"><span class="lbl" style="color:#bbf7d0;">순이익</span><span class="val">11,640,000</span></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#0f172a,#1a2e4a);padding-bottom:0;"><div class="tabs-dark"><div class="dark-tab active">장부 (42)</div><div class="dark-tab">예정 (8)</div><div class="dark-tab">미분류 (3)</div></div></div>
+        <div class="list-grouped">
+          <div class="group-section">
+            <div class="group-header"><div class="dot" style="background:#3b82f6;"></div><span class="label">차량 운영비</span><span class="count">12건</span><span class="total">₩ 15,200,000</span></div>
+            <div class="group-items">
+              <div class="group-item"><span class="emoji">⛽</span><span class="name">유류비 · 12가 3456</span><span class="sub">02/15</span><span class="amount">450,000</span></div>
+              <div class="group-item"><span class="emoji">🔧</span><span class="name">정비비 · 34나 7890</span><span class="sub">02/12</span><span class="amount">1,200,000</span></div>
+            </div>
+          </div>
+          <div class="group-section">
+            <div class="group-header"><div class="dot" style="background:#8b5cf6;"></div><span class="label">보험료</span><span class="count">5건</span><span class="total">₩ 8,500,000</span></div>
+            <div class="group-items">
+              <div class="group-item"><span class="emoji">🛡️</span><span class="name">자동차보험 · 현대해상</span><span class="sub">02/01</span><span class="amount">3,200,000</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-summary">
+          <div class="sum-item"><span class="lbl">총 건수</span><span class="val">42건</span></div>
+          <div class="sum-divider"></div>
+          <div class="sum-item"><span class="lbl">총 지출</span><span class="val" style="color:#dc2626;">₩ 41,200,000</span></div>
+          <div class="sum-actions"><button class="sum-btn" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;">📥 내보내기</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Combo 4: Dense Page -->
+    <div class="preview-card">
+      <div class="preview-label">
+        <span class="tag">조합 D</span>
+        <span class="name">밀집형 (거래내역, 관리 로그)</span>
+        <span class="desc">H3 + T1 + L4 + B2</span>
+      </div>
+      <div class="preview-body mock-page" style="min-height:auto;">
+        <div class="h-compact">
+          <div class="h-row">
+            <div class="h-icon">💳</div>
+            <div class="h-title">법인카드 관리</div>
+            <div class="h-divider"></div>
+            <div class="h-stats">
+              <div class="h-stat-inline"><span class="lbl">카드</span><span class="val" style="color:#f1f5f9;">6</span></div>
+              <div class="h-stat-inline"><span class="lbl">이번달</span><span class="val" style="color:#93c5fd;">₩12.4M</span></div>
+              <div class="h-stat-inline"><span class="lbl">한도</span><span class="val" style="color:#fcd34d;">78%</span></div>
+            </div>
+            <div class="h-actions"><button class="h-btn" style="background:#2d5fa8;color:#fff;">+ 등록</button></div>
+          </div>
+        </div>
+        <div class="tabs-bar"><div class="tab-item active">전체 <span class="count">156</span></div><div class="tab-item">승인 <span class="count">142</span></div><div class="tab-item">대기 <span class="count">14</span></div></div>
+        <div class="filter-bar"><div class="filter-chip active">전체</div><div class="filter-chip">신한 ****1234</div><div class="filter-chip">KB ****5678</div><input class="search-box" placeholder="🔍 검색..." /></div>
+        <div class="list-dense">
+          <div class="dense-row"><div class="status-dot" style="background:#22c55e;"></div><div class="name">GS칼텍스</div><div class="meta">유류비 · 신한 ****1234</div><div class="amount">85,000</div><div class="date">02/28</div><button class="action-btn">상세</button></div>
+          <div class="dense-row"><div class="status-dot" style="background:#22c55e;"></div><div class="name">이마트</div><div class="meta">소모품 · KB ****5678</div><div class="amount">156,800</div><div class="date">02/27</div><button class="action-btn">상세</button></div>
+          <div class="dense-row"><div class="status-dot" style="background:#eab308;"></div><div class="name">쿠팡</div><div class="meta">사무용품 · 신한 ****1234</div><div class="amount">42,300</div><div class="date">02/26</div><button class="action-btn">상세</button></div>
+          <div class="dense-row"><div class="status-dot" style="background:#22c55e;"></div><div class="name">현대오일뱅크</div><div class="meta">유류비 · KB ****5678</div><div class="amount">92,000</div><div class="date">02/25</div><button class="action-btn">상세</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendation Table -->
+    <div class="preview-card" style="margin-top:40px;">
+      <div class="preview-label">
+        <span class="tag">📋 추천</span>
+        <span class="name">페이지별 조합 추천표</span>
+      </div>
+      <div class="preview-body" style="padding:20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+              <th style="text-align:left;padding:8px 12px;color:#94a3b8;font-size:11px;">페이지</th>
+              <th style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">헤더</th>
+              <th style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">탭</th>
+              <th style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">리스트</th>
+              <th style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">하단</th>
+              <th style="text-align:center;padding:8px;color:#94a3b8;font-size:11px;">조합</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">🚙 차량 대장</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L1</td><td style="text-align:center;">B3</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">📑 견적/계약</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L1</td><td style="text-align:center;">B3</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">💳 법인카드</td><td style="text-align:center;">H3</td><td style="text-align:center;">T1</td><td style="text-align:center;">L4</td><td style="text-align:center;">B2</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">D</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">👥 고객 관리</td><td style="text-align:center;">H1</td><td style="text-align:center;">T2</td><td style="text-align:center;">L2</td><td style="text-align:center;">B4</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">B</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">🛡️ 보험/사고</td><td style="text-align:center;">H1</td><td style="text-align:center;">T2</td><td style="text-align:center;">L2</td><td style="text-align:center;">B4</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">B</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">👷 프리랜서</td><td style="text-align:center;">H1</td><td style="text-align:center;">T2</td><td style="text-align:center;">L2</td><td style="text-align:center;">B4</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">B</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">📊 장부/결산</td><td style="text-align:center;">H1</td><td style="text-align:center;">T3</td><td style="text-align:center;">L3</td><td style="text-align:center;">B1</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">C</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">💰 수금 관리</td><td style="text-align:center;">H1</td><td style="text-align:center;">T3</td><td style="text-align:center;">L3</td><td style="text-align:center;">B1</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">C</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">📤 거래 분류</td><td style="text-align:center;">H1</td><td style="text-align:center;">T3</td><td style="text-align:center;">L3</td><td style="text-align:center;">B2</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">C+</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">💼 투자/펀딩</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L1</td><td style="text-align:center;">B3</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">🤝 지입 정산</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L1</td><td style="text-align:center;">B3</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A</td></tr>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);"><td style="padding:8px 12px;font-weight:700;">🏦 대출 관리</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L1</td><td style="text-align:center;">B3</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A</td></tr>
+            <tr><td style="padding:8px 12px;font-weight:700;">👥 조직/권한</td><td style="text-align:center;">H1</td><td style="text-align:center;">T1</td><td style="text-align:center;">L4</td><td style="text-align:center;">-</td><td style="text-align:center;color:#2d5fa8;font-weight:800;">A·D</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -3,6 +3,7 @@
 import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
+import DarkHeader from '../../components/DarkHeader'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -122,35 +123,20 @@ export default function CorporateCardsPage() {
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
-      {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">💳 법인카드 관리</h1>
-          <p className="text-sm text-slate-400 mt-1">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
-        </div>
-        <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          카드 등록
-        </button>
-      </div>
-
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">등록 카드</p>
-          <p className="text-xl font-bold text-slate-900">{cards.length}<span className="text-xs font-normal text-slate-400 ml-0.5">장</span></p>
-          <p className="text-[10px] text-emerald-500 font-medium mt-1">활성 {activeCards}장</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">이번달 사용 건수</p>
-          <p className="text-xl font-bold text-slate-900">{totalMonthlyCount}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm col-span-2">
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">이번달 총 사용액</p>
-          <p className="text-xl font-bold text-slate-900">{formatMoney(totalMonthlyUsage)}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
-        </div>
-      </div>
+      {/* DarkHeader */}
+      <DarkHeader
+        icon="💳"
+        title="법인카드 관리"
+        subtitle="법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리"
+        stats={[
+          { label: '등록 카드', value: cards.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
+          { label: '이번달 사용건수', value: totalMonthlyCount, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
+          { label: '총 사용액', value: `${formatMoney(totalMonthlyUsage)}원`, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
+        ]}
+        actions={[
+          { label: '카드 등록', icon: '➕', onClick: () => { setForm(emptyForm); setEditingId(null); setShowForm(true) }, variant: 'primary' }
+        ]}
+      />
 
       {/* 카드 목록 - 카드형 UI */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>투자 페이지 디자인 프리뷰</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #0f172a; }
+
+  /* Navigation */
+  .preview-nav { position:sticky; top:0; z-index:100; background:#0f172a; padding:12px 24px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+  .preview-nav h1 { color:#fff; font-size:14px; font-weight:800; margin-right:16px; white-space:nowrap; }
+  .preview-nav button { padding:6px 14px; border-radius:8px; border:none; font-size:11px; font-weight:700; cursor:pointer; transition:all .15s; }
+  .preview-nav button.active { background:#2d5fa8; color:#fff; }
+  .preview-nav button:not(.active) { background:#1e293b; color:#94a3b8; }
+  .preview-nav button:hover:not(.active) { background:#334155; color:#fff; }
+  .device-toggle { margin-left:auto; display:flex; gap:4px; }
+  .device-toggle button { background:#1e293b; color:#94a3b8; border:1px solid #334155; padding:5px 10px; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer; }
+  .device-toggle button.active { background:#2d5fa8; color:#fff; border-color:#2d5fa8; }
+
+  .section-label { text-align:center; padding:20px; font-size:13px; font-weight:700; color:#64748b; letter-spacing:1px; text-transform:uppercase; }
+  .section-label span { background:#e2e8f0; padding:4px 14px; border-radius:20px; }
+
+  /* Preview frame */
+  .preview-frame { max-width:1200px; margin:0 auto; padding:20px; transition:max-width .3s; }
+  .preview-frame.mobile { max-width:390px; }
+  .preview-frame.tablet { max-width:768px; }
+
+  .page-container { background:#fff; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.08); overflow:hidden; margin-bottom:24px; }
+
+  /* ========== COMMON STYLES ========== */
+  .brand { color:#2d5fa8; }
+  .brand-bg { background:#2d5fa8; }
+
+  /* Dark Header */
+  .dark-header { background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:20px 24px; }
+  .dark-header .top-row { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+  .dark-header .title-area h2 { color:#fff; font-size:20px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .dark-header .title-area p { color:#64748b; font-size:12px; margin-top:4px; }
+  .dark-header .action-btn { background:#2d5fa8; color:#fff; padding:10px 20px; border-radius:10px; font-weight:700; font-size:13px; border:none; cursor:pointer; display:flex; align-items:center; gap:6px; }
+
+  .stat-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .stat-card { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:10px 14px; flex:1; min-width:130px; cursor:pointer; transition:all .15s; }
+  .stat-card:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
+  .stat-card .label { font-size:10px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .stat-card .value { font-size:18px; font-weight:800; color:#fff; margin-top:2px; }
+  .stat-card .value .unit { font-size:11px; font-weight:500; color:#64748b; margin-left:2px; }
+  .stat-card.green .value { color:#34d399; }
+  .stat-card.amber .value { color:#fbbf24; }
+  .stat-card.red .value { color:#f87171; }
+  .stat-card.blue .value { color:#60a5fa; }
+
+  /* Filter & Search Bar */
+  .filter-bar { display:flex; align-items:center; gap:8px; padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; flex-wrap:wrap; }
+  .filter-chip { padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .filter-chip.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+  .filter-chip:hover:not(.active) { border-color:#94a3b8; color:#334155; }
+  .search-input { flex:1; min-width:160px; padding:7px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; outline:none; background:#fff; }
+  .search-input:focus { border-color:#2d5fa8; box-shadow:0 0 0 3px rgba(45,95,168,.1); }
+
+  /* Table */
+  .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .data-table thead th { padding:12px 16px; text-align:left; font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; background:#f8fafc; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .data-table tbody tr { border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background .1s; }
+  .data-table tbody tr:hover { background:#f8fafc; }
+  .data-table tbody td { padding:14px 16px; vertical-align:middle; }
+  .data-table .name { font-weight:700; color:#0f172a; }
+  .data-table .sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+  .data-table .money { font-weight:800; text-align:right; white-space:nowrap; }
+  .data-table .badge { display:inline-block; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .badge-active { background:#ecfdf5; color:#059669; }
+  .badge-expired { background:#fef2f2; color:#dc2626; }
+  .badge-warning { background:#fffbeb; color:#d97706; }
+  .badge-blue { background:#eff6ff; color:#2563eb; }
+  .badge-purple { background:#f5f3ff; color:#7c3aed; }
+
+  .dday { font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; }
+  .dday-danger { background:#fef2f2; color:#dc2626; }
+  .dday-warn { background:#fffbeb; color:#d97706; }
+  .dday-safe { background:#f1f5f9; color:#64748b; }
+
+  /* Mobile Card List */
+  .mobile-cards { display:none; }
+  .mobile-card { padding:14px 16px; border-bottom:1px solid #f1f5f9; }
+  .mobile-card .mc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .mobile-card .mc-name { font-weight:800; font-size:14px; }
+  .mobile-card .mc-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+  .mobile-card .mc-amount { font-weight:800; font-size:15px; text-align:right; }
+  .mobile-card .mc-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+  .mobile-card .mc-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#64748b; margin-top:6px; padding-top:6px; border-top:1px solid #f8fafc; }
+
+  /* ========== DETAIL PAGE ========== */
+  .detail-header { padding:20px 24px 0; }
+  .detail-back { font-size:12px; color:#94a3b8; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; margin-bottom:12px; }
+  .detail-title-row { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+  .detail-title h1 { font-size:22px; font-weight:800; display:flex; align-items:center; gap:10px; }
+  .detail-title .meta { display:flex; gap:8px; margin-top:6px; align-items:center; flex-wrap:wrap; }
+  .detail-title .meta span { font-size:12px; color:#94a3b8; }
+  .detail-actions { display:flex; gap:6px; }
+  .detail-actions button { padding:8px 16px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer; }
+  .detail-actions .danger { color:#dc2626; border-color:#fecaca; }
+
+  /* Dashboard Cards */
+  .dash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:0 24px 20px; }
+  .dash-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; position:relative; overflow:hidden; }
+  .dash-card .dc-label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  .dash-card .dc-value { font-size:20px; font-weight:800; }
+  .dash-card .dc-sub { font-size:10px; color:#94a3b8; margin-top:4px; }
+  .dash-card .dc-bar { height:4px; background:#f1f5f9; border-radius:4px; margin-top:8px; overflow:hidden; }
+  .dash-card .dc-bar-fill { height:100%; border-radius:4px; transition:width .5s; }
+  .dash-card .dc-accent { position:absolute; top:0; left:0; width:4px; height:100%; border-radius:4px 0 0 4px; }
+
+  /* Tabs */
+  .tab-bar { display:flex; gap:4px; padding:0 24px 16px; }
+  .tab-btn { flex:1; padding:10px; border-radius:10px; font-size:13px; font-weight:700; text-align:center; border:none; cursor:pointer; transition:all .15s; }
+  .tab-btn.active { background:#0f172a; color:#fff; }
+  .tab-btn:not(.active) { background:#f1f5f9; color:#94a3b8; }
+
+  /* Form Sections */
+  .form-section { margin:0 24px 16px; background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }
+  .form-section-header { padding:14px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px; }
+  .form-section-header .num { width:22px; height:22px; background:#0f172a; color:#fff; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; }
+  .form-section-header h3 { font-size:13px; font-weight:800; }
+  .form-body { padding:20px; }
+  .form-grid { display:grid; gap:14px; }
+  .form-grid-2 { grid-template-columns:1fr 1fr; }
+  .form-grid-3 { grid-template-columns:1fr 1fr 1fr; }
+  .form-field label { display:block; font-size:10px; font-weight:700; color:#94a3b8; margin-bottom:6px; text-transform:uppercase; letter-spacing:.3px; }
+  .form-field input, .form-field select { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; font-weight:600; outline:none; background:#fff; }
+  .form-field input:focus, .form-field select:focus { border-color:#2d5fa8; box-shadow:0 0 0 3px rgba(45,95,168,.08); }
+  .form-field .hint { font-size:10px; color:#94a3b8; margin-top:4px; }
+
+  /* Ratio Helper */
+  .ratio-helper { margin-top:8px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; }
+  .ratio-helper .rh-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .ratio-helper .rh-label { font-size:10px; color:#94a3b8; }
+  .ratio-helper .rh-value { font-size:11px; font-weight:800; }
+  .ratio-helper .rh-btn { width:100%; padding:6px; border-radius:6px; font-size:10px; font-weight:700; border:1px solid; cursor:pointer; transition:all .15s; }
+  .ratio-helper .rh-btn.up { background:#eff6ff; color:#2563eb; border-color:#bfdbfe; }
+  .ratio-helper .rh-btn.down { background:#fffbeb; color:#d97706; border-color:#fde68a; }
+
+  /* Save Button */
+  .save-btn { margin:20px 24px 24px; padding:14px; background:#0f172a; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:800; width:calc(100% - 48px); cursor:pointer; transition:all .15s; }
+  .save-btn:hover { background:#1e293b; }
+
+  /* Responsive */
+  @media (max-width:768px) {
+    .dash-grid { grid-template-columns:repeat(2,1fr); }
+    .form-grid-2, .form-grid-3 { grid-template-columns:1fr; }
+    .stat-row { flex-direction:column; }
+    .stat-card { min-width:auto; }
+    .tab-btn { font-size:11px; padding:8px 4px; }
+    .data-table { display:none; }
+    .mobile-cards { display:block; }
+    .detail-title h1 { font-size:18px; }
+  }
+
+  .hidden { display:none !important; }
+  .anno { position:absolute; top:4px; right:8px; font-size:8px; font-weight:700; color:#2d5fa8; background:#eff6ff; padding:2px 6px; border-radius:4px; text-transform:uppercase; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+
+<!-- Preview Navigation -->
+<div class="preview-nav">
+  <h1>📐 투자 페이지 디자인 프리뷰</h1>
+  <button class="active" onclick="showSection('jiip-list')">지입 리스트</button>
+  <button onclick="showSection('invest-list')">일반투자 리스트</button>
+  <button onclick="showSection('jiip-detail')">지입 상세</button>
+  <button onclick="showSection('invest-detail')">일반투자 상세</button>
+  <div class="device-toggle">
+    <button class="active" onclick="setDevice('desktop',this)">💻 PC</button>
+    <button onclick="setDevice('tablet',this)">📱 태블릿</button>
+    <button onclick="setDevice('mobile',this)">📲 모바일</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: 지입투자 리스트 -->
+<!-- ============================================================ -->
+<div id="jiip-list" class="preview-frame">
+  <div class="section-label"><span>지입투자 — 리스트 페이지</span></div>
+
+  <div class="page-container">
+    <!-- 상단: Dark Header -->
+    <div class="dark-header">
+      <div class="top-row">
+        <div class="title-area">
+          <h2>🚛 지입 투자 관리</h2>
+          <p>차량별 지입 계약 현황을 관리합니다</p>
+        </div>
+        <button class="action-btn">+ 신규 계약</button>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="label">전체 계약</div>
+          <div class="value">12<span class="unit">건</span></div>
+        </div>
+        <div class="stat-card green">
+          <div class="label">운영 중</div>
+          <div class="value">8<span class="unit">건</span></div>
+        </div>
+        <div class="stat-card blue">
+          <div class="label">총 투자 유치금</div>
+          <div class="value">3.8<span class="unit">억</span></div>
+        </div>
+        <div class="stat-card amber">
+          <div class="label">월 관리비 합계</div>
+          <div class="value">160<span class="unit">만</span></div>
+        </div>
+        <div class="stat-card red">
+          <div class="label">종료</div>
+          <div class="value">4<span class="unit">건</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 중단: Filter + Search -->
+    <div class="filter-bar">
+      <button class="filter-chip active">전체 12</button>
+      <button class="filter-chip">운영중 8</button>
+      <button class="filter-chip">만기임박 2</button>
+      <button class="filter-chip">종료 4</button>
+      <input class="search-input" placeholder="차량번호, 투자자명 검색..." />
+    </div>
+
+    <!-- 하단: Table (PC) -->
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>차량</th>
+            <th>투자자</th>
+            <th>구입비용</th>
+            <th style="text-align:right;">약정금액</th>
+            <th>약정/구입</th>
+            <th>배분율</th>
+            <th>관리비</th>
+            <th>D-Day</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="name">161허9826</div><div class="sub">카니발 하이브리드</div></td>
+            <td><div class="name">정태영</div><div class="sub">010-8785-4252</div></td>
+            <td style="text-align:right; color:#64748b;">55,000,000</td>
+            <td class="money" style="color:#0f172a;">38,000,000</td>
+            <td><span class="badge badge-blue">69.1%</span></td>
+            <td><span class="badge badge-purple">48.8%</span></td>
+            <td style="color:#64748b;">200,000</td>
+            <td><span class="dday dday-safe">D-1043</span></td>
+            <td><span class="badge badge-active">● 운영중</span></td>
+          </tr>
+          <tr>
+            <td><div class="name">12가3456</div><div class="sub">스타리아</div></td>
+            <td><div class="name">김영수</div><div class="sub">010-1234-5678</div></td>
+            <td style="text-align:right; color:#64748b;">42,000,000</td>
+            <td class="money" style="color:#0f172a;">45,000,000</td>
+            <td><span class="badge" style="background:#fef2f2;color:#dc2626;">107.1%</span></td>
+            <td><span class="badge badge-purple">75%</span></td>
+            <td style="color:#64748b;">200,000</td>
+            <td><span class="dday dday-warn">D-45</span></td>
+            <td><span class="badge badge-active">● 운영중</span></td>
+          </tr>
+          <tr>
+            <td><div class="name">34나7890</div><div class="sub">쏘렌토 MQ4</div></td>
+            <td><div class="name">박민지</div><div class="sub">010-9876-5432</div></td>
+            <td style="text-align:right; color:#64748b;">38,000,000</td>
+            <td class="money" style="color:#0f172a;">30,000,000</td>
+            <td><span class="badge badge-blue">78.9%</span></td>
+            <td><span class="badge badge-purple">66%</span></td>
+            <td style="color:#64748b;">150,000</td>
+            <td><span class="dday dday-danger">D+12</span></td>
+            <td><span class="badge badge-expired">● 종료</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 하단: Mobile Cards -->
+    <div class="mobile-cards">
+      <div class="mobile-card">
+        <div class="mc-top">
+          <div>
+            <div class="mc-name">161허9826 <span class="badge badge-active" style="font-size:9px;">운영중</span></div>
+            <div class="mc-sub">카니발 하이브리드 · 정태영</div>
+          </div>
+          <div class="mc-amount">3,800<span style="font-size:11px;color:#94a3b8;">만</span></div>
+        </div>
+        <div class="mc-tags">
+          <span class="badge badge-blue" style="font-size:9px;">구입비 69.1%</span>
+          <span class="badge badge-purple" style="font-size:9px;">배분 48.8%</span>
+          <span class="dday dday-safe" style="font-size:9px;">D-1043</span>
+        </div>
+        <div class="mc-row">
+          <span>관리비 200,000원</span>
+          <span>010-8785-4252</span>
+        </div>
+      </div>
+      <div class="mobile-card">
+        <div class="mc-top">
+          <div>
+            <div class="mc-name">12가3456 <span class="badge badge-active" style="font-size:9px;">운영중</span></div>
+            <div class="mc-sub">스타리아 · 김영수</div>
+          </div>
+          <div class="mc-amount">4,500<span style="font-size:11px;color:#94a3b8;">만</span></div>
+        </div>
+        <div class="mc-tags">
+          <span class="badge" style="font-size:9px;background:#fef2f2;color:#dc2626;">구입비 107.1%</span>
+          <span class="badge badge-purple" style="font-size:9px;">배분 75%</span>
+          <span class="dday dday-warn" style="font-size:9px;">D-45</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: 일반투자 리스트 -->
+<!-- ============================================================ -->
+<div id="invest-list" class="preview-frame hidden">
+  <div class="section-label"><span>일반투자 — 리스트 페이지</span></div>
+
+  <div class="page-container">
+    <div class="dark-header">
+      <div class="top-row">
+        <div class="title-area">
+          <h2>💰 일반 투자 관리</h2>
+          <p>투자자별 계약 현황 및 수익률을 관리합니다</p>
+        </div>
+        <button class="action-btn">+ 신규 투자 등록</button>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="label">총 투자 원금</div>
+          <div class="value">5.2<span class="unit">억</span></div>
+        </div>
+        <div class="stat-card green">
+          <div class="label">운용 중</div>
+          <div class="value">6<span class="unit">건</span></div>
+        </div>
+        <div class="stat-card blue">
+          <div class="label">월 예상 이자</div>
+          <div class="value">325<span class="unit">만</span></div>
+        </div>
+        <div class="stat-card amber">
+          <div class="label">만기 임박 (90일)</div>
+          <div class="value">2<span class="unit">건</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">평균 수익률</div>
+          <div class="value">7.5<span class="unit">%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active">전체 9</button>
+      <button class="filter-chip">운용중 6</button>
+      <button class="filter-chip">만기임박 2</button>
+      <button class="filter-chip">종료 3</button>
+      <input class="search-input" placeholder="투자자명, 연락처 검색..." />
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>투자자</th>
+            <th style="text-align:right;">투자 원금</th>
+            <th>연 수익률</th>
+            <th>월 이자</th>
+            <th>지급일</th>
+            <th>계약 기간</th>
+            <th>D-Day</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="name">이정훈</div><div class="sub">010-3333-4444</div></td>
+            <td class="money" style="color:#0f172a;">100,000,000</td>
+            <td><span class="badge badge-blue">연 8%</span></td>
+            <td style="font-weight:700;color:#059669;">666,667원</td>
+            <td style="color:#64748b;">매월 10일</td>
+            <td style="font-size:11px;color:#64748b;">24.03 ~ 27.03</td>
+            <td><span class="dday dday-safe">D-365</span></td>
+            <td><span class="badge badge-active">● 운용중</span></td>
+          </tr>
+          <tr>
+            <td><div class="name">최민수</div><div class="sub">010-5555-6666</div></td>
+            <td class="money" style="color:#0f172a;">50,000,000</td>
+            <td><span class="badge badge-blue">연 7%</span></td>
+            <td style="font-weight:700;color:#059669;">291,667원</td>
+            <td style="color:#64748b;">매월 15일</td>
+            <td style="font-size:11px;color:#64748b;">23.06 ~ 26.06</td>
+            <td><span class="dday dday-warn">D-88</span></td>
+            <td><span class="badge badge-active">● 운용중</span></td>
+          </tr>
+          <tr>
+            <td><div class="name">김은정</div><div class="sub">010-7777-8888</div></td>
+            <td class="money" style="color:#0f172a;">30,000,000</td>
+            <td><span class="badge badge-blue">연 6.5%</span></td>
+            <td style="font-weight:700;color:#059669;">162,500원</td>
+            <td style="color:#64748b;">매월 20일</td>
+            <td style="font-size:11px;color:#64748b;">22.12 ~ 25.12</td>
+            <td><span class="dday dday-danger">D+60</span></td>
+            <td><span class="badge badge-expired">● 종료</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mobile-cards">
+      <div class="mobile-card">
+        <div class="mc-top">
+          <div>
+            <div class="mc-name">이정훈 <span class="badge badge-active" style="font-size:9px;">운용중</span></div>
+            <div class="mc-sub">010-3333-4444</div>
+          </div>
+          <div class="mc-amount" style="color:#0f172a;">1<span style="font-size:11px;color:#94a3b8;">억</span></div>
+        </div>
+        <div class="mc-tags">
+          <span class="badge badge-blue" style="font-size:9px;">연 8%</span>
+          <span class="badge" style="font-size:9px;background:#ecfdf5;color:#059669;">월 666,667</span>
+          <span class="dday dday-safe" style="font-size:9px;">D-365</span>
+        </div>
+        <div class="mc-row">
+          <span>24.03 ~ 27.03 · 매월 10일</span>
+        </div>
+      </div>
+      <div class="mobile-card">
+        <div class="mc-top">
+          <div>
+            <div class="mc-name">최민수 <span class="badge badge-active" style="font-size:9px;">운용중</span></div>
+            <div class="mc-sub">010-5555-6666</div>
+          </div>
+          <div class="mc-amount" style="color:#0f172a;">5,000<span style="font-size:11px;color:#94a3b8;">만</span></div>
+        </div>
+        <div class="mc-tags">
+          <span class="badge badge-blue" style="font-size:9px;">연 7%</span>
+          <span class="badge" style="font-size:9px;background:#ecfdf5;color:#059669;">월 291,667</span>
+          <span class="dday dday-warn" style="font-size:9px;">D-88</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: 지입 상세 -->
+<!-- ============================================================ -->
+<div id="jiip-detail" class="preview-frame hidden">
+  <div class="section-label"><span>지입투자 — 상세 페이지</span></div>
+
+  <div class="page-container" style="background:#f8fafc;">
+    <!-- 상단: Header -->
+    <div class="detail-header" style="background:#fff; border-bottom:1px solid #e2e8f0; padding-bottom:20px;">
+      <div class="detail-back">‹ 목록으로</div>
+      <div class="detail-title-row">
+        <div class="detail-title">
+          <h1>지입 계약 상세 <span class="badge badge-active">● 운영중</span></h1>
+          <div class="meta">
+            <span style="font-weight:700;color:#0f172a;">161허9826</span>
+            <span>·</span>
+            <span>카니발 하이브리드</span>
+            <span>·</span>
+            <span>정태영</span>
+            <span class="dday dday-safe">D-1043</span>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button>상태 변경 ▾</button>
+          <button class="danger">삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 상단: Dashboard Cards -->
+    <div style="padding:20px 24px 0;">
+      <div class="dash-grid">
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#2d5fa8;"></div>
+          <div class="dc-label">차량 구입비용</div>
+          <div class="dc-value" style="color:#0f172a;">55,000,000<span style="font-size:11px;color:#94a3b8;margin-left:2px;">원</span></div>
+          <div class="dc-sub">161허9826 (카니발)</div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#0f172a;"></div>
+          <div class="dc-label">약정금액</div>
+          <div class="dc-value" style="color:#0f172a;">38,000,000<span style="font-size:11px;color:#94a3b8;margin-left:2px;">원</span></div>
+          <div class="dc-sub" style="color:#2563eb;font-weight:700;">구입비 대비 69.1%</div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#f59e0b;"></div>
+          <div class="dc-label">입금 진행률</div>
+          <div class="dc-value" style="color:#0f172a;">0<span style="font-size:11px;color:#94a3b8;">%</span></div>
+          <div class="dc-sub">0 / 38,000,000원</div>
+          <div class="dc-bar"><div class="dc-bar-fill" style="width:0%;background:#f59e0b;"></div></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#7c3aed;"></div>
+          <div class="dc-label">배분율</div>
+          <div class="dc-value" style="color:#7c3aed;">48.8<span style="font-size:11px;color:#94a3b8;">%</span></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#64748b;"></div>
+          <div class="dc-label">관리비</div>
+          <div class="dc-value" style="color:#0f172a;">200,000<span style="font-size:11px;color:#94a3b8;margin-left:2px;">원</span></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#2563eb;"></div>
+          <div class="dc-label">약정/구입 비율</div>
+          <div class="dc-value" style="color:#2563eb;">69.1<span style="font-size:11px;color:#94a3b8;">%</span></div>
+          <div class="dc-bar"><div class="dc-bar-fill" style="width:69.1%;background:#2563eb;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 중단: Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active">📋 계약 정보</button>
+      <button class="tab-btn">📄 계약서 관리</button>
+      <button class="tab-btn">💰 입금 현황</button>
+      <button class="tab-btn">📊 이력</button>
+    </div>
+
+    <!-- 하단: Form -->
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">1</div>
+        <h3>지급 및 세금 유형</h3>
+      </div>
+      <div class="form-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #0f172a;border-radius:12px;background:#f8fafc;text-align:center;">
+            <div style="font-size:13px;font-weight:700;">● 사업소득(3.3%)</div>
+          </div>
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;text-align:center;color:#94a3b8;">
+            <div style="font-size:13px;font-weight:600;">○ 세금계산서</div>
+          </div>
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;text-align:center;color:#94a3b8;">
+            <div style="font-size:13px;font-weight:600;">○ 이자소득(27.5%)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">2</div>
+        <h3>투자자(을) 상세 정보</h3>
+      </div>
+      <div class="form-body">
+        <div class="form-grid form-grid-2">
+          <div class="form-field">
+            <label>대상 차량 *</label>
+            <select><option>161허9826 (카니발 하이브리드)</option></select>
+          </div>
+          <div class="form-field">
+            <label>연락처</label>
+            <input value="010-8785-4252" />
+          </div>
+        </div>
+        <div style="background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;margin-top:14px;">
+          <div class="form-grid form-grid-2">
+            <div class="form-field">
+              <label>성명/상호 *</label>
+              <input value="정태영" />
+            </div>
+            <div class="form-field">
+              <label>등록번호</label>
+              <input value="900101-1******" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">3</div>
+        <h3>계약 조건</h3>
+      </div>
+      <div class="form-body">
+        <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+          <div class="form-field">
+            <label>약정금액 (목표)</label>
+            <input value="38,000,000" style="text-align:right;font-size:16px;font-weight:800;" />
+          </div>
+          <div class="form-field">
+            <label>실제 입금 총액</label>
+            <div style="padding:10px 12px;border:2px solid #fecaca;border-radius:10px;background:#fef2f2;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:4px;">미수금 38,000,000원</span>
+              <span style="font-weight:800;font-size:16px;color:#dc2626;">0 <span style="font-size:11px;font-weight:500;">원</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px;">배분 조건</div>
+          <div class="form-grid form-grid-3">
+            <div class="form-field">
+              <label>관리비 (월)</label>
+              <input value="200,000" style="text-align:right;" />
+            </div>
+            <div class="form-field">
+              <label>배분율</label>
+              <input type="number" value="48.8" style="text-align:right;" />
+              <div class="ratio-helper">
+                <div class="rh-row">
+                  <span class="rh-label">기준 70% × 부족 30.9%</span>
+                  <span class="rh-value" style="color:#d97706;">추천 48.4%</span>
+                </div>
+                <button class="rh-btn down">+0.4%p ↑ 적용</button>
+              </div>
+            </div>
+            <div class="form-field">
+              <label>지급일</label>
+              <input type="number" value="10" style="text-align:right;" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn">정보 수정 저장</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: 일반투자 상세 -->
+<!-- ============================================================ -->
+<div id="invest-detail" class="preview-frame hidden">
+  <div class="section-label"><span>일반투자 — 상세 페이지</span></div>
+
+  <div class="page-container" style="background:#f8fafc;">
+    <div class="detail-header" style="background:#fff; border-bottom:1px solid #e2e8f0; padding-bottom:20px;">
+      <div class="detail-back">‹ 목록으로</div>
+      <div class="detail-title-row">
+        <div class="detail-title">
+          <h1>일반 투자 상세 <span class="badge badge-active">● 운용중</span></h1>
+          <div class="meta">
+            <span style="font-weight:700;color:#0f172a;">이정훈</span>
+            <span>·</span>
+            <span>010-3333-4444</span>
+            <span class="dday dday-safe">D-365</span>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button>상태 변경 ▾</button>
+          <button class="danger">삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div style="padding:20px 24px 0;">
+      <div class="dash-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#0f172a;"></div>
+          <div class="dc-label">투자 원금</div>
+          <div class="dc-value" style="color:#0f172a;">1<span style="font-size:14px;color:#94a3b8;margin-left:2px;">억</span></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#059669;"></div>
+          <div class="dc-label">입금 진행률</div>
+          <div class="dc-value" style="color:#059669;">100<span style="font-size:11px;color:#94a3b8;">%</span></div>
+          <div class="dc-bar"><div class="dc-bar-fill" style="width:100%;background:#059669;"></div></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#2563eb;"></div>
+          <div class="dc-label">연 수익률</div>
+          <div class="dc-value" style="color:#2563eb;">8<span style="font-size:11px;color:#94a3b8;">%</span></div>
+        </div>
+        <div class="dash-card" style="position:relative;">
+          <div class="dc-accent" style="background:#7c3aed;"></div>
+          <div class="dc-label">월 이자</div>
+          <div class="dc-value" style="color:#7c3aed;">666,667<span style="font-size:11px;color:#94a3b8;margin-left:2px;">원</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active">📋 계약 정보</button>
+      <button class="tab-btn">📄 계약서 관리</button>
+      <button class="tab-btn">💰 입금 현황</button>
+      <button class="tab-btn">📊 이력</button>
+    </div>
+
+    <!-- Form -->
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">1</div>
+        <h3>세금 유형</h3>
+      </div>
+      <div class="form-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #0f172a;border-radius:12px;background:#f8fafc;text-align:center;">
+            <div style="font-size:13px;font-weight:700;">● 이자소득(27.5%)</div>
+          </div>
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;text-align:center;color:#94a3b8;">
+            <div style="font-size:13px;font-weight:600;">○ 세금계산서</div>
+          </div>
+          <div style="flex:1;min-width:140px;padding:14px;border:2px solid #e2e8f0;border-radius:12px;text-align:center;color:#94a3b8;">
+            <div style="font-size:13px;font-weight:600;">○ 사업소득(3.3%)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">2</div>
+        <h3>투자자 정보</h3>
+      </div>
+      <div class="form-body">
+        <div class="form-grid form-grid-2">
+          <div class="form-field">
+            <label>투자자명 *</label>
+            <input value="이정훈" />
+          </div>
+          <div class="form-field">
+            <label>연락처</label>
+            <input value="010-3333-4444" />
+          </div>
+          <div class="form-field">
+            <label>이메일</label>
+            <input value="jhlee@email.com" />
+          </div>
+          <div class="form-field">
+            <label>등록번호</label>
+            <input value="880512-1******" />
+          </div>
+        </div>
+        <div style="background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;margin-top:14px;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px;">계좌 정보</div>
+          <div class="form-grid" style="grid-template-columns:1fr 2fr 1fr;">
+            <div class="form-field">
+              <label>은행</label>
+              <select><option>KB국민은행</option></select>
+            </div>
+            <div class="form-field">
+              <label>계좌번호</label>
+              <input value="123456-78-901234" />
+            </div>
+            <div class="form-field">
+              <label>예금주</label>
+              <input value="이정훈" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-header">
+        <div class="num">3</div>
+        <h3>투자 조건</h3>
+      </div>
+      <div class="form-body">
+        <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+          <div class="form-field">
+            <label>계약 시작일</label>
+            <input type="date" value="2024-03-15" />
+          </div>
+          <div class="form-field">
+            <label>계약 종료일</label>
+            <input type="date" value="2027-03-14" />
+          </div>
+        </div>
+        <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+          <div class="form-field">
+            <label>투자 원금</label>
+            <input value="100,000,000" style="text-align:right;font-size:16px;font-weight:800;" />
+          </div>
+          <div class="form-field">
+            <label>실제 입금 총액</label>
+            <div style="padding:10px 12px;border:2px solid #a7f3d0;border-radius:10px;background:#ecfdf5;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;font-weight:700;background:#d1fae5;color:#059669;padding:2px 8px;border-radius:4px;">완납</span>
+              <span style="font-weight:800;font-size:16px;color:#059669;">100,000,000 <span style="font-size:11px;font-weight:500;">원</span></span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#f8fafc;padding:16px;border-radius:12px;border:1px solid #e2e8f0;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px;">수익 조건</div>
+          <div class="form-grid form-grid-3">
+            <div class="form-field">
+              <label>연 수익률</label>
+              <div style="position:relative;">
+                <input type="number" value="8" style="text-align:right;" />
+                <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:#94a3b8;">%</span>
+              </div>
+              <div class="hint">월 이자: <b style="color:#059669;">666,667원</b></div>
+            </div>
+            <div class="form-field">
+              <label>이자 지급일</label>
+              <div style="position:relative;">
+                <input type="number" value="10" style="text-align:right;" />
+                <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:#94a3b8;">일</span>
+              </div>
+            </div>
+            <div class="form-field">
+              <label>세후 수익률</label>
+              <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f1f5f9;text-align:right;font-weight:700;font-size:13px;color:#64748b;">
+                5.8%
+              </div>
+              <div class="hint">이자소득세 27.5% 공제 후</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn">정보 수정 저장</button>
+  </div>
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.preview-frame').forEach(el => el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  document.querySelectorAll('.preview-nav > button').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+}
+function setDevice(mode, btn) {
+  document.querySelectorAll('.preview-frame').forEach(el => {
+    el.classList.remove('mobile','tablet');
+    if (mode !== 'desktop') el.classList.add(mode);
+  });
+  document.querySelectorAll('.device-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

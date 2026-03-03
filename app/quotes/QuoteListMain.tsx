@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import DarkHeader from '../components/DarkHeader'
 
 // ============================================================================
 // TYPES
@@ -772,43 +773,67 @@ export default function QuoteListPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>📑 견적/계약 관리</h1>
-          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>견적 작성·발송 및 계약 체결 관리</p>
-        </div>
-        <NewQuoteButton />
-      </div>
-
-      {/* ── KPI 대시보드 ── */}
+      {/* ── DarkHeader with KPI Stats ── */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
-          <div style={{ background: '#fff', padding: '12px 16px', borderRadius: 12, border: '1px solid #e5e7eb', cursor: 'pointer' }}
-            onClick={() => { setMainTab('long_term'); setStatusFilter('all') }}>
-            <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700 }}>장기견적</p>
-            <p style={{ fontSize: 22, fontWeight: 900, color: '#111827', marginTop: 4 }}>{kpiStats.totalQuotes}<span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 2 }}>건</span></p>
-          </div>
-          <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #bfdbfe', cursor: 'pointer' }}
-            onClick={() => { setMainTab('long_term'); setStatusFilter('shared') }}>
-            <p style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>발송됨</p>
-            <p style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>{kpiStats.sharedQuotes}<span style={{ fontSize: 13, color: '#60a5fa', marginLeft: 2 }}>건</span></p>
-          </div>
-          <div style={{ background: '#f0fdf4', padding: '12px 16px', borderRadius: 12, border: '1px solid #bbf7d0', cursor: 'pointer' }}
-            onClick={() => { setMainTab('long_term'); setStatusFilter('confirmed') }}>
-            <p style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>계약확정</p>
-            <p style={{ fontSize: 22, fontWeight: 900, color: '#15803d', marginTop: 4 }}>{kpiStats.confirmedQuotes}<span style={{ fontSize: 13, color: '#4ade80', marginLeft: 2 }}>건</span></p>
-          </div>
-          <div style={{ background: '#faf5ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #e9d5ff', cursor: 'pointer' }}
-            onClick={() => { setMainTab('contracts'); }}>
-            <p style={{ fontSize: 11, color: '#7c3aed', fontWeight: 700 }}>진행중 계약</p>
-            <p style={{ fontSize: 22, fontWeight: 900, color: '#6d28d9', marginTop: 4 }}>{kpiStats.activeContracts}<span style={{ fontSize: 13, color: '#a78bfa', marginLeft: 2 }}>건</span></p>
-          </div>
-          <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: 12, border: '1px solid #bfdbfe' }}>
-            <p style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>월 렌트수익</p>
-            <p style={{ fontSize: 18, fontWeight: 900, color: '#1d4ed8', marginTop: 4 }}>{f(Math.round(kpiStats.totalMonthlyRent * 1.1))}<span style={{ fontSize: 12, color: '#60a5fa', marginLeft: 2 }}>원</span></p>
-          </div>
-        </div>
+        <DarkHeader
+          icon="📑"
+          title="견적/계약 관리"
+          subtitle="견적 작성·발송 및 계약 체결 관리"
+          stats={[
+            {
+              label: '장기견적',
+              value: kpiStats.totalQuotes,
+              color: '#334155',
+              bgColor: '#fff',
+              borderColor: '#e2e8f0',
+              labelColor: '#94a3b8',
+              onClick: () => { setMainTab('long_term'); setStatusFilter('all') },
+            },
+            {
+              label: '발송됨',
+              value: kpiStats.sharedQuotes,
+              color: '#d97706',
+              bgColor: '#fffbeb',
+              borderColor: '#fde68a',
+              labelColor: '#fcd34d',
+              onClick: () => { setMainTab('long_term'); setStatusFilter('shared') },
+            },
+            {
+              label: '계약확정',
+              value: kpiStats.confirmedQuotes,
+              color: '#059669',
+              bgColor: '#ecfdf5',
+              borderColor: '#bbf7d0',
+              labelColor: '#6ee7b7',
+              onClick: () => { setMainTab('long_term'); setStatusFilter('confirmed') },
+            },
+            {
+              label: '진행중 계약',
+              value: kpiStats.activeContracts,
+              color: '#7c3aed',
+              bgColor: '#f5f3ff',
+              borderColor: '#ddd6fe',
+              labelColor: '#c4b5fd',
+              onClick: () => { setMainTab('contracts') },
+            },
+            {
+              label: '월 렌트수익',
+              value: f(Math.round(kpiStats.totalMonthlyRent * 1.1)),
+              color: '#2563eb',
+              bgColor: '#eff6ff',
+              borderColor: '#bfdbfe',
+              labelColor: '#93c5fd',
+            },
+          ]}
+          actions={[
+            {
+              label: '새 견적',
+              icon: '➕',
+              onClick: () => router.push('/quotes/pricing'),
+              variant: 'primary',
+            },
+          ]}
+        />
       )}
 
       {/* ── Main Tabs (보험 페이지 스타일 인라인) ── */}

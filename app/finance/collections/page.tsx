@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import ConfirmPaymentModal from './ConfirmPaymentModal'
+import DarkHeader from '../../components/DarkHeader'
 
 // ============================================
 // 수금 관리 페이지
@@ -237,34 +238,26 @@ export default function CollectionsPage() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
       <div className="space-y-6">
-        {/* 헤더 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 수금 관리</h1>
-            <p className="text-gray-500 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
+        {/* DarkHeader */}
+        <DarkHeader
+          icon="💰"
+          title="수금 관리"
+          subtitle="납부 현황 확인 및 수금 관리 · 안내 발송"
+          stats={[
+            { label: '이번달 예상 수금', value: `${nf(totalExpected)}원`, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
+            { label: '수금 완료', value: `${nf(totalCollected)}원`, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
+            { label: '수금율', value: `${collectionRate}%`, color: collectionRate >= 80 ? '#059669' : collectionRate >= 50 ? '#d97706' : '#dc2626', bgColor: collectionRate >= 80 ? '#ecfdf5' : collectionRate >= 50 ? '#fffbeb' : '#fef2f2', borderColor: collectionRate >= 80 ? '#bbf7d0' : collectionRate >= 50 ? '#fde68a' : '#fecaca', labelColor: collectionRate >= 80 ? '#6ee7b7' : collectionRate >= 50 ? '#fcd34d' : '#fca5a5' },
+            { label: '연체', value: `${nf(overdueTotal)}원`, color: overdueSchedules.length > 0 ? '#dc2626' : '#94a3b8', bgColor: overdueSchedules.length > 0 ? '#fef2f2' : '#fff', borderColor: overdueSchedules.length > 0 ? '#fecaca' : '#e2e8f0', labelColor: overdueSchedules.length > 0 ? '#fca5a5' : '#94a3b8' },
+          ]}
+        >
+          {/* Month navigation in children */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px' }}>
+            <button onClick={() => changeMonth(-1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}>‹</button>
+            <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
+              style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600 }} />
+            <button onClick={() => changeMonth(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}>›</button>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => changeMonth(-1)} className="p-2 rounded-lg hover:bg-slate-100 border border-slate-200">
-              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
-            <input
-              type="month"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-steel-600 bg-white"
-            />
-            <button onClick={() => changeMonth(1)} className="p-2 rounded-lg hover:bg-slate-100 border border-slate-200">
-              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </div>
-        </div>
-        {/* KPI 카드 */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard label="이번달 예상 수금" value={`${nf(totalExpected)}원`} sub={`${schedules.length}건`} color="slate" />
-          <KPICard label="수금 완료" value={`${nf(totalCollected)}원`} sub={`${completedSchedules.length}건`} color="green" />
-          <KPICard label="수금율" value={`${collectionRate}%`} sub={totalExpected > 0 ? `${nf(totalExpected - totalCollected)}원 미수` : '-'} color={collectionRate >= 80 ? 'green' : collectionRate >= 50 ? 'amber' : 'red'} />
-          <KPICard label="연체 합계" value={`${nf(overdueTotal)}원`} sub={`${overdueSchedules.length}건`} color={overdueSchedules.length > 0 ? 'red' : 'slate'} />
-        </div>
+        </DarkHeader>
 
         {/* 탭 + 액션 바 */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200">

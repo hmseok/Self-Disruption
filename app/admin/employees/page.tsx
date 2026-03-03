@@ -5,6 +5,7 @@ import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
+import DarkHeader from '../../components/DarkHeader'
 
 // ============================================
 // 조직/권한 통합 관리 페이지 (2-Tab 구조)
@@ -486,19 +487,20 @@ export default function OrgManagementPage() {
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
 
-      {/* ═══ 헤더 — 등록/제원 페이지 스타일 ═══ */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' as const, gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>조직/권한 관리</h1>
-          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>직원 관리 및 페이지 권한 설정</p>
-        </div>
-        {activeCompanyId && (
-          <button onClick={() => setShowInviteModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2d5fa8', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-            + 직원 초대
-          </button>
-        )}
-      </div>
+      {/* ═══ DarkHeader ═══ */}
+      <DarkHeader
+        icon="👥"
+        title="조직/권한 통합 관리"
+        subtitle="직원 관리 및 페이지 권한 설정"
+        stats={activeCompanyId ? [
+          { label: '전체 직원', value: employees.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
+          { label: '대기중 초대', value: pendingInvitationCount, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
+          { label: '권한설정 대상', value: assignableEmployees.length, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
+        ] : []}
+        actions={activeCompanyId ? [
+          { label: '직원 초대', icon: '➕', onClick: () => setShowInviteModal(true), variant: 'primary' }
+        ] : []}
+      />
 
       {role === 'god_admin' && !adminSelectedCompanyId && (
         <div style={{ padding: 20, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 16, marginBottom: 24 }}>

@@ -130,16 +130,34 @@ ${txLines}
           parsed = JSON.parse(jsonMatch[0])
         }
 
+        // 수입 카테고리 목록 (입금 거래에만 허용)
+        const INCOME_CATS = [
+          '렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입',
+          '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '기타수입'
+        ]
+
         for (const item of parsed) {
           const no = item.no - 1
           if (no >= 0 && no < batch.length && CATEGORY_LIST.includes(item.category)) {
             const tx = batch[no]
-            const confidence = Math.min(item.confidence || 60, 90)
+            let category = item.category
+            let confidence = Math.min(item.confidence || 60, 90)
+
+            // ★ 입출금 방향 검증
+            const isIncomeCat = INCOME_CATS.includes(category)
+            if (tx.type === 'expense' && isIncomeCat) {
+              console.warn(`⚠️ [재분류검증] 출금인데 수입 카테고리: ${tx.client_name} → ${category} → 스킵`)
+              continue  // 잘못된 분류는 업데이트하지 않음
+            }
+            if (tx.type === 'income' && !isIncomeCat) {
+              console.warn(`⚠️ [재분류검증] 입금인데 지출 카테고리: ${tx.client_name} → ${category} → 스킵`)
+              continue
+            }
 
             // DB 업데이트
             const { error: upErr } = await sb
               .from('transactions')
-              .update({ category: item.category })
+              .update({ category: category })
               .eq('id', tx.id)
 
             if (!upErr) {
@@ -147,7 +165,7 @@ ${txLines}
               results.push({
                 id: tx.id,
                 old_category: tx.category || '미분류',
-                new_category: item.category,
+                new_category: category,
                 confidence,
               })
             }

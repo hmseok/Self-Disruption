@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
-const MODEL = 'gemini-2.0-flash'
+const MODEL = 'gemini-2.5-flash'
 
 const PROMPT = `너는 대한민국 자동차 공식 견적서/가격표 문서 분석기야.
 업로드된 문서(PDF 또는 이미지)에서 차량 가격 정보를 추출해서 JSON으로 출력해라.
@@ -10,10 +10,16 @@ const PROMPT = `너는 대한민국 자동차 공식 견적서/가격표 문서 
 
 [추출 규칙]
 1. 문서에 있는 모든 차종, 트림, 옵션 정보를 빠짐없이 추출
-2. 가격은 원(₩) 단위 정수로 변환 (쉼표 제거)
+2. ★★★ 가격은 원(₩) 단위 정수로 변환 — 매우 중요 ★★★
+   - "74,300,000원" → 74300000 (쉼표, 원, 공백 모두 제거)
+   - "7,430만원" → 74300000 (만원 단위를 원 단위로 변환)
+   - "7430만" → 74300000
+   - 가격이 0이거나 비어있으면 절대 포함하지 마라
+   - base_price는 반드시 1000000(백만원) 이상이어야 함 — 자동차 가격이 100만원 미만일 수 없음
 3. 트림은 가격 오름차순 정렬
-4. 부가세 포함 출고가 기준
+4. 부가세 포함 출고가 기준 (VAT 포함가)
 5. 문서에서 확인된 정보만 넣고, 추측하지 마
+6. ★★★ 연식(year)은 문서에 명시된 연식을 사용하되, 없으면 현재 연도(${new Date().getFullYear()})를 사용해라 ★★★
 6. ★★★ 개별소비세 구분이 있으면 반드시 분리해라 ★★★
    - "개별소비세 5%" 가격표와 "개별소비세 3.5%" 가격표가 각각 있으면 별도 variant로 분리
    - consumption_tax 필드에 "개별소비세 5%", "개별소비세 3.5%" 등 명시
@@ -357,7 +363,63 @@ export async function POST(request: NextRequest) {
 
     result.source = `견적서 업로드 (${file.name})`
 
-    console.log(`✅ [견적서파싱] ${result.brand} ${result.model} — 차종 ${result.variants?.length || 0}개`)
+    // ★ 상세모델명 생성 — 트림 정보를 model에 포함하여 가격표 제목으로 활용
+    if (result.variants && Array.isArray(result.variants) && result.variants.length > 0) {
+      const allTrimNames: string[] = []
+      for (const v of result.variants) {
+        if (v.trims && Array.isArray(v.trims)) {
+          for (const t of v.trims) {
+            if (t.name) allTrimNames.push(t.name)
+          }
+        }
+      }
+      // 트림명에서 공통 prefix 추출 → 상세모델명 생성
+      // 예: ["520i Luxury", "520i M Sport"] → "520i Luxury / M Sport"
+      // 예: ["베이스"] → "520i (베이스)"
+      if (allTrimNames.length > 0) {
+        const baseModel = result.model || ''
+        // 트림명이 이미 모델명을 포함하는지 체크
+        const trimsSummary = allTrimNames.slice(0, 3).join(', ') + (allTrimNames.length > 3 ? ` 외 ${allTrimNames.length - 3}개` : '')
+        // model_detail: 가격표 제목용 상세 모델명
+        result.model_detail = `${baseModel} (${trimsSummary})`
+        console.log(`📋 [견적서파싱] 상세모델명: ${result.model_detail}`)
+      }
+    }
+
+    // ★ 가격 검증 — base_price가 0이거나 비정상인 트림 필터링
+    if (result.variants && Array.isArray(result.variants)) {
+      for (const variant of result.variants) {
+        if (variant.trims && Array.isArray(variant.trims)) {
+          // 만원 단위로 적힌 경우 보정 (예: 7430 → 74300000)
+          variant.trims = variant.trims.map((trim: any) => {
+            if (trim.base_price > 0 && trim.base_price < 100000) {
+              // 만원 단위로 추출된 것으로 판단 → 원 단위로 변환
+              console.warn(`⚠️ [견적서파싱] 가격 보정: ${trim.name} ${trim.base_price} → ${trim.base_price * 10000} (만원→원 변환)`)
+              trim.base_price = trim.base_price * 10000
+            }
+            return trim
+          })
+          // base_price가 0 또는 100만원 미만인 트림 제거 (비정상 데이터)
+          const before = variant.trims.length
+          variant.trims = variant.trims.filter((trim: any) => trim.base_price >= 1000000)
+          if (before !== variant.trims.length) {
+            console.warn(`⚠️ [견적서파싱] 비정상 가격 트림 ${before - variant.trims.length}개 제거`)
+          }
+        }
+      }
+      // 트림이 없는 variant 제거
+      result.variants = result.variants.filter((v: any) => v.trims && v.trims.length > 0)
+    }
+
+    // 연식 보정 — year가 현재보다 과거이면 현재 연도로 보정
+    const currentYear = new Date().getFullYear()
+    if (!result.year || result.year < currentYear - 1) {
+      console.warn(`⚠️ [견적서파싱] 연식 보정: ${result.year} → ${currentYear}`)
+      result.year = currentYear
+    }
+
+    const totalTrims = result.variants?.reduce((sum: number, v: any) => sum + (v.trims?.length || 0), 0) || 0
+    console.log(`✅ [견적서파싱] ${result.brand} ${result.model} ${result.year}년 — 차종 ${result.variants?.length || 0}개, 트림 ${totalTrims}개`)
 
     return NextResponse.json(result)
   } catch (error: any) {

@@ -3,6 +3,7 @@
 import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
+import DarkHeader from '../../components/DarkHeader'
 
 const KOREAN_BANKS = [
   'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행',
@@ -185,27 +186,37 @@ export default function FreelancersPage() {
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
-      {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👷 프리랜서/용역 관리</h1>
-          <p className="text-sm text-slate-400 mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+      {/* DarkHeader */}
+      <DarkHeader
+        icon="👷"
+        title="프리랜서/용역 관리"
+        subtitle="외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동"
+        stats={activeTab === 'payments' ? [
+          { label: '총 지급건수', value: payments.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
+          { label: '총 지급액(세전)', value: `${formatMoney(totalGross)}원`, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
+          { label: '원천징수세', value: `${formatMoney(totalTax)}원`, color: '#dc2626', bgColor: '#fef2f2', borderColor: '#fecaca', labelColor: '#fca5a5' },
+          { label: '실지급액', value: `${formatMoney(totalNet)}원`, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
+        ] : []}
+        actions={[
+          { label: activeTab === 'list' ? '프리랜서 등록' : '지급 등록', icon: '➕', onClick: () => { if (activeTab === 'list') { setForm(emptyForm); setEditingId(null); setShowForm(true) } else { setShowPaymentForm(true) } }, variant: 'primary' }
+        ]}
+      >
+        {/* 탭 */}
+        <div style={{ display: 'flex', gap: 4, padding: '8px 16px' }}>
+          {TABS.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', borderRadius: 8, fontWeight: 600, fontSize: 13,
+                background: activeTab === tab.key ? '#0f172a' : 'transparent', color: activeTab === tab.key ? '#fff' : '#94a3b8',
+                border: 'none', cursor: 'pointer', transition: 'all 0.15s'
+              }}>
+              <span style={{ fontSize: 11 }}>{tab.icon}</span>{tab.label}
+            </button>
+          ))}
         </div>
-      </div>
+      </DarkHeader>
 
-      {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-white p-1 rounded-xl border border-slate-200/80 shadow-sm">
-        {TABS.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-              activeTab === tab.key ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}>
-            <span className="text-xs">{tab.icon}</span>{tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ──── 탭1: 프리랜서 목록 ──── */}
+      {/* Tab 1: 프리랜서 목록 */}
       {activeTab === 'list' && (
         <div className="space-y-5">
           <div className="flex justify-between items-center">
@@ -267,7 +278,7 @@ export default function FreelancersPage() {
         </div>
       )}
 
-      {/* ──── 탭2: 지급 내역 ──── */}
+      {/* Tab 2: 지급 내역 */}
       {activeTab === 'payments' && (
         <div className="space-y-5">
           {/* 월 요약 */}
