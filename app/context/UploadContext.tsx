@@ -39,6 +39,19 @@ export interface Transaction {
   // 외화 관련
   currency?: string;          // KRW, USD, JPY, EUR 등
   original_amount?: number;   // 외화 원금액
+  // 추가 필드 (분류 관리에서 사용)
+  memo?: string;
+  bank_name?: string;
+  ai_category?: string;
+  ai_related_type?: string;
+  ai_related_id?: string;
+  is_cancel?: boolean;
+  classification_source?: string;
+  _split_from?: number;
+  _split_index?: number;
+  _source?: string;
+  source_data?: any;
+  [key: string]: any;  // 확장 필드 허용
 }
 
 // ✅ Context 타입 정의
@@ -63,6 +76,7 @@ interface UploadContextType {
   closeWidget: () => void;
   updateTransaction: (id: number, field: string, value: any) => void;
   deleteTransaction: (id: number) => void;
+  splitTransaction: (id: number, splits: Array<{ amount: number; description?: string; related_type?: string; related_id?: string; category?: string }>) => void;
   removeResults: (ids: Set<number>) => void;
   setCompanyId: (id: string) => void;
   loadFromQueue: () => Promise<number>;
@@ -791,68 +805,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         } as Transaction;
       });
 
-      // ── 이미 transactions에 저장된 항목 자동 정리 ──
-      let cleanedTransactions = transactions;
-      const txDates = transactions.map(t => t.transaction_date).filter(Boolean);
-      if (txDates.length > 0) {
-        const sortedDates = [...txDates].sort();
-        try {
-          const { data: existingTxs } = await supabase
-            .from('transactions')
-            .select('transaction_date, client_name, amount')
-            .eq('company_id', companyIdRef.current!)
-            .gte('transaction_date', sortedDates[0])
-            .lte('transaction_date', sortedDates[sortedDates.length - 1]);
-
-          if (existingTxs && existingTxs.length > 0) {
-            const existingCounts = new Map<string, number>();
-            for (const e of existingTxs) {
-              const key = `${e.transaction_date}|${e.client_name}|${e.amount}`;
-              existingCounts.set(key, (existingCounts.get(key) || 0) + 1);
-            }
-
-            const usedCounts = new Map<string, number>();
-            const staleQueueIds: string[] = [];
-            const filtered: Transaction[] = [];
-
-            for (const t of transactions) {
-              const key = `${t.transaction_date}|${t.client_name}|${t.amount}`;
-              const existCount = existingCounts.get(key) || 0;
-              const usedCount = usedCounts.get(key) || 0;
-              if (usedCount < existCount) {
-                usedCounts.set(key, usedCount + 1);
-                if ((t as any)._queue_id) staleQueueIds.push((t as any)._queue_id);
-              } else {
-                filtered.push(t);
-              }
-            }
-
-            // 백그라운드에서 stale queue 항목 삭제
-            if (staleQueueIds.length > 0) {
-              console.log(`[loadFromQueue] 이미 저장된 ${staleQueueIds.length}건 자동 정리`);
-              try {
-                await fetch('/api/finance/classify', {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ company_id: companyIdRef.current, ids: staleQueueIds })
-                });
-              } catch (delErr) {
-                console.error('[loadFromQueue] queue 삭제 오류:', delErr);
-              }
-            }
-
-            cleanedTransactions = filtered;
-          }
-        } catch (e) {
-          console.error('[loadFromQueue] 중복 체크 오류:', e);
-        }
-      }
-
-      setResults(cleanedTransactions);
+      // 자동 정리 제거: queue 항목을 그대로 로드 (사용자가 직접 삭제하도록)
+      setResults(transactions);
       setStatus('completed');
-      setLogs(`📂 저장된 분류 데이터 ${cleanedTransactions.length}건 로드됨` + (cleanedTransactions.length < transactions.length ? ` (${transactions.length - cleanedTransactions.length}건 이미 저장됨 → 자동 정리)` : ''));
-      console.log(`[UploadContext] loadFromQueue: ${cleanedTransactions.length}건 로드 (원본 ${transactions.length}건)`);
-      return cleanedTransactions.length;
+      setLogs(`📂 저장된 분류 데이터 ${transactions.length}건 로드됨`);
+      console.log(`[UploadContext] loadFromQueue: ${transactions.length}건 로드`);
+      return transactions.length;
     } catch (e) {
       console.error('[UploadContext] loadFromQueue error:', e);
       return 0;
@@ -884,6 +842,29 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setResults(prev => prev.filter(item => item.id !== id));
   };
 
+  // ✂️ 거래 분할 (1건 → N건)
+  const splitTransaction = (id: number, splits: Array<{ amount: number; description?: string; related_type?: string; related_id?: string; category?: string }>) => {
+    setResults(prev => {
+      const idx = prev.findIndex(item => item.id === id);
+      if (idx === -1) return prev;
+      const original = prev[idx];
+      const newItems = splits.map((s, i) => ({
+        ...original,
+        id: generateUniqueId(),
+        amount: s.amount,
+        category: s.category || original.category,
+        description: s.description || `${original.description || ''} (분할 ${i + 1}/${splits.length})`,
+        related_type: s.related_type || original.related_type || null,
+        related_id: s.related_id || original.related_id || null,
+        _split_from: original.id,
+        _split_index: i,
+      }));
+      const next = [...prev];
+      next.splice(idx, 1, ...newItems);
+      return next;
+    });
+  };
+
   // 🗑️ 벌크 삭제 (저장 완료된 항목 제거용)
   const removeResults = (ids: Set<number>) => {
     setResults(prev => prev.filter(item => !ids.has(item.id)));
@@ -894,7 +875,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       status, progress, currentFileIndex, totalFiles: fileQueue.length,
       currentFileName, logs, results, cardRegistrationResults,
       addFiles, startProcessing, pauseProcessing, resumeProcessing, cancelProcessing,
-      clearResults, closeWidget, updateTransaction, deleteTransaction, removeResults, setCompanyId, loadFromQueue
+      clearResults, closeWidget, updateTransaction, deleteTransaction, splitTransaction, removeResults, setCompanyId, loadFromQueue
     }}>
       {children}
     </UploadContext.Provider>

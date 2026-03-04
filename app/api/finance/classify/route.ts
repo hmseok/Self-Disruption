@@ -36,7 +36,7 @@ ${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
 ## 카테고리 그룹 구조
 - 매출(영업수익): 렌트/운송수입, 지입 관리비/수수료, 보험금 수령, 매각/처분수입, 이자/잡이익
-- 자본변동: 투자원금 입금, 지입 초기비용/보증금, 대출 실행(입금)
+- 자본변동: 투자원금 입금, 지입 초기비용/보증금, 렌터카 보증금(입금), 대출 실행(입금)
 - 영업비용-차량: 유류비, 정비/수리비, 차량보험료, 자동차세/공과금, 차량할부/리스료, 화물공제/적재물보험
 - 영업비용-금융: 이자비용(대출/투자), 원금상환, 지입 수익배분금(출금), 수수료/카드수수료
 - 영업비용-인건비: 급여(정규직), 일용직급여, 용역비(3.3%), 4대보험(회사부담)
@@ -52,7 +52,8 @@ ${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 - 매각/처분수입: 차량매각, 처분대금, 중고매각
 - 이자/잡이익: 이자수입, 환급, 캐시백, 잡이익
 - 투자원금 입금: 투자, 증자, 출자금
-- 지입 초기비용/보증금: 보증금, 인수금, 입주보증금
+- 지입 초기비용/보증금: 지입보증금, 인수금, 초기비용
+- 렌터카 보증금(입금): 렌터카, 렌트카, 장기렌트, 렌트보증금, 보증금(차량 관련)
 - 대출 실행(입금): 대출입금, 여신실행, 론실행
 - 기타수입: 잡수입, 기타수입
 
@@ -142,7 +143,7 @@ ${txLines}
       // 수입 카테고리 목록 (입금 거래에만 허용)
       const INCOME_CATEGORIES = [
         '렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입',
-        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '기타수입'
+        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)', '기타수입'
       ]
 
       for (const item of parsed) {
@@ -195,7 +196,8 @@ const CATEGORY_RULES = [
   { category: '렌트/운송수입', type: 'income', keywords: ['매출', '정산', '운송료', '운임', '렌트료', '화물', '운반비', '배송료', '용차료'] },
   { category: '지입 관리비/수수료', type: 'income', keywords: ['지입료', '관리비수입', '번호판사용료', '차량관리수수료'] },
   { category: '투자원금 입금', type: 'income', keywords: ['투자', '증자', '자본', '출자', '출자금'] },
-  { category: '지입 초기비용/보증금', type: 'income', keywords: ['보증금', '인수금', '초기비용', '입주보증금'] },
+  { category: '지입 초기비용/보증금', type: 'income', keywords: ['지입보증금', '인수금', '초기비용', '입주보증금'] },
+  { category: '렌터카 보증금(입금)', type: 'income', keywords: ['렌터카', '렌트카', '장기렌트', '렌트보증금', '보증금입금', '보증금'] },
   { category: '대출 실행(입금)', type: 'income', keywords: ['대출입금', '대출실행', '론실행', '여신실행'] },
   { category: '이자/잡이익', type: 'income', keywords: ['이자수입', '환급', '캐시백', '이자입금', '이자지급', '잡이익'] },
   { category: '보험금 수령', type: 'income', keywords: ['보험금', '보상금', '사고보상', '보험수령'] },
@@ -480,7 +482,7 @@ export async function POST(request: NextRequest) {
       // ── 3a. DB 학습 규칙 우선 적용 ──
       const INCOME_CATS = [
         '렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입',
-        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '기타수입'
+        '이자/잡이익', '투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)', '기타수입'
       ]
       for (const rule of dbRules) {
         const keyword = (rule.key || rule.keyword || '').toLowerCase()
@@ -933,6 +935,11 @@ export async function GET(request: NextRequest) {
 
     const { data: queueData, error: queueError, count: queueCount } = await fetchAllFromQueue()
 
+    console.log(`[GET classify] status=${status}, queueData=${queueData?.length || 0}건, queueCount=${queueCount}, error=${queueError?.message || 'none'}`)
+    if (status === 'confirmed' && queueData) {
+      console.log(`[GET classify] confirmed 항목 상세:`, queueData.map((q: any) => `${q.id.substring(0,8)}(status=${q.status}, cat=${q.final_category})`))
+    }
+
     if (!queueError && queueData && queueData.length > 0) {
       // 디버깅: 첫 번째 레코드의 alternatives 구조 확인
       const firstQ = queueData[0]
@@ -1039,15 +1046,14 @@ export async function GET(request: NextRequest) {
       .eq('company_id', company_id)
 
     // category 컬럼 필터는 사용하지 않음 (존재하지 않을 수 있음)
-    // 대신 classification_source로 구분하거나, 전체 반환
+    // 카운트 정확성을 위해 전체 로드 후 앱 레벨에서 필터링
     const { data: txData, error: txError, count: txCount } = await txQuery
       .order('created_at', { ascending: false })
-      .limit(limit)
+      .limit(5000)
 
     if (txError) throw txError
 
-    const items = (txData || []).map((tx: any) => {
-      // category 컬럼이 있으면 사용, 없으면 미분류
+    const allItems = (txData || []).map((tx: any) => {
       const cat = tx.category || '미분류'
       const isPending = !tx.category || tx.category === '미분류' || tx.category === '기타' || tx.category === ''
       return {
@@ -1074,18 +1080,17 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // status 필터링 (DB에서 못했으니 앱 레벨에서)
-    const filtered = status === 'all' ? items :
-      items.filter((i: any) => {
+    // 전체 데이터에서 정확한 카운트 계산
+    const pendingCount = allItems.filter((i: any) => i.status === 'pending').length
+    const confirmedCount = allItems.filter((i: any) => i.status === 'confirmed').length
+
+    // status 필터링
+    const filtered = status === 'all' ? allItems :
+      allItems.filter((i: any) => {
         if (status === 'pending') return i.status === 'pending'
         if (status === 'confirmed') return i.status === 'confirmed'
         return true
       })
-
-    const filteredTotal = status === 'all' ? (txCount || 0) : filtered.length
-    // pending 총 수를 정확히 계산
-    const pendingCount = items.filter((i: any) => i.status === 'pending').length
-    const confirmedCount = items.filter((i: any) => i.status === 'confirmed').length
 
     return NextResponse.json({
       items: filtered.slice(0, limit),
@@ -1118,16 +1123,32 @@ export async function PATCH(request: NextRequest) {
       status: newStatus,
     }
 
-    // 055 스키마 컬럼 (존재할 수도 있음)
-    // phase1 스키마에서는 final_matched_type/final_matched_id
+    console.log(`[PATCH classify] queue_id=${queue_id}, final_category=${final_category}, newStatus=${newStatus}, related_type=${final_related_type}, related_id=${final_related_id}`)
+
     const { data: updated, error: updateErr } = await sb
       .from('classification_queue')
       .update(updateData)
       .eq('id', queue_id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (updateErr) throw updateErr
+    if (!updated) {
+      console.log(`[PATCH classify] queue_id=${queue_id} 레코드를 찾을 수 없음`)
+      return NextResponse.json({ error: `queue_id ${queue_id} 레코드를 찾을 수 없습니다` }, { status: 404 })
+    }
+
+    // 업데이트 후 confirmed 총 수 확인 (디버깅)
+    try {
+      const { count: confirmedTotal } = await sb
+        .from('classification_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', updated.company_id)
+        .eq('status', 'confirmed')
+      console.log(`[PATCH classify] 업데이트 완료. updated.status=${updated.status}, DB confirmed 총 수=${confirmedTotal}`)
+    } catch (e) {
+      console.log(`[PATCH classify] 업데이트 완료. updated.status=${updated.status} (count 쿼리 실패)`)
+    }
 
     // 규칙 학습 (선택적)
     if (save_as_rule && rule_keyword) {

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계약 관리 UI 프리뷰</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #111827; }
+
+/* ── Sticky Selection Header ── */
+.sel-header {
+  position: sticky; top: 0; z-index: 100;
+  background: #1e293b; color: #fff; padding: 12px 32px;
+  display: flex; justify-content: space-between; align-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.sel-header h1 { font-size: 16px; font-weight: 800; }
+.sel-badges { display: flex; gap: 8px; align-items: center; }
+.sel-badge { padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; }
+.sel-badge.empty { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+.sel-badge.filled { background: #3b82f6; color: #fff; }
+.confirm-btn {
+  background: #22c55e; color: #fff; border: none; padding: 8px 20px;
+  border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer;
+  opacity: 0.4; pointer-events: none; transition: all 0.2s;
+}
+.confirm-btn.ready { opacity: 1; pointer-events: auto; }
+.confirm-btn.ready:hover { background: #16a34a; }
+
+/* ── Sections ── */
+.section { padding: 20px 32px; }
+.section-title { font-size: 16px; font-weight: 800; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.section-desc { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
+.divider { height: 1px; background: #e2e8f0; margin: 4px 32px; }
+
+/* ── Option Cards ── */
+.options-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 1400px) { .options-row { grid-template-columns: 1fr 1fr; } }
+
+.opt-card {
+  border: 2px solid #e2e8f0; border-radius: 14px; overflow: hidden;
+  cursor: pointer; transition: all 0.2s; background: #fff; position: relative;
+}
+.opt-card:hover { border-color: #93c5fd; box-shadow: 0 2px 12px rgba(59,130,246,0.1); }
+.opt-card.selected { border-color: #3b82f6; box-shadow: 0 4px 16px rgba(59,130,246,0.15); }
+.opt-card.selected::after {
+  content: '✓'; position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 50%; background: #3b82f6; color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;
+}
+.opt-label { padding: 10px 14px; font-weight: 700; font-size: 13px; border-bottom: 1px solid #f3f4f6; background: #fafbfc; }
+.opt-preview { padding: 16px; min-height: 100px; }
+
+/* ── Fixed Header Demo ── */
+.fixed-demo {
+  background: #fff; border: 2px solid #2d5fa8; border-radius: 14px; overflow: hidden;
+}
+.fixed-demo-label { background: #2d5fa8; color: #fff; padding: 8px 14px; font-size: 12px; font-weight: 700; }
+.breadcrumb-bar {
+  padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px;
+}
+.breadcrumb-dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; }
+.breadcrumb-text { font-size: 13px; color: #6b7280; }
+.breadcrumb-text b { color: #111827; font-size: 15px; }
+.page-title-area { padding: 24px; display: flex; justify-content: space-between; align-items: center; }
+.page-title { font-size: 22px; font-weight: 800; }
+.page-subtitle { font-size: 13px; color: #6b7280; }
+.action-btn { background: #1e293b; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; }
+
+/* ── Stats styles ── */
+.stats-colored { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sc-card { color: #fff; border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+.sc-card .lbl { font-size: 10px; opacity: 0.85; margin-bottom: 1px; }
+.sc-card .val { font-size: 18px; font-weight: 800; }
+.sc-card .ico { font-size: 18px; }
+
+.stats-bordered { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sb-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fff; }
+.sb-card .lbl { font-size: 10px; color: #9ca3af; margin-bottom: 1px; }
+.sb-card .val { font-size: 18px; font-weight: 800; }
+.sb-card .sub { font-size: 9px; color: #9ca3af; margin-top: 1px; }
+
+.stats-inline { display: flex; background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; overflow: hidden; }
+.si-item { flex: 1; padding: 10px; border-right: 1px solid #e5e7eb; text-align: center; }
+.si-item:last-child { border-right: none; }
+.si-item .lbl { font-size: 10px; color: #9ca3af; }
+.si-item .val { font-size: 15px; font-weight: 800; }
+
+/* ── Filter styles ── */
+.f-tabs { display: flex; gap: 5px; }
+.f-tab { padding: 5px 12px; border-radius: 7px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.f-tab.active { background: #2d5fa8; color: #fff; }
+.f-tab:not(.active) { background: #f3f4f6; color: #6b7280; }
+.f-tab .cnt { font-size: 10px; font-weight: 700; background: rgba(255,255,255,0.3); padding: 1px 6px; border-radius: 8px; }
+.f-tab:not(.active) .cnt { background: #e5e7eb; }
+.f-input { padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 7px; font-size: 13px; outline: none; }
+
+.chip { padding: 5px 12px; border-radius: 16px; font-size: 11px; font-weight: 600; display: inline-block; }
+.chip.active { background: #2d5fa8; color: #fff; }
+.chip:not(.active) { background: #f3f4f6; color: #6b7280; }
+
+.uni-search { display: flex; align-items: center; border: 1px solid #e5e7eb; border-radius: 8px; padding: 3px 8px; background: #fff; gap: 4px; }
+.uni-tag { background: #e0e7ff; color: #3b82f6; padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; }
+.uni-search input { border: none; outline: none; flex: 1; font-size: 12px; padding: 4px; }
+.uni-btn { padding: 4px 10px; background: #f3f4f6; border-radius: 5px; font-size: 11px; font-weight: 700; color: #6b7280; border: none; }
+
+/* ── Table styles ── */
+table { width: 100%; border-collapse: collapse; }
+.t-std th { padding: 8px 10px; font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+.t-std td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+.badge { padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 700; display: inline-block; }
+.b-active { background: #2d5fa8; color: #fff; }
+.b-expiring { background: #fef2f2; color: #ef4444; }
+.b-paid { background: #e0f2fe; color: #0284c7; }
+.b-done { background: #ecfdf5; color: #059669; }
+.car-img { width: 32px; height: 32px; border-radius: 6px; background: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.prog { width: 44px; height: 4px; background: #e5e7eb; border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.prog-fill { height: 100%; background: #22c55e; border-radius: 999px; }
+
+/* Card list */
+.c-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 8px; background: #fff; }
+.c-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.c-card-stats { display: flex; gap: 14px; padding-top: 8px; border-top: 1px solid #f3f4f6; font-size: 11px; }
+.c-card-stats .lbl { color: #9ca3af; font-size: 10px; }
+.c-card-stats .val { font-weight: 700; }
+
+/* ── Result Preview ── */
+.result-section {
+  padding: 24px 32px; background: #f8fafc;
+}
+.result-box {
+  max-width: 960px; margin: 0 auto; background: #f9fafb; border-radius: 16px;
+  border: 2px dashed #cbd5e1; overflow: hidden;
+}
+.result-box.active { border: 2px solid #3b82f6; border-style: solid; }
+.result-inner { padding: 20px; }
+.result-placeholder { padding: 60px 20px; text-align: center; color: #9ca3af; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ══════ STICKY SELECTION BAR ══════ -->
+<div class="sel-header">
+  <h1>계약 관리 UI — 섹션별 선택</h1>
+  <div class="sel-badges">
+    <span class="sel-badge empty" id="sel-stats">① 통계: 미선택</span>
+    <span class="sel-badge empty" id="sel-filter">② 필터: 미선택</span>
+    <span class="sel-badge empty" id="sel-table">③ 테이블: 미선택</span>
+    <button class="confirm-btn" id="confirmBtn" onclick="scrollToResult()">↓ 조합 결과 보기</button>
+  </div>
+</div>
+
+<!-- ══════ FIXED HEADER (고정) ══════ -->
+<div class="section">
+  <div class="section-title">📌 최상단 (고정) — 브레드크럼 + 타이틀</div>
+  <div class="section-desc">사고 관리 페이지와 동일한 스타일. 변경 없이 적용</div>
+  <div class="fixed-demo">
+    <div class="fixed-demo-label">✅ 고정 적용</div>
+    <div class="breadcrumb-bar">
+      <span class="breadcrumb-dot"></span>
+      <span class="breadcrumb-text">영업 &gt; <b>계약 관리</b></span>
+    </div>
+    <div class="page-title-area">
+      <div>
+        <div class="page-title">계약 관리</div>
+        <div class="page-subtitle">전체 12건</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════ STATS OPTIONS ══════ -->
+<div class="section">
+  <div class="section-title">📊 ① 통계 카드</div>
+  <div class="section-desc">페이지 타이틀 아래에 표시되는 요약 통계</div>
+  <div class="options-row">
+
+    <div class="opt-card" data-group="stats" data-value="A" onclick="pick(this)">
+      <div class="opt-label">A. 컬러 카드</div>
+      <div class="opt-preview">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+          <div class="sc-card" style="background:#3b82f6"><div><div class="lbl">총 계약</div><div class="val">12</div></div><span class="ico">📋</span></div>
+          <div class="sc-card" style="background:#10b981"><div><div class="lbl">이번달 신규</div><div class="val">3</div></div><span class="ico">✨</span></div>
+          <div class="sc-card" style="background:#06b6d4"><div><div class="lbl">진행 중</div><div class="val">8</div></div><span class="ico">⚙️</span></div>
+          <div class="sc-card" style="background:#ef4444"><div><div class="lbl">만료 임박</div><div class="val">2</div></div><span class="ico">⏰</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="stats" data-value="B" onclick="pick(this)">
+      <div class="opt-label">B. 테두리 카드 (사고관리 스타일)</div>
+      <div class="opt-preview">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+          <div class="sb-card"><div class="lbl">총 계약</div><div class="val" style="color:#1e293b">12 <span style="font-size:12px;font-weight:400">건</span></div></div>
+          <div class="sb-card" style="border-color:#bbf7d0"><div class="lbl">이번달 신규</div><div class="val" style="color:#059669">3 <span style="font-size:12px">건</span></div></div>
+          <div class="sb-card"><div class="lbl">진행 중</div><div class="val" style="color:#7c3aed">8 <span style="font-size:12px">건</span></div></div>
+          <div class="sb-card" style="border-color:#fecaca"><div class="lbl">만료 임박</div><div class="val" style="color:#ef4444">2 <span style="font-size:12px">건</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="stats" data-value="C" onclick="pick(this)">
+      <div class="opt-label">C. 인라인 한줄</div>
+      <div class="opt-preview" style="display:flex;align-items:center;min-height:100px">
+        <div class="stats-inline" style="width:100%">
+          <div class="si-item"><div class="lbl">총 계약</div><div class="val">12</div></div>
+          <div class="si-item"><div class="lbl">신규</div><div class="val" style="color:#059669">+3</div></div>
+          <div class="si-item"><div class="lbl">진행중</div><div class="val" style="color:#7c3aed">8</div></div>
+          <div class="si-item"><div class="lbl">만료임박</div><div class="val" style="color:#ef4444">2</div></div>
+          <div class="si-item"><div class="lbl">수납율</div><div class="val" style="color:#2563eb">85%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="stats" data-value="D" onclick="pick(this)">
+      <div class="opt-label">D. 통계 없음 (깔끔)</div>
+      <div class="opt-preview" style="display:flex;align-items:center;justify-content:center;min-height:100px;color:#9ca3af;font-size:12px">
+        <div style="text-align:center">
+          <div style="font-size:28px;margin-bottom:6px">🚫</div>
+          통계 카드 없이<br>바로 필터 + 테이블
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════ FILTER OPTIONS ══════ -->
+<div class="section">
+  <div class="section-title">🔍 ② 필터/검색</div>
+  <div class="section-desc">상태 필터 + 검색 UI</div>
+  <div class="options-row">
+
+    <div class="opt-card" data-group="filter" data-value="A" onclick="pick(this)">
+      <div class="opt-label">A. 탭 필터 + 검색바</div>
+      <div class="opt-preview">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="f-tabs">
+            <button class="f-tab active">전체 <span class="cnt">12</span></button>
+            <button class="f-tab">진행중 <span class="cnt">8</span></button>
+            <button class="f-tab">만료 <span class="cnt">2</span></button>
+            <button class="f-tab">종료 <span class="cnt">1</span></button>
+            <button class="f-tab">해지 <span class="cnt">1</span></button>
+          </div>
+          <input class="f-input" placeholder="🔍 검색..." readonly style="width:140px">
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="filter" data-value="B" onclick="pick(this)">
+      <div class="opt-label">B. 드롭다운 + 넓은 검색바</div>
+      <div class="opt-preview">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:7px;font-size:12px;font-weight:600">
+            <option>전체 (12)</option><option>진행중 (8)</option><option>만료임박 (2)</option>
+          </select>
+          <input class="f-input" placeholder="🔍 고객명, 차량번호 검색..." readonly style="flex:1">
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="filter" data-value="C" onclick="pick(this)">
+      <div class="opt-label">C. 칩 필터 + 정렬</div>
+      <div class="opt-preview">
+        <div style="margin-bottom:8px;display:flex;gap:5px">
+          <span class="chip active">● 전체</span>
+          <span class="chip">진행중</span>
+          <span class="chip">만료</span>
+          <span class="chip">종료</span>
+          <span class="chip">해지</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:#6b7280">정렬:</span>
+          <select style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:11px"><option>최신순</option></select>
+          <input class="f-input" placeholder="🔍 검색..." readonly style="flex:1">
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="filter" data-value="D" onclick="pick(this)">
+      <div class="opt-label">D. 통합 검색바</div>
+      <div class="opt-preview" style="display:flex;align-items:center">
+        <div class="uni-search" style="width:100%">
+          <span style="font-size:13px;color:#9ca3af">🔍</span>
+          <span class="uni-tag">상태:전체 ✕</span>
+          <input placeholder="고객명, 차량번호..." readonly style="border:none;outline:none;flex:1;font-size:12px;padding:4px">
+          <button class="uni-btn">필터</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════ TABLE OPTIONS ══════ -->
+<div class="section">
+  <div class="section-title">📋 ③ 테이블</div>
+  <div class="section-desc">계약 목록 행 표시 방식</div>
+  <div class="options-row">
+
+    <div class="opt-card" data-group="table" data-value="A" onclick="pick(this)">
+      <div class="opt-label">A. 표준 테이블</div>
+      <div class="opt-preview" style="overflow-x:auto">
+        <table class="t-std"><thead><tr><th>상태</th><th>고객명</th><th>차량</th><th>계약기간</th><th style="text-align:right">월렌트료</th><th style="text-align:center">수납</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge b-active">진행중</span></td><td style="font-weight:700">홍길동</td><td><div style="display:flex;gap:4px;align-items:center"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:11px">12허3456</div><div style="font-size:10px;color:#6b7280">BMW 520i</div></div></div></td><td style="font-size:11px;color:#4b5563">25.01~27.12</td><td style="text-align:right;font-weight:800;color:#2d5fa8;font-size:12px">1,100,000<span style="font-size:10px;color:#9ca3af">/월</span></td><td style="text-align:center"><span class="prog"><span class="prog-fill" style="width:12%"></span></span> <span style="font-size:10px">3/24</span></td></tr>
+          <tr><td><span class="badge b-expiring">만료임박</span></td><td style="font-weight:700">김철수</td><td><div style="display:flex;gap:4px;align-items:center"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:11px">45나6789</div><div style="font-size:10px;color:#6b7280">현대 G80</div></div></div></td><td style="font-size:11px;color:#4b5563">24.01~26.03</td><td style="text-align:right;font-weight:800;color:#2d5fa8;font-size:12px">880,000<span style="font-size:10px;color:#9ca3af">/월</span></td><td style="text-align:center"><span class="prog"><span class="prog-fill" style="width:100%"></span></span> <span style="font-size:10px">24/24</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="table" data-value="B" onclick="pick(this)">
+      <div class="opt-label">B. 카드형 리스트</div>
+      <div class="opt-preview">
+        <div class="c-card">
+          <div class="c-card-top"><div style="display:flex;gap:6px;align-items:center"><span class="badge b-active">진행중</span><span style="font-weight:700;font-size:13px">홍길동</span></div><span style="font-size:11px;color:#9ca3af">2025-01-15</span></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:12px">12허3456</div><div style="font-size:10px;color:#6b7280">BMW 520i</div></div></div>
+          <div class="c-card-stats"><div><div class="lbl">보증금</div><div class="val">5,000,000</div></div><div><div class="lbl">월렌트료</div><div class="val" style="color:#2d5fa8">1,100,000</div></div><div><div class="lbl">수납</div><div class="val"><span class="prog"><span class="prog-fill" style="width:12%"></span></span> 3/24</div></div><div><div class="lbl">기간</div><div class="val">25.01~27.12</div></div></div>
+        </div>
+        <div class="c-card">
+          <div class="c-card-top"><div style="display:flex;gap:6px;align-items:center"><span class="badge b-expiring">만료임박</span><span style="font-weight:700;font-size:13px">김철수</span></div><span style="font-size:11px;color:#9ca3af">2024-01-05</span></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:12px">45나6789</div><div style="font-size:10px;color:#6b7280">현대 G80</div></div></div>
+          <div class="c-card-stats"><div><div class="lbl">보증금</div><div class="val">3,000,000</div></div><div><div class="lbl">월렌트료</div><div class="val" style="color:#2d5fa8">880,000</div></div><div><div class="lbl">수납</div><div class="val"><span class="prog"><span class="prog-fill" style="width:100%"></span></span> 24/24</div></div><div><div class="lbl">기간</div><div class="val">24.01~26.03</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="table" data-value="C" onclick="pick(this)">
+      <div class="opt-label">C. 등록 페이지 스타일</div>
+      <div class="opt-preview" style="overflow-x:auto">
+        <table class="t-std"><thead><tr><th>이미지</th><th>차량 정보</th><th>고객 / 계약상태</th><th>계약기간</th><th style="text-align:right">월렌트료 / 보증금</th><th style="text-align:center">관리</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="car-img" style="width:40px;height:40px">🚗</div></td>
+            <td><div style="font-weight:800;font-size:13px">12허3456</div><div style="font-size:11px;color:#6b7280">BMW 520i</div></td>
+            <td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="font-weight:700">홍길동</span><span class="badge" style="background:#e0e7ff;color:#3b82f6">영업</span><span class="badge b-active">진행중</span><span class="badge b-paid">수납 3/24</span></div></td>
+            <td style="font-size:11px;color:#4b5563">2025-01-01<br>~ 2027-12-31</td>
+            <td style="text-align:right"><div style="font-weight:900;color:#2d5fa8;font-size:14px">1,100,000원<span style="font-size:10px;color:#9ca3af">/월</span></div><div style="font-size:10px;color:#6b7280">보증금 5,000,000원</div></td>
+            <td style="text-align:center;font-size:14px;cursor:pointer">🗑️</td>
+          </tr>
+          <tr>
+            <td><div class="car-img" style="width:40px;height:40px">🚗</div></td>
+            <td><div style="font-weight:800;font-size:13px">45나6789</div><div style="font-size:11px;color:#6b7280">현대 G80</div></td>
+            <td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="font-weight:700">김철수</span><span class="badge" style="background:#fef3c7;color:#d97706">지입</span><span class="badge b-expiring">만료임박</span></div></td>
+            <td style="font-size:11px;color:#4b5563">2024-01-01<br>~ 2026-03-31</td>
+            <td style="text-align:right"><div style="font-weight:900;color:#2d5fa8;font-size:14px">880,000원<span style="font-size:10px;color:#9ca3af">/월</span></div><div style="font-size:10px;color:#6b7280">보증금 3,000,000원</div></td>
+            <td style="text-align:center;font-size:14px;cursor:pointer">🗑️</td>
+          </tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <div class="opt-card" data-group="table" data-value="D" onclick="pick(this)">
+      <div class="opt-label">D. 컴팩트 테이블</div>
+      <div class="opt-preview" style="overflow-x:auto">
+        <table class="t-std"><thead><tr><th>고객명</th><th>차량</th><th>상태</th><th style="text-align:right">월렌트료</th><th style="text-align:center">수납</th><th>기간</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:700">홍길동</td><td>12허3456</td><td><span class="badge b-active">진행중</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">1,100,000</td><td style="text-align:center">3/24</td><td style="color:#6b7280;font-size:11px">25.01~27.12</td></tr>
+          <tr><td style="font-weight:700">김철수</td><td>45나6789</td><td><span class="badge b-expiring">만료</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">880,000</td><td style="text-align:center">24/24</td><td style="color:#6b7280;font-size:11px">24.01~26.03</td></tr>
+          <tr><td style="font-weight:700">박영희</td><td>78가1234</td><td><span class="badge b-done">완납</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">1,320,000</td><td style="text-align:center">36/36</td><td style="color:#6b7280;font-size:11px">23.01~25.12</td></tr>
+          <tr><td style="font-weight:700">이수진</td><td>23마5678</td><td><span class="badge b-active">진행중</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">990,000</td><td style="text-align:center">12/48</td><td style="color:#6b7280;font-size:11px">24.06~28.05</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════ COMBINED RESULT PREVIEW ══════ -->
+<div class="result-section" id="resultSection">
+  <div class="section-title">🎯 선택 조합 결과 미리보기</div>
+  <div class="section-desc">위에서 3가지를 모두 선택하면 최종 조합이 표시됩니다</div>
+  <div class="result-box" id="resultBox">
+    <div class="result-placeholder" id="resultPlaceholder">
+      <div style="font-size:40px;margin-bottom:12px">☝️</div>
+      위에서 ① 통계 ② 필터 ③ 테이블을 각각 선택해주세요
+    </div>
+    <div class="result-inner" id="resultInner" style="display:none">
+      <!-- 브레드크럼 -->
+      <div style="border-bottom:1px solid #e5e7eb;padding-bottom:12px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="breadcrumb-dot"></span>
+          <span class="breadcrumb-text">영업 &gt; <b>계약 관리</b></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:20px;font-weight:800">계약 관리</div><div style="font-size:12px;color:#6b7280">전체 12건</div></div>
+        </div>
+      </div>
+      <!-- Stats slot -->
+      <div id="result-stats" style="margin-bottom:16px"></div>
+      <!-- Filter slot -->
+      <div id="result-filter" style="margin-bottom:16px"></div>
+      <!-- Table slot -->
+      <div id="result-table" style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden"></div>
+    </div>
+  </div>
+</div>
+
+<div style="height:60px"></div>
+
+<script>
+const sel = { stats: null, filter: null, table: null };
+const names = {
+  stats: { A:'컬러카드', B:'테두리카드', C:'인라인', D:'없음' },
+  filter: { A:'탭+검색', B:'드롭다운+검색', C:'칩+정렬', D:'통합검색' },
+  table: { A:'표준', B:'카드형', C:'등록스타일', D:'컴팩트' },
+};
+
+function pick(el) {
+  const g = el.dataset.group, v = el.dataset.value;
+  document.querySelectorAll(`[data-group="${g}"]`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  sel[g] = v;
+
+  const badge = document.getElementById(`sel-${g}`);
+  badge.textContent = (g==='stats'?'① 통계: ':g==='filter'?'② 필터: ':'③ 테이블: ') + names[g][v];
+  badge.className = 'sel-badge filled';
+
+  const allDone = sel.stats && sel.filter && sel.table;
+  document.getElementById('confirmBtn').className = 'confirm-btn' + (allDone ? ' ready' : '');
+  if (allDone) buildResult();
+}
+
+function scrollToResult() {
+  document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+function buildResult() {
+  document.getElementById('resultPlaceholder').style.display = 'none';
+  document.getElementById('resultInner').style.display = 'block';
+  document.getElementById('resultBox').classList.add('active');
+
+  // Stats
+  const rs = document.getElementById('result-stats');
+  if (sel.stats === 'A') {
+    rs.innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div class="sc-card" style="background:#3b82f6"><div><div class="lbl">총 계약</div><div class="val">12</div></div><span class="ico">📋</span></div>
+      <div class="sc-card" style="background:#10b981"><div><div class="lbl">이번달 신규</div><div class="val">3</div></div><span class="ico">✨</span></div>
+      <div class="sc-card" style="background:#06b6d4"><div><div class="lbl">진행 중</div><div class="val">8</div></div><span class="ico">⚙️</span></div>
+      <div class="sc-card" style="background:#ef4444"><div><div class="lbl">만료 임박</div><div class="val">2</div></div><span class="ico">⏰</span></div>
+    </div>`;
+  } else if (sel.stats === 'B') {
+    rs.innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div class="sb-card"><div class="lbl">총 계약</div><div class="val" style="color:#1e293b">12 <span style="font-size:12px;font-weight:400">건</span></div></div>
+      <div class="sb-card" style="border-color:#bbf7d0"><div class="lbl">이번달 신규</div><div class="val" style="color:#059669">3 <span style="font-size:12px">건</span></div></div>
+      <div class="sb-card"><div class="lbl">진행 중</div><div class="val" style="color:#7c3aed">8 <span style="font-size:12px">건</span></div></div>
+      <div class="sb-card" style="border-color:#fecaca"><div class="lbl">만료 임박</div><div class="val" style="color:#ef4444">2 <span style="font-size:12px">건</span></div></div>
+    </div>`;
+  } else if (sel.stats === 'C') {
+    rs.innerHTML = `<div class="stats-inline"><div class="si-item"><div class="lbl">총 계약</div><div class="val">12</div></div><div class="si-item"><div class="lbl">신규</div><div class="val" style="color:#059669">+3</div></div><div class="si-item"><div class="lbl">진행중</div><div class="val" style="color:#7c3aed">8</div></div><div class="si-item"><div class="lbl">만료임박</div><div class="val" style="color:#ef4444">2</div></div><div class="si-item"><div class="lbl">수납율</div><div class="val" style="color:#2563eb">85%</div></div></div>`;
+  } else {
+    rs.innerHTML = '';
+  }
+
+  // Filter
+  const rf = document.getElementById('result-filter');
+  if (sel.filter === 'A') {
+    rf.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="f-tabs"><button class="f-tab active">전체 <span class="cnt">12</span></button><button class="f-tab">진행중 <span class="cnt">8</span></button><button class="f-tab">만료 <span class="cnt">2</span></button><button class="f-tab">종료 <span class="cnt">1</span></button><button class="f-tab">해지 <span class="cnt">1</span></button></div><input class="f-input" placeholder="🔍 고객명, 차량번호 검색..." readonly style="flex:1;min-width:160px"></div>`;
+  } else if (sel.filter === 'B') {
+    rf.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><select style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:7px;font-size:12px;font-weight:600"><option>전체 (12)</option></select><input class="f-input" placeholder="🔍 고객명, 차량번호 검색..." readonly style="flex:1"></div>`;
+  } else if (sel.filter === 'C') {
+    rf.innerHTML = `<div style="margin-bottom:8px;display:flex;gap:5px"><span class="chip active">● 전체</span><span class="chip">진행중</span><span class="chip">만료</span><span class="chip">종료</span><span class="chip">해지</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#6b7280">정렬:</span><select style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:11px"><option>최신순</option></select><input class="f-input" placeholder="🔍 검색..." readonly style="flex:1"></div>`;
+  } else {
+    rf.innerHTML = `<div class="uni-search" style="width:100%"><span style="font-size:13px;color:#9ca3af">🔍</span><span class="uni-tag">상태:전체 ✕</span><input placeholder="고객명, 차량번호..." readonly style="border:none;outline:none;flex:1;font-size:12px;padding:4px"><button class="uni-btn">필터</button></div>`;
+  }
+
+  // Table
+  const rt = document.getElementById('result-table');
+  if (sel.table === 'A') {
+    rt.innerHTML = `<div style="overflow-x:auto"><table class="t-std"><thead><tr><th>상태</th><th>고객명</th><th>차량</th><th>계약기간</th><th style="text-align:right">월렌트료</th><th style="text-align:center">수납</th></tr></thead><tbody><tr><td><span class="badge b-active">진행중</span></td><td style="font-weight:700">홍길동</td><td><div style="display:flex;gap:4px;align-items:center"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:11px">12허3456</div><div style="font-size:10px;color:#6b7280">BMW 520i</div></div></div></td><td style="font-size:11px;color:#4b5563">25.01~27.12</td><td style="text-align:right;font-weight:800;color:#2d5fa8;font-size:12px">1,100,000/월</td><td style="text-align:center"><span class="prog"><span class="prog-fill" style="width:12%"></span></span> 3/24</td></tr><tr><td><span class="badge b-expiring">만료임박</span></td><td style="font-weight:700">김철수</td><td><div style="display:flex;gap:4px;align-items:center"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:11px">45나6789</div><div style="font-size:10px;color:#6b7280">현대 G80</div></div></div></td><td style="font-size:11px;color:#4b5563">24.01~26.03</td><td style="text-align:right;font-weight:800;color:#2d5fa8;font-size:12px">880,000/월</td><td style="text-align:center"><span class="prog"><span class="prog-fill" style="width:100%"></span></span> 24/24</td></tr></tbody></table></div>`;
+  } else if (sel.table === 'B') {
+    rt.innerHTML = `<div style="padding:12px"><div class="c-card"><div class="c-card-top"><div style="display:flex;gap:6px;align-items:center"><span class="badge b-active">진행중</span><span style="font-weight:700;font-size:13px">홍길동</span></div><span style="font-size:11px;color:#9ca3af">2025-01-15</span></div><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:12px">12허3456</div><div style="font-size:10px;color:#6b7280">BMW 520i</div></div></div><div class="c-card-stats"><div><div class="lbl">보증금</div><div class="val">5,000,000</div></div><div><div class="lbl">월렌트료</div><div class="val" style="color:#2d5fa8">1,100,000</div></div><div><div class="lbl">수납</div><div class="val">3/24</div></div><div><div class="lbl">기간</div><div class="val">25.01~27.12</div></div></div></div><div class="c-card"><div class="c-card-top"><div style="display:flex;gap:6px;align-items:center"><span class="badge b-expiring">만료임박</span><span style="font-weight:700;font-size:13px">김철수</span></div><span style="font-size:11px;color:#9ca3af">2024-01-05</span></div><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><div class="car-img">🚗</div><div><div style="font-weight:700;font-size:12px">45나6789</div><div style="font-size:10px;color:#6b7280">현대 G80</div></div></div><div class="c-card-stats"><div><div class="lbl">보증금</div><div class="val">3,000,000</div></div><div><div class="lbl">월렌트료</div><div class="val" style="color:#2d5fa8">880,000</div></div><div><div class="lbl">수납</div><div class="val">24/24</div></div><div><div class="lbl">기간</div><div class="val">24.01~26.03</div></div></div></div></div>`;
+  } else if (sel.table === 'C') {
+    rt.innerHTML = `<div style="overflow-x:auto"><table class="t-std"><thead><tr><th>이미지</th><th>차량 정보</th><th>고객 / 계약상태</th><th>계약기간</th><th style="text-align:right">월렌트료 / 보증금</th><th style="text-align:center">관리</th></tr></thead><tbody><tr><td><div class="car-img" style="width:40px;height:40px">🚗</div></td><td><div style="font-weight:800;font-size:13px">12허3456</div><div style="font-size:11px;color:#6b7280">BMW 520i</div></td><td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="font-weight:700">홍길동</span><span class="badge" style="background:#e0e7ff;color:#3b82f6">영업</span><span class="badge b-active">진행중</span><span class="badge b-paid">수납 3/24</span></div></td><td style="font-size:11px;color:#4b5563">2025-01-01<br>~ 2027-12-31</td><td style="text-align:right"><div style="font-weight:900;color:#2d5fa8;font-size:14px">1,100,000원<span style="font-size:10px;color:#9ca3af">/월</span></div><div style="font-size:10px;color:#6b7280">보증금 5,000,000원</div></td><td style="text-align:center;font-size:14px">🗑️</td></tr><tr><td><div class="car-img" style="width:40px;height:40px">🚗</div></td><td><div style="font-weight:800;font-size:13px">45나6789</div><div style="font-size:11px;color:#6b7280">현대 G80</div></td><td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="font-weight:700">김철수</span><span class="badge" style="background:#fef3c7;color:#d97706">지입</span><span class="badge b-expiring">만료임박</span></div></td><td style="font-size:11px;color:#4b5563">2024-01-01<br>~ 2026-03-31</td><td style="text-align:right"><div style="font-weight:900;color:#2d5fa8;font-size:14px">880,000원<span style="font-size:10px;color:#9ca3af">/월</span></div><div style="font-size:10px;color:#6b7280">보증금 3,000,000원</div></td><td style="text-align:center;font-size:14px">🗑️</td></tr></tbody></table></div>`;
+  } else {
+    rt.innerHTML = `<div style="overflow-x:auto"><table class="t-std"><thead><tr><th>고객명</th><th>차량</th><th>상태</th><th style="text-align:right">월렌트료</th><th style="text-align:center">수납</th><th>기간</th></tr></thead><tbody><tr><td style="font-weight:700">홍길동</td><td>12허3456</td><td><span class="badge b-active">진행중</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">1,100,000</td><td style="text-align:center">3/24</td><td style="color:#6b7280;font-size:11px">25.01~27.12</td></tr><tr><td style="font-weight:700">김철수</td><td>45나6789</td><td><span class="badge b-expiring">만료</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">880,000</td><td style="text-align:center">24/24</td><td style="color:#6b7280;font-size:11px">24.01~26.03</td></tr><tr><td style="font-weight:700">박영희</td><td>78가1234</td><td><span class="badge b-done">완납</span></td><td style="text-align:right;font-weight:700;color:#2d5fa8">1,320,000</td><td style="text-align:center">36/36</td><td style="color:#6b7280;font-size:11px">23.01~25.12</td></tr></tbody></table></div>`;
+  }
+
+  scrollToResult();
+}
+</script>
+</body>
+</html>

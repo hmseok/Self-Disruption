@@ -10,7 +10,7 @@ import DarkHeader from '../components/DarkHeader'
 // ============================================================================
 // TYPES
 // ============================================================================
-type MainTab = 'long_term' | 'short_term' | 'contracts'
+type MainTab = 'long_term' | 'short_term'
 type StatusFilter = 'all' | 'draft' | 'shared' | 'confirmed' | 'archived'
 type ShortStatusFilter = 'all' | 'draft' | 'sent' | 'accepted' | 'contracted' | 'cancelled'
 
@@ -29,7 +29,6 @@ function MainTabBar({
   const tabs: { value: MainTab; label: string; icon: string }[] = [
     { value: 'long_term', label: '장기렌트', icon: '📋' },
     { value: 'short_term', label: '단기렌트', icon: '⏱️' },
-    { value: 'contracts', label: '계약', icon: '✅' },
   ]
 
   return (
@@ -422,21 +421,6 @@ function ShortTermDetailModal({
 }
 
 // ============================================================================
-// CONTRACT STATUS BADGE
-// ============================================================================
-function ContractStatusBadge({ contract }: { contract: any }) {
-  const paidCount = contract.paidCount || 0
-  const totalCount = contract.totalCount || 0
-  if (contract.status === 'completed') {
-    return <span className="px-2 py-1 rounded-md text-xs font-black bg-green-600 text-white">완납</span>
-  }
-  if (paidCount > 0) {
-    return <span className="px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-700">수납 {paidCount}/{totalCount}</span>
-  }
-  return <span className="px-2 py-1 rounded-md text-xs font-bold bg-steel-600 text-white">진행중</span>
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function QuoteListPage() {
@@ -445,7 +429,6 @@ export default function QuoteListPage() {
   const searchParams = useSearchParams()
   const [quotes, setQuotes] = useState<any[]>([])
   const [shortQuotes, setShortQuotes] = useState<any[]>([])
-  const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const initialTab = (searchParams.get('tab') as MainTab) || 'long_term'
   const [mainTab, setMainTab] = useState<MainTab>(initialTab)
@@ -454,7 +437,6 @@ export default function QuoteListPage() {
   const [customers, setCustomers] = useState<Map<string, any>>(new Map())
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [contractStatusFilter, setContractStatusFilter] = useState<'all' | 'active' | 'expiring' | 'ended' | 'cancelled'>('all')
 
   const f = (n: number) => Math.round(n || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
@@ -489,21 +471,9 @@ export default function QuoteListPage() {
           .from('short_term_quotes').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
         setShortQuotes(stQuotesData || [])
 
-        // All contracts (for contracts tab)
-        const { data: allContracts, error: contractsError } = await supabase
-          .from('contracts').select('*').eq('company_id', companyId).order('id', { ascending: false })
-        if (contractsError) console.error('계약 목록 로드 실패:', contractsError.message)
-
-        // Payment schedules for contracts
-        const contractIds = (allContracts || []).map(c => c.id)
-        const { data: paymentsData } = contractIds.length > 0
-          ? await supabase.from('payment_schedules').select('contract_id, status').in('contract_id', contractIds)
-          : { data: [] }
-
         // Customers
         const customerIds = [
           ...(quotesData || []).map((q) => q.customer_id),
-          ...(allContracts || []).map((c) => c.customer_id),
         ].filter(Boolean)
         const uniqueCustomerIds = [...new Set(customerIds)]
         const { data: customersData } = uniqueCustomerIds.length > 0
@@ -514,13 +484,7 @@ export default function QuoteListPage() {
         customersData?.forEach((c) => customersMap.set(c.id, c))
         setCustomers(customersMap)
 
-        // Contract car IDs (additional cars not in quotes)
-        const contractCarIds = (allContracts || []).map(c => c.car_id).filter(Boolean).filter((id: string) => !carIds.includes(id))
-        let allCars = carsData || []
-        if (contractCarIds.length > 0) {
-          const { data: moreCarData } = await supabase.from('cars').select('*').in('id', contractCarIds)
-          allCars = [...allCars, ...(moreCarData || [])]
-        }
+        const allCars = carsData || []
 
         // Combine quotes
         const combinedQuotes = (quotesData || []).map((quote) => ({
@@ -530,20 +494,7 @@ export default function QuoteListPage() {
           customer: customersMap.get(quote.customer_id),
         }))
 
-        // Combine contracts with payment stats
-        const combinedContracts = (allContracts || []).map((contract) => {
-          const payments = (paymentsData || []).filter(p => p.contract_id === contract.id)
-          return {
-            ...contract,
-            car: allCars.find(c => c.id === contract.car_id),
-            customer: customersMap.get(contract.customer_id),
-            totalCount: payments.length,
-            paidCount: payments.filter(p => p.status === 'paid').length,
-          }
-        })
-
         setQuotes(combinedQuotes)
-        setContracts(combinedContracts)
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -608,7 +559,6 @@ export default function QuoteListPage() {
   const mainTabCounts: Record<MainTab, number> = {
     long_term: longTermQuotes.filter(q => q.status !== 'archived').length,
     short_term: shortTermQuotes.length,
-    contracts: contracts.length,
   }
 
   // ── Handlers ──
@@ -677,10 +627,6 @@ export default function QuoteListPage() {
       if (qErr) throw new Error(`견적서 삭제 실패: ${qErr.message}`)
 
       setQuotes(prev => prev.filter(q => q.id !== quoteId))
-      if (linkedContracts && linkedContracts.length > 0) {
-        const contractIds = linkedContracts.map(c => c.id)
-        setContracts(prev => prev.filter(c => !contractIds.includes(c.id)))
-      }
     } catch (err: any) {
       console.error('[DELETE] 최종 에러:', err)
       alert(`삭제 중 오류:\n${err?.message || JSON.stringify(err)}`)
@@ -707,53 +653,13 @@ export default function QuoteListPage() {
   const displayedQuotes = filteredQuotes()
   const displayedShortQuotes = filteredShortQuotes()
 
-  // ── 계약 통계 & 필터 ──
-  const now = new Date()
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const todayStr = now.toISOString().split('T')[0]
-
-  const contractStats = {
-    total: contracts.length,
-    thisMonth: contracts.filter(c => c.created_at >= thisMonthStart).length,
-    active: contracts.filter(c => c.status === 'active').length,
-    expiringSoon: contracts.filter(c => c.status === 'active' && c.end_date && c.end_date <= thirtyDaysLater && c.end_date >= todayStr).length,
-    ended: contracts.filter(c => ['ended', 'completed', 'expired'].includes(c.status)).length,
-    cancelled: contracts.filter(c => ['cancelled', 'terminated'].includes(c.status)).length,
-    totalPaid: contracts.reduce((sum, c) => sum + (c.paidCount || 0), 0),
-    totalPayments: contracts.reduce((sum, c) => sum + (c.totalCount || 0), 0),
-  }
-
-  // 계약 상태 + 검색어 필터 적용
-  const filteredContracts = contracts.filter(c => {
-    // 상태 필터
-    if (contractStatusFilter === 'active' && c.status !== 'active') return false
-    if (contractStatusFilter === 'expiring' && !(c.status === 'active' && c.end_date && c.end_date <= thirtyDaysLater && c.end_date >= todayStr)) return false
-    if (contractStatusFilter === 'ended' && !['ended', 'completed', 'expired'].includes(c.status)) return false
-    if (contractStatusFilter === 'cancelled' && !['cancelled', 'terminated'].includes(c.status)) return false
-    // 검색어 필터
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      return (
-        (c.customer?.name || c.customer_name || '').toLowerCase().includes(term) ||
-        (c.car?.number || '').toLowerCase().includes(term) ||
-        (c.car?.brand || '').toLowerCase().includes(term) ||
-        (c.car?.model || '').toLowerCase().includes(term)
-      )
-    }
-    return true
-  })
-
   // KPI 통계
   const kpiStats = {
     totalQuotes: quotes.filter(q => q.status !== 'archived').length,
     draftQuotes: quotes.filter(q => !q.contract && !q.shared_at && q.status !== 'archived').length,
     sharedQuotes: quotes.filter(q => (q.shared_at || q.signed_at) && !q.contract && q.status !== 'archived').length,
     confirmedQuotes: quotes.filter(q => q.contract).length,
-    totalContracts: contracts.length,
-    activeContracts: contracts.filter(c => c.status !== 'completed').length,
-    completedContracts: contracts.filter(c => c.status === 'completed').length,
-    totalMonthlyRent: contracts.filter(c => c.status !== 'completed').reduce((s, c) => s + (c.monthly_rent || 0), 0),
+    archivedQuotes: quotes.filter(q => q.status === 'archived').length,
     shortQuotes: shortQuotes.length,
   }
 
@@ -777,8 +683,8 @@ export default function QuoteListPage() {
       {!loading && (
         <DarkHeader
           icon="📑"
-          title="견적/계약 관리"
-          subtitle="견적 작성·발송 및 계약 체결 관리"
+          title="견적 관리"
+          subtitle="장기·단기 렌트 견적 작성 및 발송 관리"
           stats={[
             {
               label: '장기견적',
@@ -808,21 +714,13 @@ export default function QuoteListPage() {
               onClick: () => { setMainTab('long_term'); setStatusFilter('confirmed') },
             },
             {
-              label: '진행중 계약',
-              value: kpiStats.activeContracts,
+              label: '단기견적',
+              value: kpiStats.shortQuotes,
               color: '#7c3aed',
               bgColor: '#f5f3ff',
               borderColor: '#ddd6fe',
               labelColor: '#c4b5fd',
-              onClick: () => { setMainTab('contracts') },
-            },
-            {
-              label: '월 렌트수익',
-              value: f(Math.round(kpiStats.totalMonthlyRent * 1.1)),
-              color: '#2563eb',
-              bgColor: '#eff6ff',
-              borderColor: '#bfdbfe',
-              labelColor: '#93c5fd',
+              onClick: () => { setMainTab('short_term') },
             },
           ]}
           actions={[
@@ -841,7 +739,6 @@ export default function QuoteListPage() {
         {[
           { value: 'long_term' as MainTab, label: '장기렌트', icon: '📋', count: mainTabCounts.long_term },
           { value: 'short_term' as MainTab, label: '단기렌트', icon: '⏱️', count: mainTabCounts.short_term },
-          { value: 'contracts' as MainTab, label: '계약', icon: '✅', count: mainTabCounts.contracts },
         ].map(tab => (
           <button
             key={tab.value}
@@ -947,126 +844,6 @@ export default function QuoteListPage() {
       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
         {loading ? (
           <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
-        ) : mainTab === 'contracts' ? (
-          /* ======================== CONTRACTS TAB ======================== */
-          <>
-          {/* 계약 통계 카드 */}
-          <div style={{ padding: '20px 24px 0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-            {[
-              { label: '총 계약', value: contractStats.total, color: '#3b82f6', icon: '📋' },
-              { label: '이번달 신규', value: contractStats.thisMonth, color: '#10b981', icon: '✨' },
-              { label: '진행 중', value: contractStats.active, color: '#06b6d4', icon: '⚙️' },
-              { label: '만료 임박', value: contractStats.expiringSoon, color: '#ef4444', icon: '⏰' },
-              { label: '수납율', value: contractStats.totalPayments > 0 ? `${Math.round(contractStats.totalPaid / contractStats.totalPayments * 100)}%` : '-', color: '#8b5cf6', icon: '💰' },
-            ].map((s, i) => (
-              <div key={i} style={{ background: s.color, color: '#fff', borderRadius: 12, padding: '16px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800 }}>{s.value}</div>
-                </div>
-                <span style={{ fontSize: 22 }}>{s.icon}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* 계약 상태 필터 탭 */}
-          <div style={{ padding: '16px 24px 0', display: 'flex', gap: 6, overflowX: 'auto' }}>
-            {([
-              { id: 'all', label: '전체', count: contractStats.total },
-              { id: 'active', label: '진행중', count: contractStats.active },
-              { id: 'expiring', label: '만료임박', count: contractStats.expiringSoon },
-              { id: 'ended', label: '종료', count: contractStats.ended },
-              { id: 'cancelled', label: '해지', count: contractStats.cancelled },
-            ] as const).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setContractStatusFilter(tab.id)}
-                style={{
-                  padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  background: contractStatusFilter === tab.id ? '#2d5fa8' : '#f3f4f6',
-                  color: contractStatusFilter === tab.id ? '#fff' : '#6b7280',
-                  display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
-                }}
-              >
-                {tab.label}
-                <span style={{
-                  background: contractStatusFilter === tab.id ? 'rgba(255,255,255,0.3)' : '#e5e7eb',
-                  color: contractStatusFilter === tab.id ? '#fff' : '#6b7280',
-                  borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700,
-                }}>{tab.count}</span>
-              </button>
-            ))}
-          </div>
-
-          {filteredContracts.length === 0 ? (
-            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
-              {contracts.length === 0 ? '계약 내역이 없습니다.' : '해당 조건의 계약이 없습니다.'}
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>계약기간</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>수납</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>계약일</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredContracts.map((c, idx) => (
-                    <tr
-                      key={c.id}
-                      onClick={() => router.push(`/contracts/${c.id}`)}
-                      style={{ cursor: 'pointer', borderBottom: idx < filteredContracts.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '12px 16px', paddingLeft: 24 }}><ContractStatusBadge contract={c} /></td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{c.customer?.name || c.customer_name}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f3f4f6', overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
-                            {c.car?.image_url ? (
-                              <img src={c.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <span style={{ fontSize: 9, color: '#d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
-                            )}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#111827', fontSize: 12 }}>{c.car?.number || '-'}</div>
-                            <div style={{ fontSize: 11, color: '#6b7280' }}>{c.car?.brand} {c.car?.model}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>
-                        {formatDate(c.start_date)} ~ {formatDate(c.end_date)}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280', fontSize: 13 }}>{f(c.deposit)}원</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
-                        <div style={{ fontSize: 10, color: '#9ca3af' }}>/월 (VAT포함)</div>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                          <div style={{ width: 60, height: 6, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', background: '#22c55e', borderRadius: 999, transition: 'all 0.3s', width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
-                          </div>
-                          <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>{c.paidCount}/{c.totalCount}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(c.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          </>
         ) : mainTab === 'short_term' ? (
           /* ======================== SHORT-TERM TAB ======================== */
           displayedShortQuotes.length === 0 ? (

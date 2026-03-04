@@ -14,7 +14,7 @@ import { useUpload } from '@/app/context/UploadContext'
 // ═══ 회계 기준 카테고리 (DB 저장용, select 드롭다운용) ═══
 const CATEGORIES = [
   { group: '매출(영업수익)', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익'] },
-  { group: '자본변동', items: ['투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)'] },
+  { group: '자본변동', items: ['투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)'] },
   { group: '영업비용-차량', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험'] },
   { group: '영업비용-금융', items: ['이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)', '수수료/카드수수료'] },
   { group: '영업비용-인건비', items: ['급여(정규직)', '일용직급여', '성과급지급', '용역비(3.3%)', '4대보험(회사부담)'] },
@@ -26,7 +26,7 @@ const CATEGORIES = [
 // ═══ 용도별 카테고리 (사용자 화면 표시용 — 같은 업종/종류끼리 묶기) ═══
 const DISPLAY_CATEGORIES = [
   { group: '💰 돈 들어오는 것', icon: '💰', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익', '기타수입'] },
-  { group: '🏦 투자/대출 입출금', icon: '🏦', items: ['투자원금 입금', '지입 초기비용/보증금', '대출 실행(입금)', '이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)'] },
+  { group: '🏦 투자/대출 입출금', icon: '🏦', items: ['투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)', '이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)'] },
   { group: '🚛 차량 운영', icon: '🚛', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험'] },
   { group: '👨‍💼 급여/인건비', icon: '👨‍💼', items: ['급여(정규직)', '일용직급여', '성과급지급', '용역비(3.3%)', '4대보험(회사부담)'] },
   { group: '🏢 사무실/운영비', icon: '🏢', items: ['임차료/사무실', '통신비', '소모품/사무용품', '전기/수도/가스', '경비/보안', '수선/유지비'] },
@@ -40,7 +40,7 @@ const ALL_CATEGORIES = CATEGORIES.flatMap(g => g.items)
 
 const CATEGORY_ICONS: Record<string, string> = {
   '렌트/운송수입': '🚛', '지입 관리비/수수료': '📋', '보험금 수령': '🛡️', '매각/처분수입': '🏷️', '이자/잡이익': '📈',
-  '투자원금 입금': '💰', '지입 초기비용/보증금': '🔑', '대출 실행(입금)': '🏦',
+  '투자원금 입금': '💰', '지입 초기비용/보증금': '🔑', '렌터카 보증금(입금)': '🚗', '대출 실행(입금)': '🏦',
   '유류비': '⛽', '정비/수리비': '🔧', '차량보험료': '🚗', '자동차세/공과금': '📄', '차량할부/리스료': '💳', '화물공제/적재물보험': '📦',
   '이자비용(대출/투자)': '📊', '원금상환': '💸', '지입 수익배분금(출금)': '🤝', '수수료/카드수수료': '🧾',
   '급여(정규직)': '👨‍💼', '일용직급여': '👤', '성과급지급': '🎯', '용역비(3.3%)': '👷', '4대보험(회사부담)': '🏥',
@@ -67,7 +67,7 @@ const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', 
 // 'all' = 전체 표시, string[] = 해당 그룹명만 표시 (relatedOptions의 group명 기준)
 const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
   // ── 수입(매출) ──
-  '렌트/운송수입': ['차량', '지입 차주'],
+  '렌트/운송수입': ['계약', '차량', '지입 차주'],
   '지입 관리비/수수료': ['지입 차주'],
   '보험금 수령': ['보험', '차량'],
   '매각/처분수입': ['차량'],
@@ -76,6 +76,7 @@ const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
   // ── 투자/대출 입출금 ──
   '투자원금 입금': ['투자자'],
   '지입 초기비용/보증금': ['지입 차주'],
+  '렌터카 보증금(입금)': ['계약', '렌터카'],
   '대출 실행(입금)': ['대출'],
   '이자비용(대출/투자)': ['대출', '투자자'],
   '원금상환': ['대출'],
@@ -272,7 +273,8 @@ const DEFAULT_RULES = [
   { group: '매출(영업수익)', label: '렌트/운송수입', type: 'income', keywords: ['매출', '정산', '운송료', '입금'] },
   { group: '매출(영업수익)', label: '지입 관리비/수수료', type: 'income', keywords: ['지입료', '관리비', '번호판', '수수료'] },
   { group: '자본변동(입금)', label: '투자원금 입금', type: 'income', keywords: ['투자', '증자', '자본'] },
-  { group: '자본변동(입금)', label: '지입 초기비용/보증금', type: 'income', keywords: ['보증금', '인수금', '초기'] },
+  { group: '자본변동(입금)', label: '지입 초기비용/보증금', type: 'income', keywords: ['지입보증금', '인수금', '초기비용'] },
+  { group: '자본변동(입금)', label: '렌터카 보증금(입금)', type: 'income', keywords: ['렌터카', '렌트카', '렌트보증금', '장기렌트', '보증금입금', '보증금'] },
   { group: '자본변동(입금)', label: '대출 실행(입금)', type: 'income', keywords: ['대출입금', '론', '대출실행'] },
   { group: '기타수입', label: '이자/잡이익', type: 'income', keywords: ['이자', '환급', '캐시백'] },
   { group: '지입/운송원가', label: '지입 수익배분금(출금)', type: 'expense', keywords: ['수익배분', '정산금', '배분금', '지입대금'] },
@@ -317,6 +319,10 @@ function UploadContent() {
     setCompanyId,
     cardRegistrationResults,
     loadFromQueue,
+    pauseProcessing,
+    resumeProcessing,
+    cancelProcessing,
+    splitTransaction,
   } = useUpload()
 
   // ── Upload UI State ──
@@ -347,6 +353,7 @@ function UploadContent() {
   const [reviewInvestors, setReviewInvestors] = useState<any[]>([])
   const [freelancers, setFreelancers] = useState<any[]>([])
   const [employees, setEmployees] = useState<any[]>([])
+  const [contracts, setContracts] = useState<any[]>([])
 
   // ── Tab State ── (2탭 구조: 분류 관리 + 확정완료)
   const [activeTab, setActiveTab] = useState<'classify' | 'confirmed'>('classify')
@@ -363,6 +370,10 @@ function UploadContent() {
   const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance'>('car')
   const [linkModalSelectedId, setLinkModalSelectedId] = useState<string | null>(null)
 
+  // ── 분할 모달 상태 ──
+  const [splitModalItem, setSplitModalItem] = useState<any>(null)
+  const [splitRows, setSplitRows] = useState<Array<{ amount: number; memo: string; related_type: string; related_id: string }>>([])
+
   const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   // ── Initialize ──
@@ -373,8 +384,7 @@ function UploadContent() {
     fetchStats()  // 항상 통계 로드
     if (effectiveCompanyId) {
       setCompanyId(effectiveCompanyId)
-      // 이미 저장된 confirmed queue 항목 정리 (탭 카운트 정확도 보장)
-      cleanupStaleQueue()
+      // cleanupStaleQueue 제거: 확정 항목을 자동 삭제하지 않음
       // 결과가 비어있고 처리 중이 아닐 때 → classification_queue에서 복원
       if (results.length === 0 && status !== 'processing' && !hasLoadedFromQueue.current) {
         hasLoadedFromQueue.current = true
@@ -422,13 +432,14 @@ function UploadContent() {
   const fetchBasicData = async () => {
     if (!effectiveCompanyId) return
     try {
-      const [c, i, j, cc, lo, ins] = await Promise.all([
+      const [c, i, j, cc, lo, ins, ct] = await Promise.all([
         supabase.from('cars').select('*').eq('company_id', effectiveCompanyId),
         supabase.from('general_investments').select('*').eq('company_id', effectiveCompanyId),
         supabase.from('jiip_contracts').select('*').eq('company_id', effectiveCompanyId),
         supabase.from('corporate_cards').select('*').eq('company_id', effectiveCompanyId),
         supabase.from('loans').select('*').eq('company_id', effectiveCompanyId),
         supabase.from('insurance_contracts').select('*').eq('company_id', effectiveCompanyId),
+        supabase.from('contracts').select('id, car_id, customer_id, customer_name, status, deposit, monthly_rent, start_date, end_date').eq('company_id', effectiveCompanyId).in('status', ['active', 'expired']),
       ])
       setCars(c.data || [])
       setInvestors(i.data || [])
@@ -436,6 +447,7 @@ function UploadContent() {
       setCorpCards(cc.data || [])
       setLoans(lo.data || [])
       setInsurances(ins.data || [])
+      setContracts(ct.data || [])
     } catch (err) {
       console.error('[fetchBasicData] error:', err)
     }
@@ -450,7 +462,10 @@ function UploadContent() {
       ])
       const pData = pRes.ok ? await pRes.json() : { total: 0 }
       const cData = cRes.ok ? await cRes.json() : { total: 0 }
-      setStats({ pending: pData.total || 0, confirmed: cData.total || 0 })
+      const pendingCount = pData.total || 0
+      const confirmedCount = cData.total || 0
+      console.log(`[fetchStats] API 결과: pending=${pendingCount}, confirmed=${confirmedCount}`)
+      setStats({ pending: pendingCount, confirmed: confirmedCount })
     } catch (e) {
       console.error(e)
     }
@@ -524,81 +539,49 @@ function UploadContent() {
     try {
       // classify 탭 = pending, confirmed 탭 = confirmed
       const status = activeTab === 'confirmed' ? 'confirmed' : 'pending'
+      console.log(`[fetchReviewItems] 호출: activeTab=${activeTab}, status=${status}`)
       const res = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${status}&limit=2000`)
       if (res.ok) {
         const data = await res.json()
         let loadedItems = data.items || []
 
-        // ── 확정완료 탭: 이미 transactions에 저장된 항목 자동 정리 ──
-        if (activeTab === 'confirmed' && loadedItems.length > 0) {
-          // 날짜 범위 추출
-          const dates = loadedItems.map((i: any) => i.source_data?.transaction_date || i.transaction_date).filter(Boolean)
-          if (dates.length > 0) {
-            const sortedDates = [...dates].sort()
-            const { data: existingTxs } = await supabase
-              .from('transactions')
-              .select('transaction_date, client_name, amount')
-              .eq('company_id', effectiveCompanyId)
-              .gte('transaction_date', sortedDates[0])
-              .lte('transaction_date', sortedDates[sortedDates.length - 1])
-
-            if (existingTxs && existingTxs.length > 0) {
-              // 기존 거래 개수 카운트
-              const existingCounts = new Map<string, number>()
-              for (const e of existingTxs) {
-                const key = `${e.transaction_date}|${e.client_name}|${e.amount}`
-                existingCounts.set(key, (existingCounts.get(key) || 0) + 1)
-              }
-
-              // 이미 저장된 queue 항목 식별
-              const usedCounts = new Map<string, number>()
-              const staleIds: string[] = []
-              const cleanItems: any[] = []
-
-              for (const item of loadedItems) {
-                const sd = item.source_data || {}
-                const key = `${sd.transaction_date || item.transaction_date}|${sd.client_name || item.client_name}|${Math.abs(Number(sd.amount || item.amount || 0))}`
-                const existCount = existingCounts.get(key) || 0
-                const usedCount = usedCounts.get(key) || 0
-
-                if (usedCount < existCount) {
-                  // 이미 transactions에 존재 → 정리 대상
-                  usedCounts.set(key, usedCount + 1)
-                  if (item.id) staleIds.push(item.id)
-                } else {
-                  cleanItems.push(item)
-                }
-              }
-
-              // 백그라운드에서 stale queue 항목 삭제 (API 사용)
-              if (staleIds.length > 0) {
-                console.log(`[fetchReviewItems] 확정완료 탭: 이미 저장된 ${staleIds.length}건 자동 정리`)
-                try {
-                  await fetch('/api/finance/classify', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ company_id: effectiveCompanyId, ids: staleIds })
-                  })
-                } catch (delErr) {
-                  console.error('[auto-cleanup] queue 삭제 오류:', delErr)
-                }
-              }
-
-              loadedItems = cleanItems
-            }
-          }
+        console.log(`[fetchReviewItems] API 응답: ${loadedItems.length}건 (total=${data.total}, source=${data.source})`)
+        if (status === 'confirmed') {
+          console.log(`[fetchReviewItems] 확정 항목 ID 목록:`, loadedItems.map((i: any) => `${i.id.slice(0,8)}...(${i.source_data?.client_name})`))
         }
+
+        // ── 확정완료 탭: 자동 정리 제거 (확정 항목을 그대로 표시) ──
 
         setItems(loadedItems)
         setTotal(loadedItems.length)
+
+        // ── 현재 탭의 stats를 실제 items 수로 즉시 보정 ──
+        if (status === 'confirmed') {
+          setStats(prev => ({ ...prev, confirmed: loadedItems.length }))
+        } else {
+          setStats(prev => ({ ...prev, pending: loadedItems.length }))
+        }
       }
-      // stale 항목 삭제 후 stats 다시 가져오기 (탭 카운트 정확히 반영)
-      await fetchStats()
     } catch (e) {
       console.error(e)
     }
     setLoading(false)
-  }, [effectiveCompanyId, activeTab, fetchStats])
+
+    // ── 반대 탭 카운트는 비동기로 갱신 (로딩 차단 없음) ──
+    try {
+      const otherStatus = activeTab === 'confirmed' ? 'pending' : 'confirmed'
+      const otherRes = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${otherStatus}&limit=1`)
+      if (otherRes.ok) {
+        const otherData = await otherRes.json()
+        const otherCount = otherData.total || otherData.items?.length || 0
+        if (otherStatus === 'confirmed') {
+          setStats(prev => ({ ...prev, confirmed: otherCount }))
+        } else {
+          setStats(prev => ({ ...prev, pending: otherCount }))
+        }
+      }
+    } catch (e) { /* 무시 */ }
+  }, [effectiveCompanyId, activeTab])
 
   const fetchReviewRelated = useCallback(async () => {
     if (!effectiveCompanyId) return
@@ -690,7 +673,7 @@ function UploadContent() {
   }, [items, sourceFilter, searchTerm])
 
   const groupedItems = useMemo(() => {
-    const groups: Record<string, { items: any[]; totalAmount: number; type: string; subGroups?: Record<string, { items: any[]; totalAmount: number }> }> = {}
+    const groups: Record<string, { items: any[]; totalAmount: number; type: string; foreignAmounts?: Record<string, number>; subGroups?: Record<string, { items: any[]; totalAmount: number }> }> = {}
     // 용도별 모드 매핑
     const catMap: Record<string, string> = {}
     if (categoryMode === 'display') {
@@ -898,6 +881,7 @@ function UploadContent() {
       alert(`${data.deleted}건 삭제 완료`)
       setItems([])
       setSelectedIds(new Set())
+      clearResults()  // UploadContext 결과도 함께 정리
       fetchStats()
     } catch (e: any) {
       alert('삭제 실패: ' + e.message)
@@ -987,28 +971,37 @@ function UploadContent() {
     const type = item.ai_related_type
     const id = item.ai_related_id
     if (!type || !id) return null
+    const sid = String(id)
     if (type === 'car') {
-      const c = cars.find(cc => cc.id === id)
+      const c = cars.find(cc => String(cc.id) === sid)
       return c ? { icon: '🚗', label: c.number || '차량', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' } : null
     }
     if (type === 'jiip') {
-      const j = (jiips || []).find((jj: any) => jj.id === id)
+      const j = (jiips || []).find((jj: any) => String(jj.id) === sid)
       return j ? { icon: '🚛', label: j.investor_name || '지입', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' } : null
     }
     if (type === 'invest') {
-      const inv = (investors || []).find((ii: any) => ii.id === id)
+      const inv = (investors || []).find((ii: any) => String(ii.id) === sid)
       return inv ? { icon: '💰', label: inv.investor_name || '투자', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' } : null
     }
     if (type === 'loan') {
-      const l = (loans || []).find((ll: any) => ll.id === id)
+      const l = (loans || []).find((ll: any) => String(ll.id) === sid)
       return l ? { icon: '🏦', label: l.finance_name || '대출', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' } : null
     }
     if (type === 'insurance') {
-      const ins = (insurances || []).find((ii: any) => ii.id === id)
+      const ins = (insurances || []).find((ii: any) => String(ii.id) === sid)
       return ins ? { icon: '🛡️', label: ins.company || '보험', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' } : null
     }
+    if (type === 'contract') {
+      const ct = contracts.find(c => String(c.id) === sid)
+      if (ct) {
+        const car = cars.find(c => String(c.id) === String(ct.car_id))
+        return { icon: '📋', label: `${ct.customer_name || '고객'} — ${car?.number || ''}`, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' }
+      }
+      return null
+    }
     return { icon: '🔗', label: type, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' }
-  }, [cars, jiips, investors, loans, insurances])
+  }, [cars, jiips, investors, loans, insurances, contracts])
 
   // 연결 팝오버용 옵션 (검색 포함)
   const linkOptions = useMemo(() => {
@@ -1025,6 +1018,12 @@ function UploadContent() {
   // ── Drag & Drop ──
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      if (results.length > 0) {
+        if (!confirm(`이미 ${results.length}건의 분석 결과가 있습니다.\n\n추가 업로드하면 기존 결과에 합쳐집니다.\n같은 파일이면 중복이 발생할 수 있습니다.\n\n계속하시겠습니까?`)) {
+          e.target.value = ''
+          return
+        }
+      }
       addFiles(Array.from(e.target.files))
       startProcessing()
     }
@@ -1040,6 +1039,9 @@ function UploadContent() {
     e.preventDefault()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      if (results.length > 0) {
+        if (!confirm(`이미 ${results.length}건의 분석 결과가 있습니다.\n추가 업로드하면 중복이 발생할 수 있습니다.\n계속하시겠습니까?`)) return
+      }
       addFiles(Array.from(e.dataTransfer.files))
       startProcessing()
     }
@@ -1049,7 +1051,8 @@ function UploadContent() {
   const handleUpdateItem = (id: number, field: string, val: any, item: any) => {
     updateTransaction(id, field, val)
     if (bulkMode && field !== 'amount' && field !== 'transaction_date' && field !== 'description') {
-      const sameClientItems = results.filter(r => r.client_name === item.client_name && r.id !== id)
+      // 분할된 항목(_split_from)은 개별 관리해야 하므로 일괄 변경에서 제외
+      const sameClientItems = results.filter(r => r.client_name === item.client_name && r.id !== id && !r._split_from && !item._split_from)
       sameClientItems.forEach(r => updateTransaction(r.id, field, val))
     }
   }
@@ -1298,33 +1301,42 @@ function UploadContent() {
             flags.push({ ...baseFlag, flag_type: 'foreign_currency', flag_reason: `외화 결제 (${(item as any).currency})`, severity: 'medium' })
           }
 
-          // 3) 고액 거래 (100만원 이상)
-          if (item.amount >= 1000000) {
-            flags.push({ ...baseFlag, flag_type: 'unusual_amount', flag_reason: `고액 거래 (${item.amount.toLocaleString()}원)`, severity: item.amount >= 5000000 ? 'high' : 'medium' })
+          // 결제수단 구분 (카드 vs 통장)
+          const isCard = item.payment_method === '카드' || item.payment_method === 'Card'
+
+          // 3) 고액 거래 — 카드: 100만원 이상, 통장: 5000만원 이상
+          const highAmountThreshold = isCard ? 1000000 : 50000000
+          const veryHighThreshold = isCard ? 5000000 : 100000000
+          if (item.amount >= highAmountThreshold) {
+            flags.push({ ...baseFlag, flag_type: 'unusual_amount', flag_reason: `고액 ${isCard ? '카드' : '통장'} 거래 (${item.amount.toLocaleString()}원)`, severity: item.amount >= veryHighThreshold ? 'high' : 'medium' })
           }
 
-          // 4) 주말/심야 거래 (description에 시간 포함된 경우)
-          const desc = (item.description || '').toLowerCase()
-          const timeMatch = desc.match(/(\d{1,2}):(\d{2})/)
-          if (timeMatch) {
-            const hour = parseInt(timeMatch[1])
-            if (hour >= 22 || hour < 5) {
-              flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `심야 거래 (${timeMatch[0]})`, severity: 'medium' })
+          // 4) 주말/심야 거래 — 카드 거래에만 적용 (통장은 정상 업무)
+          if (isCard) {
+            const desc = (item.description || '').toLowerCase()
+            const timeMatch = desc.match(/(\d{1,2}):(\d{2})/)
+            if (timeMatch) {
+              const hour = parseInt(timeMatch[1])
+              if (hour >= 22 || hour < 5) {
+                flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `심야 카드 거래 (${timeMatch[0]})`, severity: 'medium' })
+              }
             }
-          }
-          if (item.transaction_date) {
-            const dow = new Date(item.transaction_date).getDay()
-            if (dow === 0 || dow === 6) {
-              flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `주말 거래 (${dow === 0 ? '일' : '토'}요일)`, severity: 'low' })
+            if (item.transaction_date) {
+              const dow = new Date(item.transaction_date).getDay()
+              if (dow === 0 || dow === 6) {
+                flags.push({ ...baseFlag, flag_type: 'unusual_time', flag_reason: `주말 카드 거래 (${dow === 0 ? '일' : '토'}요일)`, severity: 'low' })
+              }
             }
           }
 
-          // 5) 개인 사용 의심 키워드
-          const clientDesc = `${item.client_name || ''} ${item.description || ''}`.toLowerCase()
-          const personalKeywords = ['편의점', '치킨', '배달', '술집', '노래방', '주점', '카페', '스타벅스', '이디야', '쿠팡', '배민', '요기요']
-          const matchedKw = personalKeywords.find(kw => clientDesc.includes(kw))
-          if (matchedKw && item.amount >= 30000) {
-            flags.push({ ...baseFlag, flag_type: 'personal_use', flag_reason: `개인 사용 의심 (${matchedKw}, ${item.amount.toLocaleString()}원)`, severity: 'medium' })
+          // 5) 개인 사용 의심 키워드 — 카드 거래에만 적용
+          if (isCard) {
+            const clientDesc = `${item.client_name || ''} ${item.description || ''}`.toLowerCase()
+            const personalKeywords = ['편의점', '치킨', '배달', '술집', '노래방', '주점', '카페', '스타벅스', '이디야', '쿠팡', '배민', '요기요']
+            const matchedKw = personalKeywords.find(kw => clientDesc.includes(kw))
+            if (matchedKw && item.amount >= 30000) {
+              flags.push({ ...baseFlag, flag_type: 'personal_use', flag_reason: `개인 사용 의심 (${matchedKw}, ${item.amount.toLocaleString()}원)`, severity: 'medium' })
+            }
           }
         })
 
@@ -1384,7 +1396,7 @@ function UploadContent() {
       if (duplicateCount > 0) msg += ` (${duplicateCount}건 중복 제외)`
       if (linkedCount > 0) msg += ` (${linkedCount}건 스케줄 자동 연결)`
       if (investUpdateCount > 0) msg += ` (${investUpdateCount}명 투자자 금액 업데이트)`
-      if (flagCount > 0) msg += `\n⚠️ ${flagCount}건 특이건 감지됨 → 법인카드관리에서 확인 가능`
+      if (flagCount > 0) msg += `\n⚠️ ${flagCount}건 특이건 감지됨 → 카드/통장 관리 > 확정완료 탭에서 확인 가능`
       alert(msg)
       // 저장된 확정 항목만 목록에서 제거, 나머지는 유지
       const savedIds = new Set(uniqueResults.map(r => r.id))
@@ -1423,6 +1435,7 @@ function UploadContent() {
   // ── Review Handlers ──
   const handleConfirm = async (item: any, overrides?: { category?: string; related_type?: string; related_id?: string }) => {
     const category = overrides?.category || item.ai_category || item.final_category
+    console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, client=${item.source_data?.client_name}`)
     try {
       const res = await fetch('/api/finance/classify', {
         method: 'PATCH',
@@ -1435,13 +1448,58 @@ function UploadContent() {
           save_as_rule: false,
         }),
       })
+      const resData = await res.json()
+      console.log(`[handleConfirm] PATCH 응답:`, res.status, resData)
       if (res.ok) {
-        setItems(prev => prev.filter(i => i.id !== item.id))
-        setStats(prev => ({ pending: prev.pending - 1, confirmed: prev.confirmed + 1 }))
+        setItems(prev => {
+          const next = prev.filter(i => i.id !== item.id)
+          console.log(`[handleConfirm] items: ${prev.length} → ${next.length}`)
+          return next
+        })
+        setStats(prev => {
+          const next = { pending: prev.pending - 1, confirmed: prev.confirmed + 1 }
+          console.log(`[handleConfirm] stats: pending ${prev.pending}→${next.pending}, confirmed ${prev.confirmed}→${next.confirmed}`)
+          return next
+        })
       }
     } catch (e) {
-      console.error(e)
+      console.error('[handleConfirm] 오류:', e)
     }
+  }
+
+  // ── 거래 분할 ──
+  const openSplitModal = (item: any) => {
+    setSplitModalItem(item)
+    // 기본값: 2건으로 균등 분할
+    const half = Math.floor(item.amount / 2)
+    setSplitRows([
+      { amount: half, memo: '', related_type: '', related_id: '' },
+      { amount: item.amount - half, memo: '', related_type: '', related_id: '' },
+    ])
+  }
+
+  const handleSplitConfirm = () => {
+    if (!splitModalItem) return
+    const totalSplit = splitRows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+    if (totalSplit !== splitModalItem.amount) {
+      alert(`분할 금액 합계(${totalSplit.toLocaleString()}원)가 원본 금액(${splitModalItem.amount.toLocaleString()}원)과 일치하지 않습니다.`)
+      return
+    }
+    if (splitRows.some(r => !r.amount || r.amount <= 0)) {
+      alert('각 분할 금액은 0보다 커야 합니다.')
+      return
+    }
+    splitTransaction(
+      splitModalItem.id,
+      splitRows.map(r => ({
+        amount: Number(r.amount),
+        description: r.memo || undefined,
+        related_type: r.related_type || undefined,
+        related_id: r.related_id || undefined,
+      }))
+    )
+    setSplitModalItem(null)
+    setSplitRows([])
   }
 
   const handleConfirmWithRule = async (item: any, category: string) => {
@@ -1470,24 +1528,48 @@ function UploadContent() {
   }
 
   const handleRevert = async (item: any) => {
+    console.log(`[handleRevert] 되돌리기 시작: id=${item.id}, _source=${item._source}, client=${item.source_data?.client_name}`)
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queue_id: item.id,
-          final_category: '기타',
-          final_related_type: null,
-          final_related_id: null,
-          save_as_rule: false,
-        }),
-      })
-      if (res.ok) {
-        setItems(prev => prev.filter(i => i.id !== item.id))
-        setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
+      if (item._source === 'transactions') {
+        // transactions 테이블에서 온 항목 → DELETE로 처리
+        const res = await fetch('/api/finance/classify', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: item.company_id, ids: [item.id] }),
+        })
+        const resData = await res.json()
+        console.log(`[handleRevert] transactions DELETE 응답:`, resData)
+        if (res.ok) {
+          setItems(prev => prev.filter(i => i.id !== item.id))
+          setStats(prev => ({ ...prev, confirmed: prev.confirmed - 1 }))
+        } else {
+          alert(`되돌리기 실패: ${resData.error || '알 수 없는 오류'}`)
+        }
+      } else {
+        // classification_queue에서 온 항목 → PATCH로 status 변경
+        const res = await fetch('/api/finance/classify', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            queue_id: item.id,
+            final_category: '기타',
+            final_related_type: null,
+            final_related_id: null,
+            save_as_rule: false,
+          }),
+        })
+        const resData = await res.json()
+        console.log(`[handleRevert] PATCH 응답: status=${res.status}`, resData)
+        if (res.ok) {
+          setItems(prev => prev.filter(i => i.id !== item.id))
+          setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
+        } else {
+          alert(`되돌리기 실패: ${resData.error || '알 수 없는 오류'}`)
+        }
       }
     } catch (e) {
-      console.error(e)
+      console.error('[handleRevert] 오류:', e)
+      alert('되돌리기 요청 중 오류가 발생했습니다.')
     }
   }
 
@@ -1575,6 +1657,57 @@ function UploadContent() {
     if (!effectiveCompanyId) return
     setDuplicateInfo({ count: 0, checking: true })
     try {
+      // ── 1) 업로드 결과(메모리)에서 중복 감지 ──
+      if (results.length > 0) {
+        const groups: Record<string, number[]> = {}
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i]
+          const key = `${r.transaction_date || ''}|${r.client_name || ''}|${Math.abs(Number(r.amount || 0))}|${r.payment_method || ''}`
+          if (!groups[key]) groups[key] = []
+          groups[key].push(i)
+        }
+        const dupGroups = Object.entries(groups).filter(([, idxs]) => idxs.length > 1)
+        const dupCount = dupGroups.reduce((acc, [, idxs]) => acc + idxs.length - 1, 0)
+
+        if (dupCount > 0) {
+          if (confirm(`⚠️ 업로드 결과 내에서 ${dupCount}건의 중복 거래가 발견되었습니다.\n(${dupGroups.length}개 그룹)\n\n중복 건을 제거하시겠습니까? (각 그룹에서 1건만 유지)`)) {
+            // 각 그룹에서 첫 번째만 유지, 나머지 삭제
+            const removeIdxSet = new Set<number>()
+            for (const [, idxs] of dupGroups) {
+              for (let k = 1; k < idxs.length; k++) {
+                removeIdxSet.add(idxs[k])
+              }
+            }
+            // 삭제할 result ID 목록 (deleteTransaction 사용)
+            const removeIds = [...removeIdxSet].sort((a, b) => b - a) // 역순으로 삭제
+            for (const idx of removeIds) {
+              const r = results[idx]
+              if (r && r.id != null) deleteTransaction(r.id)
+            }
+
+            // queue에서도 중복 삭제 (DB에 저장된 경우)
+            const queueIdsToDelete = [...removeIdxSet]
+              .map(idx => (results[idx] as any)?._queue_id)
+              .filter(Boolean)
+            if (queueIdsToDelete.length > 0) {
+              await fetch('/api/finance/classify', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIdsToDelete })
+              })
+            }
+
+            alert(`✅ ${dupCount}건 중복 제거 완료! (${results.length - dupCount}건 남음)`)
+            setDuplicateInfo({ count: 0, checking: false })
+            fetchStats()
+            return
+          }
+          setDuplicateInfo({ count: dupCount, checking: false })
+          return
+        }
+      }
+
+      // ── 2) DB(transactions)에서 중복 감지 ──
       const res = await fetch(`/api/finance/dedup?company_id=${effectiveCompanyId}`)
       if (res.ok) {
         const data = await res.json()
@@ -1820,7 +1953,7 @@ function UploadContent() {
   // 차량별 그룹핑 (유류비, 정비비 등 차량 관련 거래)
   const groupedByVehicle = useMemo(() => {
     if (uploadGroupBy !== 'vehicle') return null
-    const vehicleCategories = ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료']
+    const vehicleCategories = ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '렌터카 보증금(입금)']
     const groups: Record<string, { items: typeof filteredResults; carInfo: any; totalAmount: number; foreignAmounts: Record<string, number> }> = {}
     for (const item of filteredResults) {
       if (!vehicleCategories.includes(item.category || '') && !item.related_type?.includes('car')) {
@@ -2030,42 +2163,51 @@ function UploadContent() {
   // 연결 대상 표시 헬퍼
   const getRelatedDisplay = useCallback((type: string | null, id: string | null) => {
     if (!type || !id) return null
+    const sid = String(id)
     if (type === 'card') {
-      const c = corpCards.find(cc => cc.id === id)
-      if (!c) return { icon: '💳', label: '카드', detail: id.slice(0, 8) }
+      const c = corpCards.find(cc => String(cc.id) === sid)
+      if (!c) return { icon: '💳', label: '카드', detail: sid.slice(0, 8) }
       return { icon: '💳', label: `${c.card_company || ''} ****${(c.card_number || '').slice(-4)}`, detail: getCardDisplayName(c), color: '#f59e0b' }
     }
     if (type === 'jiip') {
-      const j = jiips.find(jj => jj.id === id)
+      const j = jiips.find(jj => String(jj.id) === sid)
       return { icon: '🚛', label: j?.investor_name || '지입', detail: j?.vehicle_number || j?.car_number || '', color: '#8b5cf6' }
     }
     if (type === 'invest') {
-      const inv = investors.find(ii => ii.id === id)
+      const inv = investors.find(ii => String(ii.id) === sid)
       return { icon: '💰', label: inv?.investor_name || '투자', detail: inv?.invest_amount ? `${Number(inv.invest_amount).toLocaleString()}원` : '', color: '#10b981' }
     }
     if (type === 'car') {
-      const car = cars.find(cc => cc.id === id)
+      const car = cars.find(cc => String(cc.id) === sid)
       return { icon: '🚗', label: car?.number || '차량', detail: car?.model ? `${car.brand || ''} ${car.model}` : '', color: '#3b82f6' }
     }
     if (type === 'loan') {
-      const l = loans.find(ll => ll.id === id)
+      const l = loans.find(ll => String(ll.id) === sid)
       return { icon: '🏦', label: l?.finance_name || '대출', detail: l?.monthly_payment ? `${Number(l.monthly_payment).toLocaleString()}원/월` : '', color: '#ef4444' }
     }
     if (type === 'insurance') {
-      const ins = insurances.find(ii => ii.id === id)
+      const ins = insurances.find(ii => String(ii.id) === sid)
       return { icon: '🛡️', label: ins?.company || '보험', detail: ins?.product_name || '', color: '#06b6d4' }
     }
     if (type === 'employee') {
-      const emp = employees.find(e => e.id === id)
+      const emp = employees.find(e => String(e.id) === sid)
       return { icon: '👨‍💼', label: emp?.name || '직원', detail: emp?.position || emp?.department || '', color: '#10b981' }
     }
     if (type === 'salary') {
-      const emp = employees.find(e => e.id === id)
+      const emp = employees.find(e => String(e.id) === sid)
       return { icon: '👤', label: emp?.name || '직원급여', detail: emp?.position || '', color: '#6366f1' }
+    }
+    if (type === 'contract') {
+      const ct = contracts.find(c => String(c.id) === sid)
+      if (ct) {
+        const car = cars.find(c => String(c.id) === String(ct.car_id))
+        return { icon: '📋', label: `${ct.customer_name || '고객'} — ${car?.number || ''}`, detail: `보증금 ${ct.deposit ? Number(ct.deposit).toLocaleString() + '원' : '-'}`, color: '#7c3aed' }
+      }
+      return { icon: '📋', label: '계약', detail: '', color: '#7c3aed' }
     }
     if (type === 'freelancer') return { icon: '📋', label: '프리랜서', detail: '', color: '#f97316' }
     return { icon: '🔗', label: type, detail: id ? String(id).slice(0, 8) : '', color: '#6b7280' }
-  }, [corpCards, jiips, investors, cars, loans, insurances, employees])
+  }, [corpCards, jiips, investors, cars, loans, insurances, employees, contracts])
 
   // 연결 대상 옵션 목록
   const relatedOptions = useMemo(() => {
@@ -2101,6 +2243,16 @@ function UploadContent() {
         sub: `${c.brand || ''} ${c.model || ''}`.trim() || '-',
         color: '#3b82f6',
       }))})
+      // 렌터카 보증금용: 회사 소유 차량(지입/임차 제외)만 표시
+      const rentalCars = cars.filter(c => !c.ownership_type || c.ownership_type === 'company')
+      if (rentalCars.length > 0) {
+        opts.push({ group: '렌터카', icon: '🚗', items: rentalCars.map(c => ({
+          value: `car_${c.id}`,
+          label: c.number || '차량',
+          sub: `${c.brand || ''} ${c.model || ''}`.trim() || '-',
+          color: '#3b82f6',
+        }))})
+      }
     }
     if (loans.length > 0) {
       opts.push({ group: '대출', icon: '🏦', items: loans.map(l => ({
@@ -2126,8 +2278,19 @@ function UploadContent() {
         color: '#10b981',
       }))})
     }
+    if (contracts.length > 0) {
+      opts.push({ group: '계약', icon: '📋', items: contracts.map(ct => {
+        const car = cars.find(c => String(c.id) === String(ct.car_id))
+        return {
+          value: `contract_${ct.id}`,
+          label: `${ct.customer_name || '고객'} — ${car?.number || '차량미정'}`,
+          sub: `월 ${ct.monthly_rent ? Number(ct.monthly_rent).toLocaleString() + '원' : '-'} · 보증금 ${ct.deposit ? Number(ct.deposit).toLocaleString() + '원' : '-'}`,
+          color: '#7c3aed',
+        }
+      })})
+    }
     return opts
-  }, [corpCards, jiips, investors, cars, loans, insurances, employees])
+  }, [corpCards, jiips, investors, cars, loans, insurances, employees, contracts])
 
   // 연결 대상 드롭다운 상태
   const [openRelatedId, setOpenRelatedId] = useState<number | null>(null)
@@ -2493,46 +2656,7 @@ function UploadContent() {
           </div>
         )}
 
-        {/* ═══ 입금/출금/잔액 요약 카드 ═══ */}
-        {(activeTab === 'classify' || activeTab === 'confirmed') && sourceFilteredItems.length > 0 && (
-          <div style={{ display: 'flex', gap: 12, padding: '12px 0 4px 0' }}>
-            <div style={{
-              flex: 1, padding: '14px 18px', borderRadius: 12,
-              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-              border: '1px solid #bfdbfe',
-            }}>
-              <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 700, marginBottom: 4 }}>입금 합계</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#1e40af' }}>
-                {summaryTotals.income.toLocaleString()}
-                <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 2 }}>원</span>
-              </div>
-            </div>
-            <div style={{
-              flex: 1, padding: '14px 18px', borderRadius: 12,
-              background: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
-              border: '1px solid #fca5a5',
-            }}>
-              <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginBottom: 4 }}>출금 합계</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#991b1b' }}>
-                {summaryTotals.expense.toLocaleString()}
-                <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 2 }}>원</span>
-              </div>
-            </div>
-            <div style={{
-              flex: 1, padding: '14px 18px', borderRadius: 12,
-              background: summaryTotals.net >= 0
-                ? 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)'
-                : 'linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)',
-              border: summaryTotals.net >= 0 ? '1px solid #86efac' : '1px solid #fdba74',
-            }}>
-              <div style={{ fontSize: 11, color: summaryTotals.net >= 0 ? '#16a34a' : '#ea580c', fontWeight: 700, marginBottom: 4 }}>잔액 차이</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: summaryTotals.net >= 0 ? '#15803d' : '#c2410c' }}>
-                {summaryTotals.net >= 0 ? '+' : ''}{summaryTotals.net.toLocaleString()}
-                <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 2 }}>원</span>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ═══ 입금/출금/잔액 요약 카드 — 결과 리스트에 이미 요약이 있으므로 숨김 ═══ */}
       </div>
 
       {/* 드래그 오버레이 (화면 전체) */}
@@ -2553,7 +2677,7 @@ function UploadContent() {
           <span style={{ fontSize: 22 }}>🎉</span>
           <div>
             <p style={{ fontWeight: 800, fontSize: 13, color: '#166534', margin: 0 }}>AI 자동분류 완료</p>
-            <p style={{ fontSize: 11, color: '#15803d', marginTop: 2 }}>총 {aiResult.total}건 중 {aiResult.updated}건이 AI에 의해 분류되었습니다</p>
+            <p style={{ fontSize: 13, color: '#15803d', marginTop: 2 }}>총 {aiResult.total}건 중 {aiResult.updated}건이 AI에 의해 분류되었습니다</p>
           </div>
           <button onClick={() => setAiResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
@@ -2564,29 +2688,52 @@ function UploadContent() {
         <div style={{ background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)', border: '1px solid #c7d2fe', borderRadius: 14, padding: 20, marginBottom: 16, textAlign: 'center' }}>
           <div style={{ width: 28, height: 28, border: '3px solid #e0e7ff', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
           <p style={{ fontWeight: 800, fontSize: 13, color: '#4338ca', margin: 0 }}>🤖 AI가 거래 내역을 분석하고 있습니다...</p>
-          <p style={{ fontSize: 11, color: '#6366f1', marginTop: 4 }}>세무 전문가 수준의 AI가 계정과목을 자동 분류합니다</p>
+          <p style={{ fontSize: 13, color: '#6366f1', marginTop: 4 }}>세무 전문가 수준의 AI가 계정과목을 자동 분류합니다</p>
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
       )}
 
       {/* Upload Processing Banner */}
-      {status === 'processing' && (
-        <div style={{ marginBottom: 16, background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1px solid #7dd3fc', borderRadius: 14, padding: 20 }}>
+      {(status === 'processing' || status === 'paused') && (
+        <div style={{ marginBottom: 16, background: status === 'paused' ? 'linear-gradient(135deg, #fefce8, #fef9c3)' : 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: status === 'paused' ? '1px solid #fde047' : '1px solid #7dd3fc', borderRadius: 14, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 24, height: 24, border: '3px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-              <span style={{ fontWeight: 800, color: '#0369a1', fontSize: 14 }}>AI 분석 진행 중</span>
+              {status === 'paused' ? (
+                <span style={{ fontSize: 20 }}>⏸️</span>
+              ) : (
+                <div style={{ width: 24, height: 24, border: '3px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              )}
+              <span style={{ fontWeight: 800, color: status === 'paused' ? '#a16207' : '#0369a1', fontSize: 14 }}>
+                {status === 'paused' ? 'AI 분석 일시정지' : 'AI 분석 진행 중'}
+              </span>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '4px 10px', borderRadius: 8 }}>
-              {totalFiles > 0 ? `파일 ${currentFileIndex + 1} / ${totalFiles}` : '처리 중...'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: status === 'paused' ? '#a16207' : '#0284c7', background: status === 'paused' ? '#fef9c3' : '#e0f2fe', padding: '4px 10px', borderRadius: 8 }}>
+                {totalFiles > 0 ? `파일 ${currentFileIndex + 1} / ${totalFiles}` : '처리 중...'}
+              </span>
+              {status === 'paused' ? (
+                <button onClick={resumeProcessing}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#fff', background: '#0284c7', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ▶ 재개
+                </button>
+              ) : (
+                <button onClick={pauseProcessing}
+                  style={{ padding: '5px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#a16207', background: '#fef9c3', border: '1px solid #fde047', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ⏸ 일시정지
+                </button>
+              )}
+              <button onClick={() => { if (confirm('AI 분석을 중단하시겠습니까?\n이미 분석된 결과는 유지됩니다.')) cancelProcessing() }}
+                style={{ padding: '5px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                ✕ 중단
+              </button>
+            </div>
           </div>
           <div style={{ background: '#fff', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg, #0284c7, #38bdf8)', borderRadius: 8, transition: 'width 0.5s ease', width: `${progress}%` }} />
+            <div style={{ height: '100%', background: status === 'paused' ? 'linear-gradient(90deg, #eab308, #facc15)' : 'linear-gradient(90deg, #0284c7, #38bdf8)', borderRadius: 8, transition: 'width 0.5s ease', width: `${progress}%` }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#0369a1', fontWeight: 600 }}>{logs || currentFileName}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0284c7' }}>{progress}%</span>
+            <span style={{ fontSize: 12, color: status === 'paused' ? '#a16207' : '#0369a1', fontWeight: 600 }}>{logs || currentFileName}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: status === 'paused' ? '#a16207' : '#0284c7' }}>{progress}%</span>
           </div>
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
@@ -2598,7 +2745,7 @@ function UploadContent() {
           <span style={{ fontSize: 22 }}>🏦</span>
           <div style={{ flex: 1 }}>
             <p style={{ fontWeight: 800, fontSize: 13, color: '#166534', margin: 0 }}>법인카드 자동 등록 완료</p>
-            <p style={{ fontSize: 11, color: '#15803d', marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: '#15803d', marginTop: 2 }}>
               신규 {cardRegistrationResults.registered}장 / 업데이트 {cardRegistrationResults.updated}장
               {cardRegistrationResults.skipped > 0 ? ` / 스킵 ${cardRegistrationResults.skipped}장` : ''}
             </p>
@@ -2620,9 +2767,9 @@ function UploadContent() {
                   </span>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', background: '#fff', padding: '2px 7px', borderRadius: 5, border: '1px solid #e2e8f0' }}>
                     <input type="checkbox" checked={bulkMode} onChange={e => setBulkMode(e.target.checked)} style={{ width: 12, height: 12, cursor: 'pointer' }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>일괄 변경</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>일괄 변경</span>
                   </label>
-                  <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
                     {uploadStats.cardCount > 0 && `카드매칭 ${uploadStats.cardMatchedCount}/${uploadStats.cardCount}`}
                     {uploadStats.cardCount > 0 && uploadStats.classifiedCount > 0 && ' · '}
                     {uploadStats.classifiedCount > 0 && `분류 ${uploadStats.classifiedCount}/${results.length}`}
@@ -2630,7 +2777,7 @@ function UploadContent() {
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {uploadConfirmedIds.size > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', padding: '2px 8px', background: '#ecfdf5', borderRadius: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', padding: '2px 8px', background: '#ecfdf5', borderRadius: 4 }}>
                       ✅ {uploadConfirmedIds.size}건 확정
                     </span>
                   )}
@@ -2662,10 +2809,10 @@ function UploadContent() {
                       alert('적용할 거래처 패턴이 없습니다.\n(같은 거래처명으로 이미 분류된 항목이 필요합니다)')
                     }
                   }}
-                    style={{ background: '#f0f9ff', color: '#2d5fa8', padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: '1px solid #93c5fd', cursor: 'pointer' }}>
+                    style={{ background: '#f0f9ff', color: '#2d5fa8', padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: '1px solid #93c5fd', cursor: 'pointer' }}>
                     🧠 거래처 학습
                   </button>
-                  <button onClick={handleBulkSave} style={{ background: '#2d5fa8', color: '#fff', padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>💾 확정 저장 {uploadConfirmedIds.size > 0 ? `(${uploadConfirmedIds.size}건)` : ''}</button>
+                  <button onClick={handleBulkSave} style={{ background: '#2d5fa8', color: '#fff', padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>💾 확정 저장 {uploadConfirmedIds.size > 0 ? `(${uploadConfirmedIds.size}건)` : ''}</button>
                 </div>
               </div>
 
@@ -2683,8 +2830,8 @@ function UploadContent() {
                             const ids = group.items.map((i: any) => i.id)
                             setUploadSelectedIds(prev => {
                               const next = new Set(prev)
-                              if (e.target.checked) ids.forEach((id: string) => next.add(id))
-                              else ids.forEach((id: string) => next.delete(id))
+                              if (e.target.checked) ids.forEach((id: number) => next.add(id))
+                              else ids.forEach((id: number) => next.delete(id))
                               return next
                             })
                           }} />
@@ -2695,10 +2842,10 @@ function UploadContent() {
                             {group.isBank ? '통장/이체 거래' : group.cardInfo ? `${group.cardInfo.card_company} ****${(group.cardInfo.card_number || '').slice(-4)}` : cardNum}
                           </p>
                           {group.isBank && (
-                            <p style={{ fontSize: 11, color: '#2d5fa8', margin: 0, marginTop: 1 }}>계좌이체, 자동이체, CMS 등 통장 거래 내역</p>
+                            <p style={{ fontSize: 13, color: '#2d5fa8', margin: 0, marginTop: 1 }}>계좌이체, 자동이체, CMS 등 통장 거래 내역</p>
                           )}
                           {!group.isBank && group.cardInfo && (
-                            <p style={{ fontSize: 11, color: '#64748b', margin: 0, marginTop: 1 }}>
+                            <p style={{ fontSize: 13, color: '#64748b', margin: 0, marginTop: 1 }}>
                               사용자: <b style={{ color: '#0f172a' }}>{getCardDisplayName(group.cardInfo)}</b>
                               {group.cardInfo.assigned_employee_id ? (() => {
                                 const emp = employees.find((e: any) => e.id === group.cardInfo.assigned_employee_id)
@@ -2708,7 +2855,7 @@ function UploadContent() {
                               })() : group.cardInfo.card_alias && group.cardInfo.card_alias !== group.cardInfo.holder_name ? <span style={{ color: '#94a3b8' }}> ({group.cardInfo.card_alias})</span> : null}
                             </p>
                           )}
-                          {!group.isBank && !group.cardInfo && <p style={{ fontSize: 11, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
+                          {!group.isBank && !group.cardInfo && <p style={{ fontSize: 13, color: '#ef4444', margin: 0, marginTop: 1 }}>미등록 카드 — 법인카드 등록 후 매칭됩니다</p>}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           {group.isBank ? (() => {
@@ -2722,9 +2869,9 @@ function UploadContent() {
                             <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                           )}
                           {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
-                            <p style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
+                            <p style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
                           )}
-                          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cardNum) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                       </div>
@@ -2734,7 +2881,7 @@ function UploadContent() {
                         const cardHasMore = group.items.length > cardLimit
                         return (
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                             <tbody>
                               {cardVisibleItems.map(item => {
                                 const isItemConfirmed = uploadConfirmedIds.has(item.id)
@@ -2742,14 +2889,14 @@ function UploadContent() {
                                 <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                   <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                     {isItemConfirmed ? (
-                                      <span title="확정됨" style={{ fontSize: 11, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
+                                      <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                     ) : (
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 80, color: '#6b7280', fontSize: 12, whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
-                                  <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 12 }}>{item.description}</td>
+                                  <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>{item.description}</td>
                                   <td style={{ padding: '4px 6px', position: 'relative' }}>
                                     {(() => {
                                       const catParts = getCategoryParts(item.category, categoryMode)
@@ -2762,12 +2909,12 @@ function UploadContent() {
                                           <div onClick={(e) => { if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
                                             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer', border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0', borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff' }}>
                                             {isUnclassified ? (
-                                              <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
+                                              <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
                                             ) : (<>
                                               <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                               <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                                <div style={{ fontSize: 9, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                <div style={{ fontSize: 11, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                               </div>
                                             </>)}
                                             <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
@@ -2776,7 +2923,7 @@ function UploadContent() {
                                             <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
                                             <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: 340, overflowY: 'auto' }}>
                                               {catPopoverStep === 'group' ? (<>
-                                                <div style={{ padding: '8px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
+                                                <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                 {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                   <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                     style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
@@ -2786,12 +2933,12 @@ function UploadContent() {
                                                   </button>
                                                 ))}
                                               </>) : (<>
-                                                <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
                                                   <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
                                                   ② 세부항목
                                                 </div>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
+                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
                                                   📂 중그룹만 (미지정)
                                                 </button>
                                                 {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(c => c.group === catPopoverGroup)?.items || [])].map(c => (
@@ -2800,7 +2947,7 @@ function UploadContent() {
                                                     onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                     onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
                                                     <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>{c}
-                                                    {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 11 }}>✓</span>}
+                                                    {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 13 }}>✓</span>}
                                                   </button>
                                                 ))}
                                               </>)}
@@ -2818,40 +2965,37 @@ function UploadContent() {
                                       const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                       return (
                                         <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 11, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                             {rd ? (
                                               <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                                  <span>{rd.icon}</span>
-                                                  <span style={{ fontWeight: 700, fontSize: 11, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
-                                                </div>
-                                                {rd.detail && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                                <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
+                                                {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
                                               </div>
                                             ) : (
-                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 11, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
+                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
                                             )}
-                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
+                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
                                           </button>
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
                                               <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
                                                 {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
                                                   <div key={group.group}>
-                                                    <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                    <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
                                                     {group.items.map(opt => {
                                                       const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
                                                       return (
                                                         <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
                                                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
                                                           <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                            <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                            <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
                                                           </div>
-                                                          {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                          {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
                                                         </button>
                                                       )
                                                     })}
@@ -2866,15 +3010,13 @@ function UploadContent() {
                                   </td>
                                   {(() => { const ad = getAmountDisplay(item); return (
                                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
-                                    {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
-                                    {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                    {ad.prefix && <span style={{ fontSize: 12, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                    {ad.isForeign && <span style={{ fontSize: 13, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
                                     {ad.text}
-                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                    {ad.originalText && <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                   </td>
                                   )})()}
-                                  <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
-                                    <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
-                                  </td>
+                                  {/* 작업 버튼은 하단 선택바/일괄분류 모달에서 처리 */}
                                 </tr>
                               )})}
                             </tbody>
@@ -2882,11 +3024,11 @@ function UploadContent() {
                           {cardHasMore && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: cardLimit + GROUP_PAGE_SIZE })) }}
-                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                 더보기 ({cardLimit}/{group.items.length}건)
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: group.items.length })) }}
-                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 13, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
                                 전체보기
                               </button>
                             </div>
@@ -2921,8 +3063,8 @@ function UploadContent() {
                               const ids = group.items.map((i: any) => i.id)
                               setUploadSelectedIds(prev => {
                                 const next = new Set(prev)
-                                if (e.target.checked) ids.forEach((id: string) => next.add(id))
-                                else ids.forEach((id: string) => next.delete(id))
+                                if (e.target.checked) ids.forEach((id: number) => next.add(id))
+                                else ids.forEach((id: number) => next.delete(id))
                                 return next
                               })
                             }} />
@@ -2930,9 +3072,9 @@ function UploadContent() {
                           {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
                           <div style={{ flex: 1 }}>
                             <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{cat}</p>
-                            {groupName && <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>}
+                            {groupName && <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>}
                             {isDisplayMode && subGroups && (
-                              <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, marginTop: 1 }}>
+                              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, marginTop: 1 }}>
                                 {subGroups.map(([k]) => k).join(' · ')}
                               </p>
                             )}
@@ -2940,9 +3082,9 @@ function UploadContent() {
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                             {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
-                              <p style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
+                              <p style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
                             )}
-                            <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                           </div>
                           <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(cat) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                         </div>
@@ -2969,30 +3111,30 @@ function UploadContent() {
                             <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                               <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                 {isItemConfirmed ? (
-                                  <span title="확정됨" style={{ fontSize: 11, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
+                                  <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                 ) : (
                                   <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                 )}
                               </td>
-                              <td style={{ padding: '8px 12px', width: 80, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 10 }}>{item.transaction_date}</td>
+                              <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
                               <td style={{ padding: '8px 12px' }}>
                                 {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
-                                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#b45309' }}>💳</span>
+                                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: '#fef3c7', color: '#b45309' }}>💳</span>
                                 ) : (
-                                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b' }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b' }}>
                                     {item.type === 'income' ? '🔵' : '🔴'}
                                   </span>
                                 )}
                               </td>
                               <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
-                              <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
-                              <td style={{ padding: '6px 8px', fontSize: 11 }}>
+                              <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>{item.description}</td>
+                              <td style={{ padding: '6px 8px', fontSize: 13 }}>
                                 {item.card_id && getCardDisplayInfo(item.card_id) ? (
-                                  <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 10 }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 12 }}>
                                     {getCardDisplayInfo(item.card_id)!.holder}
                                   </span>
                                 ) : (item as any).matched_employee_name ? (
-                                  <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontWeight: 600, fontSize: 10 }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontWeight: 600, fontSize: 12 }}>
                                     {(item as any).matched_employee_name}
                                   </span>
                                 ) : null}
@@ -3005,40 +3147,37 @@ function UploadContent() {
                                   const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                   return (
                                     <div style={{ position: 'relative' }}>
-                                      <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 11, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                      <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                         {rd ? (
-                                          <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                              <span>{rd.icon}</span>
-                                              <span style={{ fontWeight: 700, fontSize: 11, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
-                                            </div>
-                                            {rd.detail && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
+                                            {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
                                           </div>
                                         ) : (
-                                          <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 11, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
+                                          <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
                                         )}
-                                        {(_hasRelOpts || rd) && <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
+                                        {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
                                       </button>
                                       {isOpen && relPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
                                           <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
-                                            <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                            <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                               <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                             </button>
                                             {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
                                               <div key={group.group}>
-                                                <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
                                                 {group.items.map(opt => {
                                                   const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
                                                   return (
                                                     <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
                                                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
                                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                        <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                        <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
                                                       </div>
-                                                      {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                      {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
                                                     </button>
                                                   )
                                                 })}
@@ -3053,15 +3192,13 @@ function UploadContent() {
                               </td>
                               {(() => { const ad = getAmountDisplay(item); return (
                               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
-                                {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
-                                {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                {ad.prefix && <span style={{ fontSize: 12, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                {ad.isForeign && <span style={{ fontSize: 13, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
                                 {ad.text}
-                                {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                {ad.originalText && <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                               </td>
                               )})()}
-                              <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
-                                <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
-                              </td>
+                              {/* 작업 버튼은 하단 선택바/일괄분류 모달에서 처리 */}
                             </tr>
                           )}
                           return (
@@ -3078,26 +3215,26 @@ function UploadContent() {
                                     {/* Sticky sub-group header - div outside table for proper sticky behavior */}
                                     <div style={{ position: 'sticky', top: 0, zIndex: 5, background: '#f0f4ff', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderBottom: '1px solid #e2e8f0' }}>
                                       <input type="checkbox" style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8', marginLeft: 8 }}
-                                        checked={sgItemIds.length > 0 && sgItemIds.every((id: string) => uploadSelectedIds.has(id))}
+                                        checked={sgItemIds.length > 0 && sgItemIds.every((id: number) => uploadSelectedIds.has(id))}
                                         onClick={e => e.stopPropagation()}
                                         onChange={e => {
                                           setUploadSelectedIds(prev => {
                                             const next = new Set(prev)
-                                            if (e.target.checked) sgItemIds.forEach((id: string) => next.add(id))
-                                            else sgItemIds.forEach((id: string) => next.delete(id))
+                                            if (e.target.checked) sgItemIds.forEach((id: number) => next.add(id))
+                                            else sgItemIds.forEach((id: number) => next.delete(id))
                                             return next
                                           })
                                         }} />
-                                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 800, color: '#475569' }}>
                                         {CATEGORY_ICONS[sgName] || '📋'} {sgName}
                                       </span>
-                                      <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8' }}>{sg.items.length}건 · {Math.abs(sg.totalAmount).toLocaleString()}원</span>
-                                      {sg.foreignAmounts && formatForeignAmounts(sg.foreignAmounts) && (
-                                        <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginLeft: 4 }}>({formatForeignAmounts(sg.foreignAmounts)})</span>
+                                      <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}>{sg.items.length}건 · {Math.abs(sg.totalAmount).toLocaleString()}원</span>
+                                      {(sg as any).foreignAmounts && formatForeignAmounts((sg as any).foreignAmounts) && (
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginLeft: 4 }}>({formatForeignAmounts((sg as any).foreignAmounts)})</span>
                                       )}
                                     </div>
                                     <div style={{ overflowX: 'auto' }}>
-                                      <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                                      <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                                         <tbody>
                                           {sgVisible.map((item: any) => renderGroupedItemRow(item))}
                                         </tbody>
@@ -3108,7 +3245,7 @@ function UploadContent() {
                               })
                             })() : (
                               <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                                <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                                   <tbody>
                                     {catVisibleItems.map((item: any) => renderGroupedItemRow(item))}
                                   </tbody>
@@ -3118,11 +3255,11 @@ function UploadContent() {
                             {catHasMore && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: catLimit + GROUP_PAGE_SIZE })) }}
-                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                   더보기 ({catLimit}/{sortedItems.length}건)
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: sortedItems.length })) }}
-                                  style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                  style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 13, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
                                   전체보기
                                 </button>
                               </div>
@@ -3150,9 +3287,9 @@ function UploadContent() {
                         <div style={{ textAlign: 'right' }}>
                           <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                           {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
-                            <p style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
+                            <p style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
                           )}
-                          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                         </div>
                         <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(label) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                       </div>
@@ -3162,7 +3299,7 @@ function UploadContent() {
                         const vHasMore = group.items.length > vLimit
                         return (
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                          <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                             <tbody>
                               {vVisibleItems.map(item => {
                                 const isItemConfirmed = uploadConfirmedIds.has(item.id)
@@ -3170,21 +3307,21 @@ function UploadContent() {
                                 <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                   <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                     {isItemConfirmed ? (
-                                      <span title="확정됨" style={{ fontSize: 11, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
+                                      <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                     ) : (
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 80, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 10 }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px' }}>
-                                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>
+                                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>
                                       {categoryMode === 'display'
                                         ? getCategoryGroup(item.category || '미분류', 'display')
                                         : `${CATEGORY_ICONS[item.category || ''] || '📋'} ${item.category || '미분류'}`}
                                     </span>
                                   </td>
-                                  <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11 }}>{item.description}</td>
+                                  <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>{item.description}</td>
                                   <td style={{ padding: '4px 8px', position: 'relative' }}>
                                     {(() => {
                                       const rd = getRelatedDisplay(item.related_type, item.related_id)
@@ -3193,40 +3330,37 @@ function UploadContent() {
                                       const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                       return (
                                         <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 11, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                             {rd ? (
                                               <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                                  <span>{rd.icon}</span>
-                                                  <span style={{ fontWeight: 700, fontSize: 11, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
-                                                </div>
-                                                {rd.detail && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                                <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
+                                                {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
                                               </div>
                                             ) : (
-                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 11, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
+                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
                                             )}
-                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
+                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
                                           </button>
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
                                               <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto' }}>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
                                                 {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
                                                   <div key={group.group}>
-                                                    <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                                                    <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
                                                     {group.items.map(opt => {
                                                       const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
                                                       return (
                                                         <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
                                                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
                                                           <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                            <div style={{ fontSize: 10, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                            <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
                                                           </div>
-                                                          {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                          {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
                                                         </button>
                                                       )
                                                     })}
@@ -3241,15 +3375,13 @@ function UploadContent() {
                                   </td>
                                   {(() => { const ad = getAmountDisplay(item); return (
                                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
-                                    {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
-                                    {ad.isForeign && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
+                                    {ad.prefix && <span style={{ fontSize: 12, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                    {ad.isForeign && <span style={{ fontSize: 13, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 4 }}>{ad.currency}</span>}
                                     {ad.text}
-                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                    {ad.originalText && <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                   </td>
                                   )})()}
-                                  <td style={{ padding: '8px 12px', textAlign: 'center', width: 36 }}>
-                                    <button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 16 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
-                                  </td>
+                                  {/* 작업 버튼은 하단 선택바/일괄분류 모달에서 처리 */}
                                 </tr>
                               )})}
                             </tbody>
@@ -3257,11 +3389,11 @@ function UploadContent() {
                           {vHasMore && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: vLimit + GROUP_PAGE_SIZE })) }}
-                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                 더보기 ({vLimit}/{group.items.length}건)
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: group.items.length })) }}
-                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 11, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                                style={{ background: '#fff', color: '#64748b', padding: '6px 12px', borderRadius: 6, fontWeight: 600, fontSize: 13, border: '1px solid #e2e8f0', cursor: 'pointer' }}>
                                 전체보기
                               </button>
                             </div>
@@ -3282,7 +3414,7 @@ function UploadContent() {
                     <p style={{ fontWeight: 800, fontSize: 14, color: '#991b1b', margin: 0 }}>
                       ❓ 미분류 거래 {uploadStats.unclassifiedCount}건
                     </p>
-                    <p style={{ fontSize: 11, color: '#b91c1c', marginTop: 2, margin: '2px 0 0' }}>
+                    <p style={{ fontSize: 13, color: '#b91c1c', marginTop: 2, margin: '2px 0 0' }}>
                       아래 계정과목 드롭다운에서 직접 변경하거나, AI 재분류를 시도하세요
                     </p>
                   </div>
@@ -3343,7 +3475,7 @@ function UploadContent() {
                             items.forEach(item => updateTransaction(item.id, 'category', cat))
                           }
                         }}
-                          style={{ padding: '4px 8px', borderRadius: 6, background: '#fff', border: '1px solid #e5e7eb', fontSize: 10, fontWeight: 700, color: '#4b5563', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ padding: '4px 8px', borderRadius: 6, background: '#fff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#4b5563', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           {CATEGORY_ICONS[cat] || '📋'} {cat}
                         </button>
@@ -3361,24 +3493,24 @@ function UploadContent() {
                 flexWrap: 'wrap', gap: 8,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
                     조회 <span style={{ fontWeight: 800, color: '#0f172a' }}>{uploadSummaryTotals.count.toLocaleString()}</span>건
                   </span>
                   <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                  <span style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>
+                  <span style={{ fontSize: 13, color: '#2563eb', fontWeight: 700 }}>
                     입금 +{uploadSummaryTotals.income.toLocaleString()}
                   </span>
-                  <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
+                  <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 700 }}>
                     출금 -{uploadSummaryTotals.expense.toLocaleString()}
                   </span>
                   <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: uploadSummaryTotals.net >= 0 ? '#2563eb' : '#dc2626' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: uploadSummaryTotals.net >= 0 ? '#2563eb' : '#dc2626' }}>
                     순합계 {uploadSummaryTotals.net >= 0 ? '+' : ''}{uploadSummaryTotals.net.toLocaleString()}
                   </span>
                   {uploadSummaryTotals.foreignText && (
                     <>
                       <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>
                         💱 {uploadSummaryTotals.foreignText}
                       </span>
                     </>
@@ -3404,8 +3536,8 @@ function UploadContent() {
                               const ids = group.items.map((i: any) => i.id)
                               setUploadSelectedIds(prev => {
                                 const next = new Set(prev)
-                                if (e.target.checked) ids.forEach((id: string) => next.add(id))
-                                else ids.forEach((id: string) => next.delete(id))
+                                if (e.target.checked) ids.forEach((id: number) => next.add(id))
+                                else ids.forEach((id: number) => next.delete(id))
                                 return next
                               })
                             }} />
@@ -3416,9 +3548,9 @@ function UploadContent() {
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontWeight: 800, fontSize: 14, color: group.type === 'income' ? '#16a34a' : '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
                             {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
-                              <p style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
+                              <p style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
                             )}
-                            <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
+                            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>{group.items.length}건</p>
                           </div>
                           <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', transform: expandedGroups.has(label) ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                         </div>
@@ -3428,7 +3560,7 @@ function UploadContent() {
                           const gHasMore = group.items.length > gLimit
                           return (
                           <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse' }}>
+                            <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                               <tbody>
                                 {gVisibleItems.map(item => {
                                   const isItemConfirmed = uploadConfirmedIds.has(item.id)
@@ -3436,24 +3568,24 @@ function UploadContent() {
                                   <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                     <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                       {isItemConfirmed ? (
-                                        <span title="확정됨" style={{ fontSize: 11, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
+                                        <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                       ) : (
                                         <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                       )}
                                     </td>
-                                    <td style={{ padding: '8px 12px', width: 80, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 10 }}>{item.transaction_date}</td>
+                                    <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
                                     <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                     <td style={{ padding: '8px 12px' }}>
-                                      <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>
+                                      <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>
                                         {categoryMode === 'display'
                                           ? getCategoryGroup(item.category || '미분류', 'display')
                                           : `${CATEGORY_ICONS[item.category || ''] || '📋'} ${item.category || '미분류'}`}
                                       </span>
                                     </td>
-                                    <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 11, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</td>
+                                    <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 13, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</td>
                                     {(() => { const ad = getAmountDisplay(item); return (
                                     <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color, whiteSpace: 'nowrap' }}>
-                                      {ad.prefix && <span style={{ fontSize: 10, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
+                                      {ad.prefix && <span style={{ fontSize: 12, color: ad.prefixColor, marginRight: 4 }}>{ad.prefix}</span>}
                                       {ad.text}
                                     </td>
                                     )})()}
@@ -3464,7 +3596,7 @@ function UploadContent() {
                             {gHasMore && (
                               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e5e7eb' }}>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: gLimit + GROUP_PAGE_SIZE })) }}
-                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer' }}>
+                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                   더보기 ({gLimit}/{group.items.length}건)
                                 </button>
                               </div>
@@ -3493,7 +3625,7 @@ function UploadContent() {
                       <col style={{ width: 85 }} />
                       <col style={{ width: 28 }} />
                     </colgroup>
-                    <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+                    <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 10 }}>
                       <tr>
                         <th style={{ padding: '6px 4px', textAlign: 'center' }}>
                           <input type="checkbox" checked={filteredResults.length > 0 && uploadSelectedIds.size === filteredResults.length}
@@ -3518,7 +3650,7 @@ function UploadContent() {
                           <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent', transition: 'background 0.15s', height: 36, opacity: uploadConfirmedIds.has(item.id) ? 0.6 : 1 }} onMouseEnter={(e) => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = (!item.category || item.category === '미분류' || item.category === '기타') ? '#fee2e2' : 'rgba(45, 95, 168, 0.03)' }} onMouseLeave={(e) => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent' }}>
                             <td style={{ padding: '4px 4px', textAlign: 'center' }}>
                               {uploadConfirmedIds.has(item.id) ? (
-                                <span title="확정됨" style={{ fontSize: 11, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
+                                <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                               ) : (
                                 <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                               )}
@@ -3526,17 +3658,17 @@ function UploadContent() {
                             <td style={{ padding: '4px 6px', whiteSpace: 'nowrap', fontSize: 12 }}><input value={item.transaction_date || ''} onChange={e => handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} style={{ background: 'transparent', width: 74, outline: 'none', color: '#1f2937', fontSize: 12 }} /></td>
                             <td style={{ padding: '4px 6px' }}>
                               {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: '#fef3c7', color: '#b45309', whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#fef3c7', color: '#b45309', whiteSpace: 'nowrap' }}>
                                   💳 {item.card_number ? item.card_number.slice(-4) : '카드'}
                                 </span>
                               ) : (
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b', whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b', whiteSpace: 'nowrap' }}>
                                   {item.type === 'income' ? '🔵 입금' : '🔴 출금'}
                                 </span>
                               )}
                             </td>
-                            <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 11 }} /></td>
-                            <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: 'transparent', border: '1px solid #f1f5f9', borderRadius: 4, padding: '2px 4px', outline: 'none', fontSize: 12, color: '#64748b' }} /></td>
+                            <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 13 }} /></td>
+                            <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: 'transparent', border: '1px solid #f1f5f9', borderRadius: 4, padding: '2px 4px', outline: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }} /></td>
                             <td style={{ padding: '4px 4px', position: 'relative' }}>
                               {(() => {
                                 const catParts = getCategoryParts(item.category, categoryMode)
@@ -3555,13 +3687,13 @@ function UploadContent() {
                                       }}
                                     >
                                       {isUnclassified ? (
-                                        <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
                                       ) : (
                                         <>
                                           <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                           <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                            <div style={{ fontSize: 9, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                            <div style={{ fontSize: 11, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                           </div>
                                         </>
                                       )}
@@ -3573,7 +3705,7 @@ function UploadContent() {
                                         <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: 340, overflowY: 'auto' }}>
                                           {catPopoverStep === 'group' ? (
                                             <>
-                                              <div style={{ padding: '8px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
+                                              <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                               {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                 <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                   style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
@@ -3585,18 +3717,18 @@ function UploadContent() {
                                                 </button>
                                               ))}
                                               <button onClick={() => { handleUpdateItem(item.id, 'category', '미분류', item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
+                                                style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
                                                 ✕ 미분류로 초기화
                                               </button>
                                             </>
                                           ) : (
                                             <>
-                                              <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                              <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
                                                 ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                               </div>
                                               <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
+                                                style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
                                                 📂 중그룹만 (미지정)
                                               </button>
                                               {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
@@ -3607,7 +3739,7 @@ function UploadContent() {
                                                 >
                                                   <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
                                                   {c}
-                                                  {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 11 }}>✓</span>}
+                                                  {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 13 }}>✓</span>}
                                                 </button>
                                               ))}
                                             </>
@@ -3621,15 +3753,15 @@ function UploadContent() {
                             </td>
                             <td style={{ padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {cardInfo ? (
-                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
                                   {cardInfo.holder} ({cardInfo.last4})
                                 </span>
                               ) : (item as any).matched_employee_name ? (
-                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
                                   {(item as any).matched_employee_name}
                                 </span>
                               ) : (item.payment_method === '카드' || item.payment_method === 'Card') ? (
-                                <span style={{ fontSize: 10, color: '#d1d5db' }}>미매칭</span>
+                                <span style={{ fontSize: 12, color: '#d1d5db' }}>미매칭</span>
                               ) : null}
                             </td>
                             <td style={{ padding: '4px 8px', position: 'relative' }}>
@@ -3644,21 +3776,18 @@ function UploadContent() {
                                       onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }}
                                       style={{
                                         width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px',
-                                        fontSize: 11, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
+                                        fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
                                         display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none',
                                         minHeight: 32,
                                       }}
                                     >
                                       {rd ? (
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                            <span>{rd.icon}</span>
-                                            <span style={{ fontWeight: 700, fontSize: 10, color: rd.color || '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.label}</span>
-                                          </div>
-                                          {rd.detail && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+                                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                                          <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
+                                          {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
                                         </div>
                                       ) : (
-                                        <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 10, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
+                                        <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 12, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
                                       )}
                                       {(_hasRelOpts || rd) && <span style={{ fontSize: 8, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
                                     </button>
@@ -3672,7 +3801,7 @@ function UploadContent() {
                                         }}>
                                           <button
                                             onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }}
-                                            style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }}
+                                            style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }}
                                             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                                             onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}
                                           >
@@ -3680,7 +3809,7 @@ function UploadContent() {
                                           </button>
                                           {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
                                             <div key={group.group}>
-                                              <div style={{ padding: '6px 12px', fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+                                              <div style={{ padding: '6px 12px', fontSize: 13, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
                                                 {group.icon} {group.group}
                                               </div>
                                               {group.items.map(opt => {
@@ -3700,10 +3829,10 @@ function UploadContent() {
                                                   >
                                                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                      <div style={{ fontSize: 11, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                      <div style={{ fontSize: 9, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                                                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                                                      <div style={{ fontSize: 13, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
                                                     </div>
-                                                    {selected && <span style={{ fontSize: 11, color: opt.color }}>✓</span>}
+                                                    {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
                                                   </button>
                                                 )
                                               })}
@@ -3718,12 +3847,12 @@ function UploadContent() {
                             </td>
                             {(() => { const ad = getAmountDisplay(item); return (
                             <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 800, fontSize: 12, color: ad.color, whiteSpace: 'nowrap' }}>
-                              {ad.prefix && <span style={{ fontSize: 9, color: ad.prefixColor, marginRight: 2 }}>{ad.prefix}</span>}
+                              {ad.prefix && <span style={{ fontSize: 13, color: ad.prefixColor, marginRight: 2 }}>{ad.prefix}</span>}
                               {ad.isForeign && <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 3px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 2 }}>{ad.currency}</span>}
                               {ad.text}
                             </td>
                             )})()}
-                            <td style={{ padding: '4px 4px', textAlign: 'center' }}><button onClick={() => deleteTransaction(item.id)} style={{ background: 'none', border: 'none', color: '#d1d5db', fontWeight: 700, padding: 2, cursor: 'pointer', fontSize: 14 }} onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>×</button></td>
+                            {/* 작업 버튼은 하단 선택바/일괄분류 모달에서 처리 */}
                           </tr>
                         )
                       })}
@@ -3743,7 +3872,7 @@ function UploadContent() {
                   <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
                     {uploadSelectionTotals.count}건 선택
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>
                     합계 {uploadSelectionTotals.total.toLocaleString()}원
                     {uploadSelectionTotals.foreignText && (
                       <span style={{ color: '#fbbf24', marginLeft: 6 }}>({uploadSelectionTotals.foreignText})</span>
@@ -3849,7 +3978,7 @@ function UploadContent() {
                     style={{ background: '#10b981', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     ✅ 분류확정
                   </button>
-                  <button onClick={() => { setBulkClassifyOpen(true); setBulkGroup(''); setBulkItem(''); setBulkRelated('') }}
+                  <button onClick={() => { setBulkClassifyOpen(true); setBulkGroup(''); setBulkItem(''); setBulkRelated(''); setSplitRows([]) }}
                     style={{ background: '#2d5fa8', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     📋 일괄분류
                   </button>
@@ -3880,10 +4009,7 @@ function UploadContent() {
                     style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     삭제
                   </button>
-                  <button onClick={() => setUploadSelectedIds(new Set())}
-                    style={{ background: '#334155', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 6, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    ✕ 선택 해제
-                  </button>
+                  {/* 선택 해제는 체크박스 클릭으로 처리 */}
                 </div>
               )}
 
@@ -3904,30 +4030,33 @@ function UploadContent() {
                   { label: '🏢 임차료', group: categoryMode === 'display' ? '🏢 사무실/운영비' : '영업비용-관리', item: '임차료/사무실' },
                   { label: '⛽ 차량보험', group: categoryMode === 'display' ? '🚛 차량 운영' : '영업비용-차량', item: '차량보험료' },
                   { label: '💰 투자원금', group: categoryMode === 'display' ? '🏦 투자/대출 입출금' : '자본변동', item: '투자원금 입금' },
+                  { label: '🚗 렌터카보증금', group: categoryMode === 'display' ? '🏦 투자/대출 입출금' : '자본변동', item: '렌터카 보증금(입금)' },
                 ]
                 const bulkSubItems = bulkGroup ? getItemsForGroup(bulkGroup, categoryMode) : []
                 const bulkPreview = bulkItem || bulkGroup || '미분류'
                 const bulkGroupColor = bulkGroup ? (CATEGORY_COLORS[bulkGroup] || '#94a3b8') : ''
                 return (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setBulkClassifyOpen(false)}>
-                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: '80vh', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
                       {/* 헤더 */}
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>📋 일괄 분류</h3>
-                          <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>선택된 <b style={{ color: '#2d5fa8' }}>{selCount}건</b> · 합계 <b>{selTotal.toLocaleString()}원</b>{selForeignText && <span style={{ color: '#f59e0b', fontWeight: 700, marginLeft: 4 }}>({selForeignText})</span>}</p>
+                          <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0' }}>선택된 <b style={{ color: '#2d5fa8' }}>{selCount}건</b> · 합계 <b>{selTotal.toLocaleString()}원</b>{selForeignText && <span style={{ color: '#f59e0b', fontWeight: 700, marginLeft: 4 }}>({selForeignText})</span>}</p>
                         </div>
                         <button onClick={() => setBulkClassifyOpen(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: '#94a3b8', cursor: 'pointer' }}>✕</button>
                       </div>
 
+                      {/* 스크롤 가능한 본문 영역 */}
+                      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                       {/* 자주 쓰는 분류 */}
                       <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>⚡ 자주 쓰는 분류 (원클릭)</p>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>⚡ 자주 쓰는 분류 (원클릭)</p>
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                           {quickPresets.map(qp => (
                             <button key={qp.label} onClick={() => { setBulkGroup(qp.group); setBulkItem(qp.item) }}
                               style={{
-                                padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700,
+                                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
                                 border: bulkGroup === qp.group && bulkItem === qp.item ? '1px solid #2d5fa8' : '1px solid #e2e8f0',
                                 background: bulkGroup === qp.group && bulkItem === qp.item ? '#2d5fa8' : '#fff',
                                 color: bulkGroup === qp.group && bulkItem === qp.item ? '#fff' : '#374151',
@@ -3995,7 +4124,7 @@ function UploadContent() {
                                 ))}
                               </select>
                               <button onClick={() => setCustomGroupInput(true)}
-                                style={{ padding: '9px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
+                                style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
                                 + 추가
                               </button>
                             </div>
@@ -4046,7 +4175,7 @@ function UploadContent() {
                               </select>
                               {bulkGroup && customCategories.some(c => c.group === bulkGroup) && (
                                 <button onClick={() => setCustomItemInput(true)}
-                                  style={{ padding: '9px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
+                                  style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
                                   + 추가
                                 </button>
                               )}
@@ -4067,33 +4196,149 @@ function UploadContent() {
                         </div>
                       </div>
 
+                      {/* ④ 금액 분할 — 1건 선택 시에만 표시 */}
+                      {selCount === 1 && (
+                        <div style={{ padding: '0 20px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <label style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>④ 금액 분할 <span style={{ fontWeight: 500, color: '#94a3b8' }}>(선택)</span></label>
+                            {splitRows.length === 0 ? (
+                              <button onClick={() => {
+                                const item = selectedItems[0]
+                                const half = Math.floor(item.amount / 2)
+                                setSplitRows([
+                                  { amount: half, memo: '', related_type: '', related_id: '' },
+                                  { amount: item.amount - half, memo: '', related_type: '', related_id: '' },
+                                ])
+                              }}
+                                style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                                ✂️ 분할하기
+                              </button>
+                            ) : (
+                              <button onClick={() => setSplitRows([])}
+                                style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                                분할 취소
+                              </button>
+                            )}
+                          </div>
+                          {splitRows.length > 0 && (() => {
+                            const origAmount = selectedItems[0].amount
+                            const splitTotal = splitRows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+                            const diff = origAmount - splitTotal
+                            return (
+                              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#fafbfc' }}>
+                                {/* 균등 분할 */}
+                                <div style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600, marginRight: 4 }}>균등:</span>
+                                  {[2, 3, 4, 5].map(n => (
+                                    <button key={n} onClick={() => {
+                                      const base = Math.floor(origAmount / n)
+                                      const rem = origAmount - base * n
+                                      setSplitRows(Array.from({ length: n }, (_, i) => ({
+                                        amount: i === 0 ? base + rem : base, memo: '', related_type: '', related_id: '',
+                                      })))
+                                    }}
+                                      style={{ padding: '2px 10px', borderRadius: 4, border: splitRows.length === n ? '1px solid #2563eb' : '1px solid #d1d5db',
+                                        background: splitRows.length === n ? '#eff6ff' : '#fff', color: splitRows.length === n ? '#2563eb' : '#64748b',
+                                        cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                                      {n}등분
+                                    </button>
+                                  ))}
+                                  <button onClick={() => setSplitRows(prev => [...prev, { amount: 0, memo: '', related_type: '', related_id: '' }])}
+                                    style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #d1d5db', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: 13, marginLeft: 'auto' }}>
+                                    + 추가
+                                  </button>
+                                </div>
+                                {/* 분할 행들 */}
+                                <div style={{ padding: '8px 12px', maxHeight: 200, overflow: 'auto' }}>
+                                  {splitRows.map((row, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', width: 20, textAlign: 'center' }}>{i + 1}</span>
+                                      <input type="text" value={row.amount ? row.amount.toLocaleString() : ''} placeholder="금액"
+                                        onChange={e => { const num = Number(e.target.value.replace(/[^0-9]/g, '')); setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, amount: num } : r)) }}
+                                        style={{ width: 120, padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 600, textAlign: 'right' }} />
+                                      <select value={row.related_type && row.related_id ? `${row.related_type}_${row.related_id}` : ''}
+                                        onChange={e => {
+                                          const val = e.target.value
+                                          if (!val) { setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: '', related_id: '' } : r)); return }
+                                          const [t, ...rest] = val.split('_')
+                                          setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: t, related_id: rest.join('_') } : r))
+                                        }}
+                                        style={{ flex: 1, padding: '5px 6px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#475569' }}>
+                                        <option value="">차량/연결 선택</option>
+                                        {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(group => (
+                                          <optgroup key={group.group} label={`${group.icon} ${group.group}`}>
+                                            {group.items.map(opt => (
+                                              <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>
+                                            ))}
+                                          </optgroup>
+                                        ))}
+                                      </select>
+                                      {splitRows.length > 2 && (
+                                        <button onClick={() => setSplitRows(prev => prev.filter((_, j) => j !== i))}
+                                          style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 14 }}
+                                          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* 합계 검증 */}
+                                <div style={{ padding: '6px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', background: diff === 0 ? '#f0fdf4' : '#fef2f2' }}>
+                                  <span style={{ fontSize: 13, color: diff === 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                                    {diff === 0 ? '✅ 금액 일치' : `⚠️ 차이: ${diff.toLocaleString()}원`}
+                                  </span>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: diff === 0 ? '#16a34a' : '#dc2626' }}>
+                                    합계: {splitTotal.toLocaleString()}원 / {origAmount.toLocaleString()}원
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
+
                       {/* 미리보기 */}
                       {bulkGroup && (
                         <div style={{ padding: '10px 20px', background: '#f0f9ff', borderTop: '1px solid #e2e8f0' }}>
-                          <p style={{ fontSize: 10, fontWeight: 700, color: '#1e40af', marginBottom: 4 }}>미리보기</p>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', marginBottom: 4 }}>미리보기</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${bulkGroupColor}20`, color: bulkGroupColor }}>{bulkGroup.split(' ')[0]} {bulkGroup.replace(/^[^\s]+\s/, '').substring(0, 6)}</span>
+                            <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: `${bulkGroupColor}20`, color: bulkGroupColor }}>{bulkGroup.split(' ')[0]} {bulkGroup.replace(/^[^\s]+\s/, '').substring(0, 6)}</span>
                             {bulkItem && <><span style={{ color: '#d1d5db' }}>›</span><span style={{ fontSize: 12, fontWeight: 700 }}>{bulkItem}</span></>}
                             {bulkRelated && (() => {
                               const ro = relatedOptions.flatMap(g => g.items).find(o => o.value === bulkRelated)
-                              return ro ? <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>{ro.label}</span></> : null
+                              return ro ? <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>{ro.label}</span></> : null
                             })()}
                           </div>
                         </div>
                       )}
 
-                      {/* 푸터 */}
-                      <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      </div>{/* 스크롤 영역 끝 */}
+
+                      {/* 푸터 — 하단 고정 */}
+                      <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
                         <button onClick={() => setBulkClassifyOpen(false)}
                           style={{ padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#f1f5f9', color: '#475569' }}>
                           취소
                         </button>
-                        <button disabled={!bulkGroup} onClick={() => {
+                        <button disabled={!bulkGroup || (splitRows.length > 0 && splitRows.reduce((s, r) => s + (Number(r.amount) || 0), 0) !== selectedItems[0]?.amount)} onClick={() => {
                           const catValue = bulkItem || bulkGroup
-                          for (const si of selectedItems) {
-                            updateTransaction(si.id, 'category', catValue)
-                            if (bulkRelated) {
-                              updateTransaction(si.id, 'related_composite', bulkRelated)
+                          // 분할이 설정된 경우 (1건 선택 + 분할행 존재)
+                          if (splitRows.length > 0 && selCount === 1) {
+                            const origItem = selectedItems[0]
+                            splitTransaction(origItem.id, splitRows.map(r => ({
+                              amount: Number(r.amount),
+                              description: r.memo || undefined,
+                              related_type: r.related_type || undefined,
+                              related_id: r.related_id || undefined,
+                              category: catValue,
+                            })))
+                            setSplitRows([])
+                          } else {
+                            // 일반 일괄분류
+                            for (const si of selectedItems) {
+                              updateTransaction(si.id, 'category', catValue)
+                              if (bulkRelated) {
+                                updateTransaction(si.id, 'related_composite', bulkRelated)
+                              }
                             }
                           }
                           // 일괄분류 후 자동 확정
@@ -4104,7 +4349,7 @@ function UploadContent() {
                           setBulkClassifyOpen(false)
                         }}
                           style={{ padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: bulkGroup ? '#2d5fa8' : '#94a3b8', color: '#fff', opacity: bulkGroup ? 1 : 0.5 }}>
-                          ✅ {selCount}건 일괄 분류
+                          {splitRows.length > 0 ? `✂️ 분할 + 분류 (${splitRows.length}건)` : `✅ ${selCount}건 일괄 분류`}
                         </button>
                       </div>
                     </div>
@@ -4135,7 +4380,7 @@ function UploadContent() {
                 </span>
               </label>
               <button onClick={handleDeleteAll} disabled={deleting}
-                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: '#dc2626' }}>
+                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: '#dc2626' }}>
                 {deleting ? '삭제 중...' : `전체 삭제`}
               </button>
             </div>
@@ -4209,9 +4454,9 @@ function UploadContent() {
                         {!isDisplayCat && <span style={{ fontSize: 20 }}>{icon}</span>}
                         <div>
                           <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
-                          {!hasSubGroups && !isDisplayCat && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, margin: 0 }}>{groupName}</p>}
+                          {!hasSubGroups && !isDisplayCat && <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 1, margin: 0 }}>{groupName}</p>}
                           {hasSubGroups && group.subGroups && (
-                            <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, margin: 0 }}>
+                            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 1, margin: 0 }}>
                               {Object.keys(group.subGroups).join(' · ')}
                             </p>
                           )}
@@ -4224,27 +4469,27 @@ function UploadContent() {
                           {nf(group.totalAmount)}원
                         </p>
                         {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
-                          <p style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
+                          <p style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, margin: 0 }}>({formatForeignAmounts((group as any).foreignAmounts)})</p>
                         )}
-                        <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, margin: 0 }}>{group.items.length}건</p>
+                        <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 1, margin: 0 }}>{group.items.length}건</p>
                       </div>
 
                       {/* Group Actions */}
                       {activeTab === 'classify' && category !== '미분류' && category !== '기타' && (
                         <button onClick={(e) => { e.stopPropagation(); handleConfirmGroup(category, group.items) }}
-                          style={{ background: '#10b981', color: '#fff', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                          style={{ background: '#10b981', color: '#fff', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>
                           일괄확정
                         </button>
                       )}
                       {activeTab === 'classify' && (category === '미분류' || category === '기타') && (
-                        <span style={{ padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', flexShrink: 0 }}>
+                        <span style={{ padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 13, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', flexShrink: 0 }}>
                           ⚠ 분류 후 확정 가능
                         </span>
                       )}
 
                       {activeTab === 'confirmed' && (
                         <button onClick={(e) => { e.stopPropagation(); handleRevertGroup(category, group.items) }}
-                          style={{ background: '#fef2f2', color: '#dc2626', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 11, border: '1px solid #fecaca', cursor: 'pointer', flexShrink: 0 }}>
+                          style={{ background: '#fef2f2', color: '#dc2626', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: '1px solid #fecaca', cursor: 'pointer', flexShrink: 0 }}>
                           ↩ 일괄되돌리기
                         </button>
                       )}
@@ -4291,8 +4536,8 @@ function UploadContent() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 20px 6px 36px', background: '#f0f4ff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 5, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                                 {groupBy === 'category' && <span style={{ fontSize: 13 }}>{CATEGORY_ICONS[subHeader.name] || '📋'}</span>}
                                 {groupBy !== 'category' && <div style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORY_COLORS[subHeader.name] || '#94a3b8', flexShrink: 0 }} />}
-                                <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{subHeader.name}</span>
-                                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{subHeader.count}건 · {Math.abs(subHeader.amount).toLocaleString()}원</span>
+                                <span style={{ fontSize: 13, fontWeight: 800, color: '#475569' }}>{subHeader.name}</span>
+                                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{subHeader.count}건 · {Math.abs(subHeader.amount).toLocaleString()}원</span>
                               </div>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 36px', borderBottom: '1px solid #f8fafc', gap: 10, opacity: isConfirmed ? 0.5 : 1, background: selectedIds.has(item.id) ? 'rgba(59, 130, 246, 0.18)' : (item.source_data?.is_cancelled ? '#fef2f2' : 'transparent'), transition: 'background 0.2s' }}
@@ -4305,20 +4550,20 @@ function UploadContent() {
 
                               {/* 취소 뱃지 */}
                               {(item.source_data?.is_cancelled || (item.source_data?.description || '').includes('취소')) && (
-                                <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fecaca', color: '#991b1b', flexShrink: 0 }}>취소</span>
+                                <span style={{ fontSize: 13, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: '#fecaca', color: '#991b1b', flexShrink: 0 }}>취소</span>
                               )}
 
                               {/* Date */}
                               <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, width: 80, flexShrink: 0 }}>{src.transaction_date}</span>
 
                               {/* Type */}
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                              <span style={{ fontSize: 13, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
                                 background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b82f6' : '#ef4444' }}>
                                 {src.type === 'income' ? '입금' : '출금'}
                               </span>
 
                               {/* Payment Method */}
-                              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', flexShrink: 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', flexShrink: 0 }}>
                                 {src.payment_method || '통장'}
                               </span>
 
@@ -4341,7 +4586,7 @@ function UploadContent() {
                                       onClick={(e) => { e.stopPropagation(); if (linkPopoverId === item.id) { setLinkPopoverId(null); setLinkPopoverPosFixed(null) } else { setLinkPopoverId(item.id); setLinkPopoverPosFixed(calcPopPosRight(e.currentTarget, 340)); setLinkPopoverSearch(''); setLinkPopoverTab('car') } }}
                                       style={{
                                         display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6,
-                                        fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                                        fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
                                         background: ld ? ld.bg : '#f8fafc', color: ld ? ld.color : '#94a3b8',
                                         ...(ld ? {} : { borderStyle: 'dashed' as const, borderWidth: 1, borderColor: '#cbd5e1' }),
                                       }}>
@@ -4358,7 +4603,7 @@ function UploadContent() {
                                           placeholder="검색..." value={linkPopoverSearch}
                                           onChange={e => setLinkPopoverSearch(e.target.value)}
                                           onClick={e => e.stopPropagation()}
-                                          style={{ width: '100%', border: 'none', borderBottom: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 11, outline: 'none', background: '#fafbfc' }}
+                                          style={{ width: '100%', border: 'none', borderBottom: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 13, outline: 'none', background: '#fafbfc' }}
                                         />
                                         <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
                                           {([
@@ -4369,7 +4614,7 @@ function UploadContent() {
                                           ]).map(t => (
                                             <button key={t.key} onClick={() => setLinkPopoverTab(t.key)}
                                               style={{
-                                                flex: 1, padding: '8px 4px', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer',
+                                                flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
                                                 background: linkPopoverTab === t.key ? '#fff' : '#f8fafc',
                                                 color: linkPopoverTab === t.key ? '#0f172a' : '#94a3b8',
                                                 borderBottom: linkPopoverTab === t.key ? '2px solid #0f172a' : '2px solid transparent',
@@ -4382,7 +4627,7 @@ function UploadContent() {
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>🚗</span>
-                                              <div><div style={{ fontWeight: 700 }}>{c.number}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{c.brand} {c.model}</div></div>
+                                              <div><div style={{ fontWeight: 700 }}>{c.number}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{c.brand} {c.model}</div></div>
                                             </div>
                                           ))}
                                           {linkPopoverTab === 'jiip' && linkOptions.jiip.map((j: any) => (
@@ -4390,7 +4635,7 @@ function UploadContent() {
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>🚛</span>
-                                              <div><div style={{ fontWeight: 700 }}>{j.investor_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{j.vehicle_number || j.car_number || ''}</div></div>
+                                              <div><div style={{ fontWeight: 700 }}>{j.investor_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{j.vehicle_number || j.car_number || ''}</div></div>
                                             </div>
                                           ))}
                                           {linkPopoverTab === 'invest' && linkOptions.invest.map((inv: any) => (
@@ -4398,7 +4643,7 @@ function UploadContent() {
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>💰</span>
-                                              <div><div style={{ fontWeight: 700 }}>{inv.investor_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{inv.invest_amount ? Number(inv.invest_amount).toLocaleString() + '원' : ''} · {inv.interest_rate || '-'}%</div></div>
+                                              <div><div style={{ fontWeight: 700 }}>{inv.investor_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{inv.invest_amount ? Number(inv.invest_amount).toLocaleString() + '원' : ''} · {inv.interest_rate || '-'}%</div></div>
                                             </div>
                                           ))}
                                           {linkPopoverTab === 'loan' && linkOptions.loan.map((l: any) => (
@@ -4406,17 +4651,17 @@ function UploadContent() {
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>🏦</span>
-                                              <div><div style={{ fontWeight: 700 }}>{l.finance_name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>월 {l.monthly_payment ? Number(l.monthly_payment).toLocaleString() + '원' : '-'}</div></div>
+                                              <div><div style={{ fontWeight: 700 }}>{l.finance_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>월 {l.monthly_payment ? Number(l.monthly_payment).toLocaleString() + '원' : '-'}</div></div>
                                             </div>
                                           ))}
                                           {linkOptions[linkPopoverTab]?.length === 0 && (
-                                            <div style={{ padding: 16, textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>등록된 항목이 없습니다</div>
+                                            <div style={{ padding: 16, textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>등록된 항목이 없습니다</div>
                                           )}
                                         </div>
                                         {ld && (
                                           <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
                                             <button onClick={() => { handleLinkItem(item.id, '', ''); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
-                                              style={{ width: '100%', padding: '6px', borderRadius: 6, border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                              style={{ width: '100%', padding: '6px', borderRadius: 6, border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                                               연결 해제
                                             </button>
                                           </div>
@@ -4433,10 +4678,10 @@ function UploadContent() {
                                 const ad = getAmountDisplay(reviewItem)
                                 return (
                                   <span style={{ fontWeight: 800, fontSize: 13, color: ad.color, textAlign: 'right', minWidth: 90, flexShrink: 0 }}>
-                                    {ad.prefix && <span style={{ fontSize: 10, marginRight: 2 }}>{ad.prefix}</span>}
+                                    {ad.prefix && <span style={{ fontSize: 12, marginRight: 2 }}>{ad.prefix}</span>}
                                     {ad.isForeign && <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 3px', borderRadius: 3, background: '#fef3c7', color: '#92400e', marginRight: 3 }}>{ad.currency}</span>}
                                     {ad.text}
-                                    {ad.originalText && <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
+                                    {ad.originalText && <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                   </span>
                                 )
                               })()}
@@ -4446,16 +4691,16 @@ function UploadContent() {
                                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                   {(category !== '미분류' && category !== '기타') ? (
                                     <button onClick={() => handleConfirm(item)}
-                                      style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
+                                      style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
                                       확정
                                     </button>
                                   ) : (
-                                    <span style={{ fontSize: 9, color: '#dc2626', fontWeight: 700, padding: '4px 6px', background: '#fef2f2', borderRadius: 4 }}>분류필요</span>
+                                    <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 700, padding: '4px 6px', background: '#fef2f2', borderRadius: 4 }}>분류필요</span>
                                   )}
                                   <select defaultValue="" onChange={e => { if (e.target.value) handleConfirm(item, { category: e.target.value }) }}
                                     style={{
                                       border: (category === '미분류' || category === '기타') ? '2px solid #f87171' : '1px solid #e2e8f0',
-                                      borderRadius: 6, padding: '3px 4px', fontSize: 10,
+                                      borderRadius: 6, padding: '3px 4px', fontSize: 12,
                                       background: (category === '미분류' || category === '기타') ? '#fef2f2' : '#fff',
                                       color: (category === '미분류' || category === '기타') ? '#dc2626' : '#64748b',
                                       maxWidth: 100, cursor: 'pointer', fontWeight: (category === '미분류' || category === '기타') ? 700 : 400,
@@ -4468,7 +4713,7 @@ function UploadContent() {
                                     ))}
                                   </select>
                                   <button onClick={() => handleConfirmWithRule(item, item.ai_category)}
-                                    style={{ background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}
+                                    style={{ background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}
                                     title="이 거래처를 규칙으로 학습합니다">
                                     📚
                                   </button>
@@ -4479,7 +4724,7 @@ function UploadContent() {
                               {isConfirmed && activeTab === 'confirmed' && (
                                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                   <select defaultValue="" onChange={e => { if (e.target.value) handleChangeCategory(item, e.target.value) }}
-                                    style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 10, background: '#fff', color: '#64748b', maxWidth: 90, cursor: 'pointer' }}>
+                                    style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 12, background: '#fff', color: '#64748b', maxWidth: 90, cursor: 'pointer' }}>
                                     <option value="" disabled>수정</option>
                                     {CATEGORIES.map(g => (
                                       <optgroup key={g.group} label={g.group}>
@@ -4488,7 +4733,7 @@ function UploadContent() {
                                     ))}
                                   </select>
                                   <button onClick={() => handleRevert(item)}
-                                    style={{ background: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: '1px solid #fecaca', cursor: 'pointer' }}
+                                    style={{ background: '#fef2f2', color: '#dc2626', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: '1px solid #fecaca', cursor: 'pointer' }}
                                     title="대기중으로 되돌립니다">
                                     ↩ 되돌리기
                                   </button>
@@ -4524,31 +4769,31 @@ function UploadContent() {
               borderRadius: '0 0 16px 16px', flexWrap: 'wrap', gap: 8,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
                   조회 <span style={{ fontWeight: 800, color: '#0f172a' }}>{summaryTotals.count.toLocaleString()}</span>건
                 </span>
                 <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                <span style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>
+                <span style={{ fontSize: 13, color: '#2563eb', fontWeight: 700 }}>
                   입금 +{summaryTotals.income.toLocaleString()}
                 </span>
-                <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
+                <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 700 }}>
                   출금 -{summaryTotals.expense.toLocaleString()}
                 </span>
                 <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                <span style={{ fontSize: 11, fontWeight: 800, color: summaryTotals.net >= 0 ? '#2563eb' : '#dc2626' }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: summaryTotals.net >= 0 ? '#2563eb' : '#dc2626' }}>
                   순합계 {summaryTotals.net >= 0 ? '+' : ''}{summaryTotals.net.toLocaleString()}
                 </span>
                 {summaryTotals.foreignText && (
                   <>
                     <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '1px 6px', borderRadius: 4 }}>
                       💱 {summaryTotals.foreignText}
                     </span>
                   </>
                 )}
               </div>
               <button style={{
-                padding: '5px 12px', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 700,
                 color: '#64748b', background: '#fff', border: '1px solid #e2e8f0', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4,
               }}>
@@ -4568,7 +4813,7 @@ function UploadContent() {
               <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
                 {selectionTotals.count}건 선택
               </span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>
                 합계 {selectionTotals.total.toLocaleString()}원
                 {selectionTotals.foreignText && (
                   <span style={{ color: '#fbbf24', marginLeft: 6 }}>({selectionTotals.foreignText})</span>
@@ -4693,7 +4938,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🚗</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{c.number || '번호없음'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{[c.brand, c.model].filter(Boolean).join(' ') || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{[c.brand, c.model].filter(Boolean).join(' ') || '-'}</div>
                       </div>
                     ))}
                     {linkModalTab === 'jiip' && linkOptions.jiip.map((j: any) => (
@@ -4706,7 +4951,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🚛</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{j.investor_name || '미지정'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{j.vehicle_number || j.car_number || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{j.vehicle_number || j.car_number || '-'}</div>
                       </div>
                     ))}
                     {linkModalTab === 'invest' && linkOptions.invest.map((inv: any) => (
@@ -4719,7 +4964,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>💰</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{inv.investor_name || '미지정'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{inv.investment_type || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{inv.investment_type || '-'}</div>
                       </div>
                     ))}
                     {linkModalTab === 'loan' && linkOptions.loan.map((l: any) => (
@@ -4732,7 +4977,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🏦</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{l.finance_name || '미지정'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{l.loan_type || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{l.loan_type || '-'}</div>
                       </div>
                     ))}
                     {linkModalTab === 'insurance' && linkOptions.insurance.map((ins: any) => (
@@ -4745,7 +4990,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🛡️</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ins.company || '미지정'}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{ins.policy_type || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{ins.policy_type || '-'}</div>
                       </div>
                     ))}
                   </div>

@@ -614,6 +614,54 @@ function MobilePaymentCards({ schedules, onTogglePayment }: { schedules: any[], 
   )
 }
 
+// Sub-component: Linked Transactions
+function LinkedTransactionsSection({ transactions }: { transactions: any[] }) {
+  const f = (n: number) => Math.round(Math.abs(n || 0)).toLocaleString()
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const totalExpense = transactions.filter(t => t.type !== 'income').reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+          <span>💰</span> 연결된 거래 내역
+          {transactions.length > 0 && <span className="text-xs font-bold text-white bg-violet-500 px-2 py-0.5 rounded-full">{transactions.length}</span>}
+        </h3>
+      </div>
+      {transactions.length === 0 ? (
+        <div className="p-6 text-center text-gray-400 text-sm">
+          연결된 거래 내역이 없습니다.
+          <br />
+          <span className="text-xs text-gray-300 mt-1 block">카드/통장 관리에서 거래를 이 계약에 연결하세요</span>
+        </div>
+      ) : (
+        <>
+          <div className="px-6 py-3 border-b border-gray-100 flex gap-4 text-sm">
+            {totalIncome > 0 && <span className="text-blue-600 font-bold">입금 +{f(totalIncome)}원</span>}
+            {totalExpense > 0 && <span className="text-red-500 font-bold">출금 -{f(totalExpense)}원</span>}
+          </div>
+          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+            {transactions.map(tx => (
+              <div key={tx.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 shrink-0">{tx.transaction_date}</span>
+                    <span className="text-sm font-bold text-gray-800 truncate">{tx.client_name || tx.description || '-'}</span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{tx.category || '미분류'}</div>
+                </div>
+                <span className={`text-sm font-bold shrink-0 ml-3 ${tx.type === 'income' ? 'text-blue-600' : 'text-red-500'}`}>
+                  {tx.type === 'income' ? '+' : '-'}{f(tx.amount)}원
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // Main Component
 export default function ContractDetailPage() {
   const { id } = useParams()
@@ -622,6 +670,7 @@ export default function ContractDetailPage() {
 
   const [contract, setContract] = useState<any>(null)
   const [schedules, setSchedules] = useState<any[]>([])
+  const [linkedTransactions, setLinkedTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const f = (n: number) => Math.round(n || 0).toLocaleString()
@@ -649,12 +698,12 @@ export default function ContractDetailPage() {
 
       setContract(cData)
 
-      const { data: sData } = await supabase
-        .from('payment_schedules')
-        .select('*')
-        .eq('contract_id', contractId)
-        .order('round_number', { ascending: true })
-      setSchedules(sData || [])
+      const [sRes, tRes] = await Promise.all([
+        supabase.from('payment_schedules').select('*').eq('contract_id', contractId).order('round_number', { ascending: true }),
+        supabase.from('transactions').select('id, transaction_date, client_name, description, category, amount, type, payment_method').eq('related_type', 'contract').eq('related_id', contractId).order('transaction_date', { ascending: false }),
+      ])
+      setSchedules(sRes.data || [])
+      setLinkedTransactions(tRes.data || [])
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -746,6 +795,7 @@ export default function ContractDetailPage() {
           <VehicleInfoCard car={contract.car} />
           <ContractPdfSection contract={contract} schedules={schedules} />
           <CollectionStatusPanel schedules={schedules} />
+          <LinkedTransactionsSection transactions={linkedTransactions} />
           <QuoteLinkSection contract={contract} />
           <ContractTimeline quoteId={contract.quote_id} />
         </div>

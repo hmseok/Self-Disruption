@@ -11,6 +11,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
   '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/quotes/create': 'sales', '/customers': 'sales',
+  '/contracts': 'sales', '/e-contract': 'sales', '/e-contract/create': 'sales',
   '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance',
   '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
   '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
@@ -47,6 +48,9 @@ const PAGE_NAMES: Record<string, string> = {
   '/quotes/short-term': '단기대차',
   '/quotes/create': '견적 작성',
   '/customers': '고객 관리',
+  '/contracts': '계약 관리',
+  '/e-contract': '전자계약서',
+  '/e-contract/create': '새 계약서 작성',
   // 재무
   '/finance': '장부/결산',
   '/finance/collections': '수금 관리',
