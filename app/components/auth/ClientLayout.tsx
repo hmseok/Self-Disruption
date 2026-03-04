@@ -51,6 +51,8 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/insurance': '보험/가입',
   '/finance/upload': '카드/통장 관리',
   '/admin/payroll': '급여 관리',
+  '/quotes/pricing': '견적 작성',
+  '/quotes/short-term': '단기 견적',
 }
 
 // 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)

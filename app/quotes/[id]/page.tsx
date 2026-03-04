@@ -413,10 +413,10 @@ export default function QuoteDetailPage() {
   }
 
   const handleCreateContract = async () => {
-    if (linkedContract) return alert('이미 계약이 확정된 건입니다.')
-    if (quote.status === 'archived') return alert('보관된 견적서로는 계약을 확정할 수 없습니다.')
-    if (quote.expires_at && new Date() > new Date(quote.expires_at)) return alert('만료된 견적서로는 계약을 확정할 수 없습니다.')
-    if (!confirm('이 견적서로 계약을 확정하시겠습니까?')) return
+    if (linkedContract) return alert('이미 계약으로 전환된 건입니다.')
+    if (quote.status === 'archived') return alert('보관된 견적서로는 계약 전환할 수 없습니다.')
+    if (quote.expires_at && new Date() > new Date(quote.expires_at)) return alert('만료된 견적서로는 계약 전환할 수 없습니다.')
+    if (!confirm('이 견적서를 계약으로 전환하시겠습니까?\n계약 관리 페이지에서 확인할 수 있습니다.')) return
     setCreating(true)
     try {
       const detail = quote.quote_detail || {}
@@ -437,7 +437,7 @@ export default function QuoteDetailPage() {
       }
       await supabase.from('payment_schedules').insert(schedules)
       if (quote.car_id) await supabase.from('cars').update({ status: 'rented' }).eq('id', quote.car_id)
-      alert('계약 확정 완료!')
+      alert('계약 전환 완료! 계약 관리 페이지로 이동합니다.')
       router.push(`/contracts/${contract.id}`)
     } catch (e: any) { alert('에러: ' + e.message) }
     setCreating(false)
@@ -586,21 +586,41 @@ export default function QuoteDetailPage() {
             {canCreateContract && (
               <button onClick={handleCreateContract} disabled={creating}
                 className="px-6 py-2 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 shadow-lg disabled:opacity-50">
-                {creating ? '처리 중...' : '계약 확정'}
+                {creating ? '처리 중...' : '계약 전환'}
               </button>
             )}
           </div>
         </div>
 
+        {/* 서명 완료 배너 */}
+        {shareStatus === 'signed' && !linkedContract && (
+          <div className="bg-green-600 text-white p-4 rounded-2xl shadow-lg mb-4 no-print">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-bold flex items-center gap-2">✍️ 고객 서명 완료</h2>
+                <p className="text-green-100 text-sm">서명일: {quote.signed_at ? new Date(quote.signed_at).toLocaleDateString('ko-KR') : ''}</p>
+              </div>
+              <div className="flex gap-2">
+                {canCreateContract && (
+                  <button onClick={handleCreateContract} disabled={creating}
+                    className="bg-white text-green-700 px-5 py-2 rounded-xl font-bold hover:bg-gray-100 shadow text-sm">
+                    {creating ? '처리 중...' : '계약 전환 →'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {linkedContract && (
           <div className="bg-steel-600 text-white p-4 rounded-2xl shadow-lg mb-4 flex justify-between items-center no-print">
             <div>
-              <h2 className="font-bold flex items-center gap-2">계약 확정 완료</h2>
+              <h2 className="font-bold flex items-center gap-2">계약 전환 완료</h2>
               <p className="text-steel-100 text-sm">계약번호: {String(linkedContract.id).slice(0, 8)}</p>
             </div>
             <button onClick={() => router.push(`/contracts/${linkedContract.id}`)}
               className="bg-white text-steel-700 px-5 py-2 rounded-xl font-bold hover:bg-gray-100 shadow text-sm">
-              계약서 상세 →
+              계약 상세 보기 →
             </button>
           </div>
         )}

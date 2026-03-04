@@ -541,20 +541,22 @@ export default function CreateContractPage() {
 
       {/* Section 2: Second Driver */}
       <div style={styles.card}>
-        <div style={styles.sectionTitle}>제2운전자 정보</div>
-
-        <div style={styles.fieldGroup}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasDriver2 ? 16 : 0 }}>
+          <div style={{ ...styles.sectionTitle, marginBottom: 0 }}>제2운전자 정보</div>
           <button
             onClick={() => setHasDriver2(!hasDriver2)}
             style={{
-              ...styles.toggleButton,
-              width: '100%',
-              padding: '8px 12px',
-              background: hasDriver2 ? '#3b82f6' : '#e5e7eb',
-              color: hasDriver2 ? '#fff' : '#374151',
+              padding: '6px 16px',
+              background: hasDriver2 ? '#ef4444' : '#2d5fa8',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
             }}
           >
-            제2운전자 {hasDriver2 ? '제거' : '추가'}
+            {hasDriver2 ? '제거' : '+ 추가'}
           </button>
         </div>
 

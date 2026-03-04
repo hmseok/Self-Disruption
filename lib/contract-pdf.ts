@@ -153,7 +153,7 @@ export function buildContractHtml(data: ContractPdfData): string {
     </tr>
     <tr>
       <td style="padding:7px 12px;font-weight:700;background:#f8f9fa;border:1px solid #ddd;">월 렌탈료</td>
-      <td style="padding:7px 12px;border:1px solid #ddd;"><strong style="font-size:13px;">${f(terms.monthlyRent)}원</strong> <span style="color:#888;">(VAT 별도 ${f(rentVAT)}원, 합계 ${f(terms.monthlyRent + rentVAT)}원)</span></td>
+      <td style="padding:7px 12px;border:1px solid #ddd;"><strong style="font-size:14px;color:#1a1a1a;">${f(terms.monthlyRent + rentVAT)}원</strong> <span style="color:#888;font-size:11px;">(공급가 ${f(terms.monthlyRent)}원 + VAT ${f(rentVAT)}원)</span></td>
       <td style="padding:7px 12px;font-weight:700;background:#f8f9fa;border:1px solid #ddd;">보증금</td>
       <td style="padding:7px 12px;border:1px solid #ddd;">${terms.deposit > 0 ? f(terms.deposit) + '원' : '없음'}</td>
     </tr>
@@ -284,7 +284,16 @@ export function buildContractHtml(data: ContractPdfData): string {
  * @param filename - 다운로드 파일명
  */
 export async function generatePdfFromElement(element: HTMLElement, filename: string): Promise<Blob> {
-  // 1. HTML → Canvas
+  // 요소의 실제 크기를 확실히 측정하기 위해 스타일 보정
+  const originalOverflow = element.style.overflow
+  const originalHeight = element.style.height
+  element.style.overflow = 'visible'
+  element.style.height = 'auto'
+
+  // 렌더링 안정화 대기
+  await new Promise(resolve => setTimeout(resolve, 300))
+
+  // 1. HTML → Canvas (높은 해상도로 캡처)
   const canvas = await html2canvas(element, {
     scale: 2,                    // 고해상도
     useCORS: true,               // 외부 이미지(로고) 허용
@@ -292,27 +301,37 @@ export async function generatePdfFromElement(element: HTMLElement, filename: str
     backgroundColor: '#ffffff',
     width: element.scrollWidth,
     height: element.scrollHeight,
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight,
     logging: false,
   })
 
+  // 스타일 복원
+  element.style.overflow = originalOverflow
+  element.style.height = originalHeight
+
   // 2. Canvas → PDF (A4)
-  const imgData = canvas.toDataURL('image/png')
   const pdf = new jsPDF('p', 'mm', 'a4')
   const pdfW = pdf.internal.pageSize.getWidth()
   const pdfH = pdf.internal.pageSize.getHeight()
 
+  // 상하 여백 (mm)
+  const marginTop = 5
+  const marginBottom = 5
+  const usableH = pdfH - marginTop - marginBottom
+
   const imgW = pdfW
   const imgH = (canvas.height * imgW) / canvas.width
 
-  // 여러 페이지 분할 (페이지 간 1px 오버랩으로 경계선 제거)
-  const totalPages = Math.ceil(imgH / pdfH)
+  // 여러 페이지 분할
+  const totalPages = Math.ceil(imgH / usableH)
 
   for (let page = 0; page < totalPages; page++) {
     if (page > 0) pdf.addPage()
 
-    // 각 페이지의 캔버스 영역을 별도 잘라서 추가 (경계 아티팩트 방지)
-    const srcY = (page * pdfH * canvas.width) / imgW
-    const srcH = Math.min((pdfH * canvas.width) / imgW, canvas.height - srcY)
+    // 각 페이지의 캔버스 영역을 별도 잘라서 추가
+    const srcY = (page * usableH * canvas.width) / imgW
+    const srcH = Math.min((usableH * canvas.width) / imgW, canvas.height - srcY)
     if (srcH <= 0) break
 
     const pageCanvas = document.createElement('canvas')
@@ -325,7 +344,7 @@ export async function generatePdfFromElement(element: HTMLElement, filename: str
 
     const pageImgData = pageCanvas.toDataURL('image/png')
     const pageImgH = (srcH * imgW) / canvas.width
-    pdf.addImage(pageImgData, 'PNG', 0, 0, imgW, pageImgH)
+    pdf.addImage(pageImgData, 'PNG', 0, marginTop, imgW, pageImgH)
   }
 
   return pdf.output('blob')
@@ -347,7 +366,8 @@ export async function generateContractPdf(
   document.body.appendChild(container)
 
   try {
-    // 2. HTML 렌더링
+    // 2. HTML 렌더링 (700px 고정 너비로 렌더링)
+    container.style.width = '800px'
     container.innerHTML = buildContractHtml(data)
 
     // 3. 약관 섹션 채우기
@@ -356,8 +376,8 @@ export async function generateContractPdf(
       termsSection.innerHTML = termsHtml
     }
 
-    // 4. 렌더링 대기
-    await new Promise(resolve => setTimeout(resolve, 500))
+    // 4. 렌더링 대기 (이미지 로드 포함)
+    await new Promise(resolve => setTimeout(resolve, 800))
 
     // 5. PDF 생성
     const firstChild = container.firstElementChild as HTMLElement

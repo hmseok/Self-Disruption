@@ -44,8 +44,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/accidents': '사고 관리',
   // 영업
   '/quotes': '견적 관리',
-  '/quotes/pricing': '견적 단가',
-  '/quotes/short-term': '단기대차',
+  '/quotes/pricing': '견적 작성',
+  '/quotes/short-term': '단기 견적',
   '/quotes/create': '견적 작성',
   '/customers': '고객 관리',
   '/contracts': '계약 관리',
