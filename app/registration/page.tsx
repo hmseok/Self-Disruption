@@ -510,7 +510,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
          ) : (
            <>
              {/* Desktop Table View */}
-             <div style={{ overflowX: 'auto' }}>
+             <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                  <table className="w-full text-left border-collapse min-w-[650px]">
                      <thead className="bg-steel-50 border-b border-gray-100 text-steel-900 uppercase text-xs font-bold tracking-wider">
                          <tr>
@@ -579,7 +579,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
              </div>
 
              {/* Mobile Card View */}
-             <div style={{ display: 'none' }}>
+             <div className="md:hidden">
                {cars.map((car) => (
                  <div key={car.id} className="p-4 flex items-center gap-3">
                    <div className="w-12 h-10 bg-gray-100 rounded border overflow-hidden flex-shrink-0" onClick={() => router.push(`/registration/${car.id}`)}>

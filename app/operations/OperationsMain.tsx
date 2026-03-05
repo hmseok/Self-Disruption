@@ -521,7 +521,7 @@ export default function OperationsMainPage() {
       ) : (
         <>
           {/* Desktop Table */}
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto' }} className="hidden md:block">
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                 <tr>
@@ -614,6 +614,95 @@ export default function OperationsMainPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {filteredOperations.map(op => {
+              const car = getCar(op.car_id)
+              const cust = getCustomer(op.customer_id)
+              const cat = op.dispatch_category || 'regular'
+              const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
+              const isInsuranceOp = ['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat)
+              const billingInfo = op.insurance_billing_status ? BILLING_STATUS[op.insurance_billing_status] : null
+              return (
+                <div
+                  key={op.id}
+                  onClick={() => openEditModal(op)}
+                  className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
+                >
+                  {/* Date and Type */}
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1">
+                      <div className="font-bold text-gray-900 text-sm">{op.scheduled_date}</div>
+                      <div className="text-xs text-gray-400">{op.scheduled_time}</div>
+                    </div>
+                    <div className="flex flex-col gap-2 items-end">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {op.operation_type === 'delivery' ? '출고' : '반납'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>
+                        {catInfo.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Car Info */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="font-bold text-gray-800 text-sm">{car?.number || '-'}</div>
+                    <div className="text-xs text-gray-400">{car?.brand} {car?.model}</div>
+                  </div>
+
+                  {/* Customer and Driver */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="text-xs text-gray-500 font-semibold mb-1">고객</div>
+                    <div className="font-bold text-gray-800 text-sm">{cust?.name || '-'}</div>
+                    <div className="text-xs text-gray-400">{cust?.phone || ''}</div>
+                  </div>
+
+                  {/* Location */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="text-xs text-gray-500 font-semibold mb-1">장소</div>
+                    <div className="text-gray-700 text-sm">{op.location || '-'}</div>
+                    <div className="text-xs text-gray-400 truncate">{op.location_address}</div>
+                  </div>
+
+                  {/* Status and Billing */}
+                  <div className="border-t border-gray-100 pt-3 flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500 font-semibold mb-1">상태</div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-block ${OP_STATUS[op.status]?.color}`}>
+                        {OP_STATUS[op.status]?.icon} {OP_STATUS[op.status]?.label}
+                      </span>
+                    </div>
+                    {isInsuranceOp && (
+                      <div className="flex-1 text-right">
+                        <div className="text-xs text-gray-500 font-semibold mb-1">보험/정산</div>
+                        {billingInfo && billingInfo.label !== '-' && (
+                          <div className={`text-[10px] font-bold inline-block ${billingInfo.color}`}>
+                            {billingInfo.label}
+                          </div>
+                        )}
+                        {op.insurance_company_billing && (
+                          <div className="text-[10px] text-gray-500 truncate">{op.insurance_company_billing}</div>
+                        )}
+                        {(op.insurance_billed_amount || 0) > 0 && (
+                          <div className="text-[10px] text-gray-400">
+                            {Number(op.insurance_billed_amount).toLocaleString()}원
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="border-t border-gray-100 pt-3 flex gap-2 flex-wrap">
+                    <button onClick={(e) => { e.stopPropagation(); openEditModal(op); }} className="flex-1 px-2 py-2 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">수정</button>
+                    {renderStatusButtons(op)}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </>
       )}

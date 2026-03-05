@@ -941,21 +941,22 @@ export default function QuoteListPage() {
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+      <style>{`@media (max-width: 767px) { .q-main-tabs { gap: 0 !important; } .q-main-tabs button { padding: 8px 10px !important; font-size: 12px !important; } .q-chip-wrap { gap: 4px !important; margin-bottom: 6px !important; } .q-chip-wrap button { padding: 4px 10px !important; font-size: 11px !important; } .q-sort-search { gap: 6px !important; } .q-sort-search input { font-size: 12px !important; padding: 6px 10px !important; } .q-new-btn { padding: 6px 10px !important; font-size: 11px !important; } .q-sort-label { display: none !important; } }`}</style>
 
       {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e5e7eb', flex: 1 }}>
+        <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e5e7eb', flex: 1, overflow: 'auto' }}>
           {([
             { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
             { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
-            { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', count: null },
+            { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', shortLabel: '요금표', count: null },
           ]).map(t => (
             <button
               key={t.key}
               onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setInvoiceStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
               style={{
                 padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
-                fontSize: 14, fontWeight: 700, transition: 'all 0.15s',
+                fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
                 color: mainTab === t.key ? '#1e3a5f' : '#9ca3af',
                 borderBottom: mainTab === t.key ? '2px solid #1e3a5f' : '2px solid transparent',
                 marginBottom: -2,
@@ -964,7 +965,7 @@ export default function QuoteListPage() {
               {t.label}
               {t.count !== null && (
                 <span style={{
-                  marginLeft: 6, fontSize: 11, padding: '1px 6px', borderRadius: 8,
+                  marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 8,
                   background: mainTab === t.key ? '#eef2ff' : '#f3f4f6',
                   color: mainTab === t.key ? '#1e3a5f' : '#9ca3af',
                 }}>{t.count}</span>
@@ -976,6 +977,7 @@ export default function QuoteListPage() {
         {mainTab === 'long_term' && (
           <Link
             href="/quotes/pricing"
+            className="q-new-btn"
             style={{
               padding: '7px 16px', background: '#2d5fa8', color: '#fff', border: 'none',
               borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
@@ -990,6 +992,7 @@ export default function QuoteListPage() {
         {mainTab === 'short_term' && (
           <Link
             href="/quotes/short-term"
+            className="q-new-btn"
             style={{
               padding: '7px 14px', background: '#2d5fa8', color: '#fff', border: 'none',
               borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
@@ -1004,9 +1007,9 @@ export default function QuoteListPage() {
 
       {/* ═══ 칩 필터 + 정렬 + 검색 (계약관리 동일 스타일) ═══ */}
       {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           {/* 칩 필터 */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <div className="q-chip-wrap" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
             {(mainTab === 'long_term'
               ? [
                   { id: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
@@ -1052,9 +1055,9 @@ export default function QuoteListPage() {
           </div>
 
           {/* 정렬 + 검색 */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>정렬:</span>
+          <div className="q-sort-search" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span className="q-sort-label" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>정렬:</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortOption)}
@@ -1162,26 +1165,20 @@ export default function QuoteListPage() {
               </table>
             </div>
             {/* 모바일: 카드형 */}
-            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+            <div className="md:hidden">
               {filteredInvoiceQuotes.map((q: any) => {
                 const parsed = parseInvoiceMemo(q.memo || '')
                 const badge = getBadge(q)
                 return (
                   <div key={q.id} onClick={() => openInvoice(q)}
-                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.15s' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(q.created_at)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{q.customer_name || '(미입력)'}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{parsed.car || '-'}</div>
-                        <div style={{ fontSize: 12, color: '#9ca3af' }}>{parsed.period || '-'}</div>
+                    style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                        <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, flexShrink: 0 }}>{badge.label}</span>
+                        <span style={{ fontWeight: 700, color: '#111827', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
+                        <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(q.rent_fee || 0)}원</span>
-                      </div>
+                      <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
                     </div>
                   </div>
                 )
@@ -1297,36 +1294,32 @@ export default function QuoteListPage() {
               </table>
             </div>
             {/* 모바일: 카드형 */}
-            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+            <div className="md:hidden">
               {displayedQuotes.map((quote) => {
                 const isInv = quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')
                 const parsed = isInv ? parseInvoiceMemo(quote.memo) : null
                 return (
                   <div key={quote.id} onClick={() => router.push(`/quotes/${quote.id}`)}
-                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.15s' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <QuoteStatusBadge quote={quote} />
                         {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#d97706' }}>청구</span>}
+                        <span style={{ fontWeight: 700, color: '#111827', fontSize: 13 }}>{quote.customer_name || '(미입력)'}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(quote.created_at)}</span>
+                      <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14, flexShrink: 0 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{quote.customer_name || '(미입력)'}</div>
-                        {isInv ? (
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>{parsed?.car || '-'} · {parsed?.period || '-'}</div>
-                        ) : (
-                          <>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>{quote.car?.brand} {quote.car?.model} {quote.car?.number ? `(${quote.car.number})` : ''}</div>
-                            <div style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(quote.start_date)} ~ {formatDate(quote.end_date)}</div>
-                          </>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                        <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
-                        <div style={{ fontSize: 10, color: '#9ca3af' }}>{isInv ? '/총액' : '/월'} VAT포함</div>
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 2 }}>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        {isInv
+                          ? `${parsed?.car || '-'} · ${parsed?.period || '-'}`
+                          : `${quote.car?.brand || ''} ${quote.car?.model || ''} ${quote.car?.number ? `(${quote.car.number})` : ''}`
+                        }
+                      </span>
+                      <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>
+                        {isInv ? '' : `${formatDate(quote.start_date)}~${formatDate(quote.end_date)}`}
+                        {' '}{formatDate(quote.created_at)}
+                      </span>
                     </div>
                   </div>
                 )

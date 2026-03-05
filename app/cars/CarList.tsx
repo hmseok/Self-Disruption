@@ -292,7 +292,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
         ) : (
           <>
             {/* Desktop Table View */}
-            <div style={{ overflowX: 'auto' }}>
+            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                     <tr>
@@ -370,6 +370,38 @@ const { company, role, adminSelectedCompanyId } = useApp()
                     ))}
                 </tbody>
               </table>
+            </div>
+            {/* Mobile Card View */}
+            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+              {filteredCars.map((car) => (
+                <div key={car.id} onClick={() => router.push(`/cars/${car.id}`)}
+                  style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${car.status === 'available' ? 'bg-green-100 text-green-700' : car.status === 'rented' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-600'}`}>
+                        {car.status === 'available' ? '대기' : car.status === 'rented' ? '대여' : car.status}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${car.is_used ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {car.is_used ? '중고' : '신차'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${car.is_commercial === false ? 'bg-teal-100 text-teal-700' : 'bg-steel-100 text-steel-600'}`}>
+                        {car.is_commercial === false ? '비영업' : '영업'}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>{car.created_at.split('T')[0]}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                      <div style={{ fontWeight: 900, color: '#111827', fontSize: 16, marginBottom: 2 }}>{car.number}</div>
+                      <div style={{ fontSize: 13, color: '#374151', fontWeight: 700 }}>{car.brand} {car.model}</div>
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>{car.year}년 · {car.fuel}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14 }}>{formatMoney(car.purchase_price)}원</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}

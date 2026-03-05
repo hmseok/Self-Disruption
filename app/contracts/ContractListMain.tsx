@@ -226,8 +226,9 @@ export default function ContractListMain() {
             <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
             {contracts.length === 0 ? '계약 내역이 없습니다.' : '해당 조건의 계약이 없습니다.'}
           </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
+        ) : (<>
+          {/* 데스크톱 */}
+          <div className="hidden md:block" style={{ overflowX: 'auto' }}>
             <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -289,7 +290,36 @@ export default function ContractListMain() {
               </tbody>
             </table>
           </div>
-        )}
+          {/* 모바일 카드형 */}
+          <div className="md:hidden" style={{ padding: '8px 12px' }}>
+            {filteredContracts.map((c) => (
+              <div key={c.id} onClick={() => router.push(`/contracts/${c.id}`)}
+                style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <ContractStatusBadge contract={c} />
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(c.created_at)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{c.customer?.name || c.customer_name}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>{c.car?.brand} {c.car?.model} {c.car?.number ? `(${c.car.number})` : ''}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(c.start_date)} ~ {formatDate(c.end_date)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                    <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>/월 VAT포함</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
+                      <div style={{ width: 40, height: 5, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: '#22c55e', borderRadius: 999, width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
+                      </div>
+                      <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>{c.paidCount}/{c.totalCount}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>)}
       </div>
     </div>
   )

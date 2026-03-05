@@ -335,7 +335,7 @@ const router = useRouter()
           ) : (
               <>
                   {/* Desktop Table View */}
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                       <table className="w-full text-left min-w-[600px]">
                           <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
                               <tr>
@@ -382,6 +382,35 @@ const router = useRouter()
                               ))}
                           </tbody>
                       </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden" style={{ padding: '8px 12px' }}>
+                      {filteredList.map((item) => (
+                          <div key={item.id}
+                            style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'income' ? 'bg-steel-50 text-steel-600' : 'bg-red-50 text-red-600'}`}>
+                                  {item.type === 'income' ? '수입' : '지출'}
+                                </span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{item.category}</span>
+                              </div>
+                              <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>{item.transaction_date.slice(5)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>{item.client_name}</div>
+                                {item.description && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{item.description}</div>}
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                                <span className={`font-black text-base ${item.type === 'income' ? 'text-steel-600' : 'text-red-600'}`}>
+                                  {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                      ))}
                   </div>
               </>
           )}

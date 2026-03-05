@@ -632,7 +632,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
         ) : (
             <>
               {/* Desktop Table View */}
-              <div style={{ overflowX: 'auto' }}>
+              <div style={{ overflowX: 'auto' }} className="hidden md:block">
                 <table className="w-full text-left text-sm min-w-[700px]">
                   <thead className="bg-gray-50/50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs tracking-wider">
                     <tr>
@@ -702,9 +702,9 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
               </div>
 
               {/* Mobile Card View */}
-              <div style={{ display: 'none' }}>
+              <div className="md:hidden space-y-3">
                 {filteredList.map((item) => (
-                  <div key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="p-4 hover:bg-steel-50/30 transition-colors cursor-pointer">
+                  <div key={item.id} onClick={() => router.push(`/insurance/${item.id}`)} className="p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md hover:border-steel-200 transition-all cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="font-black text-lg text-gray-900">{item.number}</div>

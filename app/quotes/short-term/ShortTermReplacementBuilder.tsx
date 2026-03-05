@@ -1015,7 +1015,8 @@ export default function ShortTermReplacementBuilder() {
                 )}
               </div>
             </div>
-            <div className="overflow-x-auto">
+            {/* 데스크톱: 테이블 */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="text-gray-400 whitespace-nowrap">
                   <th className="py-2 px-3 pl-4 text-left text-sm font-bold">정비군</th>
@@ -1100,6 +1101,29 @@ export default function ShortTermReplacementBuilder() {
                 </tbody>
               </table>
             </div>
+            {/* 모바일: 카드형 */}
+            <div className="md:hidden">
+              {rates.map((r, i) => {
+                const computed = r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, r.discount_percent) : r.daily_rate
+                return (
+                  <div key={r.id || `rate-m-${i}`} style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span className="bg-steel-100 text-steel-700 text-[11px] font-bold px-2 py-0.5 rounded">{r.service_group}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{r.vehicle_class}</span>
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{r.displacement_range}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#6b7280' }}>
+                        <span>롯데 <span style={{ color: '#dc2626', fontWeight: 700 }}>{f(r.lotte_base_rate)}</span></span>
+                        <span>할인 <span style={{ fontWeight: 700 }}>{r.discount_percent}%</span></span>
+                        <span className={r.calc_method === 'auto' ? 'text-green-600' : 'text-orange-600'}>{r.calc_method === 'auto' ? '자동' : '수동'}</span>
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#2d5fa8' }}>{f(computed)}원</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           {/* ─── 롯데 참고 자료 (하단, 접이식) ─── */}
@@ -1154,7 +1178,7 @@ export default function ShortTermReplacementBuilder() {
           </div>
 
           {/* 테이블 (반응형 스크롤) */}
-          <div style={{ overflowX: 'auto' }}>
+          <div className="hidden md:block" style={{ overflowX: 'auto' }}>
             <table className="w-full">
               <thead><tr className="text-gray-400 whitespace-nowrap">
                 <th className="py-2 px-3 pl-4 text-left text-sm font-bold">카테고리</th>
@@ -1228,6 +1252,25 @@ export default function ShortTermReplacementBuilder() {
                 })}
               </tbody>
             </table>
+          </div>
+          {/* 모바일: 카드형 */}
+          <div className="md:hidden">
+            {filteredLotteRates.map((lr, i) => (
+              <div key={lr.id || i} style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded">{lr.lotte_category}</span>
+                  <span className="bg-steel-100 text-steel-700 text-[10px] font-bold px-1.5 py-0.5 rounded">{lr.service_group}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lr.vehicle_names}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                  <div style={{ display: 'flex', gap: 6, color: '#9ca3af' }}>
+                    <span>1~3일 <span style={{ color: '#dc2626', fontWeight: 700 }}>{f(lr.rate_1_3days)}</span></span>
+                    <span>7일+ <span style={{ fontWeight: 700, color: '#374151' }}>{f(lr.rate_7plus_days)}</span></span>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2d5fa8' }}>{f(calcRate(lr.rate_1_3days, globalDiscount))}원<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>/일</span></span>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">

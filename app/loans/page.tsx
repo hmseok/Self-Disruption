@@ -376,7 +376,7 @@ export default function LoanListPage() {
         ) : (
           <>
             {/* Desktop */}
-            <div style={{ overflowX: 'auto' }}>
+            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left min-w-[700px]">
                 <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs tracking-wider font-bold">
                   <tr>
@@ -424,6 +424,41 @@ export default function LoanListPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+              {filteredLoans.map((loan) => {
+                const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+                return (
+                  <div key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)}
+                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">{loan.type}</span>
+                        {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${daysLeft <= 30 ? 'bg-red-100 text-red-600' : daysLeft <= 60 ? 'bg-orange-100 text-orange-600' : 'bg-yellow-100 text-yellow-700'}`}>
+                            D-{daysLeft}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{loan.end_date || '-'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{loan.cars?.number || '차량 정보 없음'}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{loan.cars?.brand} {loan.cars?.model}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{loan.finance_name} · {loan.months}개월</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                        <span style={{ fontWeight: 900, color: '#dc2626', fontSize: 15 }}>{f(loan.monthly_payment)}원</span>
+                        <div style={{ fontSize: 10, color: '#9ca3af' }}>/월</div>
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>원금 {f(loan.total_amount)}원</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
 
           </>

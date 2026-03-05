@@ -576,7 +576,7 @@ export default function AccidentsMainPage() {
         ) : (
           <>
             {/* ── Desktop Table */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto' }} className="hidden md:block">
               <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                   <tr>
@@ -609,6 +609,134 @@ export default function AccidentsMainPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── Mobile Card View */}
+            <div className="md:hidden space-y-3 px-4 py-4">
+              {filteredAccidents.map(acc => {
+                const car = getCar(acc.car_id)
+                const isExpanded = expandedRowId === acc.id
+                return (
+                  <div
+                    key={acc.id}
+                    onClick={() => setExpandedRowId(isExpanded ? null : acc.id)}
+                    className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md hover:border-steel-300 transition-all active:bg-steel-50"
+                  >
+                    {/* Header: Date and Status */}
+                    <div className="flex justify-between items-start mb-3 gap-2">
+                      <div>
+                        <div className="font-bold text-gray-900 text-sm">{acc.accident_date}</div>
+                        {acc.accident_time && <div className="text-xs text-gray-400 mt-0.5">{acc.accident_time}</div>}
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${ACC_STATUS[acc.status]?.color || 'bg-gray-100 text-gray-600'}`}>
+                        {ACC_STATUS[acc.status]?.label || acc.status}
+                      </span>
+                    </div>
+
+                    {/* Car Info */}
+                    <div className="mb-3 pb-3 border-b border-gray-100">
+                      <div className="font-bold text-gray-800 text-sm">{car?.number || '-'}</div>
+                      {car && <div className="text-xs text-gray-500">{car.brand} {car.model}</div>}
+                    </div>
+
+                    {/* Key Details Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                      {/* Type/Fault */}
+                      <div>
+                        <span className="text-gray-400">유형</span>
+                        <div className="font-bold text-gray-800 mt-0.5">
+                          {ACC_TYPE[acc.accident_type] || acc.accident_type}
+                        </div>
+                        <div className="text-gray-500 mt-0.5">과실: {acc.fault_ratio}%</div>
+                      </div>
+
+                      {/* Insurance */}
+                      <div>
+                        <span className="text-gray-400">보험사</span>
+                        <div className="font-bold text-gray-800 mt-0.5">{acc.insurance_company || '-'}</div>
+                        {acc.insurance_claim_no && <div className="text-gray-500 mt-0.5">{acc.insurance_claim_no}</div>}
+                      </div>
+
+                      {/* Repair Cost */}
+                      <div>
+                        <span className="text-gray-400">수리비</span>
+                        <div className="font-bold text-gray-800 mt-0.5">
+                          {(acc.actual_repair_cost || acc.estimated_repair_cost || 0).toLocaleString()}
+                          <span className="text-xs text-gray-400 font-normal ml-1">원</span>
+                        </div>
+                      </div>
+
+                      {/* Source */}
+                      <div>
+                        <span className="text-gray-400">접수경로</span>
+                        <div className="mt-0.5">
+                          {acc.source && SOURCE_BADGE[acc.source] ? (
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold inline-block ${SOURCE_BADGE[acc.source].color}`}>
+                              {SOURCE_BADGE[acc.source].label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">수동</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-3 border-t border-gray-100">
+                      <StatusActions acc={acc} />
+                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                        <DetailCard title="사고 정보" items={[
+                          ['장소', acc.accident_location],
+                          ['차량상태', VEHICLE_COND[acc.vehicle_condition || ''] || acc.vehicle_condition],
+                          ['내용', acc.description],
+                        ]} />
+                        <DetailCard title="운전자" items={[
+                          ['이름', acc.driver_name],
+                          ['연락처', acc.driver_phone],
+                          ['관계', acc.driver_relation],
+                        ]} />
+                        <DetailCard title="상대방" items={[
+                          ['이름', acc.counterpart_name],
+                          ['연락처', acc.counterpart_phone],
+                          ['차량', acc.counterpart_vehicle],
+                          ['보험사', acc.counterpart_insurance],
+                        ]} />
+                        <DetailCard title="보험 처리" items={[
+                          ['자차보험', acc.insurance_company],
+                          ['접수번호', acc.insurance_claim_no],
+                          ['경찰접수', acc.police_report_no],
+                        ]} />
+                        <DetailCard title="비용 내역" items={[
+                          ['예상수리비', `${(acc.estimated_repair_cost || 0).toLocaleString()}원`],
+                          ['실제수리비', `${(acc.actual_repair_cost || 0).toLocaleString()}원`],
+                          ['보험금', `${(acc.insurance_payout || 0).toLocaleString()}원`],
+                          ['자기부담', `${(acc.customer_deductible || 0).toLocaleString()}원`],
+                          ['회사부담', `${(acc.company_cost || 0).toLocaleString()}원`],
+                        ]} />
+                        <DetailCard title="수리/대차" items={[
+                          ['정비소', acc.repair_shop_name],
+                          ['수리기간', acc.repair_start_date ? `${acc.repair_start_date} ~ ${acc.repair_end_date || '진행중'}` : '-'],
+                          ['대차', acc.replacement_car_id ? (getCar(acc.replacement_car_id)?.number || String(acc.replacement_car_id)) : '-'],
+                          ['대차기간', acc.replacement_start ? `${acc.replacement_start} ~ ${acc.replacement_end || '진행중'}` : '-'],
+                        ]} />
+                        {acc.notes && (
+                          <div className="p-3 bg-white rounded-lg border border-gray-200">
+                            <p className="font-bold text-gray-900 text-xs mb-1">메모</p>
+                            <p className="text-xs text-gray-600 whitespace-pre-wrap">{acc.notes}</p>
+                          </div>
+                        )}
+                        {acc.jandi_topic && (
+                          <div className="text-xs text-indigo-500">잔디 토픽: {acc.jandi_topic}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </>
         )}

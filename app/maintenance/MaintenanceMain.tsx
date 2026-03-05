@@ -679,7 +679,7 @@ export default function MaintenanceMainPage() {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div style={{ overflowX: 'auto' }}>
+                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                       <tr>
@@ -758,6 +758,41 @@ export default function MaintenanceMainPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden" style={{ padding: '8px 12px' }}>
+                  {filteredMaintenanceRecords.map(maint => (
+                    <div key={maint.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${MAINT_STATUS[maint.status]?.color}`}>
+                            {MAINT_STATUS[maint.status]?.label}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                            {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#9ca3af' }}>{maint.requested_date}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{getCar(maint.car_id)?.number || '-'}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>{getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>{maint.shop_name} {maint.shop_phone ? `· ${maint.shop_phone}` : ''}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                          <span style={{ fontWeight: 900, color: '#111827', fontSize: 14 }}>{maint.estimated_cost?.toLocaleString()}원</span>
+                          <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            <button onClick={() => openEditMaintenanceModal(maint)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
+                            {maint.status === 'requested' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">승인</button>}
+                            {maint.status === 'approved' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'in_shop')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-700">입고</button>}
+                            {maint.status === 'in_shop' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'completed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">출고완료</button>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -807,7 +842,7 @@ export default function MaintenanceMainPage() {
             ) : (
               <>
                 {/* Desktop Table */}
-                <div style={{ overflowX: 'auto' }}>
+                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
                       <tr>
@@ -888,6 +923,51 @@ export default function MaintenanceMainPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden" style={{ padding: '8px 12px' }}>
+                  {filteredInspectionRecords.map(insp => {
+                    const daysLeft = getDDay(insp.due_date)
+                    return (
+                      <div key={insp.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${INSP_STATUS[insp.status]?.color}`}>
+                              {INSP_STATUS[insp.status]?.label}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                              {INSP_TYPE[insp.inspection_type] || insp.inspection_type}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, color: '#9ca3af' }}>{insp.due_date}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getDDayColor(daysLeft)}`} style={{ backgroundColor: daysLeft < 0 ? '#fee2e2' : '#fef3c7', color: daysLeft < 0 ? '#991b1b' : '#92400e' }}>
+                              {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{getCar(insp.car_id)?.number || '-'}</div>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}</div>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{insp.center_name}</div>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{insp.center_address}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
+                            <button onClick={() => openEditInspectionModal(insp)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
+                            {insp.status === 'scheduled' && <button onClick={() => handleInspectionStatusChange(insp.id, 'in_progress')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-700">진행</button>}
+                            {insp.status === 'in_progress' && (
+                              <>
+                                <button onClick={() => handleInspectionStatusChange(insp.id, 'passed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">합격</button>
+                                <button onClick={() => handleInspectionStatusChange(insp.id, 'failed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-100 text-red-700">불합격</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </>
             )}
