@@ -21,6 +21,14 @@ async function verifyUser(request: NextRequest) {
   return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
 }
 
+// god_admin의 경우 company_id 오버라이드 가능
+function getEffectiveCompanyId(user: any, requestCompanyId?: string | null): string {
+  if (user.role === 'god_admin' && requestCompanyId) {
+    return requestCompanyId
+  }
+  return user.company_id
+}
+
 // GET: 영수증/지출내역 목록 조회
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
@@ -28,13 +36,37 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const { searchParams } = request.nextUrl
+  const overrideCompanyId = searchParams.get('company_id')
+  const companyId = getEffectiveCompanyId(user, overrideCompanyId)
+
+  // god_admin인데 company_id가 없으면 차단
+  if (user.role === 'god_admin' && !overrideCompanyId) {
+    return NextResponse.json({ error: '회사를 선택해주세요', data: [], months: [] }, { status: 400 })
+  }
+
+  // list_months=true → DB에 데이터가 존재하는 월 목록 반환
+  if (searchParams.get('list_months') === 'true') {
+    const { data: allDates, error } = await supabase
+      .from('expense_receipts')
+      .select('expense_date')
+      .eq('user_id', user.id)
+      .eq('company_id', companyId)
+      .order('expense_date', { ascending: false })
+    if (error) return NextResponse.json({ months: [] })
+    const monthSet = new Set<string>()
+    allDates?.forEach(row => {
+      if (row.expense_date) monthSet.add(String(row.expense_date).slice(0, 7))
+    })
+    return NextResponse.json({ months: Array.from(monthSet).sort((a, b) => b.localeCompare(a)) })
+  }
+
   const month = searchParams.get('month') // YYYY-MM
   const year = searchParams.get('year')
 
   let query = supabase
     .from('expense_receipts')
     .select('*')
-    .eq('company_id', user.company_id)
+    .eq('company_id', companyId)
     .eq('user_id', user.id)
     .order('expense_date', { ascending: false })
 
@@ -63,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { items, receipt_url } = body as {
+    const { items, receipt_url, company_id: bodyCompanyId } = body as {
       items: Array<{
         expense_date: string
         card_number?: string
@@ -75,6 +107,14 @@ export async function POST(request: NextRequest) {
         receipt_url?: string
       }>
       receipt_url?: string
+      company_id?: string
+    }
+
+    const companyId = getEffectiveCompanyId(user, bodyCompanyId)
+
+    // god_admin인데 company_id가 없으면 차단
+    if (user.role === 'god_admin' && !bodyCompanyId) {
+      return NextResponse.json({ error: '회사를 선택해주세요' }, { status: 400 })
     }
 
     if (!items || items.length === 0) {
@@ -111,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const insertData = newItems.map(item => ({
-      company_id: user.company_id,
+      company_id: companyId,
       user_id: user.id,
       user_name: user.employee_name || user.email?.split('@')[0] || '',
       expense_date: item.expense_date,
@@ -145,6 +185,45 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     console.error('영수증 API 오류:', e.message)
     return NextResponse.json({ error: '서버 오류' }, { status: 500 })
+  }
+}
+
+// PATCH: 일괄 수정
+export async function PATCH(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  try {
+    const body = await request.json()
+    const { ids, updates } = body as {
+      ids: string[]
+      updates: { category?: string; item_name?: string; customer_team?: string }
+    }
+
+    if (!ids || ids.length === 0 || !updates) {
+      return NextResponse.json({ error: 'ids와 updates 필요' }, { status: 400 })
+    }
+
+    const supabase = getSupabaseAdmin()
+    const updateData: Record<string, any> = {}
+    if (updates.category !== undefined) updateData.category = updates.category
+    if (updates.item_name !== undefined) updateData.item_name = updates.item_name
+    if (updates.customer_team !== undefined) updateData.customer_team = updates.customer_team
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('expense_receipts')
+      .update(updateData)
+      .in('id', ids)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+    return NextResponse.json({ success: true, updated: ids.length })
+  } catch (error: any) {
+    return NextResponse.json({ error: '수정 실패: ' + error.message }, { status: 500 })
   }
 }
 

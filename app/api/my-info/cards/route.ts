@@ -21,12 +21,21 @@ async function verifyUser(request: NextRequest) {
   return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
 }
 
+// god_admin의 경우 company_id 오버라이드 가능
+function getEffectiveCompanyId(user: any, requestCompanyId?: string | null): string {
+  if (user.role === 'god_admin' && requestCompanyId) {
+    return requestCompanyId
+  }
+  return user.company_id
+}
+
 // GET: 내 법인카드 목록
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const supabase = getSupabaseAdmin()
+  // 법인카드는 사용자 소속 — company_id와 무관하게 모든 내 카드 조회
   const { data, error } = await supabase
     .from('user_corporate_cards')
     .select('*')
@@ -47,7 +56,9 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   const body = await request.json()
-  const { card_name, card_number, card_company, is_default } = body
+  const { card_name, card_number, card_company, is_default, company_id: bodyCompanyId } = body
+
+  const companyId = getEffectiveCompanyId(user, bodyCompanyId)
 
   if (!card_number) {
     return NextResponse.json({ error: '카드번호는 필수입니다.' }, { status: 400 })
@@ -71,7 +82,7 @@ export async function POST(request: NextRequest) {
     .from('user_corporate_cards')
     .insert({
       user_id: user.id,
-      company_id: user.company_id,
+      company_id: companyId,
       card_name: card_name || `법인카드 ${last4}`,
       card_number: card_number.trim(),
       card_last4: last4,

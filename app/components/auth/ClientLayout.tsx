@@ -531,7 +531,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         style={{
           height: '100dvh',
           overflow: 'hidden',
-          width: '100%',
+          width: isSidebarOpen ? 'calc(100% - 240px)' : '100%',
           minWidth: 0,
           marginLeft: isSidebarOpen ? 240 : 0,
         }}

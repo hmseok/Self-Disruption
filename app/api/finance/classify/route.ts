@@ -1107,6 +1107,44 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+
+    // ★ 일괄분류 + 학습: bulk_classify 모드
+    if (body.bulk_classify && Array.isArray(body.queue_ids) && body.final_category) {
+      const sb = getSupabaseAdmin()
+      const { queue_ids, final_category, save_rules } = body
+      const PENDING_CATS = ['기타', '미분류', '']
+      const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
+
+      // 일괄 카테고리 업데이트
+      const { error: bulkErr } = await sb
+        .from('classification_queue')
+        .update({ final_category, status: newStatus })
+        .in('id', queue_ids)
+      if (bulkErr) throw bulkErr
+
+      // 학습 규칙 저장 (save_rules가 true이고 keywords 배열이 있을 때)
+      let rulesSaved = 0
+      if (save_rules && Array.isArray(body.keywords)) {
+        const uniqueKeywords = [...new Set(body.keywords.filter((k: string) => k && k.trim()))] as string[]
+        for (const keyword of uniqueKeywords) {
+          try {
+            await sb.from('finance_rules').upsert({
+              keyword: keyword.toLowerCase().trim(),
+              category: final_category,
+              related_type: body.final_related_type || null,
+              related_id: body.final_related_id || null,
+            }, { onConflict: 'keyword' })
+            rulesSaved++
+          } catch (e) {
+            console.error('Rule save error for keyword:', keyword, e)
+          }
+        }
+      }
+
+      console.log(`[PATCH classify] 일괄분류: ${queue_ids.length}건 → ${final_category} (status: ${newStatus}), 규칙 ${rulesSaved}개 저장`)
+      return NextResponse.json({ success: true, updated: queue_ids.length, rules_saved: rulesSaved })
+    }
+
     const { queue_id, final_category, final_related_type, final_related_id, save_as_rule, rule_keyword } = body
 
     if (!queue_id || !final_category) {

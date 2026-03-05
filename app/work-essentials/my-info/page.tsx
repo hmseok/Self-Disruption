@@ -24,7 +24,8 @@ const CARD_COMPANIES = [
 ]
 
 export default function MyInfoPage() {
-  const { user, company } = useApp()
+  const { user, company, role, adminSelectedCompanyId } = useApp()
+  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   // 프로필
   const [name, setName] = useState('')
@@ -177,6 +178,19 @@ export default function MyInfoPage() {
   }
 
   if (!user) return null
+
+  // ── god_admin 회사 미선택 시 차단 ──
+  if (role === 'god_admin' && !adminSelectedCompanyId) {
+    return (
+      <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500 }}>
+          <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>🏢</span>
+          <p style={{ fontWeight: 700, color: '#374151', fontSize: 16, marginBottom: 8 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p style={{ color: '#9ca3af', fontSize: 13 }}>내 정보는 회사 기준으로 관리됩니다</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>

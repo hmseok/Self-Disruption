@@ -80,6 +80,8 @@ export default function ClassificationReviewPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>('display')
+  const [showBulkCategoryPicker, setShowBulkCategoryPicker] = useState(false)
+  const [bulkCategorySearch, setBulkCategorySearch] = useState('')
 
   // 연결 대상 조회용
   const [jiips, setJiips] = useState<any[]>([])
@@ -368,6 +370,41 @@ export default function ClassificationReviewPage() {
     setSelectedIds(new Set())
     setBulkProcessing(false)
     fetchItems()
+  }
+
+  // ── 일괄분류 + 학습 ──
+  const handleBulkClassifySelected = async (category: string, saveRules: boolean = true) => {
+    if (selectedIds.size === 0) return
+    const selectedItems = items.filter(i => selectedIds.has(i.id))
+    const keywords = selectedItems
+      .map(i => i.source_data?.client_name || i.client_name || '')
+      .filter(k => k.trim())
+
+    setBulkProcessing(true)
+    setShowBulkCategoryPicker(false)
+    try {
+      const res = await fetch('/api/finance/classify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bulk_classify: true,
+          queue_ids: Array.from(selectedIds),
+          final_category: category,
+          save_rules: saveRules,
+          keywords,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const msg = saveRules && data.rules_saved > 0
+          ? `${data.updated}건 분류 완료! (${data.rules_saved}개 규칙 학습됨)`
+          : `${data.updated}건 분류 완료!`
+        alert(`✅ ${msg}`)
+        setSelectedIds(new Set())
+        fetchItems()
+      }
+    } catch (e) { console.error(e) }
+    setBulkProcessing(false)
   }
 
   const handleBulkDeleteSelected = async () => {
@@ -763,39 +800,108 @@ export default function ClassificationReviewPage() {
       )}
 
       {/* 선택 항목 플로팅 액션 바 */}
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && (() => {
+        const selectedItems = items.filter(i => selectedIds.has(i.id))
+        const totalAmount = selectedItems.reduce((sum, i) => sum + Math.abs(Number(i.source_data?.amount || i.amount || 0)), 0)
+        return (
         <div style={{
           position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
           background: '#0f172a', color: '#fff', borderRadius: 16,
           padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 16,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 320,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 400,
         }}>
-          <span style={{ fontWeight: 800, fontSize: 13 }}>
+          <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
             {selectedIds.size}건 선택
+          </span>
+          <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            합계 {nf(totalAmount)}원
           </span>
           <div style={{ width: 1, height: 20, background: '#334155' }} />
           {filter === 'pending' && (
-            <button onClick={handleBulkConfirmSelected} disabled={bulkProcessing}
-              style={{ background: '#10b981', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
-              {bulkProcessing ? '처리 중...' : '✅ 선택 확정'}
-            </button>
+            <>
+              <button onClick={handleBulkConfirmSelected} disabled={bulkProcessing}
+                style={{ background: '#10b981', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                {bulkProcessing ? '처리 중...' : '✅ 분류확정'}
+              </button>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowBulkCategoryPicker(!showBulkCategoryPicker)} disabled={bulkProcessing}
+                  style={{ background: '#3b82f6', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                  {bulkProcessing ? '처리 중...' : '📋 일괄분류'}
+                </button>
+                {showBulkCategoryPicker && (
+                  <div style={{
+                    position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+                    marginBottom: 8, background: '#fff', borderRadius: 16, padding: 12,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e2e8f0',
+                    width: 360, maxHeight: 420, overflowY: 'auto', zIndex: 60,
+                  }} onClick={e => e.stopPropagation()}>
+                    <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>분류 선택</span>
+                      <label style={{ fontSize: 11, fontWeight: 500, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                        <input type="checkbox" defaultChecked style={{ width: 14, height: 14 }} id="bulk-learn-check" />
+                        규칙 학습
+                      </label>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="카테고리 검색..."
+                      value={bulkCategorySearch}
+                      onChange={e => setBulkCategorySearch(e.target.value)}
+                      style={{ width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, marginBottom: 8, outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    {(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).map(group => {
+                      const filteredItems = group.items.filter(cat =>
+                        !bulkCategorySearch || cat.toLowerCase().includes(bulkCategorySearch.toLowerCase()) || group.group.toLowerCase().includes(bulkCategorySearch.toLowerCase())
+                      )
+                      if (filteredItems.length === 0) return null
+                      return (
+                        <div key={group.group} style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', padding: '4px 0' }}>{group.group}</div>
+                          {filteredItems.map(cat => (
+                            <button key={cat}
+                              onClick={() => {
+                                const learnCheck = document.getElementById('bulk-learn-check') as HTMLInputElement
+                                const saveRules = learnCheck?.checked ?? true
+                                if (confirm(`선택한 ${selectedIds.size}건을 "${cat}"(으)로 분류하시겠습니까?${saveRules ? '\n\n✅ 거래처명을 규칙으로 학습합니다.' : ''}`)) {
+                                  handleBulkClassifySelected(cat, saveRules)
+                                }
+                              }}
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '6px 10px', borderRadius: 8, border: 'none',
+                                background: 'transparent', cursor: 'pointer', fontSize: 12, color: '#1e293b',
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              {CATEGORY_ICONS[cat] || '📄'} {cat}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
           )}
           {filter === 'confirmed' && (
             <button onClick={handleBulkRevertSelected} disabled={bulkProcessing}
-              style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+              style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
               {bulkProcessing ? '처리 중...' : '↩ 선택 되돌리기'}
             </button>
           )}
           <button onClick={handleBulkDeleteSelected} disabled={bulkProcessing}
-            style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
-            {bulkProcessing ? '처리 중...' : '🗑 선택 삭제'}
+            style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+            삭제
           </button>
-          <button onClick={() => setSelectedIds(new Set())}
+          <button onClick={() => { setSelectedIds(new Set()); setShowBulkCategoryPicker(false) }}
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '4px 8px', marginLeft: 'auto' }}>
             ✕
           </button>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

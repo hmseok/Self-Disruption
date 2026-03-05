@@ -46,35 +46,105 @@ interface ParsedReceipt {
   total_before_tax?: number
 }
 
-async function analyzeWithGemini(base64Image: string, mimeType: string): Promise<ParsedReceipt> {
+// 날짜 보정: 년도가 없거나 미래 날짜이면 가장 가까운 과거 날짜로 조정
+function fixDate(dateStr?: string): string | undefined {
+  if (!dateStr) return undefined
+
+  const today = new Date()
+  today.setHours(23, 59, 59, 999) // 오늘까지 허용
+
+  // MM-DD만 있는 경우 (년도 없음)
+  const mdOnly = dateStr.match(/^(\d{1,2})[.\-/](\d{1,2})$/)
+  if (mdOnly) {
+    const month = parseInt(mdOnly[1])
+    const day = parseInt(mdOnly[2])
+    // 올해로 먼저 시도, 미래면 작년
+    let year = today.getFullYear()
+    const candidate = new Date(year, month - 1, day)
+    if (candidate > today) year--
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+
+  // YYYY-MM-DD 형식
+  const full = dateStr.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/)
+  if (full) {
+    let year = parseInt(full[1])
+    const month = parseInt(full[2])
+    const day = parseInt(full[3])
+    const candidate = new Date(year, month - 1, day)
+
+    // 미래 날짜 → 가장 가까운 과거 년도로
+    while (candidate > today) {
+      year--
+      candidate.setFullYear(year)
+    }
+
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+
+  return dateStr
+}
+
+function normalizeReceiptItem(raw: any): ParsedReceipt {
+  return {
+    merchant: raw.merchant || undefined,
+    amount: typeof raw.amount === 'number' ? raw.amount : parseInt(String(raw.amount).replace(/[^0-9-]/g, '')) || undefined,
+    date: fixDate(raw.date),
+    card_last4: raw.card_last4 || undefined,
+    item_name: raw.item_name || undefined,
+    category: raw.category || undefined,
+    items: Array.isArray(raw.items) ? raw.items : undefined,
+    payment_method: raw.payment_method || undefined,
+    tax: typeof raw.tax === 'number' ? raw.tax : undefined,
+    total_before_tax: typeof raw.total_before_tax === 'number' ? raw.total_before_tax : undefined,
+  }
+}
+
+async function analyzeWithGemini(base64Image: string, mimeType: string): Promise<{ items: ParsedReceipt[]; isMulti: boolean }> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 미설정')
 
   const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  const prompt = `이 이미지는 한국의 영수증/카드전표입니다. 아래 JSON 형식으로 정보를 추출해주세요.
-반드시 JSON만 반환하세요. 마크다운 코드블록(백틱)없이 순수 JSON만 응답하세요.
+  const prompt = `이 이미지는 한국의 영수증, 카드전표, 또는 카드 사용내역 캡처입니다.
 
+## 중요 규칙
+- 이미지에 거래가 1건이면 JSON 객체 1개를, 여러 건이면 JSON 배열로 반환하세요.
+- 마크다운 코드블록(백틱) 없이 순수 JSON만 응답하세요.
+- 마이너스(-) 금액이나 "가승인" 항목도 포함하세요.
+- 날짜에 년도가 보이지 않으면 "MM-DD" 형식으로만 반환하세요 (년도 추측 금지).
+- 미래 날짜는 절대 사용하지 마세요. 오늘은 ${new Date().toISOString().slice(0, 10)}입니다.
+
+## 단건 형식 (영수증 1장)
 {
   "merchant": "가맹점/사용처 이름",
-  "amount": 총결제금액(숫자만),
-  "date": "YYYY-MM-DD 형식 날짜",
+  "amount": 총결제금액(숫자),
+  "date": "YYYY-MM-DD",
   "card_last4": "카드번호 뒤 4자리",
-  "item_name": "대표 품목명 (여러개면 첫번째)",
-  "category": "주유비|충전|주차비|교통비|회식비|접대|식비|야근식대|외근식대|사무용품|택배비|기타 중 하나",
+  "item_name": "대표 품목명",
+  "category": "주유비|충전|주차비|교통비|회식비|접대|식비|야근식대|외근식대|사무용품|택배비|기타",
   "items": [{"name": "품목명", "quantity": 수량, "price": 단가}],
   "payment_method": "카드|현금|기타",
-  "tax": 부가세금액(숫자, 없으면 0),
+  "tax": 부가세(숫자, 없으면 0),
   "total_before_tax": 공급가액(숫자, 없으면 0)
 }
 
-- amount는 최종 결제 금액 (합계/총액/결제금액)
-- 날짜를 찾을 수 없으면 date를 빈 문자열로
-- 카드번호가 없으면 card_last4를 빈 문자열로
-- category는 사용처와 품목을 보고 가장 적합한 것으로 판단
-  (식당/카페/음식점 → 식비, 주유소 → 주유비, 주차장 → 주차비, 술집/룸 → 접대 등)
-- 금액이 확실하지 않으면 0으로`
+## 다건 형식 (카드내역 캡처 등)
+[
+  {"merchant": "...", "amount": ..., "date": "...", "card_last4": "...", "item_name": "...", "category": "...", "items": [], "payment_method": "카드", "tax": 0, "total_before_tax": 0},
+  ...
+]
+
+## 카테고리 판단 기준
+- 식당/카페/음식점 → 식비
+- 주유소 → 주유비
+- 주차장 → 주차비
+- 택시/버스 → 교통비
+- 전기충전 → 충전
+- 우체국/택배 → 택배비
+- 술집/룸/유흥 → 접대
+- 기타 → 기타`
 
   const response = await fetch(url, {
     method: 'POST',
@@ -93,7 +163,7 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 8192,
       },
     }),
   })
@@ -115,26 +185,52 @@ async function analyzeWithGemini(base64Image: string, mimeType: string): Promise
 
   try {
     const parsed = JSON.parse(cleaned)
-    return {
-      merchant: parsed.merchant || undefined,
-      amount: typeof parsed.amount === 'number' ? parsed.amount : parseInt(String(parsed.amount).replace(/[^0-9]/g, '')) || undefined,
-      date: parsed.date || undefined,
-      card_last4: parsed.card_last4 || undefined,
-      item_name: parsed.item_name || undefined,
-      category: parsed.category || undefined,
-      items: Array.isArray(parsed.items) ? parsed.items : undefined,
-      payment_method: parsed.payment_method || undefined,
-      tax: typeof parsed.tax === 'number' ? parsed.tax : undefined,
-      total_before_tax: typeof parsed.total_before_tax === 'number' ? parsed.total_before_tax : undefined,
+
+    // 배열인 경우 → 다건 처리
+    if (Array.isArray(parsed)) {
+      const items = parsed.map(normalizeReceiptItem).filter(item => item.amount && item.amount !== 0)
+      console.log(`✅ Gemini 다건 분석 성공: ${items.length}건`)
+      return { items, isMulti: true }
     }
+
+    // 단건 객체
+    const item = normalizeReceiptItem(parsed)
+    console.log('✅ Gemini 단건 분석 성공:', JSON.stringify(item).slice(0, 200))
+    return { items: [item], isMulti: false }
   } catch (e) {
-    console.warn('Gemini 응답 JSON 파싱 실패:', cleaned)
-    // 텍스트에서 기본 정보라도 추출 시도
-    const amountMatch = cleaned.match(/amount["\s:]+(\d+)/i)
+    // JSON이 잘려서 파싱 실패 → 부분 복구 시도
+    console.warn('Gemini JSON 파싱 실패, 부분 복구 시도')
+
+    // 잘린 배열에서 완전한 객체들만 추출
+    const objectPattern = /\{[^{}]*"merchant"\s*:\s*"[^"]*"[^{}]*"amount"\s*:\s*-?\d+[^{}]*\}/g
+    const matches = cleaned.match(objectPattern)
+
+    if (matches && matches.length > 0) {
+      const items: ParsedReceipt[] = []
+      for (const m of matches) {
+        try {
+          const obj = JSON.parse(m)
+          const item = normalizeReceiptItem(obj)
+          if (item.amount) items.push(item)
+        } catch { /* 개별 객체 파싱 실패 → 스킵 */ }
+      }
+      if (items.length > 0) {
+        console.log(`✅ Gemini 부분 복구 성공: ${items.length}건`)
+        return { items, isMulti: items.length > 1 }
+      }
+    }
+
+    // 최후 수단: 정규식으로 기본 정보 추출
+    const amountMatch = cleaned.match(/amount["\s:]+(-?\d+)/i)
     const dateMatch = cleaned.match(/(\d{4}-\d{2}-\d{2})/)
+    const merchantMatch = cleaned.match(/merchant["\s:]+["']([^"']+)["']/i)
     return {
-      amount: amountMatch ? parseInt(amountMatch[1]) : undefined,
-      date: dateMatch ? dateMatch[1] : undefined,
+      items: [{
+        amount: amountMatch ? parseInt(amountMatch[1]) : undefined,
+        date: dateMatch ? dateMatch[1] : undefined,
+        merchant: merchantMatch ? merchantMatch[1] : undefined,
+      }],
+      isMulti: false,
     }
   }
 }
@@ -232,16 +328,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. AI 분석: Gemini 우선, 실패 시 CLOVA OCR 폴백
-    let parsed: ParsedReceipt = {}
+    let parsedItems: ParsedReceipt[] = []
     let ocrEngine = 'none'
+    let isMulti = false
 
     // 2-1. Gemini Vision API 시도
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
     if (geminiKey) {
       try {
-        parsed = await analyzeWithGemini(base64, file.type)
+        const geminiResult = await analyzeWithGemini(base64, file.type)
+        parsedItems = geminiResult.items
+        isMulti = geminiResult.isMulti
         ocrEngine = 'gemini'
-        console.log('✅ Gemini 분석 성공:', JSON.stringify(parsed).slice(0, 200))
       } catch (e: any) {
         console.warn('⚠️ Gemini 분석 실패, CLOVA 폴백 시도:', e.message)
       }
@@ -250,7 +348,8 @@ export async function POST(request: NextRequest) {
     // 2-2. Gemini 실패 시 CLOVA OCR 폴백
     if (ocrEngine === 'none' && (process.env.NAVER_CLOVA_OCR_SECRET && process.env.NAVER_CLOVA_OCR_URL)) {
       try {
-        parsed = await analyzeWithClovaOCR(buffer, ext, file.name)
+        const clovaResult = await analyzeWithClovaOCR(buffer, ext, file.name)
+        parsedItems = [clovaResult]
         ocrEngine = 'clova'
         console.log('✅ CLOVA OCR 분석 성공')
       } catch (e: any) {
@@ -258,12 +357,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 다건: ocr_parsed_items 배열로 반환 / 단건: 기존 호환 ocr_parsed도 함께 반환
+    const firstItem = parsedItems[0] || {}
+
     return NextResponse.json({
       success: true,
       receipt_url: receiptUrl,
-      ocr_parsed: parsed,
+      ocr_parsed: firstItem,                    // 하위 호환
+      ocr_parsed_items: parsedItems,             // 다건 지원
       ocr_engine: ocrEngine,
       has_ocr: ocrEngine !== 'none',
+      is_multi: isMulti,
+      item_count: parsedItems.length,
     })
   } catch (e: any) {
     console.error('영수증 분석 오류:', e.message)
@@ -271,8 +376,11 @@ export async function POST(request: NextRequest) {
       success: true,
       receipt_url: '',
       ocr_parsed: {},
+      ocr_parsed_items: [],
       ocr_engine: 'none',
       has_ocr: false,
+      is_multi: false,
+      item_count: 0,
     })
   }
 }

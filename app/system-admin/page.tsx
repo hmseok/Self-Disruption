@@ -27,7 +27,92 @@ function getPlanIndex(plan: string) {
   return idx >= 0 ? idx : 0
 }
 
-const ICON_OPTIONS = ['Doc', 'Car', 'Truck', 'Shield', 'Money', 'Clipboard', 'Building', 'Chart', 'Wrench', 'Database', 'Users']
+const ICON_OPTIONS = ['Doc', 'Car', 'Truck', 'Shield', 'Money', 'Clipboard', 'Building', 'Chart', 'Wrench', 'Database', 'Users', 'Admin', 'Setting']
+
+// ── 그룹 정의 (사이드바와 동일 구조) ──
+const MODULE_GROUPS = [
+  { id: 'vehicle', label: '차량', emoji: '🚗' },
+  { id: 'ops', label: '차량운영', emoji: '🔧' },
+  { id: 'sales', label: '영업', emoji: '📋' },
+  { id: 'finance', label: '재무', emoji: '💰' },
+  { id: 'invest', label: '투자', emoji: '📈' },
+  { id: 'data', label: '데이터 관리', emoji: '🗄️' },
+  { id: 'work', label: '직장인필수', emoji: '👤' },
+  { id: 'platform', label: '플랫폼', emoji: '⚙️' },
+  { id: 'settings', label: '설정', emoji: '🛠️' },
+  { id: 'etc', label: '기타', emoji: '📁' },
+]
+
+// ── 경로 → 그룹 매핑 (사이드바 PATH_TO_GROUP 확장) ──
+const PATH_TO_GROUP: Record<string, string> = {
+  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
+  '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
+  '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
+  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance',
+  '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
+  '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/invest': 'invest', '/jiip': 'invest',
+  '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/work-essentials/my-info': 'work', '/work-essentials/receipts': 'work',
+  '/admin': 'platform', '/system-admin': 'platform', '/admin/developer': 'platform',
+  '/admin/employees': 'settings', '/admin/contract-terms': 'settings', '/admin/message-templates': 'settings',
+}
+
+function getModuleGroup(path: string): string {
+  return PATH_TO_GROUP[path] || 'etc'
+}
+
+// ── 마스터 모듈 목록 (사이드바 표시명 기준, 프로젝트 전체 페이지) ──
+const MASTER_MODULE_LIST = [
+  // 차량
+  { path: '/cars', name: '전체 차량 대장', icon_key: 'Car', description: '등록 차량 목록 및 상태 관리' },
+  { path: '/insurance', name: '보험/가입', icon_key: 'Shield', description: '차량 보험 관리' },
+  { path: '/registration', name: '등록 관리', icon_key: 'Doc', description: '차량 등록 관리' },
+  // 차량운영
+  { path: '/operations', name: '운영 관리', icon_key: 'Truck', description: '차량 운영 및 배정 관리' },
+  { path: '/maintenance', name: '정비/검사 관리', icon_key: 'Wrench', description: '차량 정비 및 검사 이력' },
+  { path: '/accidents', name: '사고 관리', icon_key: 'Shield', description: '사고 접수, 보험 처리, 수리 진행 관리' },
+  // 영업
+  { path: '/quotes', name: '견적 관리', icon_key: 'Doc', description: '견적 목록 및 관리' },
+  { path: '/quotes/pricing', name: '견적 작성', icon_key: 'Doc', description: '렌트가 산출 및 견적서 작성' },
+  { path: '/quotes/short-term', name: '단기 견적', icon_key: 'Doc', description: '단기 렌트 견적 작성' },
+  { path: '/contracts', name: '계약 관리', icon_key: 'Clipboard', description: '렌트 계약 체결 및 수납 관리' },
+  { path: '/customers', name: '고객 관리', icon_key: 'Users', description: '고객 정보 관리' },
+  { path: '/e-contract', name: '전자계약서', icon_key: 'Doc', description: '단기 임대차 전자계약서 작성/발송/서명' },
+  // 재무
+  { path: '/finance', name: '재무 관리', icon_key: 'Money', description: '재무 대시보드 및 종합 관리' },
+  { path: '/finance/collections', name: '수금 관리', icon_key: 'Money', description: '미수금 수금 관리' },
+  { path: '/finance/settlement', name: '정산 관리', icon_key: 'Money', description: '정산 내역 관리' },
+  { path: '/finance/upload', name: '카드/통장 관리', icon_key: 'Money', description: '카드·통장 매입 데이터 업로드' },
+  { path: '/finance/review', name: '재무 검토', icon_key: 'Money', description: '재무 검토 및 승인' },
+  { path: '/finance/freelancers', name: '프리랜서 관리', icon_key: 'Users', description: '프리랜서 급여 및 세금 관리' },
+  { path: '/finance/cards', name: '법인카드 관리', icon_key: 'Money', description: '법인카드 사용내역 관리' },
+  { path: '/admin/payroll', name: '급여 관리', icon_key: 'Money', description: '직원 급여 대장 · 급여 설정 · 4대보험/세금 자동 계산 · 장부 연동' },
+  { path: '/report', name: '리포트', icon_key: 'Chart', description: '매출/수익 리포트' },
+  { path: '/loans', name: '론 관리', icon_key: 'Money', description: '대출/론 관리' },
+  // 투자
+  { path: '/invest', name: '투자 정산 관리', icon_key: 'Chart', description: '투자 정산 내역 관리' },
+  { path: '/jiip', name: '지입 관리', icon_key: 'Truck', description: '지입 차량 관리' },
+  // 데이터 관리
+  { path: '/db/pricing-standards', name: '산출 기준 관리', icon_key: 'Database', description: '렌트가 산출에 사용되는 감가/보험/세금/금융/등록비 기준 데이터' },
+  { path: '/db/lotte', name: '벤치마크 비교', icon_key: 'Chart', description: '외부 시세 참조 데이터' },
+  // 직장인필수
+  { path: '/work-essentials/my-info', name: '내 정보', icon_key: 'Users', description: '개인 정보 및 법인카드 관리' },
+  { path: '/work-essentials/receipts', name: '영수증제출', icon_key: 'Clipboard', description: '법인카드 영수증 OCR 제출' },
+  // 플랫폼
+  { path: '/admin', name: '회사/가입 관리', icon_key: 'Building', description: '회사 등록 및 가입 승인 관리' },
+  { path: '/system-admin', name: '구독 관리', icon_key: 'Setting', description: '모듈 플랜 배분 및 회사별 구독 관리' },
+  { path: '/admin/developer', name: '개발자 모드', icon_key: 'Database', description: '시스템 개발자 도구' },
+  // 설정
+  { path: '/admin/employees', name: '조직/권한 관리', icon_key: 'Users', description: '직원 조직도 및 권한 설정' },
+  { path: '/admin/contract-terms', name: '계약 약관 관리', icon_key: 'Doc', description: '렌트 계약 약관 템플릿 관리' },
+  { path: '/admin/message-templates', name: '메시지 센터', icon_key: 'Clipboard', description: 'SMS/알림톡 메시지 템플릿 관리' },
+]
+
+// path → 마스터 이름 매핑 (DB 이름 동기화용)
+const MASTER_NAME_MAP: Record<string, string> = {}
+MASTER_MODULE_LIST.forEach(m => { MASTER_NAME_MAP[m.path] = m.name })
 
 export default function SystemAdminPage() {
   const router = useRouter()
@@ -41,6 +126,9 @@ export default function SystemAdminPage() {
   const [tab, setTab] = useState<'plans' | 'companies'>('plans')
   const [editingModule, setEditingModule] = useState<any>(null)
   const [moduleForm, setModuleForm] = useState({ name: '', path: '', icon_key: 'Doc', description: '', plan_group: 'free' })
+  const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(new Set())
+  const [bulkPlan, setBulkPlan] = useState<string>('free')
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     if (!appLoading && role === 'god_admin') loadData()
@@ -70,6 +158,37 @@ export default function SystemAdminPage() {
     setLoading(false)
   }
 
+  // ── 빠진 모듈 자동 동기화 ──
+  const syncMissingModules = async () => {
+    const existingPaths = new Set(modules.map(m => m.path))
+    const missing = MASTER_MODULE_LIST.filter(m => !existingPaths.has(m.path))
+
+    if (missing.length === 0) {
+      alert('모든 모듈이 등록되어 있습니다.')
+      return
+    }
+
+    if (!confirm(`${missing.length}개의 빠진 모듈을 추가하시겠습니까?\n\n${missing.map(m => `• ${m.name} (${m.path})`).join('\n')}`)) return
+
+    setSyncing(true)
+    const inserts = missing.map(m => ({
+      name: m.name,
+      path: m.path,
+      icon_key: m.icon_key,
+      description: m.description,
+      plan_group: 'free',
+    }))
+
+    const { error } = await supabase.from('system_modules').insert(inserts)
+    if (error) {
+      alert('추가 실패: ' + error.message)
+    } else {
+      alert(`${missing.length}개 모듈이 추가되었습니다.`)
+      await loadData()
+    }
+    setSyncing(false)
+  }
+
   // 모듈 수정
   const saveEditModule = async () => {
     if (!editingModule) return
@@ -91,15 +210,69 @@ export default function SystemAdminPage() {
     setModuleForm({ name: mod.name, path: mod.path, icon_key: mod.icon_key || 'Doc', description: mod.description || '', plan_group: mod.plan_group || 'free' })
   }
 
-  // 모듈 플랜 그룹 변경 (전체 모듈 카드에서 드롭다운으로)
+  // 모듈 선택 토글
+  const toggleSelectModule = (moduleId: string) => {
+    setSelectedModuleIds(prev => {
+      const next = new Set(prev)
+      if (next.has(moduleId)) next.delete(moduleId)
+      else next.add(moduleId)
+      return next
+    })
+  }
+  const toggleSelectAllModules = () => {
+    if (selectedModuleIds.size === modules.length) {
+      setSelectedModuleIds(new Set())
+    } else {
+      setSelectedModuleIds(new Set(modules.map(m => m.id)))
+    }
+  }
+
+  // 그룹 내 전체 선택 토글
+  const toggleSelectGroup = (groupModules: any[]) => {
+    const groupIds = new Set(groupModules.map(m => m.id))
+    const allSelected = groupModules.every(m => selectedModuleIds.has(m.id))
+    setSelectedModuleIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        groupIds.forEach(id => next.delete(id))
+      } else {
+        groupIds.forEach(id => next.add(id))
+      }
+      return next
+    })
+  }
+
+  // 일괄 플랜 변경
+  const handleBulkPlanChange = async () => {
+    if (selectedModuleIds.size === 0) return
+    const planLabel = getPlanInfo(bulkPlan).label
+    if (!confirm(`선택된 ${selectedModuleIds.size}개 모듈을 "${planLabel}" 플랜으로 일괄 변경하시겠습니까?`)) return
+
+    setModules(prev => prev.map(m => selectedModuleIds.has(m.id) ? { ...m, plan_group: bulkPlan } : m))
+
+    const ids = Array.from(selectedModuleIds)
+    const results = await Promise.all(
+      ids.map(id =>
+        supabase.from('system_modules').update({ plan_group: bulkPlan }).eq('id', id)
+      )
+    )
+    const failed = results.filter(r => r.error)
+    if (failed.length > 0) {
+      alert(`${failed.length}개 모듈 변경 실패`)
+      loadData()
+    }
+    setSelectedModuleIds(new Set())
+  }
+
+  // 모듈 플랜 그룹 변경
   const updateModulePlan = async (moduleId: string, newPlan: string) => {
     setModules(prev => prev.map(m => m.id === moduleId ? { ...m, plan_group: newPlan } : m))
-    const { data, error } = await supabase.rpc('update_module_plan_group', {
-      target_module_id: moduleId,
-      new_plan_group: newPlan,
-    })
-    if (error || (data && !data.success)) {
-      alert('저장 실패: ' + (error?.message || data?.error))
+    const { error } = await supabase
+      .from('system_modules')
+      .update({ plan_group: newPlan })
+      .eq('id', moduleId)
+    if (error) {
+      alert('저장 실패: ' + error.message)
       loadData()
     }
   }
@@ -160,6 +333,16 @@ export default function SystemAdminPage() {
   const getActiveCount = (companyId: string) =>
     modules.filter(m => matrix[`${companyId}_${m.id}`]).length
 
+  // ── 그룹별 모듈 분류 ──
+  const groupedModules = MODULE_GROUPS.map(group => ({
+    ...group,
+    items: modules.filter(m => getModuleGroup(m.path) === group.id),
+  })).filter(g => g.items.length > 0)
+
+  // 빠진 모듈 수
+  const existingPaths = new Set(modules.map(m => m.path))
+  const missingCount = MASTER_MODULE_LIST.filter(m => !existingPaths.has(m.path)).length
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -207,84 +390,147 @@ export default function SystemAdminPage() {
               </p>
             </div>
 
-            {/* ★ 전체 모듈 카드 (모듈 풀) */}
+            {/* ★ 전체 모듈 카드 (그룹별) */}
             <div className="mb-5 bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
               <div className="p-4 border-b-2 border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                   </svg>
                   <span className="text-lg font-black text-slate-800">전체 모듈</span>
                   <span className="text-xs text-slate-400 ml-1">({modules.length}개)</span>
+
+                  {/* 빠진 모듈 동기화 버튼 */}
+                  {missingCount > 0 && (
+                    <button
+                      onClick={syncMissingModules}
+                      disabled={syncing}
+                      className="ml-auto px-3 py-1.5 text-[11px] font-bold bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      {syncing ? '동기화 중...' : `빠진 모듈 ${missingCount}개 추가`}
+                    </button>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">개발된 모듈이 자동으로 여기에 표시됩니다. 각 모듈의 플랜을 선택해 배분하세요.</p>
+                <p className="text-[11px] text-slate-500 mt-1">사이드바와 동일한 그룹 구조로 모듈을 관리합니다.</p>
               </div>
+
               <div className="p-3 md:p-4">
+                {/* 일괄 변경 액션 바 */}
+                {selectedModuleIds.size > 0 && (
+                  <div className="mb-3 flex items-center gap-3 bg-steel-50 border border-steel-200 rounded-xl px-4 py-2.5 sticky top-0 z-10">
+                    <span className="text-xs font-bold text-steel-700">
+                      {selectedModuleIds.size}개 선택
+                    </span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <select
+                        value={bulkPlan}
+                        onChange={(e) => setBulkPlan(e.target.value)}
+                        className={`text-[11px] font-black px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-steel-400 ${getPlanInfo(bulkPlan).color}`}
+                      >
+                        {PLANS.map(p => (
+                          <option key={p.key} value={p.key}>{p.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkPlanChange}
+                        className="px-3 py-1.5 text-[11px] font-bold bg-steel-600 text-white rounded-lg hover:bg-steel-700 transition-colors active:scale-95"
+                      >
+                        일괄 변경
+                      </button>
+                      <button
+                        onClick={() => setSelectedModuleIds(new Set())}
+                        className="px-3 py-1.5 text-[11px] font-bold bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors active:scale-95"
+                      >
+                        선택 해제
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {modules.length === 0 ? (
                   <p className="text-sm text-slate-400 py-6 text-center">등록된 모듈이 없습니다.</p>
                 ) : (
-                  <>
-                    {/* Desktop: 테이블 형태 */}
-                    <div style={{ overflowX: 'auto' }}>
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-200">
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase w-12">아이콘</th>
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase">모듈명</th>
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase">경로</th>
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase">설명</th>
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase w-24 text-center">플랜</th>
-                            <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase w-12"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {modules.map(mod => {
-                            const modPlan = getPlanInfo(mod.plan_group || 'free')
-                            return (
-                              <tr key={mod.id} className="border-b border-slate-50 hover:bg-slate-50/50 group">
-                                <td className="px-3 py-2.5">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${modPlan.color}`}>
-                                    <span className="text-[10px] font-black">{mod.icon_key?.slice(0, 2) || '?'}</span>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <span className="text-sm font-bold text-slate-800">{mod.name}</span>
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <span className="text-xs text-slate-400 font-mono">{mod.path}</span>
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <span className="text-xs text-slate-400">{mod.description || '-'}</span>
-                                </td>
-                                <td className="px-3 py-2.5 text-center">
-                                  <select
-                                    value={mod.plan_group || 'free'}
-                                    onChange={(e) => updateModulePlan(mod.id, e.target.value)}
-                                    className={`text-[10px] font-black px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-steel-400 ${modPlan.color}`}
-                                  >
-                                    {PLANS.map(p => (
-                                      <option key={p.key} value={p.key}>{p.label}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <button
-                                    onClick={() => startEditModule(mod)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
-                                    title="모듈 수정"
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                    </svg>
-                                  </button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
+                  <div className="space-y-4">
+                    {groupedModules.map(group => {
+                      const allGroupSelected = group.items.every(m => selectedModuleIds.has(m.id))
+                      return (
+                        <div key={group.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                          {/* 그룹 헤더 */}
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                            <input
+                              type="checkbox"
+                              checked={allGroupSelected && group.items.length > 0}
+                              onChange={() => toggleSelectGroup(group.items)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600 focus:ring-steel-500 cursor-pointer"
+                            />
+                            <span className="text-sm">{group.emoji}</span>
+                            <span className="text-xs font-black text-slate-700 uppercase">{group.label}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{group.items.length}개</span>
+                          </div>
+
+                          {/* 그룹 내 모듈 테이블 */}
+                          <div style={{ overflowX: 'auto' }}>
+                            <table className="w-full text-left">
+                              <tbody>
+                                {group.items.map(mod => {
+                                  const modPlan = getPlanInfo(mod.plan_group || 'free')
+                                  const isSelected = selectedModuleIds.has(mod.id)
+                                  return (
+                                    <tr key={mod.id} className={`border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 group ${isSelected ? 'bg-steel-50/50' : ''}`}>
+                                      <td className="px-3 py-2 w-8">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() => toggleSelectModule(mod.id)}
+                                          className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600 focus:ring-steel-500 cursor-pointer"
+                                        />
+                                      </td>
+                                      <td className="px-2 py-2 w-10">
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${modPlan.color}`}>
+                                          <span className="text-[9px] font-black">{mod.icon_key?.slice(0, 2) || '?'}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[100px]">
+                                        <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        <span className="text-xs text-slate-400 font-mono">{mod.path}</span>
+                                      </td>
+                                      <td className="px-2 py-2">
+                                        <span className="text-xs text-slate-400">{mod.description || '-'}</span>
+                                      </td>
+                                      <td className="px-2 py-2 w-24 text-center">
+                                        <select
+                                          value={mod.plan_group || 'free'}
+                                          onChange={(e) => updateModulePlan(mod.id, e.target.value)}
+                                          className={`text-[10px] font-black px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-steel-400 ${modPlan.color}`}
+                                        >
+                                          {PLANS.map(p => (
+                                            <option key={p.key} value={p.key}>{p.label}</option>
+                                          ))}
+                                        </select>
+                                      </td>
+                                      <td className="px-2 py-2 w-10">
+                                        <button
+                                          onClick={() => startEditModule(mod)}
+                                          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
+                                          title="모듈 수정"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                          </svg>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -482,36 +728,43 @@ export default function SystemAdminPage() {
                       </div>
                     </div>
 
-                    {/* 모듈 그리드 (플랜 뱃지 포함) */}
-                    <div className="p-2 md:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                      {modules.map(mod => {
-                        const isActive = !!matrix[`${comp.id}_${mod.id}`]
-                        const modPlan = getPlanInfo(mod.plan_group || 'free')
-                        return (
-                          <button
-                            key={mod.id}
-                            onClick={() => toggleModule(comp.id, mod.id, isActive)}
-                            className={`relative p-2.5 md:p-3 rounded-xl border-2 text-left transition-all active:scale-95 ${
-                              isActive
-                                ? 'border-steel-400 bg-steel-50'
-                                : 'border-slate-200 bg-slate-50 opacity-50 hover:opacity-80'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                              <span className="text-[11px] md:text-sm font-bold text-slate-800 leading-tight break-keep">{mod.name}</span>
-                              <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 ${isActive ? 'bg-steel-500' : 'bg-slate-300'}`}>
-                                {isActive && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[9px] md:text-[10px] text-slate-400 font-mono">{mod.path}</span>
-                              <span className={`text-[8px] md:text-[9px] font-black px-1 py-0.5 rounded ${modPlan.color}`}>
-                                {modPlan.label}
-                              </span>
-                            </div>
-                          </button>
-                        )
-                      })}
+                    {/* 모듈 그리드 (그룹별) */}
+                    <div className="p-2 md:p-4">
+                      {groupedModules.map(group => (
+                        <div key={group.id} className="mb-3 last:mb-0">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 px-1">{group.emoji} {group.label}</div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                            {group.items.map(mod => {
+                              const isActive = !!matrix[`${comp.id}_${mod.id}`]
+                              const modPlan = getPlanInfo(mod.plan_group || 'free')
+                              return (
+                                <button
+                                  key={mod.id}
+                                  onClick={() => toggleModule(comp.id, mod.id, isActive)}
+                                  className={`relative p-2.5 md:p-3 rounded-xl border-2 text-left transition-all active:scale-95 ${
+                                    isActive
+                                      ? 'border-steel-400 bg-steel-50'
+                                      : 'border-slate-200 bg-slate-50 opacity-50 hover:opacity-80'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                                    <span className="text-[11px] md:text-sm font-bold text-slate-800 leading-tight break-keep">{mod.name}</span>
+                                    <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 ${isActive ? 'bg-steel-500' : 'bg-slate-300'}`}>
+                                      {isActive && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] md:text-[10px] text-slate-400 font-mono">{mod.path}</span>
+                                    <span className={`text-[8px] md:text-[9px] font-black px-1 py-0.5 rounded ${modPlan.color}`}>
+                                      {modPlan.label}
+                                    </span>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )
