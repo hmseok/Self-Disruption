@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
         customer_team?: string
         amount: number
         receipt_url?: string
+        memo?: string
       }>
       receipt_url?: string
       company_id?: string
@@ -150,24 +151,39 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const insertData = newItems.map(item => ({
-      company_id: companyId,
-      user_id: user.id,
-      user_name: user.employee_name || user.email?.split('@')[0] || '',
-      expense_date: item.expense_date,
-      card_number: item.card_number || '',
-      category: item.category,
-      merchant: item.merchant,
-      item_name: item.item_name,
-      customer_team: item.customer_team || user.employee_name || '',
-      amount: item.amount,
-      receipt_url: item.receipt_url || receipt_url || '',
-    }))
+    const makeInsertData = (withMemo: boolean) => newItems.map(item => {
+      const row: Record<string, any> = {
+        company_id: companyId,
+        user_id: user.id,
+        user_name: user.employee_name || user.email?.split('@')[0] || '',
+        expense_date: item.expense_date,
+        card_number: item.card_number || '',
+        category: item.category,
+        merchant: item.merchant,
+        item_name: item.item_name,
+        customer_team: item.customer_team || user.employee_name || '',
+        amount: item.amount,
+        receipt_url: item.receipt_url || receipt_url || '',
+      }
+      if (withMemo) row.memo = item.memo || ''
+      return row
+    })
 
-    const { data, error } = await supabase
+    // memo 컬럼 포함하여 시도, 실패 시 memo 없이 재시도
+    let { data, error } = await supabase
       .from('expense_receipts')
-      .insert(insertData)
+      .insert(makeInsertData(true))
       .select()
+
+    if (error && (error.message?.includes('memo') || error.message?.includes('column'))) {
+      console.log('memo 컬럼 미존재, memo 없이 재시도')
+      const retry = await supabase
+        .from('expense_receipts')
+        .insert(makeInsertData(false))
+        .select()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error('지출내역 저장 실패:', error)
@@ -197,7 +213,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { ids, updates } = body as {
       ids: string[]
-      updates: { category?: string; item_name?: string; customer_team?: string }
+      updates: { category?: string; item_name?: string; customer_team?: string; memo?: string }
     }
 
     if (!ids || ids.length === 0 || !updates) {
@@ -209,16 +225,31 @@ export async function PATCH(request: NextRequest) {
     if (updates.category !== undefined) updateData.category = updates.category
     if (updates.item_name !== undefined) updateData.item_name = updates.item_name
     if (updates.customer_team !== undefined) updateData.customer_team = updates.customer_team
+    if (updates.memo !== undefined) updateData.memo = updates.memo
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('expense_receipts')
       .update(updateData)
       .in('id', ids)
       .eq('user_id', user.id)
+
+    // memo 컬럼 없으면 memo 제외하고 재시도
+    if (error && updateData.memo !== undefined && (error.message?.includes('memo') || error.message?.includes('column'))) {
+      delete updateData.memo
+      if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ success: true, updated: 0, note: 'memo 컬럼 미존재' })
+      }
+      const retry = await supabase
+        .from('expense_receipts')
+        .update(updateData)
+        .in('id', ids)
+        .eq('user_id', user.id)
+      error = retry.error
+    }
 
     if (error) throw error
     return NextResponse.json({ success: true, updated: ids.length })

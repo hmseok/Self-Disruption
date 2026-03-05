@@ -1,6 +1,6 @@
 'use client'
 import { supabase } from '../utils/supabase'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 interface Props {
   companyName: string
@@ -26,6 +26,32 @@ type PagePerm = {
   data_scope: string
 }
 
+// ── 그룹 정의 (사이드바와 동일 구조) ──
+const PAGE_GROUPS = [
+  { id: 'vehicle', label: '차량 관리' },
+  { id: 'ops', label: '차량 운영' },
+  { id: 'sales', label: '영업' },
+  { id: 'finance', label: '재무' },
+  { id: 'invest', label: '투자' },
+  { id: 'data', label: '데이터 관리' },
+  { id: 'work', label: '업무 필수' },
+  { id: 'settings', label: '설정' },
+]
+
+const PATH_TO_GROUP: Record<string, string> = {
+  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
+  '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
+  '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
+  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance',
+  '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
+  '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/invest': 'invest', '/jiip': 'invest',
+  '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/work-essentials/my-info': 'work', '/work-essentials/receipts': 'work',
+  '/admin/employees': 'settings', '/admin/contract-terms': 'settings', '/admin/message-templates': 'settings',
+}
+
 export default function InviteModal({ companyName, companyId, isOpen, onClose, onSuccess }: Props) {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -44,6 +70,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   const [activeModules, setActiveModules] = useState<ActiveModule[]>([])
   const [pagePerms, setPagePerms] = useState<Record<string, PagePerm>>({})
   const [showPerms, setShowPerms] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // 부서/직급/모듈 로드
   useEffect(() => {
@@ -92,8 +119,17 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       setMessage(null)
       setPagePerms({})
       setShowPerms(false)
+      setExpandedGroups(new Set())
     }
   }, [isOpen])
+
+  // ── 그룹별 모듈 분류 ──
+  const groupedModules = useMemo(() => {
+    return PAGE_GROUPS.map(group => ({
+      ...group,
+      items: activeModules.filter(m => (PATH_TO_GROUP[m.path] || 'etc') === group.id),
+    })).filter(g => g.items.length > 0)
+  }, [activeModules])
 
   if (!isOpen) return null
 
@@ -104,13 +140,31 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
     setPagePerms(prev => {
       const current = prev[path]
       if (current?.can_view) {
-        // OFF
         const next = { ...prev }
         delete next[path]
         return next
       }
-      // ON
       return { ...prev, [path]: { page_path: path, can_view: true, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' } }
+    })
+  }
+
+  // 그룹 전체 ON/OFF
+  const toggleGroupAll = (groupItems: ActiveModule[]) => {
+    const allOn = groupItems.every(m => pagePerms[m.path]?.can_view)
+    setPagePerms(prev => {
+      const next = { ...prev }
+      if (allOn) {
+        // 전부 OFF
+        groupItems.forEach(m => delete next[m.path])
+      } else {
+        // 전부 ON
+        groupItems.forEach(m => {
+          if (!next[m.path]?.can_view) {
+            next[m.path] = { page_path: m.path, can_view: true, can_create: false, can_edit: false, can_delete: false, data_scope: 'all' }
+          }
+        })
+      }
+      return next
     })
   }
 
@@ -118,6 +172,15 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
     const current = pagePerms[path]
     if (!current) return
     setPagePerms(prev => ({ ...prev, [path]: { ...current, [field]: !current[field] } }))
+  }
+
+  const toggleExpandGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
   }
 
   const handleInvite = async () => {
@@ -334,12 +397,12 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
               </select>
             </div>
 
-            {/* 페이지 권한 (일반 직원일 때만) */}
+            {/* ★ 페이지 권한 — 그룹별 계층 구조 (일반 직원일 때만) */}
             {role === 'user' && activeModules.length > 0 && (
               <div>
                 <button type="button" onClick={() => setShowPerms(!showPerms)}
                   className="w-full flex items-center justify-between px-4 py-3 bg-steel-50 border border-steel-200 rounded-xl hover:bg-steel-100 transition-colors">
-                  <span className="text-xs font-bold text-steel-700">
+                  <span className="text-sm font-bold text-steel-700">
                     페이지 접근 권한 설정 {enabledCount > 0 && <span className="text-steel-500">({enabledCount}개 선택)</span>}
                   </span>
                   <svg className={`w-4 h-4 text-steel-500 transition-transform ${showPerms ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,32 +411,73 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
                 </button>
 
                 {showPerms && (
-                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
-                    {activeModules.map(mod => {
-                      const perm = pagePerms[mod.path]
-                      const isOn = !!perm?.can_view
+                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
+                    {groupedModules.map((group, gi) => {
+                      const isExpanded = expandedGroups.has(group.id)
+                      const groupOnCount = group.items.filter(m => pagePerms[m.path]?.can_view).length
+                      const allOn = groupOnCount === group.items.length
+                      const someOn = groupOnCount > 0 && !allOn
+
                       return (
-                        <div key={mod.path} className="p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-bold text-slate-800">{mod.name}</span>
-                            <button type="button" onClick={() => togglePage(mod.path)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                                isOn ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
-                              }`}>
-                              {isOn ? 'ON' : 'OFF'}
+                        <div key={group.id} className={gi > 0 ? 'border-t border-slate-200' : ''}>
+                          {/* 그룹 헤더 (중그룹) */}
+                          <div
+                            className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                            onClick={() => toggleExpandGroup(group.id)}
+                          >
+                            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="text-sm font-bold text-slate-700 flex-1">{group.label}</span>
+                            {groupOnCount > 0 && (
+                              <span className="text-xs font-bold text-steel-600 bg-steel-50 px-2 py-0.5 rounded-full">
+                                {groupOnCount}/{group.items.length}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleGroupAll(group.items) }}
+                              className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all ${
+                                allOn ? 'bg-green-100 text-green-700' : someOn ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {allOn ? '전체 ON' : someOn ? '일부 ON' : '전체 OFF'}
                             </button>
                           </div>
-                          {isOn && (
-                            <div className="flex gap-2 mt-2 flex-wrap">
-                              {(['can_view', 'can_create', 'can_edit', 'can_delete'] as const).map(f => (
-                                <label key={f} className="flex items-center gap-1 cursor-pointer text-xs">
-                                  <input type="checkbox" checked={perm?.[f] || false} onChange={() => togglePermField(mod.path, f)}
-                                    className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600" />
-                                  <span className="font-bold text-slate-600">
-                                    {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
-                                  </span>
-                                </label>
-                              ))}
+
+                          {/* 하위 페이지 목록 (하그룹) */}
+                          {isExpanded && (
+                            <div className="divide-y divide-slate-50">
+                              {group.items.map(mod => {
+                                const perm = pagePerms[mod.path]
+                                const isOn = !!perm?.can_view
+                                return (
+                                  <div key={mod.path} className="px-3 py-2 pl-8 bg-white">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-semibold text-slate-700">{mod.name}</span>
+                                      <button type="button" onClick={() => togglePage(mod.path)}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                          isOn ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
+                                        }`}>
+                                        {isOn ? 'ON' : 'OFF'}
+                                      </button>
+                                    </div>
+                                    {isOn && (
+                                      <div className="flex gap-3 mt-1.5 flex-wrap">
+                                        {(['can_view', 'can_create', 'can_edit', 'can_delete'] as const).map(f => (
+                                          <label key={f} className="flex items-center gap-1 cursor-pointer text-xs">
+                                            <input type="checkbox" checked={perm?.[f] || false} onChange={() => togglePermField(mod.path, f)}
+                                              className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600" />
+                                            <span className="font-bold text-slate-500">
+                                              {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
+                                            </span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
                         </div>

@@ -376,6 +376,22 @@ export default function QuoteListPage() {
   const [loading, setLoading] = useState(true)
   const initialTab = (searchParams.get('tab') as MainTab) || 'long_term'
   const [mainTab, setMainTab] = useState<MainTab>(initialTab)
+  const refetchRef = useRef(0)
+  const fetchDataRef = useRef<(() => Promise<void>) | null>(null)
+
+  // URL의 tab 파라미터 변경 시 탭 동기화 + 데이터 리프레시
+  useEffect(() => {
+    const tab = searchParams.get('tab') as MainTab
+    if (tab && ['long_term', 'short_term', 'lotte_rate'].includes(tab)) {
+      setMainTab(tab)
+      // 첫 로드 이후 탭 전환 시 refetch
+      if (refetchRef.current > 0 && fetchDataRef.current) {
+        setLoading(true)
+        fetchDataRef.current()
+      }
+      refetchRef.current++
+    }
+  }, [searchParams])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [shortStatusFilter, setShortStatusFilter] = useState<ShortStatusFilter>('all')
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>('all')
@@ -391,6 +407,7 @@ export default function QuoteListPage() {
 
   // ── 청구서(단기렌트 계약서) State ──
   const [invoiceOpen, setInvoiceOpen] = useState(false)
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
   const [qSaving, setQSaving] = useState(false)
   const [invManualAmount, setInvManualAmount] = useState(0)
   const [inv, setInv] = useState({
@@ -487,68 +504,75 @@ export default function QuoteListPage() {
   }, [companyId])
 
   // ── Fetch all data ──
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!companyId) { setLoading(false); return }
+  const fetchData = useCallback(async () => {
+    if (!companyId) { setLoading(false); return }
 
-      try {
-        // Quotes
-        const { data: quotesData, error: quotesError } = await supabase
-          .from('quotes').select('*').eq('company_id', companyId).order('id', { ascending: false })
-        if (quotesError) console.error('견적 목록 로드 실패:', quotesError.message)
+    try {
+      // Quotes
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes').select('*').eq('company_id', companyId).order('id', { ascending: false })
+      if (quotesError) console.error('견적 목록 로드 실패:', quotesError.message)
 
-        // Cars
-        const carIds = (quotesData || []).map((q) => q.car_id).filter(Boolean)
-        const { data: carsData } = carIds.length > 0
-          ? await supabase.from('cars').select('*').in('id', carIds)
-          : { data: [] }
+      // Cars
+      const carIds = (quotesData || []).map((q) => q.car_id).filter(Boolean)
+      const { data: carsData } = carIds.length > 0
+        ? await supabase.from('cars').select('*').in('id', carIds)
+        : { data: [] }
 
-        // Contracts from quotes
-        const quoteIds = (quotesData || []).map((q) => q.id)
-        const { data: contractsFromQuotes } = quoteIds.length > 0
-          ? await supabase.from('contracts').select('id, quote_id, status').in('quote_id', quoteIds)
-          : { data: [] }
+      // Contracts from quotes
+      const quoteIds = (quotesData || []).map((q) => q.id)
+      const { data: contractsFromQuotes } = quoteIds.length > 0
+        ? await supabase.from('contracts').select('id, quote_id, status').in('quote_id', quoteIds)
+        : { data: [] }
 
-        // Short-term quotes
-        const { data: stQuotesData } = await supabase
-          .from('short_term_quotes').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
-        setShortQuotes(stQuotesData || [])
+      // Short-term quotes
+      const { data: stQuotesData } = await supabase
+        .from('short_term_quotes').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+      setShortQuotes(stQuotesData || [])
 
-        // Customers
-        const customerIds = [
-          ...(quotesData || []).map((q) => q.customer_id),
-        ].filter(Boolean)
-        const uniqueCustomerIds = [...new Set(customerIds)]
-        const { data: customersData } = uniqueCustomerIds.length > 0
-          ? await supabase.from('customers').select('id, name, phone, email').in('id', uniqueCustomerIds)
-          : { data: [] }
+      // Customers
+      const customerIds = [
+        ...(quotesData || []).map((q) => q.customer_id),
+      ].filter(Boolean)
+      const uniqueCustomerIds = [...new Set(customerIds)]
+      const { data: customersData } = uniqueCustomerIds.length > 0
+        ? await supabase.from('customers').select('id, name, phone, email').in('id', uniqueCustomerIds)
+        : { data: [] }
 
-        const customersMap = new Map()
-        customersData?.forEach((c) => customersMap.set(c.id, c))
-        setCustomers(customersMap)
+      const customersMap = new Map()
+      customersData?.forEach((c) => customersMap.set(c.id, c))
+      setCustomers(customersMap)
 
-        const allCars = carsData || []
+      const allCars = carsData || []
 
-        // Combine quotes
-        const combinedQuotes = (quotesData || []).map((quote) => ({
-          ...quote,
-          car: allCars.find((c) => c.id === quote.car_id),
-          contract: (contractsFromQuotes || []).find((c) => c.quote_id === quote.id),
-          customer: customersMap.get(quote.customer_id),
-        }))
+      // Combine quotes
+      const combinedQuotes = (quotesData || []).map((quote) => ({
+        ...quote,
+        car: allCars.find((c) => c.id === quote.car_id),
+        contract: (contractsFromQuotes || []).find((c) => c.quote_id === quote.id),
+        customer: customersMap.get(quote.customer_id),
+      }))
 
-        setQuotes(combinedQuotes)
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setLoading(false)
-      }
+      setQuotes(combinedQuotes)
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
     }
-    fetchData()
   }, [companyId])
 
+  // fetchDataRef에 저장하여 searchParams 변경 시 호출 가능하게
+  useEffect(() => {
+    fetchDataRef.current = fetchData
+  }, [fetchData])
+
+  // 초기 로드
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   // ── Stats ──
-  const longTermQuotes = quotes
+  const longTermQuotes = quotes.filter(q => !isInvoice(q))
   const shortTermQuotes = shortQuotes
 
   // Long-term status counts (새 상태 기준)
@@ -786,23 +810,48 @@ export default function QuoteListPage() {
         quote_detail: invoiceDetail,
       }
 
-      let { data, error } = await supabase.from('quotes').insert({
-        ...basePayload,
-        rental_type: '청구서',
-      }).select().single()
+      let data: any = null
+      let error: any = null
 
-      if (error && error.message.includes('column')) {
-        // quote_detail 컬럼이 없을 수도 있는 fallback
-        delete basePayload.quote_detail
-        const result = await supabase.from('quotes').insert({ ...basePayload, rental_type: '청구서' }).select().single()
+      if (editingQuoteId) {
+        // ── 수정 모드: 기존 청구서 업데이트 ──
+        const updatePayload: Record<string, any> = { ...basePayload }
+        delete updatePayload.status // 상태는 유지
+        const result = await supabase.from('quotes').update({
+          ...updatePayload,
+        }).eq('id', editingQuoteId).select().single()
         data = result.data
         error = result.error
-      }
 
-      if (error) throw error
-      setQuotes(prev => [{ ...data, car: null, contract: null, customer: null }, ...prev])
-      // 새로 삽입된 레코드를 invoiceQuotes에도 추가 (리스트 갱신)
-      setInvoiceQuotes((prev: any[]) => [{ ...data, car: null, contract: null, customer: null }, ...prev])
+        if (error && error.message?.includes('column')) {
+          delete updatePayload.quote_detail
+          const retry = await supabase.from('quotes').update(updatePayload).eq('id', editingQuoteId).select().single()
+          data = retry.data
+          error = retry.error
+        }
+
+        if (error) throw error
+        // 리스트 갱신
+        setQuotes(prev => prev.map(q => q.id === editingQuoteId ? { ...q, ...data } : q))
+      } else {
+        // ── 새 청구서 생성 ──
+        const result = await supabase.from('quotes').insert({
+          ...basePayload,
+          rental_type: '청구서',
+        }).select().single()
+        data = result.data
+        error = result.error
+
+        if (error && error.message?.includes('column')) {
+          delete basePayload.quote_detail
+          const retry = await supabase.from('quotes').insert({ ...basePayload, rental_type: '청구서' }).select().single()
+          data = retry.data
+          error = retry.error
+        }
+
+        if (error) throw error
+        setQuotes(prev => [{ ...data, car: null, contract: null, customer: null }, ...prev])
+      }
 
       // PDF 다운로드
       if (download) {
@@ -865,6 +914,7 @@ export default function QuoteListPage() {
         fuel_out: '1', fuel_in: '1', memo: '',
       })
       setInvManualAmount(0)
+      setEditingQuoteId(null)
       if (!download) { /* 문자발송 버튼에서 호출 시 alert 생략 — 호출부에서 처리 */ }
       return data
     } catch (err: any) {
@@ -873,7 +923,7 @@ export default function QuoteListPage() {
     } finally {
       setQSaving(false)
     }
-  }, [companyId, inv, invManualAmount, user, companyStamp])
+  }, [companyId, inv, invManualAmount, user, companyStamp, editingQuoteId])
 
   // ============================================================================
   // RENDER
@@ -922,14 +972,33 @@ export default function QuoteListPage() {
             </button>
           ))}
         </div>
-        {mainTab === 'long_term' && <NewQuoteButton mainTab={mainTab} />}
-        {mainTab === 'short_term' && (
-          <button
-            onClick={() => setInvoiceOpen(true)}
-            style={{ padding: '8px 20px', background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: '0 2px 8px rgba(45,95,168,0.3)', whiteSpace: 'nowrap' }}
+        {/* 장기 탭: 새 견적(장기) 버튼 */}
+        {mainTab === 'long_term' && (
+          <Link
+            href="/quotes/pricing"
+            style={{
+              padding: '7px 16px', background: '#2d5fa8', color: '#fff', border: 'none',
+              borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+              marginLeft: 8, flexShrink: 0,
+            }}
           >
-            + 새 청구서
-          </button>
+            + 새 견적
+          </Link>
+        )}
+        {/* 단기 탭: 새 견적 */}
+        {mainTab === 'short_term' && (
+          <Link
+            href="/quotes/short-term"
+            style={{
+              padding: '7px 14px', background: '#2d5fa8', color: '#fff', border: 'none',
+              borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+              marginLeft: 8, flexShrink: 0,
+            }}
+          >
+            + 새 견적
+          </Link>
         )}
       </div>
 
@@ -1015,15 +1084,46 @@ export default function QuoteListPage() {
       )}
 
       {/* ═══ TAB: 단기 리스트 (구 청구서) ═══ */}
-      {mainTab === 'short_term' && (
+      {mainTab === 'short_term' && (() => {
+        const openInvoice = (q: any) => {
+          const detail = q.quote_detail || {}
+          const parsed = parseInvoiceMemo(q.memo || '')
+          setEditingQuoteId(q.id)
+          setInv({
+            tenant_name: detail.tenant_name || q.customer_name || '',
+            tenant_phone: detail.tenant_phone || '',
+            tenant_birth: detail.tenant_birth || '',
+            tenant_address: detail.tenant_address || '',
+            license_number: detail.license_number || '',
+            license_type: detail.license_type || '1종보통',
+            rental_car: detail.rental_car || parsed.car || '',
+            rental_plate: detail.rental_plate || '',
+            fuel_type: detail.fuel_type || '전기',
+            rental_start: detail.rental_start || '',
+            return_datetime: detail.return_datetime || '',
+            fuel_out: detail.fuel_out || '1',
+            fuel_in: detail.fuel_in || '1',
+            memo: detail.memo || '',
+          })
+          setInvManualAmount(detail.total_amount || q.rent_fee || 0)
+          setInvoiceOpen(true)
+        }
+        const getBadge = (q: any) => q.signed_at
+          ? { label: '서명완료', bg: '#dcfce7', color: '#16a34a' }
+          : q.shared_at
+          ? { label: '발송됨', bg: '#dbeafe', color: '#2563eb' }
+          : { label: '임시저장', bg: '#fef3c7', color: '#d97706' }
+
+        return (
         <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
           {filteredInvoiceQuotes.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
               {invoiceQuotes.length === 0 ? '단기렌트 청구서가 없습니다.' : '해당 조건의 청구서가 없습니다.'}
             </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
+          ) : (<>
+            {/* 데스크톱: 테이블 */}
+            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -1038,20 +1138,15 @@ export default function QuoteListPage() {
                 <tbody>
                   {filteredInvoiceQuotes.map((q: any, idx: number) => {
                     const parsed = parseInvoiceMemo(q.memo || '')
-                    const statusBadge = q.signed_at
-                      ? { label: '서명완료', bg: '#dcfce7', color: '#16a34a' }
-                      : q.shared_at
-                      ? { label: '발송됨', bg: '#dbeafe', color: '#2563eb' }
-                      : { label: '임시저장', bg: '#fef3c7', color: '#d97706' }
+                    const badge = getBadge(q)
                     return (
-                      <tr key={q.id}
-                        onClick={() => router.push(`/quotes/invoice/${q.id}`)}
+                      <tr key={q.id} onClick={() => openInvoice(q)}
                         style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
-                          <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                          <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{q.customer_name || '(미입력)'}</td>
                         <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{parsed.car || '-'}</td>
@@ -1066,9 +1161,36 @@ export default function QuoteListPage() {
                 </tbody>
               </table>
             </div>
-          )}
+            {/* 모바일: 카드형 */}
+            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+              {filteredInvoiceQuotes.map((q: any) => {
+                const parsed = parseInvoiceMemo(q.memo || '')
+                const badge = getBadge(q)
+                return (
+                  <div key={q.id} onClick={() => openInvoice(q)}
+                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.15s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(q.created_at)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{q.customer_name || '(미입력)'}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{parsed.car || '-'}</div>
+                        <div style={{ fontSize: 12, color: '#9ca3af' }}>{parsed.period || '-'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(q.rent_fee || 0)}원</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>)}
         </div>
-      )}
+        )
+      })()}
 
       {/* ═══ TAB: 롯데렌터카요금표 ═══ */}
       {mainTab === 'lotte_rate' && (
@@ -1086,8 +1208,9 @@ export default function QuoteListPage() {
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
               {quotes.length === 0 ? '발행된 견적서가 없습니다.' : '해당 조건의 견적서가 없습니다.'}
             </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
+          ) : (<>
+            {/* 데스크톱: 테이블 */}
+            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -1173,7 +1296,43 @@ export default function QuoteListPage() {
                 </tbody>
               </table>
             </div>
-          )
+            {/* 모바일: 카드형 */}
+            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+              {displayedQuotes.map((quote) => {
+                const isInv = quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')
+                const parsed = isInv ? parseInvoiceMemo(quote.memo) : null
+                return (
+                  <div key={quote.id} onClick={() => router.push(`/quotes/${quote.id}`)}
+                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.15s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <QuoteStatusBadge quote={quote} />
+                        {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#d97706' }}>청구</span>}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(quote.created_at)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{quote.customer_name || '(미입력)'}</div>
+                        {isInv ? (
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>{parsed?.car || '-'} · {parsed?.period || '-'}</div>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{quote.car?.brand} {quote.car?.model} {quote.car?.number ? `(${quote.car.number})` : ''}</div>
+                            <div style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(quote.start_date)} ~ {formatDate(quote.end_date)}</div>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                        <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
+                        <div style={{ fontSize: 10, color: '#9ca3af' }}>{isInv ? '/총액' : '/월'} VAT포함</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>)
         )}
       </div>
       )}
@@ -1186,7 +1345,7 @@ export default function QuoteListPage() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div
             style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setInvoiceOpen(false)}
+            onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
           />
           <div style={{
             position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
@@ -1196,8 +1355,8 @@ export default function QuoteListPage() {
           }}>
             <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#1e3a5f' }}>📄 청구서 작성</div>
-              <button onClick={() => setInvoiceOpen(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 }}>✕</button>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#1e3a5f' }}>📄 {editingQuoteId ? '청구서 수정' : '청구서 작성'}</div>
+              <button onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 }}>✕</button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>

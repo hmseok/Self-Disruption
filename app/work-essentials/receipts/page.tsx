@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useApp } from '../../context/AppContext'
 import { supabase } from '../../utils/supabase'
 
@@ -31,6 +31,7 @@ interface ExpenseItem {
   customer_team: string
   amount: number
   receipt_url: string
+  memo?: string
   created_at?: string
   _incomplete?: boolean
   _ocrEngine?: string
@@ -38,6 +39,20 @@ interface ExpenseItem {
 
 const isIncomplete = (item: ExpenseItem) =>
   !item.category || !item.merchant || !item.amount
+
+// ── 모바일 감지 훅 ──
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    setReady(true)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return { isMobile, ready }
+}
 
 export default function ReceiptsPage() {
   const { user, role, adminSelectedCompanyId, company } = useApp()
@@ -92,6 +107,9 @@ export default function ReceiptsPage() {
   // 인라인 수정
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<ExpenseItem>>({})
+
+  // 모바일 감지
+  const { isMobile, ready: mobileReady } = useIsMobile()
 
   const getToken = async () => {
     const s = await supabase.auth.getSession()
@@ -456,6 +474,7 @@ export default function ReceiptsPage() {
       item_name: item.item_name,
       customer_team: item.customer_team,
       amount: item.amount,
+      memo: item.memo || '',
     })
   }
 
@@ -475,6 +494,7 @@ export default function ReceiptsPage() {
       customer_team: editForm.customer_team ?? old?.customer_team ?? '',
       amount: editForm.amount ?? old?.amount ?? 0,
       receipt_url: old?.receipt_url || '',
+      memo: editForm.memo ?? old?.memo ?? '',
     }
 
     const res = await fetch('/api/receipts', {
@@ -551,7 +571,8 @@ export default function ReceiptsPage() {
 
     if (isEditing) {
       return (
-        <tr key={item.id || `edit-${idx}`} style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+        <Fragment key={item.id || `edit-${idx}`}>
+        <tr style={{ background: '#fffbeb' }}>
           <td style={{ padding: '6px 6px', textAlign: 'center', width: 36 }}></td>
           <td style={{ padding: '6px 6px' }}>
             <input type="date" value={editForm.expense_date || ''} onChange={e => setEditForm(p => ({ ...p, expense_date: e.target.value }))}
@@ -598,6 +619,14 @@ export default function ReceiptsPage() {
             </button>
           </td>
         </tr>
+        <tr style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+          <td style={{ padding: '2px 6px' }}></td>
+          <td colSpan={9} style={{ padding: '2px 6px 8px' }}>
+            <input value={editForm.memo || ''} onChange={e => setEditForm(p => ({ ...p, memo: e.target.value }))}
+              placeholder="메모 (선택사항)" style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, color: '#64748b', boxSizing: 'border-box' }} />
+          </td>
+        </tr>
+        </Fragment>
       )
     }
 
@@ -635,8 +664,15 @@ export default function ReceiptsPage() {
             <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>
           )}
         </td>
-        <td style={{ padding: '10px 10px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
-          {item.merchant || <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>}
+        <td style={{ padding: '10px 10px', maxWidth: 200, fontWeight: 500 }}>
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.merchant || <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>}
+          </div>
+          {item.memo && (
+            <div style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+              📝 {item.memo}
+            </div>
+          )}
         </td>
         <td style={{ padding: '10px 10px', color: '#64748b', fontSize: 12 }}>{item.item_name || '-'}</td>
         <td style={{ padding: '10px 10px', color: '#64748b', fontSize: 11 }}>{item.customer_team || '-'}</td>
@@ -656,10 +692,130 @@ export default function ReceiptsPage() {
     )
   }
 
+  // ── 모바일 카드 렌더 ──
+  const renderCard = (item: ExpenseItem, idx: number, highlight?: string) => {
+    const incomplete = item._incomplete
+    const isEditing = editingId === item.id
+
+    if (isEditing) {
+      return (
+        <div key={item.id || `edit-card-${idx}`} style={{
+          background: '#fffbeb', border: '2px solid #fde68a', borderRadius: 12, padding: 12, marginBottom: 8,
+        }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
+            <input type="date" value={editForm.expense_date || ''} onChange={e => setEditForm(p => ({ ...p, expense_date: e.target.value }))}
+              style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={editForm.card_number || ''} onChange={e => setEditForm(p => ({ ...p, card_number: e.target.value }))}
+              placeholder="카드번호" style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 11 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <select value={editForm.category || ''} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}
+              style={{ flex: 1, padding: '6px 6px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, background: '#fff' }}>
+              <option value="">구분 선택</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={editForm.merchant || ''} onChange={e => setEditForm(p => ({ ...p, merchant: e.target.value }))}
+              placeholder="사용처" style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 11 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={editForm.item_name || ''} onChange={e => setEditForm(p => ({ ...p, item_name: e.target.value }))}
+              placeholder="품명" style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 11 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={editForm.customer_team || ''} onChange={e => setEditForm(p => ({ ...p, customer_team: e.target.value }))}
+              placeholder="고객명/팀원" style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 11 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input type="number" value={editForm.amount ?? ''} onChange={e => setEditForm(p => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
+              style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, textAlign: 'right', fontWeight: 700 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input value={editForm.memo || ''} onChange={e => setEditForm(p => ({ ...p, memo: e.target.value }))}
+              placeholder="메모 (선택사항)" style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 11, color: '#64748b' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={saveEdit}
+              style={{ flex: 1, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              저장
+            </button>
+            <button onClick={() => setEditingId(null)}
+              style={{ flex: 1, background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, cursor: 'pointer' }}>
+              취소
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div key={item.id || `card-${idx}`} onClick={() => startEdit(item)} style={{
+        background: highlight ? highlight : (item.id && selectedIds.has(item.id)) ? '#dbeafe' : incomplete ? '#fffbeb' : '#fff',
+        border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, marginBottom: 8,
+        cursor: 'pointer', transition: 'background 0.2s',
+      }} onMouseEnter={e => { if (!incomplete && !highlight && !(item.id && selectedIds.has(item.id))) e.currentTarget.style.background = '#f8fafc' }}
+        onMouseLeave={e => { e.currentTarget.style.background = highlight || ((item.id && selectedIds.has(item.id)) ? '#dbeafe' : (incomplete ? '#fffbeb' : '#fff')) }}>
+
+        {/* 체크박스 + 날짜 + 구분 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <input type="checkbox" checked={item.id ? selectedIds.has(item.id) : false} onChange={() => item.id && toggleSelect(item.id)}
+            onClick={e => e.stopPropagation()} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }} />
+          <span style={{ fontWeight: 600, fontSize: 12, color: '#1e293b', flex: 1 }}>{fmtDate(item.expense_date)}</span>
+          {item.category ? (
+            <span style={{
+              display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+              background: item.category === '접대' ? '#fef3c7' : item.category.includes('주유') ? '#dbeafe' : item.category === '충전' ? '#dcfce7' : '#f1f5f9',
+              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#2563eb' : item.category === '충전' ? '#16a34a' : '#475569',
+            }}>{item.category}</span>
+          ) : (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>미입력</span>
+          )}
+        </div>
+
+        {/* 사용처 (굵게) */}
+        <div style={{ fontWeight: 600, fontSize: 12, color: '#1e293b', marginBottom: 6, wordBreak: 'break-word' }}>
+          {item.merchant || <span style={{ color: '#ef4444' }}>미입력</span>}
+        </div>
+
+        {/* 품명 + 고객명 */}
+        <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#64748b', marginBottom: 6 }}>
+          <span>{item.item_name || '-'}</span>
+          {item.customer_team && <span style={{ marginLeft: 'auto' }}>{item.customer_team}</span>}
+        </div>
+
+        {/* 메모 */}
+        {item.memo && (
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, fontStyle: 'italic', wordBreak: 'break-word' }}>
+            📝 {item.memo}
+          </div>
+        )}
+
+        {/* 금액 + 영수증 + 삭제 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: item.amount ? '#0c4a6e' : '#ef4444' }}>
+            {item.amount ? `${fmt(item.amount)}원` : '미입력'}
+          </span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {item.receipt_url && (
+              <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{
+                color: '#2563eb', fontSize: 11, fontWeight: 600, textDecoration: 'none', padding: '4px 6px'
+              }}>📎</a>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); if (item.id) handleDelete(item.id) }}
+              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '4px 4px' }} title="삭제">✕</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── god_admin 회사 미선택 시 차단 ──
   if (role === 'god_admin' && !adminSelectedCompanyId) {
     return (
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowX: 'hidden', boxSizing: 'border-box' }}>
         <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500 }}>
           <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>🏢</span>
           <p style={{ fontWeight: 700, color: '#374151', fontSize: 16, marginBottom: 8 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
@@ -670,21 +826,21 @@ export default function ReceiptsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px', overflowX: 'hidden', boxSizing: 'border-box', width: '100%' }}>
 
       {/* ── 헤더 ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>법인카드 사용내역</h1>
+          <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>법인카드 사용내역</h1>
           <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
             영수증을 올리면 <strong style={{ color: '#2563eb' }}>Gemini AI</strong>가 자동 분석합니다
           </p>
         </div>
         <button
           onClick={handleDownloadXlsx}
-          style={{ padding: '10px 18px', background: '#059669', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+          style={{ padding: '10px 18px', background: '#059669', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          엑셀 다운로드
+          {isMobile ? '다운로드' : '엑셀 다운로드'}
         </button>
       </div>
 
@@ -692,7 +848,7 @@ export default function ReceiptsPage() {
       <div
         style={{
           border: isDragOver ? '2px solid #2563eb' : '2px dashed #cbd5e1',
-          borderRadius: 16, padding: isProcessing ? '16px 20px' : '28px 20px',
+          borderRadius: 16, padding: isProcessing ? '12px 16px' : isMobile ? '20px 16px' : '28px 20px',
           textAlign: 'center', marginBottom: 20,
           background: isDragOver ? '#eff6ff' : '#fafbfc',
           cursor: 'pointer', transition: 'all 0.2s ease',
@@ -753,10 +909,12 @@ export default function ReceiptsPage() {
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 44, marginBottom: 6 }}>🧾</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: '#334155' }}>영수증 이미지를 여기에 드래그하거나 클릭</p>
-            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-              여러 장 동시 가능 · <span style={{ color: '#4285f4', fontWeight: 600 }}>Gemini AI</span> 자동 분석 · 자동 등록 · 중복 자동 제거
+            <div style={{ fontSize: isMobile ? 32 : 44, marginBottom: 6 }}>🧾</div>
+            <p style={{ fontSize: isMobile ? 13 : 15, fontWeight: 700, color: '#334155', wordBreak: 'keep-all' }}>
+              {isMobile ? '영수증 이미지를 클릭하여 업로드' : '영수증 이미지를 여기에 드래그하거나 클릭'}
+            </p>
+            <p style={{ fontSize: isMobile ? 11 : 12, color: '#94a3b8', marginTop: 4, wordBreak: 'keep-all' }}>
+              여러 장 동시 가능 · <span style={{ color: '#4285f4', fontWeight: 600 }}>Gemini AI</span> 자동 분석
             </p>
           </div>
         )}
@@ -765,61 +923,96 @@ export default function ReceiptsPage() {
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       {/* ── 월 필터 + 검색 + 합계 ── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, fontWeight: 600, background: '#fff', flexShrink: 0 }}
-        >
-          {allMonths.map(m => (
-            <option key={m} value={m}>
-              {m.replace('-', '년 ')}월
-            </option>
-          ))}
-        </select>
-        {/* 검색 */}
-        <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
-          <input
-            type="text"
-            placeholder="사용처, 품명, 구분, 고객명, 금액 검색..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8,
-              border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
-              background: '#fff', boxSizing: 'border-box',
-            }}
-            onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
-            onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
-          />
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')}
-              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
-          )}
-        </div>
+      <div style={{ display: 'flex', gap: isMobile ? 8 : 12, marginBottom: 16, alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', width: '100%', boxSizing: 'border-box' }}>
+        {isMobile ? (
+          /* 모바일: 월 + 검색을 한 줄로 */
+          <div style={{ display: 'flex', gap: 8, width: '100%', boxSizing: 'border-box' }}>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, fontWeight: 600, background: '#fff', flexShrink: 0, width: 'auto', minWidth: 0 }}
+            >
+              {allMonths.map(m => (
+                <option key={m} value={m}>{m.replace('-', '년 ')}월</option>
+              ))}
+            </select>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <input
+                type="text"
+                placeholder="검색..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 10px 8px 30px', borderRadius: 8,
+                  border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
+                  background: '#fff', boxSizing: 'border-box',
+                }}
+                onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
+                onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
+              />
+              <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')}
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* 데스크톱: 기존 레이아웃 */
+          <>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, fontWeight: 600, background: '#fff', flexShrink: 0 }}
+            >
+              {allMonths.map(m => (
+                <option key={m} value={m}>{m.replace('-', '년 ')}월</option>
+              ))}
+            </select>
+            <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+              <input
+                type="text"
+                placeholder="사용처, 품명, 구분, 고객명, 금액 검색..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8,
+                  border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
+                  background: '#fff', boxSizing: 'border-box',
+                }}
+                onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
+                onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
+              />
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')}
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
+              )}
+            </div>
+          </>
+        )}
         {searchQuery && (
           <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>{allDisplayItems.length}건</span>
         )}
         {incompleteCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef3c7', padding: '6px 14px', borderRadius: 8, border: '1px solid #fde68a', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef3c7', padding: '6px 14px', borderRadius: 8, border: '1px solid #fde68a', flexShrink: 0, width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#d97706' }}>⚠ 미비 {incompleteCount}건</span>
           </div>
         )}
-        <div style={{ marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#f0f9ff', padding: '8px 16px', borderRadius: 8, border: '1px solid #bae6fd' }}>
+        <div style={{ marginLeft: isMobile ? 0 : 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#f0f9ff', padding: '8px 16px', borderRadius: 8, border: '1px solid #bae6fd', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-start', boxSizing: 'border-box' }}>
           <span style={{ fontSize: 13, color: '#0369a1', fontWeight: 600 }}>합계</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: '#0c4a6e' }}>{fmt(totalAmount)}원</span>
-          <span style={{ fontSize: 12, color: '#64748b' }}>({allDisplayItems.length}건)</span>
+          <span style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, color: '#0c4a6e' }}>{fmt(totalAmount)}원</span>
+          <span style={{ fontSize: 12, color: '#64748b', marginLeft: 'auto' }}>({allDisplayItems.length}건)</span>
         </div>
       </div>
 
       {/* ── 카테고리별 칩 ── */}
       {Object.keys(categoryTotals).length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexWrap: 'wrap', marginBottom: 16, width: '100%', boxSizing: 'border-box' }}>
           {Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
-            <div key={cat} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>{cat}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{fmt(total)}원</span>
+            <div key={cat} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: isMobile ? '4px 8px' : '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: isMobile ? 11 : 12, color: '#475569', fontWeight: 600 }}>{cat}</span>
+              <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, color: '#1e293b' }}>{fmt(total)}원</span>
             </div>
           ))}
         </div>
@@ -831,142 +1024,196 @@ export default function ReceiptsPage() {
         const total = selItems.reduce((s, i) => s + (i.amount || 0), 0)
         return (
           <div style={{
-            position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-            background: '#0f172a', color: '#fff', borderRadius: 16,
-            padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50,
+            position: 'fixed', bottom: isMobile ? 0 : 24, left: isMobile ? 0 : '50%', right: isMobile ? 0 : 'auto', transform: isMobile ? 'none' : 'translateX(-50%)',
+            background: '#0f172a', color: '#fff', borderRadius: isMobile ? '16px 16px 0 0' : 16,
+            padding: isMobile ? '12px 16px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, flexWrap: isMobile ? 'wrap' : 'nowrap',
+            width: isMobile ? '100%' : 'auto', boxSizing: 'border-box',
           }}>
-            <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
-              {selectedIds.size}건 선택
-            </span>
-            <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {fmt(total)}원
-            </span>
-            <div style={{ width: 1, height: 24, background: '#334155' }} />
+            {/* 선택 카운트 + 합계 (첫 줄) */}
+            <div style={{ display: 'flex', gap: 12, width: isMobile ? '100%' : 'auto', minWidth: 0 }}>
+              <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
+                {selectedIds.size}건
+              </span>
+              <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {fmt(total)}원
+              </span>
+            </div>
 
-            {/* 구분 + 품명 + 고객명 바로 표시 */}
+            {isMobile && <div style={{ width: '100%', height: 1, background: '#334155' }} />}
+            {!isMobile && <div style={{ width: 1, height: 24, background: '#334155' }} />}
+
+            {/* 구분 선택 (항상 표시) */}
             <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}
-              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, fontWeight: 600 }}>
+              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, fontWeight: 600, flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 'auto' }}>
               <option value="">구분</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <input
-              value={bulkItemName}
-              onChange={e => setBulkItemName(e.target.value)}
-              placeholder="품명"
-              style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 80, outline: 'none' }}
-            />
-            <input
-              value={bulkCustomerTeam}
-              onChange={e => setBulkCustomerTeam(e.target.value)}
-              placeholder="고객명/팀원"
-              style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 100, outline: 'none' }}
-            />
-            <button onClick={async () => {
-              const updates: { category?: string; item_name?: string; customer_team?: string } = {}
-              if (bulkCategory) updates.category = bulkCategory
-              if (bulkItemName) updates.item_name = bulkItemName
-              if (bulkCustomerTeam) updates.customer_team = bulkCustomerTeam
-              if (Object.keys(updates).length === 0) { alert('변경할 항목을 입력해주세요'); return }
-              const msg = [
-                `${selectedIds.size}건`,
-                bulkCategory ? `구분→${bulkCategory}` : '',
-                bulkItemName ? `품명→${bulkItemName}` : '',
-                bulkCustomerTeam ? `고객명→${bulkCustomerTeam}` : '',
-              ].filter(Boolean).join(', ')
-              if (confirm(`${msg}\n\n일괄 변경하시겠습니까?`)) {
-                await handleBulkUpdate(updates)
-                setSelectedIds(new Set())
-                setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('')
-              } else {
-                setSelectedIds(new Set())
-                setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('')
-              }
-            }}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              적용
-            </button>
 
-            <div style={{ width: 1, height: 24, background: '#334155' }} />
-            <button onClick={handleBulkDelete}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              삭제
-            </button>
-            <button onClick={() => { setSelectedIds(new Set()); setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('') }}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}>
-              ✕
-            </button>
+            {/* 품명 + 고객명은 데스크톱에서만 표시 */}
+            {!isMobile && (
+              <>
+                <input
+                  value={bulkItemName}
+                  onChange={e => setBulkItemName(e.target.value)}
+                  placeholder="품명"
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 80, outline: 'none' }}
+                />
+                <input
+                  value={bulkCustomerTeam}
+                  onChange={e => setBulkCustomerTeam(e.target.value)}
+                  placeholder="고객명/팀원"
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 100, outline: 'none' }}
+                />
+              </>
+            )}
+            {/* 적용 + 삭제 + 닫기 */}
+            <div style={{ display: 'flex', gap: 6, width: isMobile ? '100%' : 'auto' }}>
+              <button onClick={async () => {
+                const updates: { category?: string; item_name?: string; customer_team?: string } = {}
+                if (bulkCategory) updates.category = bulkCategory
+                if (bulkItemName) updates.item_name = bulkItemName
+                if (bulkCustomerTeam) updates.customer_team = bulkCustomerTeam
+                if (Object.keys(updates).length === 0) { alert('변경할 항목을 입력해주세요'); return }
+                const msg = [
+                  `${selectedIds.size}건`,
+                  bulkCategory ? `구분→${bulkCategory}` : '',
+                  bulkItemName ? `품명→${bulkItemName}` : '',
+                  bulkCustomerTeam ? `고객명→${bulkCustomerTeam}` : '',
+                ].filter(Boolean).join(', ')
+                if (confirm(`${msg}\n\n일괄 변경하시겠습니까?`)) {
+                  await handleBulkUpdate(updates)
+                  setSelectedIds(new Set())
+                  setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('')
+                } else {
+                  setSelectedIds(new Set())
+                  setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('')
+                }
+              }}
+                style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flex: isMobile ? 1 : 'none' }}>
+                적용
+              </button>
+
+              <button onClick={handleBulkDelete}
+                style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flex: isMobile ? 1 : 'none' }}>
+                삭제
+              </button>
+              <button onClick={() => { setSelectedIds(new Set()); setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('') }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>
+                ✕
+              </button>
+            </div>
           </div>
         )
       })()}
 
-      {/* ── 테이블 ── */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '12px 6px', textAlign: 'center', width: 36 }}>
-                  <input
-                    type="checkbox"
-                    checked={allDisplayItems.filter(i => i.id).length > 0 && allDisplayItems.filter(i => i.id).every(i => selectedIds.has(i.id!))}
-                    onChange={toggleSelectAll}
-                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
-                  />
-                </th>
-                {['날짜', '카드번호', '구분', '사용처', '품명', '고객명/팀원'].map(h => (
-                  <th key={h} style={{ padding: '12px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>{h}</th>
-                ))}
-                <th style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>금액</th>
-                <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: 12 }}>영수증</th>
-                <th style={{ width: 36 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>로딩 중...</td></tr>
-              ) : allDisplayItems.length === 0 ? (
-                <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>
-                </td></tr>
-              ) : (
-                <>
-                  {/* 검색 필터 적용된 항목 */}
-                  {allDisplayItems.map((item, idx) => renderRow(item, idx))}
+      {/* ── 테이블 (데스크톱) vs 카드 (모바일) ── */}
+      {isMobile ? (
+        <div style={{ paddingBottom: selectedIds.size > 0 ? 100 : 0 }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
+          ) : allDisplayItems.length === 0 ? (
+            <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>
+            </div>
+          ) : (
+            <>
+              {/* 검색 필터 적용된 항목 - 카드 레이아웃 */}
+              {allDisplayItems.map((item, idx) => renderCard(item, idx))}
 
-                  {/* 방금 업로드된 다른 월 항목 (검색 중이 아닐 때만) */}
-                  {!searchQuery && otherMonthUploads.length > 0 && (
-                    <>
-                      <tr>
-                        <td colSpan={10} style={{ padding: '8px 10px', background: '#ecfdf5', borderTop: '2px solid #a7f3d0', borderBottom: '1px solid #a7f3d0' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>
-                            방금 업로드 (다른 월) — {otherMonthUploads.length}건
-                          </span>
-                          <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>
-                            해당 월로 이동하면 정상 표시됩니다
-                          </span>
-                        </td>
-                      </tr>
-                      {otherMonthUploads.map((item, idx) => renderRow(item, idx + 1000, '#ecfdf5'))}
-                    </>
-                  )}
+              {/* 방금 업로드된 다른 월 항목 (검색 중이 아닐 때만) */}
+              {!searchQuery && otherMonthUploads.length > 0 && (
+                <>
+                  <div style={{ padding: '8px 12px', background: '#ecfdf5', borderRadius: 8, marginBottom: 12, fontSize: 12, fontWeight: 700, color: '#059669' }}>
+                    <div>방금 업로드 (다른 월) — {otherMonthUploads.length}건</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>해당 월로 이동하면 정상 표시됩니다</div>
+                  </div>
+                  {otherMonthUploads.map((item, idx) => renderCard(item, idx + 1000, '#ecfdf5'))}
                 </>
               )}
-            </tbody>
-            {allDisplayItems.length > 0 && (
-              <tfoot>
-                <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                  <td colSpan={6} style={{ padding: '12px 10px', fontWeight: 700, color: '#1e293b' }}>합계</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 800, color: '#0c4a6e', fontSize: 15 }}>{fmt(totalAmount)}원</td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
+
+              {/* 합계 */}
+              {allDisplayItems.length > 0 && (
+                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: 8, marginTop: 12, borderTop: '2px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>합계</span>
+                    <span style={{ fontWeight: 800, color: '#0c4a6e', fontSize: 15 }}>{fmt(totalAmount)}원</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ padding: '12px 6px', textAlign: 'center', width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={allDisplayItems.filter(i => i.id).length > 0 && allDisplayItems.filter(i => i.id).every(i => selectedIds.has(i.id!))}
+                      onChange={toggleSelectAll}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                    />
+                  </th>
+                  {['날짜', '카드번호', '구분', '사용처', '품명', '고객명/팀원'].map(h => (
+                    <th key={h} style={{ padding: '12px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>{h}</th>
+                  ))}
+                  <th style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', fontSize: 12 }}>금액</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: 12 }}>영수증</th>
+                  <th style={{ width: 36 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>로딩 중...</td></tr>
+                ) : allDisplayItems.length === 0 ? (
+                  <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>
+                  </td></tr>
+                ) : (
+                  <>
+                    {/* 검색 필터 적용된 항목 */}
+                    {allDisplayItems.map((item, idx) => renderRow(item, idx))}
+
+                    {/* 방금 업로드된 다른 월 항목 (검색 중이 아닐 때만) */}
+                    {!searchQuery && otherMonthUploads.length > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={10} style={{ padding: '8px 10px', background: '#ecfdf5', borderTop: '2px solid #a7f3d0', borderBottom: '1px solid #a7f3d0' }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>
+                              방금 업로드 (다른 월) — {otherMonthUploads.length}건
+                            </span>
+                            <span style={{ fontSize: 11, color: '#64748b', marginLeft: 8 }}>
+                              해당 월로 이동하면 정상 표시됩니다
+                            </span>
+                          </td>
+                        </tr>
+                        {otherMonthUploads.map((item, idx) => renderRow(item, idx + 1000, '#ecfdf5'))}
+                      </>
+                    )}
+                  </>
+                )}
+              </tbody>
+              {allDisplayItems.length > 0 && (
+                <tfoot>
+                  <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                    <td colSpan={6} style={{ padding: '12px 10px', fontWeight: 700, color: '#1e293b' }}>합계</td>
+                    <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 800, color: '#0c4a6e', fontSize: 15 }}>{fmt(totalAmount)}원</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

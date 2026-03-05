@@ -114,6 +114,20 @@ const MASTER_MODULE_LIST = [
 const MASTER_NAME_MAP: Record<string, string> = {}
 MASTER_MODULE_LIST.forEach(m => { MASTER_NAME_MAP[m.path] = m.name })
 
+// Color constants for clean design
+const COLORS = {
+  pageBackground: '#f8fafc',
+  cardBackground: '#ffffff',
+  cardBorder: '#e2e8f0',
+  borderRadius: 16,
+  primaryText: '#1e293b',
+  secondaryText: '#475569',
+  tertiaryText: '#94a3b8',
+  activeChip: '#2d5fa8',
+  inactiveChip: '#f3f4f6',
+  inactiveChipText: '#6b7280',
+}
+
 export default function SystemAdminPage() {
   const router = useRouter()
   const { role, loading: appLoading, triggerMenuRefresh } = useApp()
@@ -352,24 +366,24 @@ export default function SystemAdminPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
-        <div style={{ animation: 'spin 1s linear infinite', width: 32, height: 32, borderRadius: '50%', borderWidth: 2, borderColor: '#e2e8f0', borderTopColor: '#1e293b' }}></div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.pageBackground }}>
+        <div style={{ animation: 'spin 1s linear infinite', width: 32, height: 32, borderRadius: '50%', borderWidth: 2, borderColor: COLORS.cardBorder, borderTopColor: COLORS.primaryText }}></div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '16px 32px' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: COLORS.pageBackground, padding: '20px 32px 40px' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
         {/* 헤더 */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>📦 구독/모듈 관리</h1>
-          <p style={{ fontSize: 13, color: '#64748b' }}>전체 모듈 풀에서 플랜별로 배분하고, 회사별 모듈을 관리합니다.</p>
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: COLORS.primaryText, marginBottom: 8 }}>구독/모듈 관리</h1>
+          <p style={{ fontSize: 14, color: COLORS.secondaryText }}>전체 모듈 풀에서 플랜별로 배분하고, 회사별 모듈을 관리합니다.</p>
         </div>
 
-        {/* 탭 */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, backgroundColor: '#f1f5f9', padding: 4, borderRadius: 12, width: 'fit-content' }}>
+        {/* 언더라인 탭 스타일 */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: 28, borderBottom: `2px solid ${COLORS.cardBorder}` }}>
           {[
             { key: 'plans' as const, label: '플랜/모듈 설정' },
             { key: 'companies' as const, label: '회사별 관리' },
@@ -378,16 +392,16 @@ export default function SystemAdminPage() {
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
-                padding: '8px 16px',
-                borderRadius: 8,
-                fontSize: 14,
-                fontWeight: 700,
-                backgroundColor: tab === t.key ? 'white' : 'transparent',
-                color: tab === t.key ? '#1e293b' : '#64748b',
+                padding: '12px 24px',
+                fontSize: 15,
+                fontWeight: tab === t.key ? 700 : 500,
+                color: tab === t.key ? COLORS.primaryText : COLORS.tertiaryText,
+                backgroundColor: 'transparent',
                 border: 'none',
+                borderBottom: tab === t.key ? `2px solid ${COLORS.primaryText}` : '2px solid transparent',
                 cursor: 'pointer',
-                boxShadow: tab === t.key ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                marginBottom: -2
               }}
             >
               {t.label}
@@ -398,82 +412,72 @@ export default function SystemAdminPage() {
         {/* ========== 탭 1: 플랜/모듈 설정 ========== */}
         {tab === 'plans' && (
           <div>
-            {/* 안내 */}
-            <div style={{ marginBottom: 20, padding: 12, backgroundColor: '#f0f4f8', borderRadius: 12, border: '1px solid #cbd5e1' }}>
-              <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
-                <strong>플랜 계층 구조:</strong> 상위 플랜은 하위 플랜의 모듈을 모두 포함합니다. 무료 → 베이직 → 프로 → 맥스 순으로, 맥스는 모든 모듈을 이용할 수 있습니다.
-              </p>
-            </div>
-
             {/* 전체 모듈 카드 (그룹별) */}
-            <div style={{ marginBottom: 24, backgroundColor: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-              <div style={{ padding: 16, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <svg style={{ width: 20, height: 20, color: '#64748b' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-                  </svg>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>전체 모듈</span>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>({modules.length}개)</span>
-
-                  {/* 빠진 모듈 동기화 버튼 */}
-                  {missingCount > 0 && (
-                    <button
-                      onClick={syncMissingModules}
-                      disabled={syncing}
-                      style={{
-                        marginLeft: 'auto',
-                        padding: '6px 12px',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        backgroundColor: '#fed7aa',
-                        color: '#92400e',
-                        border: '1px solid #fdba74',
-                        borderRadius: 8,
-                        cursor: syncing ? 'not-allowed' : 'pointer',
-                        opacity: syncing ? 0.5 : 1,
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseEnter={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#fbbf24')}
-                      onMouseLeave={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#fed7aa')}
-                    >
-                      {syncing ? '동기화 중...' : `빠진 모듈 ${missingCount}개 추가`}
-                    </button>
-                  )}
+            <div style={{ marginBottom: 28, backgroundColor: COLORS.cardBackground, borderRadius: COLORS.borderRadius, border: `1px solid ${COLORS.cardBorder}`, overflow: 'hidden' }}>
+              <div style={{ padding: 20, borderBottom: `1px solid ${COLORS.cardBorder}`, backgroundColor: COLORS.pageBackground, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: COLORS.primaryText, marginBottom: 4 }}>전체 모듈</h2>
+                  <p style={{ fontSize: 13, color: COLORS.secondaryText }}>사이드바와 동일한 그룹 구조로 모듈을 관리합니다. ({modules.length}개)</p>
                 </div>
-                <p style={{ fontSize: 11, color: '#78909c', marginTop: 4 }}>사이드바와 동일한 그룹 구조로 모듈을 관리합니다.</p>
+                {/* 빠진 모듈 동기화 버튼 */}
+                {missingCount > 0 && (
+                  <button
+                    onClick={syncMissingModules}
+                    disabled={syncing}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      backgroundColor: '#fbbf24',
+                      color: '#78350f',
+                      border: 'none',
+                      borderRadius: 8,
+                      cursor: syncing ? 'not-allowed' : 'pointer',
+                      opacity: syncing ? 0.6 : 1,
+                      transition: 'background-color 0.2s',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#f59e0b')}
+                    onMouseLeave={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#fbbf24')}
+                  >
+                    {syncing ? '동기화 중...' : `빠진 모듈 ${missingCount}개 추가`}
+                  </button>
+                )}
               </div>
 
-              <div style={{ padding: 16 }}>
+              <div style={{ padding: 20 }}>
                 {/* 일괄 변경 액션 바 */}
                 {selectedModuleIds.size > 0 && (
                   <div style={{
-                    marginBottom: 12,
+                    marginBottom: 16,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
-                    backgroundColor: '#f0f4f8',
-                    border: '1px solid #cbd5e1',
+                    backgroundColor: COLORS.pageBackground,
+                    border: `1px solid ${COLORS.cardBorder}`,
                     borderRadius: 12,
-                    padding: '10px 16px',
+                    padding: '12px 16px',
                     position: 'sticky',
                     top: 0,
                     zIndex: 10
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
-                      {selectedModuleIds.size}개 선택
+                    <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.primaryText }}>
+                      {selectedModuleIds.size}개 선택됨
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
                       <select
                         value={bulkPlan}
                         onChange={(e) => setBulkPlan(e.target.value)}
                         style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '6px 12px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          padding: '8px 12px',
                           borderRadius: 8,
-                          border: '1px solid #cbd5e1',
+                          border: `1px solid ${COLORS.cardBorder}`,
                           cursor: 'pointer',
-                          backgroundColor: 'white'
+                          backgroundColor: 'white',
+                          color: COLORS.primaryText
                         }}
                       >
                         {PLANS.map(p => (
@@ -483,36 +487,36 @@ export default function SystemAdminPage() {
                       <button
                         onClick={handleBulkPlanChange}
                         style={{
-                          padding: '6px 12px',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: '#475569',
+                          padding: '8px 16px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          backgroundColor: COLORS.secondaryText,
                           color: 'white',
                           border: 'none',
                           borderRadius: 8,
                           cursor: 'pointer',
                           transition: 'background-color 0.2s'
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#475569')}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = COLORS.secondaryText)}
                       >
                         일괄 변경
                       </button>
                       <button
                         onClick={() => setSelectedModuleIds(new Set())}
                         style={{
-                          padding: '6px 12px',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: '#e2e8f0',
-                          color: '#475569',
+                          padding: '8px 16px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          backgroundColor: COLORS.cardBorder,
+                          color: COLORS.secondaryText,
                           border: 'none',
                           borderRadius: 8,
                           cursor: 'pointer',
                           transition: 'background-color 0.2s'
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cbd5e1')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = COLORS.cardBorder)}
                       >
                         선택 해제
                       </button>
@@ -521,24 +525,24 @@ export default function SystemAdminPage() {
                 )}
 
                 {modules.length === 0 ? (
-                  <p style={{ fontSize: 14, color: '#cbd5e1', padding: '24px 0', textAlign: 'center' }}>등록된 모듈이 없습니다.</p>
+                  <p style={{ fontSize: 14, color: COLORS.tertiaryText, padding: '32px 0', textAlign: 'center' }}>등록된 모듈이 없습니다.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {groupedModules.map(group => {
                       const allGroupSelected = group.items.every(m => selectedModuleIds.has(m.id))
                       return (
-                        <div key={group.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                        <div key={group.id} style={{ border: `1px solid ${COLORS.cardBorder}`, borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.cardBackground }}>
                           {/* 그룹 헤더 */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', backgroundColor: COLORS.pageBackground, borderBottom: `1px solid ${COLORS.cardBorder}` }}>
                             <input
                               type="checkbox"
                               checked={allGroupSelected && group.items.length > 0}
                               onChange={() => toggleSelectGroup(group.items)}
-                              style={{ width: 14, height: 14, cursor: 'pointer' }}
+                              style={{ width: 16, height: 16, cursor: 'pointer' }}
                             />
-                            <span style={{ fontSize: 14 }}>{group.emoji}</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>{group.label}</span>
-                            <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{group.items.length}개</span>
+                            <span style={{ fontSize: 15 }}>{group.emoji}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.primaryText }}>{group.label}</span>
+                            <span style={{ fontSize: 12, color: COLORS.tertiaryText, fontWeight: 500, marginLeft: 'auto' }}>{group.items.length}개</span>
                           </div>
 
                           {/* 그룹 내 모듈 테이블 */}
@@ -550,47 +554,48 @@ export default function SystemAdminPage() {
                                   const isSelected = selectedModuleIds.has(mod.id)
                                   return (
                                     <tr key={mod.id} style={{
-                                      borderBottom: '1px solid #f1f5f9',
-                                      backgroundColor: isSelected ? '#f0f4f8' : 'white',
+                                      borderBottom: `1px solid ${COLORS.cardBorder}`,
+                                      backgroundColor: isSelected ? COLORS.pageBackground : COLORS.cardBackground,
                                       transition: 'background-color 0.2s'
                                     }}
-                                      onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                      onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'white')}
+                                      onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = COLORS.pageBackground)}
+                                      onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = COLORS.cardBackground)}
                                     >
-                                      <td style={{ padding: '8px 12px', width: 32 }}>
+                                      <td style={{ padding: '12px 16px', width: 40 }}>
                                         <input
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={() => toggleSelectModule(mod.id)}
-                                          style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                          style={{ width: 16, height: 16, cursor: 'pointer' }}
                                         />
                                       </td>
-                                      <td style={{ padding: '8px 8px', width: 40 }}>
-                                        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }}>
-                                          <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b' }}>{mod.icon_key?.slice(0, 2) || '?'}</span>
+                                      <td style={{ padding: '12px 12px', width: 50 }}>
+                                        <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.pageBackground }}>
+                                          <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.secondaryText }}>{mod.icon_key?.slice(0, 2) || '?'}</span>
                                         </div>
                                       </td>
-                                      <td style={{ padding: '8px 8px', minWidth: 100 }}>
-                                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{mod.name}</span>
+                                      <td style={{ padding: '12px 12px', minWidth: 140 }}>
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.primaryText, lineHeight: 1.4 }}>{mod.name}</span>
                                       </td>
-                                      <td style={{ padding: '8px 8px', minWidth: 120 }}>
-                                        <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>{mod.path}</span>
+                                      <td style={{ padding: '12px 12px', minWidth: 140 }}>
+                                        <span style={{ fontSize: 13, color: COLORS.tertiaryText, fontFamily: 'monospace' }}>{mod.path}</span>
                                       </td>
-                                      <td style={{ padding: '8px 8px', flex: 1 }}>
-                                        <span style={{ fontSize: 12, color: '#94a3b8' }}>{mod.description || '-'}</span>
+                                      <td style={{ padding: '12px 12px', flex: 1 }}>
+                                        <span style={{ fontSize: 13, color: COLORS.secondaryText, lineHeight: 1.4 }}>{mod.description || '-'}</span>
                                       </td>
-                                      <td style={{ padding: '8px 8px', width: 100, textAlign: 'center' }}>
+                                      <td style={{ padding: '12px 12px', width: 120, textAlign: 'center' }}>
                                         <select
                                           value={mod.plan_group || 'free'}
                                           onChange={(e) => updateModulePlan(mod.id, e.target.value)}
                                           style={{
-                                            fontSize: 10,
-                                            fontWeight: 700,
-                                            padding: '4px 8px',
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            padding: '6px 10px',
                                             borderRadius: 6,
-                                            border: '1px solid #cbd5e1',
+                                            border: `1px solid ${COLORS.cardBorder}`,
                                             cursor: 'pointer',
-                                            backgroundColor: 'white'
+                                            backgroundColor: 'white',
+                                            color: COLORS.primaryText
                                           }}
                                         >
                                           {PLANS.map(p => (
@@ -598,29 +603,29 @@ export default function SystemAdminPage() {
                                           ))}
                                         </select>
                                       </td>
-                                      <td style={{ padding: '8px 8px', width: 40 }}>
+                                      <td style={{ padding: '12px 12px', width: 44 }}>
                                         <button
                                           onClick={() => startEditModule(mod)}
                                           style={{
-                                            padding: 6,
+                                            padding: 8,
                                             borderRadius: 6,
-                                            color: '#cbd5e1',
+                                            color: COLORS.cardBorder,
                                             backgroundColor: 'transparent',
                                             border: 'none',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s'
                                           }}
                                           onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#e2e8f0'
-                                            e.currentTarget.style.color = '#64748b'
+                                            e.currentTarget.style.backgroundColor = COLORS.pageBackground
+                                            e.currentTarget.style.color = COLORS.secondaryText
                                           }}
                                           onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor = 'transparent'
-                                            e.currentTarget.style.color = '#cbd5e1'
+                                            e.currentTarget.style.color = COLORS.cardBorder
                                           }}
                                           title="모듈 수정"
                                         >
-                                          <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                           </svg>
                                         </button>
@@ -642,51 +647,51 @@ export default function SystemAdminPage() {
             {/* 모듈 수정 모달 */}
             {editingModule && (
               <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setEditingModule(null)}>
-                <div style={{ backgroundColor: 'white', width: '100%', maxWidth: 448, borderRadius: 16, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24 }} onClick={(e) => e.stopPropagation()}>
-                  <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>모듈 수정</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ backgroundColor: COLORS.cardBackground, width: '100%', maxWidth: 480, borderRadius: COLORS.borderRadius, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 28 }} onClick={(e) => e.stopPropagation()}>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, color: COLORS.primaryText, marginBottom: 20 }}>모듈 수정</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>모듈 이름</label>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>모듈 이름</label>
                       <input value={moduleForm.name} onChange={(e) => setModuleForm(f => ({ ...f, name: e.target.value }))}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }} placeholder="예: 차량 관리" />
+                        style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, fontSize: 14, color: COLORS.primaryText }} placeholder="예: 차량 관리" />
                     </div>
                     <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>경로 (path)</label>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>경로 (path)</label>
                       <input value={moduleForm.path} onChange={(e) => setModuleForm(f => ({ ...f, path: e.target.value }))}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, fontFamily: 'monospace' }} placeholder="예: /cars" />
+                        style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: 'monospace', color: COLORS.primaryText }} placeholder="예: /cars" />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>아이콘</label>
+                        <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>아이콘</label>
                         <select value={moduleForm.icon_key} onChange={(e) => setModuleForm(f => ({ ...f, icon_key: e.target.value }))}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
+                          style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, fontSize: 14, color: COLORS.primaryText }}>
                           {ICON_OPTIONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>플랜 그룹</label>
+                        <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>플랜 그룹</label>
                         <select value={moduleForm.plan_group} onChange={(e) => setModuleForm(f => ({ ...f, plan_group: e.target.value }))}
-                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
+                          style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, fontSize: 14, color: COLORS.primaryText }}>
                           {PLANS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
                         </select>
                       </div>
                     </div>
                     <div>
-                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>설명 (선택)</label>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>설명 (선택)</label>
                       <input value={moduleForm.description} onChange={(e) => setModuleForm(f => ({ ...f, description: e.target.value }))}
-                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }} placeholder="모듈 설명" />
+                        style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.cardBorder}`, borderRadius: 8, fontSize: 14, color: COLORS.primaryText }} placeholder="모듈 설명" />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                     <button onClick={() => setEditingModule(null)}
-                      style={{ flex: 1, padding: '10px 16px', backgroundColor: '#f1f5f9', color: '#475569', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                      style={{ flex: 1, padding: '12px 16px', backgroundColor: COLORS.pageBackground, color: COLORS.secondaryText, borderRadius: 8, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = COLORS.cardBorder)}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = COLORS.pageBackground)}
                     >취소</button>
                     <button onClick={saveEditModule}
-                      style={{ flex: 1, padding: '10px 16px', backgroundColor: '#475569', color: 'white', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#475569')}
+                      style={{ flex: 1, padding: '12px 16px', backgroundColor: COLORS.secondaryText, color: 'white', borderRadius: 8, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = COLORS.secondaryText)}
                     >저장</button>
                   </div>
                 </div>
@@ -694,21 +699,21 @@ export default function SystemAdminPage() {
             )}
 
             {/* 플랜별 배분 결과 카드 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginTop: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginTop: 32 }}>
               {PLANS.map(plan => {
                 const planModules = modules.filter(m => (m.plan_group || 'free') === plan.key)
                 const planIdx = getPlanIndex(plan.key)
                 const cumulativeCount = modules.filter(m => getPlanIndex(m.plan_group || 'free') <= planIdx).length
 
                 return (
-                  <div key={plan.key} style={{ borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: 'white' }}>
+                  <div key={plan.key} style={{ borderRadius: COLORS.borderRadius, border: `1px solid ${COLORS.cardBorder}`, overflow: 'hidden', backgroundColor: COLORS.cardBackground }}>
                     {/* 플랜 헤더 */}
-                    <div style={{ padding: 16, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#1e293b' }}></span>
-                        <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{plan.label}</span>
+                    <div style={{ padding: 16, borderBottom: `1px solid ${COLORS.cardBorder}`, backgroundColor: COLORS.pageBackground }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: COLORS.primaryText }}></span>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: COLORS.primaryText }}>{plan.label}</span>
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>
+                      <div style={{ fontSize: 13, color: COLORS.secondaryText, lineHeight: 1.5 }}>
                         고유 <strong>{planModules.length}개</strong>
                         {planIdx > 0 && (
                           <span style={{ marginLeft: 12 }}>/ 누적 <strong>{cumulativeCount}개</strong></span>
@@ -717,32 +722,32 @@ export default function SystemAdminPage() {
                     </div>
 
                     {/* 이 플랜 고유 모듈 */}
-                    <div style={{ padding: 12, backgroundColor: 'white' }}>
+                    <div style={{ padding: 16, backgroundColor: COLORS.cardBackground }}>
                       {planModules.length === 0 ? (
-                        <p style={{ fontSize: 11, color: '#cbd5e1', padding: '12px 0', textAlign: 'center' }}>배분된 모듈 없음</p>
+                        <p style={{ fontSize: 13, color: COLORS.tertiaryText, padding: '16px 0', textAlign: 'center' }}>배분된 모듈 없음</p>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           {planModules.map(mod => (
-                            <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px', borderRadius: 8, backgroundColor: 'white', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
-                              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#f1f5f9')}
+                            <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, backgroundColor: COLORS.pageBackground, border: `1px solid ${COLORS.cardBorder}`, transition: 'all 0.2s' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = COLORS.pageBackground)}
                             >
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{mod.name}</div>
-                                <div style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', lineHeight: 1.2 }}>{mod.path}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.primaryText, lineHeight: 1.3 }}>{mod.name}</div>
+                                <div style={{ fontSize: 12, color: COLORS.tertiaryText, fontFamily: 'monospace', lineHeight: 1.2 }}>{mod.path}</div>
                               </div>
                               <button onClick={() => startEditModule(mod)}
-                                style={{ padding: 4, borderRadius: 6, color: '#cbd5e1', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
+                                style={{ padding: 6, borderRadius: 6, color: COLORS.cardBorder, backgroundColor: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#e2e8f0'
-                                  e.currentTarget.style.color = '#64748b'
+                                  e.currentTarget.style.backgroundColor = COLORS.pageBackground
+                                  e.currentTarget.style.color = COLORS.secondaryText
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.backgroundColor = 'transparent'
-                                  e.currentTarget.style.color = '#cbd5e1'
+                                  e.currentTarget.style.color = COLORS.cardBorder
                                 }}
                                 title="수정">
-                                <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                               </button>
                             </div>
                           ))}
@@ -753,11 +758,11 @@ export default function SystemAdminPage() {
                       {planIdx > 0 && (() => {
                         const inherited = modules.filter(m => getPlanIndex(m.plan_group || 'free') < planIdx)
                         return inherited.length > 0 ? (
-                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', marginBottom: 6 }}>하위 플랜 포함</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLORS.cardBorder}` }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.tertiaryText, textTransform: 'uppercase', marginBottom: 8 }}>하위 플랜 포함</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                               {inherited.map(mod => (
-                                <span key={mod.id} style={{ fontSize: 10, padding: '4px 8px', backgroundColor: '#f1f5f9', color: '#94a3b8', borderRadius: 6, fontWeight: 500, lineHeight: 1 }}>
+                                <span key={mod.id} style={{ fontSize: 12, padding: '5px 10px', backgroundColor: COLORS.pageBackground, color: COLORS.secondaryText, borderRadius: 6, fontWeight: 500, lineHeight: 1, border: `1px solid ${COLORS.cardBorder}` }}>
                                   {mod.name}
                                 </span>
                               ))}
@@ -776,8 +781,8 @@ export default function SystemAdminPage() {
         {/* ========== 탭 2: 회사별 관리 ========== */}
         {tab === 'companies' && (
           <div>
-            {/* 필터 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+            {/* 필터 칩 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
               {[
                 { key: 'active' as const, label: '승인된 회사', count: companies.filter(c => c.is_active).length },
                 { key: 'all' as const, label: '전체', count: companies.length },
@@ -787,24 +792,24 @@ export default function SystemAdminPage() {
                   onClick={() => setFilter(f.key)}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: 8,
+                    borderRadius: 20,
                     fontSize: 13,
-                    fontWeight: 700,
-                    backgroundColor: filter === f.key ? '#475569' : 'white',
-                    color: filter === f.key ? 'white' : '#475569',
-                    border: filter === f.key ? 'none' : '1px solid #e2e8f0',
+                    fontWeight: 600,
+                    backgroundColor: filter === f.key ? COLORS.activeChip : COLORS.inactiveChip,
+                    color: filter === f.key ? 'white' : COLORS.inactiveChipText,
+                    border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
                 >
-                  {f.label} ({f.count})
+                  {f.label} <strong style={{ marginLeft: 4 }}>({f.count})</strong>
                 </button>
               ))}
-              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#94a3b8' }}>{modules.length}개 모듈</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: COLORS.secondaryText }}>{modules.length}개 모듈</span>
             </div>
 
             {/* 회사 카드 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {filteredCompanies.map(comp => {
                 const activeCount = getActiveCount(comp.id)
                 const planInfo = getPlanInfo(comp.plan || 'free')
@@ -812,72 +817,74 @@ export default function SystemAdminPage() {
 
                 return (
                   <div key={comp.id} style={{
-                    backgroundColor: 'white',
-                    borderRadius: 14,
-                    border: !comp.is_active ? '1px solid #fcd34d' : '1px solid #e2e8f0',
+                    backgroundColor: COLORS.cardBackground,
+                    borderRadius: COLORS.borderRadius,
+                    border: !comp.is_active ? '2px solid #fcd34d' : `1px solid ${COLORS.cardBorder}`,
                     overflow: 'hidden',
-                    opacity: !comp.is_active ? 0.6 : 1
+                    opacity: !comp.is_active ? 0.65 : 1
                   }}>
                     {/* 회사 헤더 */}
-                    <div style={{ padding: 20, borderBottom: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ padding: 20, borderBottom: `1px solid ${COLORS.cardBorder}`, backgroundColor: COLORS.pageBackground }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
                         <div style={{
-                          width: 40,
-                          height: 40,
+                          width: 48,
+                          height: 48,
                           borderRadius: 12,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: 'white',
                           fontWeight: 800,
-                          fontSize: 16,
+                          fontSize: 18,
                           flexShrink: 0,
-                          backgroundColor: comp.is_active ? '#475569' : '#eab308'
+                          backgroundColor: comp.is_active ? COLORS.secondaryText : '#eab308'
                         }}>
                           {comp.name[0]}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 15 }}>{comp.name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                            <span style={{ fontWeight: 700, color: COLORS.primaryText, fontSize: 16 }}>{comp.name}</span>
                             {/* 플랜 선택 드롭다운 */}
                             <select
                               value={comp.plan || 'free'}
                               onChange={(e) => updateCompanyPlan(comp.id, e.target.value)}
                               style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                padding: '4px 8px',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                padding: '6px 10px',
                                 borderRadius: 6,
-                                border: '1px solid #cbd5e1',
+                                border: `1px solid ${COLORS.cardBorder}`,
                                 cursor: 'pointer',
-                                backgroundColor: 'white'
+                                backgroundColor: 'white',
+                                color: COLORS.primaryText
                               }}
                             >
                               {PLANS.map(p => (
-                                <option key={p.key} value={p.key}>{p.label.toUpperCase()}</option>
+                                <option key={p.key} value={p.key}>{p.label}</option>
                               ))}
                             </select>
                             {!comp.is_active && (
-                              <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, backgroundColor: '#fef3c7', color: '#92400e' }}>승인 대기</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, backgroundColor: '#fef3c7', color: '#92400e' }}>승인 대기</span>
                             )}
                           </div>
-                          <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                            활성: <strong style={{ color: '#475569' }}>{activeCount}</strong>/{modules.length}
+                          <div style={{ fontSize: 13, color: COLORS.secondaryText, fontWeight: 500 }}>
+                            활성 모듈: <strong style={{ color: COLORS.primaryText }}>{activeCount}</strong>/{modules.length}
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                           <button
                             onClick={() => toggleAllForCompany(comp.id, true)}
                             style={{
-                              padding: '6px 12px',
-                              fontSize: 11,
-                              fontWeight: 700,
+                              padding: '8px 14px',
+                              fontSize: 12,
+                              fontWeight: 600,
                               backgroundColor: '#dcfce7',
                               color: '#166534',
-                              borderRadius: 8,
+                              borderRadius: 6,
                               border: 'none',
                               cursor: 'pointer',
-                              transition: 'background-color 0.2s'
+                              transition: 'background-color 0.2s',
+                              whiteSpace: 'nowrap'
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#bbf7d0')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcfce7')}
@@ -887,15 +894,16 @@ export default function SystemAdminPage() {
                           <button
                             onClick={() => toggleAllForCompany(comp.id, false)}
                             style={{
-                              padding: '6px 12px',
-                              fontSize: 11,
-                              fontWeight: 700,
+                              padding: '8px 14px',
+                              fontSize: 12,
+                              fontWeight: 600,
                               backgroundColor: '#fee2e2',
                               color: '#991b1b',
-                              borderRadius: 8,
+                              borderRadius: 6,
                               border: 'none',
                               cursor: 'pointer',
-                              transition: 'background-color 0.2s'
+                              transition: 'background-color 0.2s',
+                              whiteSpace: 'nowrap'
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fecaca')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fee2e2')}
@@ -907,11 +915,11 @@ export default function SystemAdminPage() {
                     </div>
 
                     {/* 모듈 그리드 (그룹별) */}
-                    <div style={{ padding: 16 }}>
+                    <div style={{ padding: 20 }}>
                       {groupedModules.map(group => (
-                        <div key={group.id} style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>{group.emoji} {group.label}</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+                        <div key={group.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: group.id === groupedModules[groupedModules.length - 1].id ? 'none' : `1px solid ${COLORS.cardBorder}` }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.secondaryText, textTransform: 'uppercase', marginBottom: 12, paddingLeft: 0 }}>{group.emoji} {group.label}</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
                             {group.items.map(mod => {
                               const isActive = !!matrix[`${comp.id}_${mod.id}`]
                               const modPlan = getPlanInfo(mod.plan_group || 'free')
@@ -956,42 +964,42 @@ export default function SystemAdminPage() {
                                   onClick={() => toggleModule(comp.id, mod.id, isActive)}
                                   style={{
                                     padding: 12,
-                                    borderRadius: 12,
+                                    borderRadius: 10,
                                     border: `2px solid ${statusColor}`,
                                     backgroundColor: statusBg,
                                     textAlign: 'left',
                                     transition: 'all 0.2s',
                                     opacity: statusOpacity,
                                     cursor: 'pointer',
-                                    color: '#1e293b'
+                                    color: COLORS.primaryText
                                   }}
                                   onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                                   onMouseLeave={(e) => (e.currentTarget.style.opacity = String(statusOpacity))}
                                 >
-                                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{mod.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.primaryText, lineHeight: 1.3 }}>{mod.name}</span>
                                     <div style={{
-                                      width: 16,
-                                      height: 16,
+                                      width: 18,
+                                      height: 18,
                                       borderRadius: '50%',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       backgroundColor: statusColor,
                                       flexShrink: 0,
-                                      marginTop: 2
+                                      marginTop: 1
                                     }}>
-                                      {isActive && <svg style={{ width: 10, height: 10, color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                                      {isActive && <svg style={{ width: 11, height: 11, color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                                     </div>
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'monospace' }}>{mod.path}</span>
-                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.05)', color: '#64748b' }}>
-                                      {modPlan.label}
-                                    </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                                    <span style={{ fontSize: 11, color: COLORS.tertiaryText, fontFamily: 'monospace' }}>{mod.path}</span>
                                   </div>
+                                  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4, backgroundColor: COLORS.pageBackground, color: COLORS.secondaryText, display: 'inline-block' }}>
+                                    {modPlan.label}
+                                  </span>
                                   {statusLabel && (
-                                    <div style={{ fontSize: 8, fontWeight: 700, marginTop: 6, color: statusColor }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, marginTop: 6, color: statusColor }}>
                                       {statusLabel}
                                     </div>
                                   )}
@@ -1007,22 +1015,16 @@ export default function SystemAdminPage() {
               })}
 
               {filteredCompanies.length === 0 && (
-                <div style={{ backgroundColor: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center' }}>
-                  <p style={{ color: '#94a3b8', fontWeight: 700 }}>해당 조건의 회사가 없습니다</p>
+                <div style={{ backgroundColor: COLORS.cardBackground, borderRadius: COLORS.borderRadius, border: `1px solid ${COLORS.cardBorder}`, padding: 48, textAlign: 'center' }}>
+                  <p style={{ color: COLORS.tertiaryText, fontWeight: 600, fontSize: 14 }}>해당 조건의 회사가 없습니다</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 안내 */}
-        <div style={{ marginTop: 24, padding: 16, backgroundColor: '#f0f4f8', borderRadius: 12, border: '1px solid #cbd5e1' }}>
-          <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>
-            <strong>플랜 계층:</strong> 무료 → 베이직 → 프로 → 맥스. 상위 플랜은 하위 플랜의 모든 모듈을 포함합니다. 회사 플랜을 변경하면 해당 플랜의 모듈이 자동으로 활성화됩니다. 개별 모듈을 수동으로 오버라이드할 수 있습니다.
-          </p>
-        </div>
-
       </div>
     </div>
   )
 }
+
