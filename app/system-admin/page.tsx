@@ -138,6 +138,13 @@ export default function SystemAdminPage() {
     }
   }, [appLoading, role])
 
+  // Refresh data when tab changes
+  useEffect(() => {
+    if (!appLoading && role === 'god_admin') {
+      loadData()
+    }
+  }, [tab, appLoading, role])
+
   const loadData = async () => {
     setLoading(true)
     const { data: compData } = await supabase.from('companies').select('*').order('name')
@@ -345,24 +352,24 @@ export default function SystemAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
+        <div style={{ animation: 'spin 1s linear infinite', width: 32, height: 32, borderRadius: '50%', borderWidth: 2, borderColor: '#e2e8f0', borderTopColor: '#1e293b' }}></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '16px 32px' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
         {/* 헤더 */}
-        <div className="mb-5 md:mb-6">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📦 구독/모듈 관리</h1>
-          <p className="text-slate-500 mt-1 text-xs md:text-sm">전체 모듈 풀에서 플랜별로 배분하고, 회사별 모듈을 관리합니다.</p>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>📦 구독/모듈 관리</h1>
+          <p style={{ fontSize: 13, color: '#64748b' }}>전체 모듈 풀에서 플랜별로 배분하고, 회사별 모듈을 관리합니다.</p>
         </div>
 
         {/* 탭 */}
-        <div className="flex gap-1 mb-5 bg-slate-100 p-1 rounded-xl w-fit">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, backgroundColor: '#f1f5f9', padding: 4, borderRadius: 12, width: 'fit-content' }}>
           {[
             { key: 'plans' as const, label: '플랜/모듈 설정' },
             { key: 'companies' as const, label: '회사별 관리' },
@@ -370,9 +377,18 @@ export default function SystemAdminPage() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 700,
+                backgroundColor: tab === t.key ? 'white' : 'transparent',
+                color: tab === t.key ? '#1e293b' : '#64748b',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: tab === t.key ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                transition: 'all 0.2s'
+              }}
             >
               {t.label}
             </button>
@@ -383,49 +399,82 @@ export default function SystemAdminPage() {
         {tab === 'plans' && (
           <div>
             {/* 안내 */}
-            <div className="mb-5 p-3 bg-steel-50 rounded-xl border border-steel-100">
-              <p className="text-[11px] md:text-xs text-steel-700">
-                <strong>플랜 계층 구조:</strong> 상위 플랜은 하위 플랜의 모듈을 모두 포함합니다.
-                무료 → 베이직 → 프로 → 맥스 순으로, 맥스는 모든 모듈을 이용할 수 있습니다.
+            <div style={{ marginBottom: 20, padding: 12, backgroundColor: '#f0f4f8', borderRadius: 12, border: '1px solid #cbd5e1' }}>
+              <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
+                <strong>플랜 계층 구조:</strong> 상위 플랜은 하위 플랜의 모듈을 모두 포함합니다. 무료 → 베이직 → 프로 → 맥스 순으로, 맥스는 모든 모듈을 이용할 수 있습니다.
               </p>
             </div>
 
-            {/* ★ 전체 모듈 카드 (그룹별) */}
-            <div className="mb-5 bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
-              <div className="p-4 border-b-2 border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* 전체 모듈 카드 (그룹별) */}
+            <div style={{ marginBottom: 24, backgroundColor: 'white', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              <div style={{ padding: 16, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <svg style={{ width: 20, height: 20, color: '#64748b' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                   </svg>
-                  <span className="text-lg font-black text-slate-800">전체 모듈</span>
-                  <span className="text-xs text-slate-400 ml-1">({modules.length}개)</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>전체 모듈</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>({modules.length}개)</span>
 
                   {/* 빠진 모듈 동기화 버튼 */}
                   {missingCount > 0 && (
                     <button
                       onClick={syncMissingModules}
                       disabled={syncing}
-                      className="ml-auto px-3 py-1.5 text-[11px] font-bold bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 transition-colors active:scale-95 disabled:opacity-50"
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        backgroundColor: '#fed7aa',
+                        color: '#92400e',
+                        border: '1px solid #fdba74',
+                        borderRadius: 8,
+                        cursor: syncing ? 'not-allowed' : 'pointer',
+                        opacity: syncing ? 0.5 : 1,
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#fbbf24')}
+                      onMouseLeave={(e) => !syncing && (e.currentTarget.style.backgroundColor = '#fed7aa')}
                     >
                       {syncing ? '동기화 중...' : `빠진 모듈 ${missingCount}개 추가`}
                     </button>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">사이드바와 동일한 그룹 구조로 모듈을 관리합니다.</p>
+                <p style={{ fontSize: 11, color: '#78909c', marginTop: 4 }}>사이드바와 동일한 그룹 구조로 모듈을 관리합니다.</p>
               </div>
 
-              <div className="p-3 md:p-4">
+              <div style={{ padding: 16 }}>
                 {/* 일괄 변경 액션 바 */}
                 {selectedModuleIds.size > 0 && (
-                  <div className="mb-3 flex items-center gap-3 bg-steel-50 border border-steel-200 rounded-xl px-4 py-2.5 sticky top-0 z-10">
-                    <span className="text-xs font-bold text-steel-700">
+                  <div style={{
+                    marginBottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    backgroundColor: '#f0f4f8',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 12,
+                    padding: '10px 16px',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
                       {selectedModuleIds.size}개 선택
                     </span>
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
                       <select
                         value={bulkPlan}
                         onChange={(e) => setBulkPlan(e.target.value)}
-                        className={`text-[11px] font-black px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-steel-400 ${getPlanInfo(bulkPlan).color}`}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          backgroundColor: 'white'
+                        }}
                       >
                         {PLANS.map(p => (
                           <option key={p.key} value={p.key}>{p.label}</option>
@@ -433,13 +482,37 @@ export default function SystemAdminPage() {
                       </select>
                       <button
                         onClick={handleBulkPlanChange}
-                        className="px-3 py-1.5 text-[11px] font-bold bg-steel-600 text-white rounded-lg hover:bg-steel-700 transition-colors active:scale-95"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          backgroundColor: '#475569',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#475569')}
                       >
                         일괄 변경
                       </button>
                       <button
                         onClick={() => setSelectedModuleIds(new Set())}
-                        className="px-3 py-1.5 text-[11px] font-bold bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors active:scale-95"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          backgroundColor: '#e2e8f0',
+                          color: '#475569',
+                          border: 'none',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cbd5e1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
                       >
                         선택 해제
                       </button>
@@ -448,75 +521,106 @@ export default function SystemAdminPage() {
                 )}
 
                 {modules.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-6 text-center">등록된 모듈이 없습니다.</p>
+                  <p style={{ fontSize: 14, color: '#cbd5e1', padding: '24px 0', textAlign: 'center' }}>등록된 모듈이 없습니다.</p>
                 ) : (
-                  <div className="space-y-4">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {groupedModules.map(group => {
                       const allGroupSelected = group.items.every(m => selectedModuleIds.has(m.id))
                       return (
-                        <div key={group.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div key={group.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
                           {/* 그룹 헤더 */}
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                             <input
                               type="checkbox"
                               checked={allGroupSelected && group.items.length > 0}
                               onChange={() => toggleSelectGroup(group.items)}
-                              className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600 focus:ring-steel-500 cursor-pointer"
+                              style={{ width: 14, height: 14, cursor: 'pointer' }}
                             />
-                            <span className="text-sm">{group.emoji}</span>
-                            <span className="text-xs font-black text-slate-700 uppercase">{group.label}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">{group.items.length}개</span>
+                            <span style={{ fontSize: 14 }}>{group.emoji}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>{group.label}</span>
+                            <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }}>{group.items.length}개</span>
                           </div>
 
                           {/* 그룹 내 모듈 테이블 */}
                           <div style={{ overflowX: 'auto' }}>
-                            <table className="w-full text-left">
+                            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                               <tbody>
                                 {group.items.map(mod => {
                                   const modPlan = getPlanInfo(mod.plan_group || 'free')
                                   const isSelected = selectedModuleIds.has(mod.id)
                                   return (
-                                    <tr key={mod.id} className={`border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 group ${isSelected ? 'bg-steel-50/50' : ''}`}>
-                                      <td className="px-3 py-2 w-8">
+                                    <tr key={mod.id} style={{
+                                      borderBottom: '1px solid #f1f5f9',
+                                      backgroundColor: isSelected ? '#f0f4f8' : 'white',
+                                      transition: 'background-color 0.2s'
+                                    }}
+                                      onMouseEnter={(e) => !isSelected && (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                      onMouseLeave={(e) => !isSelected && (e.currentTarget.style.backgroundColor = 'white')}
+                                    >
+                                      <td style={{ padding: '8px 12px', width: 32 }}>
                                         <input
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={() => toggleSelectModule(mod.id)}
-                                          className="w-3.5 h-3.5 rounded border-slate-300 text-steel-600 focus:ring-steel-500 cursor-pointer"
+                                          style={{ width: 14, height: 14, cursor: 'pointer' }}
                                         />
                                       </td>
-                                      <td className="px-2 py-2 w-10">
-                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${modPlan.color}`}>
-                                          <span className="text-[9px] font-black">{mod.icon_key?.slice(0, 2) || '?'}</span>
+                                      <td style={{ padding: '8px 8px', width: 40 }}>
+                                        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }}>
+                                          <span style={{ fontSize: 9, fontWeight: 700, color: '#64748b' }}>{mod.icon_key?.slice(0, 2) || '?'}</span>
                                         </div>
                                       </td>
-                                      <td className="px-2 py-2 min-w-[100px]">
-                                        <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                                      <td style={{ padding: '8px 8px', minWidth: 100 }}>
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>{mod.name}</span>
                                       </td>
-                                      <td className="px-2 py-2 min-w-[120px]">
-                                        <span className="text-xs text-slate-400 font-mono">{mod.path}</span>
+                                      <td style={{ padding: '8px 8px', minWidth: 120 }}>
+                                        <span style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>{mod.path}</span>
                                       </td>
-                                      <td className="px-2 py-2">
-                                        <span className="text-xs text-slate-400">{mod.description || '-'}</span>
+                                      <td style={{ padding: '8px 8px', flex: 1 }}>
+                                        <span style={{ fontSize: 12, color: '#94a3b8' }}>{mod.description || '-'}</span>
                                       </td>
-                                      <td className="px-2 py-2 w-24 text-center">
+                                      <td style={{ padding: '8px 8px', width: 100, textAlign: 'center' }}>
                                         <select
                                           value={mod.plan_group || 'free'}
                                           onChange={(e) => updateModulePlan(mod.id, e.target.value)}
-                                          className={`text-[10px] font-black px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-steel-400 ${modPlan.color}`}
+                                          style={{
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            padding: '4px 8px',
+                                            borderRadius: 6,
+                                            border: '1px solid #cbd5e1',
+                                            cursor: 'pointer',
+                                            backgroundColor: 'white'
+                                          }}
                                         >
                                           {PLANS.map(p => (
                                             <option key={p.key} value={p.key}>{p.label}</option>
                                           ))}
                                         </select>
                                       </td>
-                                      <td className="px-2 py-2 w-10">
+                                      <td style={{ padding: '8px 8px', width: 40 }}>
                                         <button
                                           onClick={() => startEditModule(mod)}
-                                          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
+                                          style={{
+                                            padding: 6,
+                                            borderRadius: 6,
+                                            color: '#cbd5e1',
+                                            backgroundColor: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#e2e8f0'
+                                            e.currentTarget.style.color = '#64748b'
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent'
+                                            e.currentTarget.style.color = '#cbd5e1'
+                                          }}
                                           title="모듈 수정"
                                         >
-                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                           </svg>
                                         </button>
@@ -537,90 +641,108 @@ export default function SystemAdminPage() {
 
             {/* 모듈 수정 모달 */}
             {editingModule && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setEditingModule(null)}>
-                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-                  <h3 className="text-lg font-black text-slate-900 mb-4">모듈 수정</h3>
-                  <div className="space-y-3">
+              <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setEditingModule(null)}>
+                <div style={{ backgroundColor: 'white', width: '100%', maxWidth: 448, borderRadius: 16, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24 }} onClick={(e) => e.stopPropagation()}>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>모듈 수정</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">모듈 이름</label>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>모듈 이름</label>
                       <input value={moduleForm.name} onChange={(e) => setModuleForm(f => ({ ...f, name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-steel-500" placeholder="예: 차량 관리" />
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }} placeholder="예: 차량 관리" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">경로 (path)</label>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>경로 (path)</label>
                       <input value={moduleForm.path} onChange={(e) => setModuleForm(f => ({ ...f, path: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:border-steel-500" placeholder="예: /cars" />
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, fontFamily: 'monospace' }} placeholder="예: /cars" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">아이콘</label>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>아이콘</label>
                         <select value={moduleForm.icon_key} onChange={(e) => setModuleForm(f => ({ ...f, icon_key: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-steel-500">
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
                           {ICON_OPTIONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">플랜 그룹</label>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>플랜 그룹</label>
                         <select value={moduleForm.plan_group} onChange={(e) => setModuleForm(f => ({ ...f, plan_group: e.target.value }))}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-steel-500">
+                          style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
                           {PLANS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
                         </select>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">설명 (선택)</label>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>설명 (선택)</label>
                       <input value={moduleForm.description} onChange={(e) => setModuleForm(f => ({ ...f, description: e.target.value }))}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-steel-500" placeholder="모듈 설명" />
+                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }} placeholder="모듈 설명" />
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-5">
+                  <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
                     <button onClick={() => setEditingModule(null)}
-                      className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200">취소</button>
+                      style={{ flex: 1, padding: '10px 16px', backgroundColor: '#f1f5f9', color: '#475569', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    >취소</button>
                     <button onClick={saveEditModule}
-                      className="flex-1 px-4 py-2.5 bg-steel-600 text-white rounded-xl text-sm font-bold hover:bg-steel-700">저장</button>
+                      style={{ flex: 1, padding: '10px 16px', backgroundColor: '#475569', color: 'white', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#475569')}
+                    >저장</button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ★ 플랜별 배분 결과 카드 */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+            {/* 플랜별 배분 결과 카드 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginTop: 24 }}>
               {PLANS.map(plan => {
                 const planModules = modules.filter(m => (m.plan_group || 'free') === plan.key)
                 const planIdx = getPlanIndex(plan.key)
                 const cumulativeCount = modules.filter(m => getPlanIndex(m.plan_group || 'free') <= planIdx).length
 
                 return (
-                  <div key={plan.key} className={`rounded-2xl border-2 overflow-hidden ${plan.headerBg}`}>
+                  <div key={plan.key} style={{ borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', backgroundColor: 'white' }}>
                     {/* 플랜 헤더 */}
-                    <div className={`p-3 md:p-4 border-b-2 ${plan.headerBg}`}>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${plan.dot}`}></span>
-                        <span className={`text-base md:text-lg font-black ${plan.headerText}`}>{plan.label}</span>
+                    <div style={{ padding: 16, borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#1e293b' }}></span>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{plan.label}</span>
                       </div>
-                      <div className="text-[10px] md:text-[11px] text-slate-500">
+                      <div style={{ fontSize: 11, color: '#64748b' }}>
                         고유 <strong>{planModules.length}개</strong>
                         {planIdx > 0 && (
-                          <span className="ml-1.5">/ 누적 <strong>{cumulativeCount}개</strong></span>
+                          <span style={{ marginLeft: 12 }}>/ 누적 <strong>{cumulativeCount}개</strong></span>
                         )}
                       </div>
                     </div>
 
                     {/* 이 플랜 고유 모듈 */}
-                    <div className="p-2 md:p-3 bg-white/80">
+                    <div style={{ padding: 12, backgroundColor: 'white' }}>
                       {planModules.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 py-3 text-center">배분된 모듈 없음</p>
+                        <p style={{ fontSize: 11, color: '#cbd5e1', padding: '12px 0', textAlign: 'center' }}>배분된 모듈 없음</p>
                       ) : (
-                        <div className="space-y-1.5">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {planModules.map(mod => (
-                            <div key={mod.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition-all group">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[11px] md:text-xs font-bold text-slate-800 leading-snug">{mod.name}</div>
-                                <div className="text-[9px] md:text-[10px] text-slate-400 font-mono leading-tight">{mod.path}</div>
+                            <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px', borderRadius: 8, backgroundColor: 'white', border: '1px solid #f1f5f9', transition: 'all 0.2s' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
+                              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#f1f5f9')}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{mod.name}</div>
+                                <div style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', lineHeight: 1.2 }}>{mod.path}</div>
                               </div>
                               <button onClick={() => startEditModule(mod)}
-                                className="p-1 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" title="수정">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                style={{ padding: 4, borderRadius: 6, color: '#cbd5e1', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'all 0.2s' }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#e2e8f0'
+                                  e.currentTarget.style.color = '#64748b'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                  e.currentTarget.style.color = '#cbd5e1'
+                                }}
+                                title="수정">
+                                <svg style={{ width: 12, height: 12 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                               </button>
                             </div>
                           ))}
@@ -631,11 +753,11 @@ export default function SystemAdminPage() {
                       {planIdx > 0 && (() => {
                         const inherited = modules.filter(m => getPlanIndex(m.plan_group || 'free') < planIdx)
                         return inherited.length > 0 ? (
-                          <div className="mt-2 pt-2 border-t border-slate-100">
-                            <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase mb-1.5">하위 플랜 포함</div>
-                            <div className="flex flex-wrap gap-1">
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', textTransform: 'uppercase', marginBottom: 6 }}>하위 플랜 포함</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                               {inherited.map(mod => (
-                                <span key={mod.id} className="text-[9px] md:text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-medium leading-tight">
+                                <span key={mod.id} style={{ fontSize: 10, padding: '4px 8px', backgroundColor: '#f1f5f9', color: '#94a3b8', borderRadius: 6, fontWeight: 500, lineHeight: 1 }}>
                                   {mod.name}
                                 </span>
                               ))}
@@ -655,7 +777,7 @@ export default function SystemAdminPage() {
         {tab === 'companies' && (
           <div>
             {/* 필터 */}
-            <div className="flex items-center gap-2 md:gap-4 mb-5">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
               {[
                 { key: 'active' as const, label: '승인된 회사', count: companies.filter(c => c.is_active).length },
                 { key: 'all' as const, label: '전체', count: companies.length },
@@ -663,64 +785,120 @@ export default function SystemAdminPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all ${
-                    filter === f.key ? 'bg-steel-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                  }`}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    backgroundColor: filter === f.key ? '#475569' : 'white',
+                    color: filter === f.key ? 'white' : '#475569',
+                    border: filter === f.key ? 'none' : '1px solid #e2e8f0',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
                 >
                   {f.label} ({f.count})
                 </button>
               ))}
-              <span className="ml-auto text-[10px] md:text-xs text-slate-400">{modules.length}개 모듈</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#94a3b8' }}>{modules.length}개 모듈</span>
             </div>
 
             {/* 회사 카드 */}
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {filteredCompanies.map(comp => {
                 const activeCount = getActiveCount(comp.id)
                 const planInfo = getPlanInfo(comp.plan || 'free')
+                const companyPlanIdx = getPlanIndex(comp.plan || 'free')
+
                 return (
-                  <div key={comp.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-                    !comp.is_active ? 'border-yellow-300 opacity-60' : 'border-slate-200'
-                  }`}>
+                  <div key={comp.id} style={{
+                    backgroundColor: 'white',
+                    borderRadius: 14,
+                    border: !comp.is_active ? '1px solid #fcd34d' : '1px solid #e2e8f0',
+                    overflow: 'hidden',
+                    opacity: !comp.is_active ? 0.6 : 1
+                  }}>
                     {/* 회사 헤더 */}
-                    <div className="p-3 md:p-5 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
-                          comp.is_active ? 'bg-steel-600' : 'bg-yellow-500'
-                        }`}>
+                    <div style={{ padding: 20, borderBottom: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 800,
+                          fontSize: 16,
+                          flexShrink: 0,
+                          backgroundColor: comp.is_active ? '#475569' : '#eab308'
+                        }}>
                           {comp.name[0]}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-900 text-sm md:text-base">{comp.name}</span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 15 }}>{comp.name}</span>
                             {/* 플랜 선택 드롭다운 */}
                             <select
                               value={comp.plan || 'free'}
                               onChange={(e) => updateCompanyPlan(comp.id, e.target.value)}
-                              className={`text-[10px] font-black px-2 py-0.5 rounded border cursor-pointer focus:outline-none ${planInfo.color}`}
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: '4px 8px',
+                                borderRadius: 6,
+                                border: '1px solid #cbd5e1',
+                                cursor: 'pointer',
+                                backgroundColor: 'white'
+                              }}
                             >
                               {PLANS.map(p => (
                                 <option key={p.key} value={p.key}>{p.label.toUpperCase()}</option>
                               ))}
                             </select>
                             {!comp.is_active && (
-                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">승인 대기</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, backgroundColor: '#fef3c7', color: '#92400e' }}>승인 대기</span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            활성: <strong className="text-steel-600">{activeCount}</strong>/{modules.length}
+                          <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                            활성: <strong style={{ color: '#475569' }}>{activeCount}</strong>/{modules.length}
                           </div>
                         </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
+                        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                           <button
                             onClick={() => toggleAllForCompany(comp.id, true)}
-                            className="px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-bold bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors active:scale-95"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              backgroundColor: '#dcfce7',
+                              color: '#166534',
+                              borderRadius: 8,
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#bbf7d0')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcfce7')}
                           >
                             전체 ON
                           </button>
                           <button
                             onClick={() => toggleAllForCompany(comp.id, false)}
-                            className="px-2.5 md:px-3 py-1.5 text-[11px] md:text-xs font-bold bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors active:scale-95"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              backgroundColor: '#fee2e2',
+                              color: '#991b1b',
+                              borderRadius: 8,
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fecaca')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fee2e2')}
                           >
                             전체 OFF
                           </button>
@@ -729,36 +907,94 @@ export default function SystemAdminPage() {
                     </div>
 
                     {/* 모듈 그리드 (그룹별) */}
-                    <div className="p-2 md:p-4">
+                    <div style={{ padding: 16 }}>
                       {groupedModules.map(group => (
-                        <div key={group.id} className="mb-3 last:mb-0">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5 px-1">{group.emoji} {group.label}</div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        <div key={group.id} style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>{group.emoji} {group.label}</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
                             {group.items.map(mod => {
                               const isActive = !!matrix[`${comp.id}_${mod.id}`]
                               const modPlan = getPlanInfo(mod.plan_group || 'free')
+                              const modulePlanIdx = getPlanIndex(mod.plan_group || 'free')
+                              const planIncluded = modulePlanIdx <= companyPlanIdx
+
+                              // Determine status
+                              let statusColor = '#e2e8f0'
+                              let statusBg = 'white'
+                              let statusOpacity = 0.5
+                              let statusLabel = ''
+
+                              if (planIncluded && isActive) {
+                                // Module ON and included in plan (expected)
+                                statusColor = '#3b82f6'
+                                statusBg = '#eff6ff'
+                                statusOpacity = 1
+                                statusLabel = '정상'
+                              } else if (planIncluded && !isActive) {
+                                // Module OFF but included in plan (warning)
+                                statusColor = '#dc2626'
+                                statusBg = '#fef2f2'
+                                statusOpacity = 1
+                                statusLabel = '⚠ 미활성'
+                              } else if (!planIncluded && isActive) {
+                                // Module ON but not in plan (override)
+                                statusColor = '#f97316'
+                                statusBg = '#fff7ed'
+                                statusOpacity = 1
+                                statusLabel = '수동활성'
+                              } else {
+                                // Module OFF and not in plan (normal)
+                                statusColor = '#cbd5e1'
+                                statusBg = '#f1f5f9'
+                                statusOpacity = 0.5
+                                statusLabel = ''
+                              }
+
                               return (
                                 <button
                                   key={mod.id}
                                   onClick={() => toggleModule(comp.id, mod.id, isActive)}
-                                  className={`relative p-2.5 md:p-3 rounded-xl border-2 text-left transition-all active:scale-95 ${
-                                    isActive
-                                      ? 'border-steel-400 bg-steel-50'
-                                      : 'border-slate-200 bg-slate-50 opacity-50 hover:opacity-80'
-                                  }`}
+                                  style={{
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    border: `2px solid ${statusColor}`,
+                                    backgroundColor: statusBg,
+                                    textAlign: 'left',
+                                    transition: 'all 0.2s',
+                                    opacity: statusOpacity,
+                                    cursor: 'pointer',
+                                    color: '#1e293b'
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.opacity = String(statusOpacity))}
                                 >
-                                  <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                                    <span className="text-[11px] md:text-sm font-bold text-slate-800 leading-tight break-keep">{mod.name}</span>
-                                    <div className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 ${isActive ? 'bg-steel-500' : 'bg-slate-300'}`}>
-                                      {isActive && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{mod.name}</span>
+                                    <div style={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: '50%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: statusColor,
+                                      flexShrink: 0,
+                                      marginTop: 2
+                                    }}>
+                                      {isActive && <svg style={{ width: 10, height: 10, color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[9px] md:text-[10px] text-slate-400 font-mono">{mod.path}</span>
-                                    <span className={`text-[8px] md:text-[9px] font-black px-1 py-0.5 rounded ${modPlan.color}`}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'monospace' }}>{mod.path}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.05)', color: '#64748b' }}>
                                       {modPlan.label}
                                     </span>
                                   </div>
+                                  {statusLabel && (
+                                    <div style={{ fontSize: 8, fontWeight: 700, marginTop: 6, color: statusColor }}>
+                                      {statusLabel}
+                                    </div>
+                                  )}
                                 </button>
                               )
                             })}
@@ -771,8 +1007,8 @@ export default function SystemAdminPage() {
               })}
 
               {filteredCompanies.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-                  <p className="text-slate-400 font-bold">해당 조건의 회사가 없습니다</p>
+                <div style={{ backgroundColor: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center' }}>
+                  <p style={{ color: '#94a3b8', fontWeight: 700 }}>해당 조건의 회사가 없습니다</p>
                 </div>
               )}
             </div>
@@ -780,10 +1016,9 @@ export default function SystemAdminPage() {
         )}
 
         {/* 안내 */}
-        <div className="mt-6 p-3 md:p-4 bg-steel-50 rounded-xl border border-steel-100">
-          <p className="text-[11px] md:text-xs text-steel-700">
-            <strong>플랜 계층:</strong> 무료 → 베이직 → 프로 → 맥스. 상위 플랜은 하위 플랜의 모든 모듈을 포함합니다.
-            회사 플랜을 변경하면 해당 플랜의 모듈이 자동으로 활성화됩니다. 개별 모듈을 수동으로 오버라이드할 수 있습니다.
+        <div style={{ marginTop: 24, padding: 16, backgroundColor: '#f0f4f8', borderRadius: 12, border: '1px solid #cbd5e1' }}>
+          <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>
+            <strong>플랜 계층:</strong> 무료 → 베이직 → 프로 → 맥스. 상위 플랜은 하위 플랜의 모든 모듈을 포함합니다. 회사 플랜을 변경하면 해당 플랜의 모듈이 자동으로 활성화됩니다. 개별 모듈을 수동으로 오버라이드할 수 있습니다.
           </p>
         </div>
 

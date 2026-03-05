@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 // GET: 토큰으로 견적서 정보 조회 (공개 접근)
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin()
   const token = request.nextUrl.searchParams.get('token')
   if (!token) return NextResponse.json({ error: '토큰이 필요합니다' }, { status: 400 })
 
@@ -82,6 +86,7 @@ export async function GET(request: NextRequest) {
 // POST: 서명 저장
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdmin()
     const body = await request.json()
     const { token, customer_name, customer_phone, signature_data, agreed_terms } = body
 
