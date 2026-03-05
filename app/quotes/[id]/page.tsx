@@ -459,6 +459,7 @@ export default function QuoteDetailPage() {
   )
   if (!quote) return null
 
+  const isInvoiceQuote = quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')
   const canCreateContract = !linkedContract && quote.status !== 'archived' && (!quote.expires_at || new Date(quote.expires_at) > new Date())
 
   // ============================================
@@ -552,7 +553,7 @@ export default function QuoteDetailPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem' }} className="no-print">
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl font-black text-gray-900">견적서 #{String(quote.id).slice(0, 8)}</h1>
+            <h1 className="text-2xl font-black text-gray-900">{isInvoiceQuote ? '청구서' : '견적서'} #{String(quote.id).slice(0, 8)}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                 quote.status === 'active' ? 'bg-green-100 text-green-700' :
@@ -567,23 +568,25 @@ export default function QuoteDetailPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white">인쇄</button>
-            <button onClick={handleEditWorksheet}
-              className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
-              {worksheet ? '렌트가 산출 수정' : '견적서 수정'}
-            </button>
+            {!isInvoiceQuote && (
+              <button onClick={handleEditWorksheet}
+                className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
+                {worksheet ? '렌트가 산출 수정' : '견적서 수정'}
+              </button>
+            )}
             <button onClick={handleShare}
               className={`px-4 py-2 text-sm rounded-xl font-bold transition-colors ${
                 shareStatus === 'signed' ? 'bg-green-100 text-green-700 border border-green-300' :
                 shareStatus === 'shared' ? 'bg-blue-100 text-blue-700 border border-blue-300' :
                 'border border-blue-300 text-blue-600 hover:bg-blue-50'
               }`}>
-              {shareStatus === 'signed' ? '서명완료' : shareStatus === 'shared' ? '발송됨' : '견적 발송'}
+              {shareStatus === 'signed' ? '서명완료' : shareStatus === 'shared' ? '발송됨' : isInvoiceQuote ? '청구서 발송' : '견적 발송'}
             </button>
             <button onClick={handleArchiveQuote} disabled={updating || quote.status === 'archived'}
               className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white disabled:opacity-50">
               {updating ? '처리 중...' : '보관'}
             </button>
-            {canCreateContract && (
+            {!isInvoiceQuote && canCreateContract && (
               <button onClick={handleCreateContract} disabled={creating}
                 className="px-6 py-2 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 shadow-lg disabled:opacity-50">
                 {creating ? '처리 중...' : '계약 전환'}
@@ -676,23 +679,149 @@ export default function QuoteDetailPage() {
           </div>
         )}
 
-        {/* 뷰 모드 토글 */}
-        <div className="flex gap-2 mt-2 mb-2 no-print">
-          {(['quote', 'analysis'] as const).map(mode => (
-            <button key={mode} onClick={() => setViewMode(mode)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                viewMode === mode ? 'bg-gray-900 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
-              }`}>
-              {mode === 'quote' ? '고객용 견적서' : '내부 원가분석'}
-            </button>
-          ))}
-        </div>
+        {/* 뷰 모드 토글 (장기렌트만) */}
+        {!isInvoiceQuote && (
+          <div className="flex gap-2 mt-2 mb-2 no-print">
+            {(['quote', 'analysis'] as const).map(mode => (
+              <button key={mode} onClick={() => setViewMode(mode)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  viewMode === mode ? 'bg-gray-900 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                }`}>
+                {mode === 'quote' ? '고객용 견적서' : '내부 원가분석'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ============================================================
-          고객용 견적서 뷰 (인쇄 대상)
+          청구서(단기) 뷰
           ============================================================ */}
-      {viewMode === 'quote' && (
+      {isInvoiceQuote && viewMode === 'quote' && (() => {
+        const memo = quote.memo || ''
+        const carMatch = memo.match(/\[청구서\]\s*(.+?)(?:\s*\||$)/)
+        const periodMatch = memo.match(/기간:\s*(.+?)(?:\s*\||$)/)
+        const phoneMatch = memo.match(/연락처:\s*(.+?)(?:\s*\||$)/)
+        const invCar = carMatch?.[1] || '-'
+        const invPeriod = periodMatch?.[1] || '-'
+        const invPhone = phoneMatch?.[1] || ''
+        const rentTotal = quote.rent_fee || 0
+        const rentVat = Math.round(rentTotal * 0.1)
+        const rentWithVat = rentTotal + rentVat
+        const invStatusBadge = quote.signed_at
+          ? { label: '서명완료', bg: 'bg-green-100', color: 'text-green-700' }
+          : quote.shared_at
+          ? { label: '발송됨', bg: 'bg-blue-100', color: 'text-blue-700' }
+          : { label: '임시저장', bg: 'bg-yellow-100', color: 'text-yellow-700' }
+
+        return (
+        <div className="max-w-[900px] mx-auto pb-10 px-4">
+          <div ref={printRef} className="bg-white rounded-2xl shadow-xl overflow-hidden print:shadow-none print:rounded-none">
+
+            {/* 헤더 */}
+            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2d5fa8)' }} className="text-white px-6 py-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-xl font-black tracking-tight">단기렌트 청구서</h1>
+                  <p className="text-blue-200 text-xs mt-0.5">SHORT-TERM RENTAL INVOICE</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-200 text-xs">작성일</p>
+                  <p className="font-bold">{fDate(quote.created_at)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+
+              {/* 상태 + 기본정보 */}
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${invStatusBadge.bg} ${invStatusBadge.color}`}>{invStatusBadge.label}</span>
+                <span className="text-gray-400 text-xs">#{String(quote.id).slice(0, 8)}</span>
+              </div>
+
+              {/* 임차인 + 대차 정보 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임차인 정보</p>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <TRow label="임차인" value={quote.customer_name || '-'} bold />
+                        <TRow label="연락처" value={invPhone || '-'} />
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">대차 정보</p>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <TRow label="차종" value={invCar} bold />
+                        <TRow label="대여기간" value={invPeriod} />
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* 요금 안내 */}
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">요금 안내</p>
+                <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)' }} className="rounded-xl p-5 text-white">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-gray-400 text-sm">공급가</span>
+                    <span className="text-gray-300 font-bold">{f(rentTotal)}원</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-700">
+                    <span className="text-gray-400 text-sm">VAT (10%)</span>
+                    <span className="text-gray-300 font-bold">{f(rentVat)}원</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white font-black text-lg">총 청구금액</span>
+                    <div className="text-right">
+                      <span className="text-3xl font-black text-white">{f(rentWithVat)}</span>
+                      <span className="text-gray-400 ml-1">원</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 메모 (사용자 메모 부분만) */}
+              {(() => {
+                const parts = memo.split('|').map((s: string) => s.trim())
+                const userMemo = parts.filter((p: string) => !p.startsWith('[청구서]') && !p.startsWith('기간:') && !p.startsWith('연락처:')).join(' | ')
+                return userMemo ? (
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">메모</p>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">{userMemo}</div>
+                  </div>
+                ) : null
+              })()}
+
+              {/* 임대인 정보 */}
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
+                <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
+                  <p className="font-black text-sm">{company?.name || '주식회사에프엠아이'}</p>
+                  {company?.business_number && <p className="text-gray-500">사업자번호: {company.business_number}</p>}
+                  {company?.phone && <p className="text-gray-500">TEL: {company.phone}</p>}
+                </div>
+              </div>
+
+              {/* 타임라인 */}
+              <QuoteTimeline quoteId={quoteId} />
+            </div>
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* ============================================================
+          고객용 견적서 뷰 (인쇄 대상) — 장기렌트
+          ============================================================ */}
+      {!isInvoiceQuote && viewMode === 'quote' && (
         <div className="max-w-[900px] mx-auto pb-10 px-4">
           <div ref={printRef} className="bg-white rounded-2xl shadow-xl overflow-hidden print:shadow-none print:rounded-none print:overflow-visible">
 
@@ -1073,7 +1202,7 @@ export default function QuoteDetailPage() {
       {/* ============================================================
           내부 원가분석 뷰
           ============================================================ */}
-      {viewMode === 'analysis' && (
+      {!isInvoiceQuote && viewMode === 'analysis' && (
         <div className="max-w-[1200px] mx-auto pb-10 px-4 md:px-6 no-print-alt">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 

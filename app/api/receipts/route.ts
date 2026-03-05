@@ -1,0 +1,137 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+async function verifyUser(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const token = authHeader.replace('Bearer ', '')
+  const supabase = getSupabaseAdmin()
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) return null
+  const { data: profile } = await supabase
+    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
+}
+
+// GET: 영수증/지출내역 목록 조회
+export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  const supabase = getSupabaseAdmin()
+  const { searchParams } = request.nextUrl
+  const month = searchParams.get('month') // YYYY-MM
+  const year = searchParams.get('year')
+
+  let query = supabase
+    .from('expense_receipts')
+    .select('*')
+    .eq('company_id', user.company_id)
+    .eq('user_id', user.id)
+    .order('expense_date', { ascending: false })
+
+  if (month) {
+    const start = `${month}-01`
+    const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+    const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
+    query = query.gte('expense_date', start).lte('expense_date', end)
+  } else if (year) {
+    query = query.gte('expense_date', `${year}-01-01`).lte('expense_date', `${year}-12-31`)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('지출내역 조회 실패:', error)
+    return NextResponse.json({ error: '조회 실패' }, { status: 500 })
+  }
+
+  return NextResponse.json({ data })
+}
+
+// POST: 지출내역 추가 (수동 입력 or OCR 결과)
+export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  try {
+    const body = await request.json()
+    const { items, receipt_url } = body as {
+      items: Array<{
+        expense_date: string
+        card_number?: string
+        category: string
+        merchant: string
+        item_name: string
+        customer_team?: string
+        amount: number
+        receipt_url?: string
+      }>
+      receipt_url?: string
+    }
+
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: '항목이 필요합니다.' }, { status: 400 })
+    }
+
+    const supabase = getSupabaseAdmin()
+
+    const insertData = items.map(item => ({
+      company_id: user.company_id,
+      user_id: user.id,
+      user_name: user.employee_name || user.email?.split('@')[0] || '',
+      expense_date: item.expense_date,
+      card_number: item.card_number || '',
+      category: item.category,
+      merchant: item.merchant,
+      item_name: item.item_name,
+      customer_team: item.customer_team || user.employee_name || '',
+      amount: item.amount,
+      receipt_url: item.receipt_url || receipt_url || '',
+    }))
+
+    const { data, error } = await supabase
+      .from('expense_receipts')
+      .insert(insertData)
+      .select()
+
+    if (error) {
+      console.error('지출내역 저장 실패:', error)
+      return NextResponse.json({ error: '저장 실패', detail: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data })
+  } catch (e: any) {
+    console.error('영수증 API 오류:', e.message)
+    return NextResponse.json({ error: '서버 오류' }, { status: 500 })
+  }
+}
+
+// DELETE: 지출내역 삭제
+export async function DELETE(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+  const { searchParams } = request.nextUrl
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'ID 필요' }, { status: 400 })
+
+  const supabase = getSupabaseAdmin()
+  const { error } = await supabase
+    .from('expense_receipts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) {
+    return NextResponse.json({ error: '삭제 실패' }, { status: 500 })
+  }
+  return NextResponse.json({ success: true })
+}

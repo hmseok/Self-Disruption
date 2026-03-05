@@ -2,74 +2,19 @@
 import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
 
 // ============================================================================
 // TYPES
 // ============================================================================
-type MainTab = 'long_term' | 'short_term' | 'invoice' | 'calc'
+type MainTab = 'long_term' | 'short_term' | 'lotte_rate'
 type StatusFilter = 'all' | 'draft' | 'shared' | 'signed' | 'contracted' | 'archived'
 type ShortStatusFilter = 'all' | 'draft' | 'sent' | 'accepted' | 'contracted' | 'cancelled'
+type InvoiceStatusFilter = 'all' | 'draft' | 'shared' | 'signed'
 type SortOption = 'latest' | 'customer' | 'expiry' | 'rent'
-
-// ============================================================================
-// LOTTE QUICK RATE DATA (빠른 계산기용 — 1~3일 기준가)
-// ============================================================================
-const LOTTE_QUICK: { cat: string; name: string; rate: number }[] = [
-  { cat: '경차', name: '스파크, 모닝', rate: 115000 },
-  { cat: '경차', name: '레이', rate: 120000 },
-  { cat: '경차', name: '캐스퍼', rate: 130000 },
-  { cat: '소형', name: '아반떼(G)', rate: 143000 },
-  { cat: '소형', name: '아반떼(H)', rate: 175000 },
-  { cat: '중형', name: '쏘나타(G), K5(G)', rate: 197000 },
-  { cat: '중형', name: '쏘나타(H)', rate: 233000 },
-  { cat: '준대형', name: 'K8 2.5', rate: 324000 },
-  { cat: '준대형', name: '그랜저 2.5(G)', rate: 340000 },
-  { cat: '대형', name: 'G80 2.5(G)', rate: 449000 },
-  { cat: '대형', name: 'G80 3.5(G)', rate: 502000 },
-  { cat: '대형', name: 'G90 3.5(G)', rate: 537000 },
-  { cat: 'SUV소형', name: '코나, 셀토스, 니로', rate: 217000 },
-  { cat: 'SUV중형', name: '투싼, 스포티지', rate: 262000 },
-  { cat: 'SUV중형', name: '쏘렌토, 싼타페', rate: 330000 },
-  { cat: 'SUV중형', name: '팰리세이드', rate: 402000 },
-  { cat: 'SUV중형', name: 'GV70', rate: 469000 },
-  { cat: 'SUV중형', name: 'GV80', rate: 529000 },
-  { cat: '승합', name: '스타리아 11인승', rate: 313000 },
-  { cat: '승합', name: '카니발 9인승(D)', rate: 336000 },
-  { cat: '승합', name: '카니발 하이리무진(H)', rate: 529000 },
-  { cat: '전기차', name: '코나EV, 니로EV', rate: 208000 },
-  { cat: '전기차', name: '아이오닉5 2WD', rate: 230000 },
-  { cat: '전기차', name: '아이오닉6', rate: 350000 },
-  { cat: '전기차', name: 'EV9', rate: 472000 },
-  { cat: '수입차', name: 'BMW 320D, BENZ C200', rate: 505000 },
-  { cat: '수입차', name: 'BMW 520D, BENZ E200', rate: 575000 },
-  { cat: '수입차', name: 'BMW X5, BENZ GLE', rate: 703000 },
-]
-const LOTTE_CATS = ['전체', ...Array.from(new Set(LOTTE_QUICK.map(l => l.cat)))]
-
-function calcQuickRate(baseRate: number, discountPct: number, days: number, hours: number): number {
-  const discounted = Math.round(baseRate * (1 - discountPct / 100))
-  // 일수별 할인: 1~3일=100%, 4일=90%, 5~6일=85%, 7일+=80%
-  const dayMultiplier = days >= 7 ? 0.80 : days >= 5 ? 0.85 : days >= 4 ? 0.90 : 1.0
-  // 시간 비율: 6h 이하=75%, 7~10h=100%, 11h+=112% (시간만 사용 시 1일 기준, 일+시간 시 추가분)
-  const hourRate = hours <= 0 ? 0
-    : hours <= 6 ? Math.round(discounted * 0.75)
-    : hours <= 10 ? discounted
-    : Math.round(discounted * 1.12)
-  if (days > 0 && hours > 0) {
-    // 일수 + 시간: 일수분 + 시간 추가분
-    return Math.round(discounted * dayMultiplier) * days + hourRate
-  } else if (days > 0) {
-    // 일수만
-    return Math.round(discounted * dayMultiplier) * days
-  } else if (hours > 0) {
-    // 시간만
-    return hourRate
-  }
-  return 0
-}
 
 // ============================================================================
 // QUOTE STATUS BADGE (장기 — 계약관리 스타일 통일)
@@ -410,7 +355,7 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
             <span style={{ fontSize: 14 }}>⏱️</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>단기렌트 견적</div>
-              <div style={{ fontSize: 11, color: '#9ca3af' }}>대차 · 단기 렌탈 견적</div>
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>빠른 계산기 · 청구서 작성</div>
             </div>
           </Link>
         </div>
@@ -433,22 +378,16 @@ export default function QuoteListPage() {
   const [mainTab, setMainTab] = useState<MainTab>(initialTab)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [shortStatusFilter, setShortStatusFilter] = useState<ShortStatusFilter>('all')
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('latest')
   const [customers, setCustomers] = useState<Map<string, any>>(new Map())
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // ── Quick Calculator State ──
-  const [calcDiscount, setCalcDiscount] = useState(40)
-  const [calcCat, setCalcCat] = useState('전체')
-  const [calcSearch, setCalcSearch] = useState('')
-  const [calcSelected, setCalcSelected] = useState<typeof LOTTE_QUICK[0] | null>(null)
-  const [calcDays, setCalcDays] = useState(1)
-  const [calcHours, setCalcHours] = useState(0)
-  const [calcDelivery, setCalcDelivery] = useState(0)
-  const [calcFaultEnabled, setCalcFaultEnabled] = useState(false)
-  const [calcFaultPercent, setCalcFaultPercent] = useState(100) // 자차과실 %
-  const [calcServiceSupport, setCalcServiceSupport] = useState(0) // 서비스지원 %
+  // (계산기는 /quotes/short-term 페이지로 이동됨)
+
+  // ── 회사 도장 (companyId 선언 후 useEffect는 아래에) ──
+  const [companyStamp, setCompanyStamp] = useState('')
 
   // ── 청구서(단기렌트 계약서) State ──
   const [invoiceOpen, setInvoiceOpen] = useState(false)
@@ -461,11 +400,51 @@ export default function QuoteListPage() {
     // 대차 정보
     rental_car: '', rental_plate: '', fuel_type: '전기',
     rental_start: '', return_datetime: '',
-    fuel_out: '1%', fuel_in: '1%',
+    fuel_out: '1', fuel_in: '1',
     // 메모
     memo: '',
   })
   const setField = (k: keyof typeof inv, v: string) => setInv(p => ({ ...p, [k]: v }))
+
+  // ── 자동 하이픈 포맷터 ──
+  const fmtPhone = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 11)
+    if (d.length <= 3) return d
+    if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
+    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
+  }
+  const fmtBirth = (v: string) => {
+    const d = v.replace(/[^0-9*]/g, '').slice(0, 13)
+    if (d.length <= 6) return d
+    return `${d.slice(0, 6)}-${d.slice(6)}`
+  }
+  const fmtLicense = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 12)
+    if (d.length <= 2) return d
+    if (d.length <= 4) return `${d.slice(0, 2)}-${d.slice(2)}`
+    if (d.length <= 10) return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`
+    return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 10)}-${d.slice(10)}`
+  }
+
+  // ── 다음 주소검색 ──
+  const openAddressSearch = () => {
+    if (!(window as any).daum?.Postcode) {
+      const s = document.createElement('script')
+      s.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
+      s.onload = () => runDaumPostcode()
+      document.head.appendChild(s)
+    } else {
+      runDaumPostcode()
+    }
+  }
+  const runDaumPostcode = () => {
+    new (window as any).daum.Postcode({
+      oncomplete: (data: any) => {
+        const addr = data.roadAddress || data.jibunAddress
+        setField('tenant_address', addr)
+      }
+    }).open()
+  }
 
   const f = (n: number) => Math.round(n || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
@@ -479,6 +458,33 @@ export default function QuoteListPage() {
   }
 
   const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+
+  // ── 회사 도장 로드 ──
+  useEffect(() => {
+    const loadStamp = async () => {
+      if (!companyId) return
+      const { data } = await supabase
+        .from('company_settings')
+        .select('value')
+        .eq('company_id', companyId)
+        .eq('key', 'pdf_defaults')
+        .maybeSingle()
+      if (data?.value?.company_stamp) {
+        setCompanyStamp(data.value.company_stamp)
+      } else {
+        try {
+          const res = await fetch('/images/company_stamp.png')
+          if (res.ok) {
+            const blob = await res.blob()
+            const reader = new FileReader()
+            reader.onload = () => setCompanyStamp(reader.result as string)
+            reader.readAsDataURL(blob)
+          }
+        } catch {}
+      }
+    }
+    loadStamp()
+  }, [companyId])
 
   // ── Fetch all data ──
   useEffect(() => {
@@ -565,9 +571,37 @@ export default function QuoteListPage() {
     cancelled: shortTermQuotes.filter(q => q.status === 'cancelled').length,
   }
 
+  // 청구서 필터 (quotes에서 rental_type='청구서' 또는 memo가 [청구서]로 시작)
+  const invoiceQuotes = quotes.filter(q => isInvoice(q))
+
+  // Invoice status counts
+  const invoiceStatusCounts: Record<InvoiceStatusFilter, number> = {
+    all: invoiceQuotes.length,
+    draft: invoiceQuotes.filter(q => !q.shared_at && !q.signed_at).length,
+    shared: invoiceQuotes.filter(q => q.shared_at && !q.signed_at).length,
+    signed: invoiceQuotes.filter(q => q.signed_at).length,
+  }
+
+  // 청구서 필터링 + 검색
+  const filteredInvoiceQuotes = useMemo(() => {
+    let result = invoiceQuotes
+    if (invoiceStatusFilter === 'draft') result = result.filter(q => !q.shared_at && !q.signed_at)
+    else if (invoiceStatusFilter === 'shared') result = result.filter(q => q.shared_at && !q.signed_at)
+    else if (invoiceStatusFilter === 'signed') result = result.filter(q => q.signed_at)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(q =>
+        (q.customer_name || '').toLowerCase().includes(term) ||
+        (q.memo || '').toLowerCase().includes(term)
+      )
+    }
+    return result.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [invoiceQuotes, invoiceStatusFilter, searchTerm])
+
   const mainTabCounts: Record<MainTab, number> = {
-    long_term: longTermQuotes.filter(q => q.status !== 'archived').length,
-    short_term: shortTermQuotes.length,
+    long_term: longTermQuotes.filter(q => q.status !== 'archived' && !isInvoice(q)).length,
+    short_term: invoiceQuotes.length,
+    lotte_rate: shortTermQuotes.length,
   }
 
   // ── Filter + Sort (장기) ──
@@ -710,10 +744,8 @@ export default function QuoteListPage() {
     if (!companyId) return alert('회사 정보를 찾을 수 없습니다.')
     if (!inv.tenant_name.trim()) return alert('임차인 이름을 입력해주세요.')
 
-    const carInfo = calcSelected ? `${calcSelected.cat} ${calcSelected.name}` : (inv.rental_car || '대차')
-    const periodDesc = calcSelected
-      ? `${calcDays > 0 ? `${calcDays}일` : ''}${calcHours > 0 ? ` ${calcHours}시간` : ''}`.trim()
-      : ''
+    const carInfo = inv.rental_car || '대차'
+    const periodDesc = ''
 
     setQSaving(true)
     try {
@@ -725,6 +757,25 @@ export default function QuoteListPage() {
         inv.memo || '',
       ].filter(Boolean).join(' | ')
 
+      const invoiceDetail = {
+        tenant_name: inv.tenant_name.trim(),
+        tenant_phone: inv.tenant_phone.trim(),
+        tenant_birth: inv.tenant_birth,
+        tenant_address: inv.tenant_address,
+        license_number: inv.license_number,
+        license_type: inv.license_type,
+        rental_car: carInfo,
+        rental_plate: inv.rental_plate,
+        fuel_type: inv.fuel_type,
+        rental_start: inv.rental_start,
+        return_datetime: inv.return_datetime,
+        fuel_out: inv.fuel_out,
+        fuel_in: inv.fuel_in,
+        memo: inv.memo,
+        total_amount: totalAmount,
+        type: 'invoice',
+      }
+
       const basePayload: Record<string, any> = {
         company_id: companyId,
         customer_name: inv.tenant_name.trim(),
@@ -732,6 +783,7 @@ export default function QuoteListPage() {
         deposit: 0,
         memo: memoText,
         status: 'draft',
+        quote_detail: invoiceDetail,
       }
 
       let { data, error } = await supabase.from('quotes').insert({
@@ -740,13 +792,17 @@ export default function QuoteListPage() {
       }).select().single()
 
       if (error && error.message.includes('column')) {
-        const result = await supabase.from('quotes').insert(basePayload).select().single()
+        // quote_detail 컬럼이 없을 수도 있는 fallback
+        delete basePayload.quote_detail
+        const result = await supabase.from('quotes').insert({ ...basePayload, rental_type: '청구서' }).select().single()
         data = result.data
         error = result.error
       }
 
       if (error) throw error
       setQuotes(prev => [{ ...data, car: null, contract: null, customer: null }, ...prev])
+      // 새로 삽입된 레코드를 invoiceQuotes에도 추가 (리스트 갱신)
+      setInvoiceQuotes((prev: any[]) => [{ ...data, car: null, contract: null, customer: null }, ...prev])
 
       // PDF 다운로드
       if (download) {
@@ -759,6 +815,9 @@ export default function QuoteListPage() {
               // 회사/담당자
               company_name: '주식회사에프엠아이',
               company_phone: '01033599559',
+              company_address: '경기 연천군 왕징면 백동로236번길 190 3동1호',
+              representative: '대표 박진숙',
+              company_stamp: companyStamp,
               staff_name: user?.email?.split('@')[0] || '',
               staff_phone: '',
               // 임차인
@@ -772,11 +831,11 @@ export default function QuoteListPage() {
               rental_car: carInfo,
               rental_plate: inv.rental_plate,
               fuel_type: inv.fuel_type,
-              rental_start: inv.rental_start,
-              fuel_out: inv.fuel_out,
-              fuel_in: inv.fuel_in,
+              rental_start: inv.rental_start.replace('T', ' ').replace(/-/g, '/'),
+              fuel_out: `${inv.fuel_out}%`,
+              fuel_in: `${inv.fuel_in}%`,
               // 요금
-              return_datetime: inv.return_datetime,
+              return_datetime: inv.return_datetime.replace('T', ' ').replace(/-/g, '/'),
               rental_hours: periodDesc || '배차중',
               total_fee: f(totalAmount),
               // 메모
@@ -803,33 +862,18 @@ export default function QuoteListPage() {
         tenant_name: '', tenant_phone: '', tenant_birth: '', tenant_address: '',
         license_number: '', license_type: '1종보통',
         rental_car: '', rental_plate: '', fuel_type: '전기', rental_start: '', return_datetime: '',
-        fuel_out: '1%', fuel_in: '1%', memo: '',
+        fuel_out: '1', fuel_in: '1', memo: '',
       })
       setInvManualAmount(0)
-      alert('청구서가 저장되었습니다!')
+      if (!download) { /* 문자발송 버튼에서 호출 시 alert 생략 — 호출부에서 처리 */ }
+      return data
     } catch (err: any) {
       alert(`저장 실패: ${err?.message || JSON.stringify(err)}`)
+      return null
     } finally {
       setQSaving(false)
     }
-  }, [companyId, inv, calcSelected, calcDays, calcHours, calcDiscount, invManualAmount, user])
-
-  // ── Calc filtered vehicles ──
-  const calcFiltered = LOTTE_QUICK.filter(l => {
-    if (calcCat !== '전체' && l.cat !== calcCat) return false
-    if (calcSearch && !l.name.toLowerCase().includes(calcSearch.toLowerCase()) && !l.cat.includes(calcSearch)) return false
-    return true
-  })
-
-  const calcRentOnly = calcSelected
-    ? calcQuickRate(calcSelected.rate, calcDiscount, calcDays, calcHours)
-    : 0
-  // 과실비율 적용: 토글 ON이면 항상 적용 (자차과실% + 서비스지원% 즉시 반영)
-  const calcFaultActive = calcFaultEnabled
-  const calcFaultAmount = calcFaultActive ? Math.round(calcRentOnly * calcFaultPercent / 100) : calcRentOnly
-  const calcSupportAmount = calcFaultActive && calcServiceSupport > 0 ? Math.round(calcRentOnly * calcServiceSupport / 100) : 0
-  const calcFinalRent = calcFaultActive ? Math.max(0, calcFaultAmount - calcSupportAmount) : calcRentOnly
-  const calcResult = calcFinalRent + calcDelivery * 10000
+  }, [companyId, inv, invManualAmount, user, companyStamp])
 
   // ============================================================================
   // RENDER
@@ -854,12 +898,11 @@ export default function QuoteListPage() {
           {([
             { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
             { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
-            { key: 'invoice' as MainTab, label: '청구서', count: null },
-            { key: 'calc' as MainTab, label: '계산기', count: null },
+            { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', count: null },
           ]).map(t => (
             <button
               key={t.key}
-              onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
+              onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setInvoiceStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
               style={{
                 padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
                 fontSize: 14, fontWeight: 700, transition: 'all 0.15s',
@@ -879,7 +922,15 @@ export default function QuoteListPage() {
             </button>
           ))}
         </div>
-        {(mainTab === 'long_term' || mainTab === 'short_term') && <NewQuoteButton mainTab={mainTab} />}
+        {mainTab === 'long_term' && <NewQuoteButton mainTab={mainTab} />}
+        {mainTab === 'short_term' && (
+          <button
+            onClick={() => setInvoiceOpen(true)}
+            style={{ padding: '8px 20px', background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: '0 2px 8px rgba(45,95,168,0.3)', whiteSpace: 'nowrap' }}
+          >
+            + 새 청구서
+          </button>
+        )}
       </div>
 
       {/* ═══ 칩 필터 + 정렬 + 검색 (계약관리 동일 스타일) ═══ */}
@@ -887,63 +938,48 @@ export default function QuoteListPage() {
         <div style={{ marginBottom: 16 }}>
           {/* 칩 필터 */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {mainTab === 'long_term' ? (
-              ([
-                { id: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
-                { id: 'draft' as StatusFilter, label: '작성중', count: statusCounts.draft },
-                { id: 'shared' as StatusFilter, label: '발송됨', count: statusCounts.shared },
-                { id: 'signed' as StatusFilter, label: '서명완료', count: statusCounts.signed },
-                { id: 'contracted' as StatusFilter, label: '계약전환', count: statusCounts.contracted },
-                { id: 'archived' as StatusFilter, label: '보관', count: statusCounts.archived },
-              ]).map(chip => (
+            {(mainTab === 'long_term'
+              ? [
+                  { id: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
+                  { id: 'draft' as StatusFilter, label: '작성중', count: statusCounts.draft },
+                  { id: 'shared' as StatusFilter, label: '발송됨', count: statusCounts.shared },
+                  { id: 'signed' as StatusFilter, label: '서명완료', count: statusCounts.signed },
+                  { id: 'contracted' as StatusFilter, label: '계약전환', count: statusCounts.contracted },
+                  { id: 'archived' as StatusFilter, label: '보관', count: statusCounts.archived },
+                ]
+              : [
+                  { id: 'all' as InvoiceStatusFilter, label: '전체', count: invoiceStatusCounts.all },
+                  { id: 'draft' as InvoiceStatusFilter, label: '임시저장', count: invoiceStatusCounts.draft },
+                  { id: 'shared' as InvoiceStatusFilter, label: '발송됨', count: invoiceStatusCounts.shared },
+                  { id: 'signed' as InvoiceStatusFilter, label: '서명완료', count: invoiceStatusCounts.signed },
+                ]
+            ).map(chip => {
+              const isActive = mainTab === 'long_term' ? statusFilter === chip.id : invoiceStatusFilter === chip.id
+              const onClick = () => {
+                if (mainTab === 'long_term') setStatusFilter(chip.id as StatusFilter)
+                else setInvoiceStatusFilter(chip.id as InvoiceStatusFilter)
+              }
+              return (
                 <button
                   key={chip.id}
-                  onClick={() => setStatusFilter(chip.id)}
+                  onClick={onClick}
                   style={{
                     padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
                     cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                    background: statusFilter === chip.id ? '#2d5fa8' : '#f3f4f6',
-                    color: statusFilter === chip.id ? '#fff' : '#6b7280',
+                    background: isActive ? '#2d5fa8' : '#f3f4f6',
+                    color: isActive ? '#fff' : '#6b7280',
                   }}
                 >
-                  {statusFilter === chip.id && '● '}{chip.label}
+                  {isActive && '● '}{chip.label}
                   <span style={{
                     marginLeft: 6, fontSize: 11, fontWeight: 700,
-                    background: statusFilter === chip.id ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
-                    color: statusFilter === chip.id ? '#fff' : '#6b7280',
+                    background: isActive ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
+                    color: isActive ? '#fff' : '#6b7280',
                     padding: '1px 7px', borderRadius: 10,
                   }}>{chip.count}</span>
                 </button>
-              ))
-            ) : (
-              ([
-                { id: 'all' as ShortStatusFilter, label: '전체', count: shortStatusCounts.all },
-                { id: 'draft' as ShortStatusFilter, label: '작성중', count: shortStatusCounts.draft },
-                { id: 'sent' as ShortStatusFilter, label: '발송됨', count: shortStatusCounts.sent },
-                { id: 'accepted' as ShortStatusFilter, label: '수락됨', count: shortStatusCounts.accepted },
-                { id: 'contracted' as ShortStatusFilter, label: '계약완료', count: shortStatusCounts.contracted },
-                { id: 'cancelled' as ShortStatusFilter, label: '취소', count: shortStatusCounts.cancelled },
-              ]).map(chip => (
-                <button
-                  key={chip.id}
-                  onClick={() => setShortStatusFilter(chip.id)}
-                  style={{
-                    padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
-                    cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                    background: shortStatusFilter === chip.id ? '#2d5fa8' : '#f3f4f6',
-                    color: shortStatusFilter === chip.id ? '#fff' : '#6b7280',
-                  }}
-                >
-                  {shortStatusFilter === chip.id && '● '}{chip.label}
-                  <span style={{
-                    marginLeft: 6, fontSize: 11, fontWeight: 700,
-                    background: shortStatusFilter === chip.id ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
-                    color: shortStatusFilter === chip.id ? '#fff' : '#6b7280',
-                    padding: '1px 7px', borderRadius: 10,
-                  }}>{chip.count}</span>
-                </button>
-              ))
-            )}
+              )
+            })}
           </div>
 
           {/* 정렬 + 검색 */}
@@ -978,496 +1014,73 @@ export default function QuoteListPage() {
         </div>
       )}
 
-      {/* ═══ TAB: 빠른 계산기 ═══ */}
-      {mainTab === 'calc' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-          {/* 왼쪽: 차종 선택 */}
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            {/* 할인율 */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>롯데 기준 할인율</span>
-                <input
-                  type="range" min="0" max="60" step="5" value={calcDiscount}
-                  onChange={e => setCalcDiscount(Number(e.target.value))}
-                  style={{ flex: 1, accentColor: '#2d5fa8' }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="number" min="0" max="70" value={calcDiscount}
-                    onChange={e => setCalcDiscount(Math.min(70, Math.max(0, Number(e.target.value))))}
-                    style={{ width: 52, textAlign: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: '#2d5fa8' }}
-                  />
-                  <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 700 }}>%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 카테고리 + 검색 */}
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center' }}>
-              <select
-                value={calcCat}
-                onChange={e => { setCalcCat(e.target.value); setCalcSelected(null) }}
-                style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12, fontWeight: 600 }}
-              >
-                {LOTTE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <input
-                type="text" placeholder="차종명으로 검색 (예: 쏘나타, G80, 카니발)"
-                value={calcSearch} onChange={e => setCalcSearch(e.target.value)}
-                style={{ flex: 1, padding: '7px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13 }}
-              />
-            </div>
-
-            {/* 차종 리스트 */}
-            <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-              {calcFiltered.map((v, i) => (
-                <div
-                  key={i}
-                  onClick={() => setCalcSelected(v)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 20px', cursor: 'pointer', transition: 'background 0.1s',
-                    background: calcSelected === v ? '#eff6ff' : 'transparent',
-                    borderBottom: '1px solid #f3f4f6', borderLeft: calcSelected === v ? '3px solid #2d5fa8' : '3px solid transparent',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginRight: 8 }}>{v.cat}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{v.name}</span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: 12, color: '#9ca3af', textDecoration: 'line-through', marginRight: 8 }}>{f(v.rate)}원</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#2d5fa8' }}>{f(Math.round(v.rate * (1 - calcDiscount / 100)))}원</span>
-                    <span style={{ fontSize: 11, color: '#9ca3af' }}>/일</span>
-                  </div>
-                </div>
-              ))}
-              {calcFiltered.length === 0 && (
-                <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>검색 결과가 없습니다</div>
-              )}
-            </div>
-          </div>
-
-          {/* 오른쪽: 계산 패널 (미니멀 플랫) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 340, flexShrink: 0 }}>
-
-            {/* 설정 카드 — 수평 row 구조 */}
-            <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '2px 16px' }}>
-              {/* 일수 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>일수</span>
-                <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                  <button onClick={() => setCalcDays(Math.max(0, calcDays - 1))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
-                  <span style={{ minWidth: 32, textAlign: 'center', fontWeight: 900, fontSize: 14, color: '#0f172a' }}>{calcDays}</span>
-                  <button onClick={() => setCalcDays(calcDays + 1)} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>+</button>
-                </div>
-              </div>
-              {/* 시간 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>시간</span>
-                <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                  <button onClick={() => setCalcHours(Math.max(0, calcHours - 1))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
-                  <span style={{ minWidth: 32, textAlign: 'center', fontWeight: 900, fontSize: 14, color: '#0f172a' }}>{calcHours}</span>
-                  <button onClick={() => setCalcHours(Math.min(23, calcHours + 1))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>+</button>
-                </div>
-              </div>
-              {/* 사고과실 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>사고과실</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {calcFaultEnabled && <span style={{ fontSize: 12, fontWeight: 800, color: '#ea580c' }}>{calcFaultPercent}%</span>}
-                  <button onClick={() => setCalcFaultEnabled(!calcFaultEnabled)}
-                    style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, background: calcFaultEnabled ? '#ea580c' : '#e2e8f0', color: calcFaultEnabled ? '#fff' : '#94a3b8' }}>
-                    {calcFaultEnabled ? 'ON' : 'OFF'}
-                  </button>
-                </div>
-              </div>
-              {/* 자차과실 (과실 ON일 때만) */}
-              {calcFaultEnabled && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: 12, color: '#c2410c', paddingLeft: 10 }}>↳ 자차과실</span>
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                      <button onClick={() => setCalcFaultPercent(Math.max(0, calcFaultPercent - 5))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
-                      <span style={{ minWidth: 38, textAlign: 'center', fontWeight: 900, fontSize: 14, color: '#0f172a' }}>{calcFaultPercent}%</span>
-                      <button onClick={() => setCalcFaultPercent(Math.min(100, calcFaultPercent + 5))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>+</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: 12, color: '#15803d', paddingLeft: 10 }}>↳ 서비스지원</span>
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                      <button onClick={() => setCalcServiceSupport(Math.max(0, calcServiceSupport - 5))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
-                      <span style={{ minWidth: 38, textAlign: 'center', fontWeight: 900, fontSize: 14, color: '#0f172a' }}>{calcServiceSupport}%</span>
-                      <button onClick={() => setCalcServiceSupport(Math.min(100, calcServiceSupport + 5))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>+</button>
-                    </div>
-                  </div>
-                </>
-              )}
-              {/* 탁송비 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>탁송비</span>
-                <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                  <button onClick={() => setCalcDelivery(Math.max(0, calcDelivery - 1))} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>−</button>
-                  <span style={{ minWidth: 36, textAlign: 'center', fontWeight: 900, fontSize: 14, color: '#0f172a' }}>{calcDelivery}<span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 1 }}>만</span></span>
-                  <button onClick={() => setCalcDelivery(calcDelivery + 1)} style={{ width: 28, height: 28, border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700, color: '#64748b' }}>+</button>
-                </div>
-              </div>
-            </div>
-
-            {/* 결과 카드 — 다크 네이비 */}
-            <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 10, padding: 18, textAlign: 'center' }}>
-              {calcSelected ? (
-                <>
-                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>
-                    {calcSelected.cat} · {calcSelected.name} · {calcDays > 0 ? `${calcDays}일` : ''}{calcHours > 0 ? ` ${calcHours}시간` : ''}
-                  </div>
-                  <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-                    {f(calcResult)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>렌트 {f(calcRentOnly)}</span>
-                    {calcFaultActive && <span style={{ fontSize: 11, color: '#fb923c' }}>과실 {calcFaultPercent}%</span>}
-                    {calcSupportAmount > 0 && <span style={{ fontSize: 11, color: '#4ade80' }}>지원 -{calcServiceSupport}%</span>}
-                    {calcDelivery > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>탁송 {calcDelivery}만</span>}
-                  </div>
-
-                  {/* 상세 내역 */}
-                  <div style={{ borderTop: '1px solid #334155', paddingTop: 10, marginTop: 10, textAlign: 'left' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                      <span style={{ color: '#94a3b8' }}>렌트비 (할인 {calcDiscount}%)</span>
-                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(calcRentOnly)}원</span>
-                    </div>
-                    {calcFaultActive && (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                          <span style={{ color: '#fb923c' }}>자차과실 ({calcFaultPercent}%)</span>
-                          <span style={{ color: '#fb923c', fontWeight: 600 }}>{f(calcFaultAmount)}원</span>
-                        </div>
-                        {calcSupportAmount > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                            <span style={{ color: '#4ade80' }}>서비스지원 (-{calcServiceSupport}%)</span>
-                            <span style={{ color: '#4ade80', fontWeight: 600 }}>-{f(calcSupportAmount)}원</span>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, borderTop: '1px solid #334155', paddingTop: 4, marginTop: 2 }}>
-                          <span style={{ color: '#fff', fontWeight: 900 }}>실부담금</span>
-                          <span style={{ color: '#fff', fontWeight: 900 }}>{f(calcFinalRent)}원</span>
-                        </div>
-                      </>
-                    )}
-                    {calcDelivery > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                        <span style={{ color: '#94a3b8' }}>탁송비</span>
-                        <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(calcDelivery * 10000)}원</span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p style={{ fontSize: 13, color: '#475569', margin: 0 }}>차종을 선택하면 예상금액이 표시됩니다</p>
-              )}
-            </div>
-
-            {/* 청구서 작성 버튼 */}
-            {calcSelected && calcResult > 0 && (
-              <button
-                onClick={() => setMainTab('invoice')}
-                style={{
-                  marginTop: 12, width: '100%', padding: '14px', border: 'none', borderRadius: 10,
-                  background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff',
-                  fontWeight: 800, fontSize: 15, cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(45,95,168,0.4)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(45,95,168,0.3)' }}
-              >
-                📄 청구서 작성
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ TAB: 청구서 작성 ═══ */}
-      {mainTab === 'invoice' && (() => {
-        const iS = { width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none' }
-        const lS = { fontSize: 10, fontWeight: 700 as const, color: '#6b7280', display: 'block', marginBottom: 2 }
-        const secTitle = (t: string) => <div style={{ fontSize: 13, fontWeight: 800, color: '#1e3a5f', padding: '10px 0 6px', borderBottom: '1px solid #e5e7eb', marginBottom: 10 }}>{t}</div>
-        const rentalCarValue = calcSelected ? `${calcSelected.cat} ${calcSelected.name}` : inv.rental_car || ''
-        return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-
-          {/* ── 좌측: 청구서 입력 폼 ── */}
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '20px 24px' }}>
-
-            {/* 임차인 정보 */}
-            {secTitle('임차인 정보')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <div>
-                <label style={lS}>임차인 *</label>
-                <input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} />
-              </div>
-              <div>
-                <label style={lS}>연락처</label>
-                <input value={inv.tenant_phone} onChange={e => setField('tenant_phone', e.target.value)} placeholder="010-0000-0000" style={iS} />
-              </div>
-              <div>
-                <label style={lS}>생년월일</label>
-                <input value={inv.tenant_birth} onChange={e => setField('tenant_birth', e.target.value)} placeholder="900101-1******" style={iS} />
-              </div>
-              <div>
-                <label style={lS}>면허구분</label>
-                <select value={inv.license_type} onChange={e => setField('license_type', e.target.value)} style={iS}>
-                  <option>1종보통</option><option>2종보통</option><option>1종대형</option>
-                </select>
-              </div>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <label style={lS}>주소</label>
-              <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 입력" style={iS} />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={lS}>운전면허번호</label>
-              <input value={inv.license_number} onChange={e => setField('license_number', e.target.value)} placeholder="00-00-000000-00" style={iS} />
-            </div>
-
-            {/* 대차 정보 */}
-            {secTitle('대차 정보')}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-              <div>
-                <label style={lS}>대차 차종 {calcSelected ? '(계산기 연동)' : ''}</label>
-                <input
-                  value={rentalCarValue}
-                  onChange={e => { if (!calcSelected) setField('rental_car' as any, e.target.value) }}
-                  readOnly={!!calcSelected}
-                  placeholder="차종 입력 (계산기에서 자동입력)"
-                  style={{ ...iS, ...(calcSelected ? { background: '#f3f4f6', color: '#6b7280' } : {}) }}
-                />
-              </div>
-              <div>
-                <label style={lS}>차량번호</label>
-                <input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} />
-              </div>
-              <div>
-                <label style={lS}>유종</label>
-                <select value={inv.fuel_type} onChange={e => setField('fuel_type', e.target.value)} style={iS}>
-                  <option>전기</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option>
-                </select>
-              </div>
-              <div>
-                <label style={lS}>대여일시</label>
-                <input value={inv.rental_start} onChange={e => setField('rental_start', e.target.value)} placeholder="2026/01/01 10:00" style={iS} />
-              </div>
-              <div>
-                <label style={lS}>반납예정일</label>
-                <input value={inv.return_datetime} onChange={e => setField('return_datetime', e.target.value)} placeholder="2026/01/08 10:00" style={iS} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <div>
-                  <label style={lS}>배차 유류</label>
-                  <input value={inv.fuel_out} onChange={e => setField('fuel_out', e.target.value)} placeholder="1%" style={iS} />
-                </div>
-                <div>
-                  <label style={lS}>반납 유류</label>
-                  <input value={inv.fuel_in} onChange={e => setField('fuel_in', e.target.value)} placeholder="1%" style={iS} />
-                </div>
-              </div>
-            </div>
-
-            {/* 메모 */}
-            {secTitle('기타 계약사항')}
-            <div style={{ marginBottom: 8 }}>
-              <textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항 메모"
-                rows={3} style={{ ...iS, resize: 'vertical' }} />
-            </div>
-          </div>
-
-          {/* ── 우측: 요금 요약 + 버튼 ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 320, flexShrink: 0 }}>
-
-            {/* 요금 요약 카드 */}
-            <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 10, padding: 18, textAlign: 'center' }}>
-              {calcSelected ? (
-                <>
-                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>
-                    {calcSelected.cat} · {calcSelected.name} · {calcDays > 0 ? `${calcDays}일` : ''}{calcHours > 0 ? ` ${calcHours}시간` : ''}
-                  </div>
-                  <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-                    {f(calcResult)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>렌트 {f(calcRentOnly)}</span>
-                    {calcFaultActive && <span style={{ fontSize: 11, color: '#fb923c' }}>과실 {calcFaultPercent}%</span>}
-                    {calcSupportAmount > 0 && <span style={{ fontSize: 11, color: '#4ade80' }}>지원 -{calcServiceSupport}%</span>}
-                    {calcDelivery > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>탁송 {calcDelivery}만</span>}
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>계산기에서 차종을 선택하면</div>
-                  <div style={{ fontSize: 13, color: '#94a3b8' }}>요금이 자동으로 표시됩니다</div>
-                  <div style={{ marginTop: 12 }}>
-                    <button
-                      onClick={() => setMainTab('calc')}
-                      style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#cbd5e1', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      계산기로 이동
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 직접 금액 입력 (계산기 미사용 시) */}
-            {!calcSelected && (
-              <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', padding: '14px 16px' }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', display: 'block', marginBottom: 4 }}>직접 금액 입력 (원)</label>
-                <input
-                  type="number"
-                  value={invManualAmount}
-                  onChange={e => setInvManualAmount(Number(e.target.value))}
-                  placeholder="0"
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 16, fontWeight: 900, color: '#2d5fa8', textAlign: 'right', outline: 'none', boxSizing: 'border-box' }}
-                />
-                {invManualAmount > 0 && (
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, textAlign: 'right' }}>{f(invManualAmount)}원</div>
-                )}
-              </div>
-            )}
-
-            {/* 안내 */}
-            <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px', border: '1px solid #dbeafe' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', marginBottom: 4 }}>단기렌트 계약서 PDF</div>
-              <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>
-                입력한 정보로 단기렌트 계약서 PDF가 생성됩니다. 계산기에서 차종 선택 후 이 탭으로 이동하면 금액이 자동 연동됩니다.
-              </div>
-            </div>
-
-            {/* 저장 / PDF 다운로드 버튼 */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => handleInvoiceSave(false, calcSelected ? calcResult : invManualAmount)}
-                disabled={qSaving}
-                style={{
-                  flex: 1, padding: '12px', border: '1px solid #e5e7eb', borderRadius: 10,
-                  background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  opacity: qSaving ? 0.5 : 1,
-                }}
-              >
-                {qSaving ? '저장 중...' : '저장만'}
-              </button>
-              <button
-                onClick={() => handleInvoiceSave(true, calcSelected ? calcResult : invManualAmount)}
-                disabled={qSaving}
-                style={{
-                  flex: 2, padding: '12px', border: 'none', borderRadius: 10,
-                  background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
-                  opacity: qSaving ? 0.5 : 1,
-                }}
-              >
-                {qSaving ? '처리 중...' : '저장 + PDF 다운로드'}
-              </button>
-            </div>
-          </div>
-        </div>
-        )
-      })()}
-
-      {/* ═══ TAB: 견적 목록 (장기/단기) ═══ */}
-      {(mainTab === 'long_term' || mainTab === 'short_term') && (<>
-
-      {/* Short-term detail modal */}
-      {selectedShortQuote && (
-        <ShortTermDetailModal
-          quote={selectedShortQuote}
-          onClose={() => setSelectedShortQuote(null)}
-          onStatusChange={handleShortStatusChange}
-          onDelete={handleShortDelete}
-        />
-      )}
-
-      {/* ── 테이블 (계약관리와 동일 스타일) ── */}
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-        {loading ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
-        ) : mainTab === 'short_term' ? (
-          /* ======================== SHORT-TERM TAB ======================== */
-          displayedShortQuotes.length === 0 ? (
+      {/* ═══ TAB: 단기 리스트 (구 청구서) ═══ */}
+      {mainTab === 'short_term' && (
+        <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+          {filteredInvoiceQuotes.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>⏱️</div>
-              {shortQuotes.length === 0 ? '단기렌트 견적이 없습니다.' : '해당 조건의 견적이 없습니다.'}
+              <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+              {invoiceQuotes.length === 0 ? '단기렌트 청구서가 없습니다.' : '해당 조건의 청구서가 없습니다.'}
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
+              <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적번호</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객/업체</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>연락처</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종 구성</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>합계</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>할인</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>임차인</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대여기간</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
                     <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>액션</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedShortQuotes.map((sq, idx) => {
-                    const detail = sq.quote_detail || {}
-                    const items = detail.items || []
-                    const total = detail.totalWithVat || detail.total || 0
-                    const vehicleSummary = items.length > 0
-                      ? items.slice(0, 2).map((it: any) => it.vehicleClass || it.group).join(', ') + (items.length > 2 ? ` 외 ${items.length - 2}건` : '')
-                      : '-'
+                  {filteredInvoiceQuotes.map((q: any, idx: number) => {
+                    const parsed = parseInvoiceMemo(q.memo || '')
+                    const statusBadge = q.signed_at
+                      ? { label: '서명완료', bg: '#dcfce7', color: '#16a34a' }
+                      : q.shared_at
+                      ? { label: '발송됨', bg: '#dbeafe', color: '#2563eb' }
+                      : { label: '임시저장', bg: '#fef3c7', color: '#d97706' }
                     return (
-                      <tr key={sq.id}
-                        onClick={() => setSelectedShortQuote(sq)}
-                        style={{ cursor: 'pointer', borderBottom: idx < displayedShortQuotes.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
+                      <tr key={q.id}
+                        onClick={() => router.push(`/quotes/invoice/${q.id}`)}
+                        style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ padding: '12px 16px', paddingLeft: 24 }}><ShortTermStatusBadge status={sq.status} /></td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827', fontFamily: 'monospace', fontSize: 12 }}>{sq.quote_number || '-'}</td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{sq.customer_name}</td>
-                        <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>{sq.customer_phone || '-'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{vehicleSummary}</td>
+                        <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
+                          <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{q.customer_name || '(미입력)'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{parsed.car || '-'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{parsed.period || '-'}</td>
                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                          <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(total)}원</span>
+                          <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(q.rent_fee || 0)}원</span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706', background: '#fffbeb', padding: '2px 8px', borderRadius: 4 }}>{sq.discount_percent || 0}%</span>
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(sq.created_at)}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            {sq.status === 'draft' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'sent')} style={{ fontSize: 11, background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>발송</button>
-                            )}
-                            {sq.status === 'sent' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'accepted')} style={{ fontSize: 11, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>수락</button>
-                            )}
-                            {sq.status === 'accepted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'contracted')} style={{ fontSize: 11, background: '#faf5ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>계약</button>
-                            )}
-                            {sq.status !== 'cancelled' && sq.status !== 'contracted' && (
-                              <button onClick={() => handleShortStatusChange(sq.id, 'cancelled')} style={{ fontSize: 11, background: '#f3f4f6', color: '#9ca3af', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: 'none', cursor: 'pointer' }}>취소</button>
-                            )}
-                          </div>
-                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(q.created_at)}</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-          )
+          )}
+        </div>
+      )}
+
+      {/* ═══ TAB: 롯데렌터카요금표 ═══ */}
+      {mainTab === 'lotte_rate' && (
+        <ShortTermReplacementBuilder />
+      )}
+
+      {/* ═══ TAB: 장기 견적 목록 ═══ */}
+      {mainTab === 'long_term' && (
+      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+        {loading ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
         ) : (
-          /* ======================== LONG-TERM QUOTES TAB ======================== */
           displayedQuotes.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
@@ -1563,8 +1176,158 @@ export default function QuoteListPage() {
           )
         )}
       </div>
+      )}
 
-      </>)}
+      {/* ═══ 청구서 작성 모달 ═══ */}
+      {invoiceOpen && (() => {
+        const iS = { width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none' }
+        const lS = { fontSize: 10, fontWeight: 700 as const, color: '#6b7280', display: 'block', marginBottom: 2 }
+        return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setInvoiceOpen(false)}
+          />
+          <div style={{
+            position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
+            width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            animation: 'fadeInUp 0.2s ease-out',
+          }}>
+            <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#1e3a5f' }}>📄 청구서 작성</div>
+              <button onClick={() => setInvoiceOpen(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>임차인 정보</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div><label style={lS}>임차인 *</label><input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} /></div>
+                  <div><label style={lS}>연락처</label><input value={inv.tenant_phone} onChange={e => setField('tenant_phone', fmtPhone(e.target.value))} placeholder="010-0000-0000" style={iS} inputMode="tel" /></div>
+                  <div><label style={lS}>생년월일</label><input value={inv.tenant_birth} onChange={e => setField('tenant_birth', fmtBirth(e.target.value))} placeholder="900101-1******" style={iS} /></div>
+                  <div>
+                    <label style={lS}>주소</label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: '#fafafa' }} onClick={openAddressSearch} />
+                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: '#f9fafb', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                    </div>
+                  </div>
+                  <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
+                  <div><label style={lS}>면허구분</label><select value={inv.license_type} onChange={e => setField('license_type', e.target.value)} style={iS}><option>1종보통</option><option>2종보통</option><option>1종대형</option></select></div>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>대차 정보</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div><label style={lS}>차종</label><input value={inv.rental_car} onChange={e => setField('rental_car', e.target.value)} placeholder="차종" style={iS} /></div>
+                  <div><label style={lS}>차량번호</label><input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} /></div>
+                  <div><label style={lS}>유종</label><select value={inv.fuel_type} onChange={e => setField('fuel_type', e.target.value)} style={iS}><option>전기</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option></select></div>
+                  <div><label style={lS}>대여일시</label><input type="datetime-local" value={inv.rental_start} onChange={e => setField('rental_start', e.target.value)} style={iS} /></div>
+                  <div><label style={lS}>반납예정일</label><input type="datetime-local" value={inv.return_datetime} onChange={e => setField('return_datetime', e.target.value)} style={iS} /></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <div>
+                      <label style={lS}>배차 유류</label>
+                      <div style={{ position: 'relative' }}>
+                        <input type="number" min={0} max={100} value={inv.fuel_out} onChange={e => setField('fuel_out', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#9ca3af', pointerEvents: 'none' }}>%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={lS}>반납 유류</label>
+                      <div style={{ position: 'relative' }}>
+                        <input type="number" min={0} max={100} value={inv.fuel_in} onChange={e => setField('fuel_in', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#9ca3af', pointerEvents: 'none' }}>%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>기타 / 저장</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div><label style={lS}>메모</label><textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항" rows={3} style={{ ...iS, resize: 'vertical' }} /></div>
+                  <div><label style={lS}>금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#2d5fa8', textAlign: 'right' }} /></div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginTop: 20 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', lineHeight: '32px' }}>발송:</span>
+                <button
+                  onClick={async () => {
+                    if (!inv.tenant_name.trim()) return alert('임차인 이름을 입력해주세요.')
+                    if (!inv.tenant_phone.trim()) return alert('연락처를 입력해주세요.')
+                    const phone = inv.tenant_phone.replace(/-/g, '')
+                    const carInfo = inv.rental_car || '대차'
+                    const amount = f(invManualAmount)
+                    try {
+                      // 1) 저장
+                      const saved = await handleInvoiceSave(false, invManualAmount)
+                      if (!saved) return
+                      const quoteId = (saved as any)?.id
+                      if (!quoteId) return alert('저장 실패')
+                      // 2) 토큰 생성
+                      const { data: { session } } = await supabase.auth.getSession()
+                      if (!session?.access_token) return alert('로그인이 필요합니다.')
+                      const shareRes = await fetch(`/api/quotes/${quoteId}/share`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                        body: JSON.stringify({ expiryDays: 7 }),
+                      })
+                      const shareData = await shareRes.json()
+                      if (!shareData.shareUrl) return alert('링크 생성 실패')
+                      // 3) SMS 발송 (링크 포함)
+                      const msg = `[에프엠아이 렌터카]\n${inv.tenant_name}님 청구서\n차종: ${carInfo}\n금액: ${amount}원\n\n확인 및 서명:\n${shareData.shareUrl}`
+                      const smsRes = await fetch('/api/send-sms', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                        body: JSON.stringify({ phone, message: msg, title: '청구서 안내', recipientName: inv.tenant_name, relatedId: quoteId }),
+                      })
+                      const smsResult = await smsRes.json()
+                      if (smsResult.success) {
+                        alert('청구서가 저장되고 문자가 발송되었습니다.')
+                        setInvoiceOpen(false)
+                      } else {
+                        alert(`저장 완료, 문자 발송 실패: ${smsResult.error || '알 수 없는 오류'}`)
+                      }
+                    } catch (err: any) {
+                      alert(`오류: ${err.message}`)
+                    }
+                  }}
+                  style={{ padding: '6px 14px', border: '1px solid #2d5fa8', borderRadius: 8, background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                >📱 저장 + 문자발송</button>
+                <button
+                  onClick={() => {
+                    const carInfo = inv.rental_car || '대차'
+                    const amount = f(invManualAmount)
+                    const subject = `[에프엠아이 렌터카] ${inv.tenant_name}님 청구서`
+                    const body = `안녕하세요, ${inv.tenant_name}님.\n\n에프엠아이 렌터카 청구서입니다.\n\n■ 차종: ${carInfo}\n■ 금액: ${amount}원\n${inv.rental_start ? `■ 대여일시: ${inv.rental_start.replace('T', ' ')}` : ''}\n${inv.return_datetime ? `■ 반납예정: ${inv.return_datetime.replace('T', ' ')}` : ''}\n\n감사합니다.\n주식회사에프엠아이`
+                    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
+                  }}
+                  style={{ padding: '6px 14px', border: '1px solid #93c5fd', borderRadius: 8, background: '#eff6ff', fontSize: 12, fontWeight: 700, color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                >📧 이메일</button>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                <button
+                  onClick={() => { handleInvoiceSave(false, invManualAmount); setInvoiceOpen(false) }}
+                  disabled={qSaving}
+                  style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
+                >{qSaving ? '저장 중...' : '저장'}</button>
+                <button
+                  onClick={() => { handleInvoiceSave(true, invManualAmount); setInvoiceOpen(false) }}
+                  disabled={qSaving}
+                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 14px rgba(45,95,168,0.3)', opacity: qSaving ? 0.5 : 1 }}
+                >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        )
+      })()}
     </div>
   )
 }

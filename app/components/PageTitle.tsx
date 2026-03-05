@@ -17,6 +17,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
   '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/work-essentials/receipts': 'work',
 }
 
 // 그룹 ID → 섹션 라벨
@@ -27,6 +28,7 @@ const GROUP_LABELS: Record<string, string> = {
   finance: '재무',
   invest: '투자',
   data: '데이터 관리',
+  work: '직장인필수',
   platform: '플랫폼',
   settings: '설정',
 }
@@ -67,6 +69,8 @@ const PAGE_NAMES: Record<string, string> = {
   // 데이터 관리
   '/db/pricing-standards': '견적 단가표',
   '/db/lotte': '벤치마크',
+  // 직장인필수
+  '/work-essentials/receipts': '영수증제출',
   // 플랫폼 (god_admin)
   '/admin': '회사/가입 관리',
   '/system-admin': '구독 관리',

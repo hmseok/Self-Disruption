@@ -69,6 +69,11 @@ const BUSINESS_GROUPS = [
   { id: 'data', label: '데이터 관리' },
 ]
 
+// 직장인필수 메뉴 (모든 로그인 사용자에게 표시)
+const WORK_ESSENTIALS_MENUS = [
+  { name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard' },
+]
+
 // god_admin 전용: 플랫폼 관리
 const PLATFORM_MENUS = [
   { name: '회사/가입 관리', path: '/admin', iconKey: 'Admin' },
@@ -139,7 +144,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ★ 앱 셸 활성화 시 body에 클래스 추가 (로그인 페이지 제외)
-  const isGuestPage = pathname.endsWith('/sign')
+  const isGuestPage = pathname.startsWith('/sign')
   const isAuthPage = pathname === '/' || pathname.startsWith('/auth') || pathname.startsWith('/public') || pathname.startsWith('/invite') || isGuestPage
   useEffect(() => {
     if (!isAuthPage) {
@@ -249,7 +254,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
   // 로그아웃 상태 → 로그인 페이지로 즉시 이동 (useEffect로 감싸서 렌더링 중 setState 방지)
   useEffect(() => {
-    if (!loading && !user && pathname !== '/' && !pathname.startsWith('/auth') && !pathname.startsWith('/public') && !pathname.startsWith('/invite') && !pathname.endsWith('/sign')) {
+    if (!loading && !user && pathname !== '/' && !pathname.startsWith('/auth') && !pathname.startsWith('/public') && !pathname.startsWith('/invite') && !pathname.startsWith('/sign')) {
       router.replace('/')
     }
   }, [loading, user, pathname, router])
@@ -450,6 +455,18 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+
+            {/* 직장인필수 */}
+            <div className="mb-3">
+              <div className="px-3 mb-1">
+                <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">직장인필수</span>
+              </div>
+              <div className="space-y-0.5">
+                {WORK_ESSENTIALS_MENUS.map(item => (
+                  <MenuItem key={item.path} item={item} pathname={pathname} />
+                ))}
+              </div>
+            </div>
 
             {/* 구분선 + 관리 영역 */}
             {(showPlatform || showSettings) && (
