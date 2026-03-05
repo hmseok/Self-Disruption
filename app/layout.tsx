@@ -1,10 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { AppProvider } from '@/app/context/AppContext'
-import ClientLayout from '@/app/components/auth/ClientLayout'
-import { UploadProvider } from '@/app/context/UploadContext'
-import UploadWidget from '@/app/components/UploadWidget'
+import ConditionalLayout from '@/app/components/auth/ConditionalLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -54,14 +51,9 @@ export default function RootLayout({
         `}} />
       </head>
       <body className={inter.className}>
-        <AppProvider>
-          <UploadProvider>
-            <ClientLayout>
-              {children}
-            </ClientLayout>
-            <UploadWidget />
-          </UploadProvider>
-        </AppProvider>
+        <ConditionalLayout>
+          {children}
+        </ConditionalLayout>
       </body>
     </html>
   )

@@ -83,7 +83,34 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    const insertData = items.map(item => ({
+    // ── 중복 체크: 같은 날짜 + 사용처 + 금액이 이미 있으면 스킵 ──
+    const duplicateChecks = await Promise.all(
+      items.map(async (item) => {
+        const { data: existing } = await supabase
+          .from('expense_receipts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('expense_date', item.expense_date)
+          .eq('merchant', item.merchant)
+          .eq('amount', item.amount)
+          .limit(1)
+        return { item, isDuplicate: !!(existing && existing.length > 0) }
+      })
+    )
+
+    const newItems = duplicateChecks.filter(c => !c.isDuplicate).map(c => c.item)
+    const skippedCount = duplicateChecks.filter(c => c.isDuplicate).length
+
+    if (newItems.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        skipped: skippedCount,
+        message: `${skippedCount}건 모두 이미 등록된 내역입니다.`,
+      })
+    }
+
+    const insertData = newItems.map(item => ({
       company_id: user.company_id,
       user_id: user.id,
       user_name: user.employee_name || user.email?.split('@')[0] || '',
@@ -107,7 +134,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '저장 실패', detail: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({
+      success: true,
+      data,
+      skipped: skippedCount,
+      message: skippedCount > 0
+        ? `${data?.length || 0}건 저장, ${skippedCount}건 중복 제외`
+        : undefined,
+    })
   } catch (e: any) {
     console.error('영수증 API 오류:', e.message)
     return NextResponse.json({ error: '서버 오류' }, { status: 500 })

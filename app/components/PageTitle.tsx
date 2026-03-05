@@ -17,6 +17,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
   '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/work-essentials/my-info': 'work',
   '/work-essentials/receipts': 'work',
 }
 
@@ -70,6 +71,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/db/pricing-standards': '견적 단가표',
   '/db/lotte': '벤치마크',
   // 직장인필수
+  '/work-essentials/my-info': '내 정보',
   '/work-essentials/receipts': '영수증제출',
   // 플랫폼 (god_admin)
   '/admin': '회사/가입 관리',

@@ -71,6 +71,7 @@ const BUSINESS_GROUPS = [
 
 // 직장인필수 메뉴 (모든 로그인 사용자에게 표시)
 const WORK_ESSENTIALS_MENUS = [
+  { name: '내 정보', path: '/work-essentials/my-info', iconKey: 'Users' },
   { name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard' },
 ]
 
