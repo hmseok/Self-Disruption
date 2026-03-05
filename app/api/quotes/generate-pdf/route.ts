@@ -297,9 +297,13 @@ export async function POST(request: NextRequest) {
 
     // 메모
     const memo = b.memo || ''
-    memo.split('\n').slice(0, 10).forEach((line: string, i: number) => {
-      txt(d, line, L + 10, cy + 4 + (i * 13), { size: 8 })
-    })
+    if (preview && !memo) {
+      txt(d, '(기타 계약사항은 견적서에서 입력)', L + 10, cy + 14, { size: 7, color: PLACEHOLDER })
+    } else {
+      memo.split('\n').slice(0, 10).forEach((line: string, i: number) => {
+        txt(d, line, L + 10, cy + 4 + (i * 13), { size: 8 })
+      })
+    }
 
     // ═══════════════════════════════════════════
     // (5) 서명란
@@ -336,8 +340,28 @@ export async function POST(request: NextRequest) {
     }
     // 임차인 (우)
     txt(d, '임차인', M + (R - M) / 2 - 15, SY + 14, { size: 9, bold: true, color: NAVY })
-    txt(d, `임차인:  ${b.tenant_name || ''}`, M + 10, SY + 34, { size: 8 })
-    txt(d, '서명 또는 (인)', R - 60, SY + 34, { size: 7, color: GRAY })
+    if (preview && !b.tenant_name) {
+      txt(d, '임차인:  (계약 시 자동입력)', M + 10, SY + 34, { size: 8, color: PLACEHOLDER })
+    } else {
+      txt(d, `임차인:  ${b.tenant_name || ''}`, M + 10, SY + 34, { size: 8 })
+    }
+    // 고객 서명 이미지 삽입
+    if (b.customer_signature) {
+      try {
+        const sigData = b.customer_signature as string
+        const sigBase64 = sigData.split(',')[1]
+        const sigImage = await pdfDoc.embedPng(Buffer.from(sigBase64, 'base64'))
+        const sigW = 80, sigH = 38
+        const sigX = R - sigW - 10
+        const sigY = Y(SY + 58)
+        pg.drawImage(sigImage, { x: sigX, y: sigY, width: sigW, height: sigH })
+      } catch (e) {
+        console.error('고객 서명 삽입 실패:', e)
+        txt(d, '서명 또는 (인)', R - 60, SY + 34, { size: 7, color: GRAY })
+      }
+    } else {
+      txt(d, '서명 또는 (인)', R - 60, SY + 34, { size: 7, color: GRAY })
+    }
 
     txt(d, '뒷면에 약관이 있으니 확인해주세요.', L, H - 35, { size: 7, color: GRAY })
     txt(d, '1/2', R - 15, H - 35, { size: 7, color: GRAY })
@@ -426,7 +450,19 @@ export async function POST(request: NextRequest) {
     ry += 15
     txt(d2, '상기 내용을 확인하고 동의하는 바 아래와 같이 서명합니다.', MARGIN, ry, { size: 7.5, bold: true })
     ry += 20
-    txt(d2, '서명 또는 (인)', R - 80, ry, { size: 8, color: GRAY })
+    // 2페이지 고객 서명
+    if (b.customer_signature) {
+      try {
+        const sigData2 = b.customer_signature as string
+        const sigBase642 = sigData2.split(',')[1]
+        const sigImage2 = await pdfDoc.embedPng(Buffer.from(sigBase642, 'base64'))
+        p2.drawImage(sigImage2, { x: R - 100, y: Y(ry + 10), width: 80, height: 38 })
+      } catch {
+        txt(d2, '서명 또는 (인)', R - 80, ry, { size: 8, color: GRAY })
+      }
+    } else {
+      txt(d2, '서명 또는 (인)', R - 80, ry, { size: 8, color: GRAY })
+    }
     txt(d2, '2/2', R - 15, H - 35, { size: 7, color: GRAY })
 
     // ════════════════════════════════════════

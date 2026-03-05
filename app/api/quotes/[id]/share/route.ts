@@ -78,7 +78,7 @@ export async function POST(
       })
       return NextResponse.json({
         token: existingToken.token,
-        shareUrl: `${origin}/public/quote/${existingToken.token}`,
+        shareUrl: `${origin}/sign/${existingToken.token}`,
         expiresAt: existingToken.expires_at,
         isExisting: true
       })
@@ -110,7 +110,7 @@ export async function POST(
       .eq('id', quoteId)
 
     const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
-    const shareUrl = `${origin}/public/quote/${token}`
+    const shareUrl = `${origin}/sign/${token}`
 
     // 라이프사이클 이벤트 기록
     recordLifecycleEvent({

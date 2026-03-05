@@ -601,6 +601,57 @@ export default function QuoteDetailPage() {
                 <p className="text-green-100 text-sm">서명일: {quote.signed_at ? new Date(quote.signed_at).toLocaleDateString('ko-KR') : ''}</p>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      // 서명 데이터 가져오기
+                      const { data: { session } } = await supabase.auth.getSession()
+                      const authToken = session?.access_token || ''
+                      const sigRes = await fetch(`/api/quotes/${quoteId}/share`, {
+                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                      })
+                      const sigData = await sigRes.json()
+                      const customerSig = sigData?.signatures?.[0]?.signature_data || ''
+                      // PDF 생성 (서명 포함)
+                      const car = quote?.car || {}
+                      const detail = quote?.quote_detail || {}
+                      const pdfRes = await fetch('/api/quotes/generate-pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          company_name: quote?.company_name || '주식회사에프엠아이',
+                          company_phone: quote?.company_phone || '',
+                          staff_name: profile?.name || '',
+                          staff_phone: profile?.phone || '',
+                          tenant_name: quote?.customer_name || '',
+                          tenant_phone: quote?.customer_phone || '',
+                          tenant_birth: quote?.customer_birth || '',
+                          tenant_address: quote?.customer_address || '',
+                          license_number: quote?.license_number || '',
+                          license_type: quote?.license_type || '',
+                          rental_car: `${car.brand || ''} ${car.model || ''}`.trim(),
+                          rental_plate: car.number || '',
+                          fuel_type: car.fuel || '',
+                          rental_start: quote?.start_date || '',
+                          return_datetime: quote?.end_date || '',
+                          rental_hours: detail.rental_days ? `${detail.rental_days}일` : '',
+                          total_fee: quote?.total_amount?.toLocaleString() || quote?.rent_fee?.toLocaleString() || '',
+                          memo: quote?.memo || '',
+                          customer_signature: customerSig,
+                        }),
+                      })
+                      if (!pdfRes.ok) throw new Error('PDF 생성 실패')
+                      const blob = await pdfRes.blob()
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url; a.download = `계약서_${quote?.customer_name || ''}_서명완료.pdf`; a.click()
+                      URL.revokeObjectURL(url)
+                    } catch (e: any) { alert('PDF 다운로드 실패: ' + e.message) }
+                  }}
+                  className="bg-white/20 text-white px-4 py-2 rounded-xl font-bold hover:bg-white/30 shadow text-sm border border-white/30"
+                >
+                  📄 서명PDF
+                </button>
                 {canCreateContract && (
                   <button onClick={handleCreateContract} disabled={creating}
                     className="bg-white text-green-700 px-5 py-2 rounded-xl font-bold hover:bg-gray-100 shadow text-sm">
