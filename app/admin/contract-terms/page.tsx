@@ -93,7 +93,7 @@ export default function ContractTermsPage() {
   const { company, profile, role, adminSelectedCompanyId, allCompanies } = useApp()
 
   // ── 탭 상태 ──
-  const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history' | 'insurance' | 'notices' | 'params'>('versions')
+  const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history' | 'insurance' | 'notices' | 'params' | 'pdf_template'>('versions')
   const [selectedCategory, setSelectedCategory] = useState<string>('long_term_rental')
 
   // ── 약관 버전 목록 ──
@@ -150,6 +150,30 @@ export default function ContractTermsPage() {
     early_termination: true,
   })
 
+  // ── PDF 템플릿 기본값 ──
+  const [pdfDefaults, setPdfDefaults] = useState({
+    company_name: '주식회사에프엠아이',
+    company_phone: '01033599559',
+    company_address: '경기 연천군 왕징면 백동로236번길 190 3동1호',
+    representative: '대표 박진숙',
+    ins_age: '만 26세 이상',
+    ins_self_limit: '3,000만원', ins_self_ded: '50만원',
+    ins_personal_limit: '무한', ins_personal_ded: '없음',
+    ins_property_limit: '1억 원', ins_property_ded: '없음',
+    ins_injury_limit: '1,500만원', ins_death_limit: '1,500만원',
+    ins_injury_ded: '없음',
+    cdw_notice: '*자기차량 손해의 경우, 고객귀책사유로 인한 사고는 면책금 (50)만원, 대인 (-)만원 / 대물 (-)만원 휴차손해료(1일 대여요금의 50%)는 각각 별도 지불하여야 합니다.',
+    terms_clause_1: '차량 임차기간 동안 발생한 유류비 및 주정차 위반과 교통법규 위반 등으로 인한 과태료와 범칙금 등은 임차인 부담입니다.',
+    terms_clause_2: '차량 임차 중 사고 발생 시, 약관에 따라 자동차보험 및 자차손해면책제도의 범위 내 손해를 보상받을 수 있습니다.',
+    terms_clause_3: '차량 임차 중 자차 사고 발생 시 해당 면책금과 휴차 보상료(대여요금의 50%)는 임차인 부담입니다.',
+    terms_clause_4: '전자계약서 이용 시 서비스 제공과 함께 서비스 운영과 관련한 각종 정보와 광고를 웹페이지 또는 모바일 애플리케이션 등에 게재할 수 있습니다.',
+    terms_clause_5: '그 외 계약조건은 자동차대여 표준약관에 따릅니다.',
+    company_stamp: '', // base64 이미지 데이터
+  })
+  const [pdfDefaultsSaving, setPdfDefaultsSaving] = useState(false)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false)
+
   // ── 폼 스크롤 ref ──
   const articleFormRef = useRef<HTMLDivElement>(null)
   const specialFormRef = useRef<HTMLDivElement>(null)
@@ -164,6 +188,124 @@ export default function ContractTermsPage() {
   const companyId = (role === 'god_admin')
     ? (adminSelectedCompanyId || allCompanies?.[0]?.id || company?.id || null)
     : (company?.id || null)
+
+  // ── PDF 기본값 로드/저장/미리보기 함수 ──
+  const fetchPdfDefaults = useCallback(async () => {
+    if (!companyId) return
+    let loaded: any = null
+    // 로컬스토리지 우선 로드
+    try {
+      const local = localStorage.getItem(`pdf_defaults_${selectedCategory}_${companyId}`)
+      if (local) {
+        loaded = JSON.parse(local)
+        setPdfDefaults(prev => ({ ...prev, ...loaded }))
+      }
+    } catch { /* */ }
+    // DB에서도 로드 시도
+    const { data } = await supabase
+      .from('contract_terms')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('contract_category', selectedCategory)
+      .eq('status', 'active')
+      .limit(1)
+      .single()
+    if (data?.pdf_defaults) {
+      try {
+        const d = typeof data.pdf_defaults === 'string' ? JSON.parse(data.pdf_defaults) : data.pdf_defaults
+        loaded = d
+        setPdfDefaults(prev => ({ ...prev, ...d }))
+      } catch { /* ignore */ }
+    }
+    // 도장 기본 이미지 로드 (저장된 도장이 없을 때)
+    if (!loaded?.company_stamp) {
+      try {
+        const res = await fetch('/images/company_stamp.png')
+        if (res.ok) {
+          const blob = await res.blob()
+          const reader = new FileReader()
+          reader.onload = () => {
+            setPdfDefaults(prev => {
+              if (!prev.company_stamp) return { ...prev, company_stamp: reader.result as string }
+              return prev
+            })
+          }
+          reader.readAsDataURL(blob)
+        }
+      } catch { /* 기본 도장 로드 실패 시 무시 */ }
+    }
+  }, [companyId, selectedCategory])
+
+  const savePdfDefaults = async () => {
+    if (!companyId) return
+    setPdfDefaultsSaving(true)
+    try {
+      const { data: active } = await supabase
+        .from('contract_terms')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('contract_category', selectedCategory)
+        .eq('status', 'active')
+        .limit(1)
+        .single()
+      if (active) {
+        const { error } = await supabase.from('contract_terms').update({ pdf_defaults: pdfDefaults }).eq('id', active.id)
+        if (error) throw error
+        alert('PDF 기본값이 저장되었습니다.')
+      } else {
+        localStorage.setItem(`pdf_defaults_${selectedCategory}_${companyId}`, JSON.stringify(pdfDefaults))
+        alert('활성 약관이 없어 로컬에 임시 저장되었습니다.')
+      }
+    } catch (err: any) {
+      localStorage.setItem(`pdf_defaults_${selectedCategory}_${companyId}`, JSON.stringify(pdfDefaults))
+      alert('로컬에 임시 저장되었습니다. (pdf_defaults 컬럼 추가 필요 시 SQL 마이그레이션 실행)')
+    } finally {
+      setPdfDefaultsSaving(false)
+    }
+  }
+
+  const generatePdfPreview = async () => {
+    setPdfPreviewLoading(true)
+    try {
+      const res = await fetch('/api/quotes/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_name: pdfDefaults.company_name,
+          company_phone: pdfDefaults.company_phone,
+          is_preview: true,
+          staff_name: '',
+          tenant_name: '',
+          tenant_phone: '',
+          tenant_birth: '',
+          tenant_address: '',
+          license_number: '',
+          license_type: '',
+          rental_car: '',
+          rental_plate: '',
+          fuel_type: '',
+          rental_start: '',
+          return_datetime: '',
+          rental_hours: '',
+          total_fee: '',
+          fuel_out: '',
+          fuel_in: '',
+          memo: '',
+          company_stamp: pdfDefaults.company_stamp || '',
+          company_address: pdfDefaults.company_address,
+          representative: pdfDefaults.representative,
+        }),
+      })
+      if (!res.ok) throw new Error('PDF 생성 실패')
+      const blob = await res.blob()
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(URL.createObjectURL(blob))
+    } catch (err: any) {
+      alert(`PDF 미리보기 실패: ${err.message}`)
+    } finally {
+      setPdfPreviewLoading(false)
+    }
+  }
 
   // ── 에러 상태 ──
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -294,8 +436,9 @@ export default function ContractTermsPage() {
   useEffect(() => {
     fetchTermsSets()
     fetchSpecialTerms()
+    fetchPdfDefaults()
     setSelectedTerms(null) // Reset selected terms when category changes
-  }, [fetchTermsSets, fetchSpecialTerms])
+  }, [fetchTermsSets, fetchSpecialTerms, fetchPdfDefaults])
 
   useEffect(() => {
     if (selectedTerms) {
@@ -715,7 +858,7 @@ export default function ContractTermsPage() {
         {Object.entries(CONTRACT_CATEGORIES).map(([key, { label, emoji }]) => (
           <button
             key={key}
-            onClick={() => setSelectedCategory(key)}
+            onClick={() => { setSelectedCategory(key); setTab('versions') }}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
               selectedCategory === key
                 ? 'bg-blue-600 text-white shadow-md'
@@ -728,9 +871,16 @@ export default function ContractTermsPage() {
         ))}
       </div>
 
-      {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 overflow-x-auto">
-        {([
+      {/* 탭 (언더라인 스타일) */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e5e7eb', marginBottom: 24 }}>
+        {(selectedCategory === 'short_term_rental' ? [
+          ['versions', '약관 버전'],
+          ['articles', '조항 편집'],
+          ['special', '특약'],
+          ['insurance', '보험 보장'],
+          ['pdf_template', 'PDF 템플릿'],
+          ['history', '변경 이력'],
+        ] : [
           ['versions', '약관 버전'],
           ['articles', '조항 편집'],
           ['special', '특약 템플릿'],
@@ -738,15 +888,17 @@ export default function ContractTermsPage() {
           ['notices', '견적 유의사항'],
           ['params', '계산 파라미터'],
           ['history', '변경 이력'],
-        ] as const).map(([key, label]) => (
+        ]).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
-            className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-              tab === key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            onClick={() => setTab(key as any)}
+            style={{
+              padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
+              fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
+              color: tab === key ? '#1e3a5f' : '#9ca3af',
+              borderBottom: tab === key ? '2px solid #1e3a5f' : '2px solid transparent',
+              marginBottom: -2,
+            }}
           >
             {label}
           </button>
@@ -2086,6 +2238,290 @@ export default function ContractTermsPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══════════════════ 탭8: PDF 템플릿 ═══════════════════ */}
+      {tab === 'pdf_template' && (
+        <div className="space-y-6">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">📄 PDF 계약서 템플릿 관리</h3>
+              <p className="text-sm text-gray-500 mt-1">계약서 PDF에 자동으로 들어가는 기본값을 설정하고 미리보기로 확인하세요.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={generatePdfPreview}
+                disabled={pdfPreviewLoading}
+                className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold hover:bg-blue-100 disabled:opacity-50"
+              >
+                {pdfPreviewLoading ? '생성 중...' : '👁 미리보기'}
+              </button>
+              <button
+                onClick={savePdfDefaults}
+                disabled={pdfDefaultsSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {pdfDefaultsSaving ? '저장 중...' : '💾 기본값 저장'}
+              </button>
+            </div>
+          </div>
+
+          {/* ── PDF 항목 체크리스트 (템플릿 항목 vs 계약입력 항목) ── */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <h4 className="text-sm font-bold text-gray-900 mb-4">PDF 계약서 항목 구성표</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 템플릿 기본값 (미리 설정) */}
+              <div>
+                <div className="text-xs font-bold text-blue-700 bg-blue-50 rounded-t-lg px-3 py-2">템플릿 기본값 (아래에서 설정)</div>
+                <table className="w-full text-xs border border-gray-200 border-t-0">
+                  <tbody>
+                    {[
+                      { name: '회사명', val: pdfDefaults.company_name },
+                      { name: '연락처', val: pdfDefaults.company_phone },
+                      { name: '주소', val: pdfDefaults.company_address },
+                      { name: '대표자', val: pdfDefaults.representative },
+                      { name: '회사 도장', val: pdfDefaults.company_stamp ? '설정됨' : '' },
+                      { name: '보험 (자차/대인/대물/자손)', val: pdfDefaults.ins_self_limit ? '설정됨' : '' },
+                      { name: '면책 안내문', val: pdfDefaults.cdw_notice ? '설정됨' : '' },
+                      { name: '약관 조항 (5항)', val: pdfDefaults.terms_clause_1 ? '설정됨' : '' },
+                    ].map((r, i) => (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="px-3 py-1.5 text-gray-600 w-40 bg-gray-50">{r.name}</td>
+                        <td className="px-3 py-1.5">
+                          {r.val ? (
+                            <span className="text-green-600 font-bold">&#10003; {r.val.length > 20 ? r.val.slice(0, 20) + '...' : r.val}</span>
+                          ) : (
+                            <span className="text-red-400">&#10007; 미설정</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* 계약 시 입력 항목 */}
+              <div>
+                <div className="text-xs font-bold text-amber-700 bg-amber-50 rounded-t-lg px-3 py-2">계약 시 입력 항목 (견적/계약에서 입력)</div>
+                <table className="w-full text-xs border border-gray-200 border-t-0">
+                  <tbody>
+                    {[
+                      { name: '임차인명', src: '견적서' },
+                      { name: '연락처 / 생년월일', src: '견적서' },
+                      { name: '주소 / 면허번호', src: '견적서' },
+                      { name: '제2운전자 정보', src: '견적서 (선택)' },
+                      { name: '대차정보 (차종/번호판/유종)', src: '견적서' },
+                      { name: '대여일시 / 반납예정일', src: '견적서' },
+                      { name: '유류량 (배차/반납)', src: '견적서' },
+                      { name: '요금 (총액/대여시간)', src: '견적서' },
+                      { name: '담당자 / 담당자 연락처', src: '로그인 정보' },
+                      { name: '메모 / 기타 계약사항', src: '견적서 (선택)' },
+                    ].map((r, i) => (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="px-3 py-1.5 text-gray-600 w-40 bg-gray-50">{r.name}</td>
+                        <td className="px-3 py-1.5 text-gray-500">{r.src}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 좌측: 기본값 편집 */}
+            <div className="space-y-5">
+
+              {/* ─── 회사 정보 ─── */}
+              <div className="bg-white rounded-xl border border-gray-200">
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-900">🏢 회사 (임대인) 정보</h4>
+                </div>
+                <table className="w-full text-sm">
+                  <tbody>
+                    {[
+                      { key: 'company_name', label: '회사명' },
+                      { key: 'company_phone', label: '연락처' },
+                      { key: 'company_address', label: '주소' },
+                      { key: 'representative', label: '대표자' },
+                    ].map(f => (
+                      <tr key={f.key} className="border-b border-gray-50">
+                        <td className="px-5 py-2.5 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            value={(pdfDefaults as any)[f.key] || ''}
+                            onChange={e => setPdfDefaults(p => ({ ...p, [f.key]: e.target.value }))}
+                            className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {/* 회사 도장 행 */}
+                    <tr className="border-b border-gray-50">
+                      <td className="px-5 py-2.5 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-4">회사 도장</td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-gray-300 rounded flex items-center justify-center overflow-hidden bg-gray-50"
+                          >
+                            {pdfDefaults.company_stamp ? (
+                              <img src={pdfDefaults.company_stamp} alt="도장" className="max-w-full max-h-full object-contain" />
+                            ) : (
+                              <span className="text-xl text-gray-300">印</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="cursor-pointer inline-flex px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs font-bold hover:bg-blue-100">
+                              이미지 선택
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  if (file.size > 2 * 1024 * 1024) { alert('2MB 이하로 업로드해주세요.'); return }
+                                  const reader = new FileReader()
+                                  reader.onload = () => setPdfDefaults(p => ({ ...p, company_stamp: reader.result as string }))
+                                  reader.readAsDataURL(file)
+                                  e.target.value = ''
+                                }}
+                              />
+                            </label>
+                            {pdfDefaults.company_stamp && (
+                              <button onClick={() => setPdfDefaults(p => ({ ...p, company_stamp: '' }))} className="inline-flex px-3 py-1 bg-red-50 text-red-600 rounded text-xs font-bold hover:bg-red-100">
+                                삭제
+                              </button>
+                            )}
+                            <span className="text-[10px] text-gray-400">PNG 투명배경 권장 · 서명란에 삽입</span>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ─── 보험 정보 ─── */}
+              <div className="bg-white rounded-xl border border-gray-200">
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-900">🛡️ 보험가입 및 면책 제도</h4>
+                </div>
+                <table className="w-full text-sm">
+                  <tbody>
+                    {[
+                      { key: 'ins_age', label: '가입 연령' },
+                      { key: 'ins_self_limit', label: '자차 한도' },
+                      { key: 'ins_self_ded', label: '자차 면책금' },
+                      { key: 'ins_personal_limit', label: '대인 한도' },
+                      { key: 'ins_personal_ded', label: '대인 면책금' },
+                      { key: 'ins_property_limit', label: '대물 한도' },
+                      { key: 'ins_property_ded', label: '대물 면책금' },
+                      { key: 'ins_injury_limit', label: '자손 한도(부상)' },
+                      { key: 'ins_death_limit', label: '자손 한도(사망)' },
+                      { key: 'ins_injury_ded', label: '자손 면책금' },
+                    ].map(f => (
+                      <tr key={f.key} className="border-b border-gray-50">
+                        <td className="px-5 py-2 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            value={(pdfDefaults as any)[f.key] || ''}
+                            onChange={e => setPdfDefaults(p => ({ ...p, [f.key]: e.target.value }))}
+                            className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td className="px-5 py-2 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-3">면책 안내문</td>
+                      <td className="px-3 py-1.5">
+                        <textarea
+                          value={pdfDefaults.cdw_notice}
+                          onChange={e => setPdfDefaults(p => ({ ...p, cdw_notice: e.target.value }))}
+                          rows={2}
+                          className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ─── 약관 조항 ─── */}
+              <div className="bg-white rounded-xl border border-gray-200">
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-900">📜 약관 고지사항 (PDF 2페이지)</h4>
+                </div>
+                <table className="w-full text-sm">
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map(n => {
+                      const key = `terms_clause_${n}` as keyof typeof pdfDefaults
+                      return (
+                        <tr key={n} className="border-b border-gray-50">
+                          <td className="px-5 py-2 w-16 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-3">제{n}항</td>
+                          <td className="px-3 py-1.5">
+                            <textarea
+                              value={pdfDefaults[key] || ''}
+                              onChange={e => setPdfDefaults(p => ({ ...p, [key]: e.target.value }))}
+                              rows={2}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 우측: PDF 미리보기 */}
+            <div>
+              <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-4">
+                <h4 className="text-sm font-bold text-gray-900 mb-3">👁 PDF 미리보기</h4>
+                {pdfPreviewUrl ? (
+                  <div className="space-y-3">
+                    <iframe
+                      src={pdfPreviewUrl}
+                      className="w-full border border-gray-200 rounded-lg"
+                      style={{ height: 600 }}
+                      title="PDF 미리보기"
+                    />
+                    <div className="flex gap-2">
+                      <a
+                        href={pdfPreviewUrl}
+                        download="계약서_미리보기.pdf"
+                        className="flex-1 text-center py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200"
+                      >
+                        📥 다운로드
+                      </a>
+                      <button
+                        onClick={generatePdfPreview}
+                        disabled={pdfPreviewLoading}
+                        className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold hover:bg-blue-100 disabled:opacity-50"
+                      >
+                        {pdfPreviewLoading ? '생성 중...' : '🔄 새로고침'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 text-gray-400">
+                    <div className="text-4xl mb-3">📄</div>
+                    <p className="font-bold text-gray-600 mb-2">PDF 미리보기가 없습니다</p>
+                    <p className="text-xs mb-3">상단의 &quot;👁 미리보기&quot; 버튼을 클릭하세요</p>
+                    <button
+                      onClick={generatePdfPreview}
+                      disabled={pdfPreviewLoading}
+                      className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {pdfPreviewLoading ? '생성 중...' : '미리보기 생성'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

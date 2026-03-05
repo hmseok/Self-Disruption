@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계산기 패널 디자인 프리뷰</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; min-height: 100vh; }
+  button { font-family: inherit; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .tab { padding: 8px 18px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; font-weight: 700; font-size: 13px; background: #fff; color: #475569; transition: all .15s; }
+  .tab.active { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  .preview-wrap { display: flex; gap: 20px; }
+  .left-placeholder { flex: 1; background: #e2e8f0; border-radius: 12px; padding: 40px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; font-weight: 600; min-height: 580px; }
+  .right-panel { width: 340px; flex-shrink: 0; }
+  .panel { display: none; flex-direction: column; gap: 8px; }
+  .panel.active { display: flex; }
+  .card { background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; padding: 14px; }
+  .dark-card { background: linear-gradient(135deg, #0f172a, #1e293b); border-radius: 10px; padding: 18px; }
+  .blue-card { background: #1d4ed8; border-radius: 10px; padding: 14px 18px; }
+  .grad-card { background: linear-gradient(135deg, #1e40af, #7c3aed); border-radius: 10px; padding: 18px; text-align: center; }
+  .info-bar { background: #eff6ff; border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid #bfdbfe; }
+  .info-icon { width: 34px; height: 34px; border-radius: 7px; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; }
+  .section-title { font-weight: 800; font-size: 12px; color: #374151; margin-bottom: 10px; }
+  .stepper { display: flex; align-items: center; border: 1px solid #e5e7eb; border-radius: 7px; overflow: hidden; }
+  .stepper button { width: 32px; height: 34px; border: none; background: #f9fafb; cursor: pointer; font-weight: 700; font-size: 14px; color: #6b7280; }
+  .stepper button:hover { background: #f3f4f6; }
+  .stepper span { flex: 1; text-align: center; font-weight: 900; font-size: 16px; }
+  .stepper-sm { display: flex; align-items: center; border-radius: 7px; overflow: hidden; }
+  .stepper-sm button { width: 28px; height: 30px; border: none; cursor: pointer; font-weight: 700; font-size: 13px; }
+  .stepper-sm span { flex: 1; text-align: center; font-weight: 900; font-size: 14px; color: #0f172a; min-width: 36px; }
+  .toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; transition: all .2s; }
+  .toggle .knob { position: absolute; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: left .2s; }
+  .pct-row { display: flex; align-items: center; justify-content: space-between; border-radius: 7px; padding: 6px 10px; }
+  .pct-row .pct-stepper { display: flex; align-items: center; }
+  .pct-row .pct-stepper button { width: 26px; height: 24px; border: none; background: #fff; cursor: pointer; font-weight: 700; font-size: 12px; }
+  .pct-row .pct-stepper span { width: 38px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; background: #fff; }
+  .pill { display: flex; align-items: center; background: #f1f5f9; border-radius: 8px; overflow: hidden; }
+  .pill button { width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; font-weight: 700; color: #64748b; }
+  .pill span { min-width: 32px; text-align: center; font-weight: 900; font-size: 14px; color: #0f172a; }
+  .row-flat { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+  .row-flat.no-border { border-bottom: none; }
+  .preset-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-weight: 600; font-size: 11px; cursor: pointer; }
+  .preset-btn.active { border: 1.5px solid #1d4ed8; background: #eff6ff; color: #1d4ed8; font-weight: 800; }
+  .mini-btn { width: 18px; height: 18px; border-radius: 4px; border: none; color: #fff; cursor: pointer; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .breakdown-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; }
+  .breakdown-row.sep { border-top: 1px solid #1e293b; padding-top: 4px; margin-top: 2px; }
+  .breakdown-row-light.sep { border-top-color: #e2e8f0; }
+  .ratio-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #f1f5f9; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 style="font-size:22px;font-weight:900;color:#0f172a;margin-bottom:4px">우측 계산 패널 디자인</h1>
+  <p style="color:#64748b;font-size:13px;margin-bottom:20px">4가지 추천 디자인 — 탭을 눌러 비교하세요. 모든 버튼이 작동합니다.</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('A')">A. 카드 분리형</button>
+    <button class="tab" onclick="switchTab('B')">B. 올인원 컴팩트</button>
+    <button class="tab" onclick="switchTab('C')">C. 미니멀 플랫</button>
+    <button class="tab" onclick="switchTab('D')">D. 대시보드 스타일</button>
+  </div>
+  <p id="desc" style="font-size:12px;color:#94a3b8;margin-bottom:16px">기능별 독립 카드 + 다크 결과 카드</p>
+
+  <div class="preview-wrap">
+    <div class="left-placeholder">← 좌측 차량 목록 영역</div>
+    <div class="right-panel" id="panels"></div>
+  </div>
+</div>
+
+<script>
+const f = n => (n||0).toLocaleString('ko-KR')
+const BASE = 90000
+const descs = { A:'기능별 독립 카드 + 다크 결과 카드', B:'단일 카드 + 상단 블루 결과바', C:'수평 레이블 + 그라데이션 결과', D:'비율바 + 프리셋 + 상세 테이블' }
+let activeTab = 'A'
+// shared state
+let S = { days:2, hours:3, faultOn:true, faultPct:50, svcPct:10, delivery:3 }
+
+function calcRent() {
+  const {days, hours} = S
+  const dayMul = days>=7?.80:days>=5?.85:days>=4?.90:1.0
+  const hourRate = hours<=0?0:hours<=6?Math.round(BASE*.75):hours<=10?BASE:Math.round(BASE*1.12)
+  if(days>0&&hours>0) return Math.round(BASE*dayMul)*days+hourRate
+  if(days>0) return Math.round(BASE*dayMul)*days
+  if(hours>0) return hourRate
+  return 0
+}
+function calc() {
+  const rent = calcRent()
+  const faultAmt = S.faultOn ? Math.round(rent*S.faultPct/100) : rent
+  const svcAmt = S.faultOn&&S.svcPct>0 ? Math.round(rent*S.svcPct/100) : 0
+  const finalRent = Math.max(0, faultAmt - svcAmt)
+  const total = finalRent + S.delivery*10000
+  return { rent, faultAmt, svcAmt, finalRent, total }
+}
+
+function switchTab(t) {
+  activeTab = t
+  document.querySelectorAll('.tab').forEach((b,i) => b.classList.toggle('active', ['A','B','C','D'][i]===t))
+  document.getElementById('desc').textContent = descs[t]
+  render()
+}
+function set(key, val) { S[key]=val; render() }
+function toggleFault() { S.faultOn=!S.faultOn; render() }
+
+function mkStepper(key, min, max, suffix='') {
+  return `<div class="stepper">
+    <button onclick="set('${key}',Math.max(${min},S.${key}-1))">−</button>
+    <span>${S[key]}${suffix?'<span style=font-size:11px;color:#94a3b8;margin-left:1px>'+suffix+'</span>':''}</span>
+    <button onclick="set('${key}',Math.min(${max},S.${key}+1))">+</button>
+  </div>`
+}
+
+function mkToggle() {
+  const on = S.faultOn
+  return `<button class="toggle" style="background:${on?'#f97316':'#d1d5db'}" onclick="toggleFault()">
+    <span class="knob" style="left:${on?18:2}px"></span>
+  </button>`
+}
+
+function mkPctRow(label, key, step, bg, border, color) {
+  return `<div class="pct-row" style="background:${bg}">
+    <span style="font-size:12px;font-weight:700;color:${color}">${label}</span>
+    <div class="pct-stepper">
+      <button style="border-radius:5px 0 0 5px;border:1px solid ${border};color:${color}" onclick="set('${key}',Math.max(0,S.${key}-${step}))">−</button>
+      <span style="border:1px solid ${border};border-left:none;border-right:none;color:${color}">${S[key]}%</span>
+      <button style="border-radius:0 5px 5px 0;border:1px solid ${border};color:${color}" onclick="set('${key}',Math.min(100,S.${key}+${step}))">+</button>
+    </div>
+  </div>`
+}
+
+function mkBreakdown(light) {
+  const c = calc()
+  const sepColor = light ? '#e2e8f0' : '#1e293b'
+  const labelColor = light ? '#64748b' : '#94a3b8'
+  let rows = `<div class="breakdown-row"><span style="color:${labelColor}">렌트비</span><span style="color:${labelColor};font-weight:600">${f(c.rent)}원</span></div>`
+  if(S.faultOn) {
+    rows += `<div class="breakdown-row"><span style="color:#fb923c">자차과실 ${S.faultPct}%</span><span style="color:#fb923c;font-weight:600">${f(c.faultAmt)}원</span></div>`
+    if(c.svcAmt>0) rows += `<div class="breakdown-row"><span style="color:#4ade80">서비스지원 -${S.svcPct}%</span><span style="color:#4ade80;font-weight:600">-${f(c.svcAmt)}원</span></div>`
+    rows += `<div class="breakdown-row" style="border-top:1px solid ${sepColor};padding-top:4px;margin-top:2px"><span style="color:${light?'#0f172a':'#fff'};font-weight:900">실부담금</span><span style="color:${light?'#0f172a':'#fff'};font-weight:900">${f(c.finalRent)}원</span></div>`
+  }
+  if(S.delivery>0) rows += `<div class="breakdown-row"><span style="color:${labelColor}">탁송비</span><span style="color:${labelColor};font-weight:600">${f(S.delivery*10000)}원</span></div>`
+  return rows
+}
+
+function renderA() {
+  const c = calc()
+  const netPct = Math.max(0, S.faultPct - S.svcPct)
+  return `
+    <div class="info-bar"><div class="info-icon">중</div><div><div style="font-weight:800;font-size:14px;color:#1e40af">쏘나타</div><div style="font-size:11px;color:#60a5fa">기본 ${f(150000)}원/일 · 할인 40%</div></div></div>
+    <div class="card">
+      <div class="section-title">사용 기간</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:3px;letter-spacing:.5px">일</div>${mkStepper('days',0,99)}</div>
+        <div><div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:3px;letter-spacing:.5px">시간</div>${mkStepper('hours',0,23)}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${S.faultOn?'10':'0'}px">
+        <span style="font-weight:800;font-size:12px;color:#374151">사고 과실</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${S.faultOn?`<span style="font-size:11px;font-weight:800;color:#ea580c">실부담 ${netPct}%</span>`:''}
+          ${mkToggle()}
+        </div>
+      </div>
+      ${S.faultOn ? `<div style="display:flex;flex-direction:column;gap:6px">
+        ${mkPctRow('자차과실','faultPct',5,'#fff7ed','#fed7aa','#c2410c')}
+        ${mkPctRow('서비스지원','svcPct',5,'#f0fdf4','#bbf7d0','#15803d')}
+      </div>` : ''}
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:8px">탁송비</div>
+      ${mkStepper('delivery',0,99,'만원')}
+    </div>
+    <div class="dark-card">
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:10px;color:#64748b">쏘나타 · ${S.days}일 ${S.hours}시간</div>
+        <div style="font-size:30px;font-weight:900;color:#fff;letter-spacing:-1px;margin-top:2px">${f(c.total)}<span style="font-size:13px;color:#64748b;margin-left:2px">원</span></div>
+      </div>
+      <div style="border-top:1px solid #1e293b;padding-top:8px">${mkBreakdown(false)}</div>
+    </div>`
+}
+
+function renderB() {
+  const c = calc()
+  const netPct = Math.max(0, S.faultPct - S.svcPct)
+
+  function smStepper(key, min, max, suffix, color) {
+    return `<div class="stepper-sm" style="border:1.5px solid ${color}18;background:#fff;border-radius:7px;overflow:hidden">
+      <button style="background:${color}08;color:${color}" onclick="set('${key}',Math.max(${min},S.${key}-${key==='days'||key==='hours'||key==='delivery'?1:5}))">−</button>
+      <span>${S[key]}${suffix?'<span style=font-size:10px;color:#94a3b8;margin-left:1px>'+suffix+'</span>':''}</span>
+      <button style="background:${color}08;color:${color}" onclick="set('${key}',Math.min(${max},S.${key}+${key==='days'||key==='hours'||key==='delivery'?1:5}))">+</button>
+    </div>`
+  }
+
+  return `
+    <div class="blue-card" style="display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:11px;color:#93c5fd">쏘나타 · ${S.days}일 ${S.hours}시간</div><div style="font-size:11px;color:#bfdbfe;margin-top:1px">할인40% · 과실 ${S.faultOn?S.faultPct+'%':'미적용'}</div></div>
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px">${f(c.total)}<span style="font-size:11px;color:#93c5fd">원</span></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px;border-bottom:1px solid #f3f4f6">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:8px;letter-spacing:.5px">사용 기간</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">일</div>${smStepper('days',0,99,'','#1d4ed8')}</div>
+          <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">시간</div>${smStepper('hours',0,23,'','#1d4ed8')}</div>
+        </div>
+      </div>
+      <div style="padding:14px;border-bottom:1px solid #f3f4f6">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${S.faultOn?'8':'0'}px">
+          <span style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px">사고 과실</span>
+          <button onclick="toggleFault()" style="padding:2px 10px;border-radius:20px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${S.faultOn?'#fff7ed':'#f3f4f6'};color:${S.faultOn?'#f97316':'#9ca3af'}">${S.faultOn?'ON · '+netPct+'%':'OFF'}</button>
+        </div>
+        ${S.faultOn ? `<div style="display:flex;gap:6px">
+          <div style="flex:1"><div style="font-size:10px;color:#c2410c;margin-bottom:2px;font-weight:600">자차과실</div>${smStepper('faultPct',0,100,'%','#f97316')}</div>
+          <div style="flex:1"><div style="font-size:10px;color:#15803d;margin-bottom:2px;font-weight:600">서비스지원</div>${smStepper('svcPct',0,100,'%','#16a34a')}</div>
+        </div>` : ''}
+      </div>
+      <div style="padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px">탁송비</span>
+          <div style="width:130px">${smStepper('delivery',0,99,'만','#6b7280')}</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#f8fafc;border-radius:10px;padding:10px 14px;border:1px solid #e2e8f0">${mkBreakdown(true)}</div>`
+}
+
+function renderC() {
+  const c = calc()
+  function pill(key, min, max, suffix, step) {
+    step = step||1
+    return `<div class="pill">
+      <button onclick="set('${key}',Math.max(${min},S.${key}-${step}))">−</button>
+      <span>${S[key]}${suffix||''}</span>
+      <button onclick="set('${key}',Math.min(${max},S.${key}+${step}))">+</button>
+    </div>`
+  }
+
+  let rows = `
+    <div class="row-flat"><span style="font-size:13px;font-weight:600;color:#475569">일수</span>${pill('days',0,99)}</div>
+    <div class="row-flat"><span style="font-size:13px;font-weight:600;color:#475569">시간</span>${pill('hours',0,23)}</div>
+    <div class="row-flat"><span style="font-size:13px;font-weight:600;color:#475569">사고과실</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${S.faultOn?`<span style="font-size:12px;font-weight:800;color:#ea580c">${S.faultPct}%</span>`:''}
+        <button onclick="toggleFault()" style="padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:700;background:${S.faultOn?'#ea580c':'#e2e8f0'};color:${S.faultOn?'#fff':'#94a3b8'}">${S.faultOn?'ON':'OFF'}</button>
+      </div>
+    </div>`
+  if(S.faultOn) {
+    rows += `
+      <div class="row-flat"><span style="font-size:12px;color:#c2410c;padding-left:10px">↳ 자차과실</span>${pill('faultPct',0,100,'%',5)}</div>
+      <div class="row-flat"><span style="font-size:12px;color:#15803d;padding-left:10px">↳ 서비스지원</span>${pill('svcPct',0,100,'%',5)}</div>`
+  }
+  rows += `<div class="row-flat no-border"><span style="font-size:13px;font-weight:600;color:#475569">탁송비</span>${pill('delivery',0,99,'만')}</div>`
+
+  return `
+    <div class="card" style="padding:2px 16px">${rows}</div>
+    <div class="grad-card">
+      <div style="font-size:11px;color:#c4b5fd;margin-bottom:2px">쏘나타 · ${S.days}일 ${S.hours}시간</div>
+      <div style="font-size:34px;font-weight:900;color:#fff;letter-spacing:-1px">${f(c.total)}<span style="font-size:13px;color:#a78bfa;margin-left:2px">원</span></div>
+      <div style="display:flex;justify-content:center;gap:12px;margin-top:6px;flex-wrap:wrap">
+        <span style="font-size:11px;color:#c4b5fd">렌트 ${f(c.rent)}</span>
+        ${S.faultOn?`<span style="font-size:11px;color:#fbbf24">과실 ${S.faultPct}%</span>`:''}
+        ${c.svcAmt>0?`<span style="font-size:11px;color:#86efac">지원 -${S.svcPct}%</span>`:''}
+        ${S.delivery>0?`<span style="font-size:11px;color:#c4b5fd">탁송 ${S.delivery}만</span>`:''}
+      </div>
+    </div>`
+}
+
+function renderD() {
+  const c = calc()
+  const deliveryAmt = S.delivery*10000
+  const rentPart = S.faultOn ? c.finalRent : c.rent
+  const rentPct = c.total>0 ? (rentPart/c.total*100).toFixed(1) : 0
+  const delPct = c.total>0 ? (deliveryAmt/c.total*100).toFixed(1) : 0
+
+  const presets = [{l:'6시간',d:0,h:6},{l:'1일',d:1,h:0},{l:'2일',d:2,h:0},{l:'3일',d:3,h:0},{l:'7일',d:7,h:0}]
+  let presetBtns = presets.map(p => {
+    const active = p.d===S.days && p.h===S.hours
+    return `<button class="preset-btn${active?' active':''}" onclick="S.days=${p.d};S.hours=${p.h};render()">${p.l}</button>`
+  }).join('')
+
+  function miniStepper(key, min, max, suffix) {
+    return `<div style="display:flex;align-items:center;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <button style="width:26px;height:28px;border:none;background:#f9fafb;cursor:pointer;font-weight:700;color:#6b7280;font-size:12px" onclick="set('${key}',Math.max(${min},S.${key}-1))">−</button>
+      <span style="flex:1;text-align:center;font-weight:900;font-size:14px">${S[key]}<span style="font-size:10px;color:#94a3b8">${suffix}</span></span>
+      <button style="width:26px;height:28px;border:none;background:#f9fafb;cursor:pointer;font-weight:700;color:#6b7280;font-size:12px" onclick="set('${key}',Math.min(${max},S.${key}+1))">+</button>
+    </div>`
+  }
+
+  return `
+    <div class="card" style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+        <div><div style="font-size:10px;color:#94a3b8;font-weight:600">예상 총 비용</div><div style="font-size:28px;font-weight:900;color:#0f172a;letter-spacing:-1px;margin-top:1px">${f(c.total)}<span style="font-size:12px;color:#94a3b8;margin-left:2px">원</span></div></div>
+        <div style="text-align:right"><div style="font-size:11px;color:#64748b;font-weight:600">쏘나타</div><div style="font-size:10px;color:#94a3b8">${S.days}일 ${S.hours}시간</div></div>
+      </div>
+      <div class="ratio-bar"><div style="width:${rentPct}%;background:#3b82f6;min-width:3px"></div>${deliveryAmt>0?`<div style="width:${delPct}%;background:#a78bfa;min-width:3px"></div>`:''}</div>
+      <div style="display:flex;gap:10px">
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:#64748b"><div style="width:7px;height:7px;border-radius:2px;background:#3b82f6"></div>렌트 ${f(rentPart)}</div>
+        ${deliveryAmt>0?`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:#64748b"><div style="width:7px;height:7px;border-radius:2px;background:#a78bfa"></div>탁송 ${f(deliveryAmt)}</div>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:10px;font-weight:800;color:#94a3b8;margin-bottom:10px;letter-spacing:.8px">설정</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">기간</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">${presetBtns}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${miniStepper('days',0,99,'일')}
+          ${miniStepper('hours',0,23,'시')}
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;font-weight:700;color:#374151">사고 과실</span>
+          <button onclick="toggleFault()" style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;border:none;cursor:pointer;font-size:10px;font-weight:700;background:${S.faultOn?'#fef3c7':'#f1f5f9'};color:${S.faultOn?'#d97706':'#94a3b8'}">
+            <div style="width:5px;height:5px;border-radius:50%;background:${S.faultOn?'#f59e0b':'#cbd5e1'}"></div>${S.faultOn?'적용':'미적용'}
+          </button>
+        </div>
+        ${S.faultOn?`<div style="display:flex;gap:6px">
+          <div style="flex:1;background:#fff7ed;border-radius:8px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;font-weight:700;color:#c2410c;margin-bottom:3px">자차과실</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:2px">
+              <button class="mini-btn" style="background:#fdba74" onclick="set('faultPct',Math.max(0,S.faultPct-5))">−</button>
+              <span style="font-weight:900;font-size:15px;color:#c2410c;min-width:34px">${S.faultPct}%</span>
+              <button class="mini-btn" style="background:#fdba74" onclick="set('faultPct',Math.min(100,S.faultPct+5))">+</button>
+            </div>
+          </div>
+          <div style="flex:1;background:#f0fdf4;border-radius:8px;padding:6px 8px;text-align:center">
+            <div style="font-size:9px;font-weight:700;color:#15803d;margin-bottom:3px">서비스지원</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:2px">
+              <button class="mini-btn" style="background:#86efac" onclick="set('svcPct',Math.max(0,S.svcPct-5))">−</button>
+              <span style="font-weight:900;font-size:15px;color:#15803d;min-width:34px">${S.svcPct}%</span>
+              <button class="mini-btn" style="background:#86efac" onclick="set('svcPct',Math.min(100,S.svcPct+5))">+</button>
+            </div>
+          </div>
+        </div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:#374151">탁송비</span>
+        <div style="display:flex;align-items:center;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+          <button style="width:26px;height:26px;border:none;background:#f9fafb;cursor:pointer;font-weight:700;font-size:12px;color:#6b7280" onclick="set('delivery',Math.max(0,S.delivery-1))">−</button>
+          <span style="width:40px;text-align:center;font-weight:900;font-size:13px">${S.delivery}만</span>
+          <button style="width:26px;height:26px;border:none;background:#f9fafb;cursor:pointer;font-weight:700;font-size:12px;color:#6b7280" onclick="set('delivery',S.delivery+1)">+</button>
+        </div>
+      </div>
+    </div>
+    <div style="background:#0f172a;border-radius:10px;padding:14px">
+      <div style="font-size:9px;font-weight:700;color:#475569;margin-bottom:6px;letter-spacing:.8px">상세 내역</div>
+      ${mkBreakdown(false)}
+    </div>`
+}
+
+function render() {
+  const html = activeTab==='A'?renderA():activeTab==='B'?renderB():activeTab==='C'?renderC():renderD()
+  document.getElementById('panels').innerHTML = `<div class="panel active">${html}</div>`
+}
+render()
+</script>
+</body>
+</html>

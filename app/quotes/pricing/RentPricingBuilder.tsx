@@ -672,13 +672,13 @@ function calcIRR(initialInvestment: number, monthlyIncome: number, termMonths: n
 const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
   const pct = total > 0 ? Math.abs(value) / total * 100 : 0
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="w-20 text-gray-500 text-xs">{label}</span>
-      <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', width: 28, textAlign: 'right' }}>{label}</span>
+      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+        <div className={color} style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 3 }} />
       </div>
-      <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
-      <span className="w-10 text-right text-gray-400 text-xs">{pct.toFixed(0)}%</span>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', width: 60, textAlign: 'right', fontWeight: 600 }}>{f(value)}원</span>
+      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', width: 28, textAlign: 'right' }}>{pct.toFixed(0)}%</span>
     </div>
   )
 }
@@ -689,23 +689,26 @@ const Section = ({ icon, title, children, className = '', defaultOpen = true, su
 }) => {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${className}`}>
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }} className={className}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full px-4 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between hover:bg-gray-100/50 transition-colors gap-2"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', cursor: 'pointer', border: 'none', background: 'transparent',
+          transition: 'background 0.15s', userSelect: 'none',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       >
-        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs shrink-0 whitespace-nowrap">
-          <span>{icon}</span> {title}
-        </h3>
-        <div className="flex items-center gap-2 min-w-0">
-          {!open && summary && <div className="text-xs text-gray-400 font-medium whitespace-nowrap truncate">{summary}</div>}
-          <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18 }}>{icon}</span>
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{title}</span>
+          {!open && summary && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{summary}</span>}
         </div>
+        <span style={{ color: '#9ca3af', fontSize: 12, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
       </button>
-      {open && <div className="px-4 py-3">{children}</div>}
+      {open && <div style={{ padding: '0 18px 18px' }}>{children}</div>}
     </div>
   )
 }
@@ -2934,26 +2937,40 @@ export default function RentPricingBuilder() {
   if (wizardStep === 'customer') {
     const calc = calculations
     return (
-      <div className="max-w-[800px] mx-auto py-8 px-4 min-h-screen bg-gray-50/50">
+      <div className="max-w-[800px] mx-auto py-8 px-4 min-h-screen" style={{ background: '#f9fafb' }}>
         {/* 스텝 인디케이터 */}
-        <div className="flex items-center gap-2 mb-8">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid #e5e7eb' }}>
           {[
-            { key: 'analysis', label: '1. 원가분석', done: true },
-            { key: 'customer', label: '2. 고객정보', done: false },
-            { key: 'preview', label: '3. 견적서', done: false },
+            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: true },
+            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
+            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
           ].map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2">
-              {i > 0 && <div className="w-8 h-px bg-gray-300" />}
-              <div className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors
-                ${s.key === 'customer' ? 'bg-steel-600 text-white' : s.done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                {s.label}
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
+              <div
+                onClick={() => { if (s.key === 'analysis') setWizardStep('analysis') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, cursor: s.done ? 'pointer' : 'default',
+                  padding: '8px 16px', borderRadius: 10,
+                  background: s.key === 'customer' ? '#2d5fa8' : 'transparent',
+                }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 13,
+                  background: s.key === 'customer' ? '#fff' : s.done ? '#dcfce7' : '#f3f4f6',
+                  color: s.key === 'customer' ? '#2d5fa8' : s.done ? '#16a34a' : '#9ca3af',
+                }}>
+                  {s.done ? '✓' : s.num}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: s.key === 'customer' ? '#fff' : '#111827' }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: s.key === 'customer' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
+                </div>
               </div>
+              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : '#e5e7eb', margin: '0 4px' }} />}
             </div>
           ))}
         </div>
-
-        <h1 className="text-2xl font-black text-gray-900 mb-2">견적서 작성</h1>
-        <p className="text-gray-500 text-sm mb-8">렌트가 산출 결과를 바탕으로 고객용 견적서를 생성합니다.</p>
 
         {/* 분석 요약 */}
         {selectedCar && calc && (
@@ -3100,22 +3117,42 @@ export default function RentPricingBuilder() {
     const rentVAT = Math.round(calc.suggestedRent * 0.1 / 1000) * 1000  // 천원단위 반올림
 
     return (
-      <div className="min-h-screen bg-gray-100 py-6 px-4 quote-print-wrapper">
+      <div className="min-h-screen py-6 px-4 quote-print-wrapper" style={{ background: '#f9fafb' }}>
         {/* 스텝 인디케이터 */}
-        <div className="max-w-[800px] mx-auto flex items-center gap-2 mb-4 print:hidden">
+        <div className="max-w-[800px] mx-auto print:hidden" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid #e5e7eb' }}>
           {[
-            { key: 'analysis', label: '1. 원가분석', done: true },
-            { key: 'customer', label: '2. 고객정보', done: true },
-            { key: 'preview', label: '3. 견적서', done: false },
+            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: true },
+            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: true },
+            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
           ].map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2">
-              {i > 0 && <div className="w-8 h-px bg-gray-300" />}
-              <div className={`px-3 py-1.5 rounded-full text-xs font-bold
-                ${s.key === 'preview' ? 'bg-steel-600 text-white' : 'bg-green-100 text-green-700'}`}>
-                {s.label}
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
+              <div
+                onClick={() => { if (s.key === 'analysis') setWizardStep('analysis'); if (s.key === 'customer') setWizardStep('customer') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  cursor: s.done ? 'pointer' : 'default',
+                  padding: '8px 16px', borderRadius: 10,
+                  background: s.key === 'preview' ? '#2d5fa8' : 'transparent',
+                }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 13,
+                  background: s.key === 'preview' ? '#fff' : s.done ? '#dcfce7' : '#f3f4f6',
+                  color: s.key === 'preview' ? '#2d5fa8' : s.done ? '#16a34a' : '#9ca3af',
+                }}>
+                  {s.done ? '✓' : s.num}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: s.key === 'preview' ? '#fff' : '#111827' }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: s.key === 'preview' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
+                </div>
               </div>
+              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : '#e5e7eb', margin: '0 4px' }} />}
             </div>
           ))}
+        </div>
         </div>
 
         {/* 상단 액션 바 */}
@@ -3494,22 +3531,58 @@ export default function RentPricingBuilder() {
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
 
-      {/* ===== 헤더 ===== */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🧮 장기렌터카 견적</h1>
-          <p className="text-gray-500 text-sm mt-1">렌트가 산출 및 견적서 생성</p>
+      {/* ===== 스텝 인디케이터 + 헤더 ===== */}
+      <div style={{ marginBottom: 24 }}>
+        {/* 스텝 인디케이터 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid #e5e7eb', marginBottom: 16 }}>
+          {[
+            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: false },
+            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
+            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
+          ].map((s, i) => (
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  cursor: 'default',
+                  padding: '8px 16px', borderRadius: 10,
+                  background: s.key === 'analysis' ? '#2d5fa8' : 'transparent',
+                }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: 13,
+                  background: s.key === 'analysis' ? '#fff' : '#f3f4f6',
+                  color: s.key === 'analysis' ? '#2d5fa8' : '#9ca3af',
+                }}>
+                  {s.num}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: s.key === 'analysis' ? '#fff' : '#111827' }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: s.key === 'analysis' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
+                </div>
+              </div>
+              {i < 2 && <div style={{ width: 40, height: 2, background: '#e5e7eb', margin: '0 4px' }} />}
+            </div>
+          ))}
         </div>
-        <div className="flex gap-2">
-          <Link href="/quotes" className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">
-            목록으로
-          </Link>
-          {selectedCar && calculations && (
-            <button onClick={handleSaveWorksheet} disabled={saving}
-              className="px-4 py-2 text-sm bg-steel-600 text-white rounded-xl font-bold hover:bg-steel-700 disabled:opacity-50">
-              {saving ? '저장 중...' : '워크시트 저장'}
-            </button>
-          )}
+        {/* 헤더 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: -0.5 }}>장기렌터카 견적</h1>
+            <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>렌트가 산출 및 견적서 생성</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/quotes" style={{ padding: '8px 16px', fontSize: 13, border: '1px solid #e5e7eb', borderRadius: 10, fontWeight: 700, color: '#6b7280', background: '#fff', textDecoration: 'none', display: 'inline-block' }}>
+              목록으로
+            </Link>
+            {selectedCar && calculations && (
+              <button onClick={handleSaveWorksheet} disabled={saving}
+                style={{ padding: '8px 16px', fontSize: 13, background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
+                {saving ? '저장 중...' : '워크시트 저장'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -5744,22 +5817,14 @@ export default function RentPricingBuilder() {
                   )}
                 </div>
 
-                {/* 원가 비중 바 */}
-                <div className="h-1.5 rounded-full overflow-hidden flex mb-2">
-                  {(() => {
-                    const total = calculations.totalMonthlyCost + calculations.totalDiscount
-                    if (total <= 0) return null
-                    const items = [
-                      { v: calculations.monthlyDepreciation, c: 'bg-red-500' },
-                      { v: calculations.totalMonthlyFinance, c: 'bg-steel-500' },
-                      { v: monthlyInsuranceCost + calculations.monthlyTax, c: 'bg-purple-500' },
-                      { v: monthlyMaintenance, c: 'bg-amber-500' },
-                      { v: calculations.monthlyRiskReserve, c: 'bg-red-400' },
-                    ]
-                    return items.map((it, i) => (
-                      <div key={i} className={`${it.c}`} style={{ width: `${Math.max(it.v / total * 100, 0)}%` }} />
-                    ))
-                  })()}
+                {/* 원가 비중 바 차트 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                  <CostBar label="감가" value={calculations.monthlyDepreciation} total={calculations.totalMonthlyCost} color="bg-red-500" />
+                  <CostBar label="금융" value={calculations.totalMonthlyFinance} total={calculations.totalMonthlyCost} color="bg-blue-500" />
+                  <CostBar label="보험" value={monthlyInsuranceCost} total={calculations.totalMonthlyCost} color="bg-purple-500" />
+                  <CostBar label="세금" value={calculations.monthlyTax} total={calculations.totalMonthlyCost} color="bg-indigo-400" />
+                  <CostBar label="정비" value={monthlyMaintenance} total={calculations.totalMonthlyCost} color="bg-amber-500" />
+                  <CostBar label="리스크" value={calculations.monthlyRiskReserve} total={calculations.totalMonthlyCost} color="bg-red-400" />
                 </div>
 
                 {/* 합계 */}

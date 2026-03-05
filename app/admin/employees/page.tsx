@@ -22,11 +22,33 @@ const DATA_SCOPES = [
 
 type ActiveModule = { path: string; name: string; group: string }
 
+// 사이드바(ClientLayout)와 동일한 이름 오버라이드
+const NAME_OVERRIDES: Record<string, string> = {
+  '/invest': '투자 정산 관리',
+  '/insurance': '보험/가입',
+  '/finance/upload': '카드/통장 관리',
+  '/admin/payroll': '급여 관리',
+  '/quotes': '견적 관리',
+  '/quotes/pricing': '견적 작성',
+  '/quotes/short-term': '단기 견적',
+}
+
 const MODULE_GROUPS: Record<string, string> = {
-  '/registration': '차량 자산', '/insurance': '차량 자산',
-  '/quotes': '대고객 영업', '/customers': '대고객 영업', '/contracts': '대고객 영업',
+  // 차량 자산
+  '/cars': '차량 자산', '/registration': '차량 자산', '/insurance': '차량 자산',
+  // 차량 운영
+  '/operations': '차량 운영', '/maintenance': '차량 운영', '/accidents': '차량 운영',
+  // 대고객 영업
+  '/quotes': '대고객 영업', '/quotes/pricing': '대고객 영업', '/quotes/short-term': '대고객 영업',
+  '/customers': '대고객 영업', '/contracts': '대고객 영업', '/e-contract': '대고객 영업',
+  // 경영 지원
+  '/finance': '경영 지원', '/finance/collections': '경영 지원', '/finance/settlement': '경영 지원',
+  '/finance/upload': '경영 지원', '/finance/review': '경영 지원', '/finance/freelancers': '경영 지원',
+  '/finance/cards': '경영 지원', '/admin/payroll': '경영 지원', '/report': '경영 지원',
+  // 파트너 자금
   '/jiip': '파트너 자금', '/invest': '파트너 자금', '/loans': '파트너 자금',
-  '/finance': '경영 지원', '/finance/upload': '경영 지원',
+  // 데이터 관리
+  '/db/pricing-standards': '데이터 관리', '/db/lotte': '데이터 관리',
 }
 
 type UserPermMap = {
@@ -152,7 +174,7 @@ export default function OrgManagementPage() {
         .filter((m: any) => m.module?.path)
         .map((m: any) => ({
           path: m.module.path,
-          name: m.module.name,
+          name: NAME_OVERRIDES[m.module.path] || m.module.name,
           group: MODULE_GROUPS[m.module.path] || '기타',
         }))
       setActiveModules(modules)
@@ -431,7 +453,9 @@ export default function OrgManagementPage() {
   }
 
   const pendingInvitationCount = invitations.filter((inv: any) => inv.status === 'pending').length
-  const moduleGroups = [...new Set(activeModules.map(m => m.group))]
+  // 그룹 표시 순서 (사이드바 BUSINESS_GROUPS 순서와 일치)
+  const GROUP_ORDER = ['차량 자산', '차량 운영', '대고객 영업', '경영 지원', '파트너 자금', '데이터 관리', '기타']
+  const moduleGroups = GROUP_ORDER.filter(g => activeModules.some(m => m.group === g))
 
   // 선택 가능한 직원 목록 (god_admin/master 제외 - 이미 전체 접근)
   const assignableEmployees = employees.filter(e => e.role === 'user' && e.is_active !== false)
