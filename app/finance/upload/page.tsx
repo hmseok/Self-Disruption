@@ -60,7 +60,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
 }
 
-const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량', employee: '직원' }
+const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량', employee: '직원', card: '법인카드', contract: '계약' }
 
 // ═══ 카테고리 → 연결 대상 타입 매핑 ═══
 // 각 세부항목이 어떤 연결 대상 그룹만 보여줄지 결정
@@ -364,10 +364,10 @@ function UploadContent() {
   const [deleting, setDeleting] = useState(false)
   const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user' | 'link' | 'date' | 'client' | 'income_expense'>('category')
   const [linkPopoverId, setLinkPopoverId] = useState<string | null>(null)
-  const [linkPopoverTab, setLinkPopoverTab] = useState<'car' | 'jiip' | 'invest' | 'loan'>('car')
+  const [linkPopoverTab, setLinkPopoverTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'contract' | 'card'>('car')
   const [linkPopoverSearch, setLinkPopoverSearch] = useState('')
   const [linkModalOpen, setLinkModalOpen] = useState(false)
-  const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance'>('car')
+  const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'contract' | 'card'>('car')
   const [linkModalSelectedId, setLinkModalSelectedId] = useState<string | null>(null)
 
   // ── 분할 모달 상태 ──
@@ -726,9 +726,11 @@ function UploadContent() {
         }
       } else if (groupBy === 'link') {
         // 연결별: 지입/투자/대출/급여/차량/보험 등 연결 유형별
-        if (item.linked_type && item.linked_id) {
-          const typeLabel = TYPE_LABELS[item.linked_type] || item.linked_type
-          const name = item.linked_name || item.linked_id
+        const rType = item.ai_related_type
+        const rId = item.ai_related_id
+        if (rType && rId) {
+          const typeLabel = TYPE_LABELS[rType] || rType
+          const name = item.ai_matched_name || rId
           key = `🔗 ${typeLabel}: ${name}`
         } else {
           key = '📋 미연결'
@@ -972,6 +974,11 @@ function UploadContent() {
     const id = item.ai_related_id
     if (!type || !id) return null
     const sid = String(id)
+    if (type === 'card') {
+      const c = corpCards.find(cc => String(cc.id) === sid)
+      if (!c) return { icon: '💳', label: '카드', color: '#b45309', bg: '#fef3c7', border: '#fde68a' }
+      return { icon: '💳', label: `${c.card_company || '카드'} ****${(c.card_number || '').slice(-4)}`, color: '#b45309', bg: '#fef3c7', border: '#fde68a' }
+    }
     if (type === 'car') {
       const c = cars.find(cc => String(cc.id) === sid)
       return c ? { icon: '🚗', label: c.number || '차량', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' } : null
@@ -992,6 +999,12 @@ function UploadContent() {
       const ins = (insurances || []).find((ii: any) => String(ii.id) === sid)
       return ins ? { icon: '🛡️', label: ins.company || '보험', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' } : null
     }
+    if (type === 'employee' || type === 'salary') {
+      const emp = employees.find(e => String(e.id) === sid)
+      return emp
+        ? { icon: type === 'salary' ? '👤' : '👨‍💼', label: emp.employee_name || emp.name || '직원', color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' }
+        : { icon: '👨‍💼', label: '직원', color: '#10b981', bg: '#f0fdf4', border: '#bbf7d0' }
+    }
     if (type === 'contract') {
       const ct = contracts.find(c => String(c.id) === sid)
       if (ct) {
@@ -1000,8 +1013,12 @@ function UploadContent() {
       }
       return null
     }
+    if (type === 'freelancer') {
+      const fr = (freelancers || []).find((f: any) => String(f.id) === sid)
+      return { icon: '📋', label: fr?.name || '프리랜서', color: '#f97316', bg: '#fff7ed', border: '#fed7aa' }
+    }
     return { icon: '🔗', label: type, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' }
-  }, [cars, jiips, investors, loans, insurances, contracts])
+  }, [cars, corpCards, jiips, investors, loans, insurances, employees, freelancers, contracts])
 
   // 연결 팝오버용 옵션 (검색 포함)
   const linkOptions = useMemo(() => {
@@ -1012,8 +1029,11 @@ function UploadContent() {
       invest: (investors || []).filter((i: any) => !s || (i.investor_name || '').toLowerCase().includes(s)),
       loan: (loans || []).filter((l: any) => !s || (l.finance_name || '').toLowerCase().includes(s)),
       insurance: (insurances || []).filter((i: any) => !s || (i.company || '').toLowerCase().includes(s)),
+      employee: (employees || []).filter((e: any) => !s || (e.employee_name || e.name || '').toLowerCase().includes(s) || (e.position || '').toLowerCase().includes(s) || (e.department || '').toLowerCase().includes(s)),
+      contract: (contracts || []).filter((c: any) => !s || (c.customer_name || '').toLowerCase().includes(s)),
+      card: (corpCards || []).filter((c: any) => !s || (c.card_company || '').toLowerCase().includes(s) || (c.card_number || '').includes(s) || (c.holder_name || '').toLowerCase().includes(s) || (c.card_alias || '').toLowerCase().includes(s)),
     }
-  }, [cars, jiips, investors, loans, insurances, linkPopoverSearch])
+  }, [cars, jiips, investors, loans, insurances, employees, contracts, corpCards, linkPopoverSearch])
 
   // ── Drag & Drop ──
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -4577,25 +4597,74 @@ function UploadContent() {
                                 {src.description || ''}
                               </span>
 
-                              {/* 연결 뱃지 + 🔗 팝오버 */}
+                              {/* 분류 뱃지: 중분류 > 하분류(상세) */}
+                              {(() => {
+                                const rawCat = item.ai_category || item.final_category || '미분류'
+                                const parts = getCategoryParts(rawCat, categoryMode)
+                                const groupColor = CATEGORY_COLORS[parts.group] || '#94a3b8'
+                                const icon = CATEGORY_ICONS[rawCat] || '📋'
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minWidth: 0, maxWidth: 180 }}>
+                                    {parts.group && (
+                                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${groupColor}18`, color: groupColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>
+                                        {categoryMode === 'display' ? parts.group.replace(/^[^\s]+\s/, '') : parts.group}
+                                      </span>
+                                    )}
+                                    {parts.item && (
+                                      <>
+                                        <span style={{ fontSize: 10, color: '#cbd5e1' }}>›</span>
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }} title={`${icon} ${parts.item}`}>
+                                          {icon} {parts.item}
+                                        </span>
+                                      </>
+                                    )}
+                                    {!parts.group && !parts.item && rawCat !== '미분류' && (
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>{icon} {rawCat}</span>
+                                    )}
+                                    {rawCat === '미분류' && (
+                                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#fef2f2', color: '#dc2626' }}>❓ 미분류</span>
+                                    )}
+                                  </div>
+                                )
+                              })()}
+
+                              {/* 연결 뱃지 + 🔗 팝오버 (카테고리별 필터링) */}
                               {(() => {
                                 const ld = getReviewLinkDisplay(item)
+                                const _cat = item.ai_category || item.final_category || '미분류'
+                                const _fGroups = getFilteredRelatedGroups(_cat)
+                                // 카테고리에 맞는 연결 대상이 있는지 확인
+                                const _hasRelOpts = !_fGroups || _fGroups.length > 0
+                                // 카테고리에 맞는 탭 목록
+                                const allLinkTabs: Array<{ key: typeof linkPopoverTab; label: string; relGroup: string }> = [
+                                  { key: 'card', label: '💳카드', relGroup: '법인카드' },
+                                  { key: 'car', label: '🚗차량', relGroup: '차량' },
+                                  { key: 'jiip', label: '🚛지입', relGroup: '지입 차주' },
+                                  { key: 'invest', label: '💰투자', relGroup: '투자자' },
+                                  { key: 'loan', label: '🏦대출', relGroup: '대출' },
+                                  { key: 'insurance', label: '🛡️보험', relGroup: '보험' },
+                                  { key: 'employee', label: '👨‍💼직원', relGroup: '직원' },
+                                  { key: 'contract', label: '📋계약', relGroup: '계약' },
+                                ]
+                                const filteredTabs = _fGroups
+                                  ? allLinkTabs.filter(t => _fGroups.includes(t.relGroup))
+                                  : allLinkTabs
                                 return (
                                   <div data-link-popover style={{ position: 'relative', flexShrink: 0 }}>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); if (linkPopoverId === item.id) { setLinkPopoverId(null); setLinkPopoverPosFixed(null) } else { setLinkPopoverId(item.id); setLinkPopoverPosFixed(calcPopPosRight(e.currentTarget, 340)); setLinkPopoverSearch(''); setLinkPopoverTab('car') } }}
+                                      onClick={(e) => { if (!_hasRelOpts && !ld) return; e.stopPropagation(); if (linkPopoverId === item.id) { setLinkPopoverId(null); setLinkPopoverPosFixed(null) } else { setLinkPopoverId(item.id); setLinkPopoverPosFixed(calcPopPosRight(e.currentTarget, 340)); setLinkPopoverSearch(''); setLinkPopoverTab(filteredTabs.length > 0 ? filteredTabs[0].key : 'car') } }}
                                       style={{
                                         display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 6,
-                                        fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-                                        background: ld ? ld.bg : '#f8fafc', color: ld ? ld.color : '#94a3b8',
-                                        ...(ld ? {} : { borderStyle: 'dashed' as const, borderWidth: 1, borderColor: '#cbd5e1' }),
+                                        fontSize: 13, fontWeight: 700, cursor: (!_hasRelOpts && !ld) ? 'default' : 'pointer', border: 'none', transition: 'all 0.15s',
+                                        background: ld ? ld.bg : '#f8fafc', color: ld ? ld.color : (_hasRelOpts ? '#f59e0b' : '#d1d5db'),
+                                        ...(ld ? {} : { borderStyle: 'dashed' as const, borderWidth: 1, borderColor: _hasRelOpts ? '#fbbf24' : '#cbd5e1' }),
                                       }}>
-                                      {ld ? `${ld.icon} ${ld.label}` : '🔗'}
+                                      {ld ? `${ld.icon} ${ld.label}` : (_hasRelOpts ? '⚠ 연결 없음' : '—')}
                                     </button>
                                     {/* 팝오버 */}
                                     {linkPopoverId === item.id && linkPopoverPosFixed && (
                                       <div data-link-popover onClick={(e) => e.stopPropagation()} style={{
-                                        position: 'fixed', top: linkPopoverPosFixed.top, right: linkPopoverPosFixed.right, width: 260,
+                                        position: 'fixed', top: linkPopoverPosFixed.top, right: linkPopoverPosFixed.right, width: 280,
                                         background: '#fff', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
                                         border: '1px solid #e2e8f0', zIndex: 60, overflow: 'hidden',
                                       }}>
@@ -4605,23 +4674,26 @@ function UploadContent() {
                                           onClick={e => e.stopPropagation()}
                                           style={{ width: '100%', border: 'none', borderBottom: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 13, outline: 'none', background: '#fafbfc' }}
                                         />
-                                        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
-                                          {([
-                                            { key: 'car' as const, label: '🚗차량' },
-                                            { key: 'jiip' as const, label: '🚛지입' },
-                                            { key: 'invest' as const, label: '💰투자' },
-                                            { key: 'loan' as const, label: '🏦대출' },
-                                          ]).map(t => (
+                                        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', overflowX: 'auto', flexWrap: 'nowrap' }}>
+                                          {filteredTabs.map(t => (
                                             <button key={t.key} onClick={() => setLinkPopoverTab(t.key)}
                                               style={{
-                                                flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer',
+                                                flex: '0 0 auto', padding: '8px 6px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                                                 background: linkPopoverTab === t.key ? '#fff' : '#f8fafc',
                                                 color: linkPopoverTab === t.key ? '#0f172a' : '#94a3b8',
                                                 borderBottom: linkPopoverTab === t.key ? '2px solid #0f172a' : '2px solid transparent',
                                               }}>{t.label}</button>
                                           ))}
                                         </div>
-                                        <div style={{ maxHeight: 180, overflowY: 'auto', padding: 6 }}>
+                                        <div style={{ maxHeight: 200, overflowY: 'auto', padding: 6 }}>
+                                          {linkPopoverTab === 'card' && linkOptions.card.map((c: any) => (
+                                            <div key={c.id} onClick={() => { handleLinkItem(item.id, 'card', c.id); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>💳</span>
+                                              <div><div style={{ fontWeight: 700 }}>{c.card_company || '카드'} ****{(c.card_number || '').slice(-4)}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{c.holder_name || c.card_alias || '공용'}</div></div>
+                                            </div>
+                                          ))}
                                           {linkPopoverTab === 'car' && linkOptions.car.map((c: any) => (
                                             <div key={c.id} onClick={() => { handleLinkItem(item.id, 'car', c.id); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
@@ -4652,6 +4724,30 @@ function UploadContent() {
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>🏦</span>
                                               <div><div style={{ fontWeight: 700 }}>{l.finance_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>월 {l.monthly_payment ? Number(l.monthly_payment).toLocaleString() + '원' : '-'}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'insurance' && linkOptions.insurance.map((ins: any) => (
+                                            <div key={ins.id} onClick={() => { handleLinkItem(item.id, 'insurance', ins.id); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>🛡️</span>
+                                              <div><div style={{ fontWeight: 700 }}>{ins.company || '보험'}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{ins.product_name || ''}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'employee' && linkOptions.employee.map((emp: any) => (
+                                            <div key={emp.id} onClick={() => { handleLinkItem(item.id, 'employee', emp.id); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>👨‍💼</span>
+                                              <div><div style={{ fontWeight: 700 }}>{emp.employee_name || emp.name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{emp.position || ''} {emp.department || ''}</div></div>
+                                            </div>
+                                          ))}
+                                          {linkPopoverTab === 'contract' && linkOptions.contract.map((ct: any) => (
+                                            <div key={ct.id} onClick={() => { handleLinkItem(item.id, 'contract', ct.id); setLinkPopoverId(null); setLinkPopoverPosFixed(null) }}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
+                                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                              <span>📋</span>
+                                              <div><div style={{ fontWeight: 700 }}>{ct.customer_name || '고객'}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{ct.car_number || ''}</div></div>
                                             </div>
                                           ))}
                                           {linkOptions[linkPopoverTab]?.length === 0 && (
@@ -4703,12 +4799,12 @@ function UploadContent() {
                                       borderRadius: 6, padding: '3px 4px', fontSize: 12,
                                       background: (category === '미분류' || category === '기타') ? '#fef2f2' : '#fff',
                                       color: (category === '미분류' || category === '기타') ? '#dc2626' : '#64748b',
-                                      maxWidth: 100, cursor: 'pointer', fontWeight: (category === '미분류' || category === '기타') ? 700 : 400,
+                                      maxWidth: 120, cursor: 'pointer', fontWeight: (category === '미분류' || category === '기타') ? 700 : 400,
                                     }}>
                                     <option value="" disabled>{(category === '미분류' || category === '기타') ? '⚠ 분류 선택' : '변경'}</option>
-                                    {CATEGORIES.map(g => (
+                                    {(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).map(g => (
                                       <optgroup key={g.group} label={g.group}>
-                                        {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {g.items.map(c => <option key={c} value={c}>{CATEGORY_ICONS[c] || '📋'} {c}</option>)}
                                       </optgroup>
                                     ))}
                                   </select>
@@ -4724,11 +4820,11 @@ function UploadContent() {
                               {isConfirmed && activeTab === 'confirmed' && (
                                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                   <select defaultValue="" onChange={e => { if (e.target.value) handleChangeCategory(item, e.target.value) }}
-                                    style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 12, background: '#fff', color: '#64748b', maxWidth: 90, cursor: 'pointer' }}>
+                                    style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 4px', fontSize: 12, background: '#fff', color: '#64748b', maxWidth: 100, cursor: 'pointer' }}>
                                     <option value="" disabled>수정</option>
-                                    {CATEGORIES.map(g => (
+                                    {(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).map(g => (
                                       <optgroup key={g.group} label={g.group}>
-                                        {g.items.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {g.items.map(c => <option key={c} value={c}>{CATEGORY_ICONS[c] || '📋'} {c}</option>)}
                                       </optgroup>
                                     ))}
                                   </select>
@@ -4892,11 +4988,14 @@ function UploadContent() {
                 {/* 타입 탭 */}
                 <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
                   {([
+                    { key: 'card', icon: '💳', label: '법인카드', count: (corpCards || []).length },
                     { key: 'car', icon: '🚗', label: '차량', count: cars.length },
                     { key: 'jiip', icon: '🚛', label: '지입', count: (jiips || []).length },
                     { key: 'invest', icon: '💰', label: '투자자', count: (investors || []).length },
                     { key: 'loan', icon: '🏦', label: '대출', count: (loans || []).length },
                     { key: 'insurance', icon: '🛡️', label: '보험', count: (insurances || []).length },
+                    { key: 'employee', icon: '👨‍💼', label: '직원', count: (employees || []).length },
+                    { key: 'contract', icon: '📋', label: '계약', count: (contracts || []).length },
                   ] as const).map(tab => (
                     <button key={tab.key} onClick={() => { setLinkModalTab(tab.key); setLinkModalSelectedId(null) }}
                       style={{
@@ -4928,6 +5027,19 @@ function UploadContent() {
                 {/* 카드 그리드 */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                    {linkModalTab === 'card' && linkOptions.card.map((c: any) => (
+                      <div key={c.id} onClick={() => setLinkModalSelectedId(c.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === c.id ? '2px solid #b45309' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === c.id ? '#fef3c7' : '#fff',
+                          boxShadow: linkModalSelectedId === c.id ? '0 2px 8px rgba(180,83,9,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>💳</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{c.card_company || '카드'} ****{(c.card_number || '').slice(-4)}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{c.holder_name || c.card_alias || '공용'}</div>
+                      </div>
+                    ))}
                     {linkModalTab === 'car' && linkOptions.car.map((c: any) => (
                       <div key={c.id} onClick={() => setLinkModalSelectedId(c.id)}
                         style={{
@@ -4990,7 +5102,33 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🛡️</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ins.company || '미지정'}</div>
-                        <div style={{ fontSize: 13, color: '#64748b' }}>{ins.policy_type || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{ins.policy_type || ins.product_name || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'employee' && linkOptions.employee.map((emp: any) => (
+                      <div key={emp.id} onClick={() => setLinkModalSelectedId(emp.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === emp.id ? '2px solid #10b981' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === emp.id ? '#f0fdf4' : '#fff',
+                          boxShadow: linkModalSelectedId === emp.id ? '0 2px 8px rgba(16,185,129,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>👨‍💼</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{emp.employee_name || emp.name || '미지정'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{[emp.position, emp.department].filter(Boolean).join(' · ') || '-'}</div>
+                      </div>
+                    ))}
+                    {linkModalTab === 'contract' && linkOptions.contract.map((ct: any) => (
+                      <div key={ct.id} onClick={() => setLinkModalSelectedId(ct.id)}
+                        style={{
+                          padding: '14px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
+                          border: linkModalSelectedId === ct.id ? '2px solid #7c3aed' : '2px solid #e2e8f0',
+                          background: linkModalSelectedId === ct.id ? '#f5f3ff' : '#fff',
+                          boxShadow: linkModalSelectedId === ct.id ? '0 2px 8px rgba(124,58,237,0.15)' : 'none',
+                        }}>
+                        <div style={{ fontSize: 20, marginBottom: 6 }}>📋</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ct.customer_name || '미지정'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{ct.car_number || '-'}</div>
                       </div>
                     ))}
                   </div>
