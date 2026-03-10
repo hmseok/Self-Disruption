@@ -8,11 +8,11 @@ import { Colors, FontSize } from '../constants/theme'
 // 탭 화면
 import DashboardScreen from '../screens/tabs/DashboardScreen'
 import CarsScreen from '../screens/tabs/CarsScreen'
+import ScheduleScreen from '../screens/tabs/ScheduleScreen'
 import QuotesScreen from '../screens/tabs/QuotesScreen'
-import FinanceScreen from '../screens/tabs/FinanceScreen'
 import MoreScreen from '../screens/tabs/MoreScreen'
 
-// 상세 화면
+// 기존 상세 화면
 import CarDetailScreen from '../screens/detail/CarDetailScreen'
 import InsuranceListScreen from '../screens/detail/InsuranceListScreen'
 import InsuranceDetailScreen from '../screens/detail/InsuranceDetailScreen'
@@ -20,6 +20,12 @@ import QuoteDetailScreen from '../screens/detail/QuoteDetailScreen'
 import LoanDetailScreen from '../screens/detail/LoanDetailScreen'
 import CustomerDetailScreen from '../screens/detail/CustomerDetailScreen'
 import SettingsScreen from '../screens/detail/SettingsScreen'
+
+// 현장직원 화면
+import VehicleHandoverScreen from '../screens/detail/VehicleHandoverScreen'
+import MaintenanceRequestScreen from '../screens/detail/MaintenanceRequestScreen'
+import AccidentReportScreen from '../screens/detail/AccidentReportScreen'
+import ExpenseReceiptScreen from '../screens/detail/ExpenseReceiptScreen'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 const Stack = createNativeStackNavigator<DetailStackParamList>()
@@ -49,7 +55,7 @@ function TabNavigator() {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          title: '대시보드',
+          title: '홈',
           tabBarIcon: ({ color, size }) => (
             <Icon name="grid-outline" size={size} color={color} />
           ),
@@ -66,22 +72,22 @@ function TabNavigator() {
         }}
       />
       <Tab.Screen
+        name="Schedule"
+        component={ScheduleScreen}
+        options={{
+          title: '일정',
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Quotes"
         component={QuotesScreen}
         options={{
           title: '견적',
           tabBarIcon: ({ color, size }) => (
             <Icon name="document-text-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Finance"
-        component={FinanceScreen}
-        options={{
-          title: '재무',
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="wallet-outline" size={size} color={color} />
           ),
         }}
       />
@@ -115,6 +121,8 @@ export default function MainNavigator() {
         component={TabNavigator}
         options={{ headerShown: false }}
       />
+
+      {/* 기존 상세 화면 */}
       <Stack.Screen name="CarDetail" component={CarDetailScreen} options={{ title: '차량 상세' }} />
       <Stack.Screen name="InsuranceList" component={InsuranceListScreen} options={{ title: '보험 관리' }} />
       <Stack.Screen name="InsuranceDetail" component={InsuranceDetailScreen} options={{ title: '보험 상세' }} />
@@ -122,6 +130,12 @@ export default function MainNavigator() {
       <Stack.Screen name="LoanDetail" component={LoanDetailScreen} options={{ title: '대출 상세' }} />
       <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} options={{ title: '고객 상세' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: '설정' }} />
+
+      {/* 현장직원 화면 */}
+      <Stack.Screen name="VehicleHandover" component={VehicleHandoverScreen} options={{ title: '차량 인수인계' }} />
+      <Stack.Screen name="MaintenanceRequest" component={MaintenanceRequestScreen} options={{ title: '정비 요청' }} />
+      <Stack.Screen name="AccidentReport" component={AccidentReportScreen} options={{ title: '사고 접수' }} />
+      <Stack.Screen name="ExpenseReceipt" component={ExpenseReceiptScreen} options={{ title: '영수증 제출' }} />
     </Stack.Navigator>
   )
 }

@@ -16,8 +16,9 @@ function getSupabaseAdmin() {
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
+  const urlToken = request.nextUrl.searchParams.get('token')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : urlToken
+  if (!token) return null
   const supabase = getSupabaseAdmin()
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return null

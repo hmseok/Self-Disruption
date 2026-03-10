@@ -17,13 +17,15 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Dashboard: undefined
   Cars: undefined
+  Schedule: undefined
   Quotes: undefined
-  Finance: undefined
   More: undefined
 }
 
 export type DetailStackParamList = {
   MainTabs: undefined
+
+  // 기존 상세 화면
   CarDetail: { id: number }
   InsuranceList: undefined
   InsuranceDetail: { id: number }
@@ -31,4 +33,10 @@ export type DetailStackParamList = {
   LoanDetail: { id: number }
   CustomerDetail: { id: number }
   Settings: undefined
+
+  // 현장직원 화면
+  VehicleHandover: undefined
+  MaintenanceRequest: undefined
+  AccidentReport: undefined
+  ExpenseReceipt: undefined
 }

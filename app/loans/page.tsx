@@ -3,7 +3,6 @@ import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import DarkHeader from '../components/DarkHeader'
 
 export default function LoanListPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
@@ -196,7 +195,7 @@ export default function LoanListPage() {
   if (role === 'god_admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="bg-white rounded-2xl border border-gray-200 p-20 text-center">
           <span className="text-4xl block mb-3">🏢</span>
           <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
@@ -205,118 +204,84 @@ export default function LoanListPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-      {/* 헤더 */}
-      <DarkHeader
-        icon="🏦"
-        title="대출/금융사 관리"
-        subtitle="대출 현황 및 금융사 계약 관리"
-        stats={[
-          {
-            label: '총 대출 잔액',
-            value: f(totalDebt),
-            color: '#334155',
-            bgColor: '#fff',
-            borderColor: '#e2e8f0',
-            labelColor: '#94a3b8'
-          },
-          {
-            label: '월 고정 지출',
-            value: f(monthlyOut),
-            color: '#dc2626',
-            bgColor: '#fef2f2',
-            borderColor: '#fecaca',
-            labelColor: '#fca5a5'
-          },
-          {
-            label: '계약 건수',
-            value: loans.length.toString(),
-            color: '#334155',
-            bgColor: '#fff',
-            borderColor: '#e2e8f0',
-            labelColor: '#94a3b8'
-          },
-          {
-            label: '만기 임박 (90일)',
-            value: expiringCount.toString(),
-            color: expiringCount > 0 ? '#d97706' : '#94a3b8',
-            bgColor: expiringCount > 0 ? '#fffbeb' : '#fff',
-            borderColor: expiringCount > 0 ? '#fde68a' : '#e2e8f0',
-            labelColor: expiringCount > 0 ? '#fcd34d' : '#94a3b8'
-          },
-          {
-            label: '평균 이자율',
-            value: avgRate + '%',
-            color: '#2563eb',
-            bgColor: '#eff6ff',
-            borderColor: '#bfdbfe',
-            labelColor: '#93c5fd'
-          }
-        ]}
-        actions={[
-          {
-            label: ocrProcessing ? '분석 중...' : '견적서 업로드',
-            icon: '📄',
-            onClick: () => fileInputRef.current?.click(),
-            variant: 'primary',
-            disabled: ocrProcessing
-          },
-          {
-            label: '직접 등록',
-            icon: '➕',
-            onClick: () => router.push('/loans/new'),
-            variant: 'secondary'
-          }
-        ]}
-      />
-
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen animate-fade-in">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
-      {/* AI 처리 상태 */}
-      {ocrProcessing && (
-        <div className="mb-6 bg-gray-900 rounded-2xl p-6 shadow-2xl ring-4 ring-steel-500/10 overflow-hidden">
-          <div className="flex justify-between items-end mb-4 text-white">
-            <div className="flex items-center gap-3">
-              <span className="animate-spin inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span>
-              <span className="font-bold">AI 견적서 분석 중...</span>
-            </div>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
-            <div className="bg-gradient-to-r from-steel-500 to-steel-400 h-2 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 0}%` }}></div>
-          </div>
-          <div className="font-mono text-xs text-gray-300 space-y-1">
-            {ocrLogs.map((log, i) => <div key={i}>{log}</div>)}
-          </div>
+      {/* KPI 카드 */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-400 font-bold">총 대출 잔액</p>
+          <p className="text-xl font-black text-gray-900 mt-1">{f(totalDebt)}<span className="text-xs text-gray-400 font-bold ml-0.5">원</span></p>
         </div>
-      )}
+        <div className="bg-red-50 rounded-2xl border border-red-100 p-4">
+          <p className="text-xs text-red-500 font-bold">월 고정 지출</p>
+          <p className="text-xl font-black text-red-600 mt-1">{f(monthlyOut)}<span className="text-xs font-bold ml-0.5">원</span></p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <p className="text-xs text-gray-400 font-bold">계약 건수</p>
+          <p className="text-xl font-black text-gray-900 mt-1">{loans.length}<span className="text-xs text-gray-400 font-bold ml-0.5">건</span></p>
+        </div>
+        <div className={`rounded-2xl border p-4 ${expiringCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200 shadow-sm'}`}>
+          <p className={`text-xs font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>만기 임박 (90일)</p>
+          <p className={`text-xl font-black mt-1 ${expiringCount > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{expiringCount}<span className="text-xs font-bold ml-0.5">건</span></p>
+        </div>
+        <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+          <p className="text-xs text-blue-500 font-bold">평균 이자율</p>
+          <p className="text-xl font-black text-blue-600 mt-1">{avgRate}<span className="text-xs font-bold ml-0.5">%</span></p>
+        </div>
+      </div>
 
-      {/* 드래그 앤 드롭 영역 */}
-      {!ocrProcessing && (
+      {/* 액션 버튼 + 드래그 영역 */}
+      <div className="flex gap-3 mb-6">
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+          onClick={() => !ocrProcessing && fileInputRef.current?.click()}
+          className={`flex-1 border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
             isDragging
               ? 'border-steel-500 bg-steel-50 scale-[1.01]'
-              : 'border-gray-300 bg-white hover:border-steel-400 hover:bg-steel-50/30'
+              : ocrProcessing
+                ? 'border-gray-200 bg-gray-50 cursor-wait'
+                : 'border-gray-200 bg-white hover:border-steel-400 hover:bg-steel-50/30'
           }`}
         >
-          <div className="text-3xl mb-2">{isDragging ? '📥' : '📄'}</div>
-          <p className="text-sm font-bold text-gray-700">
-            {isDragging ? '여기에 파일을 놓으세요' : '할부 견적서를 드래그하여 업로드'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
+          {ocrProcessing ? (
+            <div>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-steel-600 rounded-full"></span>
+                <span className="text-sm font-bold text-gray-700">AI 견적서 분석 중...</span>
+              </div>
+              <div className="w-full max-w-xs mx-auto bg-gray-200 rounded-full h-1.5">
+                <div className="bg-steel-500 h-1.5 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 10}%` }}></div>
+              </div>
+              <div className="mt-2 text-xs text-gray-400 space-y-0.5">
+                {ocrLogs.slice(0, 2).map((log, i) => <div key={i}>{log}</div>)}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-2xl mb-1">{isDragging ? '📥' : '📄'}</div>
+              <p className="text-sm font-bold text-gray-700">{isDragging ? '여기에 파일을 놓으세요' : '할부 견적서 드래그 또는 클릭'}</p>
+              <p className="text-xs text-gray-400 mt-0.5">이미지/PDF · AI 자동 인식</p>
+            </>
+          )}
         </div>
-      )}
+        <button
+          onClick={() => router.push('/loans/new')}
+          className="px-6 py-5 bg-steel-600 text-white rounded-2xl font-bold text-sm hover:bg-steel-700 transition-colors shadow-sm flex flex-col items-center justify-center gap-1"
+        >
+          <span className="text-lg">+</span>
+          <span>직접 등록</span>
+        </button>
+      </div>
 
-{/* 만기 임박 경고 배너 */}
+      {/* 만기 임박 경고 배너 */}
       {expiringLoans.length > 0 && !ocrProcessing && (
-        <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 md:p-5">
+        <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">⚠️</span>
-            <h3 className="font-bold text-amber-800 text-sm">만기 임박 ({expiringLoans.length}건) — 90일 이내 만기 도래</h3>
+            <h3 className="font-bold text-amber-800 text-sm">만기 임박 {expiringLoans.length}건 — 90일 이내</h3>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {expiringLoans.slice(0, 8).map(loan => {
@@ -343,12 +308,12 @@ export default function LoanListPage() {
 
       {/* 타입 필터 + 검색 */}
       <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <div className="flex gap-1 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {['all', '할부', '리스', '렌트', '담보대출'].map(type => (
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
                 typeFilter === type
                   ? 'bg-steel-600 text-white shadow'
                   : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
@@ -361,41 +326,50 @@ export default function LoanListPage() {
         <input
           type="text"
           placeholder="차량번호, 금융사 검색..."
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex-1 focus:outline-none focus:border-steel-500 shadow-sm"
+          className="px-4 py-2 border border-gray-200 rounded-xl text-sm flex-1 focus:outline-none focus:border-steel-500 bg-white shadow-sm"
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
         />
       </div>
 
-      {/* 리스트 테이블 */}
+      {/* 리스트 */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-gray-400">데이터를 불러오는 중...</div>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-3 border-gray-300 border-t-steel-600 rounded-full mx-auto mb-3"></div>
+              <p className="text-gray-400 text-sm font-medium">데이터 로딩 중...</p>
+            </div>
+          </div>
         ) : filteredLoans.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">{loans.length === 0 ? '등록된 금융 정보가 없습니다.' : '해당 조건의 금융 정보가 없습니다.'}</div>
+          <div className="py-16 text-center">
+            <div className="text-4xl mb-3">🏦</div>
+            <p className="font-bold text-gray-500">{loans.length === 0 ? '등록된 금융 정보가 없습니다' : '해당 조건의 금융 정보가 없습니다'}</p>
+            <p className="text-xs text-gray-400 mt-1">견적서를 업로드하거나 직접 등록해주세요</p>
+          </div>
         ) : (
           <>
             {/* Desktop */}
             <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left min-w-[700px]">
-                <thead className="bg-gray-50/50 border-b border-gray-100 text-gray-500 uppercase text-xs tracking-wider font-bold">
+                <thead className="bg-gray-50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider font-bold">
                   <tr>
                     <th className="p-4 pl-6">대상 차량</th>
                     <th className="p-4">금융사/구분</th>
                     <th className="p-4 text-right">대출 원금</th>
                     <th className="p-4 text-right">월 납입금</th>
                     <th className="p-4">기간/만기</th>
-                    <th className="p-4 text-center">관리</th>
+                    <th className="p-4 text-center w-16">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filteredLoans.map((loan) => {
                     const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
                     return (
-                      <tr key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)} className="hover:bg-steel-50/30 transition-colors cursor-pointer group">
+                      <tr key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)} className="hover:bg-steel-50/30 transition-colors cursor-pointer">
                         <td className="p-4 pl-6">
                           <div className="font-bold text-gray-900">{loan.cars?.number || '차량 정보 없음'}</div>
-                          <div className="text-xs text-gray-500">{loan.cars?.brand} {loan.cars?.model}</div>
+                          <div className="text-xs text-gray-400">{loan.cars?.brand} {loan.cars?.model}</div>
                         </td>
                         <td className="p-4">
                           <span className="font-bold text-gray-800">{loan.finance_name}</span>
@@ -427,14 +401,14 @@ export default function LoanListPage() {
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden" style={{ padding: '8px 12px' }}>
+            <div className="md:hidden divide-y divide-gray-50">
               {filteredLoans.map((loan) => {
                 const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
                 return (
                   <div key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)}
-                    style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    className="px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">{loan.type}</span>
                         {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${daysLeft <= 30 ? 'bg-red-100 text-red-600' : daysLeft <= 60 ? 'bg-orange-100 text-orange-600' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -442,25 +416,22 @@ export default function LoanListPage() {
                           </span>
                         )}
                       </div>
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>{loan.end_date || '-'}</span>
+                      <span className="text-xs text-gray-400">{loan.end_date || '-'}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{loan.cars?.number || '차량 정보 없음'}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{loan.cars?.brand} {loan.cars?.model}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{loan.finance_name} · {loan.months}개월</div>
+                    <div className="flex justify-between items-end">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-black text-gray-900 text-[15px] mb-0.5">{loan.cars?.number || '차량 정보 없음'}</div>
+                        <div className="text-xs text-gray-500">{loan.finance_name} · {loan.months}개월</div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                        <span style={{ fontWeight: 900, color: '#dc2626', fontSize: 15 }}>{f(loan.monthly_payment)}원</span>
-                        <div style={{ fontSize: 10, color: '#9ca3af' }}>/월</div>
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>원금 {f(loan.total_amount)}원</div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className="font-black text-red-600 text-[15px]">{f(loan.monthly_payment)}원</span>
+                        <div className="text-[10px] text-gray-400">/월</div>
                       </div>
                     </div>
                   </div>
                 )
               })}
             </div>
-
           </>
         )}
       </div>
@@ -469,16 +440,16 @@ export default function LoanListPage() {
       {carSelectModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setCarSelectModal(false); setPendingOcrData(null) }}>
           <div className="bg-white rounded-2xl w-full max-w-lg h-[600px] flex flex-col shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-5 border-b bg-purple-50 shrink-0">
+            <div className="px-6 py-5 border-b bg-steel-50 shrink-0">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-lg font-black text-purple-900">견적서 인식 완료</h2>
-                  <p className="text-xs text-purple-600 mt-0.5">대출을 등록할 차량을 선택하세요</p>
+                  <h2 className="text-lg font-black text-gray-900">견적서 인식 완료</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">대출을 등록할 차량을 선택하세요</p>
                 </div>
                 <button onClick={() => { setCarSelectModal(false); setPendingOcrData(null) }} className="text-2xl font-light text-gray-400 hover:text-black">&times;</button>
               </div>
               {pendingOcrData && (
-                <div className="mt-3 bg-white rounded-xl p-3 border border-purple-100 grid grid-cols-3 gap-2 text-xs">
+                <div className="mt-3 bg-white rounded-xl p-3 border border-gray-200 grid grid-cols-3 gap-2 text-xs">
                   <div><span className="text-gray-400">차량가</span><br /><span className="font-black text-gray-800">{f(pendingOcrData.vehicle_price)}원</span></div>
                   <div><span className="text-gray-400">대출금</span><br /><span className="font-black text-red-600">{f(pendingOcrData.total_amount)}원</span></div>
                   <div><span className="text-gray-400">월납입</span><br /><span className="font-black text-red-600">{f(pendingOcrData.monthly_payment)}원</span></div>
@@ -488,7 +459,7 @@ export default function LoanListPage() {
             <div className="p-4 bg-white shrink-0">
               <input
                 autoFocus
-                className="w-full p-3 border-2 border-gray-100 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-steel-500 outline-none transition-colors"
+                className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 font-bold focus:bg-white focus:border-steel-500 outline-none transition-colors"
                 placeholder="차량번호 검색"
                 value={carSearchTerm}
                 onChange={e => setCarSearchTerm(e.target.value)}

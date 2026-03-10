@@ -1176,7 +1176,7 @@ export default function QuoteListPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                         <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, flexShrink: 0 }}>{badge.label}</span>
                         <span style={{ fontWeight: 700, color: '#111827', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
-                        <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
+                        <span style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
                       </div>
                       <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
                     </div>

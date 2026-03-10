@@ -8,20 +8,54 @@ import { supabase } from '../lib/supabase'
 export interface NotificationData {
   title?: string
   body?: string
+  type?: string           // schedule, handover, maintenance, accident
+  targetId?: string       // 관련 레코드 ID
+  screen?: string         // 네비게이션할 화면명
   [key: string]: any
 }
 
 export interface NotificationState {
   fcmToken: string | null
   notification: NotificationData | null
+  pendingNavigation: { screen: string; params?: any } | null
   requestPermission: () => Promise<boolean>
   removeToken: () => Promise<boolean>
+  clearPendingNavigation: () => void
+}
+
+// 알림 데이터에서 네비게이션 목적지 파싱
+function parseNavigationTarget(data: Record<string, any>): { screen: string; params?: any } | null {
+  const type = data?.type as string
+  const targetId = data?.targetId as string
+  const screen = data?.screen as string
+
+  // 직접 screen이 지정된 경우
+  if (screen) {
+    return { screen, params: targetId ? { id: targetId } : undefined }
+  }
+
+  // type 기반 네비게이션
+  switch (type) {
+    case 'schedule':
+      return { screen: 'MainTabs', params: { screen: 'Schedule' } }
+    case 'handover':
+      return { screen: 'VehicleHandover', params: targetId ? { id: targetId } : undefined }
+    case 'maintenance':
+      return { screen: 'MaintenanceRequest', params: targetId ? { id: targetId } : undefined }
+    case 'accident':
+      return { screen: 'AccidentReport', params: targetId ? { id: targetId } : undefined }
+    case 'car':
+      return { screen: 'CarDetail', params: targetId ? { id: targetId } : undefined }
+    default:
+      return null
+  }
 }
 
 export const useNotifications = (): NotificationState => {
   const { user, profile } = useApp()
   const [fcmToken, setFcmToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationData | null>(null)
+  const [pendingNavigation, setPendingNavigation] = useState<{ screen: string; params?: any } | null>(null)
 
   // Create Android notification channel
   const createAndroidChannel = useCallback(async () => {
@@ -180,7 +214,7 @@ export const useNotifications = (): NotificationState => {
     return unsubscribe
   }, [])
 
-  // Handle background tap on notification
+  // Handle background tap on notification (딥링크 포함)
   useEffect(() => {
     const unsubscribe = messaging().onNotificationOpenedApp((remoteMessage) => {
       try {
@@ -191,6 +225,14 @@ export const useNotifications = (): NotificationState => {
             ...remoteMessage.data,
           }
           setNotification(notificationData)
+
+          // 딥링크 네비게이션 설정
+          if (remoteMessage.data) {
+            const navTarget = parseNavigationTarget(remoteMessage.data)
+            if (navTarget) {
+              setPendingNavigation(navTarget)
+            }
+          }
           console.log('백그라운드에서 알림 탭:', notificationData)
         }
       } catch (error) {
@@ -219,7 +261,7 @@ export const useNotifications = (): NotificationState => {
     return unsubscribe
   }, [])
 
-  // Check initial notification on app launch
+  // Check initial notification on app launch (딥링크 포함)
   useEffect(() => {
     const checkInitialNotification = async () => {
       try {
@@ -231,6 +273,14 @@ export const useNotifications = (): NotificationState => {
             ...remoteMessage.data,
           }
           setNotification(notificationData)
+
+          // 딥링크 네비게이션 설정
+          if (remoteMessage.data) {
+            const navTarget = parseNavigationTarget(remoteMessage.data)
+            if (navTarget) {
+              setPendingNavigation(navTarget)
+            }
+          }
           console.log('초기 알림:', notificationData)
         }
       } catch (error) {
@@ -248,10 +298,16 @@ export const useNotifications = (): NotificationState => {
     }
   }, [user?.id, profile?.company_id, getAndSaveToken])
 
+  const clearPendingNavigation = useCallback(() => {
+    setPendingNavigation(null)
+  }, [])
+
   return {
     fcmToken,
     notification,
+    pendingNavigation,
     requestPermission,
     removeToken,
+    clearPendingNavigation,
   }
 }

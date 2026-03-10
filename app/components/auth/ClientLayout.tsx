@@ -47,9 +47,12 @@ const PATH_TO_GROUP: Record<string, string> = {
 
 // 메뉴명 오버라이드
 const NAME_OVERRIDES: Record<string, string> = {
+  '/cars': '차량 관리',
+  '/registration': '차량 등록증',
   '/invest': '투자 정산 관리',
   '/insurance': '보험/가입',
   '/finance/upload': '카드/통장 관리',
+  '/finance/settlement': '지급 관리',
   '/admin/payroll': '급여 관리',
   '/quotes': '견적 관리',
   '/quotes/pricing': '견적 작성',
@@ -426,7 +429,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           )}
 
           {/* 메뉴 영역 */}
-          <nav className="flex-1 px-3 overflow-y-auto">
+          <nav className="flex-1 px-3 pb-4 overflow-y-auto">
 
             {/* 대시보드 */}
             <div className="mb-4">

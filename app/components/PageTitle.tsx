@@ -40,7 +40,7 @@ const PAGE_NAMES: Record<string, string> = {
   // 차량
   '/cars': '차량 관리',
   '/insurance': '보험/가입',
-  '/registration': '등록/이전',
+  '/registration': '차량 등록증',
   // 차량운영
   '/operations': '운행일지',
   '/maintenance': '정비 관리',

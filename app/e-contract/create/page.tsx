@@ -174,15 +174,15 @@ export default function CreateContractPage() {
   // Handle renter selection from dropdown
   const handleRenterSelect = (customer: Customer) => {
     setRenterCustomerId(customer.id);
-    setRenterName(customer.name);
-    setRenterPhone(customer.phone);
-    setRenterEmail(customer.email);
-    setRenterBirth(customer.birth);
-    setRenterAddress(customer.address);
-    setRenterLicenseNo(customer.license_no);
-    setRenterLicenseType(customer.license_type);
-    setRenterLicenseDate(customer.license_date);
-    setRenterLicenseExpiry(customer.license_expiry);
+    setRenterName(customer.name || '');
+    setRenterPhone(customer.phone || '');
+    setRenterEmail(customer.email || '');
+    setRenterBirth(customer.birth || '');
+    setRenterAddress(customer.address || '');
+    setRenterLicenseNo(customer.license_no || '');
+    setRenterLicenseType(customer.license_type || '1종보통');
+    setRenterLicenseDate(customer.license_date || '');
+    setRenterLicenseExpiry(customer.license_expiry || '');
     setCustomerSearchOpen(false);
     setCustomerSearchText('');
   };
@@ -190,15 +190,15 @@ export default function CreateContractPage() {
   // Handle driver 2 selection from dropdown
   const handleDriver2Select = (customer: Customer) => {
     setDriver2CustomerId(customer.id);
-    setDriver2Name(customer.name);
-    setDriver2Phone(customer.phone);
-    setDriver2Email(customer.email);
-    setDriver2Birth(customer.birth);
-    setDriver2Address(customer.address);
-    setDriver2LicenseNo(customer.license_no);
-    setDriver2LicenseType(customer.license_type);
-    setDriver2LicenseDate(customer.license_date);
-    setDriver2LicenseExpiry(customer.license_expiry);
+    setDriver2Name(customer.name || '');
+    setDriver2Phone(customer.phone || '');
+    setDriver2Email(customer.email || '');
+    setDriver2Birth(customer.birth || '');
+    setDriver2Address(customer.address || '');
+    setDriver2LicenseNo(customer.license_no || '');
+    setDriver2LicenseType(customer.license_type || '1종보통');
+    setDriver2LicenseDate(customer.license_date || '');
+    setDriver2LicenseExpiry(customer.license_expiry || '');
     setDriver2SearchOpen(false);
     setDriver2SearchText('');
   };

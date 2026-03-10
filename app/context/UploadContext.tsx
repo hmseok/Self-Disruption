@@ -65,6 +65,8 @@ interface UploadContextType {
   results: Transaction[];
   // 카드 등록 결과
   cardRegistrationResults: { registered: number; updated: number; skipped: number };
+  // 중복 스킵 건수
+  duplicateSkipCount: number;
 
   // 액션 함수들
   addFiles: (files: File[]) => void;
@@ -185,6 +187,27 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     lastIdRef.current = newId;
     return newId;
   }, []);
+
+  // 🔁 중복 감지용 fingerprint 생성 (날짜+거래처+금액+승인번호+비고)
+  const txFingerprint = useCallback((tx: { transaction_date?: string; client_name?: string; amount?: number; approval_number?: string; description?: string; card_number?: string }) => {
+    const d = (tx.transaction_date || '').replace(/\D/g, '').slice(0, 8);
+    const c = (tx.client_name || '').trim().toLowerCase();
+    const a = String(Math.abs(Number(tx.amount) || 0));
+    const ap = (tx.approval_number || '').trim();
+    const desc = (tx.description || '').trim().toLowerCase().slice(0, 30);
+    const card = (tx.card_number || '').replace(/\D/g, '').slice(-4);
+    return `${d}|${c}|${a}|${ap}|${desc}|${card}`;
+  }, []);
+
+  // 기존 결과의 fingerprint 셋 (중복 비교용)
+  const existingFpRef = useRef<Set<string>>(new Set());
+  // results 변경 시 fingerprint 셋 동기화
+  useEffect(() => {
+    existingFpRef.current = new Set(results.map(r => txFingerprint(r)));
+  }, [results, txFingerprint]);
+
+  // 중복 건수 알림용
+  const [duplicateSkipCount, setDuplicateSkipCount] = useState(0);
 
   // 📥 파일 추가 (기존 결과 유지하면서 새 파일 추가)
   const addFiles = (newFiles: File[]) => {
@@ -430,8 +453,22 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         // ── 승인/취소 쌍 매칭 ──
         matchCancelPairs(newTransactions);
 
+        // ── 중복 제거 ──
+        const prevFps = existingFpRef.current;
+        const unique = newTransactions.filter(tx => {
+          const fp = txFingerprint(tx);
+          if (prevFps.has(fp)) return false;
+          prevFps.add(fp);
+          return true;
+        });
+        const skipped = newTransactions.length - unique.length;
+        if (skipped > 0) {
+          setDuplicateSkipCount(prev => prev + skipped);
+          console.log(`[UploadContext] 중복 ${skipped}건 스킵됨`);
+        }
+
         setResults(prev => {
-          const combined = [...prev, ...newTransactions];
+          const combined = [...prev, ...unique];
           // 기존 결과와 새 결과 간에도 취소 매칭 시도
           matchCancelPairsAcross(combined);
           return combined;
@@ -458,7 +495,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const result = await res.json();
         if (Array.isArray(result)) {
           const newItems = result.map((item: any) => transformItem(item));
-          setResults(prev => [...prev, ...newItems]);
+          const prevFps = existingFpRef.current;
+          const unique = newItems.filter(tx => { const fp = txFingerprint(tx); if (prevFps.has(fp)) return false; prevFps.add(fp); return true; });
+          if (newItems.length > unique.length) setDuplicateSkipCount(prev => prev + (newItems.length - unique.length));
+          setResults(prev => [...prev, ...unique]);
         }
       }
     }
@@ -480,7 +520,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const result = await res.json();
         if (Array.isArray(result)) {
           const newItems = result.map((item: any) => transformItem(item));
-          setResults(prev => [...prev, ...newItems]);
+          const prevFps = existingFpRef.current;
+          const unique = newItems.filter(tx => { const fp = txFingerprint(tx); if (prevFps.has(fp)) return false; prevFps.add(fp); return true; });
+          if (newItems.length > unique.length) setDuplicateSkipCount(prev => prev + (newItems.length - unique.length));
+          setResults(prev => [...prev, ...unique]);
         }
       }
     }
@@ -821,7 +864,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const pauseProcessing = () => { isPausedRef.current = true; setStatus('paused'); setLogs('⏸️ 일시 정지됨'); };
   const resumeProcessing = () => { isPausedRef.current = false; setStatus('processing'); startProcessing(); };
   const cancelProcessing = () => { isCancelledRef.current = true; setFileQueue([]); setCurrentFileIndex(0); setProgress(0); setStatus('idle'); isProcessingRef.current = false; };
-  const clearResults = () => { setResults([]); setStatus('idle'); setProgress(0); setFileQueue([]); setCurrentFileIndex(0); isProcessingRef.current = false; setCardRegistrationResults({ registered: 0, updated: 0, skipped: 0 }); };
+  const clearResults = () => { setResults([]); setStatus('idle'); setProgress(0); setFileQueue([]); setCurrentFileIndex(0); isProcessingRef.current = false; setCardRegistrationResults({ registered: 0, updated: 0, skipped: 0 }); setDuplicateSkipCount(0); };
   const closeWidget = () => { setStatus('idle'); };
 
   // ✏️ 데이터 수정
@@ -873,7 +916,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   return (
     <UploadContext.Provider value={{
       status, progress, currentFileIndex, totalFiles: fileQueue.length,
-      currentFileName, logs, results, cardRegistrationResults,
+      currentFileName, logs, results, cardRegistrationResults, duplicateSkipCount,
       addFiles, startProcessing, pauseProcessing, resumeProcessing, cancelProcessing,
       clearResults, closeWidget, updateTransaction, deleteTransaction, splitTransaction, removeResults, setCompanyId, loadFromQueue
     }}>

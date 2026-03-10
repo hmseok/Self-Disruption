@@ -597,7 +597,7 @@ export default function DashboardPage() {
     : null
 
   const allQuickActions = [
-    { label: '등록/이전', desc: '차량 등록증 관리', href: '/registration', icon: '📄', color: 'from-steel-500 to-steel-600', modulePath: '/registration' },
+    { label: '차량 등록증', desc: '등록증 및 제원 관리', href: '/registration', icon: '📄', color: 'from-steel-500 to-steel-600', modulePath: '/registration' },
     { label: '보험/가입', desc: '보험 계약 관리', href: '/insurance', icon: '🛡️', color: 'from-teal-500 to-teal-600', modulePath: '/insurance' },
     { label: '고객 관리', desc: '고객 정보 관리', href: '/customers', icon: '👥', color: 'from-emerald-500 to-emerald-600', modulePath: '/customers' },
     { label: '견적/계약', desc: '견적서 작성', href: '/quotes', icon: '📋', color: 'from-amber-500 to-amber-600', modulePath: '/quotes' },

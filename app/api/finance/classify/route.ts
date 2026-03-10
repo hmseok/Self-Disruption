@@ -76,7 +76,7 @@ ${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 - 접대비: 골프, 선물, 경조사, 화환, 축의금
 - 여비교통비: 택시, KTX, 숙박, 호텔, 주차비, 항공, 고속버스
 - 임차료/사무실: 월세, 임대료, 건물관리
-- 통신비: KT, SKT, LG유플러스, 인터넷, 전화
+- 통신비: KT, SKT, LG유플러스, 전화요금, 회선료
 - 소모품/사무용품: 다이소, 문구, 사무용품, 토너, 복사
 - 교육/훈련비: 교육, 훈련, 연수, 세미나, 자격증
 - 광고/마케팅: 광고, 마케팅, 홍보, 네이버광고
@@ -92,6 +92,12 @@ ${categoryList.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 - 결제수단이 "카드"인 경우: 대부분 일반 경비(복리후생, 유류비, 접대비 등)
 - 결제수단이 "이체/통장"인 경우: 급여, 원금상환, 보험료, 세금 등 정기 지출 가능성 높음
 - "카드자동집금", "카드대금" → 수수료/카드수수료
+
+### 중요 주의사항
+- 비고/메모의 "인터넷", "모바일", "폰뱅킹", "서수원지점" 등은 **이체 수단/채널**이지 거래 목적이 아님. 분류 근거로 사용 금지!
+- "인터넷" = 인터넷뱅킹 이체 → 통신비가 아님. 거래처명(사람이름/회사명)으로 판단할 것
+- 거래처명이 "[은행명]+사람이름" 패턴(예: 기업윤민진, 국민석호민, 신한이승훈)이면 → 급여(정규직) 또는 용역비(3.3%)로 분류
+- 사람 이름만 있는 출금 → 급여(정규직) 또는 용역비(3.3%)로 추정 (맥락상 판단)
 
 ### 추가 규칙
 - 사람 이름만 있는 입금/출금 → 맥락상 추정 (투자, 급여, 용역비 등)
@@ -247,13 +253,43 @@ const CATEGORY_RULES = [
   { category: '기타', type: 'expense', keywords: [] },
 ]
 
+// ── 은행명 접두어 제거 ──
+const BANK_PREFIXES = [
+  '기업', '신한', '국민', '하나', '우리', '농협', '카카오', '토스', '케이',
+  '신협', '수협', '부산', '대구', '광주', '전북', '경남', '제주', '산업',
+  '씨티', '새마을', '우체국', '저축', 'nh', 'ibk', 'kb', 'sc',
+]
+
+function stripBankPrefix(name: string): string {
+  if (!name) return ''
+  let stripped = name.replace(/\s/g, '').toLowerCase()
+  for (const prefix of BANK_PREFIXES) {
+    if (stripped.startsWith(prefix) && stripped.length > prefix.length + 1) {
+      stripped = stripped.slice(prefix.length)
+      break
+    }
+  }
+  return stripped
+}
+
 // ── 유사도 함수들 ──
 function nameSimilarity(txName: string, targetName: string): number {
   if (!txName || !targetName) return 0
   const a = txName.replace(/\s/g, '').toLowerCase()
   const b = targetName.replace(/\s/g, '').toLowerCase()
   if (a === b) return 100
+
+  // 은행명 접두어 제거 후 비교 (includes보다 먼저 체크)
+  const aStripped = stripBankPrefix(a)
+  const bStripped = stripBankPrefix(b)
+  if (aStripped && bStripped) {
+    if (aStripped === bStripped) return 95  // "기업윤민진" → "윤민진" === "윤민진"
+    if (aStripped.includes(bStripped) || bStripped.includes(aStripped)) return 85
+  }
+
+  // 일반 포함 관계
   if (a.includes(b) || b.includes(a)) return 80
+
   const minLen = Math.min(a.length, b.length)
   if (minLen < 2) return 0
   let matched = 0
@@ -627,22 +663,35 @@ export async function POST(request: NextRequest) {
 
         let score = 0
 
-        // 이름 유사도 — client_name + description 모두 검사 (최대 50점)
+        // 이름 유사도 — client_name + description 모두 검사
         const nameScore1 = nameSimilarity(clientName, target.name)
         const nameScore2 = nameSimilarity(description, target.name)
         const nameScore = Math.max(nameScore1, nameScore2)
-        score += nameScore * 0.5
 
-        // 금액 근접도 (최대 40점)
-        if (target.monthlyAmount > 0) {
-          const amtScore = amountSimilarity(amount, target.monthlyAmount)
-          score += amtScore * 0.4
-        }
-
-        // 날짜 근접도 (최대 10점)
-        if (target.paymentDay > 0) {
-          const dateScore = dateSimilarity(tx.transaction_date, target.paymentDay)
-          score += dateScore * 0.1
+        // 프리랜서/급여는 이름이 가장 중요 → 이름 가중치 강화
+        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary'
+        if (isPersonMatch) {
+          // 이름 매칭: 최대 65점 (기존 50점 → 강화)
+          score += nameScore * 0.65
+          // 이름 정확 매칭(≥90) 시 추가 보너스 20점
+          if (nameScore >= 90) score += 20
+          // 금액 근접도: 최대 25점 (기존 40점 → 축소)
+          if (target.monthlyAmount > 0) {
+            score += amountSimilarity(amount, target.monthlyAmount) * 0.25
+          }
+          // 날짜 근접도: 최대 10점
+          if (target.paymentDay > 0) {
+            score += dateSimilarity(tx.transaction_date, target.paymentDay) * 0.1
+          }
+        } else {
+          // 계약/대출/보험 등은 기존 가중치 유지
+          score += nameScore * 0.5
+          if (target.monthlyAmount > 0) {
+            score += amountSimilarity(amount, target.monthlyAmount) * 0.4
+          }
+          if (target.paymentDay > 0) {
+            score += dateSimilarity(tx.transaction_date, target.paymentDay) * 0.1
+          }
         }
 
         // 보너스: 키워드 타입별 추가 점수
@@ -667,16 +716,31 @@ export async function POST(request: NextRequest) {
         result.match_score = Math.round(best.score)
         result.matched_name = best.target.name
 
-        // 매칭으로 카테고리 보정
-        if (result.category === '미분류' || result.confidence < 70) {
-          // 방향별 기본 카테고리 설정
-          if (best.target.type === 'invest') {
-            result.category = txType === 'income' ? '투자원금 입금' : '이자비용(대출/투자)'
-          } else if (best.target.type === 'jiip') {
-            result.category = txType === 'income' ? '지입 관리비/수수료' : '지입 수익배분금(출금)'
-          } else {
-            result.category = best.target.defaultCategory
-          }
+        // 매칭으로 카테고리 보정: 매칭 대상의 기본 카테고리 결정
+        const getTargetCategory = (t: MatchTarget, dir: string) => {
+          if (t.type === 'invest') return dir === 'income' ? '투자원금 입금' : '이자비용(대출/투자)'
+          if (t.type === 'jiip') return dir === 'income' ? '지입 관리비/수수료' : '지입 수익배분금(출금)'
+          return t.defaultCategory
+        }
+        const expectedCategory = getTargetCategory(best.target, txType)
+
+        // ★ 카테고리-연결 일관성 검증: 매칭 대상과 AI 카테고리가 불일치하면 강제 보정
+        // 예: 프리랜서가 매칭됐는데 '통신비'로 분류된 경우 → 용역비(3.3%)로 교정
+        const CATEGORY_TYPE_MAP: Record<string, string[]> = {
+          'freelancer': ['용역비(3.3%)', '일용직급여'],
+          'salary': ['급여(정규직)', '4대보험(회사부담)'],
+          'loan': ['차량할부/리스료', '원금상환', '이자비용(대출/투자)'],
+          'invest': ['이자비용(대출/투자)', '투자원금 입금', '원금상환'],
+          'jiip': ['지입 관리비/수수료', '지입 수익배분금(출금)', '지입 초기비용/보증금'],
+          'insurance': ['차량보험료', '보험료(일반)', '화물공제/적재물보험'],
+        }
+        const allowedCats = CATEGORY_TYPE_MAP[best.target.type] || []
+        const categoryMismatch = allowedCats.length > 0 && !allowedCats.includes(result.category)
+
+        if (result.category === '미분류' || result.confidence < 70 || (categoryMismatch && best.score >= 50)) {
+          // 매칭 점수가 충분하면 카테고리를 매칭 대상 기준으로 보정
+          console.log(`[분류보정] ${tx.client_name}: "${result.category}" → "${expectedCategory}" (매칭: ${best.target.type}/${best.target.name}, 점수: ${Math.round(best.score)})`)
+          result.category = expectedCategory
           result.confidence = Math.max(result.confidence, Math.min(best.score, 95))
         }
 
@@ -1099,6 +1163,177 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('GET classify error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// ── PUT: 재매칭 (classification_queue 항목의 연결만 다시 실행) ──
+export async function PUT(request: NextRequest) {
+  try {
+    const { company_id } = await request.json()
+    if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
+
+    const sb = getSupabaseAdmin()
+
+    // 1. classification_queue에서 pending 항목 가져오기
+    // 주의: transaction_date 등은 직접 컬럼이 아니라 alternatives->source_data 안에 있음
+    const { data: queueItems, error: qErr } = await sb
+      .from('classification_queue')
+      .select('*')
+      .eq('company_id', company_id)
+      .in('status', ['pending', 'auto_confirmed'])
+      .order('created_at', { ascending: false })
+
+    if (qErr) throw qErr
+    if (!queueItems || queueItems.length === 0) {
+      return NextResponse.json({ message: '재매칭할 항목이 없습니다.', updated: 0, total: 0 })
+    }
+
+    // 2. 매칭 대상 데이터 로드
+    const safeQ = async (query: any) => {
+      try { const r = await query; return r?.error ? { data: [] } : r } catch { return { data: [] } }
+    }
+    const [jiipRes, investRes, loanRes, salaryRes, freelancerRes, insuranceRes, carRes] = await Promise.all([
+      safeQ(sb.from('jiip_contracts').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('general_investments').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('loans').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('employee_salaries').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('freelancers').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('insurance_contracts').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('cars').select('*').eq('company_id', company_id)),
+    ])
+
+    const filterActive = (arr: any[]) => arr.filter(r => !r.status || r.status === 'active')
+    const targets: MatchTarget[] = []
+
+    for (const c of filterActive(jiipRes.data || [])) {
+      targets.push({ id: c.id, type: 'jiip', name: c.investor_name || '', monthlyAmount: Number(c.admin_fee) || 0, paymentDay: Number(c.payout_day) || 10, defaultCategory: '지입 관리비/수수료', txType: 'both' })
+    }
+    for (const c of filterActive(investRes.data || [])) {
+      const mi = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
+      targets.push({ id: c.id, type: 'invest', name: c.investor_name || '', monthlyAmount: mi, paymentDay: Number(c.payment_day) || 10, defaultCategory: '이자비용(대출/투자)', txType: 'both' })
+    }
+    for (const c of filterActive(loanRes.data || [])) {
+      targets.push({ id: c.id, type: 'loan', name: c.finance_name || '', monthlyAmount: Number(c.monthly_payment) || 0, paymentDay: Number(c.payment_date) || 10, defaultCategory: '차량할부/리스료', txType: 'expense' })
+    }
+    for (const s of (salaryRes.data || []).filter((r: any) => r.is_active !== false)) {
+      const empName = (s.profiles as any)?.name || s.name || ''
+      targets.push({ id: s.employee_id || s.id, type: 'salary', name: empName, monthlyAmount: Number(s.base_salary || s.salary) || 0, paymentDay: Number(s.pay_day || s.payment_day) || 25, defaultCategory: '급여(정규직)', txType: 'expense', extra: { employee_id: s.employee_id } })
+    }
+    for (const f of filterActive(freelancerRes.data || [])) {
+      targets.push({ id: f.id, type: 'freelancer', name: f.name || '', monthlyAmount: Number(f.default_fee) || 0, paymentDay: 0, defaultCategory: '용역비(3.3%)', txType: 'expense', extra: { service_type: f.service_type } })
+    }
+    for (const ins of insuranceRes.data || []) {
+      targets.push({ id: ins.id, type: 'insurance', name: ins.company || ins.product_name || '', monthlyAmount: Math.round((Number(ins.total_premium) || 0) / 12), paymentDay: 0, defaultCategory: '차량보험료', txType: 'expense', extra: { car_id: ins.car_id } })
+    }
+    const cars = (carRes.data || []) as any[]
+
+    // 3. 각 큐 항목에 대해 재매칭
+    // classification_queue의 거래 데이터는 alternatives.source_data 안에 저장됨
+    let updated = 0
+    for (const item of queueItems) {
+      const srcData = item.alternatives?.source_data || {}
+      const clientName = srcData.client_name || ''
+      const description = srcData.description || ''
+      const searchText = `${clientName} ${description}`.toLowerCase()
+      const amount = Math.abs(Number(srcData.amount) || 0)
+      const txType = srcData.type || 'expense'
+      const txDate = srcData.transaction_date || ''
+
+      const matchCandidates: Array<{ target: MatchTarget; score: number }> = []
+
+      for (const target of targets) {
+        if (target.txType !== 'both') {
+          if (target.txType === 'income' && txType !== 'income') continue
+          if (target.txType === 'expense' && txType !== 'expense') continue
+        }
+
+        let score = 0
+        const nameScore1 = nameSimilarity(clientName, target.name)
+        const nameScore2 = nameSimilarity(description, target.name)
+        const nameScore = Math.max(nameScore1, nameScore2)
+
+        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary'
+        if (isPersonMatch) {
+          score += nameScore * 0.65
+          if (nameScore >= 90) score += 20
+          if (target.monthlyAmount > 0) score += amountSimilarity(amount, target.monthlyAmount) * 0.25
+          if (target.paymentDay > 0 && txDate) score += dateSimilarity(txDate, target.paymentDay) * 0.1
+        } else {
+          score += nameScore * 0.5
+          if (target.monthlyAmount > 0) score += amountSimilarity(amount, target.monthlyAmount) * 0.4
+          if (target.paymentDay > 0 && txDate) score += dateSimilarity(txDate, target.paymentDay) * 0.1
+        }
+
+        if (target.type === 'insurance' && searchText.match(/보험|손해|화재|해상/)) score += 15
+        if (target.type === 'loan' && searchText.match(/캐피탈|파이낸셜|할부|대출|약정/)) score += 15
+        if (target.type === 'salary' && searchText.match(/급여|월급|임금/)) score += 15
+        if (target.type === 'freelancer' && searchText.match(/용역|외주|3\.3/)) score += 15
+
+        if (score > 20) matchCandidates.push({ target, score })
+      }
+
+      matchCandidates.sort((a, b) => b.score - a.score)
+
+      // 차량 매칭
+      let carMatch: { type: string; id: string; name: string } | null = null
+      for (const car of cars) {
+        const carNum = (car.number || '').replace(/\s/g, '')
+        if (carNum && searchText.includes(carNum.toLowerCase())) {
+          carMatch = { type: 'car', id: car.id, name: car.number }
+          break
+        }
+      }
+
+      const best = matchCandidates.length > 0 ? matchCandidates[0] : null
+      const newRelType = best ? best.target.type : carMatch ? carMatch.type : null
+      const newRelId = best ? best.target.id : carMatch ? carMatch.id : null
+      const newMatchScore = best ? Math.round(best.score) : carMatch ? 75 : 0
+      const newMatchedName = best ? best.target.name : carMatch ? carMatch.name : null
+
+      // ★ 카테고리-연결 일관성 보정 (재매칭 시에도 카테고리 교정)
+      const CATEGORY_TYPE_MAP_RE: Record<string, string[]> = {
+        'freelancer': ['용역비(3.3%)', '일용직급여'],
+        'salary': ['급여(정규직)', '4대보험(회사부담)'],
+        'loan': ['차량할부/리스료', '원금상환', '이자비용(대출/투자)'],
+        'invest': ['이자비용(대출/투자)', '투자원금 입금', '원금상환'],
+        'jiip': ['지입 관리비/수수료', '지입 수익배분금(출금)', '지입 초기비용/보증금'],
+        'insurance': ['차량보험료', '보험료(일반)', '화물공제/적재물보험'],
+      }
+      let newCategory: string | null = null
+      if (best && best.score >= 50) {
+        const currentCat = item.ai_category || item.final_category || ''
+        const allowedCats = CATEGORY_TYPE_MAP_RE[best.target.type] || []
+        if (allowedCats.length > 0 && !allowedCats.includes(currentCat)) {
+          // 카테고리가 매칭 대상과 불일치 → 기본 카테고리로 보정
+          newCategory = best.target.defaultCategory
+          console.log(`[재매칭-보정] ${clientName}: "${currentCat}" → "${newCategory}" (매칭: ${best.target.type}/${best.target.name})`)
+        }
+      }
+
+      // 기존 연결과 다르거나 카테고리 보정 필요시 업데이트
+      if (newRelType && newRelId && (item.ai_matched_type !== newRelType || item.ai_matched_id !== newRelId || newCategory)) {
+        const updateData: any = {
+          ai_matched_type: newRelType,
+          ai_matched_id: newRelId,
+          ai_matched_name: newMatchedName,
+        }
+        if (newCategory) {
+          updateData.ai_category = newCategory
+        }
+        const { error: upErr } = await sb
+          .from('classification_queue')
+          .update(updateData)
+          .eq('id', item.id)
+
+        if (!upErr) updated++
+      }
+    }
+
+    console.log(`[재매칭] ${queueItems.length}건 중 ${updated}건 업데이트`)
+    return NextResponse.json({ message: `${updated}건 재매칭 완료`, updated, total: queueItems.length })
+  } catch (error: any) {
+    console.error('재매칭 API 오류:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

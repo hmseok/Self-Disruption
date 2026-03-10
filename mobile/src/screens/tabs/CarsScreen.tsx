@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native'
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -13,15 +13,27 @@ import { useApp } from '../../context/AppContext'
 import { supabase } from '../../lib/supabase'
 import type { Car } from '../../lib/types'
 
+// ============================================
+// 차량 목록 — 현장직원용 필터 + 롱프레스 퀵액션
+// ============================================
+
 type NavigationProp = NativeStackNavigationProp<DetailStackParamList>
 
 const STATUS_TABS = [
-  { label: '전체', value: 'all' },
-  { label: '대기', value: 'available' },
-  { label: '렌트', value: 'rented' },
-  { label: '정비', value: 'maintenance' },
-  { label: '매각', value: 'sold' },
+  { label: '전체', value: 'all', icon: 'apps' },
+  { label: '가용', value: 'available', icon: 'checkmark-circle' },
+  { label: '렌트중', value: 'rented', icon: 'key' },
+  { label: '정비중', value: 'maintenance', icon: 'construct' },
+  { label: '매각', value: 'sold', icon: 'remove-circle' },
 ]
+
+const STATUS_LABEL: Record<string, string> = {
+  available: '가용', rented: '렌트중', maintenance: '정비중', sold: '매각',
+}
+
+const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'danger' | 'default'> = {
+  available: 'success', rented: 'info', maintenance: 'warning', sold: 'danger',
+}
 
 export default function CarsScreen() {
   const navigation = useNavigation<NavigationProp>()
@@ -49,9 +61,7 @@ export default function CarsScreen() {
     }
   }
 
-  useEffect(() => {
-    loadCars()
-  }, [company?.id])
+  useEffect(() => { loadCars() }, [company?.id])
 
   useEffect(() => {
     let filtered = cars
@@ -59,51 +69,85 @@ export default function CarsScreen() {
       filtered = filtered.filter(c => c.status === selectedStatus)
     }
     if (search) {
+      const q = search.toLowerCase()
       filtered = filtered.filter(c =>
-        c.number?.toLowerCase().includes(search.toLowerCase()) ||
-        c.brand?.toLowerCase().includes(search.toLowerCase()) ||
-        c.model?.toLowerCase().includes(search.toLowerCase())
+        c.number?.toLowerCase().includes(q) ||
+        c.brand?.toLowerCase().includes(q) ||
+        c.model?.toLowerCase().includes(q)
       )
     }
     setFilteredCars(filtered)
   }, [search, selectedStatus, cars])
 
-  const getStatusVariant = (status?: string) => {
-    switch (status) {
-      case 'available': return 'success'
-      case 'rented': return 'info'
-      case 'maintenance': return 'warning'
-      case 'sold': return 'danger'
-      default: return 'default'
-    }
+  // 롱프레스 퀵액션
+  const showQuickActions = (car: Car) => {
+    Alert.alert(
+      `${car.number}`,
+      `${car.brand} ${car.model}`,
+      [
+        { text: '인수인계', onPress: () => navigation.navigate('VehicleHandover') },
+        { text: '정비요청', onPress: () => navigation.navigate('MaintenanceRequest') },
+        { text: '사고접수', onPress: () => navigation.navigate('AccidentReport') },
+        { text: '상세보기', onPress: () => navigation.navigate('CarDetail', { id: car.id }) },
+        { text: '취소', style: 'cancel' },
+      ]
+    )
   }
+
+  // 상태별 개수
+  const statusCounts: Record<string, number> = { all: cars.length }
+  cars.forEach((c) => {
+    if (c.status) statusCounts[c.status] = (statusCounts[c.status] || 0) + 1
+  })
 
   const CarItem = ({ car }: { car: Car }) => (
     <TouchableOpacity
       onPress={() => navigation.navigate('CarDetail', { id: car.id })}
+      onLongPress={() => showQuickActions(car)}
       activeOpacity={0.7}
+      delayLongPress={400}
     >
       <Card style={s.carCard}>
-        <View style={s.carHeader}>
-          <View>
+        <View style={s.carTop}>
+          <View style={s.carMainInfo}>
             <Text style={s.carNumber}>{car.number}</Text>
-            <Text style={s.carModel}>{car.brand} {car.model}</Text>
+            <Text style={s.carModel}>{car.brand} {car.model} {car.trim || ''}</Text>
           </View>
-          <Badge text={car.status || 'unknown'} variant={getStatusVariant(car.status)} />
+          <Badge
+            text={STATUS_LABEL[car.status] || car.status}
+            variant={STATUS_VARIANT[car.status] || 'default'}
+          />
         </View>
-        <View style={s.carDetails}>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>연식</Text>
-            <Text style={s.detailValue}>{car.year || '-'}</Text>
+
+        <View style={s.carBottom}>
+          <View style={s.carStat}>
+            <Icon name="calendar-outline" size={13} color={Colors.textMuted} />
+            <Text style={s.carStatText}>{car.year || '-'}년</Text>
           </View>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>주행거리</Text>
-            <Text style={s.detailValue}>{car.mileage?.toLocaleString() || '-'} km</Text>
+          <View style={s.carStat}>
+            <Icon name="speedometer-outline" size={13} color={Colors.textMuted} />
+            <Text style={s.carStatText}>{car.mileage?.toLocaleString() || '-'} km</Text>
           </View>
-          <View style={s.detailRow}>
-            <Text style={s.detailLabel}>연료</Text>
-            <Text style={s.detailValue}>{car.fuel || '-'}</Text>
+          <View style={s.carStat}>
+            <Icon name="flash-outline" size={13} color={Colors.textMuted} />
+            <Text style={s.carStatText}>{car.fuel || '-'}</Text>
           </View>
+        </View>
+
+        {/* 퀵 액션 아이콘 */}
+        <View style={s.carActions}>
+          <TouchableOpacity style={s.carActionBtn} onPress={() => navigation.navigate('VehicleHandover')}>
+            <Icon name="swap-horizontal" size={16} color={Colors.info} />
+            <Text style={[s.carActionText, { color: Colors.info }]}>인수인계</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.carActionBtn} onPress={() => navigation.navigate('MaintenanceRequest')}>
+            <Icon name="construct" size={16} color={Colors.warning} />
+            <Text style={[s.carActionText, { color: Colors.warning }]}>정비</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.carActionBtn} onPress={() => navigation.navigate('AccidentReport')}>
+            <Icon name="alert-circle" size={16} color={Colors.danger} />
+            <Text style={[s.carActionText, { color: Colors.danger }]}>사고</Text>
+          </TouchableOpacity>
         </View>
       </Card>
     </TouchableOpacity>
@@ -113,6 +157,7 @@ export default function CarsScreen() {
     <SafeAreaView style={s.container}>
       <View style={s.header}>
         <Text style={s.title}>차량</Text>
+        <Text style={s.count}>{filteredCars.length}대</Text>
       </View>
 
       <View style={s.content}>
@@ -121,40 +166,52 @@ export default function CarsScreen() {
           value={search}
           onChangeText={setSearch}
           icon="search"
-          style={s.searchInput}
+          style={{ marginBottom: 12 }}
         />
 
-        <View style={s.tabsContainer}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={STATUS_TABS}
-            keyExtractor={item => item.value}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => setSelectedStatus(item.value)}
-                style={[s.tab, selectedStatus === item.value && s.tabActive]}
-              >
-                <Text style={[s.tabText, selectedStatus === item.value && s.tabTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            )}
-            contentContainerStyle={s.tabs}
-          />
-        </View>
+        {/* 상태 탭 */}
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={STATUS_TABS}
+          keyExtractor={item => item.value}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => setSelectedStatus(item.value)}
+              style={[s.tab, selectedStatus === item.value && s.tabActive]}
+            >
+              <Icon
+                name={item.icon}
+                size={14}
+                color={selectedStatus === item.value ? '#fff' : Colors.steel[400]}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[s.tabText, selectedStatus === item.value && s.tabTextActive]}>
+                {item.label}
+              </Text>
+              <Text style={[s.tabCount, selectedStatus === item.value && s.tabCountActive]}>
+                {statusCounts[item.value] || 0}
+              </Text>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={{ gap: 8, marginBottom: 16 }}
+          style={{ flexGrow: 0 }}
+        />
 
+        {/* 차량 리스트 */}
         <FlatList
           data={filteredCars}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => <CarItem car={item} />}
-          scrollEnabled={false}
+          refreshing={loading}
+          onRefresh={loadCars}
           ListEmptyComponent={
             <View style={s.empty}>
               <Icon name="car-outline" size={48} color={Colors.textMuted} />
               <Text style={s.emptyText}>차량이 없습니다</Text>
             </View>
           }
+          contentContainerStyle={{ paddingBottom: 100 }}
         />
       </View>
     </SafeAreaView>
@@ -163,24 +220,35 @@ export default function CarsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.lg },
-  title: { fontSize: FontSize['3xl'], fontWeight: '700', color: Colors.text },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.lg },
+  title: { fontSize: FontSize['2xl'], fontWeight: '900', color: Colors.text },
+  count: { fontSize: FontSize.base, fontWeight: '700', color: Colors.textSecondary },
   content: { flex: 1, paddingHorizontal: Spacing.lg },
-  searchInput: { marginBottom: Spacing.lg },
-  tabsContainer: { marginBottom: Spacing.lg },
-  tabs: { gap: Spacing.sm },
-  tab: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border },
+
+  // 탭
+  tab: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: BorderRadius.full, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border },
   tabActive: { backgroundColor: Colors.steel[700], borderColor: Colors.steel[700] },
   tabText: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary },
   tabTextActive: { color: Colors.white },
-  carCard: { marginBottom: Spacing.md },
-  carHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
-  carNumber: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.text },
-  carModel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: Spacing.xs },
-  carDetails: { gap: Spacing.sm },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  detailLabel: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  detailValue: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.text },
-  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing['3xl'] },
+  tabCount: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textMuted, marginLeft: 4 },
+  tabCountActive: { color: 'rgba(255,255,255,0.7)' },
+
+  // 차량 카드
+  carCard: { marginBottom: 10 },
+  carTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  carMainInfo: { flex: 1 },
+  carNumber: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.text },
+  carModel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  carBottom: { flexDirection: 'row', gap: 16, marginBottom: 10 },
+  carStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  carStatText: { fontSize: FontSize.xs, color: Colors.textMuted, fontWeight: '600' },
+
+  // 퀵 액션
+  carActions: { flexDirection: 'row', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.steel[100] },
+  carActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: BorderRadius.md, backgroundColor: Colors.steel[50] },
+  carActionText: { fontSize: FontSize.xs, fontWeight: '700' },
+
+  // 빈 상태
+  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyText: { fontSize: FontSize.base, color: Colors.textMuted, marginTop: Spacing.md },
 })

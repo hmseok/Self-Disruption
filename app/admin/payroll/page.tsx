@@ -15,7 +15,7 @@ import {
 // 급여 관리 통합 (v4 — 급여+프리랜서+용역비 통합)
 // ════════════════════════════════════════════════════════════════
 
-type Tab = 'ledger' | 'settings' | 'freelancers' | 'payments' | 'meals' | 'analytics'
+type Tab = 'ledger' | 'settings' | 'freelancers' | 'meals' | 'analytics'
 
 interface EmployeeSalary {
   id: string; employee_id: string; base_salary: number; allowances: Record<string, number>
@@ -608,8 +608,7 @@ export default function PayrollPage() {
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: 'ledger', label: '급여대장', count: payslips.length },
     { key: 'settings', label: '급여설정', count: settings.length },
-    { key: 'freelancers', label: '프리랜서', count: freelancers.length },
-    { key: 'payments', label: '용역비 지급', count: flPayments.length },
+    { key: 'freelancers', label: '프리랜서/용역비', count: freelancers.length },
     { key: 'meals', label: '식대/실비' },
     { key: 'analytics', label: '급여분석' },
   ]
@@ -863,49 +862,48 @@ export default function PayrollPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {/* ══════════ 탭4: 용역비 지급 ══════════ */}
-      {tab === 'payments' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div style={kpiCard('#fff', C.gray200)}><p style={kpiLabel(C.gray400)}>총 지급 건수</p><p style={kpiValue(C.steel)}>{flPayments.length}건</p></div>
-            <div style={kpiCard('#fff', C.gray200)}><p style={kpiLabel(C.gray400)}>총 지급액 (세전)</p><p style={kpiValue(C.steel)}>{n(payTotalGross)}원</p></div>
-            <div style={kpiCard(C.redLight, C.redBorder)}><p style={kpiLabel(C.red)}>원천징수세</p><p style={kpiValue(C.red)}>{n(payTotalTax)}원</p></div>
-            <div style={kpiCard(C.greenLight, C.greenBorder)}><p style={kpiLabel(C.green)}>실지급 총액</p><p style={kpiValue(C.green)}>{n(payTotalNet)}원</p></div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="month" value={payMonth} onChange={e => setPayMonth(e.target.value)} style={{ ...inputBase, width: 'auto' }} />
-            <span style={{ fontSize: 13, color: C.gray400 }}>지급완료 {payPaidCount}/{flPayments.length}건</span>
-            <div style={{ flex: 1 }} />
-            <button onClick={() => { setPayForm(emptyPayForm); setShowPayModal(true) }} style={btnPrimary()}>+ 지급 등록</button>
-          </div>
-          <div style={{ ...sectionCard, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-              <thead><tr>
-                <th style={thStyle}>프리랜서</th><th style={thStyle}>지급일</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>세전 금액</th><th style={{ ...thStyle, textAlign: 'right' }}>원천세</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>실지급액</th><th style={thStyle}>상태</th><th style={thStyle}>액션</th>
-              </tr></thead>
-              <tbody>
-                {flPayments.map(p => (
-                  <tr key={p.id} onMouseEnter={e => (e.currentTarget.style.background = C.gray50)} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ ...tdStyle, fontWeight: 700 }}>{p.freelancers?.name || '-'}{p.description && <span style={{ display: 'block', fontSize: 11, color: C.gray400 }}>{p.description}</span>}</td>
-                    <td style={{ ...tdStyle, fontSize: 13, color: C.gray500 }}>{p.payment_date}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{n(p.gross_amount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', color: C.red }}>{n(p.tax_amount)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: C.green }}>{n(p.net_amount)}</td>
-                    <td style={tdStyle}><span style={badge(p.status === 'paid' ? C.greenLight : p.status === 'cancelled' ? C.redLight : C.amberLight, p.status === 'paid' ? C.green : p.status === 'cancelled' ? C.red : C.amber)}>{p.status === 'paid' ? '지급완료' : p.status === 'cancelled' ? '취소' : '대기'}</span></td>
-                    <td style={tdStyle}>
-                      {p.status === 'pending' && <button onClick={() => handlePaymentConfirm(p)} style={{ ...btnPrimary(C.green), padding: '6px 12px', fontSize: 12 }}>지급 확정</button>}
-                      {p.status === 'paid' && <span style={{ fontSize: 11, color: C.gray400 }}>장부 반영됨</span>}
-                    </td>
-                  </tr>
-                ))}
-                {flPayments.length === 0 && <tr><td colSpan={7} style={{ ...tdStyle, textAlign: 'center', padding: 48, color: C.gray400 }}>해당 월 지급 내역이 없습니다</td></tr>}
-              </tbody>
-            </table>
+          {/* ── 용역비 지급 (합쳐진 영역) ── */}
+          <div style={{ marginTop: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: C.gray900, margin: '0 0 16px' }}>용역비 지급 내역</h3>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+              <div style={kpiCard('#fff', C.gray200)}><p style={kpiLabel(C.gray400)}>총 지급 건수</p><p style={kpiValue(C.steel, 18)}>{flPayments.length}건</p></div>
+              <div style={kpiCard('#fff', C.gray200)}><p style={kpiLabel(C.gray400)}>총 지급액 (세전)</p><p style={kpiValue(C.steel, 18)}>{n(payTotalGross)}원</p></div>
+              <div style={kpiCard(C.redLight, C.redBorder)}><p style={kpiLabel(C.red)}>원천징수세</p><p style={kpiValue(C.red, 18)}>{n(payTotalTax)}원</p></div>
+              <div style={kpiCard(C.greenLight, C.greenBorder)}><p style={kpiLabel(C.green)}>실지급 총액</p><p style={kpiValue(C.green, 18)}>{n(payTotalNet)}원</p></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+              <input type="month" value={payMonth} onChange={e => setPayMonth(e.target.value)} style={{ ...inputBase, width: 'auto' }} />
+              <span style={{ fontSize: 13, color: C.gray400 }}>지급완료 {payPaidCount}/{flPayments.length}건</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => { setPayForm(emptyPayForm); setShowPayModal(true) }} style={btnPrimary()}>+ 지급 등록</button>
+            </div>
+            <div style={{ ...sectionCard, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+                <thead><tr>
+                  <th style={thStyle}>프리랜서</th><th style={thStyle}>지급일</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>세전 금액</th><th style={{ ...thStyle, textAlign: 'right' }}>원천세</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>실지급액</th><th style={thStyle}>상태</th><th style={thStyle}>액션</th>
+                </tr></thead>
+                <tbody>
+                  {flPayments.map(p => (
+                    <tr key={p.id} onMouseEnter={e => (e.currentTarget.style.background = C.gray50)} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{p.freelancers?.name || '-'}{p.description && <span style={{ display: 'block', fontSize: 11, color: C.gray400 }}>{p.description}</span>}</td>
+                      <td style={{ ...tdStyle, fontSize: 13, color: C.gray500 }}>{p.payment_date}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>{n(p.gross_amount)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: C.red }}>{n(p.tax_amount)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: C.green }}>{n(p.net_amount)}</td>
+                      <td style={tdStyle}><span style={badge(p.status === 'paid' ? C.greenLight : p.status === 'cancelled' ? C.redLight : C.amberLight, p.status === 'paid' ? C.green : p.status === 'cancelled' ? C.red : C.amber)}>{p.status === 'paid' ? '지급완료' : p.status === 'cancelled' ? '취소' : '대기'}</span></td>
+                      <td style={tdStyle}>
+                        {p.status === 'pending' && <button onClick={() => handlePaymentConfirm(p)} style={{ ...btnPrimary(C.green), padding: '6px 12px', fontSize: 12 }}>지급 확정</button>}
+                        {p.status === 'paid' && <span style={{ fontSize: 11, color: C.gray400 }}>장부 반영됨</span>}
+                      </td>
+                    </tr>
+                  ))}
+                  {flPayments.length === 0 && <tr><td colSpan={7} style={{ ...tdStyle, textAlign: 'center', padding: 48, color: C.gray400 }}>해당 월 지급 내역이 없습니다</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -1043,14 +1041,24 @@ export default function PayrollPage() {
               {/* Sec 0: 기본정보 */}
               {mSec === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div><label style={{ fontSize: 12, fontWeight: 700, color: C.gray500, display: 'block', marginBottom: 4 }}>직원 선택</label>
-                    <select value={fEmpId} onChange={e => setFEmpId(e.target.value)} style={inputBase}><option value="">선택하세요</option>{emps.map(e => <option key={e.id} value={e.id}>{e.employee_name} ({deptMap[e.department_id] || '-'})</option>)}</select></div>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}><label style={{ fontSize: 12, fontWeight: 700, color: C.gray500, display: 'block', marginBottom: 4 }}>고용유형</label>
-                      <select value={fEmpType} onChange={e => { setFEmpType(e.target.value); setFTax(e.target.value === '프리랜서' ? '사업소득3.3%' : '근로소득') }} style={inputBase}>{EMPLOYMENT_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
+                      <select value={fEmpType} onChange={e => { setFEmpType(e.target.value); setFTax(e.target.value === '프리랜서' ? '사업소득3.3%' : '근로소득'); setFEmpId('') }} style={inputBase}>{EMPLOYMENT_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
                     <div style={{ flex: 1 }}><label style={{ fontSize: 12, fontWeight: 700, color: C.gray500, display: 'block', marginBottom: 4 }}>급여유형</label>
                       <select value={fSalType} onChange={e => setFSalType(e.target.value)} style={inputBase}>{SALARY_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
                   </div>
+                  <div><label style={{ fontSize: 12, fontWeight: 700, color: C.gray500, display: 'block', marginBottom: 4 }}>{fEmpType === '프리랜서' ? '프리랜서 선택' : '직원 선택'}</label>
+                    <select value={fEmpId} onChange={e => setFEmpId(e.target.value)} style={inputBase}>
+                      <option value="">선택하세요</option>
+                      {fEmpType === '프리랜서' ? (
+                        <>
+                          {freelancers.filter(f => f.is_active).map(f => <option key={`fl-${f.id}`} value={f.id}>{f.name} ({f.service_type || '프리랜서'})</option>)}
+                          {emps.filter(e => e.employee_name).map(e => <option key={`emp-${e.id}`} value={e.id}>{e.employee_name} (직원-프리랜서전환)</option>)}
+                        </>
+                      ) : (
+                        emps.filter(e => e.employee_name).map(e => <option key={e.id} value={e.id}>{e.employee_name} ({deptMap[e.department_id] || '-'})</option>)
+                      )}
+                    </select></div>
                   {fEmpType === '프리랜서' && <div style={{ background: C.amberLight, border: `1px solid ${C.amberBorder}`, borderRadius: 10, padding: 12, fontSize: 12, color: C.amber, fontWeight: 600 }}>프리랜서는 4대보험 대신 3.3% 원천징수(소득세 3% + 지방소득세 0.3%)가 적용됩니다.</div>}
                   {fSalType === '연봉제' ? (
                     <div><label style={{ fontSize: 12, fontWeight: 700, color: C.gray500, display: 'block', marginBottom: 4 }}>연봉</label>

@@ -7,6 +7,7 @@ const MODEL_MAIN = "gemini-2.0-flash";
 
 async function callGeminiAI(base64Data: string, mimeType: string) {
   const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
 
   const systemInstruction = `
     당신은 대한민국 차량 등록증 분석 전문가입니다.
@@ -87,8 +88,14 @@ async function callGeminiAI(base64Data: string, mimeType: string) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[ocr-registration] 요청 수신, Authorization:', request.headers.get('authorization') ? '있음' : '없음')
+
   const auth = await requireAuth(request)
-  if (auth.error) return auth.error
+  if (auth.error) {
+    console.error('[ocr-registration] ❌ 인증 실패')
+    return auth.error
+  }
+  console.log('[ocr-registration] ✅ 인증 성공:', auth.email)
 
   try {
     const { imageBase64, mimeType } = await request.json()
@@ -96,13 +103,14 @@ export async function POST(request: NextRequest) {
     // 기본값은 jpeg
     const finalMimeType = mimeType || "image/jpeg";
 
-    console.log(`🚀 [등록증분석] ${MODEL_MAIN} 가동 (${finalMimeType})`);
+    console.log(`🚀 [등록증분석] ${MODEL_MAIN} 가동 (${finalMimeType}, data size: ${Math.round(base64Data.length / 1024)}KB)`);
     const result = await callGeminiAI(base64Data, finalMimeType);
 
     console.log(`✅ [완료] ${result.brand} ${result.model_name}`);
     return NextResponse.json(result);
 
   } catch (error: any) {
+    console.error('[ocr-registration] ❌ 처리 에러:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

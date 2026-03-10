@@ -201,17 +201,33 @@ const { company, role, adminSelectedCompanyId } = useApp()
                   const reader = new FileReader(); reader.readAsDataURL(fileToUpload); reader.onload = () => r(reader.result as string);
               })
 
-              // AI 분석 (MIME Type 전달) + 타임아웃 30초
+              // AI 분석 (MIME Type 전달) + 타임아웃 60초
               const controller = new AbortController()
-              const timeout = setTimeout(() => controller.abort(), 30000)
+              const timeout = setTimeout(() => controller.abort(), 60000)
+
+              // 인증 헤더 추가
+              const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+              const { data: { session: authSession } } = await supabase.auth.getSession()
+              console.log('[Registration] auth session:', authSession ? `token=${authSession.access_token?.slice(0,20)}...` : 'NO SESSION')
+              if (authSession?.access_token) {
+                authHeaders['Authorization'] = `Bearer ${authSession.access_token}`
+              } else {
+                console.error('[Registration] ⚠️ 인증 세션 없음 - 401 에러 발생 가능')
+              }
 
               const response = await fetch('/api/ocr-registration', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: authHeaders,
                   body: JSON.stringify({ imageBase64: base64, mimeType: isPdf ? 'application/pdf' : 'image/jpeg' }),
                   signal: controller.signal
               })
               clearTimeout(timeout)
+
+              if (!response.ok) {
+                const errText = await response.text()
+                console.error('[Registration] API 응답 에러:', response.status, errText)
+                throw new Error(`서버 에러 ${response.status}: ${errText}`)
+              }
 
               const result = await response.json()
               if (result.error) throw new Error(result.error)
@@ -266,7 +282,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
               setLogs(prev => [`✅ [${detectedBrand}] ${detectedModel} 등록 완료 (${isPdf ? 'PDF' : 'IMG'})`, ...prev])
 
           } catch (error: any) {
-              const msg = error.name === 'AbortError' ? '타임아웃 (30초 초과)' : error.message
+              const msg = error.name === 'AbortError' ? '타임아웃 (60초 초과)' : error.message
               setProgress(prev => ({ ...prev, fail: prev.fail + 1 }))
               setLogs(prev => [`❌ ${files[i].name} 실패: ${msg}`, ...prev])
               newFailedFiles.push(originalFile)  // 실패 파일 저장
@@ -510,7 +526,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
          ) : (
            <>
              {/* Desktop Table View */}
-             <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+             <div style={{ overflowX: 'auto', display: 'block' }}>
                  <table className="w-full text-left border-collapse min-w-[650px]">
                      <thead className="bg-steel-50 border-b border-gray-100 text-steel-900 uppercase text-xs font-bold tracking-wider">
                          <tr>
@@ -579,7 +595,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
              </div>
 
              {/* Mobile Card View */}
-             <div className="md:hidden">
+             <div style={{ display: 'none' }}>
                {cars.map((car) => (
                  <div key={car.id} className="p-4 flex items-center gap-3">
                    <div className="w-12 h-10 bg-gray-100 rounded border overflow-hidden flex-shrink-0" onClick={() => router.push(`/registration/${car.id}`)}>

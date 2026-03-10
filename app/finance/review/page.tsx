@@ -119,7 +119,7 @@ export default function ClassificationReviewPage() {
       supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', companyId),
       supabase.from('general_investments').select('id, investor_name').eq('company_id', companyId),
       supabase.from('freelancers').select('id, name').eq('company_id', companyId),
-      supabase.from('profiles').select('id, employee_name, email, phone, position, department').eq('company_id', companyId),
+      supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id').eq('company_id', companyId),
     ])
     setJiips(j.data || [])
     setInvestors(i.data || [])

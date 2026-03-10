@@ -671,9 +671,13 @@ export default function CorporateCardsPage() {
         reader.readAsDataURL(file)
       })
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) authHeaders['Authorization'] = `Bearer ${session.access_token}`
+
       const res = await fetch('/api/ocr-card', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ imageBase64: base64, mimeType: file.type || 'image/jpeg' })
       })
 
