@@ -166,6 +166,7 @@ export default function SettlementDashboard() {
   const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([])
   const [carTxHistory, setCarTxHistory] = useState<{ related_id: string; type: string; amount: number; transaction_date: string; category?: string; client_name?: string; description?: string }[]>([])
   const [classifiedItems, setClassifiedItems] = useState<ClassifiedItem[]>([])
+  const [shareHistory, setShareHistory] = useState<{ id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[]>([])
 
   // 정산 실행 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -237,7 +238,7 @@ export default function SettlementDashboard() {
     const past12Start = `${year - 1}-${String(month).padStart(2, '0')}-01`
 
     // 병렬 로드
-    const [txRes, jiipRes, investRes, loanRes, allSettleRes, carTxRes, classifyRes] = await Promise.all([
+    const [txRes, jiipRes, investRes, loanRes, allSettleRes, carTxRes, classifyRes, shareHistoryRes] = await Promise.all([
       // 거래 내역 (당월)
       (() => {
         let q = supabase.from('transactions').select('*')
@@ -284,6 +285,13 @@ export default function SettlementDashboard() {
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q.order('created_at', { ascending: false }).limit(500)
       })(),
+      // 정산 발송 이력 (당월)
+      (() => {
+        let q = supabase.from('settlement_shares')
+          .select('id, recipient_name, recipient_phone, settlement_month, total_amount, created_at, paid_at')
+        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        return q.eq('settlement_month', filterDate).order('created_at', { ascending: false })
+      })(),
     ])
 
     const txs = txRes.data || []
@@ -293,6 +301,7 @@ export default function SettlementDashboard() {
     const allSettleTxs = allSettleRes.data || []
     const carTxs = carTxRes.data || []
     const classifyData = (classifyRes.data || []) as ClassifiedItem[]
+    setShareHistory(shareHistoryRes.data || [])
 
     // 디버그: 투자/대출 데이터 확인
     console.log('[Settlement] investData:', investData.map(i => ({
@@ -1007,6 +1016,35 @@ export default function SettlementDashboard() {
     }
   }
 
+  // 지급완료/취소 토글
+  const handleTogglePaid = async (shareId: string, currentlyPaid: boolean) => {
+    try {
+      const authToken = (await supabase.auth.getSession()).data.session?.access_token
+      const res = await fetch('/api/settlement/share/paid', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          share_ids: [shareId],
+          action: currentlyPaid ? 'unmark_paid' : 'mark_paid',
+        }),
+      })
+      if (res.ok) {
+        showToast(currentlyPaid ? '지급완료 취소됨' : '지급완료 처리됨', 'success')
+        // 로컬 상태 업데이트
+        setShareHistory(prev => prev.map(sh =>
+          sh.id === shareId
+            ? { ...sh, paid_at: currentlyPaid ? null : new Date().toISOString() }
+            : sh
+        ))
+      } else {
+        const err = await res.json()
+        showToast(err.error || '처리 실패', 'error')
+      }
+    } catch (e: any) {
+      showToast(`오류: ${e.message}`, 'error')
+    }
+  }
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -1200,6 +1238,8 @@ export default function SettlementDashboard() {
                 sendingNotify={sendingNotify}
                 notifyChannel={notifyChannel}
                 setNotifyChannel={setNotifyChannel}
+                shareHistory={shareHistory}
+                onTogglePaid={handleTogglePaid}
               />
             )}
             {activeTab === 'classify' && (
@@ -2252,7 +2292,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 // ============================================
 // 탭 4: 정산 실행
 // ============================================
-function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel }: {
+function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel, shareHistory, onTogglePaid }: {
   items: SettlementItem[]
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
@@ -2263,6 +2303,8 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
   sendingNotify: boolean
   notifyChannel: 'sms' | 'email'
   setNotifyChannel: (ch: 'sms' | 'email') => void
+  shareHistory: { id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[]
+  onTogglePaid: (shareId: string, currentlyPaid: boolean) => void
 }) {
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
@@ -2501,6 +2543,69 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                     </tr>
                   )
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 정산 발송 이력 / 지급 관리 */}
+      {shareHistory.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', marginTop: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>📋 발송 이력 · 지급 관리</span>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>
+              {shareHistory.filter(s => s.paid_at).length}/{shareHistory.length}건 지급완료
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 700, color: '#6b7280' }}>수신자</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#6b7280' }}>금액</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700, color: '#6b7280' }}>발송일</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700, color: '#6b7280' }}>상태</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700, color: '#6b7280' }}>처리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shareHistory.map(sh => (
+                  <tr key={sh.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, color: '#111827' }}>{sh.recipient_name}</div>
+                      {sh.recipient_phone && (
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                          {sh.recipient_phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#2d5fa8' }}>{nf(sh.total_amount)}원</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: 12, color: '#6b7280' }}>
+                      {new Date(sh.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {sh.paid_at ? (
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#16a34a', background: '#f0fdf4', padding: '3px 10px', borderRadius: 12 }}>지급완료</span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: '#fffbeb', padding: '3px 10px', borderRadius: 12 }}>대기</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => onTogglePaid(sh.id, !!sh.paid_at)}
+                        style={{
+                          padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          background: sh.paid_at ? '#fef2f2' : '#f0fdf4',
+                          color: sh.paid_at ? '#dc2626' : '#16a34a',
+                          border: `1px solid ${sh.paid_at ? '#fecaca' : '#bbf7d0'}`,
+                        }}
+                      >
+                        {sh.paid_at ? '취소' : '지급완료'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
