@@ -47,8 +47,13 @@ type SettlementItem = {
     carryOver: number          // 전월 이월 적자
     effectiveDistributable: number // 실제 배분대상 = 배분대상 + 이월
     shareRatio: number
-    investorPayout: number     // 차주 배분금
+    investorPayout: number     // 차주 배분금 (세전)
     companyProfit: number      // 회사 수익
+    taxType?: string           // 세금 유형 (세금계산서, 사업소득(3.3%), 이자소득(27.5%))
+    taxRate?: number           // 세율 (%)
+    taxAmount?: number         // 공제액 또는 VAT
+    supplyAmount?: number      // 공급가 (세금계산서: 배분금/1.1)
+    netPayout?: number         // 실수령액
   }
 }
 
@@ -61,7 +66,8 @@ type JiipContract = {
   contract_start_date?: string
   status: string
   car_id: string
-  cars?: { number: string }
+  tax_type?: string
+  cars?: { number: string; model?: string }
 }
 
 type InvestContract = {
@@ -481,6 +487,31 @@ export default function SettlementDashboard() {
         // 이미 지급 완료된 이전 기준월은 건너뜀 (당기 지급분은 항상 표시)
         if (isPaid && !isCurrentPayment) return
 
+        // 세금 계산
+        // 세금계산서: 배분금 = 공급가 + 부가세(VAT) → 공급가 = 배분금/1.1, VAT = 배분금-공급가
+        //   실수령액 = 배분금 그대로 (세금계산서 발행 목적의 내역 분리만)
+        // 사업소득(3.3%): 원천징수 3.3% 차감 → 실수령액 = 배분금 - 3.3%
+        // 이자소득(27.5%): 원천징수 27.5% 차감 → 실수령액 = 배분금 - 27.5%
+        const taxType = j.tax_type || '세금계산서'
+        let taxRate = 0
+        let taxAmount = 0
+        let netPayout = investorPayout
+        let supplyAmount = 0  // 공급가 (세금계산서용)
+        if (taxType === '세금계산서') {
+          taxRate = 10
+          supplyAmount = investorPayout > 0 ? Math.round(investorPayout / 1.1) : 0
+          taxAmount = investorPayout - supplyAmount  // VAT = 배분금 - 공급가
+          netPayout = investorPayout  // 배분금 = 실수령액 (변동 없음)
+        } else if (taxType === '사업소득(3.3%)') {
+          taxRate = 3.3
+          taxAmount = investorPayout > 0 ? Math.round(investorPayout * taxRate / 100) : 0
+          netPayout = investorPayout - taxAmount  // 원천징수 차감
+        } else if (taxType === '이자소득(27.5%)') {
+          taxRate = 27.5
+          taxAmount = investorPayout > 0 ? Math.round(investorPayout * taxRate / 100) : 0
+          netPayout = investorPayout - taxAmount  // 원천징수 차감
+        }
+
         const dueDay = j.payout_day || 10
         const prorataNote = isProrated ? ` (일할=${nf(adminFee)})` : ''
         const carryNote = carryOver < 0 && effectiveDistributable <= 0 ? ` [이월: ${nf(carryOver)}]` : ''
@@ -492,7 +523,7 @@ export default function SettlementDashboard() {
           id: `jiip-${j.id}-${m}`,
           type: 'jiip',
           name: j.investor_name,
-          amount: investorPayout,
+          amount: netPayout,
           dueDay,
           dueDate: `${actualDueMonth}-${dueDay.toString().padStart(2, '0')}`,
           status: isPaid ? 'paid' : 'pending',
@@ -518,6 +549,11 @@ export default function SettlementDashboard() {
             companyProfit: effectiveDistributable > 0
               ? effectiveDistributable - investorPayout + adminFee
               : adminFee,
+            taxType,
+            taxRate,
+            taxAmount,
+            supplyAmount,
+            netPayout,
           },
         })
       })
@@ -771,18 +807,28 @@ export default function SettlementDashboard() {
       msg += `■ ${monthDisplay} 정산\n`
       d.items.forEach(it => {
         msg += `  ${typeLabel(it.type)}: ${nf(it.amount)}원\n`
-        // breakdown이 있으면 대략적 계산내역 추가 (수입→비용→배분)
+        // breakdown이 있으면 대략적 계산내역 추가 (수입→비용→배분→세금)
         const bd = it.breakdown
         if (bd && it.type === 'jiip') {
-          const revenue = bd.totalRevenue || bd.revenue || 0
-          const expense = bd.totalExpense || bd.expense || 0
+          const revenue = (bd as any).totalRevenue || bd.revenue || 0
+          const expense = (bd as any).totalExpense || bd.expense || 0
           const adminFee = bd.adminFee || 0
-          const ratio = bd.shareRatio || bd.distributionRatio || 0
+          const ratio = bd.shareRatio || 0
           if (revenue > 0) {
             msg += `    수입 ${nf(revenue)} - 비용 ${nf(expense)}`
             if (adminFee > 0) msg += ` - 관리비 ${nf(adminFee)}`
             if (ratio > 0) msg += ` (배분 ${ratio > 1 ? ratio.toFixed(0) : (ratio * 100).toFixed(0)}%)`
             msg += `\n`
+          }
+          // 세금 정보 추가
+          if (bd.taxType && bd.taxAmount && bd.investorPayout) {
+            if (bd.taxType === '세금계산서') {
+              msg += `    (세금계산서) 공급가 ${nf(bd.supplyAmount || 0)} + VAT ${nf(bd.taxAmount || 0)} = ${nf(bd.investorPayout)}원\n`
+            } else if (bd.taxType === '사업소득(3.3%)') {
+              msg += `    배분금 ${nf(bd.investorPayout)} - 원천징수 3.3% ${nf(bd.taxAmount || 0)} = ${nf(bd.netPayout || 0)}원\n`
+            } else if (bd.taxType === '이자소득(27.5%)') {
+              msg += `    배분금 ${nf(bd.investorPayout)} - 원천징수 27.5% ${nf(bd.taxAmount || 0)} = ${nf(bd.netPayout || 0)}원\n`
+            }
           }
         }
       })
@@ -2485,8 +2531,30 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                     <td style={{ padding: '12px 16px', fontWeight: 800, color: '#111827' }}>{item.name}</td>
                     <td style={{ padding: '12px 16px', fontSize: 12, color: '#9ca3af' }}>{item.carNumber || '-'}</td>
                     <td style={{ padding: '12px 16px', fontWeight: 700, color: '#4b5563' }}>{item.dueDate.slice(5)}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 900, color: '#dc2626' }}>{nf(item.amount)}원</td>
-                    <td style={{ padding: '12px 16px', fontSize: 11, color: '#9ca3af', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.detail}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 900, color: '#dc2626' }}>
+                      {nf(item.amount)}원
+                      {item.breakdown?.taxType && item.breakdown.taxType !== '세금계산서' && item.breakdown.taxAmount ? (
+                        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>
+                          세전 {nf(item.breakdown.investorPayout)}
+                        </div>
+                      ) : null}
+                      {item.breakdown?.taxType === '세금계산서' && item.breakdown.taxAmount ? (
+                        <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>
+                          공급가 {nf(item.breakdown.supplyAmount || 0)} / VAT {nf(item.breakdown.taxAmount)}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 11, color: '#9ca3af', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.detail}
+                      {item.breakdown?.taxType && (
+                        <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 5px', borderRadius: 4, fontWeight: 700,
+                          background: item.breakdown.taxType === '세금계산서' ? '#dbeafe' : item.breakdown.taxType === '사업소득(3.3%)' ? '#fef3c7' : '#fce7f3',
+                          color: item.breakdown.taxType === '세금계산서' ? '#1d4ed8' : item.breakdown.taxType === '사업소득(3.3%)' ? '#92400e' : '#9d174d',
+                        }}>
+                          {item.breakdown.taxType === '세금계산서' ? '계산서' : item.breakdown.taxType === '사업소득(3.3%)' ? '3.3%' : '27.5%'}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}

@@ -32,6 +32,11 @@ type SettlementItem = {
     shareRatio?: number
     investorPayout?: number
     companyProfit?: number
+    taxType?: string       // 세금계산서, 사업소득(3.3%), 이자소득(27.5%)
+    taxRate?: number       // 세율 (%)
+    taxAmount?: number     // 세금/공제액 또는 VAT
+    supplyAmount?: number  // 공급가 (세금계산서: 배분금/1.1)
+    netPayout?: number     // 실수령액
   }
 }
 
@@ -280,6 +285,11 @@ export default function SettlementViewPage() {
                 const totalDistributable = group.items.reduce((s, it) => s + (it.breakdown?.distributable || 0), 0)
                 const totalCarryOver = group.items.reduce((s, it) => s + (it.breakdown?.carryOver || 0), 0)
                 const totalPayout = group.items.reduce((s, it) => s + (it.breakdown?.investorPayout || 0), 0)
+                const totalTaxAmount = group.items.reduce((s, it) => s + (it.breakdown?.taxAmount || 0), 0)
+                const totalSupplyAmount = group.items.reduce((s, it) => s + (it.breakdown?.supplyAmount || 0), 0)
+                const totalNetPayout = group.items.reduce((s, it) => s + (it.breakdown?.netPayout ?? it.breakdown?.investorPayout ?? 0), 0)
+                const taxType = group.items[0]?.breakdown?.taxType
+                const taxRate = group.items[0]?.breakdown?.taxRate
                 const shareRatio = group.items[0]?.breakdown?.shareRatio
                 const isMultiMonth = group.items.length > 1
 
@@ -377,10 +387,52 @@ export default function SettlementViewPage() {
                             </tr>
                           )}
                           {totalPayout > 0 && (
-                            <tr style={{ backgroundColor: '#eef2ff', borderRadius: '4px' }}>
-                              <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>차주 배분금{isMultiMonth ? ' (합계)' : ''}</td>
+                            <tr style={{
+                              borderBottom: (taxType && taxType !== '세금계산서') ? '1px solid #e5e7eb' : 'none',
+                              backgroundColor: (taxType && taxType !== '세금계산서') ? 'transparent' : '#eef2ff',
+                            }}>
+                              <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>
+                                차주 배분금{isMultiMonth ? ' (합계)' : ''}{taxType === '세금계산서' ? ' (세금계산서)' : ''}
+                              </td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR, fontSize: '16px' }}>{nf(totalPayout)}원</td>
                             </tr>
+                          )}
+                          {/* 세금 처리 */}
+                          {taxType && taxType === '세금계산서' && totalTaxAmount > 0 && (
+                            <>
+                              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '8px', color: '#666', fontSize: '12px' }}>ㄴ 공급가</td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#4b5563', fontSize: '12px' }}>{nf(totalSupplyAmount)}원</td>
+                              </tr>
+                              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '8px', color: '#666', fontSize: '12px' }}>ㄴ 부가세 (VAT 10%)</td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#4b5563', fontSize: '12px' }}>{nf(totalTaxAmount)}원</td>
+                              </tr>
+                            </>
+                          )}
+                          {taxType && taxType === '사업소득(3.3%)' && totalTaxAmount > 0 && (
+                            <>
+                              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '8px', color: '#666', fontSize: '13px' }}>원천징수 (사업소득 3.3%)</td>
+                                <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>-{nf(totalTaxAmount)}원</td>
+                              </tr>
+                              <tr style={{ backgroundColor: '#eef2ff', borderRadius: '4px' }}>
+                                <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>실수령액</td>
+                                <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR, fontSize: '16px' }}>{nf(totalNetPayout)}원</td>
+                              </tr>
+                            </>
+                          )}
+                          {taxType && taxType === '이자소득(27.5%)' && totalTaxAmount > 0 && (
+                            <>
+                              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '8px', color: '#666', fontSize: '13px' }}>원천징수 (이자소득 27.5%)</td>
+                                <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>-{nf(totalTaxAmount)}원</td>
+                              </tr>
+                              <tr style={{ backgroundColor: '#eef2ff', borderRadius: '4px' }}>
+                                <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>실수령액</td>
+                                <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR, fontSize: '16px' }}>{nf(totalNetPayout)}원</td>
+                              </tr>
+                            </>
                           )}
                         </tbody>
                       </table>

@@ -82,24 +82,72 @@ export async function GET(
       .eq('id', share.company_id)
       .single()
 
-    // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사, 월별 최신 1건만)
+    // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사)
+    // - 현재 정산서의 월은 제외
+    // - settlement_month에 여러 월이 포함된 경우(콤마구분) 분리하여 각각 표시
+    // - 월별 중복 제거 (최신 1건만)
     let pastSettlements: { settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[] = []
     if (share.recipient_phone) {
+      // 현재 정산서의 월 목록 (예: "2026-01,2026-02" → ["2026-01", "2026-02"])
+      const currentMonths = new Set(
+        (share.settlement_month || '').split(',').map((m: string) => m.trim()).filter(Boolean)
+      )
+
       const { data: pastData } = await supabase
         .from('settlement_shares')
-        .select('settlement_month, total_amount, created_at, paid_at')
+        .select('settlement_month, total_amount, items, created_at, paid_at')
         .eq('recipient_phone', share.recipient_phone)
         .eq('company_id', share.company_id)
         .neq('id', share.id)
         .order('created_at', { ascending: false })
         .limit(50)
-      // 월별 중복 제거 (최신 1건만 유지)
+
+      // 월별 분리 + 중복 제거
       const seen = new Set<string>()
-      pastSettlements = (pastData || []).filter(ps => {
-        if (seen.has(ps.settlement_month)) return false
-        seen.add(ps.settlement_month)
-        return true
-      }).slice(0, 12)
+      const expanded: typeof pastSettlements = []
+
+      ;(pastData || []).forEach(ps => {
+        // settlement_month가 여러 월인 경우 분리
+        const months = (ps.settlement_month || '').split(',').map((m: string) => m.trim()).filter(Boolean)
+        const itemsArr = Array.isArray(ps.items) ? ps.items : []
+
+        if (months.length <= 1) {
+          // 단일 월
+          const m = months[0] || ps.settlement_month
+          if (currentMonths.has(m)) return  // 현재 정산서 월 제외
+          if (seen.has(m)) return
+          seen.add(m)
+          expanded.push({
+            settlement_month: m,
+            total_amount: ps.total_amount,
+            created_at: ps.created_at,
+            paid_at: ps.paid_at,
+          })
+        } else {
+          // 여러 월 → 각 월별로 분리 (items에서 해당 월 금액 추출)
+          months.forEach((m: string) => {
+            if (currentMonths.has(m)) return
+            if (seen.has(m)) return
+            seen.add(m)
+            // items에서 해당 월의 금액만 합산
+            const monthItems = itemsArr.filter((it: any) => it.monthLabel === m)
+            const monthAmount = monthItems.length > 0
+              ? monthItems.reduce((s: number, it: any) => s + (it.amount || 0), 0)
+              : Math.round(ps.total_amount / months.length)  // fallback: 균등 분배
+            expanded.push({
+              settlement_month: m,
+              total_amount: monthAmount,
+              created_at: ps.created_at,
+              paid_at: ps.paid_at,
+            })
+          })
+        }
+      })
+
+      // 최신순 정렬 후 최대 12건
+      pastSettlements = expanded
+        .sort((a, b) => b.settlement_month.localeCompare(a.settlement_month))
+        .slice(0, 12)
     }
 
     // 8. 계좌 정보 마스킹 처리
