@@ -187,6 +187,7 @@ export default function SettlementDashboard() {
       relatedId: string
       dueDate: string
       carNumber?: string
+      carId?: string
       breakdown?: SettlementItem['breakdown']
     }[]
     message: string
@@ -831,6 +832,7 @@ export default function SettlementDashboard() {
           relatedId: item.relatedId,
           dueDate: item.dueDate,
           carNumber: item.carNumber,
+          carId: item.carId,
           breakdown: item.breakdown,
         })
       })
@@ -896,6 +898,7 @@ export default function SettlementDashboard() {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
             body: JSON.stringify({
               recipient_name: r.name,
+              recipient_phone: r.phone,
               settlement_month: r.items[0]?.monthLabel || filterDate,
               payment_date: r.items[0]?.dueDate || '',
               total_amount: r.totalAmount,
@@ -905,8 +908,30 @@ export default function SettlementDashboard() {
                 amount: it.amount,
                 detail: it.detail,
                 carNumber: it.carNumber,
+                carId: (it as any).carId,
                 breakdown: it.breakdown,
               })),
+              // 차량별 거래 상세내역 (수입/비용 항목별)
+              transaction_details: (() => {
+                const details: Record<string, { date: string; description: string; amount: number; type: string; category?: string }[]> = {}
+                r.items.forEach(it => {
+                  const carId = (it as any).carId || settlementItems.find(si => si.id === `jiip-${it.relatedId}-${it.monthLabel}`)?.carId
+                  if (!carId || it.type !== 'jiip') return
+                  const key = `${carId}_${it.monthLabel}`
+                  if (details[key]) return // 이미 처리됨
+                  details[key] = carTxHistory
+                    .filter(t => t.related_id === carId && t.transaction_date.startsWith(it.monthLabel))
+                    .map(t => ({
+                      date: t.transaction_date,
+                      description: t.client_name || t.description || t.category || '',
+                      amount: Math.abs(t.amount),
+                      type: t.type,
+                      category: t.category || '',
+                    }))
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                })
+                return Object.keys(details).length > 0 ? details : undefined
+              })(),
               message: smsModal.customNote || undefined,
               company_id: effectiveCompanyId,
             }),

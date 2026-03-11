@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 
 // ============================================
 // 정산 상세 조회 API (공개)
-// GET /api/settlement/share/[token]
-// 인증 불필요 - 토큰으로만 접근
+// GET /api/settlement/share/[token]?phone=1234
+// 전화번호 뒷4자리 인증 → 인증 통과 시 상세 데이터 반환
 // ============================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -38,11 +38,35 @@ export async function GET(
       return NextResponse.json({ error: '만료된 링크입니다.', code: 'EXPIRED' }, { status: 410 })
     }
 
-    // 3. 첫 조회 시 viewed_at 설정
+    // 3. 전화번호 인증 확인
+    const phoneParam = req.nextUrl.searchParams.get('phone')
+    const hasPhone = !!share.recipient_phone
+    let phoneVerified = false
+
+    if (hasPhone) {
+      if (!phoneParam) {
+        // 전화번호 인증 필요 → 기본 정보만 반환
+        return NextResponse.json({
+          requires_phone: true,
+          recipient_name: share.recipient_name,
+          settlement_month: share.settlement_month,
+          company_name: null, // 아래에서 채움
+        })
+      }
+      // 뒷4자리 비교
+      const storedLast4 = share.recipient_phone.slice(-4)
+      const inputLast4 = phoneParam.replace(/[^0-9]/g, '').slice(-4)
+      if (storedLast4 !== inputLast4) {
+        return NextResponse.json({ error: '전화번호가 일치하지 않습니다.', code: 'PHONE_MISMATCH' }, { status: 401 })
+      }
+      phoneVerified = true
+    }
+
+    // 4. 첫 조회 시 viewed_at 설정
     const isFirstView = !share.viewed_at
     const newViewCount = (share.view_count || 0) + 1
 
-    // 4. 조회 정보 업데이트
+    // 5. 조회 정보 업데이트
     await supabase
       .from('settlement_shares')
       .update({
@@ -51,14 +75,14 @@ export async function GET(
       })
       .eq('id', share.id)
 
-    // 5. 회사 정보 조회
+    // 6. 회사 정보 조회
     const { data: company } = await supabase
       .from('companies')
       .select('id, name, business_number, address, phone, email, logo_url')
       .eq('id', share.company_id)
       .single()
 
-    // 6. 반환 데이터 가공
+    // 7. 반환 데이터 가공
     const publicData = {
       id: share.id,
       token: share.token,
@@ -68,12 +92,14 @@ export async function GET(
       total_amount: share.total_amount,
       items: share.items,
       breakdown: share.breakdown,
+      transaction_details: share.transaction_details || null,
       message: share.message,
       created_at: share.created_at,
       expires_at: share.expires_at,
       viewed_at: share.viewed_at,
       view_count: newViewCount,
       is_first_view: isFirstView,
+      phone_verified: phoneVerified,
       company: company || null,
     }
 

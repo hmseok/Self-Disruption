@@ -33,6 +33,7 @@ type SettlementItem = {
   amount: number
   detail: string
   carNumber?: string
+  carId?: string
   breakdown?: {
     revenue?: number
     expense?: number
@@ -44,19 +45,28 @@ type SettlementItem = {
   }
 }
 
+type TransactionDetail = {
+  date: string
+  description: string
+  amount: number
+  type: 'income' | 'expense'
+  category?: string
+}
+
 type CreateShareRequest = {
   recipient_name: string
+  recipient_phone?: string
   settlement_month: string
   payment_date?: string
   total_amount: number
   items: SettlementItem[]
   breakdown?: Record<string, any>
+  transaction_details?: Record<string, TransactionDetail[]>  // carId_month → 거래내역[]
   message?: string
   company_id: string
 }
 
 function generateToken(): string {
-  // 12글자 nanoid 스타일 토큰 생성
   return crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, (c) => {
     const replacements: Record<string, string> = { '+': '-', '/': '_', '=': '' }
     return replacements[c] || c
@@ -71,11 +81,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as CreateShareRequest
     const {
       recipient_name,
+      recipient_phone,
       settlement_month,
       payment_date,
       total_amount,
       items,
       breakdown,
+      transaction_details,
       message,
       company_id
     } = body
@@ -103,22 +115,26 @@ export async function POST(request: NextRequest) {
     const token = generateToken()
 
     // 공유 레코드 생성
+    const insertData: Record<string, any> = {
+      token,
+      company_id,
+      recipient_name: recipient_name.trim(),
+      recipient_phone: recipient_phone?.replace(/[^0-9]/g, '') || null,
+      settlement_month: settlement_month.trim(),
+      payment_date: payment_date?.trim() || null,
+      total_amount: total_amount || 0,
+      items: items,
+      breakdown: breakdown || null,
+      transaction_details: transaction_details || null,
+      message: message?.trim() || null,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      view_count: 0,
+    }
+
     const { data, error } = await sb
       .from('settlement_shares')
-      .insert({
-        token,
-        company_id,
-        recipient_name: recipient_name.trim(),
-        settlement_month: settlement_month.trim(),
-        payment_date: payment_date?.trim() || null,
-        total_amount: total_amount || 0,
-        items: items,
-        breakdown: breakdown || null,
-        message: message?.trim() || null,
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-        view_count: 0,
-      })
+      .insert(insertData)
       .select()
       .single()
 
