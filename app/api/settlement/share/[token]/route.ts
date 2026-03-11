@@ -82,7 +82,7 @@ export async function GET(
       .eq('id', share.company_id)
       .single()
 
-    // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사)
+    // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사, 월별 최신 1건만)
     let pastSettlements: { settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[] = []
     if (share.recipient_phone) {
       const { data: pastData } = await supabase
@@ -92,8 +92,14 @@ export async function GET(
         .eq('company_id', share.company_id)
         .neq('id', share.id)
         .order('created_at', { ascending: false })
-        .limit(12)
-      pastSettlements = pastData || []
+        .limit(50)
+      // 월별 중복 제거 (최신 1건만 유지)
+      const seen = new Set<string>()
+      pastSettlements = (pastData || []).filter(ps => {
+        if (seen.has(ps.settlement_month)) return false
+        seen.add(ps.settlement_month)
+        return true
+      }).slice(0, 12)
     }
 
     // 8. 계좌 정보 마스킹 처리
