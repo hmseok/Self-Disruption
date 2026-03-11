@@ -46,3 +46,6 @@ mobile/SelfDisruptionApp/
 
 # SQL migrations (Supabase SQL Editor에서 수동 실행)
 /sql/
+
+# 구형 파일 아카이브
+/_archive/

@@ -716,10 +716,10 @@ export default function QuoteDetailPage() {
 
         return (
         <div className="max-w-[900px] mx-auto pb-10 px-4">
-          <div ref={printRef} className="bg-white rounded-2xl shadow-xl overflow-hidden print:shadow-none print:rounded-none">
+          <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
 
             {/* 헤더 */}
-            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2d5fa8)' }} className="text-white px-6 py-4">
+            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2d5fa8)' }} className="text-white px-6 py-4 rounded-t-2xl">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">단기렌트 청구서</h1>
@@ -823,10 +823,10 @@ export default function QuoteDetailPage() {
           ============================================================ */}
       {!isInvoiceQuote && viewMode === 'quote' && (
         <div className="max-w-[900px] mx-auto pb-10 px-4">
-          <div ref={printRef} className="bg-white rounded-2xl shadow-xl overflow-hidden print:shadow-none print:rounded-none print:overflow-visible">
+          <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
 
             {/* 헤더 */}
-            <div className="bg-gray-900 text-white px-6 py-4 print:px-5 print:py-3">
+            <div className="bg-gray-900 text-white px-6 py-4 print:px-5 print:py-3 rounded-t-2xl print:rounded-none">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">장기렌트 견적서</h1>
@@ -1190,7 +1190,7 @@ export default function QuoteDetailPage() {
             </div>
 
             {/* 푸터 */}
-            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 text-center">
+            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 text-center rounded-b-2xl">
               <p className="text-[10px] text-gray-400">
                 본 견적서는 {company?.name || '당사'}에서 발행한 공식 견적서입니다. 문의: {company?.phone || '-'}
               </p>

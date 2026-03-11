@@ -1754,6 +1754,11 @@ function UploadContent() {
     if (!effectiveCompanyId) return
     setDuplicateInfo({ count: 0, checking: true })
     try {
+      let memoryDupCount = 0
+      let memoryDupGroups: [string, number[]][] = []
+      let dbDupCount = 0
+      let dbGroupCount = 0
+
       // ── 1) 업로드 결과(메모리)에서 중복 감지 ──
       if (results.length > 0) {
         const groups: Record<string, number[]> = {}
@@ -1763,55 +1768,66 @@ function UploadContent() {
           if (!groups[key]) groups[key] = []
           groups[key].push(i)
         }
-        const dupGroups = Object.entries(groups).filter(([, idxs]) => idxs.length > 1)
-        const dupCount = dupGroups.reduce((acc, [, idxs]) => acc + idxs.length - 1, 0)
-
-        if (dupCount > 0) {
-          if (confirm(`⚠️ 업로드 결과 내에서 ${dupCount}건의 중복 거래가 발견되었습니다.\n(${dupGroups.length}개 그룹)\n\n중복 건을 제거하시겠습니까? (각 그룹에서 1건만 유지)`)) {
-            // 각 그룹에서 첫 번째만 유지, 나머지 삭제
-            const removeIdxSet = new Set<number>()
-            for (const [, idxs] of dupGroups) {
-              for (let k = 1; k < idxs.length; k++) {
-                removeIdxSet.add(idxs[k])
-              }
-            }
-            // 삭제할 result ID 목록 (deleteTransaction 사용)
-            const removeIds = [...removeIdxSet].sort((a, b) => b - a) // 역순으로 삭제
-            for (const idx of removeIds) {
-              const r = results[idx]
-              if (r && r.id != null) deleteTransaction(r.id)
-            }
-
-            // queue에서도 중복 삭제 (DB에 저장된 경우)
-            const queueIdsToDelete = [...removeIdxSet]
-              .map(idx => (results[idx] as any)?._queue_id)
-              .filter(Boolean)
-            if (queueIdsToDelete.length > 0) {
-              await fetch('/api/finance/classify', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIdsToDelete })
-              })
-            }
-
-            alert(`✅ ${dupCount}건 중복 제거 완료! (${results.length - dupCount}건 남음)`)
-            setDuplicateInfo({ count: 0, checking: false })
-            fetchStats()
-            return
-          }
-          setDuplicateInfo({ count: dupCount, checking: false })
-          return
-        }
+        memoryDupGroups = Object.entries(groups).filter(([, idxs]) => idxs.length > 1)
+        memoryDupCount = memoryDupGroups.reduce((acc, [, idxs]) => acc + idxs.length - 1, 0)
       }
 
-      // ── 2) DB(transactions)에서 중복 감지 ──
+      // ── 2) DB(transactions)에서 중복 감지 — 항상 실행 ──
       const res = await fetch(`/api/finance/dedup?company_id=${effectiveCompanyId}`)
+      let dbData: any = null
       if (res.ok) {
-        const data = await res.json()
-        setDuplicateInfo({ count: data.duplicateCount, checking: false })
-        if (data.duplicateCount === 0) {
-          alert('✅ 중복 거래가 없습니다!')
-        } else if (confirm(`⚠️ ${data.duplicateCount}건의 중복 거래가 발견되었습니다.\n(${data.groupCount}개 그룹)\n\n중복 건을 삭제하시겠습니까? (먼저 저장된 1건만 유지)`)) {
+        dbData = await res.json()
+        dbDupCount = dbData.duplicateCount || 0
+        dbGroupCount = dbData.groupCount || 0
+      }
+
+      const totalDupCount = memoryDupCount + dbDupCount
+
+      // ── 3) 결과 없으면 완료 ──
+      if (totalDupCount === 0) {
+        alert('✅ 중복 거래가 없습니다!')
+        setDuplicateInfo({ count: 0, checking: false })
+        return
+      }
+
+      // ── 4) 통합 알림 — 한번에 전부 삭제 ──
+      const parts: string[] = []
+      if (memoryDupCount > 0) parts.push(`업로드 내 ${memoryDupCount}건 (${memoryDupGroups.length}개 그룹)`)
+      if (dbDupCount > 0) parts.push(`DB 내 ${dbDupCount}건 (${dbGroupCount}개 그룹)`)
+
+      if (confirm(`⚠️ 총 ${totalDupCount}건의 중복 거래가 발견되었습니다.\n${parts.join('\n')}\n\n모든 중복 건을 한번에 삭제하시겠습니까? (각 그룹에서 1건만 유지)`)) {
+        let deletedTotal = 0
+
+        // 메모리 중복 삭제
+        if (memoryDupCount > 0) {
+          const removeIdxSet = new Set<number>()
+          for (const [, idxs] of memoryDupGroups) {
+            for (let k = 1; k < idxs.length; k++) {
+              removeIdxSet.add(idxs[k])
+            }
+          }
+          const removeIds = [...removeIdxSet].sort((a, b) => b - a)
+          for (const idx of removeIds) {
+            const r = results[idx]
+            if (r && r.id != null) deleteTransaction(r.id)
+          }
+
+          // queue에서도 중복 삭제
+          const queueIdsToDelete = [...removeIdxSet]
+            .map(idx => (results[idx] as any)?._queue_id)
+            .filter(Boolean)
+          if (queueIdsToDelete.length > 0) {
+            await fetch('/api/finance/classify', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIdsToDelete })
+            })
+          }
+          deletedTotal += memoryDupCount
+        }
+
+        // DB 중복 삭제
+        if (dbDupCount > 0) {
           const delRes = await fetch('/api/finance/dedup', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
@@ -1819,11 +1835,16 @@ function UploadContent() {
           })
           if (delRes.ok) {
             const delData = await delRes.json()
-            alert(`✅ ${delData.deleted}건 중복 삭제 완료! (${delData.remaining}건 남음)`)
-            fetchReviewItems()
+            deletedTotal += delData.deleted
           }
         }
+
+        alert(`✅ 총 ${deletedTotal}건 중복 삭제 완료!`)
+        fetchReviewItems()
+        fetchStats()
       }
+
+      setDuplicateInfo({ count: totalDupCount, checking: false })
     } catch (e) {
       console.error(e)
     }

@@ -997,7 +997,7 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 할인율 + 정비군 매핑 ─── */}
 
           {/* 정비군별 요율 매핑 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1129,7 +1129,7 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 롯데 참고 자료 (하단, 접이식) ─── */}
 
           {/* 정비군 분류 기준표 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
             <button onClick={() => setLotteOpen(!lotteOpen)} className="w-full bg-gray-50/50 border-b border-gray-100 px-5 py-3 flex items-center justify-between hover:bg-gray-100/50 transition-colors">
               <span className="font-bold text-gray-800 text-sm flex items-center gap-2">롯데렌터카 공식 요금표 <span className="text-xs text-gray-400 font-medium">{lotteUpdateDate} 기준 · 내륙</span></span>
               <span className={`text-gray-400 text-xs transition-transform ${lotteOpen ? 'rotate-180' : ''}`}>▼</span>
@@ -1344,7 +1344,7 @@ export default function ShortTermReplacementBuilder() {
         <div className="space-y-4">
 
           {/* ① 시장 표준 요율 설정 + 계약 조건 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1442,7 +1442,7 @@ export default function ShortTermReplacementBuilder() {
           </div>
 
           {/* ② 요율표 자동 산출 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1521,7 +1521,7 @@ export default function ShortTermReplacementBuilder() {
           </div>
 
           {/* ③ 고객 정보 + 견적 저장 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />

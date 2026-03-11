@@ -40,8 +40,9 @@ export default function RootLayout({
           html,body{margin:0;padding:0;height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
           body{background:#f9fafb;color:#171717}
           *,*::before,*::after{box-sizing:border-box}
-          .hidden{display:none!important}
-          @media(min-width:1024px){.lg\\:flex{display:flex!important}.lg\\:ml-60{margin-left:15rem!important}}
+          .hidden{display:none}
+          @media(min-width:768px){.md\\:block{display:block}.md\\:hidden{display:none}}
+          @media(min-width:1024px){.lg\\:flex{display:flex}.lg\\:ml-60{margin-left:15rem}}
           .flex{display:flex}.flex-col{flex-direction:column}.flex-1{flex:1 1 0%}
           .items-center{align-items:center}.justify-center{justify-content:center}
           .min-h-screen{min-height:100vh}.w-full{width:100%}.overflow-x-hidden{overflow-x:hidden}

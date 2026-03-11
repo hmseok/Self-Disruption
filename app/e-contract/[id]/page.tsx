@@ -44,7 +44,7 @@ export default function EContractDetailPage() {
   }
 
   const handleCopySignLink = () => {
-    const url = `${window.location.origin}/e-contract/${id}/sign`
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL || window.location.origin}/e-contract/${id}/sign`
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)

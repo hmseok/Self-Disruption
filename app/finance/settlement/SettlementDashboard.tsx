@@ -733,14 +733,14 @@ export default function SettlementDashboard() {
   // 메시지 빌드 헬퍼: 수신자의 항목 목록 → 통합 메시지
   const buildRecipientMessage = (name: string, items: SmsRecipient['items'], shareUrl?: string, note?: string): string => {
     const companyName = company?.name || '회사'
-    const typeLabel = (t: string) => t === 'jiip' ? '수익배분' : '투자이자'
+    const typeLabel = (t: string) => t === 'jiip' ? '수익배분' : t === 'invest' ? '투자이자' : t
 
     // 월별 그룹
-    const byMonth: Record<string, { lines: string[]; subtotal: number }> = {}
+    const byMonth: Record<string, { items: SmsRecipient['items']; subtotal: number }> = {}
     items.forEach(it => {
       const mKey = it.monthLabel || '미정'
-      if (!byMonth[mKey]) byMonth[mKey] = { lines: [], subtotal: 0 }
-      byMonth[mKey].lines.push(`  ${typeLabel(it.type)}: ${nf(it.amount)}원`)
+      if (!byMonth[mKey]) byMonth[mKey] = { items: [], subtotal: 0 }
+      byMonth[mKey].items.push(it)
       byMonth[mKey].subtotal += it.amount
     })
 
@@ -755,8 +755,24 @@ export default function SettlementDashboard() {
       const d = byMonth[m]
       const monthDisplay = m.slice(2, 4) + '년 ' + m.slice(5) + '월'
       msg += `■ ${monthDisplay} 정산\n`
-      d.lines.forEach(l => { msg += l + '\n' })
-      if (d.lines.length > 1) {
+      d.items.forEach(it => {
+        msg += `  ${typeLabel(it.type)}: ${nf(it.amount)}원\n`
+        // breakdown이 있으면 대략적 계산내역 추가 (수입→비용→배분)
+        const bd = it.breakdown
+        if (bd && it.type === 'jiip') {
+          const revenue = bd.totalRevenue || bd.revenue || 0
+          const expense = bd.totalExpense || bd.expense || 0
+          const adminFee = bd.adminFee || 0
+          const ratio = bd.shareRatio || bd.distributionRatio || 0
+          if (revenue > 0) {
+            msg += `    수입 ${nf(revenue)} - 비용 ${nf(expense)}`
+            if (adminFee > 0) msg += ` - 관리비 ${nf(adminFee)}`
+            if (ratio > 0) msg += ` (배분 ${(ratio * 100).toFixed(0)}%)`
+            msg += `\n`
+          }
+        }
+      })
+      if (d.items.length > 1) {
         msg += `  소계: ${nf(d.subtotal)}원\n`
       }
     })
@@ -768,7 +784,7 @@ export default function SettlementDashboard() {
       msg += `\n지급예정일: ${dueDate}\n`
     }
     if (shareUrl) {
-      msg += `\n상세내역 확인:\n${shareUrl}\n`
+      msg += `\n▶ 상세내역 확인:\n${shareUrl}\n`
     }
     if (note) {
       msg += `\n${note}\n`
@@ -870,7 +886,7 @@ export default function SettlementDashboard() {
 
     try {
       const authToken = (await supabase.auth.getSession()).data.session?.access_token
-      const baseUrl = window.location.origin
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
 
       // 1. 수신자별 상세 링크 생성
       const recipientsWithLinks = await Promise.all(validRecipients.map(async (r) => {
