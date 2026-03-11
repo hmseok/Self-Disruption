@@ -254,124 +254,155 @@ export default function SettlementViewPage() {
           </div>
         </div>
 
-        {/* 정산 항목 (통합 뷰) */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          {data.items.map((item, idx) => {
-            const bd = item.breakdown
-            const hasBd = bd && Object.keys(bd).length > 0
-            const txs = getTxDetails(item.carId, item.monthLabel)
-            const incomeTxs = txs.filter(t => t.type === 'income')
-            const expenseTxs = txs.filter(t => t.type === 'expense' && !(t.category || '').includes('차량구입'))
+        {/* 정산 항목 (차량별 통합 뷰) */}
+        {(() => {
+          // 차량별 그룹핑 (같은 차량 여러 월 → 합산)
+          const carGroups: { carNumber: string; carModel: string; items: SettlementItem[] }[] = []
+          const noCarItems: SettlementItem[] = []
+          const carMap = new Map<string, { carModel: string; items: SettlementItem[] }>()
 
-            return (
-              <div key={idx} style={{ marginBottom: idx < data.items.length - 1 ? '20px' : '0', paddingBottom: idx < data.items.length - 1 ? '20px' : '0', borderBottom: idx < data.items.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                {/* 차량번호 + 차종 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  {item.carNumber && (
-                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>{item.carNumber}</span>
-                  )}
-                  {item.carModel && (
-                    <span style={{ fontSize: '13px', color: '#888' }}>{item.carModel}</span>
-                  )}
+          data.items.forEach(item => {
+            if (!item.carNumber) { noCarItems.push(item); return }
+            const key = item.carNumber
+            if (!carMap.has(key)) carMap.set(key, { carModel: item.carModel || '', items: [] })
+            carMap.get(key)!.items.push(item)
+          })
+          carMap.forEach((v, k) => carGroups.push({ carNumber: k, carModel: v.carModel, items: v.items }))
+
+          return (
+            <>
+              {carGroups.map((group, gIdx) => {
+                // 월별 항목들의 breakdown 합산
+                const totalRevenue = group.items.reduce((s, it) => s + (it.breakdown?.revenue || 0), 0)
+                const totalExpense = group.items.reduce((s, it) => s + (it.breakdown?.expense || 0), 0)
+                const totalNetProfit = group.items.reduce((s, it) => s + (it.breakdown?.netProfit || 0), 0)
+                const totalAdminFee = group.items.reduce((s, it) => s + (it.breakdown?.adminFee || 0), 0)
+                const totalDistributable = group.items.reduce((s, it) => s + (it.breakdown?.distributable || 0), 0)
+                const totalCarryOver = group.items.reduce((s, it) => s + (it.breakdown?.carryOver || 0), 0)
+                const totalPayout = group.items.reduce((s, it) => s + (it.breakdown?.investorPayout || 0), 0)
+                const shareRatio = group.items[0]?.breakdown?.shareRatio
+                const isMultiMonth = group.items.length > 1
+
+                // 전체 거래내역 합산
+                const allIncomeTxs: TransactionDetail[] = []
+                const allExpenseTxs: TransactionDetail[] = []
+                group.items.forEach(item => {
+                  const txs = getTxDetails(item.carId, item.monthLabel)
+                  allIncomeTxs.push(...txs.filter(t => t.type === 'income'))
+                  allExpenseTxs.push(...txs.filter(t => t.type === 'expense' && !(t.category || '').includes('차량구입')))
+                })
+
+                return (
+                  <div key={gIdx} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '20px', marginBottom: '15px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                    {/* 차량 헤더 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>{group.carNumber}</span>
+                      {group.carModel && <span style={{ fontSize: '13px', color: '#888' }}>{group.carModel}</span>}
+                      {isMultiMonth && (
+                        <span style={{ fontSize: '11px', color: '#999', background: '#f3f4f6', padding: '2px 8px', borderRadius: '10px' }}>
+                          {group.items.map(it => it.monthLabel.slice(5) + '월').join(' + ')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '15px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <tbody>
+                          {totalRevenue > 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#666' }}>차량 수입{isMultiMonth ? ' (합계)' : ''}</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>+{nf(totalRevenue)}원</td>
+                            </tr>
+                          )}
+                          {allIncomeTxs.length > 0 && (
+                            <tr><td colSpan={2} style={{ padding: '0 0 8px 0' }}>
+                              <div style={{ backgroundColor: '#f0fdf4', borderRadius: '4px', padding: '8px 12px', marginTop: '4px' }}>
+                                {allIncomeTxs.sort((a, b) => a.date.localeCompare(b.date)).map((tx, i) => (
+                                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '12px', color: '#4b5563' }}>
+                                    <span>{tx.date.slice(5)} {tx.description}{tx.category ? ` (${tx.category})` : ''}</span>
+                                    <span style={{ color: '#16a34a', fontWeight: '500' }}>+{nf(tx.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td></tr>
+                          )}
+                          {totalExpense > 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#666' }}>차량 비용 (유지비 등){isMultiMonth ? ' (합계)' : ''}</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>-{nf(totalExpense)}원</td>
+                            </tr>
+                          )}
+                          {allExpenseTxs.length > 0 && (
+                            <tr><td colSpan={2} style={{ padding: '0 0 8px 0' }}>
+                              <div style={{ backgroundColor: '#fef2f2', borderRadius: '4px', padding: '8px 12px', marginTop: '4px' }}>
+                                {allExpenseTxs.sort((a, b) => a.date.localeCompare(b.date)).map((tx, i) => (
+                                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '12px', color: '#4b5563' }}>
+                                    <span>{tx.date.slice(5)} {tx.description}{tx.category ? ` (${tx.category})` : ''}</span>
+                                    <span style={{ color: '#dc2626', fontWeight: '500' }}>-{nf(tx.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td></tr>
+                          )}
+                          {totalNetProfit !== 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', fontWeight: 'bold', color: '#333' }}>순수익</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#333' }}>{nf(totalNetProfit)}원</td>
+                            </tr>
+                          )}
+                          {totalAdminFee > 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#666' }}>지입비 (회사 수입)</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#f59e0b' }}>-{nf(totalAdminFee)}원</td>
+                            </tr>
+                          )}
+                          {totalDistributable !== 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#666' }}>배분대상{isMultiMonth ? ' (합계)' : ''}</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold' }}>{nf(totalDistributable)}원</td>
+                            </tr>
+                          )}
+                          {totalCarryOver !== 0 && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#666' }}>전월 이월</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>{nf(totalCarryOver)}원</td>
+                            </tr>
+                          )}
+                          {shareRatio !== undefined && (
+                            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '8px 0', color: '#7c3aed', fontWeight: 'bold' }}>배분율</td>
+                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#7c3aed' }}>
+                                {shareRatio > 1 ? shareRatio.toFixed(0) : (shareRatio * 100).toFixed(0)}%
+                              </td>
+                            </tr>
+                          )}
+                          {totalPayout > 0 && (
+                            <tr style={{ backgroundColor: '#eef2ff', borderRadius: '4px' }}>
+                              <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>차주 배분금{isMultiMonth ? ' (합계)' : ''}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR, fontSize: '16px' }}>{nf(totalPayout)}원</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* 차량 미연결 항목 (투자이자 등) */}
+              {noCarItems.length > 0 && (
+                <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '20px', marginBottom: '15px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                  {noCarItems.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: idx < noCarItems.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                      <span style={{ fontSize: '13px', color: '#666' }}>{item.detail || (item.type === 'invest' ? '투자이자' : '기타')}</span>
+                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: BRAND_COLOR }}>{nf(item.amount)}원</span>
+                    </div>
+                  ))}
                 </div>
-
-                {hasBd && (
-                  <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '15px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <tbody>
-                        {/* 차량 수입 */}
-                        {bd!.revenue !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#666' }}>차량 수입</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>+{nf(bd!.revenue)}원</td>
-                          </tr>
-                        )}
-                        {incomeTxs.length > 0 && (
-                          <tr><td colSpan={2} style={{ padding: '0 0 8px 0' }}>
-                            <div style={{ backgroundColor: '#f0fdf4', borderRadius: '4px', padding: '8px 12px', marginTop: '4px' }}>
-                              {incomeTxs.map((tx, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '12px', color: '#4b5563' }}>
-                                  <span>{tx.date.slice(5)} {tx.description}{tx.category ? ` (${tx.category})` : ''}</span>
-                                  <span style={{ color: '#16a34a', fontWeight: '500' }}>+{nf(tx.amount)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </td></tr>
-                        )}
-                        {/* 차량 비용 */}
-                        {bd!.expense !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#666' }}>차량 비용 (유지비 등)</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>-{nf(bd!.expense)}원</td>
-                          </tr>
-                        )}
-                        {expenseTxs.length > 0 && (
-                          <tr><td colSpan={2} style={{ padding: '0 0 8px 0' }}>
-                            <div style={{ backgroundColor: '#fef2f2', borderRadius: '4px', padding: '8px 12px', marginTop: '4px' }}>
-                              {expenseTxs.map((tx, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '12px', color: '#4b5563' }}>
-                                  <span>{tx.date.slice(5)} {tx.description}{tx.category ? ` (${tx.category})` : ''}</span>
-                                  <span style={{ color: '#dc2626', fontWeight: '500' }}>-{nf(tx.amount)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </td></tr>
-                        )}
-                        {/* 순수익 */}
-                        {bd!.netProfit !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', fontWeight: 'bold', color: '#333' }}>순수익</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#333' }}>{nf(bd!.netProfit)}원</td>
-                          </tr>
-                        )}
-                        {bd!.adminFee !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#666' }}>지입비 (회사 수입)</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#f59e0b' }}>-{nf(bd!.adminFee)}원</td>
-                          </tr>
-                        )}
-                        {bd!.distributable !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#666' }}>당월 배분대상</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold' }}>{nf(bd!.distributable)}원</td>
-                          </tr>
-                        )}
-                        {bd!.carryOver !== undefined && bd!.carryOver !== 0 && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#666' }}>전월 이월</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>{nf(bd!.carryOver)}원</td>
-                          </tr>
-                        )}
-                        {bd!.shareRatio !== undefined && (
-                          <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 0', color: '#7c3aed', fontWeight: 'bold' }}>배분율</td>
-                            <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#7c3aed' }}>
-                              {bd!.shareRatio > 1 ? bd!.shareRatio.toFixed(0) : (bd!.shareRatio * 100).toFixed(0)}%
-                            </td>
-                          </tr>
-                        )}
-                        {bd!.investorPayout !== undefined && (
-                          <tr style={{ backgroundColor: '#eef2ff', borderRadius: '4px' }}>
-                            <td style={{ padding: '10px 8px', color: BRAND_COLOR, fontWeight: 'bold', fontSize: '14px' }}>차주 배분금</td>
-                            <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR, fontSize: '16px' }}>{nf(bd!.investorPayout)}원</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* breakdown 없는 항목(투자이자 등)은 간단히 표시 */}
-                {!hasBd && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                    <span style={{ fontSize: '13px', color: '#666' }}>{item.detail}</span>
-                    <span style={{ fontSize: '16px', fontWeight: 'bold', color: BRAND_COLOR }}>{nf(item.amount)}원</span>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )}
+            </>
+          )
+        })()}
 
         {/* 총액 */}
         <div style={{ backgroundColor: BRAND_COLOR, color: 'white', borderRadius: '8px', padding: '25px', textAlign: 'center', marginBottom: '20px' }}>
