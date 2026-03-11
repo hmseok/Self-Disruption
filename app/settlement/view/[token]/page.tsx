@@ -19,6 +19,7 @@ type SettlementItem = {
   amount: number
   detail: string
   carNumber?: string
+  carModel?: string
   carId?: string
   breakdown?: {
     revenue?: number
@@ -211,7 +212,7 @@ export default function SettlementViewPage() {
   // 정산 기준월: 여러 월이면 기간으로 표시
   const allMonths = Array.from(new Set(data.items.map(it => it.monthLabel))).sort()
   const settlementPeriod = allMonths.length > 1
-    ? `${allMonths[0]} ~ ${allMonths[allMonths.length - 1]}`
+    ? `${allMonths[0]}~${allMonths[allMonths.length - 1]}`
     : data.settlement_month
 
   return (
@@ -244,16 +245,18 @@ export default function SettlementViewPage() {
             const hasBd = bd && Object.keys(bd).length > 0
             const txs = getTxDetails(item.carId, item.monthLabel)
             const incomeTxs = txs.filter(t => t.type === 'income')
-            const expenseTxs = txs.filter(t => t.type === 'expense')
+            const expenseTxs = txs.filter(t => t.type === 'expense' && !(t.category || '').includes('차량구입'))
 
             return (
               <div key={idx} style={{ marginBottom: idx < data.items.length - 1 ? '20px' : '0', paddingBottom: idx < data.items.length - 1 ? '20px' : '0', borderBottom: idx < data.items.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                {/* 차량번호 + 월 라벨 (간결) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                {/* 차량번호 + 차종 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                   {item.carNumber && (
-                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>{item.carNumber}</span>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>{item.carNumber}</span>
                   )}
-                  <span style={{ fontSize: '12px', color: '#999' }}>{item.monthLabel}</span>
+                  {item.carModel && (
+                    <span style={{ fontSize: '13px', color: '#888' }}>{item.carModel}</span>
+                  )}
                 </div>
 
                 {hasBd && (

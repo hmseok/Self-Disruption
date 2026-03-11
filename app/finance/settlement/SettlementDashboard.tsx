@@ -34,6 +34,7 @@ type SettlementItem = {
   relatedId: string
   detail: string
   carNumber?: string
+  carModel?: string            // 차종 (모델명)
   carId?: string               // 차량 ID (통장 내역 필터링용)
   monthLabel?: string          // 기준월 (미수 누적 시 과거 월 표시)
   isOverdue?: boolean          // 이전 월 미수 여부
@@ -187,6 +188,7 @@ export default function SettlementDashboard() {
       relatedId: string
       dueDate: string
       carNumber?: string
+      carModel?: string
       carId?: string
       breakdown?: SettlementItem['breakdown']
     }[]
@@ -244,7 +246,7 @@ export default function SettlementDashboard() {
       })(),
       // 지입 계약 (contract_start_date 포함)
       (() => {
-        let q = supabase.from('jiip_contracts').select('*, cars(number)').eq('status', 'active')
+        let q = supabase.from('jiip_contracts').select('*, cars(number, model)').eq('status', 'active')
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q
       })(),
@@ -489,6 +491,7 @@ export default function SettlementDashboard() {
             ? `${m.slice(5)}월분: 배분대상${nf(effectiveDistributable)}×${shareRatio}%`
             : `${m.slice(5)}월분: 적자${nf(effectiveDistributable)}${carryNote}`,
           carNumber: j.cars?.number,
+          carModel: j.cars?.model,
           carId: j.car_id,
           monthLabel: m,
           isOverdue,
@@ -832,6 +835,7 @@ export default function SettlementDashboard() {
           relatedId: item.relatedId,
           dueDate: item.dueDate,
           carNumber: item.carNumber,
+          carModel: item.carModel,
           carId: item.carId,
           breakdown: item.breakdown,
         })
@@ -908,19 +912,24 @@ export default function SettlementDashboard() {
                 amount: it.amount,
                 detail: it.detail,
                 carNumber: it.carNumber,
-                carId: (it as any).carId,
+                carModel: it.carModel,
+                carId: it.carId,
                 breakdown: it.breakdown,
               })),
               // 차량별 거래 상세내역 (수입/비용 항목별)
               transaction_details: (() => {
                 const details: Record<string, { date: string; description: string; amount: number; type: string; category?: string }[]> = {}
                 r.items.forEach(it => {
-                  const carId = (it as any).carId || settlementItems.find(si => si.id === `jiip-${it.relatedId}-${it.monthLabel}`)?.carId
+                  const carId = it.carId
+                    || settlementItems.find(si => si.id === `jiip-${it.relatedId}-${it.monthLabel}`)?.carId
+                    || jiips.find(j => j.id === it.relatedId)?.car_id
                   if (!carId || it.type !== 'jiip') return
-                  const key = `${carId}_${it.monthLabel}`
+                  const carIdStr = String(carId)
+                  const key = `${carIdStr}_${it.monthLabel}`
                   if (details[key]) return // 이미 처리됨
                   details[key] = carTxHistory
-                    .filter(t => t.related_id === carId && t.transaction_date.startsWith(it.monthLabel))
+                    .filter(t => String(t.related_id) === carIdStr && t.transaction_date.startsWith(it.monthLabel)
+                      && !(t.category || '').includes('차량구입'))
                     .map(t => ({
                       date: t.transaction_date,
                       description: t.client_name || t.description || t.category || '',
@@ -929,7 +938,9 @@ export default function SettlementDashboard() {
                       category: t.category || '',
                     }))
                     .sort((a, b) => a.date.localeCompare(b.date))
+                  console.log(`[SMS Share] carId=${carIdStr}, month=${it.monthLabel}, txCount=${details[key].length}`)
                 })
+                console.log('[SMS Share] transaction_details keys:', Object.keys(details))
                 return Object.keys(details).length > 0 ? details : undefined
               })(),
               message: smsModal.customNote || undefined,
