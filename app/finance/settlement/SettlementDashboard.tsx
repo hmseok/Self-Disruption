@@ -777,6 +777,60 @@ export default function SettlementDashboard() {
   }
 
   // ============================================
+  // 정산 취소 (통장내역 연결 전만 가능)
+  // ============================================
+  const handleCancelSettlement = async (item: SettlementItem) => {
+    if (!effectiveCompanyId) return
+    if (!confirm(`${item.name}님의 ${item.monthLabel?.slice(5)}월 ${item.type === 'jiip' ? '지입' : item.type === 'invest' ? '투자' : '대출'} 정산을 취소하시겠습니까?\n\n생성된 거래 내역이 삭제됩니다.`)) return
+
+    try {
+      // 정산 실행 시 생성한 transaction 찾기
+      // related_type + related_id 매칭 + 정산 날짜(dueDate) 매칭
+      const relatedType = item.type === 'jiip' ? 'jiip_share' : item.type
+      const { data: matchTxs, error: findErr } = await supabase
+        .from('transactions')
+        .select('id, related_type, related_id, transaction_date, amount, description')
+        .eq('company_id', effectiveCompanyId)
+        .eq('related_type', relatedType)
+        .eq('related_id', item.relatedId)
+        .eq('transaction_date', item.dueDate)
+        .eq('type', 'expense')
+
+      if (findErr) throw findErr
+      if (!matchTxs || matchTxs.length === 0) {
+        alert('취소할 거래 내역을 찾을 수 없습니다.')
+        return
+      }
+
+      // 통장내역과 연결(매칭) 여부 확인 — classification_queue에서 transaction_id로 연결된 건
+      const txIds = matchTxs.map(t => t.id)
+      const { data: linkedClassify } = await supabase
+        .from('classification_queue')
+        .select('id')
+        .in('transaction_id', txIds)
+        .limit(1)
+
+      if (linkedClassify && linkedClassify.length > 0) {
+        alert('⚠️ 이 정산 건은 이미 통장내역과 연결되어 있어 취소할 수 없습니다.\n\n통장분류 탭에서 연결을 먼저 해제해주세요.')
+        return
+      }
+
+      // 거래 삭제
+      const { error: delErr } = await supabase
+        .from('transactions')
+        .delete()
+        .in('id', txIds)
+
+      if (delErr) throw delErr
+
+      alert(`✅ ${item.name}님의 ${item.monthLabel?.slice(5)}월 정산이 취소되었습니다.`)
+      fetchAllData()  // 목록 새로고침
+    } catch (e: any) {
+      alert('정산 취소 실패: ' + e.message)
+    }
+  }
+
+  // ============================================
   // 정산 알림 발송 — 모달 열기 (수신자별 통합 + 월별 상세)
   // ============================================
 
@@ -1286,6 +1340,7 @@ export default function SettlementDashboard() {
                 setNotifyChannel={setNotifyChannel}
                 shareHistory={shareHistory}
                 onTogglePaid={handleTogglePaid}
+                onCancelSettlement={handleCancelSettlement}
               />
             )}
             {activeTab === 'classify' && (
@@ -2338,7 +2393,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 // ============================================
 // 탭 4: 정산 실행
 // ============================================
-function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel, shareHistory, onTogglePaid }: {
+function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel, shareHistory, onTogglePaid, onCancelSettlement }: {
   items: SettlementItem[]
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
@@ -2351,6 +2406,7 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
   setNotifyChannel: (ch: 'sms' | 'email') => void
   shareHistory: { id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[]
   onTogglePaid: (shareId: string, currentlyPaid: boolean) => void
+  onCancelSettlement: (item: SettlementItem) => void
 }) {
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
@@ -2579,6 +2635,7 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                     <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                   <th style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const, letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
+                  <th style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const, letterSpacing: '0.05em', textAlign: 'center', width: 70 }}>취소</th>
                 </tr>
               </thead>
               <tbody>
@@ -2608,6 +2665,20 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
                       <td style={{ padding: '10px 16px', fontSize: 12, color: '#9ca3af' }}>{item.carNumber || '-'}</td>
                       <td style={{ padding: '10px 16px', fontWeight: 700, color: '#4b5563' }}>{item.dueDate.slice(5)}</td>
                       <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 900, color: '#16a34a' }}>{nf(item.amount)}원</td>
+                      <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onCancelSettlement(item) }}
+                          style={{
+                            padding: '3px 8px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                            background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fee2e2' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2' }}
+                        >
+                          취소
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
