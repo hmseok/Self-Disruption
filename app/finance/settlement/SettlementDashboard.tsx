@@ -767,7 +767,7 @@ export default function SettlementDashboard() {
           if (revenue > 0) {
             msg += `    수입 ${nf(revenue)} - 비용 ${nf(expense)}`
             if (adminFee > 0) msg += ` - 관리비 ${nf(adminFee)}`
-            if (ratio > 0) msg += ` (배분 ${(ratio * 100).toFixed(0)}%)`
+            if (ratio > 0) msg += ` (배분 ${ratio > 1 ? ratio.toFixed(0) : (ratio * 100).toFixed(0)}%)`
             msg += `\n`
           }
         }

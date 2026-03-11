@@ -289,7 +289,7 @@ export default function SettlementViewPage() {
                             <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                               <td style={{ padding: '8px 0', color: '#666' }}>배분율</td>
                               <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 'bold', color: '#333' }}>
-                                {item.breakdown.shareRatio.toFixed(2)}%
+                                {item.breakdown.shareRatio > 1 ? item.breakdown.shareRatio.toFixed(0) : (item.breakdown.shareRatio * 100).toFixed(0)}%
                               </td>
                             </tr>
                           )}

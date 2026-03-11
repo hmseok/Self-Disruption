@@ -49,3 +49,7 @@ mobile/SelfDisruptionApp/
 
 # 구형 파일 아카이브
 /_archive/
+
+# Google/Firebase 서비스 키 (절대 커밋 금지)
+GoogleService-Info*.plist
+google-services.json

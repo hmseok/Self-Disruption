@@ -15,6 +15,8 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
 
   // 게스트 전용 경로 — ClientLayout 완전 우회
   const isGuestRoute = pathname.startsWith('/sign')
+    || pathname.startsWith('/settlement/view')
+    || pathname.startsWith('/e-contract/')
 
   if (isGuestRoute) {
     return <>{children}</>
