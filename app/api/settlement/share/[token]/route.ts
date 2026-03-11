@@ -82,17 +82,53 @@ export async function GET(
       .eq('id', share.company_id)
       .single()
 
-    // 7. 반환 데이터 가공
+    // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사)
+    let pastSettlements: { settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[] = []
+    if (share.recipient_phone) {
+      const { data: pastData } = await supabase
+        .from('settlement_shares')
+        .select('settlement_month, total_amount, created_at, paid_at')
+        .eq('recipient_phone', share.recipient_phone)
+        .eq('company_id', share.company_id)
+        .neq('id', share.id)
+        .order('created_at', { ascending: false })
+        .limit(12)
+      pastSettlements = pastData || []
+    }
+
+    // 8. 계좌 정보 마스킹 처리
+    let maskedBankInfo = null
+    if (share.bank_info) {
+      const bi = share.bank_info as { bank_name?: string; account_holder?: string; account_number?: string }
+      const maskAccount = (acc: string) => {
+        if (!acc || acc.length < 4) return acc
+        return '****' + acc.slice(-4)
+      }
+      const maskName = (name: string) => {
+        if (!name) return name
+        if (name.length <= 1) return name
+        return name[0] + '*'.repeat(name.length - 2) + name[name.length - 1]
+      }
+      maskedBankInfo = {
+        bank_name: bi.bank_name || '',
+        account_holder: maskName(bi.account_holder || ''),
+        account_number: maskAccount(bi.account_number || ''),
+      }
+    }
+
+    // 9. 반환 데이터 가공
     const publicData = {
       id: share.id,
       token: share.token,
       recipient_name: share.recipient_name,
       settlement_month: share.settlement_month,
       payment_date: share.payment_date,
+      paid_at: share.paid_at || null,
       total_amount: share.total_amount,
       items: share.items,
       breakdown: share.breakdown,
       transaction_details: share.transaction_details || null,
+      bank_info: maskedBankInfo,
       message: share.message,
       created_at: share.created_at,
       expires_at: share.expires_at,
@@ -101,6 +137,7 @@ export async function GET(
       is_first_view: isFirstView,
       phone_verified: phoneVerified,
       company: company || null,
+      past_settlements: pastSettlements,
     }
 
     return NextResponse.json(publicData)

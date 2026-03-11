@@ -35,16 +35,31 @@ type SettlementItem = {
   }
 }
 
+type PastSettlement = {
+  settlement_month: string
+  total_amount: number
+  created_at: string
+  paid_at: string | null
+}
+
+type BankInfo = {
+  bank_name: string
+  account_holder: string
+  account_number: string
+}
+
 type SettlementShare = {
   id: string
   token: string
   recipient_name: string
   settlement_month: string
   payment_date?: string
+  paid_at?: string
   total_amount: number
   items: SettlementItem[]
   breakdown?: Record<string, any>
   transaction_details?: Record<string, TransactionDetail[]>
+  bank_info?: BankInfo
   message?: string
   created_at: string
   expires_at: string
@@ -61,6 +76,7 @@ type SettlementShare = {
     email?: string
     logo_url?: string
   }
+  past_settlements?: PastSettlement[]
 }
 
 type PageState = 'loading' | 'phone_gate' | 'valid' | 'expired' | 'error'
@@ -363,10 +379,39 @@ export default function SettlementViewPage() {
           <div style={{ fontSize: '36px', fontWeight: 'bold' }}>{nf(data.total_amount)}원</div>
         </div>
 
-        {data.payment_date && (
+        {/* 지급 정보 (계좌 + 지급일) */}
+        {(data.payment_date || data.bank_info) && (
           <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>지급예정일</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>{data.payment_date}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: data.bank_info && data.payment_date ? '1fr 1fr' : '1fr', gap: '20px' }}>
+              {data.bank_info && (
+                <div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>지급 계좌</div>
+                  <div style={{ fontSize: '14px', color: '#333' }}>
+                    <span style={{ fontWeight: 'bold' }}>{data.bank_info.bank_name}</span>
+                    {' '}{data.bank_info.account_number}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                    예금주: {data.bank_info.account_holder}
+                  </div>
+                </div>
+              )}
+              {data.payment_date && (
+                <div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                    {data.paid_at ? '지급완료일' : '지급예정일'}
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', color: data.paid_at ? '#16a34a' : '#333' }}>
+                    {data.paid_at ? new Date(data.paid_at).toLocaleDateString('ko-KR') : data.payment_date}
+                  </div>
+                  {data.paid_at && (
+                    <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px', fontWeight: 'bold' }}>지급 완료</div>
+                  )}
+                  {!data.paid_at && (
+                    <div style={{ fontSize: '11px', color: '#f59e0b', marginTop: '4px', fontWeight: 'bold' }}>지급 대기</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -374,6 +419,37 @@ export default function SettlementViewPage() {
           <div style={{ backgroundColor: '#fffbeb', borderRadius: '8px', padding: '20px', marginBottom: '20px', borderLeft: '4px solid #f59e0b' }}>
             <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '8px', fontWeight: 'bold' }}>발송자 메시지</div>
             <div style={{ fontSize: '14px', color: '#333', whiteSpace: 'pre-wrap' }}>{data.message}</div>
+          </div>
+        )}
+
+        {/* 과거 정산 이력 */}
+        {data.past_settlements && data.past_settlements.length > 0 && (
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '15px' }}>이전 정산 이력</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                  <th style={{ padding: '8px 0', textAlign: 'left', color: '#999', fontWeight: '500' }}>정산월</th>
+                  <th style={{ padding: '8px 0', textAlign: 'right', color: '#999', fontWeight: '500' }}>금액</th>
+                  <th style={{ padding: '8px 0', textAlign: 'right', color: '#999', fontWeight: '500' }}>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.past_settlements.map((ps, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px 0', color: '#333' }}>{ps.settlement_month}</td>
+                    <td style={{ padding: '10px 0', textAlign: 'right', fontWeight: 'bold', color: BRAND_COLOR }}>{nf(ps.total_amount)}원</td>
+                    <td style={{ padding: '10px 0', textAlign: 'right' }}>
+                      {ps.paid_at ? (
+                        <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold' }}>지급완료</span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 'bold' }}>대기</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 

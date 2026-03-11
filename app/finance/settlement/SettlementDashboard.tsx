@@ -194,6 +194,7 @@ export default function SettlementDashboard() {
     }[]
     message: string
     shareUrl?: string     // 상세 링크 URL
+    bankInfo?: { bank_name: string; account_holder: string; account_number: string }
   }
   const [smsModal, setSmsModal] = useState<{
     open: boolean
@@ -858,6 +859,13 @@ export default function SettlementDashboard() {
 
         const phone = contract?.investor_phone || contract?.phone || ''
         const email = contract?.investor_email || contract?.email || ''
+        const bankInfo = (contract?.bank_name || contract?.account_number || contract?.account_holder)
+          ? {
+              bank_name: contract?.bank_name || '',
+              account_holder: contract?.account_holder || '',
+              account_number: contract?.account_number || '',
+            }
+          : undefined
 
         recipientList.push({
           key,
@@ -867,6 +875,7 @@ export default function SettlementDashboard() {
           totalAmount: g.items.reduce((s, i) => s + i.amount, 0),
           items: g.items,
           message: buildRecipientMessage(g.name, g.items),
+          bankInfo,
         })
       }
 
@@ -943,6 +952,7 @@ export default function SettlementDashboard() {
                 console.log('[SMS Share] transaction_details keys:', Object.keys(details))
                 return Object.keys(details).length > 0 ? details : undefined
               })(),
+              bank_info: r.bankInfo || undefined,
               message: smsModal.customNote || undefined,
               company_id: effectiveCompanyId,
             }),

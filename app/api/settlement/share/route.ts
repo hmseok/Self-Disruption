@@ -53,6 +53,12 @@ type TransactionDetail = {
   category?: string
 }
 
+type BankInfo = {
+  bank_name?: string
+  account_holder?: string
+  account_number?: string
+}
+
 type CreateShareRequest = {
   recipient_name: string
   recipient_phone?: string
@@ -62,6 +68,7 @@ type CreateShareRequest = {
   items: SettlementItem[]
   breakdown?: Record<string, any>
   transaction_details?: Record<string, TransactionDetail[]>  // carId_month → 거래내역[]
+  bank_info?: BankInfo
   message?: string
   company_id: string
 }
@@ -88,6 +95,7 @@ export async function POST(request: NextRequest) {
       items,
       breakdown,
       transaction_details,
+      bank_info,
       message,
       company_id
     } = body
@@ -126,6 +134,7 @@ export async function POST(request: NextRequest) {
       items: items,
       breakdown: breakdown || null,
       transaction_details: transaction_details || null,
+      bank_info: bank_info || null,
       message: message?.trim() || null,
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
