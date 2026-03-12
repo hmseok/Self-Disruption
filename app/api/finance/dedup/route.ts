@@ -25,6 +25,7 @@ async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, com
       .from('transactions')
       .select('id, transaction_date, client_name, amount, payment_method, description, created_at')
       .eq('company_id', company_id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
 
@@ -123,13 +124,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: '중복 거래가 없습니다.', deleted: 0 })
     }
 
-    // 50건씩 배치 삭제
+    // 50건씩 배치 소프트 삭제
+    const now = new Date().toISOString()
     let totalDeleted = 0
     for (let i = 0; i < idsToDelete.length; i += 50) {
       const batch = idsToDelete.slice(i, i + 50)
       const { error: delErr } = await sb
         .from('transactions')
-        .delete()
+        .update({ deleted_at: now })
         .in('id', batch)
 
       if (!delErr) totalDeleted += batch.length
@@ -143,6 +145,7 @@ export async function DELETE(request: NextRequest) {
         .from('classification_queue')
         .select('id, source_data')
         .eq('company_id', company_id)
+        .is('deleted_at', null)
         .in('status', ['pending', 'auto_confirmed', 'confirmed'])
 
       if (queueItems && queueItems.length > 0) {
@@ -163,7 +166,7 @@ export async function DELETE(request: NextRequest) {
         if (queueDupIds.length > 0) {
           for (let i = 0; i < queueDupIds.length; i += 50) {
             const batch = queueDupIds.slice(i, i + 50)
-            await sb.from('classification_queue').delete().in('id', batch)
+            await sb.from('classification_queue').update({ deleted_at: now }).in('id', batch)
           }
         }
       }

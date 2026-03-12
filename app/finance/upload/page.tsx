@@ -1180,6 +1180,20 @@ function UploadContent() {
     count: number; totalAmount: number; filterLabel: string; statusLabel: string;
   }>({ open: false, mode: 'all', targetIds: [], count: 0, totalAmount: 0, filterLabel: '', statusLabel: '' })
 
+  // ── 중복 체크 결과 모달 상태 ──
+  const [dupModal, setDupModal] = useState<{
+    open: boolean;
+    totalCount: number;
+    sections: { icon: string; title: string; count: number; details: { text: string; sub?: string }[];
+      crossDetails?: { upload: { date: string; name: string; amount: number; desc: string }; db: { date: string; name: string; amount: number; desc: string }; where: string; matchReason: string }[];
+    }[];
+    actionLabel: string;
+    onConfirm: (() => void) | null;
+    onUpdate: (() => void) | null;
+    hasCross: boolean;
+    excludedIndices: Set<number>; // 크로스 중복 중 제외할 인덱스
+  }>({ open: false, totalCount: 0, sections: [], actionLabel: '', onConfirm: null, onUpdate: null, hasCross: false, excludedIndices: new Set() })
+
   // ── 소프트 삭제 실행 함수 ──
   const executeSoftDelete = async (targetIds: string[]) => {
     if (!effectiveCompanyId || targetIds.length === 0) return
@@ -2030,6 +2044,32 @@ function UploadContent() {
     setReMatching(false)
   }
 
+  // ── 중복 체크 키 생성: 내부 중복(엄격)과 크로스 중복(유연) 2단계 ──
+  // 내부 중복 키: 시분초 포함 날짜 + 거래처 + 금액 + 결제수단 + 적요 (같은 데이터소스)
+  const makeDupKey = (date: string, clientName: string, amount: number, paymentMethod: string, description: string) => {
+    const desc = (description || '').trim().toLowerCase().slice(0, 30)
+    return `${date || ''}|${(clientName || '').trim()}|${Math.abs(Number(amount || 0))}|${paymentMethod || ''}|${desc}`
+  }
+  // 크로스 중복 키: 날짜(일자만) + 금액 (다른 데이터소스 간 비교용, Gemini 파싱 차이 허용)
+  const makeCrossKey = (date: string, amount: number) => {
+    const dateOnly = (date || '').trim().slice(0, 10) // YYYY-MM-DD만
+    return `${dateOnly}|${Math.abs(Number(amount || 0))}`
+  }
+  // 거래처명 유사도 체크 (한쪽이 다른 쪽을 포함하거나 같으면 true)
+  const isNameSimilar = (a: string, b: string) => {
+    const na = (a || '').replace(/[^가-힣a-zA-Z0-9]/g, '').trim()
+    const nb = (b || '').replace(/[^가-힣a-zA-Z0-9]/g, '').trim()
+    if (!na || !nb) return true // 한쪽이 비어있으면 금액+날짜로만 판단
+    if (na === nb) return true
+    if (na.includes(nb) || nb.includes(na)) return true
+    // 뒤에서 2글자 이상 일치하면 유사 (은행명 접두사 제거용: 농협박진숙 ↔ 박진숙)
+    if (na.length >= 2 && nb.length >= 2) {
+      const shortLen = Math.min(na.length, nb.length)
+      if (shortLen >= 2 && (na.endsWith(nb.slice(-shortLen)) || nb.endsWith(na.slice(-shortLen)))) return true
+    }
+    return false
+  }
+
   const handleCheckDuplicates = async () => {
     if (!effectiveCompanyId) return
     setDuplicateInfo({ count: 0, checking: true })
@@ -2038,13 +2078,19 @@ function UploadContent() {
       let memoryDupGroups: [string, number[]][] = []
       let dbDupCount = 0
       let dbGroupCount = 0
+      let crossDupCount = 0
+      let crossDupItems: {
+        upload: { date: string; name: string; amount: number; desc: string };
+        db: { date: string; name: string; amount: number; desc: string };
+        where: string; matchReason: string;
+      }[] = []
 
-      // ── 1) 업로드 결과(메모리)에서 중복 감지 ──
+      // ── 1) 업로드 결과(메모리) 내부 중복 감지 ──
       if (results.length > 0) {
         const groups: Record<string, number[]> = {}
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
-          const key = `${r.transaction_date || ''}|${r.client_name || ''}|${Math.abs(Number(r.amount || 0))}|${r.payment_method || ''}`
+          const key = makeDupKey(r.transaction_date, r.client_name, r.amount, r.payment_method, r.description)
           if (!groups[key]) groups[key] = []
           groups[key].push(i)
         }
@@ -2052,7 +2098,89 @@ function UploadContent() {
         memoryDupCount = memoryDupGroups.reduce((acc, [, idxs]) => acc + idxs.length - 1, 0)
       }
 
-      // ── 2) DB(transactions)에서 중복 감지 — 항상 실행 ──
+      // ── 2) 업로드 ↔ DB 크로스 중복 체크 (classification_queue + transactions) ──
+      // 날짜(일자) + 금액으로 1차 매칭, 거래처명 유사도로 2차 확인 (Gemini 파싱 차이 허용)
+      if (results.length > 0) {
+        const dates = results.map(r => r.transaction_date).filter(Boolean)
+        const minDate = dates.length > 0 ? dates.sort()[0] : null
+        const maxDate = dates.length > 0 ? dates.sort().reverse()[0] : null
+
+        if (minDate && maxDate) {
+          // classification_queue 기존 항목 조회 (현재 업로드 결과의 _queue_id는 제외)
+          const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
+          const { data: queueItems } = await supabase
+            .from('classification_queue')
+            .select('id, source_data, status')
+            .eq('company_id', effectiveCompanyId)
+            .is('deleted_at', null)
+            .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+
+          // 크로스 키(날짜+금액) → DB 항목 상세정보 배열로 그룹핑
+          type DbEntry = { name: string; date: string; amount: number; desc: string; source: 'queue' | 'tx'; used: boolean }
+          const dbCrossMap = new Map<string, DbEntry[]>()
+
+          if (queueItems) {
+            for (const q of queueItems) {
+              if (uploadQueueIds.includes(q.id)) continue
+              const sd = q.source_data || {}
+              const ckey = makeCrossKey(sd.transaction_date, sd.amount)
+              if (!dbCrossMap.has(ckey)) dbCrossMap.set(ckey, [])
+              dbCrossMap.get(ckey)!.push({
+                name: sd.client_name || '', date: sd.transaction_date || '', amount: Math.abs(Number(sd.amount || 0)),
+                desc: sd.description || '', source: 'queue', used: false,
+              })
+            }
+          }
+
+          // transactions 기존 항목 조회
+          const { data: txItems } = await supabase
+            .from('transactions')
+            .select('transaction_date, client_name, amount, payment_method, description')
+            .eq('company_id', effectiveCompanyId)
+            .is('deleted_at', null)
+            .gte('transaction_date', minDate.slice(0, 10))
+            .lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+
+          if (txItems) {
+            for (const tx of txItems) {
+              const ckey = makeCrossKey(tx.transaction_date, tx.amount)
+              if (!dbCrossMap.has(ckey)) dbCrossMap.set(ckey, [])
+              dbCrossMap.get(ckey)!.push({
+                name: tx.client_name || '', date: tx.transaction_date || '', amount: Math.abs(Number(tx.amount || 0)),
+                desc: tx.description || '', source: 'tx', used: false,
+              })
+            }
+          }
+
+          // 업로드 항목별 크로스 중복 판정: 날짜+금액 매칭 → 거래처명 유사 확인
+          for (const r of results) {
+            const ckey = makeCrossKey(r.transaction_date, r.amount)
+            const dbEntries = dbCrossMap.get(ckey)
+            if (!dbEntries) continue
+
+            const match = dbEntries.find(e => !e.used && isNameSimilar(r.client_name, e.name))
+            if (match) {
+              match.used = true
+              crossDupCount++
+              // 매칭 사유 생성
+              const reasons: string[] = []
+              reasons.push(`날짜: ${(r.transaction_date || '').slice(0, 10)} = ${(match.date || '').slice(0, 10)}`)
+              reasons.push(`금액: ${Math.abs(r.amount || 0).toLocaleString()} = ${match.amount.toLocaleString()}`)
+              if (r.client_name === match.name) reasons.push(`거래처 정확일치`)
+              else reasons.push(`거래처 유사: "${r.client_name}" ≈ "${match.name}"`)
+
+              crossDupItems.push({
+                upload: { date: r.transaction_date || '', name: r.client_name || '', amount: Math.abs(r.amount || 0), desc: r.description || '' },
+                db: { date: match.date, name: match.name, amount: match.amount, desc: match.desc },
+                where: match.source === 'tx' ? '확정완료' : '분류대기',
+                matchReason: reasons.join(' / '),
+              })
+            }
+          }
+        }
+      }
+
+      // ── 3) DB(transactions) 내부 중복 감지 — 항상 실행 ──
       const res = await fetch(`/api/finance/dedup?company_id=${effectiveCompanyId}`)
       let dbData: any = null
       if (res.ok) {
@@ -2061,24 +2189,58 @@ function UploadContent() {
         dbGroupCount = dbData.groupCount || 0
       }
 
-      const totalDupCount = memoryDupCount + dbDupCount
+      const totalDupCount = memoryDupCount + dbDupCount + crossDupCount
 
-      // ── 3) 결과 없으면 완료 ──
+      // ── 4) 결과 없으면 완료 ──
       if (totalDupCount === 0) {
         alert('✅ 중복 거래가 없습니다!')
         setDuplicateInfo({ count: 0, checking: false })
         return
       }
 
-      // ── 4) 통합 알림 — 한번에 전부 삭제 ──
-      const parts: string[] = []
-      if (memoryDupCount > 0) parts.push(`업로드 내 ${memoryDupCount}건 (${memoryDupGroups.length}개 그룹)`)
-      if (dbDupCount > 0) parts.push(`DB 내 ${dbDupCount}건 (${dbGroupCount}개 그룹)`)
+      // ── 5) 모달에 상세 결과 표시 ──
+      const sections: typeof dupModal.sections = []
+      if (memoryDupCount > 0) {
+        sections.push({
+          icon: '📋', title: '업로드 내부 중복', count: memoryDupCount,
+          details: memoryDupGroups.slice(0, 15).map(([, idxs]) => {
+            const r = results[idxs[0]]
+            return {
+              text: `${(r.transaction_date || '?').slice(0, 16)} | ${r.client_name || '?'} | ${Math.abs(r.amount || 0).toLocaleString()}원`,
+              sub: `${idxs.length}건 중 ${idxs.length - 1}건 중복`,
+            }
+          }),
+        })
+      }
+      if (crossDupCount > 0) {
+        sections.push({
+          icon: '🔄', title: 'DB에 이미 존재 (크로스 중복)', count: crossDupCount,
+          details: [], // 크로스는 crossDetails로 상세 표시
+          crossDetails: crossDupItems.slice(0, 30),
+        })
+      }
+      if (dbDupCount > 0) {
+        sections.push({
+          icon: '💾', title: '확정완료(DB) 내부 중복', count: dbDupCount,
+          details: (dbData?.samples || []).slice(0, 15).map((s: any) => {
+            const tx = s.sample || {}
+            return {
+              text: `${(tx.transaction_date || '?').slice(0, 16)} | ${tx.client_name || '?'} | ${Math.abs(tx.amount || 0).toLocaleString()}원`,
+              sub: `${s.count}건 중 ${s.count - 1}건 중복`,
+            }
+          }),
+        })
+      }
 
-      if (confirm(`⚠️ 총 ${totalDupCount}건의 중복 거래가 발견되었습니다.\n${parts.join('\n')}\n\n모든 중복 건을 한번에 삭제하시겠습니까? (각 그룹에서 1건만 유지)`)) {
+      const actionParts: string[] = []
+      if (memoryDupCount + dbDupCount > 0) actionParts.push('내부 중복 삭제')
+      if (crossDupCount > 0) actionParts.push('크로스 중복 목록 제거')
+
+      // 실행 콜백 생성
+      const executeDedup = async () => {
         let deletedTotal = 0
 
-        // 메모리 중복 삭제
+        // 메모리 내부 중복 삭제
         if (memoryDupCount > 0) {
           const removeIdxSet = new Set<number>()
           for (const [, idxs] of memoryDupGroups) {
@@ -2091,19 +2253,70 @@ function UploadContent() {
             const r = results[idx]
             if (r && r.id != null) deleteTransaction(r.id)
           }
-
-          // queue에서도 중복 삭제
           const queueIdsToDelete = [...removeIdxSet]
             .map(idx => (results[idx] as any)?._queue_id)
             .filter(Boolean)
           if (queueIdsToDelete.length > 0) {
-            const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIdsToDelete)
-            if (delErr) console.error('queue 중복 삭제 오류:', delErr)
+            await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', queueIdsToDelete)
           }
           deletedTotal += memoryDupCount
         }
 
-        // DB 중복 삭제
+        // 크로스 중복 → 업로드 목록에서 제거 (날짜+금액+거래처 유사 매칭)
+        if (crossDupCount > 0) {
+          const crossRemoveIdxSet = new Set<number>()
+          const dates = results.map(r => r.transaction_date).filter(Boolean)
+          const minDate = dates.sort()[0]
+          const maxDate = dates.sort().reverse()[0]
+          const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
+
+          type DbEntry2 = { name: string; used: boolean }
+          const dbCrossMap2 = new Map<string, DbEntry2[]>()
+
+          const { data: queueItems2 } = await supabase
+            .from('classification_queue').select('id, source_data, status')
+            .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+            .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+          if (queueItems2) {
+            for (const q of queueItems2) {
+              if (uploadQueueIds.includes(q.id)) continue
+              const sd = q.source_data || {}
+              const ck = makeCrossKey(sd.transaction_date, sd.amount)
+              if (!dbCrossMap2.has(ck)) dbCrossMap2.set(ck, [])
+              dbCrossMap2.get(ck)!.push({ name: sd.client_name || '', used: false })
+            }
+          }
+          const { data: txItems2 } = await supabase
+            .from('transactions').select('transaction_date, client_name, amount, payment_method, description')
+            .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+            .gte('transaction_date', minDate.slice(0, 10)).lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+          if (txItems2) {
+            for (const tx of txItems2) {
+              const ck = makeCrossKey(tx.transaction_date, tx.amount)
+              if (!dbCrossMap2.has(ck)) dbCrossMap2.set(ck, [])
+              dbCrossMap2.get(ck)!.push({ name: tx.client_name || '', used: false })
+            }
+          }
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i]
+            const ck = makeCrossKey(r.transaction_date, r.amount)
+            const entries = dbCrossMap2.get(ck)
+            if (!entries) continue
+            const m = entries.find(e => !e.used && isNameSimilar(r.client_name, e.name))
+            if (m) { m.used = true; crossRemoveIdxSet.add(i) }
+          }
+          const removeResultIds = new Set([...crossRemoveIdxSet].map(idx => results[idx]?.id).filter(Boolean))
+          if (removeResultIds.size > 0) {
+            removeResults(removeResultIds)
+            const crossQueueIds = [...crossRemoveIdxSet].map(idx => (results[idx] as any)?._queue_id).filter(Boolean)
+            if (crossQueueIds.length > 0) {
+              await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', crossQueueIds)
+            }
+          }
+          deletedTotal += crossDupCount
+        }
+
+        // DB 내부 중복 삭제
         if (dbDupCount > 0) {
           const delRes = await fetch('/api/finance/dedup', {
             method: 'DELETE',
@@ -2116,10 +2329,108 @@ function UploadContent() {
           }
         }
 
-        alert(`✅ 총 ${deletedTotal}건 중복 삭제 완료!`)
+        alert(`✅ 총 ${deletedTotal}건 중복 정리 완료!`)
+        setDupModal(prev => ({ ...prev, open: false }))
         fetchReviewItems()
         fetchStats()
       }
+
+      // 크로스 중복 → 기존 DB 데이터를 새 파싱 결과로 업데이트
+      const executeUpdate = crossDupCount > 0 ? async () => {
+        let updatedCount = 0
+        const dates = results.map(r => r.transaction_date).filter(Boolean)
+        const minDate = dates.sort()[0]
+        const maxDate = dates.sort().reverse()[0]
+        const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
+
+        // DB 항목을 ID 포함하여 다시 조회
+        type DbUpdateEntry = { id: string; name: string; table: string; used: boolean }
+        const dbUpdateMap = new Map<string, DbUpdateEntry[]>()
+
+        const { data: qItems } = await supabase
+          .from('classification_queue').select('id, source_data')
+          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+        if (qItems) {
+          for (const q of qItems) {
+            if (uploadQueueIds.includes(q.id)) continue
+            const sd = q.source_data || {}
+            const ck = makeCrossKey(sd.transaction_date, sd.amount)
+            if (!dbUpdateMap.has(ck)) dbUpdateMap.set(ck, [])
+            dbUpdateMap.get(ck)!.push({ id: q.id, name: sd.client_name || '', table: 'classification_queue', used: false })
+          }
+        }
+        const { data: tItems } = await supabase
+          .from('transactions').select('id, transaction_date, client_name, amount, description')
+          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .gte('transaction_date', minDate.slice(0, 10)).lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+        if (tItems) {
+          for (const tx of tItems) {
+            const ck = makeCrossKey(tx.transaction_date, tx.amount)
+            if (!dbUpdateMap.has(ck)) dbUpdateMap.set(ck, [])
+            dbUpdateMap.get(ck)!.push({ id: tx.id, name: tx.client_name || '', table: 'transactions', used: false })
+          }
+        }
+
+        // 매칭된 항목 업데이트
+        const updatePromises: Promise<any>[] = []
+        const updateResultIds = new Set<string>()
+        for (const r of results) {
+          const ck = makeCrossKey(r.transaction_date, r.amount)
+          const entries = dbUpdateMap.get(ck)
+          if (!entries) continue
+          const m = entries.find(e => !e.used && isNameSimilar(r.client_name, e.name))
+          if (!m) continue
+          m.used = true
+          updateResultIds.add(r.id)
+
+          if (m.table === 'transactions') {
+            updatePromises.push(supabase.from('transactions').update({
+              transaction_date: r.transaction_date,
+              client_name: r.client_name,
+              amount: r.amount,
+              description: r.description || '',
+              payment_method: r.payment_method || '',
+              category: r.category || r.ai_category || '',
+            }).eq('id', m.id))
+          } else {
+            updatePromises.push(supabase.from('classification_queue').update({
+              source_data: {
+                transaction_date: r.transaction_date,
+                client_name: r.client_name,
+                amount: r.amount,
+                description: r.description || '',
+                payment_method: r.payment_method || '',
+              },
+              ai_category: r.category || r.ai_category || '',
+            }).eq('id', m.id))
+          }
+          updatedCount++
+        }
+
+        await Promise.all(updatePromises)
+
+        // 업데이트된 항목은 업로드 목록에서 제거
+        if (updateResultIds.size > 0) {
+          removeResults(updateResultIds)
+        }
+
+        alert(`✅ ${updatedCount}건 DB 데이터를 새 파싱 결과로 업데이트 완료!`)
+        setDupModal(prev => ({ ...prev, open: false }))
+        fetchReviewItems()
+        fetchStats()
+      } : null
+
+      // 모달 열기
+      setDupModal({
+        open: true,
+        totalCount: totalDupCount,
+        sections,
+        actionLabel: actionParts.join(' + '),
+        onConfirm: executeDedup,
+        onUpdate: executeUpdate,
+        hasCross: crossDupCount > 0,
+      })
 
       setDuplicateInfo({ count: totalDupCount, checking: false })
     } catch (e) {
@@ -2874,7 +3185,7 @@ function UploadContent() {
 
           {/* 2탭: 분류 관리 + 확정완료 */}
           {([
-            { key: 'classify' as const, label: '📋 분류 관리', count: stats.pending, countColor: '#d97706' },
+            { key: 'classify' as const, label: '📋 분류 관리', count: (results.length > 0 ? results.length : stats.pending), countColor: '#d97706' },
             { key: 'confirmed' as const, label: '✅ 확정완료', count: stats.confirmed, countColor: '#16a34a' },
           ]).map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()); setSourceFilter('all') }}
@@ -6169,6 +6480,129 @@ function UploadContent() {
                 style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer' }}>
                 {deleting ? '삭제 중...' : `${deleteModal.count}건 삭제`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 중복 체크 결과 모달 ═══ */}
+      {dupModal.open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setDupModal(prev => ({ ...prev, open: false, onConfirm: null }))}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{
+            position: 'relative', background: '#fff', borderRadius: 16, width: '95%', maxWidth: 680,
+            maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+          }} onClick={e => e.stopPropagation()}>
+            {/* 헤더 */}
+            <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚠️</div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>중복 거래 발견</h3>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>총 {dupModal.totalCount.toLocaleString()}건의 중복이 감지되었습니다</p>
+                </div>
+              </div>
+            </div>
+            {/* 내용 스크롤 */}
+            <div style={{ overflowY: 'auto', padding: '12px 24px 16px', flex: 1 }}>
+              {dupModal.sections.map((sec, si) => (
+                <div key={si} style={{ marginBottom: si < dupModal.sections.length - 1 ? 16 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 16 }}>{sec.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{sec.title}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', background: '#fef2f2', padding: '2px 8px', borderRadius: 10 }}>{sec.count}건</span>
+                  </div>
+
+                  {/* 크로스 중복: 업로드↔DB 비교 테이블 */}
+                  {sec.crossDetails && sec.crossDetails.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {sec.crossDetails.map((cd, ci) => (
+                        <div key={ci} style={{ background: '#f8fafc', borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                          {/* 매칭 사유 */}
+                          <div style={{ padding: '6px 10px', background: '#fef3c7', fontSize: 10, color: '#92400e', fontWeight: 600 }}>
+                            #{ci + 1} 매칭 사유: {cd.matchReason}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: 11 }}>
+                            {/* 업로드 데이터 */}
+                            <div style={{ padding: '8px 10px', borderRight: '1px solid #e2e8f0' }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: '#2563eb', marginBottom: 6 }}>📤 업로드 (파싱)</div>
+                              {(() => { const dt = formatDatetime(cd.upload.date); return (
+                                <div style={{ color: '#334155', fontSize: 12, lineHeight: 1.4, marginBottom: 4 }}>
+                                  {dt.date}
+                                  {dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}
+                                </div>
+                              )})()}
+                              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{cd.upload.name || '-'}</div>
+                              <div style={{ color: '#dc2626', fontWeight: 700 }}>{cd.upload.amount.toLocaleString()}원</div>
+                              {cd.upload.desc && <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 3 }}>{cd.upload.desc.slice(0, 30)}</div>}
+                            </div>
+                            {/* DB 데이터 */}
+                            <div style={{ padding: '8px 10px' }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: '#16a34a', marginBottom: 6 }}>💾 DB ({cd.where})</div>
+                              {(() => { const dt = formatDatetime(cd.db.date); return (
+                                <div style={{ color: '#334155', fontSize: 12, lineHeight: 1.4, marginBottom: 4 }}>
+                                  {dt.date}
+                                  {dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}
+                                </div>
+                              )})()}
+                              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{cd.db.name || '-'}</div>
+                              <div style={{ color: '#dc2626', fontWeight: 700 }}>{cd.db.amount.toLocaleString()}원</div>
+                              {cd.db.desc && <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 3 }}>{cd.db.desc.slice(0, 30)}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {sec.crossDetails.length < sec.count && (
+                        <div style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', padding: 4 }}>... 외 {sec.count - sec.crossDetails.length}건</div>
+                      )}
+                    </div>
+                  ) : (
+                    /* 일반 중복 (내부 중복, DB 중복) */
+                    <div style={{ background: '#f8fafc', borderRadius: 10, overflow: 'hidden' }}>
+                      {sec.details.map((d, di) => (
+                        <div key={di} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 12px', fontSize: 12, color: '#334155',
+                          borderBottom: di < sec.details.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{d.text}</span>
+                          {d.sub && <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, marginLeft: 8 }}>{d.sub}</span>}
+                        </div>
+                      ))}
+                      {sec.details.length === 0 && !sec.crossDetails && (
+                        <div style={{ padding: '8px 12px', fontSize: 12, color: '#94a3b8' }}>상세 정보 없음</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* 액션 설명 + 버튼 */}
+            <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #f1f5f9' }}>
+              {dupModal.hasCross && (
+                <p style={{ margin: '0 0 8px', fontSize: 11, color: '#64748b', lineHeight: 1.5, background: '#f0f9ff', padding: '8px 10px', borderRadius: 8, border: '1px solid #bae6fd' }}>
+                  <strong>중복 정리</strong>: 크로스 중복을 업로드 목록에서 제거<br />
+                  <strong>재파싱 업데이트</strong>: 기존 DB 데이터를 새 파싱 결과로 덮어쓰기 (거래처명, 분류 등 갱신)
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setDupModal(prev => ({ ...prev, open: false, onConfirm: null, onUpdate: null }))}
+                  style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  취소
+                </button>
+                {dupModal.hasCross && dupModal.onUpdate && (
+                  <button onClick={() => dupModal.onUpdate?.()}
+                    style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                    🔄 재파싱 업데이트
+                  </button>
+                )}
+                <button onClick={() => dupModal.onConfirm?.()}
+                  style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                  🗑️ 중복 정리
+                </button>
+              </div>
             </div>
           </div>
         </div>
