@@ -16,10 +16,10 @@ export async function POST(req: NextRequest) {
     console.log('[finance-parser] fileType:', fileType, '| mimeType:', mimeType, '| dataLen:', data?.length);
 
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         generationConfig: {
             responseMimeType: "application/json",
-            maxOutputTokens: 8192
+            maxOutputTokens: 65536
         }
     });
 
@@ -39,7 +39,16 @@ export async function POST(req: NextRequest) {
 - payment_method는 반드시 "Bank"로 설정하세요.
 - card_number는 빈문자열로.
 - 적요/기재내용에서 거래처명을 client_name에 추출하세요.
-- "지급(원)" 또는 "찾으신금액" 컬럼은 출금(expense), "입금(원)" 또는 "맡기신금액" 컬럼은 입금(income)입니다.`,
+
+⚠️⚠️⚠️ 거래 금액(amount) 추출 규칙 (매우 중요!!!):
+✅ 거래 금액으로 사용할 컬럼:
+  - "지급(원)", "지급", "출금", "출금액", "출금금액", "찾으신금액" → expense (출금)
+  - "입금(원)", "입금", "입금액", "입금금액", "맡기신금액" → income (입금)
+❌ 절대로 거래 금액으로 사용하면 안 되는 컬럼:
+  - "거래후잔액", "거래후 잔액(원)", "잔액", "거래후잔액(원)" → 이것은 누적 잔액이지 거래 금액이 아닙니다!!!
+  - 잔액은 항상 다른 금액 컬럼보다 큰 숫자입니다. 잔액을 amount에 넣으면 절대 안 됩니다.
+- 같은 행에 입금과 출금이 모두 있으면 0이 아닌 쪽만 amount로 사용하세요.
+- amount는 반드시 해당 거래의 입금액 또는 지급액이어야 합니다.`,
     };
     const hint = fileTypeHints[fileType || ''] || '';
 
@@ -61,14 +70,14 @@ ${hint}
 데이터의 실제 기간을 반드시 확인하세요. 미래 날짜가 되면 안 됩니다.
 
 [결과 필드 — 반드시 모든 필드를 포함]
-- transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15)
+- transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15). 원본 데이터에 시간(HH:mm:ss 또는 HH:mm)이 있으면 반드시 YYYY-MM-DD HH:mm:ss 형식으로 포함 (예: ${currentYear}-01-15 10:53:30). 시간이 없으면 YYYY-MM-DD만 사용. ⚠️ 같은 날짜에 동일 금액 거래가 여러 건일 수 있으므로 시간을 반드시 보존!
 - client_name: 거래처명/가맹점명/사람이름 (입금, 출금, 이체 같은 거래유형 단어 제외)
 - amount: 양수 숫자 (콤마 제거). 외화인 경우 원래 외화 금액 그대로 사용
 - currency: 통화코드 (기본값 "KRW"). 달러이면 "USD", 엔화이면 "JPY", 유로이면 "EUR" 등. $, ¥, €, US$ 등의 기호가 있거나 "달러", "USD", "미화" 등 표기가 있으면 해당 통화코드 사용
 - original_amount: 외화 원금액 (currency가 KRW가 아닌 경우에만 설정, 원화 결제금액이 별도로 있으면 amount에는 원화금액, original_amount에는 외화금액 설정)
 - type: "income" 또는 "expense"
 - payment_method: 반드시 "Card" 또는 "Bank" 중 하나만 사용
-- description: 적요, 업종, 주소, 할부정보 등을 " / "로 연결. 외화 거래인 경우 통화정보 포함 (예: "USD 결제 / 환율 1,350")
+- description: 적요, 기재내용, 취급점/거래점, 업종, 주소, 할부정보, 거래시간(HH:mm:ss) 등을 " / "로 연결. ⚠️ 통장 거래에서 취급점/거래점과 시간 정보가 있으면 반드시 description에 포함 (중복 거래 구분에 필수). 외화 거래인 경우 통화정보 포함 (예: "USD 결제 / 환율 1,350")
 - card_number: 카드번호 문자열 (없으면 "")
 - approval_number: 승인번호 (없으면 "")
 
@@ -100,7 +109,8 @@ ${hint}
 
 [중요 규칙]
 - 취소 거래도 포함, description에 "취소" 명시
-- 잔액은 금액에 포함하지 않음
+- ⚠️ "잔액", "거래후잔액", "거래후 잔액(원)" 컬럼 값을 절대 amount에 넣지 마세요! 잔액은 누적 잔고입니다!
+- amount는 반드시 "입금(원)/지급(원)/출금/입금/찾으신금액/맡기신금액" 컬럼에서만 추출하세요
 - 같은 행에 입금/출금 둘 다 있으면 0이 아닌 쪽 사용
 - 날짜: 반드시 YYYY-MM-DD (예: 20260115 → ${currentYear}-01-15, 02.26 → ${currentYear}-02-26)
 - 연도가 없는 날짜(MM.DD, MM/DD)는 반드시 ${currentYear}년으로 설정
@@ -126,13 +136,115 @@ ${mimeType === 'text/csv' ? data : '(이미지 데이터)'}`;
 
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    const parsed = JSON.parse(text);
+    // 잘린 JSON 복구 시도
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (jsonErr) {
+      console.warn('[finance-parser] JSON 파싱 실패, 복구 시도:', (jsonErr as Error).message);
+      // 배열이 중간에 잘린 경우: 마지막 완전한 객체까지만 파싱
+      const lastCloseBrace = text.lastIndexOf('}');
+      if (lastCloseBrace > 0) {
+        const truncated = text.substring(0, lastCloseBrace + 1) + ']';
+        try {
+          parsed = JSON.parse(truncated);
+          console.log(`[finance-parser] 잘린 JSON 복구 성공: ${parsed.length}건`);
+        } catch {
+          // 그래도 실패하면 원본 에러 throw
+          throw jsonErr;
+        }
+      } else {
+        throw jsonErr;
+      }
+    }
 
     // 📊 결과 검증 로그
     if (Array.isArray(parsed)) {
       const methods = parsed.map((p: any) => p.payment_method);
       const uniqueMethods = [...new Set(methods)];
       console.log(`[finance-parser] ✅ ${parsed.length}건 파싱 완료 | payment_methods: ${uniqueMethods.join(', ')} | fileType: ${fileType}`);
+
+      // ⚠️ 통장 거래: 잔액이 금액으로 잘못 파싱되었는지 검증
+      if (fileType === 'bank_statement' && mimeType === 'text/csv' && typeof data === 'string') {
+        try {
+          const csvLines = data.split('\n').map((line: string) => line.split(',').map((c: string) => c.trim().replace(/^"|"$/g, '')));
+          if (csvLines.length > 0) {
+            const headerLine = csvLines[0];
+            // 잔액 컬럼 인덱스 찾기
+            const balanceIdx = headerLine.findIndex((h: string) =>
+              /잔액|거래후\s*잔액|거래후잔액/.test(h) && !/입금|출금|지급/.test(h)
+            );
+            // 지급/출금 컬럼 인덱스 찾기
+            const withdrawIdx = headerLine.findIndex((h: string) => /지급|출금|찾으신/.test(h));
+            // 입금 컬럼 인덱스 찾기
+            const depositIdx = headerLine.findIndex((h: string) => /입금|맡기신/.test(h) && !/출금|지급/.test(h));
+
+            if (balanceIdx >= 0 && (withdrawIdx >= 0 || depositIdx >= 0)) {
+              // CSV의 잔액 값 목록 수집
+              const balanceValues = new Set<number>();
+              for (let li = 1; li < csvLines.length; li++) {
+                const row = csvLines[li];
+                if (row.length > balanceIdx) {
+                  const bv = Math.abs(Number(String(row[balanceIdx]).replace(/[,\s]/g, '')) || 0);
+                  if (bv > 0) balanceValues.add(bv);
+                }
+              }
+
+              // 파싱된 amount가 잔액 값과 일치하는지 확인
+              let balanceMatchCount = 0;
+              for (const item of parsed) {
+                const amt = Math.abs(Number(item.amount) || 0);
+                if (amt > 0 && balanceValues.has(amt)) {
+                  balanceMatchCount++;
+                }
+              }
+
+              // 50% 이상이 잔액 값과 일치하면 → 잔액을 금액으로 잘못 파싱한 것
+              if (balanceMatchCount > 0 && balanceMatchCount >= parsed.length * 0.5) {
+                console.error(`[finance-parser] ❌ 잔액 오파싱 감지! ${balanceMatchCount}/${parsed.length}건이 잔액값과 일치`);
+                console.error(`[finance-parser] → CSV에서 직접 지급/입금 컬럼으로 보정 시도`);
+
+                // CSV에서 직접 올바른 금액 추출하여 보정
+                for (const item of parsed) {
+                  // 날짜와 거래처명으로 원본 CSV 행 매칭
+                  const txDate = item.transaction_date || '';
+                  const clientName = item.client_name || '';
+
+                  for (let li = 1; li < csvLines.length; li++) {
+                    const row = csvLines[li];
+                    const rowStr = row.join(' ');
+
+                    // 날짜와 거래처명이 모두 포함된 행 찾기
+                    const dateMatches = rowStr.includes(txDate.replace(/-/g, '.')) ||
+                                       rowStr.includes(txDate.replace(/-/g, '')) ||
+                                       rowStr.includes(txDate);
+                    const nameMatches = clientName && rowStr.includes(clientName);
+
+                    if (dateMatches && nameMatches) {
+                      const withdrawAmt = withdrawIdx >= 0 ? Math.abs(Number(String(row[withdrawIdx]).replace(/[,\s]/g, '')) || 0) : 0;
+                      const depositAmt = depositIdx >= 0 ? Math.abs(Number(String(row[depositIdx]).replace(/[,\s]/g, '')) || 0) : 0;
+
+                      if (withdrawAmt > 0 || depositAmt > 0) {
+                        const correctAmt = withdrawAmt > 0 ? withdrawAmt : depositAmt;
+                        const correctType = withdrawAmt > 0 ? 'expense' : 'income';
+
+                        if (Math.abs(Number(item.amount)) !== correctAmt) {
+                          console.log(`[finance-parser] 보정: ${item.client_name} ${item.amount} → ${correctAmt} (${correctType})`);
+                          item.amount = correctAmt;
+                          item.type = correctType;
+                        }
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (balanceCheckErr) {
+          console.warn('[finance-parser] 잔액 검증 중 오류 (무시):', balanceCheckErr);
+        }
+      }
 
       // payment_method 강제 정규화 (Gemini가 비표준 값 반환 시 대응)
       for (const item of parsed) {

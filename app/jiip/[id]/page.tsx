@@ -62,6 +62,9 @@ export default function JiipDetailPage() {
   const [paymentSummary, setPaymentSummary] = useState<any>(null)
   const [generatingSchedule, setGeneratingSchedule] = useState(false)
 
+  // 지입 거래 내역 (통장 연결 기반)
+  const [jiipTxList, setJiipTxList] = useState<any[]>([])
+
   // 데이터 상태
   const [item, setItem] = useState<any>({
     car_id: '', tax_type: '세금계산서',
@@ -104,7 +107,7 @@ export default function JiipDetailPage() {
   useEffect(() => {
     if (!jiipId) return
     if (activeTab === 'contract') loadSendingLogs()
-    if (activeTab === 'payments') loadPaymentSchedule()
+    if (activeTab === 'payments') { loadPaymentSchedule(); loadJiipTransactions() }
     if (activeTab === 'history') loadStatusHistory()
   }, [activeTab, jiipId])
 
@@ -151,10 +154,19 @@ export default function JiipDetailPage() {
   }
 
   const fetchRealDeposit = async () => {
-    const { data } = await supabase
-      .from('transactions').select('amount')
-      .eq('related_type', 'jiip').eq('related_id', jiipId).eq('type', 'income')
-    if (data) setRealDepositTotal(data.reduce((acc, cur) => acc + (cur.amount || 0), 0))
+    // jiip + jiip_share 모두 조회
+    const { data: d1 } = await supabase
+      .from('transactions').select('amount, type')
+      .eq('related_type', 'jiip').eq('related_id', jiipId)
+    const { data: d2 } = await supabase
+      .from('transactions').select('amount, type')
+      .eq('related_type', 'jiip_share').eq('related_id', jiipId)
+    const all = [...(d1 || []), ...(d2 || [])]
+    const net = all.reduce((acc, cur) => {
+      const amt = Math.abs(cur.amount || 0)
+      return acc + (cur.type === 'income' ? amt : -amt)
+    }, 0)
+    setRealDepositTotal(net)
   }
 
   // ── API 호출 헬퍼 ──
@@ -255,6 +267,30 @@ export default function JiipDetailPage() {
       } else { alert(result.error) }
     } catch { alert('스케줄 생성 실패') }
     finally { setGeneratingSchedule(false) }
+  }
+
+  // ── 지입 거래 내역 로드 (transactions 기반 — jiip + jiip_share 모두) ──
+  const loadJiipTransactions = async () => {
+    if (!jiipId) return
+    // jiip (분류에서 직접 연결) + jiip_share (정산 지급) 모두 조회
+    const { data: d1 } = await supabase
+      .from('transactions')
+      .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
+      .eq('related_type', 'jiip')
+      .eq('related_id', String(jiipId))
+      .order('transaction_date', { ascending: true })
+
+    const { data: d2 } = await supabase
+      .from('transactions')
+      .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
+      .eq('related_type', 'jiip_share')
+      .eq('related_id', String(jiipId))
+      .order('transaction_date', { ascending: true })
+
+    // 합치고 날짜순 정렬
+    const all = [...(d1 || []), ...(d2 || [])]
+    all.sort((a, b) => (a.transaction_date || '').localeCompare(b.transaction_date || ''))
+    setJiipTxList(all)
   }
 
   // ── 저장/삭제 ──
@@ -951,119 +987,172 @@ export default function JiipDetailPage() {
       {/* ================================================================ */}
       {/* 탭 3: 입금 현황 */}
       {/* ================================================================ */}
-      {activeTab === 'payments' && !isNew && (
-        <div className="space-y-5">
-          {/* 요약 카드 */}
-          {paymentSummary && (
+      {activeTab === 'payments' && !isNew && (() => {
+        const incomeTxs = jiipTxList.filter((t: any) => t.type === 'income')
+        const expenseTxs = jiipTxList.filter((t: any) => t.type === 'expense')
+        const totalIncome = incomeTxs.reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0)
+        const totalExpense = expenseTxs.reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0)
+        const netBalance = totalIncome - totalExpense
+        const nf = (n: number) => n.toLocaleString()
+
+        return (
+          <div className="space-y-5">
+            {/* 요약 카드 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">총 스케줄</p>
-                <p className="text-xl font-bold text-slate-900">{paymentSummary.total_months}<span className="text-xs font-normal text-slate-400 ml-0.5">개월</span></p>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">총 거래</p>
+                <p className="text-xl font-bold text-slate-900">{jiipTxList.length}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">완료</p>
-                <p className="text-xl font-bold text-emerald-600">{paymentSummary.completed}<span className="text-xs font-normal text-slate-400 ml-0.5">건</span></p>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">총 입금 (지입비 등)</p>
+                <p className="text-xl font-bold text-emerald-600">{nf(totalIncome)}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">예상 총액</p>
-                <p className="text-lg font-bold text-slate-900">{paymentSummary.total_expected?.toLocaleString()}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">총 출금 (배분금 등)</p>
+                <p className="text-xl font-bold text-red-500">{nf(totalExpense)}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">미수금</p>
-                <p className={`text-lg font-bold ${paymentSummary.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                  {paymentSummary.balance?.toLocaleString()}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span>
-                </p>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">순잔액</p>
+                <p className={`text-xl font-bold ${netBalance >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{nf(netBalance)}<span className="text-xs font-normal text-slate-400 ml-0.5">원</span></p>
               </div>
             </div>
-          )}
 
-          {/* 스케줄 관리 */}
-          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-              <h3 className="font-bold text-sm text-slate-900">월별 결제 스케줄</h3>
-              <button onClick={generateSchedule} disabled={generatingSchedule}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold text-xs hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 transition-colors flex items-center gap-1.5">
-                {generatingSchedule ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    생성 중...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    {paymentSchedules.length > 0 ? '재생성' : '스케줄 생성'}
-                  </>
-                )}
-              </button>
-            </div>
-
-            {paymentSchedules.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50/80">
-                      <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">회차</th>
-                      <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">결제 예정일</th>
-                      <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">예상 금액</th>
-                      <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">실제 입금</th>
-                      <th className="p-3.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">상태</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {paymentSchedules.map((s: any) => {
-                      const isPast = new Date(s.payment_date) < new Date()
-                      const isOverdue = s.status === 'pending' && isPast
-                      return (
-                        <tr key={s.id} className={`hover:bg-slate-50/50 transition-colors ${isOverdue ? 'bg-red-50/30' : ''}`}>
-                          <td className="p-3.5 font-semibold text-slate-700">{s.payment_number}회</td>
-                          <td className="p-3.5 text-slate-500">{formatDate(s.payment_date)}</td>
-                          <td className="p-3.5 text-right font-semibold text-slate-700">{s.expected_amount?.toLocaleString()}원</td>
-                          <td className="p-3.5 text-right font-semibold text-emerald-600">{s.actual_amount ? `${s.actual_amount.toLocaleString()}원` : <span className="text-slate-300">-</span>}</td>
-                          <td className="p-3.5 text-center">
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                              s.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
-                              isOverdue ? 'bg-red-50 text-red-500' :
-                              'bg-slate-100 text-slate-400'
-                            }`}>
-                              {s.status === 'completed' ? '완료' : isOverdue ? '연체' : '대기'}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+            {/* 통장 거래 내역 */}
+            <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-sm text-slate-900">통장 거래 내역</h3>
+                <span className="text-xs text-slate-400">{jiipTxList.length}건</span>
               </div>
-            ) : (
-              <div className="text-center py-12 px-6">
-                <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                <p className="font-semibold text-sm text-slate-500">결제 스케줄이 없습니다</p>
-                <p className="text-xs text-slate-400 mt-1">위 버튼을 눌러 자동 생성하세요</p>
+
+              {jiipTxList.length > 0 ? (
+                <div className="divide-y divide-slate-50">
+                  {jiipTxList.map((t: any, idx: number) => {
+                    const isIncome = t.type === 'income'
+                    const amt = Math.abs(t.amount || 0)
+                    const runningBalance = jiipTxList.slice(0, idx + 1).reduce((s: number, tx: any) => {
+                      return s + (tx.type === 'income' ? Math.abs(tx.amount || 0) : -Math.abs(tx.amount || 0))
+                    }, 0)
+                    const isShare = t.related_type === 'jiip_share'
+                    return (
+                      <div key={t.id} className="px-6 py-3.5 flex justify-between items-center hover:bg-slate-50/50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isIncome ? 'bg-emerald-500' : 'bg-red-400'}`}></span>
+                            <p className="text-sm font-semibold text-slate-700 truncate">
+                              {t.client_name || t.description || (isIncome ? '지입비 입금' : '수익배분 지급')}
+                            </p>
+                            {isShare && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 shrink-0">정산</span>
+                            )}
+                            {t.category && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 shrink-0">{t.category}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5 ml-3.5">{t.transaction_date}</p>
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <p className={`font-bold text-sm ${isIncome ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {isIncome ? '+' : '-'}{nf(amt)}원
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">잔액 {nf(runningBalance)}원</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6">
+                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+                  </svg>
+                  <p className="font-semibold text-sm text-slate-500">연결된 거래 내역이 없습니다</p>
+                  <p className="text-xs text-slate-400 mt-1">통장/카드 분류관리에서 거래를 이 지입 계약에 연결하세요</p>
+                </div>
+              )}
+            </section>
+
+            {/* 계약 정보 비교 */}
+            {item.admin_fee > 0 && (
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700 font-semibold">월 관리비 (지입비)</span>
+                  <span className="text-sm font-bold text-blue-800">{nf(item.admin_fee)}원</span>
+                </div>
+                <div className="flex justify-between items-center mt-1.5">
+                  <span className="text-sm text-blue-700 font-semibold">수익 배분율</span>
+                  <span className="text-sm font-bold text-blue-800">차주 {item.share_ratio}% / 회사 {100 - item.share_ratio}%</span>
+                </div>
               </div>
             )}
-          </section>
 
-          {/* 실제 입금 내역 */}
-          {paymentTransactions.length > 0 && (
+            {/* 월별 결제 스케줄 */}
             <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="font-bold text-sm text-slate-900">실제 입금 내역</h3>
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-sm text-slate-900">월별 결제 스케줄</h3>
+                <button onClick={generateSchedule} disabled={generatingSchedule}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold text-xs hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 transition-colors flex items-center gap-1.5">
+                  {generatingSchedule ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      {paymentSchedules.length > 0 ? '재생성' : '스케줄 생성'}
+                    </>
+                  )}
+                </button>
               </div>
-              <div className="divide-y divide-slate-50">
-                {paymentTransactions.map((t: any) => (
-                  <div key={t.id} className="px-6 py-3.5 flex justify-between items-center hover:bg-slate-50/50 transition-colors">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">{t.description || '입금'}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(t.created_at)}</p>
-                    </div>
-                    <span className="font-bold text-emerald-600 text-sm">+{t.amount?.toLocaleString()}원</span>
-                  </div>
-                ))}
-              </div>
+
+              {paymentSchedules.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50/80">
+                        <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">회차</th>
+                        <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">결제 예정일</th>
+                        <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">예상 금액</th>
+                        <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">실제 입금</th>
+                        <th className="p-3.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">상태</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {paymentSchedules.map((s: any) => {
+                        const isPast = new Date(s.payment_date) < new Date()
+                        const isOverdue = s.status === 'pending' && isPast
+                        return (
+                          <tr key={s.id} className={`hover:bg-slate-50/50 transition-colors ${isOverdue ? 'bg-red-50/30' : ''}`}>
+                            <td className="p-3.5 font-semibold text-slate-700">{s.payment_number}회</td>
+                            <td className="p-3.5 text-slate-500">{formatDate(s.payment_date)}</td>
+                            <td className="p-3.5 text-right font-semibold text-slate-700">{s.expected_amount?.toLocaleString()}원</td>
+                            <td className="p-3.5 text-right font-semibold text-emerald-600">{s.actual_amount ? `${s.actual_amount.toLocaleString()}원` : <span className="text-slate-300">-</span>}</td>
+                            <td className="p-3.5 text-center">
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                                s.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
+                                isOverdue ? 'bg-red-50 text-red-500' :
+                                'bg-slate-100 text-slate-400'
+                              }`}>
+                                {s.status === 'completed' ? '완료' : isOverdue ? '연체' : '대기'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 px-6">
+                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <p className="font-semibold text-sm text-slate-500">결제 스케줄이 없습니다</p>
+                  <p className="text-xs text-slate-400 mt-1">위 버튼을 눌러 자동 생성하세요</p>
+                </div>
+              )}
             </section>
-          )}
-        </div>
-      )}
+          </div>
+        )
+      })()}
 
       {/* ================================================================ */}
       {/* 탭 4: 이력 */}

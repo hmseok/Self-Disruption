@@ -23,7 +23,7 @@ async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, com
   while (hasMore) {
     const { data, error } = await sb
       .from('transactions')
-      .select('id, transaction_date, client_name, amount, payment_method, created_at')
+      .select('id, transaction_date, client_name, amount, payment_method, description, created_at')
       .eq('company_id', company_id)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
@@ -42,11 +42,14 @@ async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, com
 }
 
 // ── 중복 그룹핑 ──
+// description(적요/메모)까지 포함하여 같은 날 같은 금액이라도 적요가 다르면 별건으로 취급
 function groupDuplicates(allTxs: any[]) {
   const groups: Record<string, any[]> = {}
   for (const tx of allTxs) {
-    // 금액 절대값으로 비교하여 부호 차이로 인한 누락 방지
-    const key = `${tx.transaction_date}|${tx.client_name}|${Math.abs(Number(tx.amount || 0))}|${tx.payment_method}`
+    // description 포함: 같은 날 같은 사람이 같은 금액을 이체해도
+    // 적요(시간, 메모 등)가 다르면 중복이 아님
+    const desc = (tx.description || '').trim()
+    const key = `${tx.transaction_date}|${tx.client_name}|${Math.abs(Number(tx.amount || 0))}|${tx.payment_method}|${desc}`
     if (!groups[key]) groups[key] = []
     groups[key].push(tx)
   }
@@ -146,7 +149,8 @@ export async function DELETE(request: NextRequest) {
         const queueGroups: Record<string, any[]> = {}
         for (const q of queueItems) {
           const sd = q.source_data || {}
-          const key = `${sd.transaction_date || ''}|${sd.client_name || ''}|${Math.abs(Number(sd.amount || 0))}|${sd.payment_method || ''}`
+          const desc = (sd.description || '').trim()
+          const key = `${sd.transaction_date || ''}|${sd.client_name || ''}|${Math.abs(Number(sd.amount || 0))}|${sd.payment_method || ''}|${desc}`
           if (!queueGroups[key]) queueGroups[key] = []
           queueGroups[key].push(q)
         }

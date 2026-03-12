@@ -145,18 +145,21 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // 실제 입금 내역 조회
+  // 실제 입금 내역 조회 (jiip은 jiip + jiip_share 모두 포함)
+  const relatedTypes = contractType === 'jiip' ? ['jiip', 'jiip_share'] : [contractType!]
   const { data: transactions } = await sb
     .from('transactions')
-    .select('id, amount, type, created_at, description')
-    .eq('related_type', contractType)
+    .select('id, amount, type, created_at, transaction_date, description, related_type')
+    .in('related_type', relatedTypes)
     .eq('related_id', contractId)
-    .eq('type', 'income')
-    .order('created_at', { ascending: true })
+    .order('transaction_date', { ascending: true })
 
   // 요약 계산
   const totalExpected = (schedules || []).reduce((sum, s) => sum + (s.expected_amount || 0), 0)
-  const totalActual = (transactions || []).reduce((sum, t) => sum + (t.amount || 0), 0)
+  const incomeTxs = (transactions || []).filter((t: any) => t.type === 'income')
+  const expenseTxs = (transactions || []).filter((t: any) => t.type === 'expense')
+  const totalIncome = incomeTxs.reduce((sum: number, t: any) => sum + Math.abs(t.amount || 0), 0)
+  const totalExpenseAmt = expenseTxs.reduce((sum: number, t: any) => sum + Math.abs(t.amount || 0), 0)
   const completedCount = (schedules || []).filter(s => s.status === 'completed').length
   const overdueCount = (schedules || []).filter(s => {
     return s.status === 'pending' && new Date(s.payment_date) < new Date()
@@ -170,8 +173,10 @@ export async function GET(request: NextRequest) {
       completed: completedCount,
       overdue: overdueCount,
       total_expected: totalExpected,
-      total_actual: totalActual,
-      balance: totalExpected - totalActual,
+      total_income: totalIncome,
+      total_expense: totalExpenseAmt,
+      total_actual: totalIncome,
+      balance: totalExpected - totalIncome,
     },
   })
 }

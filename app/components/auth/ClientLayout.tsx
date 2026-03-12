@@ -569,6 +569,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 // ═══════════════════════════════════════════════════════════════
 function UploadProgressWidget() {
   const pathname = usePathname()
+  const [dismissed, setDismissed] = useState(false)
   let uploadContext: ReturnType<typeof useUpload> | null = null
   try { uploadContext = useUpload() } catch { return null }
   if (!uploadContext) return null
@@ -587,13 +588,29 @@ function UploadProgressWidget() {
   if (!isProcessing && !hasResults) return null
   // 업로드/분류 확정 페이지에서는 숨기기
   if (pathname === '/finance/review' || pathname === '/finance/upload') return null
+  // 사용자가 닫기 버튼 눌렀으면 숨기기 (분류 대기 알림만 — 업로드 처리 중에는 항상 표시)
+  if (dismissed && !isProcessing) return null
 
   return (
     <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      position: 'fixed', bottom: 24, left: 210, zIndex: 9999,
       background: '#fff', borderRadius: 16, padding: '16px 20px', width: 320,
       boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0',
     }}>
+      {/* 닫기 버튼 (분류 대기 알림에만) */}
+      {!isProcessing && hasResults && (
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDismissed(true) }}
+          style={{
+            position: 'absolute', top: 8, right: 10,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 16, color: '#94a3b8', lineHeight: 1, padding: '2px 4px',
+          }}
+          title="닫기"
+        >
+          ×
+        </button>
+      )}
       {/* 업로드 처리 중 */}
       {isProcessing && (
         <>
@@ -623,7 +640,7 @@ function UploadProgressWidget() {
       {/* 분류 확정 대기 알림 */}
       {!isProcessing && hasResults && (
         <a href="/finance/upload" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16 }}>📋</span>
               <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>분류 확정 대기</span>

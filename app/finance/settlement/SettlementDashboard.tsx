@@ -33,6 +33,7 @@ type SettlementItem = {
   status: 'pending' | 'approved' | 'paid'
   relatedId: string
   detail: string
+  paidTxIds?: string[]          // 정산 완료 시 해당 transaction ID(s) — 취소 시 직접 삭제용
   carNumber?: string
   carModel?: string            // 차종 (모델명)
   carId?: string               // 차량 ID (통장 내역 필터링용)
@@ -80,6 +81,15 @@ type InvestContract = {
   status: string
   car_id?: string
   car_number?: string
+  tax_type?: string  // '이자소득(27.5%)', '사업소득(3.3%)', '세금계산서' 등
+}
+
+type InvestDeposit = {
+  id: string
+  investment_id: string
+  deposit_date: string
+  amount: number
+  memo?: string
 }
 
 // InvestContract는 위의 InvestContract로 대체됨
@@ -173,6 +183,7 @@ export default function SettlementDashboard() {
   const [carTxHistory, setCarTxHistory] = useState<{ related_id: string; type: string; amount: number; transaction_date: string; category?: string; client_name?: string; description?: string }[]>([])
   const [classifiedItems, setClassifiedItems] = useState<ClassifiedItem[]>([])
   const [shareHistory, setShareHistory] = useState<{ id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[]>([])
+  const [investDepositHistory, setInvestDepositHistory] = useState<{ id: string; transaction_date: string; amount: number; type: string; related_id: string; client_name?: string; description?: string }[]>([])
 
   // 정산 실행 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -244,7 +255,7 @@ export default function SettlementDashboard() {
     const past12Start = `${year - 1}-${String(month).padStart(2, '0')}-01`
 
     // 병렬 로드
-    const [txRes, jiipRes, investRes, loanRes, allSettleRes, carTxRes, classifyRes, shareHistoryRes] = await Promise.all([
+    const [txRes, jiipRes, investRes, loanRes, allSettleRes, carTxRes, classifyRes, shareHistoryRes, investDepositsRes, investTxDepositsRes] = await Promise.all([
       // 거래 내역 (당월)
       (() => {
         let q = supabase.from('transactions').select('*')
@@ -254,7 +265,7 @@ export default function SettlementDashboard() {
       })(),
       // 지입 계약 (contract_start_date 포함)
       (() => {
-        let q = supabase.from('jiip_contracts').select('*, cars(number, model)').eq('status', 'active')
+        let q = supabase.from('jiip_contracts').select('*, cars(number, model, owner_bank, owner_account, owner_account_holder)').eq('status', 'active')
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q
       })(),
@@ -270,9 +281,9 @@ export default function SettlementDashboard() {
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q
       })(),
-      // 전체 정산 거래 (미수 누적 확인용 — 최근 12개월)
+      // 전체 정산 거래 (미수 누적 확인용 — 최근 12개월) — id 포함 (취소 시 직접 삭제용)
       (() => {
-        let q = supabase.from('transactions').select('related_type, related_id, transaction_date, amount')
+        let q = supabase.from('transactions').select('id, related_type, related_id, transaction_date, amount')
           .in('related_type', ['jiip_share', 'invest', 'loan'])
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q.gte('transaction_date', past12Start)
@@ -298,6 +309,23 @@ export default function SettlementDashboard() {
         if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
         return q.eq('settlement_month', filterDate).order('created_at', { ascending: false })
       })(),
+      // 투자금 입금 내역 (투자금 변동 추적 — 테이블 없으면 빈 배열)
+      (async () => {
+        try {
+          let q = supabase.from('investment_deposits')
+            .select('id, investment_id, deposit_date, amount, memo')
+          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          return await q.order('deposit_date', { ascending: true })
+        } catch { return { data: [], error: null } }
+      })(),
+      // 투자 관련 통장 거래 내역 (투자 원금 변동 추적 — transactions 기반, income+expense 모두)
+      (() => {
+        let q = supabase.from('transactions')
+          .select('id, transaction_date, amount, type, related_type, related_id, category, client_name, description')
+          .eq('related_type', 'invest')
+        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        return q.order('transaction_date', { ascending: true })
+      })(),
     ])
 
     const txs = txRes.data || []
@@ -308,6 +336,18 @@ export default function SettlementDashboard() {
     const carTxs = carTxRes.data || []
     const classifyData = (classifyRes.data || []) as ClassifiedItem[]
     setShareHistory(shareHistoryRes.data || [])
+    const investDeposits: InvestDeposit[] = investDepositsRes?.data || []
+    // 통장 거래 기반 투자금 거래 내역 (income=입금, expense=이자지급 등)
+    const investTxDeposits: { id: string; transaction_date: string; amount: number; type: string; related_id: string; client_name?: string; description?: string }[] =
+      (investTxDepositsRes?.data || []).map((t: any) => ({
+        id: t.id,
+        transaction_date: t.transaction_date,
+        amount: Math.abs(Number(t.amount) || 0),
+        type: t.type || 'income',
+        related_id: String(t.related_id || ''),
+        client_name: t.client_name || '',
+        description: t.description || '',
+      }))
 
     // 디버그: 투자/대출 데이터 확인
     console.log('[Settlement] investData:', investData.map(i => ({
@@ -318,7 +358,9 @@ export default function SettlementDashboard() {
       id: l.id, name: l.finance_name, monthly: l.monthly_payment,
       startDate: l.start_date, status: l.status,
     })))
+    console.log('[Settlement] investDeposits(table):', investDeposits.length, '건, investTxDeposits(transactions):', investTxDeposits.length, '건')
 
+    setInvestDepositHistory(investTxDeposits)
     setTransactions(txs)
     setJiips(jiipData)
     setInvestors(investData)
@@ -327,7 +369,7 @@ export default function SettlementDashboard() {
     setClassifiedItems(classifyData)
 
     // 정산 항목 생성 (미수 누적 포함)
-    buildSettlementItems(jiipData, investData, loanData, filterDate, allSettleTxs, carTxs)
+    buildSettlementItems(jiipData, investData, loanData, filterDate, allSettleTxs, carTxs, investDeposits, investTxDeposits)
     setLoading(false)
   }
 
@@ -339,8 +381,10 @@ export default function SettlementDashboard() {
     investData: InvestContract[],
     loanData: LoanContract[],
     selectedMonth: string,
-    allSettleTxs: { related_type: string; related_id: string; transaction_date: string; amount: number }[],
-    carTxs: { related_type: string; related_id: string; type: string; amount: number; transaction_date: string; category?: string }[]
+    allSettleTxs: { id: string; related_type: string; related_id: string; transaction_date: string; amount: number }[],
+    carTxs: { related_type: string; related_id: string; type: string; amount: number; transaction_date: string; category?: string }[],
+    investDeposits?: InvestDeposit[],
+    investTxDeposits?: { id: string; transaction_date: string; amount: number; type: string; related_id: string }[]
   ) => {
     const [selYear, selMonth] = selectedMonth.split('-').map(Number)
 
@@ -358,14 +402,18 @@ export default function SettlementDashboard() {
     }
 
     // 정산완료 확인: 정산 거래는 지급월(N+1)에 기록됨 → 기준월(N)로 변환
-    // `${related_type}_${related_id}_${기준월}` 형태
-    const paidSet = new Set(
-      allSettleTxs.map(t => {
-        const txMonth = t.transaction_date.slice(0, 7)
-        const baseMonth = prevMonthStr(txMonth)
-        return `${t.related_type}_${t.related_id}_${baseMonth}`
-      })
-    )
+    // `${related_type}_${related_id}_${기준월}` → [txId, ...] 매핑
+    const paidMap = new Map<string, string[]>()
+    allSettleTxs.forEach(t => {
+      const txMonth = t.transaction_date.slice(0, 7)
+      const baseMonth = prevMonthStr(txMonth)
+      const key = `${t.related_type}_${t.related_id}_${baseMonth}`
+      const existing = paidMap.get(key) || []
+      existing.push(t.id)
+      paidMap.set(key, existing)
+    })
+    // paidSet 호환용 (기존 has() 호출 대체)
+    const paidSet = { has: (key: string) => paidMap.has(key) }
 
     // ── 정산 계산 제외 카테고리 ──
     // 차량구입비용은 이미 수익분배비율에 반영됨 → 운영 수입/비용만 포함
@@ -528,12 +576,13 @@ export default function SettlementDashboard() {
           dueDate: `${actualDueMonth}-${dueDay.toString().padStart(2, '0')}`,
           status: isPaid ? 'paid' : 'pending',
           relatedId: j.id,
+          paidTxIds: isPaid ? paidMap.get(`jiip_share_${j.id}_${m}`) : undefined,
           detail: effectiveDistributable > 0
             ? `${m.slice(5)}월분: 배분대상${nf(effectiveDistributable)}×${shareRatio}%`
             : `${m.slice(5)}월분: 적자${nf(effectiveDistributable)}${carryNote}`,
           carNumber: j.cars?.number,
           carModel: j.cars?.model,
-          carId: j.car_id,
+          carId: j.car_id ? String(j.car_id) : undefined,
           monthLabel: m,
           isOverdue,
           breakdown: {
@@ -560,52 +609,138 @@ export default function SettlementDashboard() {
     })
 
     // ── 2. 투자 이자 ──
-    // 월이자 = 투자원금 × 연이자율% ÷ 12
+    // 월이자 = 해당월 투자원금 × 연이자율% ÷ 12
+    // 투자금은 입금내역(investment_deposits)에 따라 월별로 다를 수 있음
+    // 세금: tax_type에 따라 공제 적용
     // 기준월 N의 이자 → N+1월에 지급
+    const deposits = investDeposits || []
+
+    // 특정 투자의 특정 월 기준 투자원금 계산
+    // 우선순위: 1) investment_deposits 테이블 2) 통장 거래(transactions) 3) 계약 원금(fallback)
+    const getInvestBalance = (investId: string, baseMonth: string, fallbackAmount: number): number => {
+      // 1차: investment_deposits 테이블에서 조회
+      const invDeposits = deposits.filter(d => String(d.investment_id) === String(investId))
+      if (invDeposits.length > 0) {
+        const [y, mo] = baseMonth.split('-').map(Number)
+        const endOfMonth = `${baseMonth}-${new Date(y, mo, 0).getDate()}`
+        let balance = 0
+        invDeposits.forEach(d => {
+          if (d.deposit_date <= endOfMonth) {
+            balance += d.amount
+          }
+        })
+        if (balance > 0) return balance
+      }
+
+      // 2차: 통장 거래(transactions)에서 투자 관련 거래로 월별 순잔액 추적 (income - expense)
+      const txDeposits = (investTxDeposits || []).filter(t => String(t.related_id) === String(investId))
+      if (txDeposits.length > 0) {
+        const [y, mo] = baseMonth.split('-').map(Number)
+        const endOfMonth = `${baseMonth}-${new Date(y, mo, 0).getDate()}`
+        let balance = 0
+        txDeposits.forEach(t => {
+          if (t.transaction_date <= endOfMonth) {
+            balance += (t.type === 'income' ? t.amount : -t.amount)
+          }
+        })
+        if (balance > 0) {
+          console.log(`[getInvestBalance] invest=${investId} month=${baseMonth} → 통장거래 기준 ${balance.toLocaleString()}원 (${txDeposits.filter(t => t.transaction_date <= endOfMonth).length}건)`)
+          return balance
+        }
+      }
+
+      // 3차: 계약 원금 (fallback)
+      return fallbackAmount
+    }
+
     console.log('[Settlement] Processing investData, count:', investData.length)
     investData.forEach(inv => {
-      const amt = inv.invest_amount || 0
       const rate = inv.interest_rate || 0
-      const monthlyInterest = Math.floor((amt * (rate / 100)) / 12)
-      console.log(`[Settlement] invest ${inv.investor_name}: amt=${amt}, rate=${rate}, monthly=${monthlyInterest}, start=${inv.contract_start_date}`)
-      if (monthlyInterest === 0) return
+      if (rate === 0) return
 
       // 기준월 목록 (계약시작월 ~ 선택월 전월)
       const baseMonths = getBaseMonths(inv.contract_start_date?.slice(0, 7))
 
       // 당월 시작 계약: getBaseMonths가 빈 배열이면 당월을 포함하여 표시
-      // (실제 지급은 다음 달이지만 목록에는 표시)
       const contractStartMonth = inv.contract_start_date?.slice(0, 7)
       if (baseMonths.length === 0 && contractStartMonth && contractStartMonth <= selectedMonth) {
         baseMonths.push(contractStartMonth)
       }
 
+      // 세금 타입
+      const taxType = inv.tax_type || '이자소득(27.5%)'
+
       baseMonths.forEach(m => {
         const isPaid = paidSet.has(`invest_${inv.id}_${m}`)
         const paymentMonth = nextMonthStr(m)
         const isCurrentPayment = paymentMonth === selectedMonth
-        if (isPaid && !isCurrentPayment) return
+        // 투자: 정산 완료된 월도 모두 표시 (지입과 달리 이월 누적 없으므로 전체 이력 표시)
+
+        // 해당 월 기준 투자 원금 (입금내역 반영)
+        const currentBalance = getInvestBalance(String(inv.id), m, inv.invest_amount || 0)
+        const monthlyInterest = Math.floor((currentBalance * (rate / 100)) / 12)
+        if (monthlyInterest === 0) return
+
+        // 세금 계산
+        let taxRate = 0, taxAmount = 0, supplyAmount = 0, netPayout = monthlyInterest
+        if (taxType === '세금계산서') {
+          taxRate = 10
+          supplyAmount = Math.round(monthlyInterest / 1.1)
+          taxAmount = monthlyInterest - supplyAmount
+          netPayout = monthlyInterest // 배분금 = 실수령액
+        } else if (taxType === '사업소득(3.3%)') {
+          taxRate = 3.3
+          taxAmount = Math.round(monthlyInterest * taxRate / 100)
+          netPayout = monthlyInterest - taxAmount
+        } else if (taxType === '이자소득(27.5%)') {
+          taxRate = 27.5
+          taxAmount = Math.round(monthlyInterest * taxRate / 100)
+          netPayout = monthlyInterest - taxAmount
+        }
 
         const dueDay = inv.payment_day || 10
         const isNextMonthPayment = paymentMonth > selectedMonth
         const isOverdueInv = !isCurrentPayment && !isPaid && !isNextMonthPayment
         const actualDueMonthInv = isOverdueInv ? selectedMonth : paymentMonth
+
+        // 세전/세후 표시 여부
+        const hasTax = taxRate > 0 && taxType !== '세금계산서'
+        const displayAmount = netPayout // 실지급액 기준
+
         items.push({
           id: `invest-${inv.id}-${m}`,
           type: 'invest',
           name: inv.investor_name,
-          amount: monthlyInterest,
+          amount: displayAmount,
           dueDay,
           dueDate: `${actualDueMonthInv}-${dueDay.toString().padStart(2, '0')}`,
           status: isPaid ? 'paid' : 'pending',
-          relatedId: inv.id,
+          relatedId: String(inv.id),
+          paidTxIds: isPaid ? paidMap.get(`invest_${inv.id}_${m}`) : undefined,
           detail: isNextMonthPayment
-            ? `${m.slice(5)}월분 (${paymentMonth.slice(5)}월 지급예정): 원금 ${nf(amt)}원 × ${rate}% ÷ 12`
-            : `${m.slice(5)}월분: 원금 ${nf(amt)}원 × ${rate}% ÷ 12`,
+            ? `${m.slice(5)}월분 (${paymentMonth.slice(5)}월 지급예정): 원금 ${nf(currentBalance)}원 × ${rate}% ÷ 12`
+            : `${m.slice(5)}월분: 원금 ${nf(currentBalance)}원 × ${rate}% ÷ 12`,
           carNumber: inv.car_number,
           carId: inv.car_id,
           monthLabel: m,
           isOverdue: isOverdueInv,
+          breakdown: {
+            revenue: currentBalance, // 투자 원금 (표시용)
+            expense: 0,
+            adminFee: 0,
+            netProfit: monthlyInterest, // 세전 이자
+            distributable: monthlyInterest,
+            carryOver: 0,
+            effectiveDistributable: monthlyInterest,
+            shareRatio: rate,
+            investorPayout: monthlyInterest, // 세전 금액
+            companyProfit: 0,
+            taxType,
+            taxRate,
+            taxAmount,
+            supplyAmount,
+            netPayout,
+          },
         })
       })
     })
@@ -643,6 +778,7 @@ export default function SettlementDashboard() {
           dueDate: `${actualDueMonthLoan}-${dueDay.toString().padStart(2, '0')}`,
           status: isPaid ? 'paid' : 'pending',
           relatedId: loan.id,
+          paidTxIds: isPaid ? paidMap.get(`loan_${loan.id}_${m}`) : undefined,
           detail: isNextMonthPayment
             ? `${m.slice(5)}월분 (${paymentMonth.slice(5)}월 상환예정): ${loan.type === '리스' ? '리스료' : '대출 상환금'}`
             : `${m.slice(5)}월분: ${loan.type === '리스' ? '리스료' : '대출 상환금'}`,
@@ -753,7 +889,7 @@ export default function SettlementDashboard() {
           amount: item.amount,
           payment_method: '통장',
           related_type: relatedType,
-          related_id: item.relatedId,
+          related_id: String(item.relatedId),
           company_id: effectiveCompanyId,
         }
       })
@@ -777,6 +913,125 @@ export default function SettlementDashboard() {
   }
 
   // ============================================
+  // 다계좌이체 Excel 파일 생성 (우리은행 양식)
+  // 열: 입금은행 | 계좌번호 | 이체금액 | 보내는분표시 | 받는분표시 | CMS번호
+  // ============================================
+  const handleDownloadBulkTransfer = async () => {
+    const selected = settlementItems.filter(i => selectedIds.has(i.id) && i.status === 'pending')
+    if (selected.length === 0) return alert('이체할 항목을 선택해주세요.')
+
+    try {
+      // 수신자별 은행정보 조회
+      const bankMap: Record<string, { bank: string; account: string; holder: string }> = {}
+
+      for (const item of selected) {
+        const key = `${item.type}_${item.relatedId}`
+        if (bankMap[key]) continue
+
+        if (item.type === 'jiip') {
+          // 지입: jiip_contracts → cars의 차주 은행정보
+          const jiip = jiips.find(j => j.id === item.relatedId)
+          if (jiip?.cars) {
+            bankMap[key] = {
+              bank: (jiip.cars as any).owner_bank || '',
+              account: (jiip.cars as any).owner_account || '',
+              holder: (jiip.cars as any).owner_account_holder || item.name,
+            }
+          }
+        } else if (item.type === 'invest') {
+          // 투자: general_investments의 은행정보
+          const inv = investors.find(i => i.id === item.relatedId)
+          if (inv) {
+            const { data: invDetail } = await supabase
+              .from('general_investments')
+              .select('bank_name, account_number, account_holder')
+              .eq('id', item.relatedId)
+              .single()
+            if (invDetail) {
+              bankMap[key] = {
+                bank: invDetail.bank_name || '',
+                account: invDetail.account_number || '',
+                holder: invDetail.account_holder || item.name,
+              }
+            }
+          }
+        } else if (item.type === 'loan') {
+          // 대출: 금융사 정보 (loans 테이블에 은행정보 없을 수 있음)
+          const loan = loans.find(l => l.id === item.relatedId)
+          bankMap[key] = {
+            bank: loan?.finance_name || '',
+            account: '',
+            holder: loan?.finance_name || '',
+          }
+        }
+
+        if (!bankMap[key]) {
+          bankMap[key] = { bank: '', account: '', holder: item.name }
+        }
+      }
+
+      // 수신자별 합산 (같은 사람에게 여러 건이면 합산)
+      const recipientMap: Record<string, { bank: string; account: string; holder: string; amount: number; memo: string }> = {}
+      selected.forEach(item => {
+        const bankKey = `${item.type}_${item.relatedId}`
+        const bi = bankMap[bankKey] || { bank: '', account: '', holder: item.name }
+        const recipKey = `${bi.bank}_${bi.account}`
+
+        if (!recipientMap[recipKey]) {
+          recipientMap[recipKey] = {
+            bank: bi.bank,
+            account: bi.account,
+            holder: bi.holder,
+            amount: 0,
+            memo: '',
+          }
+        }
+        recipientMap[recipKey].amount += item.amount
+        // 메모에 항목 정보 추가
+        const itemMemo = `${item.monthLabel?.slice(5)}월 ${item.type === 'jiip' ? '수익배분' : item.type === 'invest' ? '투자이자' : '대출상환'}`
+        if (recipientMap[recipKey].memo) recipientMap[recipKey].memo += '/'
+        recipientMap[recipKey].memo += itemMemo
+      })
+
+      const companyName = company?.name || '정산'
+      const rows = Object.values(recipientMap).filter(r => r.amount > 0)
+
+      if (rows.length === 0) return alert('이체 가능한 항목이 없습니다.')
+
+      // 은행정보 누락 체크
+      const missingBank = rows.filter(r => !r.bank || !r.account)
+      if (missingBank.length > 0) {
+        const names = missingBank.map(r => r.holder).join(', ')
+        if (!confirm(`⚠️ ${names}의 은행정보가 누락되어 있습니다.\n계속 진행하시겠습니까? (누락 항목은 빈칸으로 생성됩니다)`)) return
+      }
+
+      // CSV 생성 (우리은행 다계좌이체 양식: xls로 업로드 가능)
+      // 헤더 없이 데이터만, 각 열: 입금은행 | 계좌번호 | 이체금액 | 보내는분표시 | 받는분표시 | CMS번호
+      let csvContent = '\uFEFF' // BOM for Korean encoding
+      rows.forEach(r => {
+        const bankShort = r.bank.replace('은행', '').replace('뱅크', '') // 우리은행 → 우리
+        const account = r.account.replace(/-/g, '') // 하이픈 제거
+        csvContent += `${bankShort}\t${account}\t${r.amount}\t${companyName}\t${r.memo}\t\n`
+      })
+
+      // 다운로드
+      const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `다계좌이체_${filterDate}_${new Date().toISOString().slice(0, 10)}.xls`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      showToast(`✅ ${rows.length}건 다계좌이체 파일 다운로드 완료`, 'success')
+    } catch (e: any) {
+      alert('다계좌이체 파일 생성 실패: ' + e.message)
+    }
+  }
+
+  // ============================================
   // 정산 취소 (통장내역 연결 전만 가능)
   // ============================================
   const handleCancelSettlement = async (item: SettlementItem) => {
@@ -784,26 +1039,40 @@ export default function SettlementDashboard() {
     if (!confirm(`${item.name}님의 ${item.monthLabel?.slice(5)}월 ${item.type === 'jiip' ? '지입' : item.type === 'invest' ? '투자' : '대출'} 정산을 취소하시겠습니까?\n\n생성된 거래 내역이 삭제됩니다.`)) return
 
     try {
-      // 정산 실행 시 생성한 transaction 찾기
-      // related_type + related_id 매칭 + 정산 날짜(dueDate) 매칭
-      const relatedType = item.type === 'jiip' ? 'jiip_share' : item.type
-      const { data: matchTxs, error: findErr } = await supabase
-        .from('transactions')
-        .select('id, related_type, related_id, transaction_date, amount, description')
-        .eq('company_id', effectiveCompanyId)
-        .eq('related_type', relatedType)
-        .eq('related_id', item.relatedId)
-        .eq('transaction_date', item.dueDate)
-        .eq('type', 'expense')
+      // ── 방법 1: paidTxIds가 있으면 직접 삭제 (가장 확실) ──
+      let txIds: string[] = item.paidTxIds || []
 
-      if (findErr) throw findErr
-      if (!matchTxs || matchTxs.length === 0) {
-        alert('취소할 거래 내역을 찾을 수 없습니다.')
+      // ── 방법 2: paidTxIds가 없으면 DB 재검색 (하위 호환) ──
+      if (txIds.length === 0) {
+        const relatedType = item.type === 'jiip' ? 'jiip_share' : item.type
+        const relatedIdStr = String(item.relatedId)
+
+        // 넓은 범위로 검색 (type 필터 없이)
+        const { data: matchTxs, error: findErr } = await supabase
+          .from('transactions')
+          .select('id, related_type, related_id, transaction_date')
+          .eq('company_id', effectiveCompanyId)
+          .in('related_type', ['jiip_share', 'invest', 'loan', relatedType])
+
+        if (findErr) throw findErr
+
+        // 느슨한 비교 (related_id 문자열/숫자 혼합 대응)
+        const filtered = (matchTxs || []).filter(t =>
+          t.related_type === relatedType &&
+          (t.related_id === relatedIdStr || String(t.related_id) === relatedIdStr)
+        )
+
+        // 날짜 매칭 우선, 없으면 전체
+        const dateMatched = filtered.filter(t => t.transaction_date === item.dueDate)
+        txIds = (dateMatched.length > 0 ? dateMatched : filtered).map(t => t.id)
+      }
+
+      if (txIds.length === 0) {
+        alert(`취소할 거래 내역을 찾을 수 없습니다.\n\n[디버그]\ntype: ${item.type}\nrelatedId: ${item.relatedId}\ndueDate: ${item.dueDate}\npaidTxIds: ${JSON.stringify(item.paidTxIds)}`)
         return
       }
 
-      // 통장내역과 연결(매칭) 여부 확인 — classification_queue에서 transaction_id로 연결된 건
-      const txIds = matchTxs.map(t => t.id)
+      // 통장내역과 연결(매칭) 여부 확인
       const { data: linkedClassify } = await supabase
         .from('classification_queue')
         .select('id')
@@ -823,8 +1092,8 @@ export default function SettlementDashboard() {
 
       if (delErr) throw delErr
 
-      alert(`✅ ${item.name}님의 ${item.monthLabel?.slice(5)}월 정산이 취소되었습니다.`)
-      fetchAllData()  // 목록 새로고침
+      alert(`✅ ${item.name}님의 ${item.monthLabel?.slice(5)}월 정산이 취소되었습니다. (${txIds.length}건 삭제)`)
+      fetchAllData()
     } catch (e: any) {
       alert('정산 취소 실패: ' + e.message)
     }
@@ -988,10 +1257,10 @@ export default function SettlementDashboard() {
         })
       }
 
-      setSmsModal({ open: true, recipients: recipientList, loading: false })
+      setSmsModal({ open: true, recipients: recipientList, customNote: '', loading: false })
     } catch (err: any) {
       showToast(`연락처 조회 실패: ${err.message}`, 'error')
-      setSmsModal({ open: false, recipients: [], loading: false })
+      setSmsModal({ open: false, recipients: [], customNote: '', loading: false })
     }
   }
 
@@ -1324,7 +1593,7 @@ export default function SettlementDashboard() {
         ) : (
           <>
             {activeTab === 'revenue' && <RevenueTab revenueBySource={revenueBySource} totalIncome={summary.income} transactions={transactions} />}
-            {activeTab === 'settlement' && <SettlementTab items={settlementItems} summary={settlementSummary} carTxHistory={carTxHistory} />}
+            {activeTab === 'settlement' && <SettlementTab items={settlementItems} summary={settlementSummary} carTxHistory={carTxHistory} investDepositHistory={investDepositHistory} />}
             {activeTab === 'pnl' && <PnLTab revenueBySource={revenueBySource} expenseByGroup={expenseByGroup} summary={summary} filterDate={filterDate} />}
             {activeTab === 'execute' && (
               <ExecuteTab
@@ -1341,6 +1610,7 @@ export default function SettlementDashboard() {
                 shareHistory={shareHistory}
                 onTogglePaid={handleTogglePaid}
                 onCancelSettlement={handleCancelSettlement}
+                onDownloadBulkTransfer={handleDownloadBulkTransfer}
               />
             )}
             {activeTab === 'classify' && (
@@ -1809,10 +2079,11 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
 // ============================================
 // 탭 2: 정산 현황
 // ============================================
-function SettlementTab({ items, summary, carTxHistory }: {
+function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
   items: SettlementItem[]
   summary: { totalItems: number; pendingCount: number; pendingAmount: number; paidCount: number; paidAmount: number }
   carTxHistory: { related_id: string; type: string; amount: number; transaction_date: string; category?: string; client_name?: string; description?: string }[]
+  investDepositHistory: { id: string; transaction_date: string; amount: number; type: string; related_id: string; client_name?: string; description?: string }[]
 }) {
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
   const [viewMode, setViewMode] = useState<'byDate' | 'list' | 'byCar'>('byDate')
@@ -1927,12 +2198,12 @@ function SettlementTab({ items, summary, carTxHistory }: {
           <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
-        {/* 상세 breakdown (지입 수익배분 상세) */}
-        {isExpanded && item.breakdown && (() => {
-          // 해당 차량의 기준월 거래내역 조회 (carId로 정확히 필터링)
+        {/* 상세 breakdown (지입 수익배분 상세 — invest/loan은 별도 패널 사용) */}
+        {isExpanded && item.breakdown && item.type === 'jiip' && (() => {
+          // 해당 차량의 기준월 거래내역 조회 (carId로 정확히 필터링 — String 변환 필수)
           const txsForMonth = carTxHistory.filter(t =>
             t.transaction_date.startsWith(item.monthLabel || '') &&
-            item.carId && t.related_id === item.carId
+            item.carId && String(t.related_id) === String(item.carId)
           )
           const incomeTxs = txsForMonth.filter(t => t.type === 'income')
           const expenseTxs = txsForMonth.filter(t => t.type === 'expense')
@@ -2045,13 +2316,103 @@ function SettlementTab({ items, summary, carTxHistory }: {
           )
         })()}
 
-        {/* 투자 이자 상세 */}
-        {isExpanded && item.type === 'invest' && (
-          <div className="mx-5 mb-3 bg-blue-50 rounded-xl p-4 text-sm border border-blue-100">
-            <p className="text-xs font-bold text-blue-600 mb-1">💰 투자이자 계산</p>
-            <p className="text-gray-700">{item.detail}</p>
-          </div>
-        )}
+        {/* 투자 이자 상세 (입금 내역 + 원금 변동 히스토리 포함) */}
+        {isExpanded && item.type === 'invest' && (() => {
+          type InvestTx = { id: string; transaction_date: string; amount: number; type: string; related_id: string; client_name?: string; description?: string }
+          // 해당 투자의 전체 거래 내역 (통장 거래 기반)
+          const allInvestTxs: InvestTx[] = investDepositHistory.filter((t: InvestTx) => String(t.related_id) === String(item.relatedId))
+          // income만 = 입금(투자금 납입), expense는 이자지급 등
+          const depositTxs = allInvestTxs.filter((t: InvestTx) => t.type === 'income')
+          // 해당 월 말일까지의 입금만 필터링
+          const baseMonth = item.monthLabel || ''
+          const [bY, bM] = baseMonth.split('-').map(Number)
+          const endOfBaseMonth = bY && bM ? `${baseMonth}-${new Date(bY, bM, 0).getDate()}` : ''
+
+          const depositsUpToMonth = depositTxs.filter((t: InvestTx) => endOfBaseMonth && t.transaction_date <= endOfBaseMonth)
+          const cumulativeBalance = depositsUpToMonth.reduce((sum: number, t: InvestTx) => sum + t.amount, 0)
+
+          // 세금 정보 (breakdown에서 가져오기)
+          const bd = item.breakdown
+
+          return (
+            <div className="mx-5 mb-3 space-y-2">
+              {/* 이자 계산 상세 */}
+              <div className="bg-blue-50 rounded-xl p-4 text-sm border border-blue-100 space-y-1.5">
+                <p className="text-xs font-bold text-blue-600 mb-2">💰 {baseMonth.slice(5)}월분 투자이자 계산</p>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">투자 원금 (해당월 기준)</span>
+                  <span className="font-bold text-blue-700">{nf(bd?.revenue || 0)}원</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">연이자율</span>
+                  <span className="font-bold text-gray-700">{bd?.shareRatio || 0}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">월이자 (원금 × {bd?.shareRatio}% ÷ 12)</span>
+                  <span className="font-bold text-gray-800">{nf(bd?.netProfit || 0)}원</span>
+                </div>
+                {bd && (bd.taxRate || 0) > 0 && (
+                  <>
+                    <div className="border-t border-dashed border-blue-200 my-1"></div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">{bd.taxType || '세금'}</span>
+                      <span className="text-red-500 font-bold">-{nf(bd.taxAmount || 0)}원</span>
+                    </div>
+                    {bd.taxType === '세금계산서' && (bd.supplyAmount || 0) > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500">공급가액</span>
+                        <span className="text-gray-600">{nf(bd.supplyAmount || 0)}원</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between bg-blue-100/70 rounded-lg px-2 py-1.5 -mx-1">
+                      <span className="text-blue-800 font-bold">실지급액</span>
+                      <span className="font-black text-blue-800">{nf(bd.netPayout || item.amount)}원</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* 투자금 거래 내역 (통장 거래 기반 원금 변동 히스토리) */}
+              <div className="bg-white rounded-xl p-4 text-sm border border-gray-200">
+                <p className="text-xs font-bold text-gray-500 mb-3">📋 투자금 거래 내역 ({allInvestTxs.length}건)</p>
+                {allInvestTxs.length > 0 ? (
+                  <div className="space-y-1">
+                    {allInvestTxs.map((tx: InvestTx, idx: number) => {
+                      // 누적 잔액 계산 (income은 +, expense는 -)
+                      const runningBalance = allInvestTxs.slice(0, idx + 1).reduce((sum: number, t: InvestTx) => {
+                        return sum + (t.type === 'income' ? t.amount : -t.amount)
+                      }, 0)
+                      const isIncome = tx.type === 'income'
+                      const isBeforeMonth = endOfBaseMonth && tx.transaction_date <= endOfBaseMonth
+                      return (
+                        <div key={tx.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${isBeforeMonth ? (isIncome ? 'bg-green-50/50' : 'bg-red-50/50') : 'bg-gray-50'}`}>
+                          <span className="text-gray-400 w-16 shrink-0">{tx.transaction_date.slice(2)}</span>
+                          <span className={`font-bold shrink-0 ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                            {isIncome ? '+' : '-'}{nf(tx.amount)}원
+                          </span>
+                          {(tx.client_name || tx.description) && (
+                            <span className="text-gray-400 text-[10px] truncate max-w-[80px]">{tx.client_name || tx.description}</span>
+                          )}
+                          <span className="flex-1"></span>
+                          <span className="text-gray-400 text-[10px]">잔액</span>
+                          <span className={`font-bold shrink-0 ${isBeforeMonth ? 'text-blue-600' : 'text-gray-400'}`}>{nf(runningBalance)}원</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-2">통장분류에서 투자 연결된 거래가 없습니다</p>
+                )}
+                {cumulativeBalance > 0 && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between">
+                    <span className="text-xs text-gray-500 font-bold">{baseMonth.slice(5)}월 기준 투자 원금 (입금 누적)</span>
+                    <span className="text-sm font-black text-blue-700">{nf(cumulativeBalance)}원</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* 대출 상환 상세 */}
         {isExpanded && item.type === 'loan' && (
@@ -2393,7 +2754,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 // ============================================
 // 탭 4: 정산 실행
 // ============================================
-function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel, shareHistory, onTogglePaid, onCancelSettlement }: {
+function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecute, executing, onSendNotify, sendingNotify, notifyChannel, setNotifyChannel, shareHistory, onTogglePaid, onCancelSettlement, onDownloadBulkTransfer }: {
   items: SettlementItem[]
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
@@ -2407,6 +2768,7 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
   shareHistory: { id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; created_at: string; paid_at: string | null }[]
   onTogglePaid: (shareId: string, currentlyPaid: boolean) => void
   onCancelSettlement: (item: SettlementItem) => void
+  onDownloadBulkTransfer: () => void
 }) {
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
@@ -2489,6 +2851,24 @@ function ExecuteTab({ items, selectedIds, toggleSelect, toggleSelectAll, onExecu
           </button>
         </div>
       </div>
+
+      {/* 다계좌이체 다운로드 바 */}
+      {selectedIds.size > 0 && (
+        <div style={{ padding: '8px 20px', background: '#f0f9ff', borderBottom: '1px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: '#0369a1', fontWeight: 600 }}>
+            🏦 선택한 {selectedIds.size}건의 은행 이체 파일을 생성할 수 있습니다
+          </span>
+          <button
+            onClick={onDownloadBulkTransfer}
+            style={{
+              padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: '#0284c7', color: '#fff', border: 'none',
+            }}
+          >
+            📥 다계좌이체 파일 다운로드
+          </button>
+        </div>
+      )}
 
       {/* 필터 바: 타입 + 월 + 검색 */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 8, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>

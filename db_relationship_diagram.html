@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Disruption DB 관계 구조도</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Pretendard', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { text-align: center; font-size: 22px; margin-bottom: 8px; color: #f8fafc; }
+  .subtitle { text-align: center; font-size: 13px; color: #94a3b8; margin-bottom: 32px; }
+
+  .section { margin-bottom: 40px; }
+  .section-title {
+    font-size: 16px; font-weight: 700; color: #38bdf8; margin-bottom: 16px;
+    padding: 8px 16px; background: #1e293b; border-radius: 8px; border-left: 4px solid #38bdf8;
+  }
+
+  .diagram { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+
+  .table-card {
+    background: #1e293b; border-radius: 12px; border: 1px solid #334155;
+    width: 320px; overflow: hidden; transition: transform 0.2s;
+  }
+  .table-card:hover { transform: translateY(-2px); border-color: #475569; }
+  .table-card.primary { border-color: #3b82f6; }
+  .table-card.secondary { border-color: #22c55e; }
+  .table-card.bridge { border-color: #f59e0b; }
+  .table-card.support { border-color: #a855f7; }
+
+  .table-header {
+    padding: 12px 16px; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .table-card.primary .table-header { background: #1e3a5f; color: #60a5fa; }
+  .table-card.secondary .table-header { background: #14532d; color: #4ade80; }
+  .table-card.bridge .table-header { background: #451a03; color: #fbbf24; }
+  .table-card.support .table-header { background: #3b0764; color: #c084fc; }
+
+  .table-header .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 600; margin-left: auto;
+  }
+  .table-card.primary .badge { background: #1d4ed8; color: #bfdbfe; }
+  .table-card.secondary .badge { background: #15803d; color: #bbf7d0; }
+  .table-card.bridge .badge { background: #92400e; color: #fef3c7; }
+  .table-card.support .badge { background: #6b21a8; color: #e9d5ff; }
+
+  .columns { padding: 8px 16px 12px; }
+  .col-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 0; font-size: 12px; color: #cbd5e1;
+    border-bottom: 1px solid #1e293b;
+  }
+  .col-row:last-child { border-bottom: none; }
+  .col-name { font-weight: 600; color: #f1f5f9; min-width: 140px; }
+  .col-type { color: #64748b; font-size: 11px; font-family: monospace; }
+  .pk { color: #fbbf24; font-size: 10px; font-weight: 700; }
+  .fk { color: #f87171; font-size: 10px; font-weight: 700; }
+  .col-desc { color: #94a3b8; font-size: 11px; margin-left: auto; }
+
+  .flow-container {
+    background: #1e293b; border-radius: 12px; padding: 24px; margin: 16px 0;
+    border: 1px solid #334155;
+  }
+  .flow-step {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+  }
+  .flow-num {
+    width: 28px; height: 28px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-weight: 700;
+    font-size: 13px; flex-shrink: 0;
+  }
+  .flow-num.blue { background: #1d4ed8; color: #bfdbfe; }
+  .flow-num.green { background: #15803d; color: #bbf7d0; }
+  .flow-num.yellow { background: #92400e; color: #fef3c7; }
+  .flow-num.purple { background: #6b21a8; color: #e9d5ff; }
+  .flow-num.red { background: #991b1b; color: #fecaca; }
+  .flow-content { flex: 1; }
+  .flow-title { font-weight: 700; font-size: 13px; color: #f1f5f9; }
+  .flow-desc { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .flow-table { font-size: 11px; color: #60a5fa; font-family: monospace; }
+  .flow-arrow { color: #475569; font-size: 20px; text-align: center; padding: 4px 0; margin-left: 8px; }
+
+  .relation-box {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 12px 16px; margin: 8px 0; font-size: 12px;
+  }
+  .relation-box code { color: #fbbf24; background: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+  .relation-arrow { color: #f87171; font-weight: 700; }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 24px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  .related-types {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px; margin-top: 12px;
+  }
+  .rt-item {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    padding: 10px 12px; font-size: 12px;
+  }
+  .rt-type { font-weight: 700; color: #fbbf24; font-family: monospace; }
+  .rt-target { color: #60a5fa; }
+  .rt-categories { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Self-Disruption ERP — DB 관계 구조도</h1>
+<p class="subtitle">통장관리 & 차량매칭 비용관리 테이블 관계</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> 핵심 테이블 (Primary)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> 차량/계약 테이블</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> 분류/매칭 테이블</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div> 보조 테이블</div>
+</div>
+
+<!-- ===== 1. 핵심 흐름 ===== -->
+<div class="section">
+  <div class="section-title">1. 통장관리 → 분류 → 차량매칭 전체 흐름</div>
+  <div class="flow-container">
+    <div class="flow-step">
+      <div class="flow-num blue">1</div>
+      <div class="flow-content">
+        <div class="flow-title">통장/카드 거래내역 업로드</div>
+        <div class="flow-desc">엑셀 파일 파싱 → Gemini AI 분석 → transactions 테이블에 INSERT</div>
+        <div class="flow-table">POST /api/finance-parser → INSERT INTO transactions</div>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="flow-num yellow">2</div>
+      <div class="flow-content">
+        <div class="flow-title">AI 자동 분류 (classification_queue)</div>
+        <div class="flow-desc">거래처명 매칭 + AI 카테고리 분류 → 신뢰도 80% 이상 자동확정, 미만 수동검토</div>
+        <div class="flow-table">POST /api/finance/classify → INSERT INTO classification_queue</div>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="flow-num green">3</div>
+      <div class="flow-content">
+        <div class="flow-title">차량/계약 매칭</div>
+        <div class="flow-desc">분류 결과에 따라 related_type + related_id 설정 (차량, 지입, 투자, 대출 등)</div>
+        <div class="flow-table">UPDATE transactions SET related_type='car', related_id='{car_id}'</div>
+      </div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step">
+      <div class="flow-num purple">4</div>
+      <div class="flow-content">
+        <div class="flow-title">정산/리포트</div>
+        <div class="flow-desc">차량별 수익/비용 집계, 지입 수익배분, 투자이자 계산, 손익계산서</div>
+        <div class="flow-table">SELECT * FROM transactions WHERE related_type='car' AND related_id=?</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 2. transactions 테이블 (핵심) ===== -->
+<div class="section">
+  <div class="section-title">2. transactions 테이블 (핵심 — 모든 거래의 중심)</div>
+  <div class="diagram">
+    <div class="table-card primary" style="width:100%; max-width:700px;">
+      <div class="table-header">
+        transactions
+        <span class="badge">핵심 테이블</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ companies(id)</span></div>
+        <div class="col-row"><span class="col-name">transaction_date</span> <span class="col-type">DATE</span> <span class="col-desc">거래일 (시간 없음)</span></div>
+        <div class="col-row"><span class="col-name">client_name</span> <span class="col-type">TEXT</span> <span class="col-desc">거래처명</span></div>
+        <div class="col-row"><span class="col-name">description</span> <span class="col-type">TEXT</span> <span class="col-desc">적요/메모 (중복체크 키)</span></div>
+        <div class="col-row"><span class="col-name">amount</span> <span class="col-type">NUMERIC(15,2)</span> <span class="col-desc">금액</span></div>
+        <div class="col-row"><span class="col-name">type</span> <span class="col-type">VARCHAR(20)</span> <span class="col-desc">income / expense</span></div>
+        <div class="col-row"><span class="col-name">status</span> <span class="col-type">VARCHAR(20)</span> <span class="col-desc">draft/pending/completed/cancelled</span></div>
+        <div class="col-row"><span class="col-name">payment_method</span> <span class="col-type">VARCHAR(20)</span> <span class="col-desc">bank_transfer / card / cash</span></div>
+        <div class="col-row" style="background:#1a2744; border-radius:4px; padding:6px 0; margin:4px 0;">
+          <span style="color:#fbbf24; font-weight:700; font-size:11px; padding-left:4px;">── 차량매칭 핵심 컬럼 ──</span>
+        </div>
+        <div class="col-row"><span class="col-name">category</span> <span class="col-type">TEXT</span> <span class="col-desc">유류비, 정비/수리비, 급여 등</span></div>
+        <div class="col-row"><span class="col-name" style="color:#fbbf24;">related_type</span> <span class="col-type">TEXT</span> <span class="col-desc" style="color:#f87171;">다형성 FK 타입</span></div>
+        <div class="col-row"><span class="col-name" style="color:#fbbf24;">related_id</span> <span class="col-type">TEXT</span> <span class="col-desc" style="color:#f87171;">다형성 FK ID</span></div>
+        <div class="col-row"><span class="col-name">classification_source</span> <span class="col-type">TEXT</span> <span class="col-desc">manual / rule / ai</span></div>
+        <div class="col-row"><span class="col-name">confidence</span> <span class="col-type">INT</span> <span class="col-desc">AI 분류 신뢰도 0-100</span></div>
+        <div class="col-row" style="background:#1a2744; border-radius:4px; padding:6px 0; margin:4px 0;">
+          <span style="color:#a855f7; font-weight:700; font-size:11px; padding-left:4px;">── 기타 참조 컬럼 ──</span>
+        </div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">card_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ corporate_cards(id)</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">employee_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ profiles(id)</span></div>
+        <div class="col-row"><span class="col-name">employee_name</span> <span class="col-type">TEXT</span> <span class="col-desc">직원명 (비정규화)</span></div>
+        <div class="col-row"><span class="col-name">is_cancel</span> <span class="col-type">BOOLEAN</span> <span class="col-desc">취소 거래 여부</span></div>
+        <div class="col-row"><span class="col-name">cancel_pair_id</span> <span class="col-type">UUID</span> <span class="col-desc">취소-승인 매칭</span></div>
+        <div class="col-row"><span class="col-name">currency</span> <span class="col-type">VARCHAR(10)</span> <span class="col-desc">KRW/USD/JPY/EUR</span></div>
+        <div class="col-row"><span class="col-name">original_amount</span> <span class="col-type">NUMERIC(15,2)</span> <span class="col-desc">외화 원금액</span></div>
+        <div class="col-row"><span class="col-name">memo</span> <span class="col-type">TEXT</span> <span class="col-desc">비고</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3. related_type 다형성 관계 ===== -->
+<div class="section">
+  <div class="section-title">3. related_type / related_id 다형성(Polymorphic) 관계 — 핵심 매칭 구조</div>
+  <p style="font-size:13px; color:#94a3b8; margin-bottom:12px; padding:0 8px;">
+    transactions 테이블은 별도 브릿지 테이블 없이 <code style="color:#fbbf24; background:#1e293b; padding:2px 6px; border-radius:4px;">related_type</code> + <code style="color:#fbbf24; background:#1e293b; padding:2px 6px; border-radius:4px;">related_id</code> 2개 컬럼으로 여러 테이블을 동적으로 참조합니다.
+  </p>
+  <div class="related-types">
+    <div class="rt-item">
+      <div><span class="rt-type">'car'</span> → <span class="rt-target">cars.id</span></div>
+      <div class="rt-categories">유류비, 정비/수리비, 차량보험료, 자동차세, 통행료/주차비, 차량매입</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'jiip_share'</span> → <span class="rt-target">jiip_contracts.id</span></div>
+      <div class="rt-categories">지입 수익배분금(출금) — 정산 시 생성</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'invest'</span> → <span class="rt-target">general_investments.id</span></div>
+      <div class="rt-categories">투자자 이자 지급 — 정산 시 생성 (id=BIGINT)</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'loan'</span> → <span class="rt-target">loans.id</span></div>
+      <div class="rt-categories">차량할부/리스료, 원금상환, 이자비용</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'salary'</span> → <span class="rt-target">employee_salaries.employee_id</span></div>
+      <div class="rt-categories">급여(정규직), 상여금/퇴직금</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'freelancer'</span> → <span class="rt-target">freelancers.id</span></div>
+      <div class="rt-categories">용역비(3.3%) — 프리랜서 용역비</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'insurance'</span> → <span class="rt-target">insurance_policy_record.id</span></div>
+      <div class="rt-categories">차량보험료, 보험금 수령</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'card'</span> → <span class="rt-target">corporate_cards.id</span></div>
+      <div class="rt-categories">법인카드 거래 — card_id FK와 별도</div>
+    </div>
+    <div class="rt-item">
+      <div><span class="rt-type">'contract'</span> → <span class="rt-target">contracts.id</span></div>
+      <div class="rt-categories">렌탈계약 관련 수입/지출</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 4. classification_queue ===== -->
+<div class="section">
+  <div class="section-title">4. classification_queue (분류 검토 큐)</div>
+  <div class="diagram">
+    <div class="table-card bridge" style="width:100%; max-width:700px;">
+      <div class="table-header">
+        classification_queue
+        <span class="badge">분류/매칭 브릿지</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ companies(id)</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">transaction_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ transactions(id) ON DELETE CASCADE</span></div>
+        <div class="col-row"><span class="col-name">source_type</span> <span class="col-type">TEXT</span> <span class="col-desc">'bank_statement' (기본값)</span></div>
+        <div class="col-row"><span class="col-name">source_data</span> <span class="col-type">JSONB</span> <span class="col-desc">원본 거래 데이터 스냅샷</span></div>
+        <div class="col-row" style="background:#2a1a00; border-radius:4px; padding:6px 0; margin:4px 0;">
+          <span style="color:#fbbf24; font-weight:700; font-size:11px; padding-left:4px;">── AI 분류 결과 ──</span>
+        </div>
+        <div class="col-row"><span class="col-name">ai_category</span> <span class="col-type">TEXT</span> <span class="col-desc">AI 추천 카테고리</span></div>
+        <div class="col-row"><span class="col-name">ai_confidence</span> <span class="col-type">INT</span> <span class="col-desc">0-100 (80↑ 자동확정)</span></div>
+        <div class="col-row"><span class="col-name">ai_related_type</span> <span class="col-type">TEXT</span> <span class="col-desc">AI 추천 연관타입 (car, jiip 등)</span></div>
+        <div class="col-row"><span class="col-name">ai_related_id</span> <span class="col-type">TEXT</span> <span class="col-desc">AI 추천 연관ID</span></div>
+        <div class="col-row"><span class="col-name">alternatives</span> <span class="col-type">JSONB</span> <span class="col-desc">대체 분류 후보 [{category, confidence}]</span></div>
+        <div class="col-row" style="background:#2a1a00; border-radius:4px; padding:6px 0; margin:4px 0;">
+          <span style="color:#22c55e; font-weight:700; font-size:11px; padding-left:4px;">── 사용자 확정 결과 ──</span>
+        </div>
+        <div class="col-row"><span class="col-name">final_category</span> <span class="col-type">TEXT</span> <span class="col-desc">최종 확정 카테고리</span></div>
+        <div class="col-row"><span class="col-name">final_related_type</span> <span class="col-type">TEXT</span> <span class="col-desc">최종 확정 연관타입</span></div>
+        <div class="col-row"><span class="col-name">final_related_id</span> <span class="col-type">TEXT</span> <span class="col-desc">최종 확정 연관ID</span></div>
+        <div class="col-row"><span class="col-name">status</span> <span class="col-type">TEXT</span> <span class="col-desc">pending → auto_confirmed / confirmed / rejected</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">reviewed_by</span> <span class="col-type">UUID</span> <span class="col-desc">→ profiles(id)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="relation-box" style="margin-top:16px;">
+    <strong style="color:#f8fafc;">classification_queue ↔ transactions 관계:</strong><br><br>
+    <code>classification_queue.transaction_id</code> <span class="relation-arrow">→</span> <code>transactions.id</code> (1:1 또는 1:N)<br><br>
+    <strong>v1 방식:</strong> transaction_id로 직접 참조 (FK ON DELETE CASCADE)<br>
+    <strong>v3 방식:</strong> source_data JSONB에 원본 스냅샷 저장 (transaction 삭제되어도 이력 유지)<br><br>
+    <strong>확정 시:</strong> classification_queue의 final_* 값을 → transactions의 category, related_type, related_id에 UPDATE
+  </div>
+</div>
+
+<!-- ===== 5. 차량 관련 테이블 ===== -->
+<div class="section">
+  <div class="section-title">5. 차량 관련 테이블 (transactions에서 related_type으로 연결)</div>
+  <div class="diagram">
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        cars
+        <span class="badge">차량 마스터</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGINT</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="col-name">number</span> <span class="col-type">TEXT</span> <span class="col-desc">차량번호</span></div>
+        <div class="col-row"><span class="col-name">model</span> <span class="col-type">TEXT</span> <span class="col-desc">차종</span></div>
+        <div class="col-row"><span class="col-name">total_cost</span> <span class="col-type">BIGINT</span> <span class="col-desc">총 취득비용</span></div>
+        <div class="col-row"><span class="col-name">detailed_status</span> <span class="col-type">TEXT</span> <span class="col-desc">상세상태</span></div>
+        <div class="col-row"><span class="col-name">owner_bank</span> <span class="col-type">TEXT</span> <span class="col-desc">차주 은행</span></div>
+        <div class="col-row"><span class="col-name">owner_account</span> <span class="col-type">TEXT</span> <span class="col-desc">차주 계좌</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">current_contract_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ contracts(id)</span></div>
+      </div>
+    </div>
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        car_costs
+        <span class="badge">차량 취득비용</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">category</span> <span class="col-type">TEXT</span> <span class="col-desc">매입/세금/등록/보험/정비/기타</span></div>
+        <div class="col-row"><span class="col-name">item_name</span> <span class="col-type">TEXT</span> <span class="col-desc">항목명</span></div>
+        <div class="col-row"><span class="col-name">amount</span> <span class="col-type">BIGINT</span> <span class="col-desc">금액</span></div>
+      </div>
+    </div>
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        jiip_contracts
+        <span class="badge">지입 계약</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">driver_name</span> <span class="col-type">TEXT</span> <span class="col-desc">차주명</span></div>
+        <div class="col-row"><span class="col-name">share_ratio</span> <span class="col-type">NUMERIC</span> <span class="col-desc">수익배분비율</span></div>
+        <div class="col-row"><span class="col-name">tax_type</span> <span class="col-type">TEXT</span> <span class="col-desc">세금유형</span></div>
+        <div class="col-row"><span class="col-name">status</span> <span class="col-type">TEXT</span> <span class="col-desc">active/terminated</span></div>
+      </div>
+    </div>
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        general_investments
+        <span class="badge">투자 계약</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type" style="color:#f87171;">BIGINT</span> <span class="col-desc" style="color:#f87171;">주의! UUID 아님</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="col-name">investor_name</span> <span class="col-type">TEXT</span></div>
+        <div class="col-row"><span class="col-name">invest_amount</span> <span class="col-type">BIGINT</span></div>
+        <div class="col-row"><span class="col-name">interest_rate</span> <span class="col-type">NUMERIC</span></div>
+        <div class="col-row"><span class="col-name">tax_type</span> <span class="col-type">VARCHAR(30)</span> <span class="col-desc">이자소득/사업소득/세금계산서</span></div>
+        <div class="col-row"><span class="col-name">bank_name</span> <span class="col-type">TEXT</span></div>
+        <div class="col-row"><span class="col-name">account_number</span> <span class="col-type">TEXT</span></div>
+      </div>
+    </div>
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        loans
+        <span class="badge">대출</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">company_id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">finance_name</span> <span class="col-type">TEXT</span></div>
+        <div class="col-row"><span class="col-name">monthly_payment</span> <span class="col-type">BIGINT</span></div>
+        <div class="col-row"><span class="col-name">start_date</span> <span class="col-type">DATE</span></div>
+      </div>
+    </div>
+
+    <div class="table-card secondary">
+      <div class="table-header">
+        investment_deposits
+        <span class="badge">투자금 변동</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">investment_id</span> <span class="col-type" style="color:#f87171;">BIGINT</span> <span class="col-desc">→ general_investments(id)</span></div>
+        <div class="col-row"><span class="col-name">deposit_date</span> <span class="col-type">DATE</span></div>
+        <div class="col-row"><span class="col-name">amount</span> <span class="col-type">BIGINT</span></div>
+        <div class="col-row"><span class="col-name">memo</span> <span class="col-type">TEXT</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 6. 차량 운영 테이블 ===== -->
+<div class="section">
+  <div class="section-title">6. 차량 운영관리 테이블 (cars 기준 하위 테이블)</div>
+  <div class="diagram">
+
+    <div class="table-card support">
+      <div class="table-header">
+        maintenance_records
+        <span class="badge">정비 이력</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">maintenance_type</span> <span class="col-type">TEXT</span> <span class="col-desc">정기/비정기/리콜 등</span></div>
+        <div class="col-row"><span class="col-name">actual_cost</span> <span class="col-type">NUMERIC</span></div>
+        <div class="col-row"><span class="col-name">status</span> <span class="col-type">TEXT</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="table-header">
+        accident_records
+        <span class="badge">사고 관리</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">actual_repair_cost</span> <span class="col-type">NUMERIC</span></div>
+        <div class="col-row"><span class="col-name">insurance_payout</span> <span class="col-type">NUMERIC</span></div>
+        <div class="col-row"><span class="col-name">company_cost</span> <span class="col-type">NUMERIC</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="table-header">
+        inspection_records
+        <span class="badge">검사 이력</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="col-name">inspection_type</span> <span class="col-type">TEXT</span></div>
+        <div class="col-row"><span class="col-name">due_date</span> <span class="col-type">DATE</span></div>
+        <div class="col-row"><span class="col-name">inspection_fee</span> <span class="col-type">NUMERIC</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="table-header">
+        vehicle_operations
+        <span class="badge">출고/반납</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">car_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ cars(id)</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">contract_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ contracts(id)</span></div>
+        <div class="col-row"><span class="col-name">operation_type</span> <span class="col-type">TEXT</span> <span class="col-desc">delivery/return</span></div>
+        <div class="col-row"><span class="col-name">insurance_billing_status</span> <span class="col-type">TEXT</span> <span class="col-desc">보험 청구</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="table-header">
+        insurance_policy_record
+        <span class="badge">보험 가입기록</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">BIGSERIAL</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">group_id</span> <span class="col-type">BIGINT</span> <span class="col-desc">→ insurance_vehicle_group(id)</span></div>
+        <div class="col-row"><span class="col-name">vehicle_id</span> <span class="col-type">TEXT</span> <span class="col-desc">차량 ID (soft ref)</span></div>
+        <div class="col-row"><span class="col-name">vehicle_value</span> <span class="col-type">BIGINT</span></div>
+        <div class="col-row"><span class="col-name">total_premium</span> <span class="col-type">INT</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="table-header">
+        transaction_flags
+        <span class="badge">거래 특이건 플래그</span>
+      </div>
+      <div class="columns">
+        <div class="col-row"><span class="pk">PK</span> <span class="col-name">id</span> <span class="col-type">UUID</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">transaction_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ transactions(id)</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">queue_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ classification_queue(id)</span></div>
+        <div class="col-row"><span class="col-name">flag_type</span> <span class="col-type">TEXT</span> <span class="col-desc">duplicate_suspect 등</span></div>
+        <div class="col-row"><span class="fk">FK</span> <span class="col-name">salary_adjustment_id</span> <span class="col-type">UUID</span> <span class="col-desc">→ salary_adjustments(id)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 7. 전체 ER 요약 ===== -->
+<div class="section">
+  <div class="section-title">7. 전체 FK 관계 요약 (화살표 = FK 방향)</div>
+  <div class="flow-container" style="font-family: monospace; font-size: 13px; line-height: 2.2; white-space: pre;">
+<span style="color:#60a5fa; font-weight:700;">transactions</span>
+  ├─ company_id      <span style="color:#f87171;">───FK──→</span> <span style="color:#4ade80;">companies</span>
+  ├─ card_id         <span style="color:#f87171;">───FK──→</span> <span style="color:#c084fc;">corporate_cards</span>
+  ├─ employee_id     <span style="color:#f87171;">───FK──→</span> <span style="color:#c084fc;">profiles</span>
+  ├─ related_type='<span style="color:#fbbf24;">car</span>'        + related_id  <span style="color:#f87171;">──→</span> <span style="color:#4ade80;">cars</span>.id
+  ├─ related_type='<span style="color:#fbbf24;">jiip_share</span>' + related_id  <span style="color:#f87171;">──→</span> <span style="color:#4ade80;">jiip_contracts</span>.id
+  ├─ related_type='<span style="color:#fbbf24;">invest</span>'     + related_id  <span style="color:#f87171;">──→</span> <span style="color:#4ade80;">general_investments</span>.id <span style="color:#f87171;">(BIGINT!)</span>
+  ├─ related_type='<span style="color:#fbbf24;">loan</span>'       + related_id  <span style="color:#f87171;">──→</span> <span style="color:#4ade80;">loans</span>.id
+  ├─ related_type='<span style="color:#fbbf24;">salary</span>'     + related_id  <span style="color:#f87171;">──→</span> <span style="color:#c084fc;">employee_salaries</span>.employee_id
+  ├─ related_type='<span style="color:#fbbf24;">freelancer</span>' + related_id  <span style="color:#f87171;">──→</span> <span style="color:#c084fc;">freelancers</span>.id
+  ├─ related_type='<span style="color:#fbbf24;">insurance</span>'  + related_id  <span style="color:#f87171;">──→</span> <span style="color:#c084fc;">insurance_policy_record</span>.id
+  └─ related_type='<span style="color:#fbbf24;">card</span>'       + related_id  <span style="color:#f87171;">──→</span> <span style="color:#c084fc;">corporate_cards</span>.id
+
+<span style="color:#fbbf24; font-weight:700;">classification_queue</span>
+  ├─ transaction_id  <span style="color:#f87171;">───FK──→</span> <span style="color:#60a5fa;">transactions</span>.id (CASCADE)
+  └─ ai/final_related_type + _id  <span style="color:#f87171;">──→</span> (위 다형성 관계와 동일)
+
+<span style="color:#4ade80; font-weight:700;">cars</span>  ←── 하위 테이블들
+  ├── <span style="color:#c084fc;">car_costs</span>.car_id         (취득비용 항목)
+  ├── <span style="color:#c084fc;">jiip_contracts</span>.car_id    (지입계약)
+  ├── <span style="color:#c084fc;">loans</span>.car_id              (대출/할부)
+  ├── <span style="color:#c084fc;">maintenance_records</span>.car_id (정비이력)
+  ├── <span style="color:#c084fc;">accident_records</span>.car_id   (사고이력)
+  ├── <span style="color:#c084fc;">inspection_records</span>.car_id (검사이력)
+  ├── <span style="color:#c084fc;">vehicle_operations</span>.car_id (출고/반납)
+  └── <span style="color:#c084fc;">vehicle_schedules</span>.car_id  (스케줄)
+
+<span style="color:#c084fc; font-weight:700;">transaction_flags</span>
+  ├─ transaction_id      <span style="color:#f87171;">──FK──→</span> <span style="color:#60a5fa;">transactions</span>.id
+  ├─ queue_id            <span style="color:#f87171;">──FK──→</span> <span style="color:#fbbf24;">classification_queue</span>.id
+  └─ salary_adjustment_id<span style="color:#f87171;">──FK──→</span> <span style="color:#c084fc;">salary_adjustments</span>.id
+  </div>
+</div>
+
+<!-- ===== 8. 중복체크 키 ===== -->
+<div class="section">
+  <div class="section-title">8. 중복체크(Dedup) 키 구성 — 수정 완료</div>
+  <div class="flow-container">
+    <div style="font-size:13px; line-height:1.8;">
+      <strong style="color:#f87171;">기존 (문제):</strong>
+      <code style="color:#94a3b8;">transaction_date | client_name | |amount| | payment_method</code>
+      <br>→ 같은 날 같은 금액 이체시 <span style="color:#f87171; font-weight:700;">정상 거래가 중복으로 삭제됨</span>
+      <br><br>
+      <strong style="color:#4ade80;">수정 후:</strong>
+      <code style="color:#f8fafc;">transaction_date | client_name | |amount| | payment_method | <span style="color:#fbbf24; font-weight:700;">description</span></code>
+      <br>→ 적요(이체시간, 메모)가 다르면 별건으로 인식
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center; color:#475569; font-size:11px; margin-top:40px; padding-bottom:20px;">
+  Self-Disruption ERP — DB 관계 구조도 | 2026-03-11
+</div>
+
+</body>
+</html>

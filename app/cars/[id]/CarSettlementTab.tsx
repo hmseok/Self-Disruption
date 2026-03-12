@@ -78,7 +78,7 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
       const endDate = `${filterDate}-${lastDay}`
       const past12Start = `${year - 1}-${String(month).padStart(2, '0')}-01`
 
-      const [txRes, queueRes, jiipRes, investRes, loanRes, allSettleRes, carTxHistRes] = await Promise.all([
+      const [txRes, queueRes, jiipRes, investRes, loanRes, allSettleRes, carTxHistRes, investTxDepositsRes] = await Promise.all([
         // 당월 거래내역
         supabase.from('transactions')
           .select('id, transaction_date, type, category, client_name, description, amount, payment_method, related_type, related_id')
@@ -112,6 +112,11 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
           .select('type, amount, transaction_date, category')
           .eq('related_type', 'car').eq('related_id', String(carId))
           .gte('transaction_date', past12Start),
+        // 투자 관련 통장 거래 내역 (투자 원금 변동 추적 — income+expense 모두)
+        supabase.from('transactions')
+          .select('id, transaction_date, amount, type, related_type, related_id')
+          .eq('related_type', 'invest')
+          .order('transaction_date', { ascending: true }),
       ])
 
       // 거래 내역 정리
@@ -270,13 +275,37 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
         })
       })
 
-      // ── 투자 이자 ──
+      // ── 투자 이자 (월별 실제 잔액 기반) ──
       const investData = investRes.data || []
+      // 투자 관련 통장 입금 내역 (원금 변동 추적)
+      const investTxDeposits = (investTxDepositsRes?.data || []).map((t: any) => ({
+        id: t.id,
+        transaction_date: t.transaction_date,
+        amount: Math.abs(Number(t.amount) || 0),
+        type: t.type || 'income',
+        related_id: String(t.related_id || ''),
+      }))
+
+      // 월별 투자 잔액 계산 함수 (income - expense 순잔액)
+      const getInvestBalance = (investId: string, baseMonth: string, fallbackAmount: number): number => {
+        const txDeposits = investTxDeposits.filter((t: any) => String(t.related_id) === String(investId))
+        if (txDeposits.length > 0) {
+          const [y2, mo2] = baseMonth.split('-').map(Number)
+          const endOfMonth = `${baseMonth}-${new Date(y2, mo2, 0).getDate()}`
+          let balance = 0
+          txDeposits.forEach((t: any) => {
+            if (t.transaction_date <= endOfMonth) {
+              balance += (t.type === 'income' ? t.amount : -t.amount)
+            }
+          })
+          if (balance > 0) return balance
+        }
+        return fallbackAmount
+      }
+
       investData.forEach((inv: any) => {
-        const amt = inv.invest_amount || 0
         const rate = inv.interest_rate || 0
-        const monthlyInterest = Math.floor((amt * (rate / 100)) / 12)
-        if (monthlyInterest === 0) return
+        if (rate === 0) return
 
         const baseMonths = getBaseMonths(inv.contract_start_date)
         // 당월 시작 계약: getBaseMonths가 빈 배열이면 당월을 포함하여 표시
@@ -289,7 +318,13 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
           const isPaid = paidSet.has(`invest_${inv.id}_${m}`)
           const paymentMonth = nextMonthStr(m)
           const isCurrentPayment = paymentMonth === filterDate
-          if (isPaid && !isCurrentPayment) return
+          // 지급완료 월도 표시 (히스토리 확인용)
+
+          // 해당 월 기준 투자 원금 (통장 거래 기반)
+          const currentBalance = getInvestBalance(String(inv.id), m, inv.invest_amount || 0)
+          const monthlyInterest = Math.floor((currentBalance * (rate / 100)) / 12)
+          if (monthlyInterest === 0) return
+
           const dueDay = inv.payment_day || 10
           const isNextMonthPayment = paymentMonth > filterDate
           items.push({
@@ -299,8 +334,8 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
             dueDate: `${paymentMonth}-${dueDay.toString().padStart(2, '0')}`,
             status: isPaid ? 'paid' : 'pending', relatedId: inv.id,
             detail: isNextMonthPayment
-              ? `${m.slice(5)}월분 (${paymentMonth.slice(5)}월 지급예정): 원금 ${fmt(amt)}원 × ${rate}% ÷ 12`
-              : `${m.slice(5)}월분: 원금 ${fmt(amt)}원 × ${rate}% ÷ 12`,
+              ? `${m.slice(5)}월분 (${paymentMonth.slice(5)}월 지급예정): 원금 ${fmt(currentBalance)}원 × ${rate}% ÷ 12`
+              : `${m.slice(5)}월분: 원금 ${fmt(currentBalance)}원 × ${rate}% ÷ 12`,
             monthLabel: m, isOverdue: !isCurrentPayment && !isPaid && !isNextMonthPayment,
           })
         })

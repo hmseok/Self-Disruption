@@ -136,6 +136,207 @@ const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
+// 날짜+시간 표시 헬퍼: "2026-02-25 16:45:06" → 날짜 + 시간 두 줄
+const formatDatetime = (dt: string | null | undefined) => {
+  if (!dt) return { date: '', time: '' }
+  const s = String(dt).replace('T', ' ')
+  const date = s.substring(0, 10)
+  let time = ''
+  if (s.length > 10) {
+    // "2025-10-13 17:40:46+00:00" → "17:40:46"
+    const rest = s.substring(11)
+    const match = rest.match(/^(\d{2}:\d{2}:\d{2})/)
+    time = match ? match[1] : rest.substring(0, 8)
+  }
+  return { date, time }
+}
+
+// ═══ 클라이언트사이드 Supabase 직접 조회 헬퍼 ═══
+// VM 네트워크 제한으로 서버사이드 API 라우트가 Supabase에 접근 불가 시 fallback
+function parseQueueItem(q: any) {
+  let altData: any = {}
+  let sd: any = {}
+  let candidates: any[] = []
+
+  // alternatives 파싱
+  const rawAlt = q.alternatives
+  if (typeof rawAlt === 'string') {
+    try {
+      const parsed = JSON.parse(rawAlt)
+      altData = typeof parsed === 'string' ? JSON.parse(parsed) : parsed
+    } catch { altData = {} }
+  } else if (rawAlt && typeof rawAlt === 'object') {
+    altData = rawAlt
+  }
+
+  // source_data 찾기
+  if (q.source_data && typeof q.source_data === 'object' && Object.keys(q.source_data).length > 0) {
+    sd = q.source_data
+  } else if (altData.source_data && typeof altData.source_data === 'object') {
+    sd = altData.source_data
+  } else if (altData.transaction_date || altData.client_name || altData.amount) {
+    sd = altData
+  }
+
+  // candidates 찾기
+  if (Array.isArray(altData.candidates)) candidates = altData.candidates
+  else if (Array.isArray(altData)) candidates = altData
+  else if (Array.isArray(q.alternatives)) candidates = q.alternatives
+
+  return {
+    id: q.id,
+    company_id: q.company_id,
+    transaction_id: q.transaction_id,
+    source_type: q.source_type || (sd.payment_method === '카드' ? 'card_statement' : 'bank_statement'),
+    source_data: {
+      transaction_date: sd.transaction_date || '',
+      client_name: sd.client_name || '',
+      description: sd.description || '',
+      amount: sd.amount || 0,
+      type: sd.type || 'expense',
+      payment_method: sd.payment_method || '',
+      card_number: sd.card_number || '',
+      card_id: sd.card_id || null,
+      is_cancel: sd.is_cancel || false,
+      matched_employee_id: sd.matched_employee_id || null,
+      matched_employee_name: sd.matched_employee_name || null,
+    },
+    ai_category: q.ai_category || q.final_category || '미분류',
+    ai_confidence: q.ai_confidence || 0,
+    ai_related_type: q.ai_matched_type || null,
+    ai_related_id: q.ai_matched_id || null,
+    ai_matched_name: q.ai_matched_name || null,
+    alternatives: candidates,
+    status: q.status,
+    final_category: q.final_category || null,
+    is_cancel: sd.is_cancel || false,
+    card_id: sd.card_id || null,
+    card_number: sd.card_number || '',
+    matched_employee_id: sd.matched_employee_id || null,
+    matched_employee_name: sd.matched_employee_name || null,
+    matched_contract_name: sd.matched_contract_name || q.ai_matched_name || null,
+    _source: 'queue' as const,
+  }
+}
+
+async function fetchQueueDirect(companyId: string, status: string, limit: number) {
+  let query = supabase
+    .from('classification_queue')
+    .select('*', { count: 'exact' })
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+
+  if (status === 'pending') {
+    query = query.in('status', ['pending', 'auto_confirmed'])
+  } else if (status === 'confirmed') {
+    query = query.eq('status', 'confirmed')
+  }
+
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[fetchQueueDirect] error:', error)
+    return { items: [], total: 0 }
+  }
+
+  if (data && data.length > 0) {
+    const items = data.map(parseQueueItem)
+    return { items, total: count || data.length, source: 'classification_queue' }
+  }
+
+  // Fallback: transactions 테이블
+  const { data: txData, count: txCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact' })
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(5000)
+
+  const allItems = (txData || []).map((tx: any) => {
+    const cat = tx.category || '미분류'
+    const isPending = !tx.category || tx.category === '미분류' || tx.category === '기타' || tx.category === ''
+    return {
+      id: tx.id, company_id: tx.company_id,
+      source_data: {
+        transaction_date: tx.transaction_date || '', client_name: tx.client_name || '',
+        description: tx.description || '', amount: tx.amount || 0,
+        type: tx.type || 'expense', payment_method: tx.payment_method || '',
+        card_number: tx.card_number || '',
+      },
+      ai_category: cat, ai_confidence: tx.confidence || 0,
+      ai_related_type: tx.related_type || null, ai_related_id: tx.related_id || null,
+      alternatives: [], status: isPending ? 'pending' : 'confirmed',
+      final_category: isPending ? null : cat, is_cancel: tx.is_cancel || false,
+      _source: 'transactions' as const,
+    }
+  })
+
+  const filtered = status === 'all' ? allItems :
+    allItems.filter((i: any) => status === 'pending' ? i.status === 'pending' : i.status === 'confirmed')
+  const pendingCount = allItems.filter((i: any) => i.status === 'pending').length
+  const confirmedCount = allItems.filter((i: any) => i.status === 'confirmed').length
+
+  return {
+    items: filtered.slice(0, limit),
+    total: status === 'pending' ? pendingCount : status === 'confirmed' ? confirmedCount : (txCount || 0),
+    source: 'transactions',
+  }
+}
+
+// ═══ 확정완료 탭 전용: transactions 테이블 직접 조회 ═══
+async function fetchConfirmedTransactions(companyId: string, limit: number) {
+  const { data: txData, error: txError, count: txCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact' })
+    .eq('company_id', companyId)
+    .is('deleted_at', null)
+    .order('transaction_date', { ascending: false })
+    .limit(limit)
+
+  if (txError) {
+    console.error('[fetchConfirmedTransactions] error:', txError)
+    return { items: [], total: 0 }
+  }
+
+  const items = (txData || []).map((tx: any) => ({
+    id: tx.id,
+    company_id: tx.company_id,
+    transaction_date: tx.transaction_date || '',
+    source_data: {
+      transaction_date: tx.transaction_date || '',
+      client_name: tx.client_name || '',
+      description: tx.description || '',
+      amount: tx.amount || 0,
+      type: tx.type || 'expense',
+      payment_method: tx.payment_method || '',
+      card_number: tx.card_number || '',
+    },
+    client_name: tx.client_name || '',
+    description: tx.description || '',
+    amount: tx.amount || 0,
+    type: tx.type || 'expense',
+    payment_method: tx.payment_method || '',
+    card_number: tx.card_number || '',
+    ai_category: tx.category || '미분류',
+    ai_confidence: tx.confidence || 0,
+    ai_related_type: tx.related_type || null,
+    ai_related_id: tx.related_id || null,
+    related_type: tx.related_type || null,
+    related_id: tx.related_id || null,
+    alternatives: [],
+    status: 'confirmed',
+    final_category: tx.category || null,
+    is_cancel: tx.is_cancel || false,
+    card_id: tx.card_id || null,
+    _source: 'transactions' as const,
+  }))
+
+  return { items, total: txCount || items.length, source: 'transactions' }
+}
+
 // 카드 vs 통장 금액 표시 헬퍼
 const isCardItem = (item: any) => {
   const pm = (item.payment_method || item.source_data?.payment_method || '').toLowerCase()
@@ -377,8 +578,13 @@ function UploadContent() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
-  // 카테고리 뷰 모드: 회계 기준 vs 용도별
-  const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>('display')
+  // 카테고리 뷰 모드: 회계 기준 vs 용도별 (localStorage 영속화)
+  const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('finance_categoryMode') as 'accounting' | 'display') || 'display'
+    }
+    return 'display'
+  })
 
   // ── Related Data (Review) ──
   const [reviewJiips, setReviewJiips] = useState<any[]>([])
@@ -390,17 +596,57 @@ function UploadContent() {
   // ── Tab State ── (2탭 구조: 분류 관리 + 확정완료)
   const [activeTab, setActiveTab] = useState<'classify' | 'confirmed'>('classify')
   // classify 탭의 소스 필터 (칩): 전체/카드/통장/미분류/중분류완료/하분류완료
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'card' | 'bank' | 'unclassified' | 'cat_matched' | 'fully_matched'>('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'card' | 'bank' | 'unclassified' | 'cat_matched' | 'fully_matched'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('finance_sourceFilter') as any) || 'all'
+    }
+    return 'all'
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
-  const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user' | 'link' | 'date' | 'client' | 'income_expense'>('category')
+  const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user' | 'link' | 'date' | 'client' | 'income_expense'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('finance_groupBy') as any) || 'category'
+    }
+    return 'category'
+  })
   const [linkPopoverId, setLinkPopoverId] = useState<string | null>(null)
   const [linkPopoverTab, setLinkPopoverTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'freelancer' | 'contract' | 'card'>('car')
   const [linkPopoverSearch, setLinkPopoverSearch] = useState('')
   const [linkModalOpen, setLinkModalOpen] = useState(false)
   const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'contract' | 'card'>('car')
   const [linkModalSelectedId, setLinkModalSelectedId] = useState<string | null>(null)
+
+  // ── UI 상태 영속화 (localStorage) ──
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finance_categoryMode', categoryMode)
+    }
+  }, [categoryMode])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finance_groupBy', groupBy)
+    }
+  }, [groupBy])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finance_sourceFilter', sourceFilter)
+    }
+  }, [sourceFilter])
+
+  // ── results ↔ 그룹핑 상태 동기화 ──
+  // results가 비워질 때 (확정 저장 후 등) upload 상태를 review 상태와 동기화
+  const prevResultsLen = useRef(results.length)
+  useEffect(() => {
+    if (prevResultsLen.current > 0 && results.length === 0) {
+      // results가 방금 비워짐 → review 뷰로 전환됨
+      // uploadGroupBy → groupBy 동기화 (이미 위에서 같이 설정되므로 OK)
+      // uploadSubFilter → sourceFilter 동기화
+      setExpandedGroups(new Set())
+    }
+    prevResultsLen.current = results.length
+  }, [results.length])
 
   // ── 분할 모달 상태 ──
   const [splitModalItem, setSplitModalItem] = useState<any>(null)
@@ -494,15 +740,13 @@ function UploadContent() {
   const fetchStats = useCallback(async () => {
     if (!effectiveCompanyId) return
     try {
-      const [pRes, cRes] = await Promise.all([
-        fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=pending&limit=1`),
-        fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=confirmed&limit=1`),
+      const [pData, cData] = await Promise.all([
+        fetchQueueDirect(effectiveCompanyId, 'pending', 1),
+        fetchConfirmedTransactions(effectiveCompanyId, 1),
       ])
-      const pData = pRes.ok ? await pRes.json() : { total: 0 }
-      const cData = cRes.ok ? await cRes.json() : { total: 0 }
       const pendingCount = pData.total || 0
       const confirmedCount = cData.total || 0
-      console.log(`[fetchStats] API 결과: pending=${pendingCount}, confirmed=${confirmedCount}`)
+      console.log(`[fetchStats] 직접 조회 결과: pending=${pendingCount}, confirmed=${confirmedCount}`)
       setStats({ pending: pendingCount, confirmed: confirmedCount })
     } catch (e) {
       console.error(e)
@@ -514,10 +758,8 @@ function UploadContent() {
   const cleanupStaleQueue = useCallback(async () => {
     if (!effectiveCompanyId) return
     try {
-      // API를 통해 confirmed 항목 조회 (source_data 정규화 처리됨)
-      const res = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=confirmed&limit=500`)
-      if (!res.ok) return
-      const json = await res.json()
+      // 클라이언트사이드 직접 조회 (source_data 정규화 처리됨)
+      const json = await fetchQueueDirect(effectiveCompanyId, 'confirmed', 500)
       const confirmedItems = json.items || []
       if (confirmedItems.length === 0) return
 
@@ -556,11 +798,12 @@ function UploadContent() {
 
       if (staleIds.length > 0) {
         console.log(`[cleanupStaleQueue] 이미 저장된 confirmed ${staleIds.length}건 자동 삭제`)
-        await fetch('/api/finance/classify', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company_id: effectiveCompanyId, ids: staleIds })
-        })
+        // 직접 Supabase에서 삭제
+        const { error: delErr } = await supabase
+          .from('classification_queue')
+          .delete()
+          .in('id', staleIds)
+        if (delErr) console.error('[cleanupStaleQueue] 삭제 오류:', delErr)
         await fetchStats()
       }
     } catch (e) {
@@ -575,36 +818,29 @@ function UploadContent() {
     }
     setLoading(true)
     try {
-      // classify 탭 = pending, confirmed 탭 = confirmed
-      const status = activeTab === 'confirmed' ? 'confirmed' : 'pending'
-      console.log(`[fetchReviewItems] 호출: activeTab=${activeTab}, status=${status}`)
-      const res = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${status}&limit=2000`)
-      if (res.ok) {
-        const data = await res.json()
-        let loadedItems = data.items || []
+      // classify 탭 = classification_queue pending, confirmed 탭 = transactions 테이블
+      console.log(`[fetchReviewItems] 호출: activeTab=${activeTab}`)
+      const data = activeTab === 'confirmed'
+        ? await fetchConfirmedTransactions(effectiveCompanyId, 5000)
+        : await fetchQueueDirect(effectiveCompanyId, 'pending', 2000)
+      let loadedItems = data.items || []
 
-        console.log(`[fetchReviewItems] API 응답: ${loadedItems.length}건 (total=${data.total}, source=${data.source})`)
-        if (status === 'confirmed') {
-          console.log(`[fetchReviewItems] 확정 항목 ID 목록:`, loadedItems.map((i: any) => `${i.id.slice(0,8)}...(${i.source_data?.client_name})`))
-        }
+      console.log(`[fetchReviewItems] 직접 조회 응답: ${loadedItems.length}건 (total=${data.total}, source=${data.source})`)
 
-        // ── 확정완료 탭: 자동 정리 제거 (확정 항목을 그대로 표시) ──
+      // 필드명 정규화: ai_related_type/ai_related_id → related_type/related_id
+      const normalizedItems = loadedItems.map((item: any) => ({
+        ...item,
+        related_type: item.related_type || item.ai_related_type || null,
+        related_id: item.related_id || item.ai_related_id || null,
+      }))
+      setItems(normalizedItems)
+      setTotal(loadedItems.length)
 
-        // 필드명 정규화: API가 ai_related_type/ai_related_id로 보내지만, 렌더링은 related_type/related_id를 사용
-        const normalizedItems = loadedItems.map((item: any) => ({
-          ...item,
-          related_type: item.related_type || item.ai_related_type || null,
-          related_id: item.related_id || item.ai_related_id || null,
-        }))
-        setItems(normalizedItems)
-        setTotal(loadedItems.length)
-
-        // ── 현재 탭의 stats를 실제 items 수로 즉시 보정 ──
-        if (status === 'confirmed') {
-          setStats(prev => ({ ...prev, confirmed: loadedItems.length }))
-        } else {
-          setStats(prev => ({ ...prev, pending: loadedItems.length }))
-        }
+      // ── 현재 탭의 stats를 실제 items 수로 즉시 보정 ──
+      if (status === 'confirmed') {
+        setStats(prev => ({ ...prev, confirmed: loadedItems.length }))
+      } else {
+        setStats(prev => ({ ...prev, pending: loadedItems.length }))
       }
     } catch (e) {
       console.error(e)
@@ -613,16 +849,14 @@ function UploadContent() {
 
     // ── 반대 탭 카운트는 비동기로 갱신 (로딩 차단 없음) ──
     try {
-      const otherStatus = activeTab === 'confirmed' ? 'pending' : 'confirmed'
-      const otherRes = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=${otherStatus}&limit=1`)
-      if (otherRes.ok) {
-        const otherData = await otherRes.json()
-        const otherCount = otherData.total || otherData.items?.length || 0
-        if (otherStatus === 'confirmed') {
-          setStats(prev => ({ ...prev, confirmed: otherCount }))
-        } else {
-          setStats(prev => ({ ...prev, pending: otherCount }))
-        }
+      if (activeTab === 'confirmed') {
+        // 현재 확정완료 탭 → 분류관리(pending) 카운트 갱신
+        const otherData = await fetchQueueDirect(effectiveCompanyId, 'pending', 1)
+        setStats(prev => ({ ...prev, pending: otherData.total || 0 }))
+      } else {
+        // 현재 분류관리 탭 → 확정완료(transactions) 카운트 갱신
+        const otherData = await fetchConfirmedTransactions(effectiveCompanyId, 1)
+        setStats(prev => ({ ...prev, confirmed: otherData.total || 0 }))
       }
     } catch (e) { /* 무시 */ }
   }, [effectiveCompanyId, activeTab])
@@ -694,29 +928,60 @@ function UploadContent() {
     return card.holder_name || card.card_alias || '공용'
   }, [employees])
 
-  // ── 소스 필터 적용 (칩: 전체/카드/통장/미분류) ──
+  // ── 소스 필터 적용 (칩: 전체/카드/통장/미분류/분류완료/연결완료) ──
   const sourceFilteredItems = useMemo(() => {
-    let filtered = items
-    if (sourceFilter === 'card') filtered = items.filter(i => isCardItem(i))
-    else if (sourceFilter === 'bank') filtered = items.filter(i => !isCardItem(i))
-    else if (sourceFilter === 'unclassified') filtered = items.filter(i => !i.ai_category || i.ai_category === '미분류' || i.ai_category === '기타')
-    else if (sourceFilter === 'cat_matched') filtered = items.filter(i => i.ai_category && i.ai_category !== '미분류' && i.ai_category !== '기타')
-    else if (sourceFilter === 'fully_matched') filtered = items.filter(i => i.ai_category && i.ai_category !== '미분류' && i.ai_category !== '기타' && (i.ai_related_type || i.related_type) && (i.ai_related_id || i.related_id))
+    // results(업로드 탭 데이터)가 있으면 results 기준, 없으면 items(classify 탭) 기준
+    // results 항목을 items 형태로 정규화 (source_data 추가)
+    const normalizedResults = results.map(r => ({
+      ...r,
+      ai_category: r.ai_category || r.category || '미분류',
+      ai_related_type: r.ai_related_type || r.related_type || null,
+      ai_related_id: r.ai_related_id || r.related_id || null,
+      source_data: r.source_data || {
+        client_name: r.client_name,
+        description: r.description,
+        amount: r.amount,
+        type: r.type,
+        payment_method: r.payment_method,
+        card_number: r.card_number || '',
+        approval_number: r.approval_number || '',
+        currency: (r as any).currency || 'KRW',
+        original_amount: (r as any).original_amount || null,
+      },
+    }))
+    // 확정완료 탭에서는 항상 items(API 데이터) 사용, 분류 탭에서는 results(업로드)가 있으면 우선
+    const baseItems = activeTab === 'confirmed' ? items : (normalizedResults.length > 0 ? normalizedResults : items)
+    let filtered = baseItems
+    if (sourceFilter === 'card') filtered = baseItems.filter(i => isCardItem(i))
+    else if (sourceFilter === 'bank') filtered = baseItems.filter(i => !isCardItem(i))
+    else if (sourceFilter === 'unclassified') filtered = baseItems.filter(i => {
+      const cat = i.ai_category || i.category || ''
+      return !cat || cat === '미분류' || cat === '기타'
+    })
+    else if (sourceFilter === 'cat_matched') filtered = baseItems.filter(i => {
+      const cat = i.ai_category || i.category || ''
+      return cat && cat !== '미분류' && cat !== '기타'
+    })
+    else if (sourceFilter === 'fully_matched') filtered = baseItems.filter(i => {
+      const cat = i.ai_category || i.category || ''
+      const hasRel = (i.ai_related_type || i.related_type) && (i.ai_related_id || i.related_id)
+      return cat && cat !== '미분류' && cat !== '기타' && hasRel
+    })
     // 검색어 필터
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
       filtered = filtered.filter(i => {
         const sd = i.source_data || {}
         const haystack = [
-          sd.client_name, sd.description, sd.memo, sd.card_number,
-          i.ai_category, i.matched_car_number, i.matched_employee_name,
+          sd.client_name || i.client_name, sd.description || i.description, sd.memo, sd.card_number,
+          i.ai_category || i.category, i.matched_car_number, i.matched_employee_name,
           i.linked_name, sd.bank_name,
         ].filter(Boolean).join(' ').toLowerCase()
         return haystack.includes(q)
       })
     }
     return filtered
-  }, [items, sourceFilter, searchTerm])
+  }, [items, results, sourceFilter, searchTerm, activeTab])
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: any[]; totalAmount: number; type: string; foreignAmounts?: Record<string, number>; subGroups?: Record<string, { items: any[]; totalAmount: number }> }> = {}
@@ -729,11 +994,12 @@ function UploadContent() {
     }
     for (const item of sourceFilteredItems) {
       let key = ''
+      // source_data가 없으면 item 자체를 source_data로 사용 (results 항목 호환)
+      const sd = item.source_data || item
       if (groupBy === 'category') {
-        const rawCat = item.ai_category || '미분류'
+        const rawCat = item.ai_category || item.category || '미분류'
         key = categoryMode === 'display' ? (catMap[rawCat] || '📦 기타 지출') : rawCat
       } else if (groupBy === 'card') {
-        const sd = item.source_data || {}
         const cardNum = sd.card_number || ''
         const last4 = cardNum.replace(/\D/g, '').slice(-4)
         if (last4 && sd.payment_method !== '통장') {
@@ -743,7 +1009,6 @@ function UploadContent() {
           key = sd.payment_method === '통장' ? '📋 통장 거래' : '💳 카드번호 없음'
         }
       } else if (groupBy === 'bank') {
-        const sd = item.source_data || {}
         if (sd.payment_method === '카드' || sd.payment_method === 'Card') {
           key = '💳 카드 거래'
         } else {
@@ -755,13 +1020,11 @@ function UploadContent() {
         if (item.matched_car_number) {
           key = `🚙 ${item.matched_car_number}`
         } else {
-          const sd = item.source_data || {}
           const desc = `${sd.client_name || ''} ${sd.description || ''}`
           const carMatch = cars.find((c: any) => c.number && desc.includes(c.number))
           key = carMatch ? `🚙 ${carMatch.number}` : '📋 차량 미매칭'
         }
       } else if (groupBy === 'user') {
-        const sd = item.source_data || {}
         if (item.matched_employee_name) {
           key = `👤 ${item.matched_employee_name}`
         } else if (sd.card_number) {
@@ -911,53 +1174,84 @@ function UploadContent() {
     return { count: selectedIds.size, total, foreignText: formatForeignAmounts(foreignAmounts) }
   }, [selectedIds, items])
 
-  // ── 일괄 삭제 핸들러 ──
-  const handleDeleteAll = async () => {
-    if (!effectiveCompanyId) return
-    const statusLabel = activeTab === 'confirmed' ? '확정 완료' : '분류 대기'
-    if (!confirm(`${statusLabel} 항목 ${items.length}건을 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return
+  // ── 삭제 확인 모달 상태 ──
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean; mode: 'all' | 'selected'; targetIds: string[];
+    count: number; totalAmount: number; filterLabel: string; statusLabel: string;
+  }>({ open: false, mode: 'all', targetIds: [], count: 0, totalAmount: 0, filterLabel: '', statusLabel: '' })
 
+  // ── 소프트 삭제 실행 함수 ──
+  const executeSoftDelete = async (targetIds: string[]) => {
+    if (!effectiveCompanyId || targetIds.length === 0) return
     setDeleting(true)
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_id: effectiveCompanyId, status: activeTab === 'confirmed' ? 'confirmed' : 'pending' })
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      alert(`${data.deleted}건 삭제 완료`)
-      setItems([])
+      const tableName = activeTab === 'confirmed' ? 'transactions' : 'classification_queue'
+      const now = new Date().toISOString()
+      for (let i = 0; i < targetIds.length; i += 50) {
+        const batch = targetIds.slice(i, i + 50)
+        const { error: delErr } = await supabase.from(tableName).update({ deleted_at: now }).in('id', batch)
+        if (delErr) throw new Error(delErr.message)
+      }
+      alert(`${targetIds.length}건 삭제 완료 (휴지통으로 이동)`)
+      setItems(prev => prev.filter(i => !targetIds.includes(i.id)))
       setSelectedIds(new Set())
-      clearResults()  // UploadContext 결과도 함께 정리
       fetchStats()
     } catch (e: any) {
       alert('삭제 실패: ' + e.message)
     }
     setDeleting(false)
+    setDeleteModal(prev => ({ ...prev, open: false }))
   }
 
-  const handleDeleteSelected = async () => {
-    if (!effectiveCompanyId || selectedIds.size === 0) return
-    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return
-
-    setDeleting(true)
-    try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_id: effectiveCompanyId, ids: Array.from(selectedIds) })
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      alert(`${data.deleted}건 삭제 완료`)
-      setItems(prev => prev.filter(i => !selectedIds.has(i.id)))
-      setSelectedIds(new Set())
-      fetchStats()
-    } catch (e: any) {
-      alert('삭제 실패: ' + e.message)
+  // ── 휴지통 복원 함수 ──
+  const handleRestoreDeleted = async () => {
+    if (!effectiveCompanyId) return
+    const tables = ['transactions', 'classification_queue'] as const
+    let restoredTotal = 0
+    for (const tbl of tables) {
+      const { data, error } = await supabase.from(tbl)
+        .update({ deleted_at: null })
+        .eq('company_id', effectiveCompanyId)
+        .not('deleted_at', 'is', null)
+        .select('id')
+      if (!error && data) restoredTotal += data.length
     }
-    setDeleting(false)
+    if (restoredTotal > 0) {
+      alert(`${restoredTotal}건 복원 완료`)
+      fetchReviewItems()
+    } else {
+      alert('휴지통에 복원할 항목이 없습니다.')
+    }
+  }
+
+  // ── 일괄 삭제 핸들러 (현재 필터 기준) → 모달 표시 ──
+  const handleDeleteAll = () => {
+    if (!effectiveCompanyId) return
+    const targetItems = sourceFilteredItems
+    if (targetItems.length === 0) return alert('삭제할 항목이 없습니다.')
+    const statusLabel = activeTab === 'confirmed' ? '확정 완료' : '분류 대기'
+    const filterLabel = sourceFilter !== 'all'
+      ? (sourceFilter === 'card' ? '카드' : sourceFilter === 'bank' ? '통장' : sourceFilter === 'cat_matched' ? '분류완료' : sourceFilter === 'fully_matched' ? '연결완료' : sourceFilter === 'unclassified' ? '미분류' : sourceFilter)
+      : '전체'
+    const totalAmount = targetItems.reduce((sum: number, i: any) => sum + Math.abs(i.amount || i.source_data?.amount || 0), 0)
+    setDeleteModal({
+      open: true, mode: 'all',
+      targetIds: targetItems.map((i: any) => i.id),
+      count: targetItems.length, totalAmount, filterLabel, statusLabel,
+    })
+  }
+
+  // ── 선택 삭제 핸들러 → 모달 표시 ──
+  const handleDeleteSelected = () => {
+    if (!effectiveCompanyId || selectedIds.size === 0) return
+    const selected = items.filter(i => selectedIds.has(i.id))
+    const totalAmount = selected.reduce((sum, i: any) => sum + Math.abs(i.amount || i.source_data?.amount || 0), 0)
+    setDeleteModal({
+      open: true, mode: 'selected',
+      targetIds: Array.from(selectedIds),
+      count: selectedIds.size, totalAmount,
+      filterLabel: '선택 항목', statusLabel: activeTab === 'confirmed' ? '확정 완료' : '분류 대기',
+    })
   }
 
   const toggleSelectId = (id: string) => {
@@ -970,7 +1264,7 @@ function UploadContent() {
   }
 
   const toggleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(items.map(i => i.id)))
+    if (checked) setSelectedIds(new Set(sourceFilteredItems.map((i: any) => i.id)))
     else setSelectedIds(new Set())
   }
 
@@ -988,17 +1282,11 @@ function UploadContent() {
   // ── 연결 처리 (단건/일괄) ──
   const handleLinkItem = async (itemId: string, relatedType: string, relatedId: string) => {
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queue_id: itemId,
-          final_related_type: relatedType,
-          final_related_id: relatedId,
-          save_as_rule: false,
-        }),
-      })
-      if (res.ok) {
+      const { error: upErr } = await supabase
+        .from('classification_queue')
+        .update({ final_related_type: relatedType, final_related_id: relatedId })
+        .eq('id', itemId)
+      if (!upErr) {
         setItems(prev => prev.map(i => i.id === itemId ? { ...i, ai_related_type: relatedType, ai_related_id: relatedId } : i))
       }
     } catch (e) { console.error(e) }
@@ -1141,16 +1429,17 @@ function UploadContent() {
     if (minDate && maxDate) {
       const { data: existing } = await supabase
         .from('transactions')
-        .select('transaction_date, client_name, amount, payment_method, description')
+        .select('transaction_date, client_name, amount, payment_method, description, type')
         .eq('company_id', effectiveCompanyId)
         .gte('transaction_date', minDate)
         .lte('transaction_date', maxDate)
 
       if (existing && existing.length > 0) {
-        // 기존 거래의 키별 개수 카운트 (같은 사람이 같은 날 같은 금액으로 여러 건 가능)
+        // 기존 거래의 키별 개수 카운트 (description + type 포함으로 정확도 향상)
         const existingCounts = new Map<string, number>()
         for (const e of existing) {
-          const key = `${e.transaction_date}|${e.client_name}|${e.amount}|${e.payment_method}`
+          const desc = (e.description || '').trim().toLowerCase().slice(0, 30)
+          const key = `${e.transaction_date}|${e.client_name}|${e.amount}|${e.payment_method}|${e.type}|${desc}`
           existingCounts.set(key, (existingCounts.get(key) || 0) + 1)
         }
 
@@ -1158,7 +1447,8 @@ function UploadContent() {
         const usedCounts = new Map<string, number>()
         const filtered: typeof confirmedResults = []
         for (const r of confirmedResults) {
-          const key = `${r.transaction_date}|${r.client_name}|${r.amount}|${r.payment_method}`
+          const desc = (r.description || '').trim().toLowerCase().slice(0, 30)
+          const key = `${r.transaction_date}|${r.client_name}|${r.amount}|${r.payment_method}|${r.type}|${desc}`
           const existCount = existingCounts.get(key) || 0
           const usedCount = usedCounts.get(key) || 0
           if (usedCount < existCount) {
@@ -1177,16 +1467,22 @@ function UploadContent() {
     // ── 중복 항목 자동 정리 (이미 저장된 항목은 queue에서 삭제 + 목록에서 제거) ──
     if (duplicateCount > 0) {
       const duplicateItems = confirmedResults.filter(r => !uniqueResults.includes(r))
+
+      // 중복 스킵 상세 로그 생성
+      const dupLogLines = duplicateItems.slice(0, 20).map(r =>
+        `  ${r.transaction_date?.slice(0, 10) || '?'} | ${r.client_name || '?'} | ${Math.abs(r.amount || 0).toLocaleString()}원`
+      )
+      const dupLogText = dupLogLines.join('\n')
+      const moreText = duplicateItems.length > 20 ? `\n  ... 외 ${duplicateItems.length - 20}건` : ''
+      console.log(`[중복 스킵 상세]\n${dupLogText}${moreText}`)
+
       // classification_queue에서 중복 항목 삭제
       const dupQueueIds = duplicateItems.map(r => (r as any)._queue_id).filter(Boolean)
       if (dupQueueIds.length > 0) {
         try {
-          await fetch('/api/finance/classify', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ company_id: effectiveCompanyId, ids: dupQueueIds })
-          })
-          console.log(`[handleBulkSave] 중복 항목 ${dupQueueIds.length}건 classification_queue에서 삭제`)
+          const { error: delErr } = await supabase.from('classification_queue').delete().in('id', dupQueueIds)
+          if (delErr) console.error('[handleBulkSave] 중복 항목 queue 삭제 오류:', delErr)
+          else console.log(`[handleBulkSave] 중복 항목 ${dupQueueIds.length}건 classification_queue에서 삭제`)
         } catch (e) {
           console.error('[handleBulkSave] 중복 항목 queue 삭제 오류:', e)
         }
@@ -1201,12 +1497,12 @@ function UploadContent() {
       })
 
       if (uniqueResults.length === 0) {
-        alert(`✅ ${duplicateCount}건은 이미 저장된 거래입니다.\n목록에서 정리 완료했습니다.`)
+        alert(`✅ ${duplicateCount}건은 이미 저장된 거래입니다.\n\n[스킵된 항목]\n${dupLogText}${moreText}\n\n목록에서 정리 완료했습니다.`)
         fetchStats()
         return
       }
       // 중복 아닌 항목이 있으면 계속 진행
-      alert(`ℹ️ ${duplicateCount}건은 이미 저장된 거래 → 목록에서 정리됨\n나머지 ${uniqueResults.length}건을 저장합니다.`)
+      alert(`ℹ️ ${duplicateCount}건 중복 제외 (이미 저장됨)\n\n[스킵 항목]\n${dupLogText}${moreText}\n\n나머지 ${uniqueResults.length}건을 저장합니다.`)
     }
 
     if (!confirm(`확정된 ${uniqueResults.length}건을 저장하시겠습니까?`)) return
@@ -1282,56 +1578,49 @@ function UploadContent() {
       // classification_queue 정리 — API를 통해 삭제 (RLS 우회, service_role_key 사용)
       if (effectiveCompanyId) {
         try {
-          // 1) _queue_id가 있는 항목은 API DELETE로 직접 삭제
+          // 1) _queue_id가 있는 항목은 직접 삭제
           const queueIds = uniqueResults.map(r => (r as any)._queue_id).filter(Boolean)
           if (queueIds.length > 0) {
-            const delRes = await fetch('/api/finance/classify', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIds })
-            })
-            const delData = await delRes.json()
-            console.log(`[handleBulkSave] API로 classification_queue ${delData.deleted || 0}건 삭제 (_queue_id 기반)`)
+            const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
+            if (delErr) console.error('[handleBulkSave] queue 삭제 오류:', delErr)
+            else console.log(`[handleBulkSave] classification_queue ${queueIds.length}건 삭제 (_queue_id 기반)`)
           }
 
           // 2) _queue_id가 없는 항목은 cleanupStaleQueue로 처리 (API 기반)
           const itemsWithoutQueueId = uniqueResults.filter(r => !(r as any)._queue_id)
           if (itemsWithoutQueueId.length > 0) {
             console.log(`[handleBulkSave] _queue_id 없는 항목 ${itemsWithoutQueueId.length}건 → API 매칭 삭제`)
-            // GET API로 pending queue 조회 (source_data 정규화됨)
-            const qRes = await fetch(`/api/finance/classify?company_id=${effectiveCompanyId}&status=pending&limit=2000`)
-            if (qRes.ok) {
-              const qData = await qRes.json()
-              const qItems = qData.items || []
+            // 클라이언트사이드 직접 조회 (source_data 정규화됨)
+            const qData = await fetchQueueDirect(effectiveCompanyId, 'pending', 2000)
+            const qItems = qData.items || []
 
-              if (qItems.length > 0) {
-                const deleteIds: string[] = []
-                const savedKeys = new Map<string, number>()
-                for (const r of itemsWithoutQueueId) {
-                  const key = `${r.transaction_date}|${r.client_name}|${Math.abs(Number(r.amount || 0))}`
-                  savedKeys.set(key, (savedKeys.get(key) || 0) + 1)
-                }
-                const usedKeys = new Map<string, number>()
+            if (qItems.length > 0) {
+              const deleteIds: string[] = []
+              const savedKeys = new Map<string, number>()
+              for (const r of itemsWithoutQueueId) {
+                const key = `${r.transaction_date}|${r.client_name}|${Math.abs(Number(r.amount || 0))}`
+                savedKeys.set(key, (savedKeys.get(key) || 0) + 1)
+              }
+              const usedKeys = new Map<string, number>()
 
-                for (const q of qItems) {
-                  const sd = q.source_data || {}
-                  const key = `${sd.transaction_date}|${sd.client_name}|${Math.abs(Number(sd.amount || 0))}`
-                  const savedCount = savedKeys.get(key) || 0
-                  const usedCount = usedKeys.get(key) || 0
-                  if (savedCount > 0 && usedCount < savedCount) {
-                    usedKeys.set(key, usedCount + 1)
-                    deleteIds.push(q.id)
-                  }
+              for (const q of qItems) {
+                const sd = q.source_data || {}
+                const key = `${sd.transaction_date}|${sd.client_name}|${Math.abs(Number(sd.amount || 0))}`
+                const savedCount = savedKeys.get(key) || 0
+                const usedCount = usedKeys.get(key) || 0
+                if (savedCount > 0 && usedCount < savedCount) {
+                  usedKeys.set(key, usedCount + 1)
+                  deleteIds.push(q.id)
                 }
+              }
 
-                if (deleteIds.length > 0) {
-                  await fetch('/api/finance/classify', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ company_id: effectiveCompanyId, ids: deleteIds })
-                  })
-                  console.log(`[handleBulkSave] API 매칭으로 classification_queue ${deleteIds.length}건 추가 삭제`)
-                }
+              if (deleteIds.length > 0) {
+                const { error: delErr } = await supabase
+                  .from('classification_queue')
+                  .delete()
+                  .in('id', deleteIds)
+                if (delErr) console.error('[handleBulkSave] queue 삭제 오류:', delErr)
+                console.log(`[handleBulkSave] 직접 조회 매칭으로 classification_queue ${deleteIds.length}건 추가 삭제`)
               }
             }
           }
@@ -1501,22 +1790,20 @@ function UploadContent() {
   // ── Review Handlers ──
   const handleConfirm = async (item: any, overrides?: { category?: string; related_type?: string; related_id?: string }) => {
     const category = overrides?.category || item.ai_category || item.final_category
-    console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, client=${item.source_data?.client_name}`)
+    const PENDING_CATS = ['기타', '미분류', '']
+    const newStatus = PENDING_CATS.includes(category) ? 'pending' : 'confirmed'
+    const relType = overrides?.related_type || item.related_type || item.ai_related_type || null
+    const relId = overrides?.related_id || item.related_id || item.ai_related_id || null
+    console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, status=${newStatus}`)
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queue_id: item.id,
-          final_category: category,
-          final_related_type: overrides?.related_type || item.ai_related_type,
-          final_related_id: overrides?.related_id || item.ai_related_id,
-          save_as_rule: false,
-        }),
-      })
-      const resData = await res.json()
-      console.log(`[handleConfirm] PATCH 응답:`, res.status, resData)
-      if (res.ok) {
+      const updateData: Record<string, any> = { final_category: category, status: newStatus }
+      if (relType !== undefined) updateData.final_related_type = relType
+      if (relId !== undefined) updateData.final_related_id = relId
+      const { error: upErr } = await supabase
+        .from('classification_queue')
+        .update(updateData)
+        .eq('id', item.id)
+      if (!upErr) {
         setItems(prev => {
           const next = prev.filter(i => i.id !== item.id)
           console.log(`[handleConfirm] items: ${prev.length} → ${next.length}`)
@@ -1527,6 +1814,8 @@ function UploadContent() {
           console.log(`[handleConfirm] stats: pending ${prev.pending}→${next.pending}, confirmed ${prev.confirmed}→${next.confirmed}`)
           return next
         })
+      } else {
+        console.error('[handleConfirm] 업데이트 오류:', upErr)
       }
     } catch (e) {
       console.error('[handleConfirm] 오류:', e)
@@ -1572,19 +1861,25 @@ function UploadContent() {
     const keyword = item.source_data?.client_name || ''
     if (!keyword) return handleConfirm(item, { category })
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queue_id: item.id,
-          final_category: category,
-          final_related_type: item.ai_related_type,
-          final_related_id: item.ai_related_id,
-          save_as_rule: true,
-          rule_keyword: keyword,
-        }),
-      })
-      if (res.ok) {
+      const PENDING_CATS = ['기타', '미분류', '']
+      const newStatus = PENDING_CATS.includes(category) ? 'pending' : 'confirmed'
+      // 큐 업데이트
+      const { error: upErr } = await supabase
+        .from('classification_queue')
+        .update({
+          final_category: category, status: newStatus,
+          final_related_type: item.ai_related_type || null,
+          final_related_id: item.ai_related_id || null,
+        })
+        .eq('id', item.id)
+      if (!upErr) {
+        // 규칙 저장
+        await supabase.from('finance_rules').upsert({
+          keyword: keyword.toLowerCase(),
+          category,
+          related_type: item.ai_related_type || null,
+          related_id: item.ai_related_id || null,
+        }, { onConflict: 'keyword' })
         setItems(prev => prev.filter(i => i.id !== item.id))
         setStats(prev => ({ pending: prev.pending - 1, confirmed: prev.confirmed + 1 }))
       }
@@ -1597,40 +1892,25 @@ function UploadContent() {
     console.log(`[handleRevert] 되돌리기 시작: id=${item.id}, _source=${item._source}, client=${item.source_data?.client_name}`)
     try {
       if (item._source === 'transactions') {
-        // transactions 테이블에서 온 항목 → DELETE로 처리
-        const res = await fetch('/api/finance/classify', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company_id: item.company_id, ids: [item.id] }),
-        })
-        const resData = await res.json()
-        console.log(`[handleRevert] transactions DELETE 응답:`, resData)
-        if (res.ok) {
+        // transactions 테이블에서 온 항목 → 직접 삭제
+        const { error: delErr } = await supabase.from('transactions').delete().eq('id', item.id)
+        if (delErr) {
+          alert(`되돌리기 실패: ${delErr.message}`)
+        } else {
           setItems(prev => prev.filter(i => i.id !== item.id))
           setStats(prev => ({ ...prev, confirmed: prev.confirmed - 1 }))
-        } else {
-          alert(`되돌리기 실패: ${resData.error || '알 수 없는 오류'}`)
         }
       } else {
-        // classification_queue에서 온 항목 → PATCH로 status 변경
-        const res = await fetch('/api/finance/classify', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            queue_id: item.id,
-            final_category: '기타',
-            final_related_type: null,
-            final_related_id: null,
-            save_as_rule: false,
-          }),
-        })
-        const resData = await res.json()
-        console.log(`[handleRevert] PATCH 응답: status=${res.status}`, resData)
-        if (res.ok) {
+        // classification_queue에서 온 항목 → 직접 status 변경
+        const { error: upErr } = await supabase
+          .from('classification_queue')
+          .update({ final_category: '기타', status: 'pending', final_related_type: null, final_related_id: null })
+          .eq('id', item.id)
+        if (upErr) {
+          alert(`되돌리기 실패: ${upErr.message}`)
+        } else {
           setItems(prev => prev.filter(i => i.id !== item.id))
           setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
-        } else {
-          alert(`되돌리기 실패: ${resData.error || '알 수 없는 오류'}`)
         }
       }
     } catch (e) {
@@ -1641,18 +1921,18 @@ function UploadContent() {
 
   const handleChangeCategory = async (item: any, newCategory: string) => {
     try {
-      const res = await fetch('/api/finance/classify', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queue_id: item.id,
+      const PENDING_CATS = ['기타', '미분류', '']
+      const newStatus = PENDING_CATS.includes(newCategory) ? 'pending' : 'confirmed'
+      const { error: upErr } = await supabase
+        .from('classification_queue')
+        .update({
           final_category: newCategory,
-          final_related_type: item.ai_related_type,
-          final_related_id: item.ai_related_id,
-          save_as_rule: false,
-        }),
-      })
-      if (res.ok) {
+          status: newStatus,
+          final_related_type: item.ai_related_type || null,
+          final_related_id: item.ai_related_id || null,
+        })
+        .eq('id', item.id)
+      if (!upErr) {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, ai_category: newCategory, final_category: newCategory } : i))
       }
     } catch (e) {
@@ -1817,11 +2097,8 @@ function UploadContent() {
             .map(idx => (results[idx] as any)?._queue_id)
             .filter(Boolean)
           if (queueIdsToDelete.length > 0) {
-            await fetch('/api/finance/classify', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIdsToDelete })
-            })
+            const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIdsToDelete)
+            if (delErr) console.error('queue 중복 삭제 오류:', delErr)
           }
           deletedTotal += memoryDupCount
         }
@@ -1890,7 +2167,15 @@ function UploadContent() {
 
   // ── Upload Results Sub-filter & Grouping ──
   const [uploadSubFilter, setUploadSubFilter] = useState<'all' | 'card' | 'bank' | 'unclassified'>('all')
-  const [uploadGroupBy, setUploadGroupBy] = useState<'none' | 'card_number' | 'category' | 'vehicle' | 'client' | 'income_expense' | 'date' | 'user'>('none')
+  const [uploadGroupBy, setUploadGroupBy] = useState<'none' | 'card_number' | 'category' | 'vehicle' | 'client' | 'income_expense' | 'date' | 'user'>(() => {
+    // groupBy와 동기화 — 업로드 뷰에서도 동일한 그룹핑 유지
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('finance_groupBy') || 'category'
+      const reverseMap: Record<string, string> = { category: 'category', card: 'card_number', bank: 'none', vehicle: 'vehicle', user: 'user', date: 'date', client: 'client', income_expense: 'income_expense' }
+      return (reverseMap[saved] || 'category') as any
+    }
+    return 'category'
+  })
   // 카드 전용 서브필터
   const [cardSubFilter, setCardSubFilter] = useState<'all' | 'matched' | 'unmatched' | 'by_company' | 'by_user'>('all')
   // 통장 전용 서브필터
@@ -1902,6 +2187,28 @@ function UploadContent() {
     if (uploadSubFilter === 'card') filtered = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
     else if (uploadSubFilter === 'bank') filtered = results.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
     else if (uploadSubFilter === 'unclassified') filtered = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
+    // sourceFilter 적용 (분류완료/연결완료 칩)
+    if (sourceFilter === 'cat_matched') {
+      filtered = filtered.filter(r => {
+        const cat = r.ai_category || r.category || ''
+        return cat && cat !== '미분류' && cat !== '기타'
+      })
+    } else if (sourceFilter === 'fully_matched') {
+      filtered = filtered.filter(r => {
+        const cat = r.ai_category || r.category || ''
+        const hasRel = (r.ai_related_type || r.related_type) && (r.ai_related_id || r.related_id)
+        return cat && cat !== '미분류' && cat !== '기타' && hasRel
+      })
+    } else if (sourceFilter === 'unclassified') {
+      filtered = filtered.filter(r => {
+        const cat = r.ai_category || r.category || ''
+        return !cat || cat === '미분류' || cat === '기타'
+      })
+    } else if (sourceFilter === 'card') {
+      filtered = filtered.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
+    } else if (sourceFilter === 'bank') {
+      filtered = filtered.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
+    }
     // 검색어 필터
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
@@ -1911,7 +2218,7 @@ function UploadContent() {
       })
     }
     return filtered
-  }, [results, uploadSubFilter, searchTerm])
+  }, [results, uploadSubFilter, sourceFilter, searchTerm])
 
   // 2차 필터: 카드/통장 전용 서브필터 적용
   const filteredResults = useMemo(() => {
@@ -2570,7 +2877,7 @@ function UploadContent() {
             { key: 'classify' as const, label: '📋 분류 관리', count: stats.pending, countColor: '#d97706' },
             { key: 'confirmed' as const, label: '✅ 확정완료', count: stats.confirmed, countColor: '#16a34a' },
           ]).map(tab => (
-            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()); if (tab.key === 'confirmed' && (sourceFilter === 'cat_matched' || sourceFilter === 'fully_matched')) setSourceFilter('all') }}
+            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()); setSourceFilter('all') }}
               style={{
                 padding: '10px 18px', border: 'none', cursor: 'pointer',
                 borderBottom: activeTab === tab.key ? '3px solid #2d5fa8' : '3px solid transparent',
@@ -3138,7 +3445,7 @@ function UploadContent() {
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>
                                     <div>{item.description}</div>
@@ -3370,7 +3677,7 @@ function UploadContent() {
                                   <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                 )}
                               </td>
-                              <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
+                              <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                               <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                               <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -3691,7 +3998,7 @@ function UploadContent() {
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
+                                  <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -4042,7 +4349,7 @@ function UploadContent() {
                                         <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                       )}
                                     </td>
-                                    <td style={{ padding: '8px 12px', width: 88, color: '#6b7280', whiteSpace: 'nowrap', fontSize: 13 }}>{item.transaction_date}</td>
+                                    <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                     <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                     <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 13, maxWidth: 180 }}>
                                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -4206,7 +4513,7 @@ function UploadContent() {
                   <table style={{ width: '100%', textAlign: 'left', fontSize: 12, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                     <colgroup>
                       <col style={{ width: 30 }} />
-                      <col style={{ width: 78 }} />
+                      <col style={{ width: 100 }} />
                       <col style={{ width: 55 }} />
                       <col style={{ width: 'auto' }} />
                       <col style={{ width: 'auto' }} />
@@ -4246,7 +4553,7 @@ function UploadContent() {
                                 <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                               )}
                             </td>
-                            <td style={{ padding: '4px 6px', whiteSpace: 'nowrap', fontSize: 12 }}><input value={item.transaction_date || ''} onChange={e => handleUpdateItem(item.id, 'transaction_date', e.target.value, item)} style={{ background: 'transparent', width: 74, outline: 'none', color: '#1f2937', fontSize: 12 }} /></td>
+                            <td style={{ padding: '4px 6px', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                             <td style={{ padding: '4px 6px' }}>
                               {(item.payment_method === '카드' || item.payment_method === 'Card') ? (
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#fef3c7', color: '#b45309', whiteSpace: 'nowrap' }}>
@@ -4477,7 +4784,7 @@ function UploadContent() {
                             <button onClick={() => setUploadSelectedIds(prev => { const n = new Set(prev); n.delete(item.id); return n })}
                               style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 }}
                               onMouseEnter={e => e.currentTarget.style.color = '#f87171'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>×</button>
-                            <span style={{ color: '#94a3b8', minWidth: 80, fontSize: 13 }}>{item.transaction_date}</span>
+                            <span style={{ color: '#94a3b8', minWidth: 130, fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11 }}>{dt.time}</span></>}</>})()}</span>
                             <span style={{ color: '#e2e8f0', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, fontSize: 13 }}>{item.client_name}</span>
                             <span style={{ color: item.type === 'income' ? '#60a5fa' : '#f87171', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 13 }}>
                               {item.type === 'income' ? '+' : '-'}{Math.abs(item.amount).toLocaleString()}
@@ -4555,14 +4862,11 @@ function UploadContent() {
                         return
                       }
 
-                      // classification_queue 정리 — API로 삭제 (RLS 우회)
+                      // classification_queue 정리 — 직접 삭제
                       const queueIds = selectedItems.map(r => (r as any)._queue_id).filter(Boolean)
                       if (queueIds.length > 0) {
-                        await fetch('/api/finance/classify', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ company_id: effectiveCompanyId, ids: queueIds })
-                        })
+                        const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
+                        if (delErr) console.error('queue 삭제 오류:', delErr)
                       }
 
                       // ── 투자 연결 거래 → 투자자 순합계 업데이트 ──
@@ -4610,14 +4914,10 @@ function UploadContent() {
                     const queueIds = selectedItems.map(r => (r as any)._queue_id).filter(Boolean)
                     if (queueIds.length > 0) {
                       try {
-                        const res = await fetch('/api/finance/classify', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ ids: queueIds, company_id: effectiveCompanyId }),
-                        })
-                        if (!res.ok) console.error('classification_queue 삭제 실패')
+                        const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
+                        if (delErr) console.error('classification_queue 삭제 실패:', delErr)
                       } catch (e) {
-                        console.error('삭제 API 오류:', e)
+                        console.error('삭제 오류:', e)
                       }
                     }
                     for (const item of selectedItems) {
@@ -5004,8 +5304,8 @@ function UploadContent() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
-                  checked={items.length > 0 && selectedIds.size === items.length}
-                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < items.length }}
+                  checked={sourceFilteredItems.length > 0 && selectedIds.size === sourceFilteredItems.length}
+                  ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sourceFilteredItems.length }}
                   onChange={(e) => toggleSelectAll(e.target.checked)}
                   style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
                 />
@@ -5016,6 +5316,10 @@ function UploadContent() {
               <button onClick={handleDeleteAll} disabled={deleting}
                 style={{ padding: '5px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: '#dc2626' }}>
                 {deleting ? '삭제 중...' : `전체 삭제`}
+              </button>
+              <button onClick={handleRestoreDeleted}
+                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b' }}>
+                🗑️ 휴지통 복원
               </button>
             </div>
           )}
@@ -5197,7 +5501,12 @@ function UploadContent() {
                               )}
 
                               {/* Date */}
-                              <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, width: 80, flexShrink: 0 }}>{src.transaction_date}</span>
+                              {(() => { const dt = formatDatetime(src.transaction_date); return (
+                                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500, width: 130, flexShrink: 0, lineHeight: 1.4 }}>
+                                  <span style={{ display: 'block', color: '#64748b', fontWeight: 600 }}>{dt.date}</span>
+                                  {dt.time && <span style={{ display: 'block', fontSize: 11 }}>{dt.time}</span>}
+                                </span>
+                              )})()}
 
                               {/* Type */}
                               <span style={{ fontSize: 13, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
@@ -5813,6 +6122,56 @@ function UploadContent() {
             </div>
           )}
         </>
+      )}
+
+      {/* ═══ 삭제 확인 모달 ═══ */}
+      {deleteModal.open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setDeleteModal(prev => ({ ...prev, open: false }))}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{
+            position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 420,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '24px 24px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🗑️</div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>삭제 확인</h3>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>휴지통으로 이동 (복원 가능)</p>
+                </div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>상태</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deleteModal.statusLabel}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>필터</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deleteModal.filterLabel}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>삭제 건수</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#dc2626' }}>{deleteModal.count.toLocaleString()}건</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>합계 금액</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{deleteModal.totalAmount.toLocaleString()}원</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '0 24px 20px' }}>
+              <button onClick={() => setDeleteModal(prev => ({ ...prev, open: false }))}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                취소
+              </button>
+              <button onClick={() => executeSoftDelete(deleteModal.targetIds)} disabled={deleting}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer' }}>
+                {deleting ? '삭제 중...' : `${deleteModal.count}건 삭제`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

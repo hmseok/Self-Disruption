@@ -1395,6 +1395,9 @@ export async function PATCH(request: NextRequest) {
       final_category,
       status: newStatus,
     }
+    // ★ final_related_type/id가 있으면 classification_queue에도 저장
+    if (final_related_type !== undefined) updateData.final_related_type = final_related_type || null
+    if (final_related_id !== undefined) updateData.final_related_id = final_related_id || null
 
     console.log(`[PATCH classify] queue_id=${queue_id}, final_category=${final_category}, newStatus=${newStatus}, related_type=${final_related_type}, related_id=${final_related_id}`)
 
@@ -1523,6 +1526,45 @@ export async function PATCH(request: NextRequest) {
         } catch (e) {
           console.error('[classify PATCH] 되돌리기 지입 금액 재계산 오류:', e)
         }
+      }
+    }
+
+    // ★ 확정 시 → 매칭되는 transaction의 category/related_type/related_id 업데이트
+    if (newStatus === 'confirmed' && updated) {
+      try {
+        // source_data에서 거래 정보 추출
+        let sd: any = {}
+        if (updated.source_data && typeof updated.source_data === 'object' && Object.keys(updated.source_data).length > 0) {
+          sd = updated.source_data
+        } else if (updated.alternatives) {
+          const alt = typeof updated.alternatives === 'string' ? JSON.parse(updated.alternatives) : updated.alternatives
+          if (alt?.source_data) sd = alt.source_data
+          else if (alt?.transaction_date) sd = alt
+        }
+
+        const txDate = sd?.transaction_date || updated.transaction_date
+        const clientName = sd?.client_name || updated.client_name
+        const amount = Math.abs(Number(sd?.amount || updated.amount || 0))
+        const companyId = updated.company_id
+
+        if (txDate && companyId) {
+          const txUpdateData: Record<string, any> = { category: final_category }
+          if (final_related_type !== undefined) txUpdateData.related_type = final_related_type || null
+          if (final_related_id !== undefined) txUpdateData.related_id = final_related_id || null
+
+          const { error: txUpdateErr, count: txUpdated } = await sb
+            .from('transactions')
+            .update(txUpdateData)
+            .eq('company_id', companyId)
+            .eq('transaction_date', txDate)
+            .eq('client_name', clientName || '')
+            .eq('amount', amount)
+
+          if (txUpdateErr) console.error('[classify PATCH] 확정: transactions 업데이트 오류:', txUpdateErr)
+          else console.log(`[classify PATCH] 확정: transactions 업데이트 (${txDate}/${clientName}/${amount}) → category=${final_category}, related=${final_related_type}/${final_related_id}, count=${txUpdated}`)
+        }
+      } catch (e) {
+        console.error('[classify PATCH] 확정: transactions 업데이트 처리 오류:', e)
       }
     }
 

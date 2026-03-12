@@ -169,7 +169,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   // 🏢 회사 ID (분석 API용)
   const companyIdRef = useRef<string | null>(null);
-  const setCompanyId = useCallback((id: string) => { companyIdRef.current = id; }, []);
+  const setCompanyId = useCallback((id: string) => {
+    // 회사 변경 시 DB fingerprint 리로드
+    if (id && id !== companyIdRef.current) {
+      dbFpLoadedRef.current = false;
+      dbFpRef.current = new Map();
+    }
+    companyIdRef.current = id;
+  }, []);
 
   // 🔐 인증 헤더
   const getAuthHeaders = useCallback(async () => {
@@ -188,23 +195,69 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     return newId;
   }, []);
 
-  // 🔁 중복 감지용 fingerprint 생성 (날짜+거래처+금액+승인번호+비고)
-  const txFingerprint = useCallback((tx: { transaction_date?: string; client_name?: string; amount?: number; approval_number?: string; description?: string; card_number?: string }) => {
+  // 🔁 중복 감지용 fingerprint 생성 (날짜+거래처+금액+타입+승인번호+비고+카드)
+  const txFingerprint = useCallback((tx: { transaction_date?: string; client_name?: string; amount?: number; type?: string; approval_number?: string; description?: string; card_number?: string }) => {
     const d = (tx.transaction_date || '').replace(/\D/g, '').slice(0, 8);
     const c = (tx.client_name || '').trim().toLowerCase();
     const a = String(Math.abs(Number(tx.amount) || 0));
+    const t = (tx.type || '').trim().toLowerCase();
     const ap = (tx.approval_number || '').trim();
     const desc = (tx.description || '').trim().toLowerCase().slice(0, 30);
     const card = (tx.card_number || '').replace(/\D/g, '').slice(-4);
-    return `${d}|${c}|${a}|${ap}|${desc}|${card}`;
+    return `${d}|${c}|${a}|${t}|${ap}|${desc}|${card}`;
   }, []);
 
-  // 기존 결과의 fingerprint 셋 (중복 비교용)
-  const existingFpRef = useRef<Set<string>>(new Set());
-  // results 변경 시 fingerprint 셋 동기화
+  // 기존 결과의 fingerprint 개수 맵 (중복 비교용 — 같은 fingerprint 여러 건 허용)
+  const existingFpRef = useRef<Map<string, number>>(new Map());
+  // DB 확정완료 거래의 fingerprint 맵 (업로드 시 DB 중복 체크용)
+  const dbFpRef = useRef<Map<string, number>>(new Map());
+  const dbFpLoadedRef = useRef(false);
+
+  // results 변경 시 fingerprint 맵 동기화 (DB fingerprint도 병합)
   useEffect(() => {
-    existingFpRef.current = new Set(results.map(r => txFingerprint(r)));
+    const fpMap = new Map<string, number>();
+    // 현재 세션 결과
+    for (const r of results) {
+      const fp = txFingerprint(r);
+      fpMap.set(fp, (fpMap.get(fp) || 0) + 1);
+    }
+    // DB 확정 거래 fingerprint 병합
+    for (const [fp, count] of dbFpRef.current) {
+      fpMap.set(fp, (fpMap.get(fp) || 0) + count);
+    }
+    existingFpRef.current = fpMap;
   }, [results, txFingerprint]);
+
+  // DB 확정완료 거래 fingerprint 로드 (회사 선택 시 1회)
+  const loadDbFingerprints = useCallback(async (companyId: string) => {
+    if (!companyId || dbFpLoadedRef.current) return;
+    try {
+      const { data } = await supabase
+        .from('transactions')
+        .select('transaction_date, client_name, amount, type, approval_number, description, card_number')
+        .eq('company_id', companyId)
+        .order('transaction_date', { ascending: false })
+        .limit(5000);
+      if (data && data.length > 0) {
+        const fpMap = new Map<string, number>();
+        for (const row of data) {
+          const fp = txFingerprint(row);
+          fpMap.set(fp, (fpMap.get(fp) || 0) + 1);
+        }
+        dbFpRef.current = fpMap;
+        dbFpLoadedRef.current = true;
+        // existingFpRef도 갱신
+        const merged = new Map<string, number>(existingFpRef.current);
+        for (const [fp, count] of fpMap) {
+          merged.set(fp, (merged.get(fp) || 0) + count);
+        }
+        existingFpRef.current = merged;
+        console.log(`[UploadContext] DB 확정 거래 ${data.length}건 fingerprint 로드 완료`);
+      }
+    } catch (e) {
+      console.error('[UploadContext] DB fingerprint 로드 실패:', e);
+    }
+  }, [txFingerprint]);
 
   // 중복 건수 알림용
   const [duplicateSkipCount, setDuplicateSkipCount] = useState(0);
@@ -269,6 +322,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   // ═══════════════════════════════════════════════════════════════
   const processSingleFile = async (file: File, index: number, total: number) => {
     await new Promise(res => setTimeout(res, 10)); // UI 렌더링 틱
+
+    // DB 확정 거래 fingerprint 로드 (최초 1회)
+    if (companyIdRef.current && !dbFpLoadedRef.current) {
+      await loadDbFingerprints(companyIdRef.current);
+    }
 
     // 1. 엑셀/CSV 처리
     if (file.name.match(/\.(xlsx|xls|csv)$/i) || file.type.includes('spreadsheet') || file.type.includes('csv')) {
@@ -453,12 +511,22 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         // ── 승인/취소 쌍 매칭 ──
         matchCancelPairs(newTransactions);
 
-        // ── 중복 제거 ──
-        const prevFps = existingFpRef.current;
+        // ── 중복 제거 (개수 기반: 같은 fingerprint 여러 건 허용) ──
+        const prevFpCounts = new Map<string, number>(existingFpRef.current);
+        const usedFpCounts = new Map<string, number>();
         const unique = newTransactions.filter(tx => {
           const fp = txFingerprint(tx);
-          if (prevFps.has(fp)) return false;
-          prevFps.add(fp);
+          const existCount = prevFpCounts.get(fp) || 0;
+          const usedCount = usedFpCounts.get(fp) || 0;
+          if (usedCount < existCount) {
+            // 이미 존재하는 개수 내 → 중복
+            usedFpCounts.set(fp, usedCount + 1);
+            return false;
+          }
+          // 기존 개수 초과 → 새 거래 (통과)
+          usedFpCounts.set(fp, usedCount + 1);
+          prevFpCounts.set(fp, existCount + 1);
+          existingFpRef.current.set(fp, existCount + 1);
           return true;
         });
         const skipped = newTransactions.length - unique.length;
@@ -495,8 +563,17 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const result = await res.json();
         if (Array.isArray(result)) {
           const newItems = result.map((item: any) => transformItem(item));
-          const prevFps = existingFpRef.current;
-          const unique = newItems.filter(tx => { const fp = txFingerprint(tx); if (prevFps.has(fp)) return false; prevFps.add(fp); return true; });
+          const fpCounts = existingFpRef.current;
+          const usedCounts = new Map<string, number>();
+          const unique = newItems.filter(tx => {
+            const fp = txFingerprint(tx);
+            const exist = fpCounts.get(fp) || 0;
+            const used = usedCounts.get(fp) || 0;
+            if (used < exist) { usedCounts.set(fp, used + 1); return false; }
+            usedCounts.set(fp, used + 1);
+            fpCounts.set(fp, exist + 1);
+            return true;
+          });
           if (newItems.length > unique.length) setDuplicateSkipCount(prev => prev + (newItems.length - unique.length));
           setResults(prev => [...prev, ...unique]);
         }
@@ -520,8 +597,17 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const result = await res.json();
         if (Array.isArray(result)) {
           const newItems = result.map((item: any) => transformItem(item));
-          const prevFps = existingFpRef.current;
-          const unique = newItems.filter(tx => { const fp = txFingerprint(tx); if (prevFps.has(fp)) return false; prevFps.add(fp); return true; });
+          const fpCounts = existingFpRef.current;
+          const usedCounts = new Map<string, number>();
+          const unique = newItems.filter(tx => {
+            const fp = txFingerprint(tx);
+            const exist = fpCounts.get(fp) || 0;
+            const used = usedCounts.get(fp) || 0;
+            if (used < exist) { usedCounts.set(fp, used + 1); return false; }
+            usedCounts.set(fp, used + 1);
+            fpCounts.set(fp, exist + 1);
+            return true;
+          });
           if (newItems.length > unique.length) setDuplicateSkipCount(prev => prev + (newItems.length - unique.length));
           setResults(prev => [...prev, ...unique]);
         }
@@ -763,12 +849,26 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (rawType === 'income' || rawType === '입금' || rawType === '수입') txType = 'income';
     else txType = 'expense';
 
+    // transaction_date에 시간이 포함된 경우 분리 (DB는 date 타입)
+    let txDate = item.transaction_date || '';
+    let txTime = '';
+    if (txDate.length > 10) {
+      // "2026-01-15 10:53:30" → date="2026-01-15", time="10:53:30"
+      txTime = txDate.substring(11).trim();
+      txDate = txDate.substring(0, 10);
+    }
+    // 시간 정보를 description에 추가 (중복 구분용)
+    let finalDescription = item.description || '';
+    if (txTime && !finalDescription.includes(txTime)) {
+      finalDescription = finalDescription ? `${txTime} / ${finalDescription}` : txTime;
+    }
+
     return {
       id: generateUniqueId(),
-      transaction_date: item.transaction_date || '',
+      transaction_date: txDate,
       type: txType,
       client_name: item.client_name || '',
-      description: item.description || '',
+      description: finalDescription,
       amount,
       payment_method: paymentMethodKr,
       category: '미분류',
