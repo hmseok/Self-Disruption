@@ -80,9 +80,13 @@ function parseKoreanDatetime(str: string): { date: string; time: string | null }
   return { date: new Date().toISOString().split('T')[0], time: null }
 }
 
-// ── 금액 파싱: "300,000" → 300000, "1,000,000(자기부담율:20%)" → 1000000
+// ── 금액 파싱
+// 단순: "300,000" → 300000
+// 복합: "300,000/1,000,000(자기부담율:20%)" → 첫 번째 금액 300000
 function parseAmount(str: string): number {
-  const cleaned = str.replace(/[^0-9]/g, '')
+  // 슬래시가 있으면 첫 번째 금액만 사용 (기본 면책금)
+  const firstPart = str.split('/')[0].trim()
+  const cleaned = firstPart.replace(/[^0-9]/g, '')
   return parseInt(cleaned, 10) || 0
 }
 
@@ -383,6 +387,7 @@ async function insertAccidentRecord(
     driver.license ? `면허종류: ${driver.license}` : '',
     driver.relation ? `운전자 관계: ${driver.relation}` : '',
     fields['접수자'] ? `접수자: ${fields['접수자']}` : '',
+    fields['면책금'] && fields['면책금'].includes('/') ? `면책금 원본: ${fields['면책금']}` : '',
     header.extras.length > 0 ? `추가정보: ${header.extras.join(', ')}` : '',
   ].filter(Boolean).join('\n')
 
