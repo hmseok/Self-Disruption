@@ -10,7 +10,7 @@
       {
         "source": "**",
         "run": {
-          "serviceId": "secondlife-erp",
+          "serviceId": "self-disruption",
           "region": "asia-northeast3"
         }
       }
