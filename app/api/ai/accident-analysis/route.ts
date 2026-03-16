@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// 런타임에만 초기화 (빌드 시 API 키 없어도 통과)
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 // ============================================
 // AI 사고 분석 API
@@ -102,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `다음 사고 접수 건을 분석해주세요:\n\n${contextParts.join('\n')}`
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
