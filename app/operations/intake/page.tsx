@@ -47,6 +47,7 @@ const SOURCE_MAP: Record<string, { label: string; bg: string }> = {
   jandi_accident: { label: '잔디사고', bg: 'bg-red-500' },
   jandi_replacement: { label: '잔디대차', bg: 'bg-orange-500' },
   manual: { label: '수동', bg: 'bg-gray-400' },
+  cafe24: { label: '구전산', bg: 'bg-purple-500' },
 }
 const STAGE_MAP: Record<string, { label: string; color: string }> = {
   accident_reported: { label: '사고접수', color: '#ef4444' },
@@ -99,6 +100,8 @@ export default function IntakePage() {
   const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
   const [records, setRecords] = useState<AccidentRecord[]>([])
+  const [cafe24Records, setCafe24Records] = useState<AccidentRecord[]>([])
+  const [cafe24Loading, setCafe24Loading] = useState(false)
   const [cars, setCars] = useState<Car[]>([])
   const [operations, setOperations] = useState<VehicleOperation[]>([])
   const [customerNotes, setCustomerNotes] = useState<CustomerNote[]>([])
@@ -149,7 +152,88 @@ export default function IntakePage() {
     finally { setLoading(false) }
   }, [companyId])
 
+  // ── cafe24 사고접수 fetch ──
+  const fetchCafe24 = useCallback(async () => {
+    setCafe24Loading(true)
+    try {
+      const params = new URLSearchParams({ limit: '200' })
+      if (dateFrom) params.set('from', dateFrom)
+      if (dateTo) params.set('to', dateTo)
+      if (search) params.set('search', search)
+      const res = await fetch(`/api/cafe24/accidents?${params}`)
+      if (!res.ok) { setCafe24Records([]); return }
+      const json = await res.json()
+      if (!json.success) { setCafe24Records([]); return }
+      // cafe24 row를 AccidentRecord 호환으로 매핑
+      const mapped: AccidentRecord[] = (json.data || []).map((r: any, idx: number) => {
+        // 날짜 포맷 변환 (YYYYMMDD → YYYY-MM-DD)
+        const fmtDate = (d: string | null) => {
+          if (!d || d.length < 8) return ''
+          return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+        }
+        const accDate = fmtDate(r.accidentDate)
+        const accTime = r.accidentTime ? `${r.accidentTime.slice(0, 2)}:${r.accidentTime.slice(2, 4)}` : ''
+
+        // 상태 매핑
+        const statusMap: Record<string, string> = {
+          '10': 'accident_reported', '20': 'dispatch_preparing', '30': 'dispatched',
+          '40': 'in_repair', '50': 'repair_done', '60': 'returning',
+          '70': 'car_returned', '80': 'billing', '90': 'closed',
+        }
+
+        return {
+          id: -(idx + 1), // negative ID to avoid collision with supabase
+          company_id: '', car_id: null, contract_id: null, customer_id: null,
+          accident_date: accDate, accident_time: accTime,
+          accident_location: r.accidentLocation || '', accident_type: 'collision',
+          fault_ratio: parseInt(r.faultRate) || 0,
+          description: r.accidentMemo || '',
+          status: r.status || '',
+          driver_name: r.counterpartName || '', driver_phone: r.counterpartPhone || '',
+          driver_relation: '', counterpart_name: r.counterpartName || '',
+          counterpart_phone: r.counterpartPhone || '',
+          counterpart_vehicle: r.counterpartVehicle || '',
+          counterpart_insurance: r.counterpartInsurance || '',
+          insurance_company: r.counterpartInsurance || '',
+          insurance_claim_no: r.accidentNo || '',
+          insurance_filed_at: null, insurance_status: null,
+          police_reported: false, police_report_no: null,
+          repair_shop_name: r.repairShopName || '',
+          repair_start_date: null, repair_end_date: null,
+          estimated_repair_cost: 0, actual_repair_cost: 0,
+          insurance_payout: 0, customer_deductible: 0, company_cost: 0,
+          replacement_car_id: null, replacement_start: r.rentalFromDate ? fmtDate(r.rentalFromDate) : null,
+          replacement_end: r.rentalToDate ? fmtDate(r.rentalToDate) : null,
+          replacement_cost: null,
+          vehicle_condition: null,
+          notes: `*접수번호: ${r.accidentNo || '-'}\n*배송처: ${r.repairShopName || '-'}\n*차량번호: ${r.rentalCarNo || '-'}\n*차종: ${r.rentalCarModel || '-'}`,
+          handler_id: null,
+          created_at: accDate ? `${accDate}T${accTime || '00:00'}:00` : '',
+          updated_at: '',
+          source: 'cafe24',
+          jandi_raw: null,
+          jandi_topic: null,
+          workflow_stage: statusMap[r.status] || 'accident_reported',
+          car: null, replacement_car: null,
+        }
+      })
+      setCafe24Records(mapped)
+    } catch (e) {
+      console.error('cafe24 fetch error:', e)
+      setCafe24Records([])
+    } finally {
+      setCafe24Loading(false)
+    }
+  }, [dateFrom, dateTo, search])
+
   useEffect(() => { fetchData() }, [fetchData])
+
+  // cafe24 소스가 선택되면 자동 fetch
+  useEffect(() => {
+    if (sourceFilter === 'cafe24' && cafe24Records.length === 0 && !cafe24Loading) {
+      fetchCafe24()
+    }
+  }, [sourceFilter, fetchCafe24, cafe24Records.length, cafe24Loading])
 
   // ── Realtime ──
   useEffect(() => {
@@ -173,8 +257,8 @@ export default function IntakePage() {
   const selected = useMemo(() => records.find(r => r.id === selectedId) || null, [records, selectedId])
 
   const filtered = useMemo(() => {
-    let list = records
-    if (sourceFilter !== 'all') list = list.filter(r => r.source === sourceFilter)
+    let list = sourceFilter === 'cafe24' ? cafe24Records : records
+    if (sourceFilter !== 'all' && sourceFilter !== 'cafe24') list = list.filter(r => r.source === sourceFilter)
     if (stageFilter !== 'all') {
       if (stageFilter === 'new') list = list.filter(r => ['accident_reported', 'replacement_requested'].includes(r.workflow_stage || 'accident_reported'))
       else if (stageFilter === 'progress') list = list.filter(r => ['customer_contacted', 'dispatch_preparing', 'dispatched', 'in_transit_delivery', 'in_repair', 'repair_done', 'returning', 'car_returned', 'maintenance', 'standby'].includes(r.workflow_stage || ''))
@@ -284,7 +368,7 @@ export default function IntakePage() {
           <PipeBtn label={`종결 ${stageCounts['closed'] || 0}`} active={stageFilter === 'closed'} color="#64748b" onClick={() => setStageFilter('closed')} />
           <div style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#22c55e', fontWeight: 600 }}>배차가능 {availableCarCount}대</span>
-            <button onClick={fetchData} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
+            <button onClick={() => { fetchData(); if (sourceFilter === 'cafe24') fetchCafe24() }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
           </div>
         </div>
       </div>
@@ -296,6 +380,7 @@ export default function IntakePage() {
           <option value="jandi_accident">잔디 사고</option>
           <option value="jandi_replacement">잔디 대차</option>
           <option value="manual">수동등록</option>
+          <option value="cafe24">구전산(카페24)</option>
         </select>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...selectStyle, width: 130 }} />
         <span style={{ color: '#9ca3af', fontSize: 12 }}>~</span>
@@ -328,8 +413,8 @@ export default function IntakePage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>불러오는 중...</td></tr>
+              {(loading || (sourceFilter === 'cafe24' && cafe24Loading)) ? (
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>{sourceFilter === 'cafe24' ? '구전산 데이터 불러오는 중...' : '불러오는 중...'}</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>검색 결과 없음</td></tr>
               ) : filtered.map(r => {
@@ -343,8 +428,8 @@ export default function IntakePage() {
                     style={{ cursor: 'pointer', background: isSel ? '#eef2ff' : '#fff', borderBottom: '1px solid #f3f4f6', transition: 'background .1s' }}
                     onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#fafafa' }}
                     onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = '#fff' }}>
-                    <Td style={{ fontWeight: 500, color: '#6b7280' }}>{r.id}</Td>
-                    <Td><span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, color: '#fff', background: src?.bg.replace('bg-', '') === 'red-500' ? '#ef4444' : src?.bg === 'bg-orange-500' ? '#f97316' : '#9ca3af', whiteSpace: 'nowrap' }}>{src?.label}</span></Td>
+                    <Td style={{ fontWeight: 500, color: '#6b7280' }}>{r.source === 'cafe24' ? (r.insurance_claim_no || `C${-r.id}`) : r.id}</Td>
+                    <Td><span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, color: '#fff', background: src?.bg === 'bg-red-500' ? '#ef4444' : src?.bg === 'bg-orange-500' ? '#f97316' : src?.bg === 'bg-purple-500' ? '#8b5cf6' : '#9ca3af', whiteSpace: 'nowrap' }}>{src?.label}</span></Td>
                     <Td style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(r.accident_date)}</Td>
                     <Td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{jd.carNumber || '-'}</Td>
                     <Td style={{ color: '#6b7280', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{jd.carModel || '-'}</Td>
