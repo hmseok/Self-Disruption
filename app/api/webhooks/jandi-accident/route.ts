@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { assignHandler, executeAssignment, parseRegion, extractClientName, extractFaultType } from '../../lib/assignment-engine'
 
 // ============================================
 // 잔디(Jandi) Outgoing Webhook → 사고 접수
@@ -391,6 +392,13 @@ async function insertAccidentRecord(
     header.extras.length > 0 ? `추가정보: ${header.extras.join(', ')}` : '',
   ].filter(Boolean).join('\n')
 
+  // ── 지역/거래처/과실유형 파싱 (배정 + 검색용)
+  const region = parseRegion(fields['사고장소'] || '')
+  const clientNameParsed = header.clientName || ''
+  const faultTypeLabel = header.faultType || ''
+  const insuranceTypeLabel = header.insuranceType || ''
+  const settlementTypeLabel = header.settlementType || ''
+
   // ── INSERT
   const insertData: Record<string, any> = {
     company_id: companyId,
@@ -421,6 +429,13 @@ async function insertAccidentRecord(
     source: 'jandi_accident',
     jandi_raw: rawText,
     jandi_topic: roomName,
+    // ── 배정 시스템용 파싱 컬럼
+    client_name: clientNameParsed || null,
+    fault_type: faultTypeLabel || null,
+    insurance_type: insuranceTypeLabel || null,
+    settlement_type: settlementTypeLabel || null,
+    region_sido: region.sido || null,
+    region_sigungu: region.sigungu || null,
   }
 
   // 수리 필요 시 상태 바로 변경
@@ -437,6 +452,44 @@ async function insertAccidentRecord(
   if (insertErr) {
     console.error('사고 등록 실패:', JSON.stringify(insertErr))
     return jandiResponse(`❌ 사고 등록 실패: ${insertErr.message}`, '#FF0000')
+  }
+
+  // ── 자동 배정 시도 ─────────────────────────
+  let assignmentLabel = ''
+  try {
+    const assignResult = await assignHandler(supabase, {
+      id: accident.id,
+      company_id: companyId,
+      accident_location: fields['사고장소'] || '',
+      repair_shop_name: repair.repairLocation || '',
+      notes: noteParts,
+      fault_ratio: faultRatio,
+      jandi_raw: rawText,
+      vehicle_condition: vehicleCondition,
+      insurance_company: ownInsurance.company || '',
+    })
+
+    if (assignResult.handler_id) {
+      await executeAssignment(supabase, accident.id, assignResult.handler_id, {
+        match_type: assignResult.match_type,
+        matched_rule: assignResult.matched_rule,
+        is_auto: true,
+      })
+
+      // assigned_at 업데이트
+      await supabase.from('accident_records').update({
+        assigned_at: new Date().toISOString(),
+        assignment_type: 'auto',
+        assignment_rule: assignResult.matched_rule,
+      }).eq('id', accident.id)
+
+      assignmentLabel = `\n👷 담당자: ${assignResult.handler_name || '배정됨'} (${assignResult.matched_rule || '자동'})`
+
+      // TODO: 여기에 푸시 알림 발송 추가
+    }
+  } catch (assignErr) {
+    console.error('자동 배정 실패 (사고 접수는 정상):', assignErr)
+    // 배정 실패해도 사고 접수는 성공 처리
   }
 
   // ── 차량 상태 변경 (차량이 있는 경우)
@@ -470,6 +523,7 @@ async function insertAccidentRecord(
     (ownInsurance.company ? `🏢 보험사: ${ownInsurance.company} (${ownInsurance.claimNo || '-'})\n` : '') +
     `🔧 ${drivableLabel} / ${repairLabel}\n` +
     (deductible > 0 ? `💰 면책금: ${deductible.toLocaleString()}원\n` : '') +
+    assignmentLabel +
     `\n📋 상태: 접수완료 → ERP 사고관리에서 확인하세요.`,
     '#2ECC71'
   )
