@@ -14,8 +14,18 @@ export function getCafe24Pool(): mysql.Pool {
       connectionLimit: 5,
       queueLimit: 0,
       connectTimeout: 10000,
-      // 카페24 DB는 EUC-KR일 수 있음
       charset: 'utf8mb4',
+      // Buffer → String 자동 변환 (MariaDB 호환)
+      typeCast: function (field: any, next: any) {
+        if (field.type === 'VAR_STRING' || field.type === 'STRING' || field.type === 'VARCHAR' ||
+            field.type === 'BLOB' || field.type === 'TINY_BLOB' || field.type === 'MEDIUM_BLOB' ||
+            field.type === 'LONG_BLOB') {
+          const val = field.buffer();
+          if (val === null) return null;
+          return val.toString('utf8');
+        }
+        return next();
+      },
     });
   }
   return pool;
