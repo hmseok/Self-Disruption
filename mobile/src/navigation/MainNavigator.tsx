@@ -27,6 +27,10 @@ import MaintenanceRequestScreen from '../screens/detail/MaintenanceRequestScreen
 import AccidentReportScreen from '../screens/detail/AccidentReportScreen'
 import ExpenseReceiptScreen from '../screens/detail/ExpenseReceiptScreen'
 
+// 사고팀 화면
+import AccidentDashboardScreen from '../screens/tabs/AccidentDashboardScreen'
+import AccidentCaseDetailScreen from '../screens/detail/AccidentCaseDetailScreen'
+
 const Tab = createBottomTabNavigator<MainTabParamList>()
 const Stack = createNativeStackNavigator<DetailStackParamList>()
 
@@ -136,6 +140,10 @@ export default function MainNavigator() {
       <Stack.Screen name="MaintenanceRequest" component={MaintenanceRequestScreen} options={{ title: '정비 요청' }} />
       <Stack.Screen name="AccidentReport" component={AccidentReportScreen} options={{ title: '사고 접수' }} />
       <Stack.Screen name="ExpenseReceipt" component={ExpenseReceiptScreen} options={{ title: '영수증 제출' }} />
+
+      {/* 사고팀 화면 */}
+      <Stack.Screen name="AccidentDashboard" component={AccidentDashboardScreen} options={{ title: '사고 관리', headerShown: false }} />
+      <Stack.Screen name="AccidentCaseDetail" component={AccidentCaseDetailScreen} options={{ title: '사고건 상세' }} />
     </Stack.Navigator>
   )
 }
