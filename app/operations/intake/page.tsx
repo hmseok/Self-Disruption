@@ -44,10 +44,8 @@ type CustomerNote = { id: number; customer_id: number; author_name: string; note
 // Constants & Mappings
 // ============================================
 const SOURCE_MAP: Record<string, { label: string; bg: string }> = {
-  jandi_accident: { label: '잔디사고', bg: 'bg-red-500' },
-  jandi_replacement: { label: '잔디대차', bg: 'bg-orange-500' },
-  manual: { label: '수동', bg: 'bg-gray-400' },
   cafe24: { label: '구전산', bg: 'bg-purple-500' },
+  manual: { label: '수동', bg: 'bg-gray-400' },
 }
 const STAGE_MAP: Record<string, { label: string; color: string }> = {
   accident_reported: { label: '사고접수', color: '#ef4444' },
@@ -99,7 +97,6 @@ export default function IntakePage() {
   const { user, company, role, adminSelectedCompanyId } = useApp()
   const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
-  const [records, setRecords] = useState<AccidentRecord[]>([])
   const [cafe24Records, setCafe24Records] = useState<AccidentRecord[]>([])
   const [cafe24Loading, setCafe24Loading] = useState(false)
   const [cars, setCars] = useState<Car[]>([])
@@ -111,7 +108,6 @@ export default function IntakePage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('all')
-  const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [sortKey, setSortKey] = useState<'date' | 'id'>('date')
@@ -125,19 +121,15 @@ export default function IntakePage() {
   const [smsTarget, setSmsTarget] = useState<{ name: string; phone: string } | null>(null)
   const [smsMessage, setSmsMessage] = useState('')
   const [smsSending, setSmsSending] = useState(false)
-  const [showRaw, setShowRaw] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
-  // ── Fetch ──
-  const fetchData = useCallback(async () => {
+  // ── Fetch supporting data (cars, operations) ──
+  const fetchSupportData = useCallback(async () => {
     if (!companyId) return
     setLoading(true)
     try {
-      const [accR, carsR, opsR] = await Promise.all([
-        supabase.from('accident_records')
-          .select('*, car:cars!accident_records_car_id_fkey(id,number,brand,model,status), replacement_car:cars!accident_records_replacement_car_id_fkey(id,number,brand,model)')
-          .eq('company_id', companyId).order('created_at', { ascending: false }).limit(500),
+      const [carsR, opsR] = await Promise.all([
         supabase.from('cars')
           .select('id,number,brand,model,status,ownership_type,detailed_status')
           .eq('company_id', companyId).order('number'),
@@ -145,21 +137,17 @@ export default function IntakePage() {
           .select('*,car:cars!vehicle_operations_car_id_fkey(number,brand,model)')
           .eq('company_id', companyId).in('status', ['scheduled', 'preparing', 'inspecting', 'in_transit']).limit(100),
       ])
-      if (accR.data) setRecords(accR.data)
       if (carsR.data) setCars(carsR.data)
       if (opsR.data) setOperations(opsR.data as any)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [companyId])
 
-  // ── cafe24 사고접수 fetch ──
+  // ── cafe24 사고접수 fetch (primary data source) ──
   const fetchCafe24 = useCallback(async () => {
     setCafe24Loading(true)
     try {
       const params = new URLSearchParams({ limit: '200' })
-      if (dateFrom) params.set('from', dateFrom)
-      if (dateTo) params.set('to', dateTo)
-      if (search) params.set('search', search)
       const res = await fetch(`/api/cafe24/accidents?${params}`)
       if (!res.ok) { setCafe24Records([]); return }
       const json = await res.json()
@@ -224,41 +212,29 @@ export default function IntakePage() {
     } finally {
       setCafe24Loading(false)
     }
-  }, [dateFrom, dateTo, search])
+  }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
-
-  // cafe24 소스가 선택되면 자동 fetch
+  // Load cafe24 and support data on mount
   useEffect(() => {
-    if (sourceFilter === 'cafe24' && cafe24Records.length === 0 && !cafe24Loading) {
-      fetchCafe24()
-    }
-  }, [sourceFilter, fetchCafe24, cafe24Records.length, cafe24Loading])
+    fetchSupportData()
+    fetchCafe24()
+  }, [fetchSupportData, fetchCafe24])
 
-  // ── Realtime ──
-  useEffect(() => {
-    if (!companyId) return
-    const ch = supabase.channel('intake-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'accident_records', filter: `company_id=eq.${companyId}` }, () => fetchData())
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [companyId, fetchData])
 
   // ── Notes fetch ──
   useEffect(() => {
     if (!selectedId || !companyId) { setCustomerNotes([]); return }
-    const rec = records.find(r => r.id === selectedId)
+    const rec = cafe24Records.find(r => r.id === selectedId)
     if (!rec?.customer_id) { setCustomerNotes([]); return }
     supabase.from('customer_notes').select('*').eq('customer_id', rec.customer_id).eq('company_id', companyId)
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => { if (data) setCustomerNotes(data) })
-  }, [selectedId, companyId, records])
+  }, [selectedId, companyId, cafe24Records])
 
   // ── Computed ──
-  const selected = useMemo(() => records.find(r => r.id === selectedId) || null, [records, selectedId])
+  const selected = useMemo(() => cafe24Records.find(r => r.id === selectedId) || null, [cafe24Records, selectedId])
 
   const filtered = useMemo(() => {
-    let list = sourceFilter === 'cafe24' ? cafe24Records : records
-    if (sourceFilter !== 'all' && sourceFilter !== 'cafe24') list = list.filter(r => r.source === sourceFilter)
+    let list = cafe24Records
     if (stageFilter !== 'all') {
       if (stageFilter === 'new') list = list.filter(r => ['accident_reported', 'replacement_requested'].includes(r.workflow_stage || 'accident_reported'))
       else if (stageFilter === 'progress') list = list.filter(r => ['customer_contacted', 'dispatch_preparing', 'dispatched', 'in_transit_delivery', 'in_repair', 'repair_done', 'returning', 'car_returned', 'maintenance', 'standby'].includes(r.workflow_stage || ''))
@@ -285,21 +261,21 @@ export default function IntakePage() {
       return sortDir === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb)
     })
     return list
-  }, [records, sourceFilter, stageFilter, dateFrom, dateTo, search, sortKey, sortDir])
+  }, [cafe24Records, stageFilter, dateFrom, dateTo, search, sortKey, sortDir])
 
   // Stats by stage
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {}
-    records.forEach(r => { const s = r.workflow_stage || 'accident_reported'; m[s] = (m[s] || 0) + 1 })
+    cafe24Records.forEach(r => { const s = r.workflow_stage || 'accident_reported'; m[s] = (m[s] || 0) + 1 })
     return m
-  }, [records])
+  }, [cafe24Records])
 
   const availableCarCount = useMemo(() => cars.filter(c => c.status === 'available' || c.detailed_status === 'available').length, [cars])
 
   // ── Actions ──
   const handleStageChange = async (id: number, stage: string) => {
     await supabase.from('accident_records').update({ workflow_stage: stage, updated_at: new Date().toISOString() }).eq('id', id)
-    setRecords(prev => prev.map(r => r.id === id ? { ...r, workflow_stage: stage } : r))
+    // Note: cafe24 records have negative IDs and cannot be updated in supabase
   }
   const openSms = (name: string, phone: string) => { setSmsTarget({ name, phone }); setSmsMessage(''); setShowSmsModal(true) }
   const sendSms = async () => {
@@ -357,7 +333,7 @@ export default function IntakePage() {
       {/* ── Stage Pipeline ── */}
       <div style={{ borderBottom: '1px solid #e5e7eb', background: '#fff', padding: '12px 20px', overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 'max-content' }}>
-          <PipeBtn label={`전체 ${records.length}`} active={stageFilter === 'all'} color="#374151" onClick={() => setStageFilter('all')} />
+          <PipeBtn label={`전체 ${cafe24Records.length}`} active={stageFilter === 'all'} color="#374151" onClick={() => setStageFilter('all')} />
           <PipeBtn label={`신규접수 ${(stageCounts['accident_reported'] || 0) + (stageCounts['replacement_requested'] || 0)}`} active={stageFilter === 'new'} color="#ef4444" onClick={() => setStageFilter('new')} />
           {(['customer_contacted', 'dispatch_preparing', 'dispatched', 'in_transit_delivery'] as const).map(s => {
             const st = STAGE_MAP[s]; const c = stageCounts[s] || 0
@@ -368,26 +344,19 @@ export default function IntakePage() {
           <PipeBtn label={`종결 ${stageCounts['closed'] || 0}`} active={stageFilter === 'closed'} color="#64748b" onClick={() => setStageFilter('closed')} />
           <div style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#22c55e', fontWeight: 600 }}>배차가능 {availableCarCount}대</span>
-            <button onClick={() => { fetchData(); if (sourceFilter === 'cafe24') fetchCafe24() }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
+            <button onClick={() => { fetchSupportData(); fetchCafe24() }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
           </div>
         </div>
       </div>
 
       {/* ── Filters ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '8px 20px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={selectStyle}>
-          <option value="all">전체 소스</option>
-          <option value="jandi_accident">잔디 사고</option>
-          <option value="jandi_replacement">잔디 대차</option>
-          <option value="manual">수동등록</option>
-          <option value="cafe24">구전산(카페24)</option>
-        </select>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...selectStyle, width: 130 }} />
         <span style={{ color: '#9ca3af', fontSize: 12 }}>~</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...selectStyle, width: 130 }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="차량번호, 고객명, 접수번호, 보험사..." style={{ ...selectStyle, flex: 1, minWidth: 200 }} />
-        {(sourceFilter !== 'all' || dateFrom || dateTo || search) && (
-          <button onClick={() => { setSourceFilter('all'); setDateFrom(''); setDateTo(''); setSearch('') }} style={{ fontSize: 11, color: '#6b7280', cursor: 'pointer', background: 'none', border: 'none', textDecoration: 'underline' }}>초기화</button>
+        {(dateFrom || dateTo || search) && (
+          <button onClick={() => { setDateFrom(''); setDateTo(''); setSearch('') }} style={{ fontSize: 11, color: '#6b7280', cursor: 'pointer', background: 'none', border: 'none', textDecoration: 'underline' }}>초기화</button>
         )}
         <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>{filtered.length}건</span>
       </div>
@@ -413,8 +382,8 @@ export default function IntakePage() {
               </tr>
             </thead>
             <tbody>
-              {(loading || (sourceFilter === 'cafe24' && cafe24Loading)) ? (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>{sourceFilter === 'cafe24' ? '구전산 데이터 불러오는 중...' : '불러오는 중...'}</td></tr>
+              {(loading || cafe24Loading) ? (
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>데이터 불러오는 중...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>검색 결과 없음</td></tr>
               ) : filtered.map(r => {
@@ -486,11 +455,7 @@ export default function IntakePage() {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {selected.driver_phone && <QBtn label={`운전자 ${selected.driver_name}`} onClick={() => openSms(selected.driver_name, selected.driver_phone)} />}
                   {selected.driver_phone && <QBtn label="전화" onClick={() => window.open(`tel:${selected.driver_phone}`)} color="#059669" />}
-                  {selected.jandi_raw && <QBtn label={showRaw ? '원문닫기' : '잔디원문'} onClick={() => setShowRaw(!showRaw)} color="#6b7280" />}
                 </div>
-                {showRaw && selected.jandi_raw && (
-                  <pre style={{ marginTop: 8, padding: 10, background: '#f9fafb', borderRadius: 6, fontSize: 11, lineHeight: 1.5, maxHeight: 200, overflow: 'auto', border: '1px solid #e5e7eb', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{selected.jandi_raw}</pre>
-                )}
                 {selected.replacement_car && (
                   <div style={{ marginTop: 8, padding: '6px 10px', background: '#eef2ff', borderRadius: 6, fontSize: 12, color: '#4f46e5', fontWeight: 500 }}>
                     대차: {selected.replacement_car.number} ({selected.replacement_car.brand} {selected.replacement_car.model})
