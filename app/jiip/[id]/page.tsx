@@ -273,11 +273,13 @@ export default function JiipDetailPage() {
   const loadJiipTransactions = async () => {
     if (!jiipId) return
     // jiip (분류에서 직접 연결) + jiip_share (정산 지급) 모두 조회
+    // ★ deleted_at이 null인 항목만 (되돌리기로 soft-delete된 항목 제외)
     const { data: d1 } = await supabase
       .from('transactions')
       .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
       .eq('related_type', 'jiip')
       .eq('related_id', String(jiipId))
+      .is('deleted_at', null)
       .order('transaction_date', { ascending: true })
 
     const { data: d2 } = await supabase
@@ -285,6 +287,7 @@ export default function JiipDetailPage() {
       .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
       .eq('related_type', 'jiip_share')
       .eq('related_id', String(jiipId))
+      .is('deleted_at', null)
       .order('transaction_date', { ascending: true })
 
     // 합치고 날짜순 정렬
@@ -1021,7 +1024,16 @@ export default function JiipDetailPage() {
             <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="font-bold text-sm text-slate-900">통장 거래 내역</h3>
-                <span className="text-xs text-slate-400">{jiipTxList.length}건</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">{jiipTxList.length}건</span>
+                  <button
+                    onClick={() => loadJiipTransactions()}
+                    className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors"
+                    title="거래 내역 새로고침"
+                  >
+                    🔄 새로고침
+                  </button>
+                </div>
               </div>
 
               {jiipTxList.length > 0 ? (
@@ -1080,10 +1092,80 @@ export default function JiipDetailPage() {
                 </div>
                 <div className="flex justify-between items-center mt-1.5">
                   <span className="text-sm text-blue-700 font-semibold">수익 배분율</span>
-                  <span className="text-sm font-bold text-blue-800">차주 {item.share_ratio}% / 회사 {100 - item.share_ratio}%</span>
+                  <span className="text-sm font-bold text-blue-800">차주 {Number(item.share_ratio).toFixed(1)}% / 회사 {(100 - Number(item.share_ratio)).toFixed(1)}%</span>
                 </div>
               </div>
             )}
+
+            {/* ── 월별 정산 근거 (통장 거래 기반) ── */}
+            {jiipTxList.length > 0 && (() => {
+              // 월별 그룹핑
+              const monthMap = new Map<string, { income: number; expense: number; txs: any[] }>()
+              jiipTxList.forEach((t: any) => {
+                const m = t.transaction_date?.slice(0, 7)
+                if (!m) return
+                if (!monthMap.has(m)) monthMap.set(m, { income: 0, expense: 0, txs: [] })
+                const entry = monthMap.get(m)!
+                const amt = Math.abs(t.amount || 0)
+                if (t.type === 'income') entry.income += amt
+                else entry.expense += amt
+                entry.txs.push(t)
+              })
+              const months = Array.from(monthMap.entries()).sort((a, b) => b[0].localeCompare(a[0]))
+
+              return (
+                <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-slate-900">월별 정산 근거</h3>
+                    <span className="text-[11px] text-slate-400">관리비 {nf(item.admin_fee || 0)}원 / 배분 {item.share_ratio || 0}%</span>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {months.map(([month, data]) => (
+                      <details key={month} className="group">
+                        <summary className="px-6 py-3.5 flex justify-between items-center cursor-pointer hover:bg-slate-50/50 transition-colors list-none">
+                          <span className="text-sm font-semibold text-slate-700">{month}</span>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">수입</p>
+                              <p className="text-sm font-bold text-emerald-600">+{nf(data.income)}원</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">지출</p>
+                              <p className="text-sm font-bold text-red-500">-{nf(data.expense)}원</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">순액</p>
+                              <p className={`text-sm font-bold ${data.income - data.expense >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{nf(data.income - data.expense)}원</p>
+                            </div>
+                            <svg className="w-4 h-4 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </summary>
+                        <div className="px-6 pb-4 bg-slate-50/30">
+                          <div className="space-y-1.5 mt-1">
+                            {data.txs.map((t: any) => {
+                              const isInc = t.type === 'income'
+                              return (
+                                <div key={t.id} className="flex justify-between items-center py-1.5 px-3 rounded bg-white/60 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isInc ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                                    <span className="text-slate-600">{t.transaction_date?.slice(5)}</span>
+                                    <span className="text-slate-700 font-medium">{t.client_name || t.description || (isInc ? '지입비' : '배분금')}</span>
+                                    {t.category && <span className="text-[10px] px-1 py-0.5 rounded bg-slate-100 text-slate-400">{t.category}</span>}
+                                  </div>
+                                  <span className={`font-semibold ${isInc ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {isInc ? '+' : '-'}{nf(Math.abs(t.amount || 0))}원
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </section>
+              )
+            })()}
 
             {/* 월별 결제 스케줄 */}
             <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">

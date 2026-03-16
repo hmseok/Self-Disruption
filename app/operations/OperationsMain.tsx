@@ -157,7 +157,7 @@ export default function OperationsMainPage() {
   const [loading, setLoading] = useState(true)
 
   // UI states
-  const [viewMode, setViewMode] = useState<'timeline' | 'calendar' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'dashboard' | 'timeline' | 'calendar' | 'list'>('dashboard')
   const [listFilter, setListFilter] = useState<'today' | 'week' | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -243,9 +243,11 @@ export default function OperationsMainPage() {
   const getCar = (id: any) => cars.find(c => String(c.id) === String(id))
   const getCustomer = (id: any) => customers.find(c => String(c.id) === String(id))
 
-  const today = new Date().toISOString().split('T')[0]
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0] })()
-  const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + (6 - d.getDay())); return d.toISOString().split('T')[0] })()
+  const toLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  const today = toLocalDate(new Date())
+  const tomorrowDate = (() => { const d = new Date(); d.setDate(d.getDate()+1); return toLocalDate(d) })()
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return toLocalDate(d) })()
+  const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + (6 - d.getDay())); return toLocalDate(d) })()
 
   // ============================================
   // KPI Stats
@@ -262,6 +264,32 @@ export default function OperationsMainPage() {
       insurancePendingBilling: operations.filter(op => isInsurance(op) && op.insurance_billing_status === 'pending').length,
     }
   }, [operations, contracts, today, weekStart, weekEnd])
+
+  // ============================================
+  // Dashboard Data
+  // ============================================
+  const dashboardData = useMemo(() => {
+    const active = operations.filter(op => op.status !== 'cancelled')
+    const todayOps = active.filter(op => op.scheduled_date === today).sort((a,b) => (a.scheduled_time||'').localeCompare(b.scheduled_time||''))
+    const tomorrowOps = active.filter(op => op.scheduled_date === tomorrowDate).sort((a,b) => (a.scheduled_time||'').localeCompare(b.scheduled_time||''))
+    // 이번주 (오늘/내일 제외) 예정
+    const weekOps = active.filter(op => op.scheduled_date > tomorrowDate && op.scheduled_date <= weekEnd && op.status !== 'completed')
+      .sort((a,b) => a.scheduled_date.localeCompare(b.scheduled_date) || (a.scheduled_time||'').localeCompare(b.scheduled_time||''))
+    // 주의 필요: 과거 일정인데 완료 안 된 것들
+    const overdueOps = active.filter(op => op.scheduled_date < today && !['completed', 'cancelled'].includes(op.status))
+      .sort((a,b) => a.scheduled_date.localeCompare(b.scheduled_date))
+    // 진행 중 (예정이 아닌 것들)
+    const inProgressOps = active.filter(op => ['preparing', 'inspecting', 'in_transit'].includes(op.status))
+    // 이번주 완료된 것들 (최근 순)
+    const weekCompleted = active.filter(op => op.scheduled_date >= weekStart && op.scheduled_date <= weekEnd && op.status === 'completed')
+      .sort((a,b) => b.scheduled_date.localeCompare(a.scheduled_date) || (b.scheduled_time||'').localeCompare(a.scheduled_time||''))
+    // 다음주 예정
+    const nextWeekStart = (() => { const d = new Date(); d.setDate(d.getDate() + (7 - d.getDay())); return toLocalDate(d) })()
+    const nextWeekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + (13 - d.getDay())); return toLocalDate(d) })()
+    const nextWeekOps = active.filter(op => op.scheduled_date >= nextWeekStart && op.scheduled_date <= nextWeekEnd && op.status !== 'completed')
+      .sort((a,b) => a.scheduled_date.localeCompare(b.scheduled_date))
+    return { todayOps, tomorrowOps, weekOps, overdueOps, inProgressOps, weekCompleted, nextWeekOps }
+  }, [operations, today, tomorrowDate, weekEnd])
 
   // ============================================
   // Filtered Operations (List View)
@@ -709,6 +737,320 @@ export default function OperationsMainPage() {
     </div>
   )
 
+  // ============================================
+  // Dashboard View
+  // ============================================
+  const renderDashboardCard = (op: Operation, size: 'large' | 'compact' = 'large') => {
+    const car = getCar(op.car_id)
+    const cust = getCustomer(op.customer_id)
+    const cat = op.dispatch_category || 'regular'
+    const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
+    const isDelivery = op.operation_type === 'delivery'
+    const statusInfo = OP_STATUS[op.status]
+
+    // 다음 상태 버튼 정보
+    const nextAction = (() => {
+      if (op.status === 'scheduled') return { label: '준비 시작', next: 'preparing', color: 'bg-blue-500 hover:bg-blue-600', icon: '🔧' }
+      if (op.status === 'preparing') return { label: '점검 시작', next: 'inspecting', color: 'bg-purple-500 hover:bg-purple-600', icon: '🔍' }
+      if (op.status === 'inspecting' && isDelivery) return { label: '출발', next: 'in_transit', color: 'bg-amber-500 hover:bg-amber-600', icon: '🚗' }
+      if (op.status === 'inspecting' && !isDelivery) return { label: '반납 완료', next: 'completed', color: 'bg-green-500 hover:bg-green-600', icon: '✅' }
+      if (op.status === 'in_transit') return { label: '인도 완료', next: 'completed', color: 'bg-green-500 hover:bg-green-600', icon: '✅' }
+      return null
+    })()
+
+    if (size === 'compact') {
+      return (
+        <div key={op.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => openEditModal(op)}>
+          {/* 유형 아이콘 */}
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${isDelivery ? 'bg-blue-100' : 'bg-amber-100'}`}>
+            {isDelivery ? '🚚' : '🔙'}
+          </div>
+          {/* 정보 */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-black text-sm text-gray-900">{car?.number || '-'}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>{catInfo.label}</span>
+            </div>
+            <div className="text-xs text-gray-500 truncate">{car?.brand} {car?.model} · {cust?.name || '고객 미지정'}</div>
+          </div>
+          {/* 시간 */}
+          <div className="text-right flex-shrink-0">
+            <div className="text-xs font-bold text-gray-700">{op.scheduled_time || '-'}</div>
+            <div className="text-[10px] text-gray-400 truncate max-w-[80px]">{op.location || ''}</div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div key={op.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all overflow-hidden">
+        {/* 상단: 유형 + 상태 */}
+        <div className={`px-4 py-2.5 flex items-center justify-between ${isDelivery ? 'bg-blue-50 border-b border-blue-100' : 'bg-amber-50 border-b border-amber-100'}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{isDelivery ? '🚚' : '🔙'}</span>
+            <span className={`font-black text-sm ${isDelivery ? 'text-blue-700' : 'text-amber-700'}`}>
+              {isDelivery ? '출고' : '반납'}
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>{catInfo.label}</span>
+          </div>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${statusInfo?.color}`}>
+            {statusInfo?.icon} {statusInfo?.label}
+          </span>
+        </div>
+
+        {/* 중단: 차량 + 고객 정보 */}
+        <div className="p-4 cursor-pointer" onClick={() => openEditModal(op)}>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="text-lg font-black text-gray-900">{car?.number || '-'}</div>
+              <div className="text-sm text-gray-500">{car?.brand} {car?.model}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-black text-gray-900">{op.scheduled_time || '-'}</div>
+              <div className="text-xs text-gray-400">{op.scheduled_date}</div>
+            </div>
+          </div>
+
+          {/* 세부 정보 - 큰 글씨로 */}
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {cust?.name && (
+              <div className="bg-gray-50 rounded-lg p-2">
+                <div className="text-[10px] text-gray-400 font-bold">고객</div>
+                <div className="font-bold text-gray-800">{cust.name}</div>
+                {cust.phone && <div className="text-xs text-gray-500">{cust.phone}</div>}
+              </div>
+            )}
+            {op.location && (
+              <div className="bg-gray-50 rounded-lg p-2">
+                <div className="text-[10px] text-gray-400 font-bold">장소</div>
+                <div className="font-bold text-gray-800 truncate">{op.location}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 하단: 액션 버튼 - 크고 눈에 띄게 */}
+        {op.status !== 'completed' && nextAction && (
+          <div className="px-4 pb-4">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleStatusChange(op.id, nextAction.next) }}
+              className={`w-full py-3 rounded-xl text-white font-black text-sm ${nextAction.color} transition-all active:scale-[0.98] shadow-sm`}>
+              {nextAction.icon} {nextAction.label}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderDashboard = () => {
+    const { todayOps, tomorrowOps, weekOps, overdueOps, inProgressOps, weekCompleted, nextWeekOps } = dashboardData
+    const todayDeliveries = todayOps.filter(op => op.operation_type === 'delivery' && op.status !== 'completed')
+    const todayReturns = todayOps.filter(op => op.operation_type === 'return' && op.status !== 'completed')
+    const todayCompleted = todayOps.filter(op => op.status === 'completed')
+
+    // 요일 이름
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+    const todayDayName = dayNames[new Date().getDay()]
+    const tomorrowDayName = dayNames[new Date(tomorrowDate).getDay()]
+
+    return (
+      <div className="space-y-6">
+        {/* 주의 필요 - 가장 위에 */}
+        {overdueOps.length > 0 && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4">
+            <h2 className="text-base font-black text-red-700 mb-3 flex items-center gap-2">
+              <span className="w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center text-sm">!</span>
+              지연 주의 — 미처리 {overdueOps.length}건
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {overdueOps.map(op => renderDashboardCard(op))}
+            </div>
+          </div>
+        )}
+
+        {/* 진행 중인 작업 */}
+        {inProgressOps.length > 0 && (
+          <div className="bg-blue-50/50 border border-blue-200 rounded-2xl p-4">
+            <h2 className="text-base font-black text-blue-800 mb-3 flex items-center gap-2">
+              <span className="text-lg">⚡</span>
+              지금 진행 중 — {inProgressOps.length}건
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {inProgressOps.map(op => renderDashboardCard(op))}
+            </div>
+          </div>
+        )}
+
+        {/* 오늘 할 일 */}
+        <div>
+          <h2 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
+            <span className="w-8 h-8 bg-gray-900 text-white rounded-xl flex items-center justify-center text-sm">
+              {new Date().getDate()}
+            </span>
+            오늘 ({todayDayName})
+            {todayOps.length === 0 && <span className="text-sm font-normal text-gray-400 ml-1">— 예정 없음</span>}
+          </h2>
+
+          {(todayDeliveries.length > 0 || todayReturns.length > 0) ? (
+            <div className="space-y-4">
+              {/* 출고 */}
+              {todayDeliveries.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-black">🚚 출고 {todayDeliveries.length}건</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {todayDeliveries.map(op => renderDashboardCard(op))}
+                  </div>
+                </div>
+              )}
+              {/* 반납 */}
+              {todayReturns.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-black">🔙 반납 {todayReturns.length}건</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {todayReturns.map(op => renderDashboardCard(op))}
+                  </div>
+                </div>
+              )}
+              {/* 오늘 완료 */}
+              {todayCompleted.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-black">✅ 완료 {todayCompleted.length}건</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {todayCompleted.map(op => renderDashboardCard(op, 'compact'))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : todayOps.length > 0 ? (
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
+              <div className="text-3xl mb-2">🎉</div>
+              <div className="font-bold text-green-700">오늘 모든 작업 완료!</div>
+              <div className="text-sm text-green-600">총 {todayCompleted.length}건 처리 완료</div>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
+              <div className="text-3xl mb-2">📋</div>
+              <div className="font-bold text-gray-500">오늘 예정된 배차가 없습니다</div>
+            </div>
+          )}
+        </div>
+
+        {/* 내일 예정 */}
+        {tomorrowOps.length > 0 && (
+          <div>
+            <h2 className="text-base font-black text-gray-700 mb-3 flex items-center gap-2">
+              <span className="w-7 h-7 bg-gray-200 text-gray-600 rounded-lg flex items-center justify-center text-xs font-black">
+                {new Date(tomorrowDate).getDate()}
+              </span>
+              내일 ({tomorrowDayName}) — {tomorrowOps.length}건
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tomorrowOps.filter(op => op.status !== 'completed').map(op => renderDashboardCard(op, 'compact'))}
+            </div>
+          </div>
+        )}
+
+        {/* 이번 주 나머지 예정 */}
+        {weekOps.length > 0 && (
+          <div>
+            <h2 className="text-base font-black text-gray-600 mb-3 flex items-center gap-2">
+              <span className="text-lg">📅</span>
+              이번 주 예정 — {weekOps.length}건
+            </h2>
+            <div className="space-y-2">
+              {Object.entries(
+                weekOps.reduce((acc, op) => {
+                  const d = op.scheduled_date
+                  if (!acc[d]) acc[d] = []
+                  acc[d].push(op)
+                  return acc
+                }, {} as Record<string, Operation[]>)
+              ).map(([date, ops]) => (
+                <div key={date} className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2">
+                    {date} ({dayNames[new Date(date).getDay()]})
+                  </div>
+                  <div className="space-y-2">
+                    {ops.map(op => renderDashboardCard(op, 'compact'))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 다음 주 예정 */}
+        {nextWeekOps.length > 0 && (
+          <div>
+            <h2 className="text-base font-black text-gray-600 mb-3 flex items-center gap-2">
+              <span className="text-lg">📆</span>
+              다음 주 예정 — {nextWeekOps.length}건
+            </h2>
+            <div className="space-y-2">
+              {Object.entries(
+                nextWeekOps.reduce((acc, op) => {
+                  const d = op.scheduled_date
+                  if (!acc[d]) acc[d] = []
+                  acc[d].push(op)
+                  return acc
+                }, {} as Record<string, Operation[]>)
+              ).map(([date, ops]) => (
+                <div key={date} className="bg-gray-50 rounded-xl p-3">
+                  <div className="text-xs font-bold text-gray-500 mb-2">
+                    {date} ({dayNames[new Date(date).getDay()]})
+                  </div>
+                  <div className="space-y-2">
+                    {ops.map(op => renderDashboardCard(op, 'compact'))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 이번 주 완료 요약 */}
+        {weekCompleted.length > 0 && (
+          <div className="border-t border-gray-200 pt-4">
+            <h2 className="text-sm font-black text-gray-400 mb-3 flex items-center gap-2">
+              <span className="text-base">✅</span>
+              이번 주 처리 완료 — {weekCompleted.length}건
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+              {weekCompleted.slice(0, 6).map(op => {
+                const car = getCar(op.car_id)
+                const isDelivery = op.operation_type === 'delivery'
+                return (
+                  <div key={op.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm opacity-70 cursor-pointer hover:opacity-100 transition-opacity"
+                    onClick={() => openEditModal(op)}>
+                    <span className={`w-6 h-6 rounded flex items-center justify-center text-xs ${isDelivery ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                      {isDelivery ? '출' : '반'}
+                    </span>
+                    <span className="font-bold text-gray-600">{car?.number || '-'}</span>
+                    <span className="text-gray-400 text-xs">{op.scheduled_date}</span>
+                    <span className="ml-auto text-green-500 text-xs">✓</span>
+                  </div>
+                )
+              })}
+              {weekCompleted.length > 6 && (
+                <div className="flex items-center justify-center p-2 text-xs text-gray-400">
+                  외 {weekCompleted.length - 6}건 더...
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Status action buttons
   const renderStatusButtons = (op: Operation) => {
     const buttons: React.ReactNode[] = []
@@ -765,8 +1107,8 @@ export default function OperationsMainPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
+      {/* KPI Cards - 대시보드 외 뷰에서만 표시 */}
+      <div className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5 ${viewMode === 'dashboard' ? 'hidden' : ''}`}>
         <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
           <p className="text-[11px] text-gray-400 font-bold">오늘 출고</p>
           <p className="text-xl font-black text-blue-600 mt-1">{stats.todayDeliveries}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
@@ -800,6 +1142,7 @@ export default function OperationsMainPage() {
       {/* View Mode Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
         {[
+          { key: 'dashboard', label: '🏠 대시보드', },
           { key: 'list', label: '📋 리스트', },
           { key: 'timeline', label: '📊 타임라인', },
           { key: 'calendar', label: '📅 캘린더', },
@@ -812,6 +1155,7 @@ export default function OperationsMainPage() {
       </div>
 
       {/* View Content */}
+      {viewMode === 'dashboard' && renderDashboard()}
       {viewMode === 'list' && renderListView()}
       {viewMode === 'timeline' && renderTimeline()}
       {viewMode === 'calendar' && (

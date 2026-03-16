@@ -83,7 +83,7 @@ const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
   '차량구입비': ['차량', '대출'],
   '선납금(차량대출)': ['차량', '대출'],
   '이자비용(대출/투자)': ['대출', '투자자'],
-  '원금상환': ['대출', '차량'],
+  '원금상환': ['대출', '차량', '투자자'],
   '지입 수익배분금(출금)': ['지입 차주'],
   // ── 차량 운영 ──
   '유류비': ['차량'],
@@ -93,6 +93,9 @@ const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
   '차량할부/리스료': ['차량', '대출'],
   '화물공제/적재물보험': ['차량', '보험'],
   '주차비': ['차량'],
+  '탁송비': ['차량'],
+  '자동차세': ['차량'],
+  '과태료': ['차량'],
   // ── 급여/인건비 ──
   '급여(정규직)': ['직원', '프리랜서'],
   '일용직급여': ['프리랜서', '직원'],
@@ -215,6 +218,8 @@ function parseQueueItem(q: any) {
     matched_employee_id: sd.matched_employee_id || null,
     matched_employee_name: sd.matched_employee_name || null,
     matched_contract_name: sd.matched_contract_name || q.ai_matched_name || null,
+    related_type: q.final_matched_type || null,
+    related_id: q.final_matched_id || null,
     _source: 'queue' as const,
   }
 }
@@ -246,7 +251,13 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
     return { items, total: count || data.length, source: 'classification_queue' }
   }
 
-  // Fallback: transactions 테이블
+  // pending 상태에서 classification_queue가 비어있으면 → 빈 결과 반환 (fallback 하지 않음)
+  // 이전에는 transactions 테이블로 fallback하여 확정 완료된 거래가 다시 pending으로 표시되는 중복 버그가 있었음
+  if (status === 'pending') {
+    return { items: [], total: 0, source: 'classification_queue' }
+  }
+
+  // Fallback: transactions 테이블 (confirmed 또는 all 조회 시에만)
   const { data: txData, count: txCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact' })
@@ -257,7 +268,7 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
 
   const allItems = (txData || []).map((tx: any) => {
     const cat = tx.category || '미분류'
-    const isPending = !tx.category || tx.category === '미분류' || tx.category === '기타' || tx.category === ''
+    const isPending = !tx.category || tx.category === '미분류' || tx.category === ''
     return {
       id: tx.id, company_id: tx.company_id,
       source_data: {
@@ -287,7 +298,80 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
 }
 
 // ═══ 확정완료 탭 전용: transactions 테이블 직접 조회 ═══
-async function fetchConfirmedTransactions(companyId: string, limit: number) {
+// + 고아 복구: classification_queue에 confirmed인데 transactions에 없는 건 자동 복구
+async function fetchConfirmedTransactions(companyId: string, limit: number, skipOrphanRecovery = false) {
+  // ── 1) 고아 복구: confirmed queue 중 transaction_id가 없거나 soft-deleted된 건 복구 ──
+  if (!skipOrphanRecovery) try {
+    const { data: orphaned } = await supabase
+      .from('classification_queue')
+      .select('id, transaction_id, final_category, final_matched_type, final_matched_id, source_data, company_id')
+      .eq('company_id', companyId)
+      .eq('status', 'confirmed')
+      .is('deleted_at', null)
+
+    // 고아 복구: transaction_id가 없는 confirmed 건만 처리 (매번 전체 스캔 방지)
+    const orphansWithoutTx = (orphaned || []).filter((q: any) => !q.transaction_id)
+    const orphansWithTx = (orphaned || []).filter((q: any) => q.transaction_id)
+
+    // transaction_id가 있지만 soft-deleted된 경우만 복원
+    if (orphansWithTx.length > 0) {
+      const txIds = orphansWithTx.map((q: any) => q.transaction_id)
+      const { data: deletedTxs } = await supabase
+        .from('transactions')
+        .select('id')
+        .in('id', txIds)
+        .not('deleted_at', 'is', null)
+
+      if (deletedTxs && deletedTxs.length > 0) {
+        const deletedIds = new Set(deletedTxs.map((t: any) => t.id))
+        for (const q of orphansWithTx) {
+          if (!deletedIds.has(q.transaction_id)) continue
+          const txUpdate: Record<string, any> = { deleted_at: null }
+          if (q.final_category) txUpdate.category = q.final_category
+          if (q.final_matched_type !== undefined) txUpdate.related_type = q.final_matched_type
+          if (q.final_matched_id !== undefined) txUpdate.related_id = q.final_matched_id
+          await supabase.from('transactions').update(txUpdate).eq('id', q.transaction_id)
+          console.log(`[orphan-recovery] restored soft-deleted tx: ${q.transaction_id}`)
+        }
+      }
+    }
+
+    // transaction_id가 없는 진짜 고아만 신규 생성
+    for (const q of orphansWithoutTx) {
+      const sd = q.source_data || {}
+      const txPayload: Record<string, any> = {
+        company_id: q.company_id || companyId,
+        transaction_date: sd.transaction_date || '',
+        client_name: sd.client_name || '',
+        description: sd.description || '',
+        amount: sd.type === 'expense' ? -Math.abs(Number(sd.amount || 0)) : Math.abs(Number(sd.amount || 0)),
+        type: sd.type || 'expense',
+        category: q.final_category || sd.category || '미분류',
+        payment_method: sd.payment_method || '통장',
+        card_id: sd.card_id || null,
+        memo: sd.memo || '',
+      }
+      if (q.final_matched_type) txPayload.related_type = q.final_matched_type
+      if (q.final_matched_id) txPayload.related_id = q.final_matched_id
+      const { data: newTx, error: txErr } = await supabase
+        .from('transactions')
+        .insert(txPayload)
+        .select('id')
+        .single()
+      if (!txErr && newTx?.id) {
+        await supabase.from('classification_queue')
+          .update({ transaction_id: newTx.id })
+          .eq('id', q.id)
+        console.log(`[orphan-recovery] created new tx: ${newTx.id}, client: ${sd.client_name}`)
+      } else if (txErr) {
+        console.error(`[orphan-recovery] failed to create tx for queue ${q.id}:`, txErr.message)
+      }
+    }
+  } catch (e) {
+    console.error('[orphan-recovery] error:', e)
+  }
+
+  // ── 2) 정상 조회 ──
   const { data: txData, error: txError, count: txCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact' })
@@ -304,6 +388,7 @@ async function fetchConfirmedTransactions(companyId: string, limit: number) {
   const items = (txData || []).map((tx: any) => ({
     id: tx.id,
     company_id: tx.company_id,
+    transaction_id: tx.id,
     transaction_date: tx.transaction_date || '',
     source_data: {
       transaction_date: tx.transaction_date || '',
@@ -426,23 +511,35 @@ function getFilteredRelatedGroups(category: string | null | undefined): string[]
   const mapped = CATEGORY_RELATED_MAP[category]
   if (mapped === 'all') return null
   if (Array.isArray(mapped)) return mapped
-  // 카테고리가 그룹명인 경우 → 그 그룹의 첫 번째 항목으로 매핑 시도
+  // 카테고리가 그룹명인 경우 → 그룹 내 모든 항목의 매핑을 합산
   for (const src of [DISPLAY_CATEGORIES, CATEGORIES]) {
     const grp = src.find(g => g.group === category)
     if (grp && grp.items.length > 0) {
-      const firstItem = grp.items[0]
-      const firstMapped = CATEGORY_RELATED_MAP[firstItem]
-      if (firstMapped === 'all') return null
-      if (Array.isArray(firstMapped)) return firstMapped
+      const merged = new Set<string>()
+      for (const item of grp.items) {
+        const m = CATEGORY_RELATED_MAP[item]
+        if (m === 'all') return null
+        if (Array.isArray(m)) m.forEach(v => merged.add(v))
+      }
+      if (merged.size > 0) return Array.from(merged)
     }
   }
   return null // 매핑 없으면 전체 표시
 }
 
-function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'accounting'): string {
+function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'accounting', customCats?: Array<{ group: string; items: string[] }>): string {
   const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
   for (const g of source) {
     if (g.items.includes(cat)) return g.group
+  }
+  // 커스텀 카테고리 검색
+  if (customCats) {
+    // cat이 커스텀 그룹명 자체인 경우
+    if (customCats.some(c => c.group === cat)) return cat
+    // cat이 커스텀 세부항목인 경우
+    for (const c of customCats) {
+      if (c.items.includes(cat)) return c.group
+    }
   }
   return mode === 'display' ? '📦 기타 지출' : '기타'
 }
@@ -451,12 +548,21 @@ function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'account
 const ALL_ACCOUNTING_GROUPS = new Set(CATEGORIES.map(g => g.group))
 const ALL_DISPLAY_GROUPS = new Set(DISPLAY_CATEGORIES.map(g => g.group))
 
-function getCategoryParts(cat: string | null | undefined, mode: 'accounting' | 'display'): { group: string; item: string } {
+function getCategoryParts(cat: string | null | undefined, mode: 'accounting' | 'display', customCats?: Array<{ group: string; items: string[] }>): { group: string; item: string } {
   if (!cat || cat === '미분류') return { group: '', item: '' }
   const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
   const groupSet = mode === 'display' ? ALL_DISPLAY_GROUPS : ALL_ACCOUNTING_GROUPS
   // cat이 현재 모드의 그룹명인 경우
   if (groupSet.has(cat)) return { group: cat, item: '' }
+  // cat이 커스텀 그룹명인 경우
+  if (customCats) {
+    const customGrp = customCats.find(c => c.group === cat)
+    if (customGrp) return { group: cat, item: '' }
+    // cat이 커스텀 세부항목인 경우
+    for (const c of customCats) {
+      if (c.items.includes(cat)) return { group: c.group, item: cat }
+    }
+  }
   // cat이 다른 모드의 그룹명인 경우 → 현재 모드 그룹으로 매핑
   const otherSource = mode === 'display' ? CATEGORIES : DISPLAY_CATEGORIES
   const otherGroupSet = mode === 'display' ? ALL_ACCOUNTING_GROUPS : ALL_DISPLAY_GROUPS
@@ -560,6 +666,7 @@ function UploadContent() {
 
   // ── Upload UI State ──
   const [isDragging, setIsDragging] = useState(false)
+  const dragCounterRef = useRef(0)
   const [cars, setCars] = useState<any[]>([])
   const [investors, setInvestors] = useState<any[]>([])
   const [jiips, setJiips] = useState<any[]>([])
@@ -651,6 +758,7 @@ function UploadContent() {
   // ── 분할 모달 상태 ──
   const [splitModalItem, setSplitModalItem] = useState<any>(null)
   const [splitRows, setSplitRows] = useState<Array<{ amount: number; memo: string; related_type: string; related_id: string }>>([])
+  const [splitVer, setSplitVer] = useState(0) // 균등분할/추가 등 외부 리셋 시 key 갱신용
 
   const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
 
@@ -742,7 +850,7 @@ function UploadContent() {
     try {
       const [pData, cData] = await Promise.all([
         fetchQueueDirect(effectiveCompanyId, 'pending', 1),
-        fetchConfirmedTransactions(effectiveCompanyId, 1),
+        fetchConfirmedTransactions(effectiveCompanyId, 1, true),
       ])
       const pendingCount = pData.total || 0
       const confirmedCount = cData.total || 0
@@ -854,8 +962,8 @@ function UploadContent() {
         const otherData = await fetchQueueDirect(effectiveCompanyId, 'pending', 1)
         setStats(prev => ({ ...prev, pending: otherData.total || 0 }))
       } else {
-        // 현재 분류관리 탭 → 확정완료(transactions) 카운트 갱신
-        const otherData = await fetchConfirmedTransactions(effectiveCompanyId, 1)
+        // 현재 분류관리 탭 → 확정완료(transactions) 카운트 갱신 (고아 복구 skip)
+        const otherData = await fetchConfirmedTransactions(effectiveCompanyId, 1, true)
         setStats(prev => ({ ...prev, confirmed: otherData.total || 0 }))
       }
     } catch (e) { /* 무시 */ }
@@ -956,11 +1064,11 @@ function UploadContent() {
     else if (sourceFilter === 'bank') filtered = baseItems.filter(i => !isCardItem(i))
     else if (sourceFilter === 'unclassified') filtered = baseItems.filter(i => {
       const cat = i.ai_category || i.category || ''
-      return !cat || cat === '미분류' || cat === '기타'
+      return !cat || cat === '미분류'
     })
     else if (sourceFilter === 'cat_matched') filtered = baseItems.filter(i => {
       const cat = i.ai_category || i.category || ''
-      return cat && cat !== '미분류' && cat !== '기타'
+      return cat && cat !== '미분류'
     })
     else if (sourceFilter === 'fully_matched') filtered = baseItems.filter(i => {
       const cat = i.ai_category || i.category || ''
@@ -973,9 +1081,10 @@ function UploadContent() {
       filtered = filtered.filter(i => {
         const sd = i.source_data || {}
         const haystack = [
-          sd.client_name || i.client_name, sd.description || i.description, sd.memo, sd.card_number,
+          sd.client_name || i.client_name, sd.description || i.description,
+          sd.memo, sd.card_number,
           i.ai_category || i.category, i.matched_car_number, i.matched_employee_name,
-          i.linked_name, sd.bank_name,
+          i.linked_name, sd.bank_name, i.matched_contract_name,
         ].filter(Boolean).join(' ').toLowerCase()
         return haystack.includes(q)
       })
@@ -1132,7 +1241,7 @@ function UploadContent() {
 
   // ── 리뷰 탭 미분류 통계 ──
   const reviewUnclassifiedCount = useMemo(() => {
-    return items.filter(i => !i.ai_category || i.ai_category === '미분류' || i.ai_category === '기타').length
+    return items.filter(i => !i.ai_category || i.ai_category === '미분류').length
   }, [items])
 
   // ── B1 하단 요약바 데이터 ──
@@ -1179,6 +1288,30 @@ function UploadContent() {
     open: boolean; mode: 'all' | 'selected'; targetIds: string[];
     count: number; totalAmount: number; filterLabel: string; statusLabel: string;
   }>({ open: false, mode: 'all', targetIds: [], count: 0, totalAmount: 0, filterLabel: '', statusLabel: '' })
+
+  // ── 중복 체크 결과 모달 상태 ──
+  const [dupModal, setDupModal] = useState<{
+    open: boolean;
+    totalCount: number;
+    sections: { icon: string; title: string; count: number; details: { text: string; sub?: string }[];
+      crossDetails?: {
+        upload: { date: string; name: string; amount: number; desc: string };
+        db: { date: string; name: string; amount: number; desc: string };
+        where: string; matchReason: string;
+        matchLevel: 'exact' | 'time_diff' | 'similar'; // 정확일치 vs 시간다름 vs 유사(검수필요)
+        similarReasons: string[]; // 유사 사유 목록
+        uploadResultIdx: number; // results[] 배열 인덱스
+      }[];
+    }[];
+    actionLabel: string;
+    onConfirm: (() => void) | null;
+    onUpdate: (() => void) | null;
+    hasCross: boolean;
+    excludedIndices: Set<number>; // 크로스 중복 중 제외할 인덱스 (체크 해제된 항목)
+    dupViewFilter: 'all' | 'exact' | 'time_diff' | 'name_diff' | 'desc_diff'; // 조건별 미리보기 필터
+  }>({ open: false, totalCount: 0, sections: [], actionLabel: '', onConfirm: null, onUpdate: null, hasCross: false, excludedIndices: new Set(), dupViewFilter: 'all' })
+  // excludedIndices를 ref로도 관리 (클로저 문제 해결 — executeDedup/executeUpdate가 최신 값 참조)
+  const excludedIndicesRef = useRef<Set<number>>(new Set())
 
   // ── 소프트 삭제 실행 함수 ──
   const executeSoftDelete = async (targetIds: string[]) => {
@@ -1282,9 +1415,27 @@ function UploadContent() {
   // ── 연결 처리 (단건/일괄) ──
   const handleLinkItem = async (itemId: string, relatedType: string, relatedId: string) => {
     try {
+      // ★ 확정완료 탭: item.id는 transactions 테이블 ID → transactions 직접 업데이트
+      if (activeTab === 'confirmed') {
+        const { error: txErr } = await supabase
+          .from('transactions')
+          .update({ related_type: relatedType || null, related_id: relatedId || null })
+          .eq('id', itemId)
+        if (txErr) {
+          console.error('[handleLinkItem] transactions 업데이트 실패:', txErr)
+        } else {
+          console.log(`[handleLinkItem] 확정항목 연결 변경: id=${itemId}, type=${relatedType || 'null'}, id=${relatedId || 'null'}`)
+          setItems(prev => prev.map(i => i.id === itemId
+            ? { ...i, related_type: relatedType || null, related_id: relatedId || null, ai_related_type: relatedType || null, ai_related_id: relatedId || null }
+            : i
+          ))
+        }
+        return
+      }
+      // 분류 관리 탭: item.id는 classification_queue ID → classification_queue 업데이트
       const { error: upErr } = await supabase
         .from('classification_queue')
-        .update({ final_related_type: relatedType, final_related_id: relatedId })
+        .update({ final_matched_type: relatedType, final_matched_id: relatedId })
         .eq('id', itemId)
       if (!upErr) {
         setItems(prev => prev.map(i => i.id === itemId ? { ...i, ai_related_type: relatedType, ai_related_id: relatedId } : i))
@@ -1359,7 +1510,12 @@ function UploadContent() {
     const s = linkPopoverSearch.toLowerCase()
     return {
       car: cars.filter(c => !s || (c.number || '').toLowerCase().includes(s) || (c.brand || '').toLowerCase().includes(s) || (c.model || '').toLowerCase().includes(s)),
-      jiip: (jiips || []).filter((j: any) => !s || (j.investor_name || '').toLowerCase().includes(s) || (j.vehicle_number || j.car_number || '').toLowerCase().includes(s)),
+      jiip: (jiips || []).filter((j: any) => {
+        if (!s) return true
+        if ((j.investor_name || '').toLowerCase().includes(s)) return true
+        const jCar = j.car_id ? cars.find((cc: any) => String(cc.id) === String(j.car_id)) : null
+        return (jCar?.number || '').toLowerCase().includes(s)
+      }),
       invest: (investors || []).filter((i: any) => !s || (i.investor_name || '').toLowerCase().includes(s)),
       loan: (loans || []).filter((l: any) => !s || (l.finance_name || '').toLowerCase().includes(s)),
       insurance: (insurances || []).filter((i: any) => !s || (i.company || '').toLowerCase().includes(s)),
@@ -1385,13 +1541,22 @@ function UploadContent() {
     e.target.value = ''
   }
 
+  const onDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current += 1
+    if (dragCounterRef.current === 1) setIsDragging(true)
+  }
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    setIsDragging(true)
   }
-  const onDragLeave = () => setIsDragging(false)
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setIsDragging(false) }
+  }
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    dragCounterRef.current = 0
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       if (results.length > 0) {
@@ -1405,10 +1570,34 @@ function UploadContent() {
   // ── Upload Handlers ──
   const handleUpdateItem = (id: number, field: string, val: any, item: any) => {
     updateTransaction(id, field, val)
-    if (bulkMode && field !== 'amount' && field !== 'transaction_date' && field !== 'description') {
+    // 카테고리 변경 시 → 기존 연결이 새 카테고리와 호환되지 않으면 리셋
+    if (field === 'category' && item.related_type) {
+      const allowed = getFilteredRelatedGroups(val)
+      if (allowed !== null) {
+        // 현재 연결의 그룹명 찾기
+        const relGroup = relatedOptions.find(rg => rg.items.some(o => o.value === `${item.related_type}_${item.related_id}`))
+        if (!relGroup || !allowed.includes(relGroup.group)) {
+          updateTransaction(id, 'related_composite', '')
+        }
+      }
+    }
+    // 연결(related) 변경은 각 항목이 다른 대상에 연결될 수 있으므로 일괄 변경 제외
+    if (bulkMode && field !== 'amount' && field !== 'transaction_date' && field !== 'description' && field !== 'related_composite' && field !== 'related_type' && field !== 'related_id') {
       // 분할된 항목(_split_from)은 개별 관리해야 하므로 일괄 변경에서 제외
       const sameClientItems = results.filter(r => r.client_name === item.client_name && r.id !== id && !r._split_from && !item._split_from)
-      sameClientItems.forEach(r => updateTransaction(r.id, field, val))
+      sameClientItems.forEach(r => {
+        updateTransaction(r.id, field, val)
+        // 같은 거래처 항목도 연결 호환성 체크
+        if (field === 'category' && r.related_type) {
+          const allowed = getFilteredRelatedGroups(val)
+          if (allowed !== null) {
+            const relGroup = relatedOptions.find(rg => rg.items.some(o => o.value === `${r.related_type}_${r.related_id}`))
+            if (!relGroup || !allowed.includes(relGroup.group)) {
+              updateTransaction(r.id, 'related_composite', '')
+            }
+          }
+        }
+      })
     }
   }
 
@@ -1790,33 +1979,113 @@ function UploadContent() {
   // ── Review Handlers ──
   const handleConfirm = async (item: any, overrides?: { category?: string; related_type?: string; related_id?: string }) => {
     const category = overrides?.category || item.ai_category || item.final_category
-    const PENDING_CATS = ['기타', '미분류', '']
+    const PENDING_CATS = ['미분류', '']
     const newStatus = PENDING_CATS.includes(category) ? 'pending' : 'confirmed'
-    const relType = overrides?.related_type || item.related_type || item.ai_related_type || null
-    const relId = overrides?.related_id || item.related_id || item.ai_related_id || null
-    console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, status=${newStatus}`)
+    // ★ overrides에 명시적으로 null이 들어오면 매칭 해제이므로 || 대신 ?? 체크
+    const relType = overrides && 'related_type' in overrides
+      ? (overrides.related_type ?? null)
+      : (item.related_type || item.ai_related_type || null)
+    const relId = overrides && 'related_id' in overrides
+      ? (overrides.related_id ?? null)
+      : (item.related_id || item.ai_related_id || null)
+    console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, status=${newStatus}, relType=${relType}, relId=${relId}`)
     try {
+      // 1) classification_queue 업데이트
       const updateData: Record<string, any> = { final_category: category, status: newStatus }
-      if (relType !== undefined) updateData.final_related_type = relType
-      if (relId !== undefined) updateData.final_related_id = relId
+      if (relType !== undefined) updateData.final_matched_type = relType
+      if (relId !== undefined) updateData.final_matched_id = relId
       const { error: upErr } = await supabase
         .from('classification_queue')
         .update(updateData)
         .eq('id', item.id)
-      if (!upErr) {
-        setItems(prev => {
-          const next = prev.filter(i => i.id !== item.id)
-          console.log(`[handleConfirm] items: ${prev.length} → ${next.length}`)
-          return next
-        })
-        setStats(prev => {
-          const next = { pending: prev.pending - 1, confirmed: prev.confirmed + 1 }
-          console.log(`[handleConfirm] stats: pending ${prev.pending}→${next.pending}, confirmed ${prev.confirmed}→${next.confirmed}`)
-          return next
-        })
-      } else {
-        console.error('[handleConfirm] 업데이트 오류:', upErr)
+
+      if (upErr) {
+        console.error('[handleConfirm] classification_queue 업데이트 오류:', upErr)
+        return
       }
+
+      // 2) transactions 테이블 동기화 — 확정 시 실제 거래 데이터도 반영
+      if (newStatus === 'confirmed') {
+        const sd = item.source_data || {}
+        if (item.transaction_id) {
+          // 기존 트랜잭션이 연결되어 있으면 → 업데이트 (soft-delete된 것도 복원)
+          const txUpdate: Record<string, any> = {
+            category,
+            deleted_at: null, // soft-delete 복원
+          }
+          if (relType !== undefined) txUpdate.related_type = relType
+          if (relId !== undefined) txUpdate.related_id = relId
+          const { error: txErr } = await supabase
+            .from('transactions')
+            .update(txUpdate)
+            .eq('id', item.transaction_id)
+          if (txErr) console.error('[handleConfirm] transactions 업데이트 오류:', txErr)
+          else console.log(`[handleConfirm] transactions 업데이트 완료: txId=${item.transaction_id}`)
+        } else {
+          // 트랜잭션이 없으면 → 기존 동일 거래가 있는지 먼저 확인 후 연결 또는 신규 생성
+          const matchAmount = sd.type === 'expense' ? -Math.abs(Number(sd.amount || 0)) : Math.abs(Number(sd.amount || 0))
+          const { data: existingTx } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('company_id', item.company_id || effectiveCompanyId)
+            .eq('transaction_date', sd.transaction_date || '')
+            .eq('client_name', sd.client_name || '')
+            .eq('amount', matchAmount)
+            .is('deleted_at', null)
+            .limit(1)
+            .single()
+
+          if (existingTx?.id) {
+            // 기존 거래 발견 → 연결만 하고 카테고리 업데이트
+            const txUpdate: Record<string, any> = { category }
+            if (relType !== undefined) txUpdate.related_type = relType
+            if (relId !== undefined) txUpdate.related_id = relId
+            await supabase.from('transactions').update(txUpdate).eq('id', existingTx.id)
+            await supabase.from('classification_queue').update({ transaction_id: existingTx.id }).eq('id', item.id)
+            console.log(`[handleConfirm] 기존 tx 연결: txId=${existingTx.id}`)
+          } else {
+            // 진짜 새 거래 → 신규 생성
+            const txPayload: Record<string, any> = {
+              company_id: item.company_id || effectiveCompanyId,
+              transaction_date: sd.transaction_date || '',
+              client_name: sd.client_name || '',
+              description: sd.description || '',
+              amount: matchAmount,
+              type: sd.type || 'expense',
+              category,
+              payment_method: sd.payment_method || '통장',
+              card_id: sd.card_id || null,
+              memo: sd.memo || '',
+            }
+            if (relType) txPayload.related_type = relType
+            if (relId) txPayload.related_id = relId
+            const { data: newTx, error: txErr } = await supabase
+              .from('transactions')
+              .insert(txPayload)
+              .select('id')
+              .single()
+            if (txErr) {
+              console.error('[handleConfirm] transactions 신규 생성 오류:', txErr)
+            } else {
+              console.log(`[handleConfirm] transactions 신규 생성 완료: txId=${newTx?.id}`)
+              if (newTx?.id) {
+                await supabase.from('classification_queue').update({ transaction_id: newTx.id }).eq('id', item.id)
+              }
+            }
+          }
+        }
+      }
+
+      setItems(prev => {
+        const next = prev.filter(i => i.id !== item.id)
+        console.log(`[handleConfirm] items: ${prev.length} → ${next.length}`)
+        return next
+      })
+      setStats(prev => {
+        const next = { pending: prev.pending - 1, confirmed: prev.confirmed + 1 }
+        console.log(`[handleConfirm] stats: pending ${prev.pending}→${next.pending}, confirmed ${prev.confirmed}→${next.confirmed}`)
+        return next
+      })
     } catch (e) {
       console.error('[handleConfirm] 오류:', e)
     }
@@ -1859,52 +2128,82 @@ function UploadContent() {
 
   const handleConfirmWithRule = async (item: any, category: string) => {
     const keyword = item.source_data?.client_name || ''
-    if (!keyword) return handleConfirm(item, { category })
-    try {
-      const PENDING_CATS = ['기타', '미분류', '']
-      const newStatus = PENDING_CATS.includes(category) ? 'pending' : 'confirmed'
-      // 큐 업데이트
-      const { error: upErr } = await supabase
-        .from('classification_queue')
-        .update({
-          final_category: category, status: newStatus,
-          final_related_type: item.ai_related_type || null,
-          final_related_id: item.ai_related_id || null,
-        })
-        .eq('id', item.id)
-      if (!upErr) {
-        // 규칙 저장
+    // handleConfirm에 위임 (transactions 동기화 포함)
+    await handleConfirm(item, {
+      category,
+      related_type: item.ai_related_type || undefined,
+      related_id: item.ai_related_id || undefined,
+    })
+    // 규칙 저장 (키워드가 있을 때만)
+    if (keyword) {
+      try {
         await supabase.from('finance_rules').upsert({
           keyword: keyword.toLowerCase(),
           category,
           related_type: item.ai_related_type || null,
           related_id: item.ai_related_id || null,
         }, { onConflict: 'keyword' })
-        setItems(prev => prev.filter(i => i.id !== item.id))
-        setStats(prev => ({ pending: prev.pending - 1, confirmed: prev.confirmed + 1 }))
+      } catch (e) {
+        console.error('[handleConfirmWithRule] 규칙 저장 오류:', e)
       }
-    } catch (e) {
-      console.error(e)
     }
   }
 
   const handleRevert = async (item: any) => {
-    console.log(`[handleRevert] 되돌리기 시작: id=${item.id}, _source=${item._source}, client=${item.source_data?.client_name}`)
+    console.log(`[handleRevert] 되돌리기 시작: id=${item.id}, _source=${item._source}, tx_id=${item.transaction_id}, client=${item.source_data?.client_name}`)
     try {
       if (item._source === 'transactions') {
-        // transactions 테이블에서 온 항목 → 직접 삭제
-        const { error: delErr } = await supabase.from('transactions').delete().eq('id', item.id)
+        // transactions 테이블에서 온 항목 → classification_queue에 pending으로 복원 후 soft-delete
+        const sd = item.source_data || {}
+        const origTxId = item.transaction_id || item.id // 확정완료 탭에서는 id가 곧 transaction_id
+        const { error: insErr } = await supabase.from('classification_queue').insert({
+          company_id: effectiveCompanyId,
+          transaction_id: origTxId, // ★ 원본 트랜잭션 ID 보존 — 재확정 시 복원에 필요
+          status: 'pending',
+          ai_category: item.ai_category || sd.category || '미분류',
+          ai_matched_type: item.related_type || null,
+          ai_matched_id: item.related_id || null,
+          final_category: null,
+          final_matched_type: null,
+          final_matched_id: null,
+          source_data: {
+            transaction_date: sd.transaction_date || item.transaction_date || '',
+            client_name: sd.client_name || item.client_name || '',
+            amount: Math.abs(Number(sd.amount || item.amount || 0)),
+            type: sd.type || item.type || 'expense',
+            description: sd.description || item.description || '',
+            payment_method: sd.payment_method || item.payment_method || '통장',
+            card_id: sd.card_id || item.card_id || null,
+            memo: sd.memo || '',
+            source: 'revert_from_confirmed',
+          },
+        })
+        if (insErr) {
+          alert(`되돌리기 실패: ${insErr.message}`)
+          return
+        }
+        // 원본 트랜잭션 soft-delete
+        const { error: delErr } = await supabase.from('transactions')
+          .update({ deleted_at: new Date().toISOString() }).eq('id', origTxId)
         if (delErr) {
           alert(`되돌리기 실패: ${delErr.message}`)
         } else {
           setItems(prev => prev.filter(i => i.id !== item.id))
-          setStats(prev => ({ ...prev, confirmed: prev.confirmed - 1 }))
+          setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
+          console.log(`[handleRevert] 완료: queue에 pending 삽입 + tx ${origTxId} soft-delete`)
         }
       } else {
         // classification_queue에서 온 항목 → 직접 status 변경
+        // transaction_id가 있으면 해당 트랜잭션도 soft-delete
+        if (item.transaction_id) {
+          await supabase.from('transactions')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', item.transaction_id)
+          console.log(`[handleRevert] queue 항목의 연결 tx ${item.transaction_id} soft-delete`)
+        }
         const { error: upErr } = await supabase
           .from('classification_queue')
-          .update({ final_category: '기타', status: 'pending', final_related_type: null, final_related_id: null })
+          .update({ final_category: '기타', status: 'pending', final_matched_type: null, final_matched_id: null })
           .eq('id', item.id)
         if (upErr) {
           alert(`되돌리기 실패: ${upErr.message}`)
@@ -1921,18 +2220,28 @@ function UploadContent() {
 
   const handleChangeCategory = async (item: any, newCategory: string) => {
     try {
-      const PENDING_CATS = ['기타', '미분류', '']
+      const PENDING_CATS = ['미분류', '']
       const newStatus = PENDING_CATS.includes(newCategory) ? 'pending' : 'confirmed'
+      const relType = item.ai_related_type || null
+      const relId = item.ai_related_id || null
       const { error: upErr } = await supabase
         .from('classification_queue')
         .update({
           final_category: newCategory,
           status: newStatus,
-          final_related_type: item.ai_related_type || null,
-          final_related_id: item.ai_related_id || null,
+          final_matched_type: relType,
+          final_matched_id: relId,
         })
         .eq('id', item.id)
       if (!upErr) {
+        // transactions 테이블도 동기화
+        if (item.transaction_id) {
+          const txUpdate: Record<string, any> = { category: newCategory }
+          if (relType !== undefined) txUpdate.related_type = relType
+          if (relId !== undefined) txUpdate.related_id = relId
+          await supabase.from('transactions').update(txUpdate).eq('id', item.transaction_id)
+          console.log(`[handleChangeCategory] transactions 업데이트: txId=${item.transaction_id}, category=${newCategory}`)
+        }
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, ai_category: newCategory, final_category: newCategory } : i))
       }
     } catch (e) {
@@ -1974,6 +2283,8 @@ function UploadContent() {
       await handleConfirm(item)
     }
     setSelectedIds(new Set())
+    clearResults()
+    await loadFromQueue()
     fetchReviewItems()
   }
 
@@ -1991,6 +2302,8 @@ function UploadContent() {
       if (res.ok) {
         const data = await res.json()
         setAiResult({ updated: data.updated, total: data.total })
+        clearResults()
+        await loadFromQueue()
         fetchReviewItems()
       } else {
         const err = await res.json()
@@ -2001,6 +2314,17 @@ function UploadContent() {
       alert('AI 분류 요청 중 오류가 발생했습니다.')
     }
     setAiClassifying(false)
+  }
+
+  // ── 조회(새로고침): 데이터를 DB에서 다시 불러오기 ──
+  const [refreshing, setRefreshing] = useState(false)
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    clearResults()
+    await loadFromQueue()
+    fetchReviewItems()
+    fetchStats()
+    setRefreshing(false)
   }
 
   // ── 재매칭: 기존 항목의 연결(프리랜서/직원 등)만 다시 실행 ──
@@ -2018,6 +2342,9 @@ function UploadContent() {
       if (res.ok) {
         const data = await res.json()
         alert(`✅ ${data.updated}건 재매칭 완료 (전체 ${data.total}건)`)
+        // results(UploadContext)와 items 모두 새로고침
+        clearResults()
+        await loadFromQueue()
         fetchReviewItems()
       } else {
         const err = await res.json()
@@ -2030,6 +2357,57 @@ function UploadContent() {
     setReMatching(false)
   }
 
+  // ── 중복 체크 키 생성: 내부 중복(엄격)과 크로스 중복(유연) 2단계 ──
+  // 내부 중복 키: 시분초 포함 날짜 + 거래처 + 금액 + 결제수단 + 적요 (같은 데이터소스)
+  const makeDupKey = (date: string, clientName: string, amount: number, paymentMethod: string, description: string) => {
+    const desc = (description || '').trim().toLowerCase().slice(0, 30)
+    return `${date || ''}|${(clientName || '').trim()}|${Math.abs(Number(amount || 0))}|${paymentMethod || ''}|${desc}`
+  }
+  // 크로스 중복 키: 날짜(일자만) + 금액 + 입출금타입 (입금↔출금은 다른 거래)
+  const makeCrossKey = (date: string, amount: number, type?: string) => {
+    const dateOnly = (date || '').trim().slice(0, 10) // YYYY-MM-DD만
+    const txType = type === 'income' ? 'I' : 'E'
+    return `${dateOnly}|${Math.abs(Number(amount || 0))}|${txType}`
+  }
+  // 은행접두사 제거하여 거래처명 정규화 (기업윤민진→윤민진, 국민안경희→안경희, 카카전상호→전상호)
+  const BANK_PREFIXES = ['기업', '국민', '농협', '하나', '카카', '카카오', '신한', '우리', '수협', '케이', '씨티', '제일', '산업', '수출입', 'SC', 'IBK', 'KB', 'NH', 'BNK']
+  const normalizeBankName = (name: string) => {
+    let n = (name || '').replace(/[^가-힣a-zA-Z0-9_]/g, '').trim()
+    for (const prefix of BANK_PREFIXES) {
+      if (n.startsWith(prefix) && n.length > prefix.length + 1) {
+        n = n.slice(prefix.length)
+        break // 하나의 접두사만 제거
+      }
+    }
+    return n
+  }
+  // 거래처명 유사도 체크 (한쪽이 다른 쪽을 포함하거나 같으면 true)
+  const isNameSimilar = (a: string, b: string) => {
+    const na = (a || '').replace(/[^가-힣a-zA-Z0-9]/g, '').trim()
+    const nb = (b || '').replace(/[^가-힣a-zA-Z0-9]/g, '').trim()
+    if (!na || !nb) return true // 한쪽이 비어있으면 금액+날짜로만 판단
+    if (na === nb) return true
+    if (na.includes(nb) || nb.includes(na)) return true
+    // 정규화(은행접두사 제거) 후 비교
+    const nna = normalizeBankName(a)
+    const nnb = normalizeBankName(b)
+    if (nna && nnb && nna === nnb) return true
+    if (nna && nnb && (nna.includes(nnb) || nnb.includes(nna))) return true
+    // 뒤에서 2글자 이상 일치하면 유사 (은행명 접두사 제거용: 농협박진숙 ↔ 박진숙)
+    if (na.length >= 2 && nb.length >= 2) {
+      const shortLen = Math.min(na.length, nb.length)
+      if (shortLen >= 2 && (na.endsWith(nb.slice(-shortLen)) || nb.endsWith(na.slice(-shortLen)))) return true
+    }
+    return false
+  }
+  // 거래처명 정규화 후 정확일치 확인 (은행접두사 차이만 있는 경우 true)
+  const isNameNormalizedMatch = (a: string, b: string) => {
+    const na = normalizeBankName(a)
+    const nb = normalizeBankName(b)
+    if (!na || !nb) return false
+    return na === nb
+  }
+
   const handleCheckDuplicates = async () => {
     if (!effectiveCompanyId) return
     setDuplicateInfo({ count: 0, checking: true })
@@ -2038,13 +2416,22 @@ function UploadContent() {
       let memoryDupGroups: [string, number[]][] = []
       let dbDupCount = 0
       let dbGroupCount = 0
+      let crossDupCount = 0
+      let crossDupItems: {
+        upload: { date: string; name: string; amount: number; desc: string; type: string };
+        db: { date: string; name: string; amount: number; desc: string; type: string };
+        where: string; matchReason: string;
+        matchLevel: 'exact' | 'time_diff' | 'similar';
+        similarReasons: string[];
+        uploadResultIdx: number; // results[] 배열 인덱스 (삭제 시 정확한 매칭용)
+      }[] = []
 
-      // ── 1) 업로드 결과(메모리)에서 중복 감지 ──
+      // ── 1) 업로드 결과(메모리) 내부 중복 감지 ──
       if (results.length > 0) {
         const groups: Record<string, number[]> = {}
         for (let i = 0; i < results.length; i++) {
           const r = results[i]
-          const key = `${r.transaction_date || ''}|${r.client_name || ''}|${Math.abs(Number(r.amount || 0))}|${r.payment_method || ''}`
+          const key = makeDupKey(r.transaction_date, r.client_name, r.amount, r.payment_method, r.description)
           if (!groups[key]) groups[key] = []
           groups[key].push(i)
         }
@@ -2052,7 +2439,217 @@ function UploadContent() {
         memoryDupCount = memoryDupGroups.reduce((acc, [, idxs]) => acc + idxs.length - 1, 0)
       }
 
-      // ── 2) DB(transactions)에서 중복 감지 — 항상 실행 ──
+      // ── 2) 업로드 ↔ DB 크로스 중복 체크 (classification_queue + transactions) ──
+      // 날짜(일자) + 금액으로 1차 매칭, 거래처명 유사도로 2차 확인 (Gemini 파싱 차이 허용)
+      if (results.length > 0) {
+        const dates = results.map(r => r.transaction_date).filter(Boolean)
+        const minDate = dates.length > 0 ? dates.sort()[0] : null
+        const maxDate = dates.length > 0 ? dates.sort().reverse()[0] : null
+
+        if (minDate && maxDate) {
+          // classification_queue 기존 항목 조회 (현재 업로드 결과의 _queue_id는 제외)
+          const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
+          const { data: queueItems } = await supabase
+            .from('classification_queue')
+            .select('id, source_data, status')
+            .eq('company_id', effectiveCompanyId)
+            .is('deleted_at', null)
+            .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+
+          // 크로스 키(날짜+금액) → DB 항목 상세정보 배열로 그룹핑
+          type DbEntry = { name: string; date: string; amount: number; desc: string; type: string; source: 'queue' | 'tx'; used: boolean }
+          const dbCrossMap = new Map<string, DbEntry[]>()
+
+          if (queueItems) {
+            for (const q of queueItems) {
+              if (uploadQueueIds.includes(q.id)) continue
+              const sd = q.source_data || {}
+              const ckey = makeCrossKey(sd.transaction_date, sd.amount, sd.type)
+              if (!dbCrossMap.has(ckey)) dbCrossMap.set(ckey, [])
+              dbCrossMap.get(ckey)!.push({
+                name: sd.client_name || '', date: sd.transaction_date || '', amount: Math.abs(Number(sd.amount || 0)),
+                desc: sd.description || '', type: sd.type || 'expense', source: 'queue', used: false,
+              })
+            }
+          }
+
+          // transactions 기존 항목 조회
+          const { data: txItems } = await supabase
+            .from('transactions')
+            .select('transaction_date, client_name, amount, payment_method, description, type')
+            .eq('company_id', effectiveCompanyId)
+            .is('deleted_at', null)
+            .gte('transaction_date', minDate.slice(0, 10))
+            .lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+
+          if (txItems) {
+            for (const tx of txItems) {
+              const ckey = makeCrossKey(tx.transaction_date, tx.amount, (tx as any).type)
+              if (!dbCrossMap.has(ckey)) dbCrossMap.set(ckey, [])
+              dbCrossMap.get(ckey)!.push({
+                name: tx.client_name || '', date: tx.transaction_date || '', amount: Math.abs(Number(tx.amount || 0)),
+                desc: tx.description || '', type: (tx as any).type || 'expense', source: 'tx', used: false,
+              })
+            }
+          }
+
+          // 업로드 항목별 크로스 중복 판정: 날짜+금액 매칭 → 거래처명 유사 확인
+          // ── matchLevel 판정 기준 (3단계) ──
+          // 1) 정확일치(exact): 날짜+금액+시간 완전일치 → 이름/적요 무관하게 동일 거래
+          // 2) 정확일치(exact): 날짜+금액+정규화된이름 일치 → 은행접두사 차이는 정확일치로 간주
+          // 3) 유사(similar): 날짜+금액만 일치 + 이름 유사 → 검수 필요
+          // ※ 적요 차이는 데이터소스마다 항상 다르므로 matchLevel에 영향 없음 (참고만 표시)
+          // ※ 2-pass 매칭: 시간 정확 일치 항목을 우선 매칭하여 잘못된 매칭 방지
+
+          // Helper: 매칭된 업로드↔DB 쌍 처리 (ri: results[] 인덱스)
+          const processCrossMatch = (r: typeof results[0], matchEntry: DbEntry, ri: number) => {
+            crossDupCount++
+
+            const diffNotes: string[] = []
+            const criticalDiffs: string[] = []
+
+            // 1) 시간 비교
+            const uploadTime = (r.transaction_date || '').slice(11, 19)
+            const dbTime = (matchEntry.date || '').slice(11, 19)
+            let timeMatches = false
+            if (uploadTime && dbTime) {
+              timeMatches = uploadTime === dbTime
+              if (!timeMatches) {
+                const toSec = (t: string) => {
+                  const p = t.split(':').map(Number)
+                  return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0)
+                }
+                const diff = Math.abs(toSec(uploadTime) - toSec(dbTime))
+                diffNotes.push(`시간 다름: ${uploadTime} ≠ ${dbTime} (${diff}초 차이)`)
+              }
+            } else if (!uploadTime && dbTime) {
+              timeMatches = false
+            }
+
+            // 2) 거래처명 비교
+            const uploadName = (r.client_name || '').trim()
+            const dbName = (matchEntry.name || '').trim()
+            const isExactName = uploadName === dbName
+            const isNormalizedMatch = !isExactName && isNameNormalizedMatch(uploadName, dbName)
+            if (!isExactName && uploadName && dbName) {
+              if (isNormalizedMatch) {
+                diffNotes.push(`거래처 은행접두사 차이: "${uploadName}" ↔ "${dbName}"`)
+              } else {
+                diffNotes.push(`거래처 유사: "${uploadName}" ≈ "${dbName}"`)
+                criticalDiffs.push(`거래처 유사: "${uploadName}" ≈ "${dbName}"`)
+              }
+            }
+
+            // 3) 적요/설명 비교 (참고만, matchLevel에 영향 없음)
+            const uploadDesc = (r.description || '').trim().slice(0, 30)
+            const dbDesc = (matchEntry.desc || '').trim().slice(0, 30)
+            if (uploadDesc && dbDesc && uploadDesc !== dbDesc) {
+              diffNotes.push(`적요 다름: "${uploadDesc}" ≠ "${dbDesc}"`)
+            }
+
+            // matchLevel 결정 (시간 정확일치 또는 5분 이내만 진입 → 모두 동일 거래)
+            const matchLevel: 'exact' | 'time_diff' | 'similar' = 'exact'
+
+            // 매칭 사유 생성
+            const reasons: string[] = []
+            reasons.push(`날짜: ${(r.transaction_date || '').slice(0, 10)} = ${(matchEntry.date || '').slice(0, 10)}`)
+            reasons.push(`금액: ${Math.abs(r.amount || 0).toLocaleString()} = ${matchEntry.amount.toLocaleString()}`)
+            if (isExactName) reasons.push(`거래처 정확일치`)
+            else if (isNormalizedMatch) reasons.push(`거래처 정규화일치: "${r.client_name}" ↔ "${matchEntry.name}"`)
+            else reasons.push(`거래처 유사: "${r.client_name}" ≈ "${matchEntry.name}"`)
+
+            crossDupItems.push({
+              upload: { date: r.transaction_date || '', name: r.client_name || '', amount: Math.abs(r.amount || 0), desc: r.description || '', type: r.type || 'expense' },
+              db: { date: matchEntry.date, name: matchEntry.name, amount: matchEntry.amount, desc: matchEntry.desc, type: matchEntry.type || 'expense' },
+              where: matchEntry.source === 'tx' ? '확정완료' : '분류대기',
+              matchReason: reasons.join(' / '),
+              matchLevel,
+              similarReasons: diffNotes,
+              uploadResultIdx: ri,
+            })
+          }
+
+          // ── Pass 1: 시간 정확일치 + 이름 유사 매칭 ──
+          // 같은 거래처에 같은 금액을 수초 간격으로 여러 번 이체하는 경우가 있으므로
+          // 시간이 1초라도 다르면 별도 거래로 간주 (시간 완전일치만 중복 판정)
+          const matchedUploadIdx = new Set<number>()
+          for (let ri = 0; ri < results.length; ri++) {
+            const r = results[ri]
+            const ckey = makeCrossKey(r.transaction_date, r.amount, r.type)
+            const dbEntries = dbCrossMap.get(ckey)
+            if (!dbEntries) continue
+            const uploadTime = (r.transaction_date || '').slice(11, 19)
+            if (!uploadTime) continue
+            const match = dbEntries.find(e => !e.used && isNameSimilar(r.client_name, e.name) && (e.date || '').slice(11, 19) === uploadTime)
+            if (match) {
+              match.used = true
+              matchedUploadIdx.add(ri)
+              processCrossMatch(r, match, ri)
+            }
+          }
+
+          // ── Pass 2: 갯수 기반 매칭 (이름 무관) ──
+          // Pass 1에서 이름 유사도 실패로 매칭 안 된 항목 처리
+          // 동일 날짜+시간+금액+타입 키에 대해 미매칭 upload 수 = 미매칭 DB 수이면
+          // Gemini 파싱 차이와 관계없이 동일 거래로 판정
+          const unmatchedByFullKey = new Map<string, number[]>() // fullKey → upload indices
+          for (let ri = 0; ri < results.length; ri++) {
+            if (matchedUploadIdx.has(ri)) continue
+            const r = results[ri]
+            const uploadTime = (r.transaction_date || '').slice(11, 19)
+            if (!uploadTime) continue
+            const fullKey = `${(r.transaction_date || '').slice(0, 10)}|${uploadTime}|${Math.abs(Number(r.amount || 0))}|${r.type === 'income' ? 'I' : 'E'}`
+            if (!unmatchedByFullKey.has(fullKey)) unmatchedByFullKey.set(fullKey, [])
+            unmatchedByFullKey.get(fullKey)!.push(ri)
+          }
+
+          for (const [fullKey, uploadIndices] of unmatchedByFullKey) {
+            // fullKey에서 date, time, amount, type 분리
+            const [dateOnly, time, amountStr, txType] = fullKey.split('|')
+            const ckey = `${dateOnly}|${amountStr}|${txType}`
+            const dbEntries = dbCrossMap.get(ckey)
+            if (!dbEntries) continue
+
+            // DB에서 같은 시간이면서 미사용인 항목들
+            const unmatchedDbEntries = dbEntries.filter(e => !e.used && (e.date || '').slice(11, 19) === time)
+            if (unmatchedDbEntries.length === 0) continue
+
+            // 갯수가 같으면 모두 매칭 (1:1 순서대로)
+            if (uploadIndices.length <= unmatchedDbEntries.length) {
+              console.log(`[중복체크] 갯수 기반 매칭: ${fullKey} (upload ${uploadIndices.length}건 = DB ${unmatchedDbEntries.length}건 중 매칭)`)
+              for (let i = 0; i < uploadIndices.length; i++) {
+                const ri = uploadIndices[i]
+                const dbEntry = unmatchedDbEntries[i]
+                dbEntry.used = true
+                matchedUploadIdx.add(ri)
+                processCrossMatch(results[ri], dbEntry, ri)
+              }
+            }
+          }
+        }
+
+        // ── 역방향 중복 쌍 제거 (v2) ──
+        // 업로드A↔DB_B와 업로드B↔DB_A가 같은 쌍이면 하나만 남김
+        const seenPairKeys = new Set<string>()
+        const dedupedCrossItems: typeof crossDupItems = []
+        for (const item of crossDupItems) {
+          // 쌍 키: 날짜+금액+이름 정렬 (양방향 동일 키 생성)
+          const partA = `${(item.upload.date || '').slice(0,10)}|${item.upload.amount}|${item.upload.name}`
+          const partB = `${(item.db.date || '').slice(0,10)}|${item.db.amount}|${item.db.name}`
+          const pairKey = [partA, partB].sort().join('⇔')
+          if (seenPairKeys.has(pairKey)) {
+            console.log(`[중복체크] 역방향 쌍 제거: ${pairKey}`)
+            continue
+          }
+          seenPairKeys.add(pairKey)
+          dedupedCrossItems.push(item)
+        }
+        console.log(`[중복체크] 역방향 제거: ${crossDupItems.length} → ${dedupedCrossItems.length}건`)
+        crossDupItems = dedupedCrossItems
+        crossDupCount = crossDupItems.length
+      }
+
+      // ── 3) DB(transactions) 내부 중복 감지 — 항상 실행 ──
       const res = await fetch(`/api/finance/dedup?company_id=${effectiveCompanyId}`)
       let dbData: any = null
       if (res.ok) {
@@ -2061,24 +2658,67 @@ function UploadContent() {
         dbGroupCount = dbData.groupCount || 0
       }
 
-      const totalDupCount = memoryDupCount + dbDupCount
+      const totalDupCount = memoryDupCount + dbDupCount + crossDupCount
 
-      // ── 3) 결과 없으면 완료 ──
+      // ── 4) 결과 없으면 완료 ──
       if (totalDupCount === 0) {
         alert('✅ 중복 거래가 없습니다!')
         setDuplicateInfo({ count: 0, checking: false })
         return
       }
 
-      // ── 4) 통합 알림 — 한번에 전부 삭제 ──
-      const parts: string[] = []
-      if (memoryDupCount > 0) parts.push(`업로드 내 ${memoryDupCount}건 (${memoryDupGroups.length}개 그룹)`)
-      if (dbDupCount > 0) parts.push(`DB 내 ${dbDupCount}건 (${dbGroupCount}개 그룹)`)
+      // ── 5) 모달에 상세 결과 표시 ──
+      const sections: typeof dupModal.sections = []
+      if (memoryDupCount > 0) {
+        sections.push({
+          icon: '📋', title: '업로드 내부 중복', count: memoryDupCount,
+          details: memoryDupGroups.slice(0, 15).map(([, idxs]) => {
+            const r = results[idxs[0]]
+            return {
+              text: `${(r.transaction_date || '?').slice(0, 16)} | ${r.client_name || '?'} | ${Math.abs(r.amount || 0).toLocaleString()}원`,
+              sub: `${idxs.length}건 중 ${idxs.length - 1}건 중복`,
+            }
+          }),
+        })
+      }
+      if (crossDupCount > 0) {
+        sections.push({
+          icon: '🔄', title: 'DB에 이미 존재 (크로스 중복)', count: crossDupCount,
+          details: [], // 크로스는 crossDetails로 상세 표시
+          crossDetails: crossDupItems,
+        })
+      }
+      if (dbDupCount > 0) {
+        sections.push({
+          icon: '💾', title: '확정완료(DB) 내부 중복', count: dbDupCount,
+          details: (dbData?.samples || []).slice(0, 15).map((s: any) => {
+            const tx = s.sample || {}
+            return {
+              text: `${(tx.transaction_date || '?').slice(0, 16)} | ${tx.client_name || '?'} | ${Math.abs(tx.amount || 0).toLocaleString()}원`,
+              sub: `${s.count}건 중 ${s.count - 1}건 중복`,
+            }
+          }),
+        })
+      }
 
-      if (confirm(`⚠️ 총 ${totalDupCount}건의 중복 거래가 발견되었습니다.\n${parts.join('\n')}\n\n모든 중복 건을 한번에 삭제하시겠습니까? (각 그룹에서 1건만 유지)`)) {
+      const actionParts: string[] = []
+      if (memoryDupCount + dbDupCount > 0) actionParts.push('내부 중복 삭제')
+      if (crossDupCount > 0) actionParts.push('크로스 중복 목록 제거')
+
+      // 실행 콜백 생성
+      // ※ crossDupItems의 인덱스 기준으로 excludedIndices 관리
+      //   excludedIndices에 있는 항목은 중복처리에서 제외 (유사 항목 중 사용자가 체크 해제한 것)
+      const executeDedup = async () => {
+        // 실행 시점의 excludedIndices 참조 (ref에서 — 클로저 문제 해결)
+        const currentExcluded = excludedIndicesRef.current
+
+        // 제외되지 않은 크로스 중복 항목만 처리 대상
+        const activeCrossItems = crossDupItems.filter((_, idx) => !currentExcluded.has(idx))
+        const activeCrossCount = activeCrossItems.length
+
         let deletedTotal = 0
 
-        // 메모리 중복 삭제
+        // 메모리 내부 중복 삭제
         if (memoryDupCount > 0) {
           const removeIdxSet = new Set<number>()
           for (const [, idxs] of memoryDupGroups) {
@@ -2091,19 +2731,33 @@ function UploadContent() {
             const r = results[idx]
             if (r && r.id != null) deleteTransaction(r.id)
           }
-
-          // queue에서도 중복 삭제
           const queueIdsToDelete = [...removeIdxSet]
             .map(idx => (results[idx] as any)?._queue_id)
             .filter(Boolean)
           if (queueIdsToDelete.length > 0) {
-            const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIdsToDelete)
-            if (delErr) console.error('queue 중복 삭제 오류:', delErr)
+            await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', queueIdsToDelete)
           }
           deletedTotal += memoryDupCount
         }
 
-        // DB 중복 삭제
+        // 크로스 중복 → 업로드 목록에서 제거 (체크된 항목만)
+        // ※ 감지 시 저장한 uploadResultIdx를 직접 사용하여 정확히 해당 항목만 삭제
+        if (activeCrossCount > 0) {
+          const crossRemoveIdxSet = new Set<number>(
+            activeCrossItems.map(cd => cd.uploadResultIdx).filter(idx => idx >= 0 && idx < results.length)
+          )
+          const removeResultIds = new Set([...crossRemoveIdxSet].map(idx => results[idx]?.id).filter(Boolean))
+          if (removeResultIds.size > 0) {
+            removeResults(removeResultIds)
+            const crossQueueIds = [...crossRemoveIdxSet].map(idx => (results[idx] as any)?._queue_id).filter(Boolean)
+            if (crossQueueIds.length > 0) {
+              await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', crossQueueIds)
+            }
+          }
+          deletedTotal += removeResultIds.size
+        }
+
+        // DB 내부 중복 삭제
         if (dbDupCount > 0) {
           const delRes = await fetch('/api/finance/dedup', {
             method: 'DELETE',
@@ -2116,10 +2770,124 @@ function UploadContent() {
           }
         }
 
-        alert(`✅ 총 ${deletedTotal}건 중복 삭제 완료!`)
+        alert(`✅ 총 ${deletedTotal}건 중복 정리 완료!`)
+        setDupModal(prev => ({ ...prev, open: false }))
         fetchReviewItems()
         fetchStats()
       }
+
+      // 크로스 중복 → 기존 DB 데이터를 새 파싱 결과로 업데이트 (체크된 항목만)
+      const executeUpdate = crossDupCount > 0 ? async () => {
+        const currentExcludedUpd = excludedIndicesRef.current
+        const activeCrossItems = crossDupItems.filter((_, idx) => !currentExcludedUpd.has(idx))
+        if (activeCrossItems.length === 0) {
+          alert('업데이트할 항목이 없습니다. (모든 유사 항목이 체크 해제됨)')
+          return
+        }
+
+        // activeCrossItems의 uploadResultIdx를 사용하여 정확히 매칭
+        const activeResultIndices = new Set(activeCrossItems.map(cd => cd.uploadResultIdx).filter(idx => idx >= 0 && idx < results.length))
+
+        let updatedCount = 0
+        const dates = results.map(r => r.transaction_date).filter(Boolean)
+        const minDate = dates.sort()[0]
+        const maxDate = dates.sort().reverse()[0]
+        const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
+
+        // DB 항목을 ID 포함하여 다시 조회
+        type DbUpdateEntry = { id: string; name: string; table: string; used: boolean }
+        const dbUpdateMap = new Map<string, DbUpdateEntry[]>()
+
+        const { data: qItems } = await supabase
+          .from('classification_queue').select('id, source_data')
+          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+        if (qItems) {
+          for (const q of qItems) {
+            if (uploadQueueIds.includes(q.id)) continue
+            const sd = q.source_data || {}
+            const ck = makeCrossKey(sd.transaction_date, sd.amount)
+            if (!dbUpdateMap.has(ck)) dbUpdateMap.set(ck, [])
+            dbUpdateMap.get(ck)!.push({ id: q.id, name: sd.client_name || '', table: 'classification_queue', used: false })
+          }
+        }
+        const { data: tItems } = await supabase
+          .from('transactions').select('id, transaction_date, client_name, amount, description')
+          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .gte('transaction_date', minDate.slice(0, 10)).lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+        if (tItems) {
+          for (const tx of tItems) {
+            const ck = makeCrossKey(tx.transaction_date, tx.amount)
+            if (!dbUpdateMap.has(ck)) dbUpdateMap.set(ck, [])
+            dbUpdateMap.get(ck)!.push({ id: tx.id, name: tx.client_name || '', table: 'transactions', used: false })
+          }
+        }
+
+        // 매칭된 항목 업데이트 (체크된 항목만 — uploadResultIdx로 정확히 식별)
+        const updatePromises: Promise<any>[] = []
+        const updateResultIds = new Set<string>()
+        for (const ri of activeResultIndices) {
+          const r = results[ri]
+          if (!r) continue
+
+          const ck = makeCrossKey(r.transaction_date, r.amount)
+          const entries = dbUpdateMap.get(ck)
+          if (!entries) continue
+          const m = entries.find(e => !e.used && isNameSimilar(r.client_name, e.name))
+          if (!m) continue
+          m.used = true
+          updateResultIds.add(r.id)
+
+          if (m.table === 'transactions') {
+            updatePromises.push(supabase.from('transactions').update({
+              transaction_date: r.transaction_date,
+              client_name: r.client_name,
+              amount: r.amount,
+              description: r.description || '',
+              payment_method: r.payment_method || '',
+              category: r.category || r.ai_category || '',
+            }).eq('id', m.id))
+          } else {
+            updatePromises.push(supabase.from('classification_queue').update({
+              source_data: {
+                transaction_date: r.transaction_date,
+                client_name: r.client_name,
+                amount: r.amount,
+                description: r.description || '',
+                payment_method: r.payment_method || '',
+              },
+              ai_category: r.category || r.ai_category || '',
+            }).eq('id', m.id))
+          }
+          updatedCount++
+        }
+
+        await Promise.all(updatePromises)
+
+        // 업데이트된 항목은 업로드 목록에서 제거
+        if (updateResultIds.size > 0) {
+          removeResults(updateResultIds)
+        }
+
+        alert(`✅ ${updatedCount}건 DB 데이터를 새 파싱 결과로 업데이트 완료!`)
+        setDupModal(prev => ({ ...prev, open: false }))
+        fetchReviewItems()
+        fetchStats()
+      } : null
+
+      // 모달 열기 (excludedIndices 초기화)
+      excludedIndicesRef.current = new Set()
+      setDupModal({
+        open: true,
+        totalCount: totalDupCount,
+        sections,
+        actionLabel: actionParts.join(' + '),
+        onConfirm: executeDedup,
+        onUpdate: executeUpdate,
+        hasCross: crossDupCount > 0,
+        excludedIndices: new Set(),
+        dupViewFilter: 'all',
+      })
 
       setDuplicateInfo({ count: totalDupCount, checking: false })
     } catch (e) {
@@ -2150,6 +2918,7 @@ function UploadContent() {
 
   // ── Upload Results Selection ──
   const [uploadSelectedIds, setUploadSelectedIds] = useState<Set<number>>(new Set())
+  const [floatingBarExpanded, setFloatingBarExpanded] = useState(false)
   const toggleUploadSelect = (id: number) => {
     setUploadSelectedIds(prev => {
       const next = new Set(prev)
@@ -2186,7 +2955,7 @@ function UploadContent() {
     let filtered = results
     if (uploadSubFilter === 'card') filtered = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
     else if (uploadSubFilter === 'bank') filtered = results.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
-    else if (uploadSubFilter === 'unclassified') filtered = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
+    else if (uploadSubFilter === 'unclassified') filtered = results.filter(r => !r.category || r.category === '미분류')
     // sourceFilter 적용 (분류완료/연결완료 칩)
     if (sourceFilter === 'cat_matched') {
       filtered = filtered.filter(r => {
@@ -2202,7 +2971,7 @@ function UploadContent() {
     } else if (sourceFilter === 'unclassified') {
       filtered = filtered.filter(r => {
         const cat = r.ai_category || r.category || ''
-        return !cat || cat === '미분류' || cat === '기타'
+        return !cat || cat === '미분류'
       })
     } else if (sourceFilter === 'card') {
       filtered = filtered.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
@@ -2213,7 +2982,7 @@ function UploadContent() {
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase()
       filtered = filtered.filter(r => {
-        const haystack = [r.client_name, r.description, r.memo, r.card_number, r.category, r.bank_name].filter(Boolean).join(' ').toLowerCase()
+        const haystack = [r.client_name, r.memo, r.card_number, r.category, r.bank_name].filter(Boolean).join(' ').toLowerCase()
         return haystack.includes(q)
       })
     }
@@ -2557,8 +3326,8 @@ function UploadContent() {
   const uploadStats = useMemo(() => {
     const cardItems = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
     const bankItems = results.filter(r => r.payment_method !== '카드' && r.payment_method !== 'Card')
-    const classifiedCount = results.filter(r => r.category && r.category !== '미분류' && r.category !== '기타').length
-    const unclassifiedCount = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타').length
+    const classifiedCount = results.filter(r => r.category && r.category !== '미분류').length
+    const unclassifiedCount = results.filter(r => !r.category || r.category === '미분류').length
     // card_id가 있고 실제 corpCards에 매칭되는 건만 카운트
     const cardMatchedCount = cardItems.filter(r => {
       if (!r.card_id) return false
@@ -2614,7 +3383,10 @@ function UploadContent() {
     }
     if (type === 'jiip') {
       const j = jiips.find(jj => String(jj.id) === sid)
-      return { icon: '🚛', label: j?.investor_name || '지입', detail: `지입${j?.vehicle_number || j?.car_number ? ' · ' + (j?.vehicle_number || j?.car_number) : ''}`, color: '#8b5cf6' }
+      const jiipCar = j?.car_id ? cars.find(cc => String(cc.id) === String(j.car_id)) : null
+      const carNum = jiipCar?.number || ''
+      const carModel = jiipCar ? `${jiipCar.brand || ''} ${jiipCar.model || ''}`.trim() : ''
+      return { icon: '🚛', label: j?.investor_name || '지입', detail: `지입${carNum ? ' · ' + carNum : ''}${carModel ? ' · ' + carModel : ''}`, color: '#8b5cf6' }
     }
     if (type === 'invest') {
       const inv = investors.find(ii => String(ii.id) === sid)
@@ -2670,7 +3442,7 @@ function UploadContent() {
       opts.push({ group: '지입 차주', icon: '🚛', items: jiips.map(j => ({
         value: `jiip_${j.id}`,
         label: j.investor_name || '차주',
-        sub: `${j.vehicle_number || j.car_number || ''} · 관리비 ${j.admin_fee ? Number(j.admin_fee).toLocaleString() + '원' : '-'}`,
+        sub: (() => { const jc = j.car_id ? cars.find((cc: any) => String(cc.id) === String(j.car_id)) : null; return `${jc?.number || ''} ${jc ? (jc.brand || '') + ' ' + (jc.model || '') : ''}`.trim() + ` · 관리비 ${j.admin_fee ? Number(j.admin_fee).toLocaleString() + '원' : '-'}`; })(),
         color: '#8b5cf6',
       }))})
     }
@@ -2797,6 +3569,8 @@ function UploadContent() {
   const [bulkGroup, setBulkGroup] = useState('')
   const [bulkItem, setBulkItem] = useState('')
   const [bulkRelated, setBulkRelated] = useState('')
+  const [perItemMode, setPerItemMode] = useState(false)  // 개별 연결 모드
+  const [perItemRelated, setPerItemRelated] = useState<Record<number, string>>({})  // item.id → related value
   const [customGroupInput, setCustomGroupInput] = useState(false)
   const [customGroupText, setCustomGroupText] = useState('')
   const [customItemInput, setCustomItemInput] = useState(false)
@@ -2840,7 +3614,8 @@ function UploadContent() {
   }
 
   return (
-    <div onDragOver={onDragOver} style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+      style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
 
       {/* ═══ 탭바 카드 (PageTitle은 레이아웃에서 자동 제공) ═══ */}
       <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '0 2px 16px rgba(45,95,168,0.08)', background: '#fff' }}>
@@ -2874,7 +3649,7 @@ function UploadContent() {
 
           {/* 2탭: 분류 관리 + 확정완료 */}
           {([
-            { key: 'classify' as const, label: '📋 분류 관리', count: stats.pending, countColor: '#d97706' },
+            { key: 'classify' as const, label: '📋 분류 관리', count: (results.length > 0 ? results.length : stats.pending), countColor: '#d97706' },
             { key: 'confirmed' as const, label: '✅ 확정완료', count: stats.confirmed, countColor: '#16a34a' },
           ]).map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()); setSourceFilter('all') }}
@@ -2893,6 +3668,17 @@ function UploadContent() {
 
           {/* 액션 버튼 (오른쪽) */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, paddingRight: 8 }}>
+            {/* 조회(새로고침) 버튼 - 양쪽 탭 공통 */}
+            <button onClick={handleRefresh} disabled={refreshing}
+              style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                color: '#475569', background: '#f1f5f9', border: '1px solid #cbd5e1',
+                cursor: refreshing ? 'not-allowed' : 'pointer',
+                opacity: refreshing ? 0.5 : 1,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+              🔍 {refreshing ? '조회 중...' : '조회'}
+            </button>
             {activeTab === 'classify' && (
               <>
                 <button onClick={handleCheckDuplicates} disabled={duplicateInfo.checking}
@@ -2943,14 +3729,21 @@ function UploadContent() {
         {/* ═══ T2 인라인 칩 필터바 (항상 표시) ═══ */}
         {(activeTab === 'classify' || activeTab === 'confirmed') && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', gap: 6, borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-            {/* 소스 필터 칩 — 확정완료 탭은 항상 DB 데이터, 분류관리 탭은 업로드 결과 우선 */}
-            {(results.length > 0 && activeTab !== 'confirmed' ? [
+            {/* 소스 필터 칩 — 탭별 분리 */}
+            {(activeTab === 'confirmed' ? [
+              // 확정완료 탭: 전체/카드/통장만 (미분류 불필요)
+              { key: 'all' as const, label: '📋 전체', count: stats.confirmed },
+              { key: 'card' as const, label: '💳 카드', count: items.filter(i => isCardItem(i)).length },
+              { key: 'bank' as const, label: '🏦 통장', count: items.filter(i => !isCardItem(i)).length },
+            ] : results.length > 0 ? [
+              // 분류관리 탭 (업로드 결과 우선)
               { key: 'all' as const, label: '📋 전체', count: results.length },
               { key: 'card' as const, label: '💳 카드', count: uploadStats.cardCount },
               { key: 'bank' as const, label: '🏦 통장', count: uploadStats.bankCount },
               { key: 'unclassified' as const, label: '❓ 미분류', count: uploadStats.unclassifiedCount, isRed: true },
             ] : [
-              { key: 'all' as const, label: '📋 전체', count: activeTab === 'confirmed' ? stats.confirmed : stats.pending },
+              // 분류관리 탭 (DB 데이터)
+              { key: 'all' as const, label: '📋 전체', count: stats.pending },
               { key: 'card' as const, label: '💳 카드', count: items.filter(i => isCardItem(i)).length },
               { key: 'bank' as const, label: '🏦 통장', count: items.filter(i => !isCardItem(i)).length },
               { key: 'unclassified' as const, label: '❓ 미분류', count: reviewUnclassifiedCount, isRed: true },
@@ -3174,26 +3967,25 @@ function UploadContent() {
                 }}>✕</button>
               )}
             </div>
-            {activeTab !== 'confirmed' && (
-              <span style={{ fontSize: 12, color: '#2d5fa8', fontWeight: 600, flexShrink: 0 }}>
-                분류 완료 {stats.pending - reviewUnclassifiedCount}/{stats.pending}건
-              </span>
-            )}
+            {/* 분류 완료 카운트는 필터 칩에 통합됨 */}
           </div>
         )}
 
         {/* ═══ 입금/출금/잔액 요약 카드 — 결과 리스트에 이미 요약이 있으므로 숨김 ═══ */}
       </div>
 
-      {/* 드래그 오버레이 (화면 전체) */}
+      {/* 드래그 오버레이 (상단 배너 — 페이지를 가리지 않음) */}
       {isDragging && (
-        <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-          style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: '48px 64px', textAlign: 'center', boxShadow: '0 25px 50px rgba(0,0,0,0.3)' }}>
-            <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>📥</span>
-            <p style={{ fontWeight: 900, fontSize: 18, color: '#0f172a', margin: 0 }}>파일을 놓아주세요</p>
-            <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>엑셀, 영수증, PDF 지원</p>
-          </div>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
+          background: 'linear-gradient(135deg, #2d5fa8, #1e40af)',
+          padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ fontSize: 24 }}>📥</span>
+          <p style={{ fontWeight: 900, fontSize: 16, color: '#fff', margin: 0 }}>파일을 놓아주세요</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', margin: 0 }}>엑셀, 영수증, PDF 지원</p>
         </div>
       )}
 
@@ -3411,15 +4203,15 @@ function UploadContent() {
                         const cardVisibleItems = group.items.slice(0, cardLimit)
                         const cardHasMore = group.items.length > cardLimit
                         return (
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+                        <div>
+                          <table style={{ width: '100%', tableLayout: 'fixed', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                             <colgroup>
                               <col style={{ width: 32 }} />
-                              <col style={{ width: 90 }} />
-                              <col style={{ width: '18%' }} />
-                              <col style={{ width: '18%' }} />
-                              <col style={{ width: '22%' }} />
-                              <col style={{ width: '15%' }} />
+                              <col style={{ width: 120 }} />
+                              <col />
+                              <col />
+                              <col style={{ width: 200 }} />
+                              <col style={{ width: 180 }} />
                               <col style={{ width: 110 }} />
                             </colgroup>
                             <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -3437,7 +4229,7 @@ function UploadContent() {
                               {cardVisibleItems.map(item => {
                                 const isItemConfirmed = uploadConfirmedIds.has(item.id)
                                 return (
-                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
+                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                   <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                     {isItemConfirmed ? (
                                       <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
@@ -3445,7 +4237,7 @@ function UploadContent() {
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
+                                  <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>
                                     <div>{item.description}</div>
@@ -3460,7 +4252,7 @@ function UploadContent() {
                                   </td>
                                   <td style={{ padding: '4px 6px', position: 'relative' }}>
                                     {(() => {
-                                      const catParts = getCategoryParts(item.category, categoryMode)
+                                      const catParts = getCategoryParts(item.category, categoryMode, customCategories)
                                       const isUnclassified = !catParts.group
                                       const isOpen = openCategoryId === item.id
                                       const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
@@ -3526,7 +4318,7 @@ function UploadContent() {
                                       const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                       return (
                                         <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                             {rd ? (
                                               <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
@@ -3540,7 +4332,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -3610,7 +4402,7 @@ function UploadContent() {
                     // 용도별 모드: cat은 DISPLAY_CATEGORIES의 그룹명 (이미 아이콘 포함)
                     // 회계 모드: cat은 개별 카테고리명
                     const icon = isDisplayMode ? '' : (CATEGORY_ICONS[cat] || '📋')
-                    const groupName = isDisplayMode ? '' : getCategoryGroup(cat, 'accounting')
+                    const groupName = isDisplayMode ? '' : getCategoryGroup(cat, 'accounting', customCategories)
                     const subGroups = isDisplayMode && (group as any).subGroups ? Object.entries((group as any).subGroups as Record<string, { items: typeof filteredResults; totalAmount: number }>) : null
 
                     return (
@@ -3669,7 +4461,7 @@ function UploadContent() {
                           const renderGroupedItemRow = (item: any) => {
                             const isItemConfirmed = uploadConfirmedIds.has(item.id)
                             return (
-                            <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
+                            <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                               <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                 {isItemConfirmed ? (
                                   <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
@@ -3677,7 +4469,7 @@ function UploadContent() {
                                   <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                 )}
                               </td>
-                              <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
+                              <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                               <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                               <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -3686,7 +4478,7 @@ function UploadContent() {
                               {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 */}
                               <td style={{ padding: '4px 4px', position: 'relative' }}>
                                 {(() => {
-                                  const catParts = getCategoryParts(item.category, categoryMode)
+                                  const catParts = getCategoryParts(item.category, categoryMode, customCategories)
                                   const isUnclassified = !catParts.group
                                   const isOpen = openCategoryId === item.id
                                   const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
@@ -3773,7 +4565,7 @@ function UploadContent() {
                                   const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                   return (
                                     <div style={{ position: 'relative' }}>
-                                      <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                      <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                         {rd ? (
                                           <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                             <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
@@ -3787,7 +4579,7 @@ function UploadContent() {
                                       {isOpen && relPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                             <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                               <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                             </button>
@@ -3859,15 +4651,15 @@ function UploadContent() {
                                         <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginLeft: 4 }}>({formatForeignAmounts((sg as any).foreignAmounts)})</span>
                                       )}
                                     </div>
-                                    <div style={{ overflowX: 'auto' }}>
-                                      <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+                                    <div>
+                                      <table style={{ width: '100%', tableLayout: 'fixed', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                                         <colgroup>
                                           <col style={{ width: 32 }} />
-                                          <col style={{ width: 90 }} />
-                                          <col style={{ width: '18%' }} />
-                                          <col style={{ width: '18%' }} />
-                                          <col style={{ width: '22%' }} />
-                                          <col style={{ width: '15%' }} />
+                                          <col style={{ width: 120 }} />
+                                          <col />
+                                          <col />
+                                          <col style={{ width: 200 }} />
+                                          <col style={{ width: 180 }} />
                                           <col style={{ width: 110 }} />
                                         </colgroup>
                                         <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -3890,15 +4682,15 @@ function UploadContent() {
                                 )
                               })
                             })() : (
-                              <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+                              <div>
+                                <table style={{ width: '100%', tableLayout: 'fixed', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                                   <colgroup>
                                     <col style={{ width: 32 }} />
-                                    <col style={{ width: 90 }} />
-                                    <col style={{ width: '18%' }} />
-                                    <col style={{ width: '18%' }} />
-                                    <col style={{ width: '22%' }} />
-                                    <col style={{ width: '15%' }} />
+                                    <col style={{ width: 120 }} />
+                                    <col />
+                                    <col />
+                                    <col style={{ width: 200 }} />
+                                    <col style={{ width: 180 }} />
                                     <col style={{ width: 110 }} />
                                   </colgroup>
                                   <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -3945,6 +4737,20 @@ function UploadContent() {
                     <div key={label} style={{ borderBottom: '2px solid #e5e7eb' }}>
                       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
                         onClick={() => toggleGroup(label)}>
+                        {/* Group Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={group.items.length > 0 && group.items.every((i: any) => selectedIds.has(i.id))}
+                          ref={(el) => {
+                            if (el) {
+                              const checkedCount = group.items.filter((i: any) => selectedIds.has(i.id)).length
+                              el.indeterminate = checkedCount > 0 && checkedCount < group.items.length
+                            }
+                          }}
+                          onChange={(e) => { e.stopPropagation(); toggleSelectGroup(group.items) }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                        />
                         <div style={{ width: 4, height: 32, borderRadius: 4, background: group.carInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
                         <span style={{ fontSize: 16 }}>{label.startsWith('🚛') ? '🚛' : '🏢'}</span>
                         <div style={{ flex: 1 }}>
@@ -3964,15 +4770,15 @@ function UploadContent() {
                         const vVisibleItems = group.items.slice(0, vLimit)
                         const vHasMore = group.items.length > vLimit
                         return (
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+                        <div>
+                          <table style={{ width: '100%', tableLayout: 'fixed', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                             <colgroup>
                               <col style={{ width: 32 }} />
-                              <col style={{ width: 90 }} />
-                              <col style={{ width: '18%' }} />
-                              <col style={{ width: '18%' }} />
-                              <col style={{ width: '22%' }} />
-                              <col style={{ width: '15%' }} />
+                              <col style={{ width: 120 }} />
+                              <col />
+                              <col />
+                              <col style={{ width: 200 }} />
+                              <col style={{ width: 180 }} />
                               <col style={{ width: 110 }} />
                             </colgroup>
                             <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -3990,7 +4796,7 @@ function UploadContent() {
                               {vVisibleItems.map(item => {
                                 const isItemConfirmed = uploadConfirmedIds.has(item.id)
                                 return (
-                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
+                                <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                   <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                     {isItemConfirmed ? (
                                       <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
@@ -3998,7 +4804,7 @@ function UploadContent() {
                                       <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                     )}
                                   </td>
-                                  <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
+                                  <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                   <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -4007,7 +4813,7 @@ function UploadContent() {
                                   {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 (차량별) */}
                                   <td style={{ padding: '4px 4px', position: 'relative' }}>
                                     {(() => {
-                                      const catParts = getCategoryParts(item.category, categoryMode)
+                                      const catParts = getCategoryParts(item.category, categoryMode, customCategories)
                                       const isUnclassified = !catParts.group
                                       const isCatOpen = openCategoryId === item.id
                                       const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
@@ -4086,7 +4892,7 @@ function UploadContent() {
                                       const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                       return (
                                         <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                             {rd ? (
                                               <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
@@ -4100,7 +4906,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -4179,7 +4985,7 @@ function UploadContent() {
                       onClick={async () => {
                         if (!confirm('미분류 거래를 AI로 재분류하시겠습니까?')) return
                         // 미분류 거래만 모아서 classify API로 보내기
-                        const unclassifiedItems = results.filter(r => !r.category || r.category === '미분류' || r.category === '기타')
+                        const unclassifiedItems = results.filter(r => !r.category || r.category === '미분류')
                         if (unclassifiedItems.length === 0) return alert('미분류 거래가 없습니다.')
 
                         try {
@@ -4315,15 +5121,15 @@ function UploadContent() {
                           const gVisibleItems = group.items.slice(0, gLimit)
                           const gHasMore = group.items.length > gLimit
                           return (
-                          <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+                          <div>
+                            <table style={{ width: '100%', tableLayout: 'fixed', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
                               <colgroup>
                                 <col style={{ width: 32 }} />
-                                <col style={{ width: 90 }} />
-                                <col style={{ width: '18%' }} />
-                                <col style={{ width: '18%' }} />
-                                <col style={{ width: '22%' }} />
-                                <col style={{ width: '15%' }} />
+                                <col style={{ width: 120 }} />
+                                <col />
+                                <col />
+                                <col style={{ width: 200 }} />
+                                <col style={{ width: 180 }} />
                                 <col style={{ width: 110 }} />
                               </colgroup>
                               <thead style={{ background: '#f9fafb', color: '#6b7280', fontWeight: 700, fontSize: 12, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -4341,7 +5147,7 @@ function UploadContent() {
                                 {gVisibleItems.map(item => {
                                   const isItemConfirmed = uploadConfirmedIds.has(item.id)
                                   return (
-                                  <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: isItemConfirmed ? 0.6 : 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
+                                  <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: 1, background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }} onMouseEnter={e => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = isItemConfirmed ? 'rgba(16,185,129,0.06)' : 'rgba(79,70,229,0.03)' }} onMouseLeave={e => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : isItemConfirmed ? 'rgba(16,185,129,0.04)' : 'transparent' }}>
                                     <td style={{ padding: '4px 6px', textAlign: 'center' }}>
                                       {isItemConfirmed ? (
                                         <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
@@ -4349,7 +5155,7 @@ function UploadContent() {
                                         <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
                                       )}
                                     </td>
-                                    <td style={{ padding: '8px 12px', width: 140, color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
+                                    <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
                                     <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
                                     <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 13, maxWidth: 180 }}>
                                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
@@ -4358,7 +5164,7 @@ function UploadContent() {
                                     {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 (공통 그룹뷰) */}
                                     <td style={{ padding: '4px 4px', position: 'relative' }}>
                                       {(() => {
-                                        const catParts = getCategoryParts(item.category, categoryMode)
+                                        const catParts = getCategoryParts(item.category, categoryMode, customCategories)
                                         const isUnclassified = !catParts.group
                                         const isCatOpen = openCategoryId === item.id
                                         const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
@@ -4438,7 +5244,7 @@ function UploadContent() {
                                         const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
                                         return (
                                           <div style={{ position: 'relative' }}>
-                                            <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isRelOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
+                                            <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isRelOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
                                               {rd ? (
                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                   <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
@@ -4452,7 +5258,7 @@ function UploadContent() {
                                             {isRelOpen && relPopoverPos && (
                                               <>
                                                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                   <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                     <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                   </button>
@@ -4569,7 +5375,7 @@ function UploadContent() {
                             <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: 'transparent', border: '1px solid #f1f5f9', borderRadius: 4, padding: '2px 4px', outline: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }} /></td>
                             <td style={{ padding: '4px 4px', position: 'relative' }}>
                               {(() => {
-                                const catParts = getCategoryParts(item.category, categoryMode)
+                                const catParts = getCategoryParts(item.category, categoryMode, customCategories)
                                 const isUnclassified = !catParts.group
                                 const isOpen = openCategoryId === item.id
                                 const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
@@ -4671,7 +5477,7 @@ function UploadContent() {
                                 return (
                                   <div style={{ position: 'relative' }}>
                                     <button
-                                      onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPos(e.currentTarget, 320)) } }}
+                                      onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }}
                                       style={{
                                         width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px',
                                         fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
@@ -4693,9 +5499,9 @@ function UploadContent() {
                                       <>
                                         <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
                                         <div style={{
-                                          position: 'fixed', top: relPopoverPos.top, left: relPopoverPos.left, zIndex: 99,
+                                          position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99,
                                           background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
-                                          boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxHeight: 320, overflowY: 'auto',
+                                          boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: 320, overflowY: 'auto',
                                         }}>
                                           <button
                                             onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }}
@@ -4758,6 +5564,8 @@ function UploadContent() {
                   </table>
                 </div>
               )}
+              {/* 플로팅 바에 가려지지 않도록 하단 여백 */}
+              {uploadSelectedIds.size > 0 && <div style={{ height: 80 }} />}
 
               {/* ═══ B2 업로드 선택 시 플로팅 액션 바 ═══ */}
               {uploadSelectedIds.size > 0 && (
@@ -4765,13 +5573,14 @@ function UploadContent() {
                   position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
                   background: '#0f172a', color: '#fff', borderRadius: 14,
                   boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 50, maxWidth: '90vw',
+                  transition: 'all 0.2s ease',
                 }}>
-                  {/* ── 선택 목록 펼침 영역 ── */}
+                  {/* ── 선택 목록 펼침 영역 (토글) ── */}
                   {(() => {
                     const selItems = filteredResults.filter(r => uploadSelectedIds.has(r.id))
-                    if (selItems.length <= 1) return null
+                    if (selItems.length <= 1 || !floatingBarExpanded) return null
                     return (
-                      <div style={{ maxHeight: 180, overflowY: 'auto', padding: '10px 20px 6px', borderBottom: '1px solid #334155' }}>
+                      <div style={{ maxHeight: 220, overflowY: 'auto', padding: '10px 20px 6px', borderBottom: '1px solid #334155' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                           <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 700 }}>선택된 항목</span>
                           <button onClick={() => setUploadSelectedIds(new Set())}
@@ -4794,8 +5603,16 @@ function UploadContent() {
                       </div>
                     )
                   })()}
-                  {/* ── 메인 액션 바 ── */}
+                  {/* ── 메인 액션 바 (항상 1줄 컴팩트) ── */}
                   <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  {uploadSelectedIds.size > 1 && (
+                    <button onClick={() => setFloatingBarExpanded(prev => !prev)}
+                      style={{ background: 'none', border: '1px solid #475569', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', padding: '3px 8px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#e2e8f0' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#94a3b8' }}>
+                      {floatingBarExpanded ? '▼ 접기' : '▲ 목록'}
+                    </button>
+                  )}
                   <span style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap' }}>
                     {uploadSelectionTotals.count}건 선택
                   </span>
@@ -4902,7 +5719,7 @@ function UploadContent() {
                     style={{ background: '#10b981', color: '#fff', padding: '9px 18px', borderRadius: 8, fontWeight: 800, fontSize: 13, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     ✅ 분류확정
                   </button>
-                  <button onClick={() => { setBulkClassifyOpen(true); setBulkGroup(''); setBulkItem(''); setBulkRelated(''); setSplitRows([]) }}
+                  <button onClick={() => { setBulkClassifyOpen(true); setBulkGroup(''); setBulkItem(''); setBulkRelated(''); setSplitRows([]); setPerItemMode(false); setPerItemRelated({}) }}
                     style={{ background: '#2d5fa8', color: '#fff', padding: '9px 18px', borderRadius: 8, fontWeight: 800, fontSize: 13, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     📋 일괄분류
                   </button>
@@ -4958,7 +5775,7 @@ function UploadContent() {
                 const bulkGroupColor = bulkGroup ? (CATEGORY_COLORS[bulkGroup] || '#94a3b8') : ''
                 return (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setBulkClassifyOpen(false)}>
-                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
                       {/* 헤더 */}
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
@@ -5110,16 +5927,61 @@ function UploadContent() {
                           )}
                         </div>
                         <div style={{ marginBottom: 14 }}>
-                          <label style={{ fontSize: 12, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 4 }}>③ 연결 <span style={{ fontWeight: 500, color: '#94a3b8' }}>(선택)</span></label>
-                          <select value={bulkRelated} onChange={e => setBulkRelated(e.target.value)}
-                            style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkRelated ? '#1e293b' : '#94a3b8', outline: 'none', background: '#fff' }}>
-                            <option value="">연결 안함</option>
-                            {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(grp => (
-                              <optgroup key={grp.group} label={`${grp.icon} ${grp.group}`}>
-                                {grp.items.map(opt => <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>)}
-                              </optgroup>
-                            ))}
-                          </select>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <label style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>③ 연결 <span style={{ fontWeight: 500, color: '#94a3b8' }}>(선택)</span></label>
+                            {selCount > 1 && (
+                              <button onClick={() => { setPerItemMode(prev => !prev); if (!perItemMode) { setBulkRelated('') } else { setPerItemRelated({}) } }}
+                                style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 5,
+                                  border: perItemMode ? '1px solid #2563eb' : '1px solid #d1d5db',
+                                  background: perItemMode ? '#eff6ff' : '#f8fafc',
+                                  color: perItemMode ? '#2563eb' : '#64748b', cursor: 'pointer' }}>
+                                {perItemMode ? '✓ 개별 연결' : '개별 연결'}
+                              </button>
+                            )}
+                          </div>
+                          {!perItemMode ? (
+                            <select value={bulkRelated} onChange={e => setBulkRelated(e.target.value)}
+                              style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkRelated ? '#1e293b' : '#94a3b8', outline: 'none', background: '#fff' }}>
+                              <option value="">연결 안함</option>
+                              {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(grp => (
+                                <optgroup key={grp.group} label={`${grp.icon} ${grp.group}`}>
+                                  {grp.items.map(opt => <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>)}
+                                </optgroup>
+                              ))}
+                            </select>
+                          ) : (
+                            <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden', background: '#fafbfc' }}>
+                              <div style={{ padding: '6px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>각 항목별로 연결 대상을 선택하세요</span>
+                              </div>
+                              <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                {selectedItems.map((item, idx) => (
+                                  <div key={item.id} style={{ padding: '8px 12px', borderBottom: idx < selectedItems.length - 1 ? '1px solid #f1f5f9' : 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', width: 18, textAlign: 'center', flexShrink: 0 }}>{idx + 1}</span>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {item.client_name || '거래처 없음'}
+                                      </span>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: item.type === 'income' ? '#2563eb' : '#dc2626', whiteSpace: 'nowrap' }}>
+                                        {item.type === 'income' ? '+' : '-'}{Math.abs(item.amount).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <select value={perItemRelated[item.id] || ''}
+                                      onChange={e => setPerItemRelated(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                                        color: perItemRelated[item.id] ? '#1e293b' : '#94a3b8', background: '#fff', boxSizing: 'border-box' }}>
+                                      <option value="">🔗 연결 선택</option>
+                                      {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(grp => (
+                                        <optgroup key={grp.group} label={`${grp.icon} ${grp.group}`}>
+                                          {grp.items.map(opt => <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>)}
+                                        </optgroup>
+                                      ))}
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -5136,6 +5998,7 @@ function UploadContent() {
                                   { amount: half, memo: '', related_type: '', related_id: '' },
                                   { amount: item.amount - half, memo: '', related_type: '', related_id: '' },
                                 ])
+                                setSplitVer(v => v + 1)
                               }}
                                 style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                                 ✂️ 분할하기
@@ -5163,6 +6026,7 @@ function UploadContent() {
                                       setSplitRows(Array.from({ length: n }, (_, i) => ({
                                         amount: i === 0 ? base + rem : base, memo: '', related_type: '', related_id: '',
                                       })))
+                                      setSplitVer(v => v + 1)
                                     }}
                                       style={{ padding: '2px 10px', borderRadius: 4, border: splitRows.length === n ? '1px solid #2563eb' : '1px solid #d1d5db',
                                         background: splitRows.length === n ? '#eff6ff' : '#fff', color: splitRows.length === n ? '#2563eb' : '#64748b',
@@ -5170,50 +6034,77 @@ function UploadContent() {
                                       {n}등분
                                     </button>
                                   ))}
-                                  <button onClick={() => setSplitRows(prev => [...prev, { amount: 0, memo: '', related_type: '', related_id: '' }])}
+                                  <button onClick={() => {
+                                    setSplitRows(prev => {
+                                      const newCount = prev.length + 1
+                                      const base = Math.floor(origAmount / newCount)
+                                      const rem = origAmount - base * newCount
+                                      return Array.from({ length: newCount }, (_, i) => ({
+                                        amount: i === 0 ? base + rem : base,
+                                        memo: prev[i]?.memo || '',
+                                        related_type: prev[i]?.related_type || '',
+                                        related_id: prev[i]?.related_id || '',
+                                      }))
+                                    })
+                                    setSplitVer(v => v + 1)
+                                  }}
                                     style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid #d1d5db', background: '#fff', color: '#64748b', cursor: 'pointer', fontSize: 13, marginLeft: 'auto' }}>
                                     + 추가
                                   </button>
                                 </div>
                                 {/* 분할 행들 */}
-                                <div style={{ padding: '8px 12px', maxHeight: 200, overflow: 'auto' }}>
-                                  {splitRows.map((row, i) => (
-                                    <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                                      <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', width: 20, textAlign: 'center' }}>{i + 1}</span>
-                                      <input type="text" value={row.amount ? row.amount.toLocaleString() : ''} placeholder="금액"
-                                        onChange={e => { const num = Number(e.target.value.replace(/[^0-9]/g, '')); setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, amount: num } : r)) }}
-                                        onFocus={() => {
-                                          if (!row.amount || row.amount === 0) {
-                                            const otherSum = splitRows.reduce((s, r, j) => j === i ? s : s + (Number(r.amount) || 0), 0)
-                                            const remaining = origAmount - otherSum
-                                            if (remaining > 0) setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, amount: remaining } : r))
-                                          }
-                                        }}
-                                        style={{ width: 120, padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 600, textAlign: 'right' }} />
-                                      <select value={row.related_type && row.related_id ? `${row.related_type}_${row.related_id}` : ''}
-                                        onChange={e => {
-                                          const val = e.target.value
-                                          if (!val) { setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: '', related_id: '' } : r)); return }
-                                          const [t, ...rest] = val.split('_')
-                                          setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: t, related_id: rest.join('_') } : r))
-                                        }}
-                                        style={{ flex: 1, padding: '5px 6px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, color: '#475569' }}>
-                                        <option value="">차량/연결 선택</option>
-                                        {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                          <optgroup key={group.group} label={`${group.icon} ${group.group}`}>
-                                            {group.items.map(opt => (
-                                              <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>
-                                            ))}
-                                          </optgroup>
-                                        ))}
-                                      </select>
-                                      {splitRows.length > 2 && (
-                                        <button onClick={() => setSplitRows(prev => prev.filter((_, j) => j !== i))}
-                                          style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 14 }}
-                                          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}>×</button>
-                                      )}
+                                <div style={{ padding: '8px 12px', maxHeight: 240, overflow: 'auto' }}>
+                                  {splitRows.map((row, i) => {
+                                    const otherSum = splitRows.reduce((s, r, j) => j === i ? s : s + (Number(r.amount) || 0), 0)
+                                    const remaining = origAmount - otherSum
+                                    return (
+                                    <div key={`v${splitVer}_${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, padding: '4px 0', borderBottom: i < splitRows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', width: 16, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+                                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <input type="text"
+                                          defaultValue={row.amount ? row.amount.toLocaleString() : ''}
+                                          placeholder={remaining > 0 ? `나머지 ${remaining.toLocaleString()}` : '금액'}
+                                          onFocus={e => {
+                                            if (!row.amount || row.amount === 0) {
+                                              if (remaining > 0) e.target.value = remaining.toLocaleString()
+                                            }
+                                          }}
+                                          onBlur={e => {
+                                            const num = Number(e.target.value.replace(/[^0-9]/g, ''))
+                                            e.target.value = num ? num.toLocaleString() : ''
+                                            setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, amount: num } : r))
+                                          }}
+                                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                          style={{ width: '100%', padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontWeight: 600, textAlign: 'right', boxSizing: 'border-box' }} />
+                                        <select value={row.related_type && row.related_id ? `${row.related_type}_${row.related_id}` : ''}
+                                          onChange={e => {
+                                            const val = e.target.value
+                                            if (!val) { setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: '', related_id: '' } : r)); return }
+                                            const [t, ...rest] = val.split('_')
+                                            setSplitRows(prev => prev.map((r, j) => j === i ? { ...r, related_type: t, related_id: rest.join('_') } : r))
+                                          }}
+                                          style={{ width: '100%', padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, color: '#475569', background: '#f8fafc', boxSizing: 'border-box' }}>
+                                          <option value="">🔗 연결 선택</option>
+                                          {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(group => (
+                                            <optgroup key={group.group} label={`${group.icon} ${group.group}`}>
+                                              {group.items.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label} — {opt.sub}</option>
+                                              ))}
+                                            </optgroup>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <button onClick={() => {
+                                        if (splitRows.length <= 1) { setSplitRows([]); setSplitVer(v => v + 1); return }
+                                        setSplitRows(prev => prev.filter((_, j) => j !== i))
+                                        setSplitVer(v => v + 1)
+                                      }}
+                                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0 }}
+                                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#d1d5db'}
+                                        title={splitRows.length <= 1 ? '분할 취소' : '행 삭제'}>×</button>
                                     </div>
-                                  ))}
+                                    )
+                                  })}
                                 </div>
                                 {/* 합계 검증 */}
                                 <div style={{ padding: '6px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', background: diff === 0 ? '#f0fdf4' : '#fef2f2' }}>
@@ -5237,10 +6128,14 @@ function UploadContent() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: `${bulkGroupColor}20`, color: bulkGroupColor }}>{bulkGroup.split(' ')[0]} {bulkGroup.replace(/^[^\s]+\s/, '').substring(0, 6)}</span>
                             {bulkItem && <><span style={{ color: '#d1d5db' }}>›</span><span style={{ fontSize: 12, fontWeight: 700 }}>{bulkItem}</span></>}
-                            {bulkRelated && (() => {
+                            {perItemMode ? (
+                              Object.keys(perItemRelated).length > 0 && (
+                                <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>개별연결 {Object.values(perItemRelated).filter(Boolean).length}건</span></>
+                              )
+                            ) : bulkRelated ? (() => {
                               const ro = relatedOptions.flatMap(g => g.items).find(o => o.value === bulkRelated)
                               return ro ? <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>{ro.label}</span></> : null
-                            })()}
+                            })() : null}
                           </div>
                         </div>
                       )}
@@ -5270,8 +6165,24 @@ function UploadContent() {
                             // 일반 일괄분류
                             for (const si of selectedItems) {
                               updateTransaction(si.id, 'category', catValue)
-                              if (bulkRelated) {
+                              if (perItemMode) {
+                                // 개별 연결 모드: 각 항목마다 다른 연결
+                                const itemRelated = perItemRelated[si.id]
+                                // 연결 설정 또는 기존 연결 초기화
+                                updateTransaction(si.id, 'related_composite', itemRelated || '')
+                              } else if (bulkRelated) {
                                 updateTransaction(si.id, 'related_composite', bulkRelated)
+                              } else {
+                                // 연결 미지정 시 → 새 카테고리와 호환되지 않는 기존 연결 초기화
+                                if (si.related_type) {
+                                  const allowed = getFilteredRelatedGroups(catValue)
+                                  if (allowed !== null) {
+                                    const relGroup = relatedOptions.find(rg => rg.items.some(o => o.value === `${si.related_type}_${si.related_id}`))
+                                    if (!relGroup || !allowed.includes(relGroup.group)) {
+                                      updateTransaction(si.id, 'related_composite', '')
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -5347,7 +6258,7 @@ function UploadContent() {
                 const isDisplayCat = categoryMode === 'display' && groupBy === 'category'
                 const hasSubGroups = group.subGroups && Object.keys(group.subGroups).length > 1
                 const icon = isDisplayCat ? '' : (CATEGORY_ICONS[category] || '📋')
-                const groupName = isDisplayCat ? '' : getCategoryGroup(category, 'accounting')
+                const groupName = isDisplayCat ? '' : getCategoryGroup(category, 'accounting', customCategories)
                 const groupColor = CATEGORY_COLORS[isDisplayCat ? category : groupName] || '#64748b'
                 const isIncome = group.type === 'income'
 
@@ -5413,11 +6324,11 @@ function UploadContent() {
                       {activeTab === 'classify' && (() => {
                         const unclassifiedCount = group.items.filter((i: any) => {
                           const ic = i.ai_category || i.final_category || '미분류'
-                          return !ic || ic === '미분류' || ic === '기타'
+                          return !ic || ic === '미분류'
                         }).length
                         const classifiedItems = group.items.filter((i: any) => {
                           const ic = i.ai_category || i.final_category || '미분류'
-                          return ic && ic !== '미분류' && ic !== '기타'
+                          return ic && ic !== '미분류'
                         })
                         return (<>
                           {classifiedItems.length > 0 && (
@@ -5487,7 +6398,7 @@ function UploadContent() {
                                 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{subHeader.count}건 · {Math.abs(subHeader.amount).toLocaleString()}원</span>
                               </div>
                             )}
-                            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 36px', borderBottom: '1px solid #f8fafc', gap: 10, opacity: isConfirmed ? 0.5 : 1, background: selectedIds.has(item.id) ? 'rgba(59, 130, 246, 0.18)' : (item.source_data?.is_cancelled ? '#fef2f2' : 'transparent'), transition: 'background 0.2s' }}
+                            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 10px 36px', borderBottom: '1px solid #f8fafc', gap: 10, opacity: 1, background: selectedIds.has(item.id) ? 'rgba(59, 130, 246, 0.18)' : isConfirmed ? 'rgba(16, 185, 129, 0.06)' : (item.source_data?.is_cancelled ? '#fef2f2' : 'transparent'), transition: 'background 0.2s' }}
                               onMouseEnter={(e) => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(79, 70, 229, 0.06)' }}
                               onMouseLeave={(e) => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = item.source_data?.is_cancelled ? '#fef2f2' : 'transparent' }}>
 
@@ -5529,32 +6440,78 @@ function UploadContent() {
                                 {src.description || ''}
                               </span>
 
-                              {/* 분류 뱃지: 중분류 > 하분류(상세) */}
+                              {/* 분류 뱃지: 인터랙티브 팝오버 (카테고리별 뷰) */}
                               {(() => {
                                 const rawCat = item.ai_category || item.final_category || '미분류'
-                                const parts = getCategoryParts(rawCat, categoryMode)
-                                const groupColor = CATEGORY_COLORS[parts.group] || '#94a3b8'
-                                const icon = CATEGORY_ICONS[rawCat] || '📋'
+                                const catParts = getCategoryParts(rawCat, categoryMode, customCategories)
+                                const isUnclassified = !catParts.group
+                                const isCatOpen = openCategoryId === item.id
+                                const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
+                                const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
                                 return (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, minWidth: 0, maxWidth: 180 }}>
-                                    {parts.group && (
-                                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${groupColor}18`, color: groupColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>
-                                        {categoryMode === 'display' ? parts.group.replace(/^[^\s]+\s/, '') : parts.group}
-                                      </span>
-                                    )}
-                                    {parts.item && (
+                                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                                    <div onClick={(e) => { if (isCatOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
+                                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer', border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0', borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s', minWidth: 100 }}>
+                                      {isUnclassified ? (
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
+                                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 4px', borderRadius: 3, background: `${groupColor}18`, color: groupColor, whiteSpace: 'nowrap' }}>
+                                            {categoryMode === 'display' ? catParts.group.replace(/^[^\s]+\s/, '') : catParts.group}
+                                          </span>
+                                          {catParts.item && <>
+                                            <span style={{ fontSize: 9, color: '#cbd5e1' }}>›</span>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{groupIcon} {catParts.item}</span>
+                                          </>}
+                                        </div>
+                                      )}
+                                      <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>▼</span>
+                                    </div>
+                                    {/* 카테고리 팝오버 */}
+                                    {isCatOpen && catPopoverPos && (
                                       <>
-                                        <span style={{ fontSize: 10, color: '#cbd5e1' }}>›</span>
-                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }} title={`${icon} ${parts.item}`}>
-                                          {icon} {parts.item}
-                                        </span>
+                                        <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
+                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                          {catPopoverStep === 'group' ? (
+                                            <>
+                                              <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
+                                              {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map((i: string) => ({ label: i })) }))].map(g => (
+                                                <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
+                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                  onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
+                                                  onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
+                                                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
+                                                  {g.group}
+                                                </button>
+                                              ))}
+                                              <button onClick={() => { handleChangeCategory(item, '미분류'); setOpenCategoryId(null); setCatPopoverPos(null) }}
+                                                style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
+                                                ✕ 미분류로 초기화
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
+                                              </div>
+                                              <button onClick={() => { handleChangeCategory(item, catPopoverGroup); setOpenCategoryId(null); setCatPopoverPos(null) }}
+                                                style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
+                                                📂 중그룹만 (미지정)
+                                              </button>
+                                              {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
+                                                <button key={c} onClick={() => { handleChangeCategory(item, c); setOpenCategoryId(null); setCatPopoverPos(null) }}
+                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                  onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
+                                                  onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
+                                                  <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
+                                                  {c}
+                                                </button>
+                                              ))}
+                                            </>
+                                          )}
+                                        </div>
                                       </>
-                                    )}
-                                    {!parts.group && !parts.item && rawCat !== '미분류' && (
-                                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap' }}>{icon} {rawCat}</span>
-                                    )}
-                                    {rawCat === '미분류' && (
-                                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#fef2f2', color: '#dc2626' }}>❓ 미분류</span>
                                     )}
                                   </div>
                                 )
@@ -5640,7 +6597,7 @@ function UploadContent() {
                                               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s' }}
                                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                                               <span>🚛</span>
-                                              <div><div style={{ fontWeight: 700 }}>{j.investor_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{j.vehicle_number || j.car_number || ''}</div></div>
+                                              <div><div style={{ fontWeight: 700 }}>{j.investor_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{(() => { const jc = j.car_id ? cars.find((cc: any) => String(cc.id) === String(j.car_id)) : null; return jc ? `${jc.number || ''} ${(jc.brand || '') + ' ' + (jc.model || '')}`.trim() : ''; })()}</div></div>
                                             </div>
                                           ))}
                                           {linkPopoverTab === 'invest' && linkOptions.invest.map((inv: any) => (
@@ -5726,32 +6683,19 @@ function UploadContent() {
                               {/* Actions - Pending */}
                               {!isConfirmed && activeTab === 'classify' && (() => {
                                 const itemCat = item.ai_category || item.final_category || '미분류'
-                                const isUnclassified = !itemCat || itemCat === '미분류' || itemCat === '기타'
+                                const isUnclassified = !itemCat || itemCat === '미분류'
                                 return (
-                                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                                  {!isUnclassified ? (
-                                    <button onClick={() => handleConfirm(item)}
-                                      style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
-                                      확정
-                                    </button>
-                                  ) : (
-                                    <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 700, padding: '4px 6px', background: '#fef2f2', borderRadius: 4 }}>분류필요</span>
-                                  )}
-                                  <select defaultValue="" onChange={e => { if (e.target.value) handleConfirm(item, { category: e.target.value }) }}
+                                <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                                  <button onClick={() => handleConfirm(item)}
+                                    disabled={isUnclassified}
                                     style={{
-                                      border: isUnclassified ? '2px solid #f87171' : '1px solid #e2e8f0',
-                                      borderRadius: 6, padding: '3px 4px', fontSize: 12,
-                                      background: isUnclassified ? '#fef2f2' : '#fff',
-                                      color: isUnclassified ? '#dc2626' : '#64748b',
-                                      maxWidth: 120, cursor: 'pointer', fontWeight: isUnclassified ? 700 : 400,
+                                      background: isUnclassified ? '#f1f5f9' : '#0f172a',
+                                      color: isUnclassified ? '#94a3b8' : '#fff',
+                                      padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12,
+                                      border: 'none', cursor: isUnclassified ? 'not-allowed' : 'pointer',
                                     }}>
-                                    <option value="" disabled>{isUnclassified ? '⚠ 분류 선택' : '변경'}</option>
-                                    {(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).map(g => (
-                                      <optgroup key={g.group} label={g.group}>
-                                        {g.items.map(c => <option key={c} value={c}>{CATEGORY_ICONS[c] || '📋'} {c}</option>)}
-                                      </optgroup>
-                                    ))}
-                                  </select>
+                                    확정
+                                  </button>
                                   <button onClick={() => handleConfirmWithRule(item, item.ai_category)}
                                     style={{ background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}
                                     title="이 거래처를 규칙으로 학습합니다">
@@ -5865,9 +6809,9 @@ function UploadContent() {
                   const selected = items.filter(i => selectedIds.has(i.id) && i.status !== 'confirmed')
                   const confirmable = selected.filter(i => {
                     const cat = i.ai_category || '미분류'
-                    return cat !== '미분류' && cat !== '기타'
+                    return cat !== '미분류'
                   })
-                  if (confirmable.length === 0) return alert('확정 가능한 항목이 없습니다.\n(미분류/기타는 분류 후 확정 가능)')
+                  if (confirmable.length === 0) return alert('확정 가능한 항목이 없습니다.\n(미분류는 분류 후 확정 가능)')
                   if (!confirm(`${confirmable.length}건을 일괄 확정하시겠습니까?`)) return
                   for (const item of confirmable) {
                     await handleConfirm(item, { category: item.ai_category })
@@ -6009,7 +6953,7 @@ function UploadContent() {
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🚛</div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{j.investor_name || '미지정'}</div>
-                        <div style={{ fontSize: 13, color: '#64748b' }}>{j.vehicle_number || j.car_number || '-'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{(() => { const jc = j.car_id ? cars.find((cc: any) => String(cc.id) === String(j.car_id)) : null; return jc ? `${jc.number || '-'} ${(jc.brand || '') + ' ' + (jc.model || '')}`.trim() : '-'; })()}</div>
                       </div>
                     ))}
                     {linkModalTab === 'invest' && linkOptions.invest.map((inv: any) => (
@@ -6169,6 +7113,512 @@ function UploadContent() {
                 style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 800, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer' }}>
                 {deleting ? '삭제 중...' : `${deleteModal.count}건 삭제`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 중복 체크 결과 모달 ═══ */}
+      {dupModal.open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setDupModal(prev => ({ ...prev, open: false, onConfirm: null }))}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{
+            position: 'relative', background: '#fff', borderRadius: 16, width: '95%', maxWidth: 680,
+            maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+          }} onClick={e => e.stopPropagation()}>
+            {/* 헤더 */}
+            <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚠️</div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>중복 거래 발견</h3>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>총 {dupModal.totalCount.toLocaleString()}건의 중복이 감지되었습니다</p>
+                </div>
+              </div>
+            </div>
+            {/* 내용 스크롤 */}
+            <div style={{ overflowY: 'auto', padding: '12px 24px 16px', flex: 1 }}>
+              {dupModal.sections.map((sec, si) => (
+                <div key={si} style={{ marginBottom: si < dupModal.sections.length - 1 ? 16 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 16 }}>{sec.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{sec.title}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', background: '#fef2f2', padding: '2px 8px', borderRadius: 10 }}>{sec.count}건</span>
+                  </div>
+
+                  {/* 크로스 중복: 조건별 미리보기 필터 + 정확일치/유사 분리 표시 */}
+                  {sec.crossDetails && sec.crossDetails.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* 조건별 미리보기 필터 칩 */}
+                      {(() => {
+                        const allCross = sec.crossDetails!
+                        const exactCount = allCross.filter(cd => cd.matchLevel === 'exact').length
+                        const timeDiffCount = allCross.filter(cd => cd.matchLevel === 'time_diff').length
+                        const nameDiffCount = allCross.filter(cd => cd.similarReasons.some(r => r.includes('거래처'))).length
+                        const descDiffCount = allCross.filter(cd => cd.similarReasons.some(r => r.includes('적요'))).length
+                        const filters: { key: typeof dupModal.dupViewFilter; label: string; count: number; color: string; bg: string }[] = [
+                          { key: 'all', label: '전체', count: allCross.length, color: '#0f172a', bg: '#f1f5f9' },
+                          { key: 'exact', label: '정확일치', count: exactCount, color: '#166534', bg: '#dcfce7' },
+                          { key: 'time_diff', label: '시간 다름', count: timeDiffCount, color: '#991b1b', bg: '#fee2e2' },
+                          { key: 'name_diff', label: '거래처 유사', count: nameDiffCount, color: '#92400e', bg: '#fef3c7' },
+                          { key: 'desc_diff', label: '적요 다름', count: descDiffCount, color: '#3730a3', bg: '#e0e7ff' },
+                        ]
+                        return (
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4, padding: '6px 0' }}>
+                            <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, lineHeight: '22px', marginRight: 2 }}>조건별 보기:</span>
+                            {filters.map(f => (
+                              <button key={f.key}
+                                onClick={() => setDupModal(prev => ({ ...prev, dupViewFilter: f.key }))}
+                                style={{
+                                  fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                                  border: dupModal.dupViewFilter === f.key ? `2px solid ${f.color}` : '1px solid #e2e8f0',
+                                  background: dupModal.dupViewFilter === f.key ? f.bg : '#fff',
+                                  color: dupModal.dupViewFilter === f.key ? f.color : '#64748b',
+                                  transition: 'all 0.15s',
+                                }}>
+                                {f.label} {f.count > 0 && <span style={{ fontWeight: 800 }}>{f.count}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )
+                      })()}
+
+                      {/* 정확일치 항목 — dupViewFilter가 'all' 또는 'exact'일 때만 표시 */}
+                      {(() => {
+                        if (dupModal.dupViewFilter !== 'all' && dupModal.dupViewFilter !== 'exact') return null
+                        const exactItems = sec.crossDetails.filter(cd => cd.matchLevel === 'exact')
+                        if (exactItems.length === 0) return null
+                        const exactGlobalIndices = exactItems.map(cd => sec.crossDetails!.indexOf(cd))
+                        const exactSelectedCount = exactGlobalIndices.filter(idx => !dupModal.excludedIndices.has(idx)).length
+                        const exactAllSelected = exactSelectedCount === exactItems.length
+                        return (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 6 }}>
+                                ✅ 정확일치 {exactItems.length}건
+                              </span>
+                              <span style={{ fontSize: 10, color: '#64748b' }}>체크 해제하면 중복처리에서 제외됩니다</span>
+                              <span
+                                onClick={() => {
+                                  setDupModal(prev => {
+                                    const next = new Set(prev.excludedIndices)
+                                    if (exactAllSelected) {
+                                      exactGlobalIndices.forEach(idx => next.add(idx))
+                                    } else {
+                                      exactGlobalIndices.forEach(idx => next.delete(idx))
+                                    }
+                                    excludedIndicesRef.current = next
+                                    return { ...prev, excludedIndices: next }
+                                  })
+                                }}
+                                style={{ fontSize: 10, color: '#2563eb', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline', marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                              >
+                                {exactAllSelected ? '전체 해제' : `전체 선택 (${exactSelectedCount}/${exactItems.length})`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {exactItems.map((cd, ci) => {
+                                const globalIdx = sec.crossDetails!.indexOf(cd)
+                                const isExcluded = dupModal.excludedIndices.has(globalIdx)
+                                return (
+                                  <div key={ci} style={{
+                                    background: isExcluded ? '#f8fafc' : '#f0fdf4', borderRadius: 8, overflow: 'hidden',
+                                    border: isExcluded ? '1px solid #e2e8f0' : '1px solid #bbf7d0',
+                                    opacity: isExcluded ? 0.5 : 1, transition: 'all 0.2s', fontSize: 11,
+                                  }}>
+                                    <div style={{ padding: '5px 10px', background: isExcluded ? '#f1f5f9' : '#dcfce7', fontSize: 10, color: isExcluded ? '#94a3b8' : '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}>
+                                        <input type="checkbox" checked={!isExcluded}
+                                          onChange={() => {
+                                            setDupModal(prev => {
+                                              const next = new Set(prev.excludedIndices)
+                                              if (next.has(globalIdx)) next.delete(globalIdx)
+                                              else next.add(globalIdx)
+                                              excludedIndicesRef.current = next
+                                              return { ...prev, excludedIndices: next }
+                                            })
+                                          }}
+                                          style={{ width: 14, height: 14, accentColor: '#16a34a', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontWeight: 700 }}>#{globalIdx + 1}</span>
+                                      </label>
+                                      <span style={{ flex: 1 }}>{cd.matchReason}</span>
+                                    </div>
+                                    {!isExcluded && (() => {
+                                      const uDt = formatDatetime(cd.upload.date)
+                                      const dDt = formatDatetime(cd.db.date)
+                                      const uTime = (cd.upload.date || '').slice(11, 19)
+                                      const dTime = (cd.db.date || '').slice(11, 19)
+                                      const timeSame = (!uTime && !dTime) || uTime === dTime
+                                      const nameSame = (cd.upload.name || '').trim() === (cd.db.name || '').trim() || isNameNormalizedMatch(cd.upload.name, cd.db.name)
+                                      const descSame = (cd.upload.desc || '').trim().slice(0,30) === (cd.db.desc || '').trim().slice(0,30)
+                                      const sameColor = '#166534'; const diffColor = '#dc2626'
+                                      const sameBg = '#f0fdf4'; const diffBg = '#fef2f2'
+                                      const uType = (cd.upload as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const dType = (cd.db as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const typeSame = (cd.upload as any).type === (cd.db as any).type
+                                      const rows: { label: string; left: string; right: string; same: boolean }[] = [
+                                        { label: '날짜', left: uDt.date, right: dDt.date, same: uDt.date === dDt.date },
+                                        { label: '시간', left: uTime || '-', right: dTime || '-', same: !!timeSame },
+                                        { label: '입출금', left: uType, right: dType, same: typeSame },
+                                        { label: '거래처', left: cd.upload.name || '-', right: cd.db.name || '-', same: !!nameSame },
+                                        { label: '금액', left: cd.upload.amount.toLocaleString() + '원', right: cd.db.amount.toLocaleString() + '원', same: cd.upload.amount === cd.db.amount },
+                                        { label: '적요', left: (cd.upload.desc || '-').slice(0, 40), right: (cd.db.desc || '-').slice(0, 40), same: !!descSame },
+                                      ]
+                                      return (
+                                        <div style={{ fontSize: 11 }}>
+                                          {/* 컬럼 헤더 */}
+                                          <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', borderBottom: '1px solid #bbf7d0', fontSize: 10, fontWeight: 800 }}>
+                                            <div style={{ padding: '3px 6px', color: '#64748b' }}>필드</div>
+                                            <div style={{ padding: '3px 6px', color: '#2563eb', borderLeft: '1px solid #e2e8f0' }}>📤 업로드</div>
+                                            <div style={{ padding: '3px 6px', color: '#16a34a', borderLeft: '1px solid #e2e8f0' }}>💾 DB ({cd.where})</div>
+                                          </div>
+                                          {rows.map((row, ri) => (
+                                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', background: row.same ? sameBg : diffBg, borderBottom: ri < rows.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                                              <div style={{ padding: '3px 6px', fontSize: 10, fontWeight: 700, color: '#64748b' }}>{row.label}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.left}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.right}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* 시간 다름 항목 — 날짜+금액+거래처 일치하지만 시간이 다른 항목 */}
+                      {(() => {
+                        if (dupModal.dupViewFilter !== 'all' && dupModal.dupViewFilter !== 'time_diff') return null
+                        const timeDiffItems = sec.crossDetails.filter(cd => cd.matchLevel === 'time_diff')
+                        if (timeDiffItems.length === 0) return null
+                        const timeDiffGlobalIndices = timeDiffItems.map(cd => sec.crossDetails!.indexOf(cd))
+                        const timeDiffSelectedCount = timeDiffGlobalIndices.filter(idx => !dupModal.excludedIndices.has(idx)).length
+                        const timeDiffAllSelected = timeDiffSelectedCount === timeDiffItems.length
+                        return (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '2px 8px', borderRadius: 6 }}>
+                                🕐 시간 다름 {timeDiffItems.length}건
+                              </span>
+                              <span style={{ fontSize: 10, color: '#64748b' }}>날짜+금액+거래처 일치, 시간만 다름 — 체크 해제하면 제외</span>
+                              <span
+                                onClick={() => {
+                                  setDupModal(prev => {
+                                    const next = new Set(prev.excludedIndices)
+                                    if (timeDiffAllSelected) {
+                                      timeDiffGlobalIndices.forEach(idx => next.add(idx))
+                                    } else {
+                                      timeDiffGlobalIndices.forEach(idx => next.delete(idx))
+                                    }
+                                    excludedIndicesRef.current = next
+                                    return { ...prev, excludedIndices: next }
+                                  })
+                                }}
+                                style={{ fontSize: 10, color: '#2563eb', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline', marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                              >
+                                {timeDiffAllSelected ? '전체 해제' : `전체 선택 (${timeDiffSelectedCount}/${timeDiffItems.length})`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {timeDiffItems.map((cd, ci) => {
+                                const globalIdx = sec.crossDetails!.indexOf(cd)
+                                const isExcluded = dupModal.excludedIndices.has(globalIdx)
+                                return (
+                                  <div key={ci} style={{
+                                    background: isExcluded ? '#f8fafc' : '#fef2f2', borderRadius: 8, overflow: 'hidden',
+                                    border: isExcluded ? '1px solid #e2e8f0' : '1px solid #fecaca',
+                                    opacity: isExcluded ? 0.5 : 1, transition: 'all 0.2s', fontSize: 11,
+                                  }}>
+                                    <div style={{ padding: '5px 10px', background: isExcluded ? '#f1f5f9' : '#fee2e2', fontSize: 10, color: isExcluded ? '#94a3b8' : '#991b1b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}>
+                                        <input type="checkbox" checked={!isExcluded}
+                                          onChange={() => {
+                                            setDupModal(prev => {
+                                              const next = new Set(prev.excludedIndices)
+                                              if (next.has(globalIdx)) next.delete(globalIdx)
+                                              else next.add(globalIdx)
+                                              excludedIndicesRef.current = next
+                                              return { ...prev, excludedIndices: next }
+                                            })
+                                          }}
+                                          style={{ width: 14, height: 14, accentColor: '#dc2626', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontWeight: 700 }}>#{globalIdx + 1}</span>
+                                      </label>
+                                      <span style={{ flex: 1 }}>{cd.matchReason}</span>
+                                    </div>
+                                    {!isExcluded && (() => {
+                                      const uDt = formatDatetime(cd.upload.date)
+                                      const dDt = formatDatetime(cd.db.date)
+                                      const uTime = (cd.upload.date || '').slice(11, 19)
+                                      const dTime = (cd.db.date || '').slice(11, 19)
+                                      const timeSame = (!uTime && !dTime) || uTime === dTime
+                                      const nameSame = (cd.upload.name || '').trim() === (cd.db.name || '').trim() || isNameNormalizedMatch(cd.upload.name, cd.db.name)
+                                      const descSame = (cd.upload.desc || '').trim().slice(0,30) === (cd.db.desc || '').trim().slice(0,30)
+                                      const sameColor = '#166534'; const diffColor = '#dc2626'
+                                      const sameBg = '#f0fdf4'; const diffBg = '#fef2f2'
+                                      const uType = (cd.upload as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const dType = (cd.db as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const typeSame = (cd.upload as any).type === (cd.db as any).type
+                                      const rows: { label: string; left: string; right: string; same: boolean }[] = [
+                                        { label: '날짜', left: uDt.date, right: dDt.date, same: uDt.date === dDt.date },
+                                        { label: '시간', left: uTime || '-', right: dTime || '-', same: !!timeSame },
+                                        { label: '입출금', left: uType, right: dType, same: typeSame },
+                                        { label: '거래처', left: cd.upload.name || '-', right: cd.db.name || '-', same: !!nameSame },
+                                        { label: '금액', left: cd.upload.amount.toLocaleString() + '원', right: cd.db.amount.toLocaleString() + '원', same: cd.upload.amount === cd.db.amount },
+                                        { label: '적요', left: (cd.upload.desc || '-').slice(0, 40), right: (cd.db.desc || '-').slice(0, 40), same: !!descSame },
+                                      ]
+                                      return (
+                                        <div style={{ fontSize: 11 }}>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', borderBottom: '1px solid #fecaca', fontSize: 10, fontWeight: 800 }}>
+                                            <div style={{ padding: '3px 6px', color: '#64748b' }}>필드</div>
+                                            <div style={{ padding: '3px 6px', color: '#2563eb', borderLeft: '1px solid #e2e8f0' }}>📤 업로드</div>
+                                            <div style={{ padding: '3px 6px', color: '#16a34a', borderLeft: '1px solid #e2e8f0' }}>💾 DB ({cd.where})</div>
+                                          </div>
+                                          {rows.map((row, ri) => (
+                                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', background: row.same ? sameBg : diffBg, borderBottom: ri < rows.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                                              <div style={{ padding: '3px 6px', fontSize: 10, fontWeight: 700, color: '#64748b' }}>{row.label}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.left}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.right}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* 유사 항목 (검수 필요) — 조건별 필터 적용 + 개별 체크박스 */}
+                      {(() => {
+                        // dupViewFilter에 따라 표시 항목 결정
+                        if (dupModal.dupViewFilter === 'exact') return null // 정확일치만 보기
+                        if (dupModal.dupViewFilter === 'time_diff') return null // 시간다름 필터는 위 섹션에서 처리
+
+                        let similarItems: typeof sec.crossDetails = []
+                        if (dupModal.dupViewFilter === 'name_diff') {
+                          // 거래처 유사 필터: matchLevel 무관, similarReasons에 거래처 포함된 모든 항목
+                          similarItems = sec.crossDetails.filter(cd => cd.similarReasons.some(r => r.includes('거래처')))
+                        } else if (dupModal.dupViewFilter === 'desc_diff') {
+                          // 적요 다름 필터: matchLevel 무관, similarReasons에 적요 포함된 모든 항목
+                          similarItems = sec.crossDetails.filter(cd => cd.similarReasons.some(r => r.includes('적요')))
+                        } else {
+                          // all: matchLevel이 similar인 항목만
+                          similarItems = sec.crossDetails.filter(cd => cd.matchLevel === 'similar')
+                        }
+                        if (similarItems.length === 0) return null
+                        const similarGlobalIndices = similarItems.map(cd => sec.crossDetails!.indexOf(cd))
+                        const similarSelectedCount = similarGlobalIndices.filter(idx => !dupModal.excludedIndices.has(idx)).length
+                        const similarAllSelected = similarSelectedCount === similarItems.length
+                        return (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '2px 8px', borderRadius: 6 }}>
+                                ⚠️ 유사 항목 {similarItems.length}건{dupModal.dupViewFilter !== 'all' ? ` (${dupModal.dupViewFilter === 'time_diff' ? '시간 다름' : dupModal.dupViewFilter === 'name_diff' ? '거래처 유사' : '적요 다름'} 필터)` : ''} — 검수 필요
+                              </span>
+                              <span style={{ fontSize: 10, color: '#64748b' }}>체크 해제하면 중복처리에서 제외됩니다</span>
+                              <span
+                                onClick={() => {
+                                  setDupModal(prev => {
+                                    const next = new Set(prev.excludedIndices)
+                                    if (similarAllSelected) {
+                                      similarGlobalIndices.forEach(idx => next.add(idx))
+                                    } else {
+                                      similarGlobalIndices.forEach(idx => next.delete(idx))
+                                    }
+                                    excludedIndicesRef.current = next
+                                    return { ...prev, excludedIndices: next }
+                                  })
+                                }}
+                                style={{ fontSize: 10, color: '#2563eb', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline', marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                              >
+                                {similarAllSelected ? '전체 해제' : `전체 선택 (${similarSelectedCount}/${similarItems.length})`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {similarItems.map((cd, ci) => {
+                                const globalIdx = sec.crossDetails!.indexOf(cd)
+                                const isExcluded = dupModal.excludedIndices.has(globalIdx)
+                                return (
+                                  <div key={ci} style={{
+                                    background: isExcluded ? '#f8fafc' : '#fffbeb', borderRadius: 8, overflow: 'hidden',
+                                    border: isExcluded ? '1px solid #e2e8f0' : '1px solid #fde68a',
+                                    opacity: isExcluded ? 0.6 : 1, transition: 'all 0.2s',
+                                  }}>
+                                    {/* 헤더: 체크박스 + 매칭 사유 + 유사 사유 배지 */}
+                                    <div style={{ padding: '6px 10px', background: isExcluded ? '#f1f5f9' : '#fef3c7', fontSize: 10, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', flexShrink: 0 }}>
+                                        <input type="checkbox" checked={!isExcluded}
+                                          onChange={() => {
+                                            setDupModal(prev => {
+                                              const next = new Set(prev.excludedIndices)
+                                              if (next.has(globalIdx)) next.delete(globalIdx)
+                                              else next.add(globalIdx)
+                                              excludedIndicesRef.current = next // ref 동기화
+                                              return { ...prev, excludedIndices: next }
+                                            })
+                                          }}
+                                          style={{ width: 14, height: 14, accentColor: '#d97706', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontWeight: 700, color: isExcluded ? '#94a3b8' : '#92400e' }}>#{globalIdx + 1}</span>
+                                      </label>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ color: '#92400e', fontWeight: 600, marginBottom: 3 }}>{cd.matchReason}</div>
+                                        {/* 유사 사유 배지들 */}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                                          {cd.similarReasons.map((reason, ri) => (
+                                            <span key={ri} style={{
+                                              fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                                              background: reason.includes('시간') ? '#fee2e2' : reason.includes('거래처') ? '#fef3c7' : '#e0e7ff',
+                                              color: reason.includes('시간') ? '#991b1b' : reason.includes('거래처') ? '#92400e' : '#3730a3',
+                                            }}>
+                                              {reason}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {/* 데이터 비교 — 동일 행 구조, 같은부분 초록 / 다른부분 빨강 */}
+                                    {(() => {
+                                      const uDt = formatDatetime(cd.upload.date)
+                                      const dDt = formatDatetime(cd.db.date)
+                                      const uTime = (cd.upload.date || '').slice(11, 19)
+                                      const dTime = (cd.db.date || '').slice(11, 19)
+                                      const timeSame = (!uTime && !dTime) || uTime === dTime
+                                      const nameSame = (cd.upload.name || '').trim() === (cd.db.name || '').trim() || isNameNormalizedMatch(cd.upload.name, cd.db.name)
+                                      const descSame = (cd.upload.desc || '').trim().slice(0,30) === (cd.db.desc || '').trim().slice(0,30)
+                                      const sameColor = '#166534'; const diffColor = '#dc2626'
+                                      const sameBg = '#f0fdf4'; const diffBg = '#fef2f2'
+                                      const uType = (cd.upload as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const dType = (cd.db as any).type === 'income' ? '🔵 입금' : '🔴 출금'
+                                      const typeSame = (cd.upload as any).type === (cd.db as any).type
+                                      const rows: { label: string; left: string; right: string; same: boolean }[] = [
+                                        { label: '날짜', left: uDt.date, right: dDt.date, same: uDt.date === dDt.date },
+                                        { label: '시간', left: uTime || '-', right: dTime || '-', same: !!timeSame },
+                                        { label: '입출금', left: uType, right: dType, same: typeSame },
+                                        { label: '거래처', left: cd.upload.name || '-', right: cd.db.name || '-', same: !!nameSame },
+                                        { label: '금액', left: cd.upload.amount.toLocaleString() + '원', right: cd.db.amount.toLocaleString() + '원', same: cd.upload.amount === cd.db.amount },
+                                        { label: '적요', left: (cd.upload.desc || '-').slice(0, 40), right: (cd.db.desc || '-').slice(0, 40), same: !!descSame },
+                                      ]
+                                      return (
+                                        <div style={{ fontSize: 11 }}>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', borderBottom: '1px solid #fde68a', fontSize: 10, fontWeight: 800 }}>
+                                            <div style={{ padding: '3px 6px', color: '#64748b' }}>필드</div>
+                                            <div style={{ padding: '3px 6px', color: '#2563eb', borderLeft: '1px solid #e2e8f0' }}>📤 업로드</div>
+                                            <div style={{ padding: '3px 6px', color: '#16a34a', borderLeft: '1px solid #e2e8f0' }}>💾 DB ({cd.where})</div>
+                                          </div>
+                                          {rows.map((row, ri) => (
+                                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 1fr', background: row.same ? sameBg : diffBg, borderBottom: ri < rows.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                                              <div style={{ padding: '3px 6px', fontSize: 10, fontWeight: 700, color: '#64748b' }}>{row.label}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.left}</div>
+                                              <div style={{ padding: '3px 6px', fontWeight: 600, color: row.same ? sameColor : diffColor, borderLeft: '1px solid rgba(0,0,0,0.06)', wordBreak: 'break-all' }}>{row.right}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {sec.crossDetails.length < sec.count && (
+                        <div style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', padding: 4 }}>... 외 {sec.count - sec.crossDetails.length}건</div>
+                      )}
+                    </div>
+                  ) : (
+                    /* 일반 중복 (내부 중복, DB 중복) */
+                    <div style={{ background: '#f8fafc', borderRadius: 10, overflow: 'hidden' }}>
+                      {sec.details.map((d, di) => (
+                        <div key={di} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 12px', fontSize: 12, color: '#334155',
+                          borderBottom: di < sec.details.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{d.text}</span>
+                          {d.sub && <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, marginLeft: 8 }}>{d.sub}</span>}
+                        </div>
+                      ))}
+                      {sec.details.length === 0 && !sec.crossDetails && (
+                        <div style={{ padding: '8px 12px', fontSize: 12, color: '#94a3b8' }}>상세 정보 없음</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* 액션 설명 + 선택 현황 + 버튼 */}
+            <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #f1f5f9' }}>
+              {dupModal.hasCross && (() => {
+                const crossSection = dupModal.sections.find(s => s.crossDetails)
+                const totalCross = crossSection?.crossDetails?.length || 0
+                const allExact = crossSection?.crossDetails?.filter(cd => cd.matchLevel === 'exact') || []
+                const allTimeDiff = crossSection?.crossDetails?.filter(cd => cd.matchLevel === 'time_diff') || []
+                const allSimilar = crossSection?.crossDetails?.filter(cd => cd.matchLevel === 'similar') || []
+                // 각 타입별 제외 건수 계산
+                const excludedExactCount = allExact.filter(cd => dupModal.excludedIndices.has(crossSection?.crossDetails?.indexOf(cd) ?? -1)).length
+                const excludedTimeDiffCount = allTimeDiff.filter(cd => dupModal.excludedIndices.has(crossSection?.crossDetails?.indexOf(cd) ?? -1)).length
+                const excludedSimilarCount = allSimilar.filter(cd => dupModal.excludedIndices.has(crossSection?.crossDetails?.indexOf(cd) ?? -1)).length
+                const activeExact = allExact.length - excludedExactCount
+                const activeTimeDiff = allTimeDiff.length - excludedTimeDiffCount
+                const activeSimilar = allSimilar.length - excludedSimilarCount
+                const activeCount = activeExact + activeTimeDiff + activeSimilar
+                return (
+                  <div style={{ margin: '0 0 10px', fontSize: 11, color: '#64748b', lineHeight: 1.6, background: '#f0f9ff', padding: '10px 12px', borderRadius: 8, border: '1px solid #bae6fd' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, color: '#0f172a' }}>처리 대상:</span>
+                      {allExact.length > 0 && (
+                        <span style={{ background: excludedExactCount > 0 ? '#fef3c7' : '#dcfce7', color: excludedExactCount > 0 ? '#92400e' : '#166534', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                          정확일치 {activeExact}/{allExact.length}건{excludedExactCount > 0 ? ' 선택' : ''}
+                        </span>
+                      )}
+                      {allTimeDiff.length > 0 && (
+                        <span style={{ background: excludedTimeDiffCount > 0 ? '#fef3c7' : '#fee2e2', color: excludedTimeDiffCount > 0 ? '#92400e' : '#991b1b', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                          시간다름 {activeTimeDiff}/{allTimeDiff.length}건{excludedTimeDiffCount > 0 ? ' 선택' : ''}
+                        </span>
+                      )}
+                      {allSimilar.length > 0 && (
+                        <span style={{ background: excludedSimilarCount > 0 ? '#fef3c7' : '#dcfce7', color: excludedSimilarCount > 0 ? '#92400e' : '#166534', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                          유사 {activeSimilar}/{allSimilar.length}건 선택
+                        </span>
+                      )}
+                      <span style={{ fontWeight: 800, color: '#2563eb' }}>→ 총 {activeCount}건 처리</span>
+                    </div>
+                    <strong>중복 정리</strong>: 선택된 크로스 중복을 업로드 목록에서 제거<br />
+                    <strong>재파싱 업데이트</strong>: 선택된 항목의 기존 DB 데이터를 새 파싱 결과로 덮어쓰기 (거래처명, 분류 등 갱신)
+                  </div>
+                )
+              })()}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setDupModal(prev => ({ ...prev, open: false, onConfirm: null, onUpdate: null }))}
+                  style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  취소
+                </button>
+                {dupModal.hasCross && dupModal.onUpdate && (
+                  <button onClick={() => dupModal.onUpdate?.()}
+                    style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                    🔄 재파싱 업데이트
+                  </button>
+                )}
+                <button onClick={() => dupModal.onConfirm?.()}
+                  style={{ flex: 1, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                  🗑️ 중복 정리
+                </button>
+              </div>
             </div>
           </div>
         </div>

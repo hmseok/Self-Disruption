@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../utils/supabase'
+import WorkflowBoard, { type AccidentCase, type WorkflowStage } from './WorkflowBoard'
+import WorkflowDetail from './WorkflowDetail'
 
 // ============================================
 // Types — 실제 accident_records DB 컬럼에 맞춤
@@ -177,7 +179,88 @@ export default function AccidentsMainPage() {
   // Jandi raw message toggle
   const [showJandiRaw, setShowJandiRaw] = useState(false)
 
+  // ── Workflow view state
+  const [mainView, setMainView] = useState<'workflow' | 'legacy'>('workflow')
+  const [selectedWorkflowCase, setSelectedWorkflowCase] = useState<AccidentCase | null>(null)
+  const [availableCarsForDispatch, setAvailableCarsForDispatch] = useState<{ id: number; number: string; brand: string; model: string; status: string }[]>([])
+
+  // 유휴 차량 조회 (배차준비용)
+  useEffect(() => {
+    if (!effectiveCompanyId) return
+    supabase
+      .from('cars')
+      .select('id,number,brand,model,status')
+      .eq('company_id', effectiveCompanyId)
+      .in('status', ['available', 'idle', '대기', '운행중'])
+      .order('brand')
+      .then(({ data }) => setAvailableCarsForDispatch(data || []))
+  }, [effectiveCompanyId])
+
+  // ── Workflow handlers
+  const handleWorkflowStageChange = async (caseId: number, newStage: WorkflowStage) => {
+    const { error } = await supabase
+      .from('accident_records')
+      .update({ workflow_stage: newStage })
+      .eq('id', caseId)
+    if (error) { console.error('단계 변경 실패:', error); return }
+    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, workflow_stage: newStage } as any : a))
+    if (selectedWorkflowCase?.id === caseId) {
+      setSelectedWorkflowCase(prev => prev ? { ...prev, workflow_stage: newStage } : null)
+    }
+  }
+
+  const handleChecklistToggle = async (caseId: number, checkKey: string, checked: boolean) => {
+    const acc = accidents.find(a => a.id === caseId) as any
+    if (!acc) return
+    const currentChecklist = acc.workflow_checklist || {}
+    const newChecklist = { ...currentChecklist, [checkKey]: checked }
+    const { error } = await supabase
+      .from('accident_records')
+      .update({ workflow_checklist: newChecklist })
+      .eq('id', caseId)
+    if (error) { console.error('체크리스트 업데이트 실패:', error); return }
+    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, workflow_checklist: newChecklist } as any : a))
+    if (selectedWorkflowCase?.id === caseId) {
+      setSelectedWorkflowCase(prev => prev ? { ...prev, workflow_checklist: newChecklist } : null)
+    }
+  }
+
+  const handleFieldUpdate = async (caseId: number, fields: Record<string, any>) => {
+    const { error } = await supabase
+      .from('accident_records')
+      .update(fields)
+      .eq('id', caseId)
+    if (error) { console.error('필드 업데이트 실패:', error); return }
+    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, ...fields } as any : a))
+    if (selectedWorkflowCase?.id === caseId) {
+      setSelectedWorkflowCase(prev => prev ? { ...prev, ...fields } : null)
+    }
+  }
+
   const getCar = useCallback((id: any) => cars.find(c => Number(c.id) === Number(id)), [cars])
+
+  // AccidentRecord → AccidentCase 변환
+  const workflowCases: AccidentCase[] = useMemo(() => {
+    return accidents.map(a => {
+      const car = cars.find(c => Number(c.id) === Number(a.car_id))
+      return {
+        ...a,
+        car_number: car?.number || '',
+        car_model: car ? `${car.brand} ${car.model}` : '',
+        workflow_stage: (a as any).workflow_stage || 'accident_reported',
+        workflow_checklist: (a as any).workflow_checklist || {},
+        replacement_car_number: (a as any).replacement_car_number || '',
+        delivery_location: (a as any).delivery_location || '',
+        delivery_date: (a as any).delivery_date || '',
+        return_date: (a as any).return_date || '',
+        transport_company: (a as any).transport_company || '',
+        billing_amount: (a as any).billing_amount || 0,
+        payment_received: (a as any).payment_received || 0,
+        payment_date: (a as any).payment_date || '',
+        assigned_to: (a as any).assigned_to || '',
+      } as AccidentCase
+    })
+  }, [accidents, cars])
 
   // ── Fetch
   const fetchAccidents = useCallback(async () => {
@@ -455,20 +538,73 @@ export default function AccidentsMainPage() {
       {/* ── Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚨 사고 관리</h1>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+            {mainView === 'workflow' ? '📋 워크플로우' : '🚨 사고 관리'}
+          </h1>
           <p className="text-gray-500 mt-1 text-sm">
-            전체 <span className="font-bold text-steel-600">{accidents.length}</span>건
-            {filteredAccidents.length !== accidents.length && ` / 검색 ${filteredAccidents.length}건`}
+            {mainView === 'workflow'
+              ? <>진행 중 <span className="font-bold text-steel-600">{workflowCases.filter(c => c.workflow_stage !== 'closed').length}</span>건</>
+              : <>전체 <span className="font-bold text-steel-600">{accidents.length}</span>건
+                {filteredAccidents.length !== accidents.length && ` / 검색 ${filteredAccidents.length}건`}</>
+            }
           </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
-        >
-          + 사고 등록
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 뷰 전환 */}
+          <div className="flex bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => setMainView('workflow')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                mainView === 'workflow' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              📋 워크플로우
+            </button>
+            <button
+              onClick={() => setMainView('legacy')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                mainView === 'legacy' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              📊 목록
+            </button>
+          </div>
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
+          >
+            + 사고 등록
+          </button>
+        </div>
       </div>
 
+      {/* ── Workflow Board View */}
+      {mainView === 'workflow' && (
+        <>
+          <WorkflowBoard
+            cases={workflowCases}
+            cars={cars as any}
+            onStageChange={handleWorkflowStageChange}
+            onCaseClick={(c) => setSelectedWorkflowCase(c)}
+            onChecklistToggle={handleChecklistToggle}
+          />
+          {selectedWorkflowCase && (
+            <WorkflowDetail
+              caseData={selectedWorkflowCase}
+              cars={cars as any}
+              availableCars={availableCarsForDispatch}
+              onClose={() => setSelectedWorkflowCase(null)}
+              onStageChange={handleWorkflowStageChange}
+              onChecklistToggle={handleChecklistToggle}
+              onFieldUpdate={handleFieldUpdate}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── Legacy View (KPI + Table) */}
+      {mainView === 'legacy' && (
+      <div>
       {/* ── KPI Cards */}
       {accidents.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -741,6 +877,8 @@ export default function AccidentsMainPage() {
           </>
         )}
       </div>
+      </div>
+      )}
 
       {/* ── Modal */}
       {showModal && (

@@ -613,18 +613,37 @@ export default function GeneralInvestDetail() {
                     </div>
                   </div>
                 </div>
-                {/* 세금 유형 */}
-                <div className="mt-4">
-                  <label className="block text-[11px] text-slate-400 mb-1">세금 유형</label>
-                  <select
-                    className="w-full border border-slate-200 p-2.5 rounded-lg font-semibold bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
-                    value={item.tax_type || '이자소득(27.5%)'}
-                    onChange={e => setItem({ ...item, tax_type: e.target.value })}
-                  >
-                    <option value="이자소득(27.5%)">이자소득 (27.5%)</option>
-                    <option value="사업소득(3.3%)">사업소득 (3.3%)</option>
-                    <option value="세금계산서">세금계산서 (VAT 10%)</option>
-                  </select>
+                {/* 세금 유형 + 거치기간 */}
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">세금 유형</label>
+                    <select
+                      className="w-full border border-slate-200 p-2.5 rounded-lg font-semibold bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
+                      value={item.tax_type || '이자소득(27.5%)'}
+                      onChange={e => setItem({ ...item, tax_type: e.target.value })}
+                    >
+                      <option value="이자소득(27.5%)">이자소득 (27.5%)</option>
+                      <option value="사업소득(3.3%)">사업소득 (3.3%)</option>
+                      <option value="세금계산서">세금계산서 (VAT 10%)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">거치기간</label>
+                    <div className="relative">
+                      <select
+                        className="w-full border border-slate-200 p-2.5 rounded-lg font-semibold bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all"
+                        value={item.grace_period_months || 0}
+                        onChange={e => setItem({ ...item, grace_period_months: Number(e.target.value) })}
+                      >
+                        <option value={0}>없음</option>
+                        <option value={1}>1개월</option>
+                        <option value={2}>2개월</option>
+                        <option value={3}>3개월</option>
+                        <option value={6}>6개월</option>
+                        <option value={12}>12개월</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
                 {item.invest_amount > 0 && (
                   <div className="mt-3 pt-3 border-t border-slate-200/50">
@@ -939,6 +958,166 @@ export default function GeneralInvestDetail() {
                 )}
               </div>
             )}
+
+            {/* ── 월별 이자 계산 근거 ── */}
+            {item.interest_rate > 0 && (() => {
+              const rate = item.interest_rate || 0
+              const gracePeriod = item.grace_period_months || 0
+              const contractStart = item.contract_start_date
+              const fallbackAmt = item.invest_amount || 0
+
+              // 계약 시작월 ~ 현재월까지 월 목록 생성
+              const months: string[] = []
+              if (contractStart) {
+                const now = new Date()
+                const cur = new Date(contractStart)
+                cur.setDate(1)
+                while (cur <= now && months.length < 24) {
+                  months.push(cur.toISOString().slice(0, 7))
+                  cur.setMonth(cur.getMonth() + 1)
+                }
+              }
+
+              // 일할계산 로직 (SettlementDashboard와 동일)
+              const calcMonthDetail = (baseMonth: string) => {
+                const [y, mo] = baseMonth.split('-').map(Number)
+                const daysInMonth = new Date(y, mo, 0).getDate()
+                const monthStart = `${baseMonth}-01`
+                const endOfMonth = `${baseMonth}-${String(daysInMonth).padStart(2, '0')}`
+
+                // 거치기간 체크
+                let isGrace = false
+                if (gracePeriod > 0 && contractStart) {
+                  const sd = new Date(contractStart)
+                  const graceEnd = new Date(sd.getFullYear(), sd.getMonth() + gracePeriod, sd.getDate())
+                  const monthEnd = new Date(y, mo - 1, daysInMonth)
+                  if (monthEnd < graceEnd) isGrace = true
+                }
+
+                // 입금/상환 이벤트 수집
+                type Evt = { date: string; amount: number; label: string }
+                const events: Evt[] = []
+                const txIncome = investTxList.filter(t => t.type === 'income')
+                const txExpense = investTxList.filter(t => t.type === 'expense')
+
+                txIncome.forEach(t => {
+                  events.push({ date: t.transaction_date.slice(0, 10), amount: Math.abs(t.amount || 0), label: t.client_name || t.description || '입금' })
+                })
+                // 원금상환 (이자 제외)
+                txExpense.forEach(t => {
+                  const desc = ((t.client_name || '') + (t.description || '') + (t.category || '')).toLowerCase()
+                  const isInterest = desc.includes('이자') || desc.includes('interest') || desc.includes('배당')
+                  if (!isInterest) {
+                    events.push({ date: t.transaction_date.slice(0, 10), amount: -Math.abs(t.amount || 0), label: t.client_name || t.description || '원금상환' })
+                  }
+                })
+
+                const hasDeposits = events.length > 0
+
+                if (!hasDeposits) {
+                  // fallback: 계약금액 기준
+                  if (contractStart && contractStart.slice(0, 7) > baseMonth) {
+                    return { baseMonth, daysInMonth, isGrace, hasDeposits, balance: 0, weighted: 0, interest: 0, details: [] as { from: number; to: number; balance: number; days: number }[] }
+                  }
+                  if (contractStart && contractStart.slice(0, 7) === baseMonth) {
+                    const startDay = parseInt(contractStart.slice(8, 10)) || 1
+                    const remainDays = daysInMonth - startDay + 1
+                    const weighted = Math.floor(fallbackAmt * remainDays / daysInMonth)
+                    const interest = isGrace ? 0 : Math.floor((weighted * (rate / 100)) / 12)
+                    return { baseMonth, daysInMonth, isGrace, hasDeposits, balance: fallbackAmt, weighted, interest, details: [{ from: startDay, to: daysInMonth, balance: fallbackAmt, days: remainDays }] }
+                  }
+                  const interest = isGrace ? 0 : Math.floor((fallbackAmt * (rate / 100)) / 12)
+                  return { baseMonth, daysInMonth, isGrace, hasDeposits, balance: fallbackAmt, weighted: fallbackAmt, interest, details: [{ from: 1, to: daysInMonth, balance: fallbackAmt, days: daysInMonth }] }
+                }
+
+                // 일할계산
+                events.sort((a, b) => a.date.localeCompare(b.date))
+                let running = 0
+                events.filter(e => e.date < monthStart).forEach(e => { running += e.amount })
+
+                const inMonth = events.filter(e => e.date >= monthStart && e.date <= endOfMonth)
+                let weightedSum = 0
+                let prevDay = 1
+                const details: { from: number; to: number; balance: number; days: number }[] = []
+
+                for (const evt of inMonth) {
+                  const evtDay = parseInt(evt.date.slice(8, 10)) || 1
+                  const holdDays = evtDay - prevDay
+                  if (holdDays > 0) {
+                    weightedSum += running * holdDays
+                    details.push({ from: prevDay, to: evtDay - 1, balance: running, days: holdDays })
+                  }
+                  running += evt.amount
+                  prevDay = evtDay
+                }
+                const remainDays = daysInMonth - prevDay + 1
+                if (remainDays > 0) {
+                  weightedSum += running * remainDays
+                  details.push({ from: prevDay, to: daysInMonth, balance: running, days: remainDays })
+                }
+
+                const weighted = Math.floor(weightedSum / daysInMonth)
+                const interest = isGrace ? 0 : Math.floor((weighted * (rate / 100)) / 12)
+                return { baseMonth, daysInMonth, isGrace, hasDeposits, balance: running, weighted, interest, details }
+              }
+
+              const monthDetails = months.map(m => calcMonthDetail(m)).reverse()
+
+              return (
+                <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-slate-900">월별 이자 계산 근거</h3>
+                    <span className="text-[11px] text-slate-400">이자율 {rate}% / 거치 {gracePeriod}개월</span>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {monthDetails.map(md => (
+                      <details key={md.baseMonth} className="group">
+                        <summary className="px-6 py-3.5 flex justify-between items-center cursor-pointer hover:bg-slate-50/50 transition-colors list-none">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-slate-700">{md.baseMonth}</span>
+                            {md.isGrace && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200">거치기간</span>}
+                            {!md.hasDeposits && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 ring-1 ring-slate-200">계약금액 기준</span>}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">가중평균잔액</p>
+                              <p className="text-sm font-bold text-slate-700">{nf(md.weighted)}원</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-slate-400">이자</p>
+                              <p className={`text-sm font-bold ${md.interest > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{nf(md.interest)}원</p>
+                            </div>
+                            <svg className="w-4 h-4 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </summary>
+                        <div className="px-6 pb-4 bg-slate-50/30">
+                          <div className="text-xs text-slate-500 space-y-1.5 mt-1">
+                            <p className="font-medium text-slate-600 mb-2">일할계산 상세 ({md.daysInMonth}일 기준)</p>
+                            {md.details.map((d, i) => (
+                              <div key={i} className="flex justify-between items-center py-1 px-2 rounded bg-white/60">
+                                <span>{d.from}일 ~ {d.to}일 ({d.days}일간)</span>
+                                <span className="font-medium">{nf(d.balance)}원 x {d.days}일</span>
+                              </div>
+                            ))}
+                            <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-semibold text-slate-700">
+                              <span>= 가중합계 / {md.daysInMonth}일</span>
+                              <span>{nf(md.weighted)}원</span>
+                            </div>
+                            <div className="flex justify-between text-slate-600">
+                              <span>이자 = {nf(md.weighted)} x {rate}% / 12</span>
+                              <span className="font-bold text-emerald-600">{nf(md.interest)}원{md.isGrace ? ' (거치기간 → 0원)' : ''}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </details>
+                    ))}
+                    {monthDetails.length === 0 && (
+                      <div className="text-center py-8 text-sm text-slate-400">계약 시작일이 설정되지 않았습니다</div>
+                    )}
+                  </div>
+                </section>
+              )
+            })()}
           </div>
         )
       })()}

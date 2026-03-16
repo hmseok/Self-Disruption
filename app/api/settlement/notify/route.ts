@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
             sendResult = await sendSMS({
               phone: recipient,
               message: r.message,
-              title: `정산 안내 - ${r.name}`,
+              title: `정산 안내 - ${r.name}님`,
             })
           } else {
             sendResult = await sendEmail({
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
             channel,
             recipient,
             recipientName: r.name,
-            subject: `정산 안내 - ${r.name}`,
+            subject: `정산 안내 - ${r.name}님`,
             body: r.message,
             status: sendResult.success ? 'sent' : 'failed',
             resultCode: sendResult.resultCode,
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
           let sendResult: { success: boolean; error?: string; resultCode?: string }
           if (channel === 'sms') {
-            sendResult = await sendSMS({ phone: recipient, message, title: `정산 안내 - ${item.name}` })
+            sendResult = await sendSMS({ phone: recipient, message, title: `정산 안내 - ${item.name}님` })
           } else {
             sendResult = await sendEmail({ to: recipient, subject: `[정산 안내] ${item.name}님`, text: message })
           }

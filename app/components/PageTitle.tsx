@@ -9,10 +9,10 @@ import { usePathname } from 'next/navigation'
 // 경로 → 비즈니스 그룹 매핑 (ClientLayout과 동기화)
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/quotes/create': 'sales', '/customers': 'sales',
   '/contracts': 'sales', '/e-contract': 'sales', '/e-contract/create': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance',
+  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance',
   '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
   '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',
@@ -57,6 +57,8 @@ const PAGE_NAMES: Record<string, string> = {
   '/finance': '장부/결산',
   '/finance/collections': '수금 관리',
   '/finance/settlement': '정산 관리',
+  '/finance/fleet': '차량별 수익',
+  '/operations/intake': '접수/오더 관리',
   '/finance/upload': '카드/통장 관리',
   '/finance/review': '분류/확정',
   '/finance/freelancers': '프리랜서 관리',

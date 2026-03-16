@@ -87,8 +87,8 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
           .order('transaction_date', { ascending: false }),
         // classification_queue
         supabase.from('classification_queue')
-          .select('id, source_data, final_category, final_related_type, final_related_id, status')
-          .eq('final_related_type', 'car').eq('final_related_id', String(carId))
+          .select('id, source_data, final_category, final_matched_type, final_matched_id, status')
+          .eq('final_matched_type', 'car').eq('final_matched_id', String(carId))
           .in('status', ['confirmed', 'auto_confirmed']),
         // 지입 계약
         supabase.from('jiip_contracts')

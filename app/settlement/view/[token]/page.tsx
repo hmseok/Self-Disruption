@@ -240,7 +240,7 @@ export default function SettlementViewPage() {
     <div style={{ fontFamily: '"Noto Sans KR", sans-serif', backgroundColor: '#f5f6f8', minHeight: '100vh', paddingBottom: '40px' }}>
       <div style={{ backgroundColor: BRAND_COLOR, color: 'white', padding: '30px 20px', textAlign: 'center' }}>
         {data.company?.logo_url && <img src={data.company.logo_url} alt="" style={{ maxHeight: '50px', marginBottom: '15px' }} />}
-        <h1 style={{ margin: '0 0 5px 0', fontSize: '28px', fontWeight: 'bold' }}>{data.company?.name || 'Self-Disruption'}</h1>
+        <h1 style={{ margin: '0 0 5px 0', fontSize: '28px', fontWeight: 'bold' }}>{data.company?.name || '정산 명세서'}</h1>
         <p style={{ margin: 0, fontSize: '14px', opacity: 0.9 }}>정산 명세서</p>
       </div>
 

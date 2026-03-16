@@ -103,9 +103,9 @@ export default function PnlTab({ carId, companyId, car }: PnlTabProps) {
       // 4. classification_queue에서 확정된 것 (아직 transactions에 안 간 것)
       const queuePromise = supabase
         .from('classification_queue')
-        .select('id, source_data, final_category, final_related_type, final_related_id, status')
-        .eq('final_related_type', 'car')
-        .eq('final_related_id', String(carId))
+        .select('id, source_data, final_category, final_matched_type, final_matched_id, status')
+        .eq('final_matched_type', 'car')
+        .eq('final_matched_id', String(carId))
         .in('status', ['confirmed', 'auto_confirmed'])
 
       const [txRes, loanRes, insRes, queueRes] = await Promise.all([txPromise, loanPromise, insPromise, queuePromise])
