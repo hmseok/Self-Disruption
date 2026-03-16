@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // 🐳 도커 배포 필수 설정
+  serverExternalPackages: ['mysql2'], // cafe24 DB 연동 — standalone에서 네이티브 모듈 포함
   // ⚠️ Next.js 16은 Turbopack이 기본 — webpack 강제 시 런타임 청크 불일치로 hydration 실패
   // bundler: 'webpack',  // (16.1.6에서 standalone CSS 버그 수정됨 — 제거)
 
