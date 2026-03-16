@@ -138,41 +138,8 @@ export async function DELETE(request: NextRequest) {
       else console.error('Delete batch error:', delErr.message)
     }
 
-    // classification_queue에서도 관련 중복 정리
-    // (같은 키 기준으로 중복된 큐 항목도 정리)
-    try {
-      const { data: queueItems } = await sb
-        .from('classification_queue')
-        .select('id, source_data')
-        .eq('company_id', company_id)
-        .is('deleted_at', null)
-        .in('status', ['pending', 'auto_confirmed', 'confirmed'])
-
-      if (queueItems && queueItems.length > 0) {
-        const queueGroups: Record<string, any[]> = {}
-        for (const q of queueItems) {
-          const sd = q.source_data || {}
-          const desc = (sd.description || '').trim()
-          const key = `${sd.transaction_date || ''}|${sd.client_name || ''}|${Math.abs(Number(sd.amount || 0))}|${sd.payment_method || ''}|${desc}`
-          if (!queueGroups[key]) queueGroups[key] = []
-          queueGroups[key].push(q)
-        }
-        const queueDupIds: string[] = []
-        for (const [, items] of Object.entries(queueGroups)) {
-          if (items.length > 1) {
-            queueDupIds.push(...items.slice(1).map(i => i.id))
-          }
-        }
-        if (queueDupIds.length > 0) {
-          for (let i = 0; i < queueDupIds.length; i += 50) {
-            const batch = queueDupIds.slice(i, i + 50)
-            await sb.from('classification_queue').update({ deleted_at: now }).in('id', batch)
-          }
-        }
-      }
-    } catch (qErr) {
-      console.error('Queue dedup cleanup error:', qErr)
-    }
+    // NOTE: classification_queue는 건드리지 않음
+    // queue는 분류 파이프라인 데이터이므로, transactions 중복 삭제와 독립적으로 관리되어야 함
 
     return NextResponse.json({
       message: `${totalDeleted}건 중복 거래 삭제 완료`,

@@ -1,19 +1,41 @@
 'use client'
 import { useUpload } from '../context/UploadContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
+
+const NAV_ITEMS = [
+  { label: '📊 대시보드', path: '/finance' },
+  { label: '📑 분류 관리', path: '/finance/upload' },
+  { label: '💳 정산 관리', path: '/finance/settlement' },
+  { label: '🚗 차량 관리', path: '/cars' },
+]
 
 export default function UploadWidget() {
   const { status, progress, currentFileName, logs, totalFiles, currentFileIndex, pauseProcessing, resumeProcessing, cancelProcessing, closeWidget } = useUpload()
   const router = useRouter()
+  const pathname = usePathname()
   const [isExpanded, setIsExpanded] = useState(true)
+  const [showNav, setShowNav] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
+  const navRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (status === 'processing') setIsExpanded(true);
   }, [status]);
+
+  // 외부 클릭 시 네비게이션 메뉴 닫기
+  useEffect(() => {
+    if (!showNav) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setShowNav(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNav])
 
   // 드래그 핸들러
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -38,6 +60,11 @@ export default function UploadWidget() {
     }
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleNavClick = (path: string) => {
+    router.push(path)
+    setShowNav(false)
   }
 
   if (status === 'idle' && totalFiles === 0) return null;
@@ -94,6 +121,46 @@ export default function UploadWidget() {
                 <span className="text-[10px] font-bold text-gray-400 select-none">파일 분석 중</span>
               </div>
               <div className="flex items-center gap-1">
+                {/* 빠른 이동 버튼 */}
+                <div className="relative" ref={navRef}>
+                  <button
+                    onClick={() => setShowNav(v => !v)}
+                    className={`w-6 h-6 flex items-center justify-center rounded-md hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors ${showNav ? 'bg-blue-100 text-blue-600' : ''}`}
+                    title="빠른 이동"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1"/>
+                      <rect x="14" y="3" width="7" height="7" rx="1"/>
+                      <rect x="3" y="14" width="7" height="7" rx="1"/>
+                      <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                  </button>
+                  {/* 빠른 이동 드롭다운 메뉴 */}
+                  {showNav && (
+                    <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">빠른 이동</span>
+                      </div>
+                      {NAV_ITEMS.map((item) => {
+                        const isActive = pathname === item.path || (item.path !== '/finance' && pathname?.startsWith(item.path))
+                        return (
+                          <button
+                            key={item.path}
+                            onClick={() => handleNavClick(item.path)}
+                            className={`w-full text-left px-3 py-2.5 text-xs font-medium flex items-center gap-2 transition-colors
+                              ${isActive
+                                ? 'bg-blue-50 text-blue-700 font-bold'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              }`}
+                          >
+                            <span>{item.label}</span>
+                            {isActive && <span className="ml-auto text-blue-400 text-[10px]">현재</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button onClick={() => setIsExpanded(false)} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-200 text-gray-400" title="최소화">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>

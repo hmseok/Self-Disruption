@@ -73,6 +73,7 @@ const MASTER_MODULE_LIST = [
   { path: '/operations', name: '운영 관리', icon_key: 'Truck', description: '차량 운영 및 배정 관리' },
   { path: '/maintenance', name: '정비/검사 관리', icon_key: 'Wrench', description: '차량 정비 및 검사 이력' },
   { path: '/accidents', name: '사고 관리', icon_key: 'Shield', description: '사고 접수, 보험 처리, 수리 진행 관리' },
+  { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리' },
   // 영업
   { path: '/quotes', name: '견적 관리', icon_key: 'Doc', description: '견적 목록 및 관리' },
   { path: '/quotes/pricing', name: '견적 작성', icon_key: 'Doc', description: '렌트가 산출 및 견적서 작성' },
@@ -84,6 +85,7 @@ const MASTER_MODULE_LIST = [
   { path: '/finance', name: '재무 관리', icon_key: 'Money', description: '재무 대시보드 및 종합 관리' },
   { path: '/finance/collections', name: '수금 관리', icon_key: 'Money', description: '미수금 수금 관리' },
   { path: '/finance/settlement', name: '정산 관리', icon_key: 'Money', description: '정산 내역 관리' },
+  { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석' },
   { path: '/finance/upload', name: '카드/통장 관리', icon_key: 'Money', description: '카드·통장 매입 데이터 업로드' },
   { path: '/finance/review', name: '재무 검토', icon_key: 'Money', description: '재무 검토 및 승인' },
   { path: '/finance/freelancers', name: '프리랜서 관리', icon_key: 'Users', description: '프리랜서 급여 및 세금 관리' },

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { requireAuth } from '../../utils/auth-guard'
 
-const MODEL = 'gemini-2.5-flash'
+const MODEL = 'gemini-2.0-flash'
 
 const PROMPT = `너는 대한민국 자동차 공식 견적서/가격표 문서 분석기야.
 업로드된 문서(PDF 또는 이미지)에서 차량 가격 정보를 추출해서 JSON으로 출력해라.

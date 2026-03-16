@@ -48,13 +48,9 @@ export async function POST(request: NextRequest) {
     const transactions = await fetchAll(sb, 'transactions', company_id,
       'id, transaction_date, client_name, amount, description, payment_method')
 
-    // 2) 기존 classification_queue의 confirmed 건 조회 (이미 확정된 건)
-    const { data: confirmedQueue } = await sb
-      .from('classification_queue')
-      .select('id, source_data, status')
-      .eq('company_id', company_id)
-      .is('deleted_at', null)
-      .in('status', ['confirmed', 'auto_confirmed'])
+    // 2) 기존 classification_queue 전체 조회 (pending + confirmed — 중복 삽입 방지용)
+    const cqAll = await fetchAll(sb, 'classification_queue', company_id,
+      'id, source_data, status')
 
     // 3) transactions를 (date, abs_amount) → 배열로 그룹핑
     const txMap = new Map<string, any[]>()
@@ -87,6 +83,57 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 4-b) unmatched 엑셀 행을 기존 cq와 매칭하여 중복 삽입 방지
+    const cqMap = new Map<string, any[]>()
+    for (const cq of cqAll) {
+      const sd = cq.source_data || {}
+      const d = ((sd.transaction_date || '') + '').substring(0, 10)
+      const a = Math.abs(Number(sd.amount || 0))
+      const key = `${d}|${a}`
+      if (!cqMap.has(key)) cqMap.set(key, [])
+      cqMap.get(key)!.push({ ...cq, _matched: false })
+    }
+
+    const cqMatched: { cqId: string; excelRow: any }[] = []
+    const trulyUnmatched: any[] = []
+
+    for (const row of unmatched) {
+      const dateOnly = (row.date || '').substring(0, 10)
+      const absAmt = Math.abs(Number(row.amount || 0))
+      const key = `${dateOnly}|${absAmt}`
+
+      const candidates = cqMap.get(key) || []
+      const unmatchedCq = candidates.find((c: any) => !c._matched)
+
+      if (unmatchedCq) {
+        unmatchedCq._matched = true
+        cqMatched.push({ cqId: unmatchedCq.id, excelRow: row })
+      } else {
+        trulyUnmatched.push(row)
+      }
+    }
+
+    // 4-c) 매칭된 cq 건: source_data 업데이트 (엑셀 원본 데이터로)
+    let cqUpdatedCount = 0
+    for (const { cqId, excelRow } of cqMatched) {
+      const newSourceData: any = {
+        transaction_date: excelRow.datetime || excelRow.date,
+        client_name: excelRow.client || '',
+        amount: Math.abs(Number(excelRow.amount || 0)),
+        type: excelRow.tx_type === 'income' ? 'income' : 'expense',
+        description: [excelRow.summary, excelRow.branch].filter(Boolean).map((s: string) => s.trim()).filter(Boolean).join(' / ') || `${(excelRow.summary || '').trim()} ${(excelRow.client || '').trim()}`.trim(),
+        payment_method: '통장',
+        memo: excelRow.memo || '',
+        source: 'excel_import',
+      }
+      const { error } = await sb
+        .from('classification_queue')
+        .update({ source_data: newSourceData })
+        .eq('id', cqId)
+      if (!error) cqUpdatedCount++
+      else console.error('CQ update error:', error.message)
+    }
+
     // 5) 매칭된 건: transactions 업데이트 (엑셀 원본 데이터로)
     let updatedCount = 0
     const updateErrors: string[] = []
@@ -98,8 +145,13 @@ export async function POST(request: NextRequest) {
         if (excelRow.datetime && excelRow.datetime.length > 10) {
           updateData.transaction_date = excelRow.datetime
         }
-        // description 업데이트: 적요 + 거래처명
-        const desc = `${(excelRow.summary || '').trim()} ${(excelRow.client || '').trim()}`.trim()
+        // client_name 업데이트 (엑셀 기재내용 원본)
+        if (excelRow.client) {
+          updateData.client_name = excelRow.client.trim()
+        }
+        // description 업데이트: 적요 + 취급점
+        const descParts = [excelRow.summary, excelRow.branch].filter(Boolean).map((s: string) => s.trim()).filter(Boolean)
+        const desc = descParts.join(' / ') || `${(excelRow.summary || '').trim()} ${(excelRow.client || '').trim()}`.trim()
         if (desc) {
           updateData.description = desc
         }
@@ -138,18 +190,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7) 매칭 안 된 엑셀 건: classification_queue에 삽입
+    // 7) 진짜 매칭 안 된 엑셀 건만: classification_queue에 삽입
     let insertedCount = 0
-    for (let i = 0; i < unmatched.length; i += 50) {
-      const batch = unmatched.slice(i, i + 50)
+    for (let i = 0; i < trulyUnmatched.length; i += 50) {
+      const batch = trulyUnmatched.slice(i, i + 50)
       const inserts = batch.map((row: any) => ({
         company_id,
         status: 'pending',
         source_data: {
           transaction_date: row.datetime || row.date,
           client_name: row.client || '',
-          amount: row.amount,
-          description: `${(row.summary || '').trim()} ${(row.client || '').trim()}`.trim(),
+          amount: Math.abs(Number(row.amount || 0)),
+          type: row.tx_type === 'income' ? 'income' : 'expense',
+          description: [row.summary, row.branch].filter(Boolean).map((s: string) => s.trim()).filter(Boolean).join(' / ') || `${(row.summary || '').trim()} ${(row.client || '').trim()}`.trim(),
           payment_method: '통장',
           memo: row.memo || '',
           source: 'excel_import',
@@ -167,13 +220,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       total_excel: excel_rows.length,
       total_transactions: transactions.length,
-      matched: matched.length,
-      updated: updatedCount,
-      unmatched_excel: unmatched.length,
+      matched_tx: matched.length,
+      updated_tx: updatedCount,
+      matched_cq: cqMatched.length,
+      updated_cq: cqUpdatedCount,
+      truly_unmatched: trulyUnmatched.length,
       inserted: insertedCount,
       unmatched_tx: unmatchedTxIds.length,
       deleted_tx: deletedTxCount,
-      summary: `엑셀 ${excel_rows.length}건: ${matched.length}건 매칭(업데이트), ${unmatched.length}건 신규(분류대기), ${deletedTxCount}건 기존확정 삭제`,
+      summary: `엑셀 ${excel_rows.length}건: TX ${matched.length}건 매칭, CQ ${cqMatched.length}건 매칭, ${trulyUnmatched.length}건 신규삽입, ${deletedTxCount}건 기존삭제`,
     })
 
   } catch (error: any) {

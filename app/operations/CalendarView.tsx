@@ -23,19 +23,23 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
   // Calendar Data Generation
   // ============================================
   const calendarDays = useMemo(() => {
+    // 로컬 날짜를 YYYY-MM-DD 형식으로 변환 (UTC 변환 없이)
+    const toLocalDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
     if (viewType === 'month') {
       const firstDay = new Date(year, month, 1)
       const lastDay = new Date(year, month + 1, 0)
       const startOffset = firstDay.getDay()
       const days: { date: string; inMonth: boolean; isToday: boolean }[] = []
+      const today = toLocalDateStr(new Date())
 
       // Previous month filler
       for (let i = startOffset - 1; i >= 0; i--) {
         const d = new Date(year, month, -i)
-        days.push({ date: d.toISOString().split('T')[0], inMonth: false, isToday: false })
+        days.push({ date: toLocalDateStr(d), inMonth: false, isToday: false })
       }
       // Current month
-      const today = new Date().toISOString().split('T')[0]
       for (let d = 1; d <= lastDay.getDate(); d++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
         days.push({ date: dateStr, inMonth: true, isToday: dateStr === today })
@@ -43,20 +47,19 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
       // Next month filler (to complete 6 rows)
       while (days.length < 42) {
         const d = new Date(year, month + 1, days.length - startOffset - lastDay.getDate() + 1)
-        days.push({ date: d.toISOString().split('T')[0], inMonth: false, isToday: false })
+        days.push({ date: toLocalDateStr(d), inMonth: false, isToday: false })
       }
       return days
     } else {
       // Week view
-      const today = new Date().toISOString().split('T')[0]
+      const today = toLocalDateStr(new Date())
       const startOfWeek = new Date(currentDate)
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
       const days: { date: string; inMonth: boolean; isToday: boolean }[] = []
       for (let i = 0; i < 7; i++) {
         const d = new Date(startOfWeek)
         d.setDate(d.getDate() + i)
-        const dateStr = d.toISOString().split('T')[0]
-        days.push({ date: dateStr, inMonth: true, isToday: dateStr === today })
+        days.push({ date: toLocalDateStr(d), inMonth: true, isToday: toLocalDateStr(d) === today })
       }
       return days
     }

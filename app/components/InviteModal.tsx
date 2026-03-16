@@ -40,10 +40,10 @@ const PAGE_GROUPS = [
 
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
   '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance',
+  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance',
   '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
   '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/invest': 'invest', '/jiip': 'invest',

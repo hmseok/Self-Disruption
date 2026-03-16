@@ -402,19 +402,23 @@ export async function POST(request: NextRequest) {
 
     // 지입 계약
     for (const c of filterActive(jiipRes.data || [])) {
+      const acctDigits = (c.account_number || '').replace(/\D/g, '')
       targets.push({
         id: c.id, type: 'jiip',
-        name: c.investor_name || c.investor_name || '',
+        name: c.investor_name || '',
         monthlyAmount: Number(c.admin_fee) || 0,
         paymentDay: Number(c.payout_day) || 10,
         defaultCategory: '지입 관리비/수수료',
         txType: 'both',
+        extra: { account_number: acctDigits, account_holder: c.account_holder || '' },
       })
     }
 
     // 투자 계약
     for (const c of filterActive(investRes.data || [])) {
       const monthlyInterest = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
+      // 계좌번호에서 숫자만 추출 (매칭용)
+      const acctDigits = (c.account_number || '').replace(/\D/g, '')
       targets.push({
         id: c.id, type: 'invest',
         name: c.investor_name || '',
@@ -422,6 +426,7 @@ export async function POST(request: NextRequest) {
         paymentDay: Number(c.payment_day) || 10,
         defaultCategory: '이자비용(대출/투자)',
         txType: 'both',
+        extra: { account_number: acctDigits, account_holder: c.account_holder || '' },
       })
     }
 
@@ -668,8 +673,8 @@ export async function POST(request: NextRequest) {
         const nameScore2 = nameSimilarity(description, target.name)
         const nameScore = Math.max(nameScore1, nameScore2)
 
-        // 프리랜서/급여는 이름이 가장 중요 → 이름 가중치 강화
-        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary'
+        // 프리랜서/급여/투자/지입은 이름이 가장 중요 → 이름 가중치 강화
+        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary' || target.type === 'invest' || target.type === 'jiip'
         if (isPersonMatch) {
           // 이름 매칭: 최대 65점 (기존 50점 → 강화)
           score += nameScore * 0.65
@@ -694,11 +699,39 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // 보너스: 계좌번호 매칭 (투자/지입) — 가장 강력한 식별자
+        if (target.extra?.account_number && target.extra.account_number.length >= 4) {
+          const acctNum = target.extra.account_number
+          const descDigits = description.replace(/\D/g, '')
+          // description에 계좌번호가 포함되어 있으면 강력 보너스
+          if (descDigits.includes(acctNum) || acctNum.includes(descDigits.slice(-6))) {
+            score += 40  // 계좌번호 매칭 = 매우 높은 보너스
+          }
+          // account_holder 이름이 client_name과 일치하면 보너스
+          if (target.extra.account_holder && clientName && target.extra.account_holder === clientName) {
+            score += 30  // 예금주 이름 일치
+          }
+        }
+
         // 보너스: 키워드 타입별 추가 점수
         if (target.type === 'insurance' && searchText.match(/보험|손해|화재|해상/)) score += 15
         if (target.type === 'loan' && searchText.match(/캐피탈|파이낸셜|할부|대출|약정/)) score += 15
         if (target.type === 'salary' && searchText.match(/급여|월급|임금/)) score += 15
         if (target.type === 'freelancer' && searchText.match(/용역|외주|3\.3/)) score += 15
+        if (target.type === 'jiip' && searchText.match(/지입|관리비|수수료/)) score += 15
+        if (target.type === 'invest' && searchText.match(/투자|이자|원금/)) score += 15
+
+        // ★ 카테고리-타입 정합성: 급여(정규직)↔salary, 용역비(3.3%)↔freelancer 구분
+        // AI 분류 카테고리와 매칭 타입이 일치하면 보너스, 불일치하면 페널티
+        const cat = result.category
+        if (target.type === 'salary') {
+          if (cat === '급여(정규직)' || cat === '성과급지급' || cat === '4대보험(회사부담)') score += 25
+          else if (cat === '용역비(3.3%)' || cat === '일용직급여') score -= 30
+        }
+        if (target.type === 'freelancer') {
+          if (cat === '용역비(3.3%)' || cat === '일용직급여') score += 25
+          else if (cat === '급여(정규직)' || cat === '성과급지급' || cat === '4대보험(회사부담)') score -= 30
+        }
 
         if (score > 20) {
           matchCandidates.push({ target, score })
@@ -873,7 +906,7 @@ export async function POST(request: NextRequest) {
     const queueItems = enriched.map((t: any) => ({
       company_id,
       ai_category: t.category,
-      ai_confidence: t.confidence || 0,
+      ai_confidence: Math.round(t.confidence || 0),
       ai_matched_type: t.related_type || null,
       ai_matched_id: t.related_id || null,
       ai_matched_name: t.matched_contract_name || null,
@@ -947,6 +980,7 @@ export async function GET(request: NextRequest) {
         .from('classification_queue')
         .select('*', { count: 'exact' })
         .eq('company_id', company_id)
+        .is('deleted_at', null)
 
       if (status === 'pending') {
         baseQuery = baseQuery.in('status', ['pending', 'auto_confirmed'])
@@ -975,6 +1009,7 @@ export async function GET(request: NextRequest) {
           .from('classification_queue')
           .select('*', { count: 'exact' })
           .eq('company_id', company_id)
+          .is('deleted_at', null)
 
         if (status === 'pending') {
           pageQuery = pageQuery.in('status', ['pending', 'auto_confirmed'])
@@ -1005,6 +1040,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (!queueError && queueData && queueData.length > 0) {
+      // ★ invest/jiip 이름 조회 맵 (final_matched_id로 이름 해결)
+      const nameMap: Record<string, string> = {}
+      try {
+        const { data: invs } = await sb.from('general_investments').select('id, investor_name').eq('company_id', company_id)
+        ;(invs || []).forEach((i: any) => { nameMap[`invest_${i.id}`] = i.investor_name })
+        const { data: jiips } = await sb.from('jiip_contracts').select('id, investor_name').eq('company_id', company_id)
+        ;(jiips || []).forEach((j: any) => { nameMap[`jiip_${j.id}`] = j.investor_name })
+      } catch (e) { console.error('[GET classify] nameMap 조회 오류:', e) }
+
       // 디버깅: 첫 번째 레코드의 alternatives 구조 확인
       const firstQ = queueData[0]
       console.log('[GET classify] 첫 번째 레코드 디버깅:')
@@ -1084,9 +1128,14 @@ export async function GET(request: NextRequest) {
           },
           ai_category: q.ai_category || q.final_category || '미분류',
           ai_confidence: q.ai_confidence || 0,
-          ai_related_type: q.ai_matched_type || null,
-          ai_related_id: q.ai_matched_id || null,
-          ai_matched_name: q.ai_matched_name || null,
+          ai_related_type: q.final_matched_type || q.ai_matched_type || null,
+          ai_related_id: q.final_matched_id || q.ai_matched_id || null,
+          ai_matched_name: (() => {
+            const fType = q.final_matched_type || q.ai_matched_type
+            const fId = q.final_matched_id || q.ai_matched_id
+            if (fType && fId && nameMap[`${fType}_${fId}`]) return nameMap[`${fType}_${fId}`]
+            return q.ai_matched_name || null
+          })(),
           alternatives: candidates,
           status: q.status,
           final_category: q.final_category || null,
@@ -1103,14 +1152,18 @@ export async function GET(request: NextRequest) {
     }
 
     // ── 2차 fallback: transactions 테이블에서 조회 ──
-    // category 컬럼 존재 여부를 먼저 확인
+    // pending 상태에서 classification_queue가 비어있으면 → 빈 결과 반환 (fallback 하지 않음)
+    // 이전에는 transactions 테이블로 fallback하여 soft-deleted 거래가 다시 나타나는 버그가 있었음
+    if (status === 'pending') {
+      return NextResponse.json({ items: [], total: 0, source: 'classification_queue' })
+    }
+
     let txQuery = sb
       .from('transactions')
       .select('*', { count: 'exact' })
       .eq('company_id', company_id)
+      .is('deleted_at', null)
 
-    // category 컬럼 필터는 사용하지 않음 (존재하지 않을 수 있음)
-    // 카운트 정확성을 위해 전체 로드 후 앱 레벨에서 필터링
     const { data: txData, error: txError, count: txCount } = await txQuery
       .order('created_at', { ascending: false })
       .limit(5000)
@@ -1119,7 +1172,7 @@ export async function GET(request: NextRequest) {
 
     const allItems = (txData || []).map((tx: any) => {
       const cat = tx.category || '미분류'
-      const isPending = !tx.category || tx.category === '미분류' || tx.category === '기타' || tx.category === ''
+      const isPending = !tx.category || tx.category === '미분류' || tx.category === ''
       return {
         id: tx.id,
         company_id: tx.company_id,
@@ -1133,7 +1186,7 @@ export async function GET(request: NextRequest) {
           card_number: tx.card_number || '',
         },
         ai_category: cat,
-        ai_confidence: tx.confidence || 0,
+        ai_confidence: Math.round(tx.confidence || 0),
         ai_related_type: tx.related_type || null,
         ai_related_id: tx.related_id || null,
         alternatives: [],
@@ -1181,6 +1234,7 @@ export async function PUT(request: NextRequest) {
       .from('classification_queue')
       .select('*')
       .eq('company_id', company_id)
+      .is('deleted_at', null)
       .in('status', ['pending', 'auto_confirmed'])
       .order('created_at', { ascending: false })
 
@@ -1207,11 +1261,13 @@ export async function PUT(request: NextRequest) {
     const targets: MatchTarget[] = []
 
     for (const c of filterActive(jiipRes.data || [])) {
-      targets.push({ id: c.id, type: 'jiip', name: c.investor_name || '', monthlyAmount: Number(c.admin_fee) || 0, paymentDay: Number(c.payout_day) || 10, defaultCategory: '지입 관리비/수수료', txType: 'both' })
+      const acctDigits = (c.account_number || '').replace(/\D/g, '')
+      targets.push({ id: c.id, type: 'jiip', name: c.investor_name || '', monthlyAmount: Number(c.admin_fee) || 0, paymentDay: Number(c.payout_day) || 10, defaultCategory: '지입 관리비/수수료', txType: 'both', extra: { account_number: acctDigits, account_holder: c.account_holder || '' } })
     }
     for (const c of filterActive(investRes.data || [])) {
       const mi = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
-      targets.push({ id: c.id, type: 'invest', name: c.investor_name || '', monthlyAmount: mi, paymentDay: Number(c.payment_day) || 10, defaultCategory: '이자비용(대출/투자)', txType: 'both' })
+      const acctDigits = (c.account_number || '').replace(/\D/g, '')
+      targets.push({ id: c.id, type: 'invest', name: c.investor_name || '', monthlyAmount: mi, paymentDay: Number(c.payment_day) || 10, defaultCategory: '이자비용(대출/투자)', txType: 'both', extra: { account_number: acctDigits, account_holder: c.account_holder || '' } })
     }
     for (const c of filterActive(loanRes.data || [])) {
       targets.push({ id: c.id, type: 'loan', name: c.finance_name || '', monthlyAmount: Number(c.monthly_payment) || 0, paymentDay: Number(c.payment_date) || 10, defaultCategory: '차량할부/리스료', txType: 'expense' })
@@ -1232,7 +1288,7 @@ export async function PUT(request: NextRequest) {
     // classification_queue의 거래 데이터는 alternatives.source_data 안에 저장됨
     let updated = 0
     for (const item of queueItems) {
-      const srcData = item.alternatives?.source_data || {}
+      const srcData = item.alternatives?.source_data || item.source_data || {}
       const clientName = srcData.client_name || ''
       const description = srcData.description || ''
       const searchText = `${clientName} ${description}`.toLowerCase()
@@ -1253,7 +1309,8 @@ export async function PUT(request: NextRequest) {
         const nameScore2 = nameSimilarity(description, target.name)
         const nameScore = Math.max(nameScore1, nameScore2)
 
-        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary'
+        // 투자/지입도 이름 기반 매칭이므로 person match로 처리
+        const isPersonMatch = target.type === 'freelancer' || target.type === 'salary' || target.type === 'invest' || target.type === 'jiip'
         if (isPersonMatch) {
           score += nameScore * 0.65
           if (nameScore >= 90) score += 20
@@ -1265,10 +1322,35 @@ export async function PUT(request: NextRequest) {
           if (target.paymentDay > 0 && txDate) score += dateSimilarity(txDate, target.paymentDay) * 0.1
         }
 
+        // 보너스: 계좌번호 매칭 (투자/지입)
+        if (target.extra?.account_number && target.extra.account_number.length >= 4) {
+          const acctNum = target.extra.account_number
+          const descDigits = description.replace(/\D/g, '')
+          if (descDigits.includes(acctNum) || acctNum.includes(descDigits.slice(-6))) {
+            score += 40
+          }
+          if (target.extra.account_holder && clientName && target.extra.account_holder === clientName) {
+            score += 30
+          }
+        }
+
         if (target.type === 'insurance' && searchText.match(/보험|손해|화재|해상/)) score += 15
         if (target.type === 'loan' && searchText.match(/캐피탈|파이낸셜|할부|대출|약정/)) score += 15
         if (target.type === 'salary' && searchText.match(/급여|월급|임금/)) score += 15
         if (target.type === 'freelancer' && searchText.match(/용역|외주|3\.3/)) score += 15
+        if (target.type === 'jiip' && searchText.match(/지입|관리비|수수료/)) score += 15
+        if (target.type === 'invest' && searchText.match(/투자|이자|원금/)) score += 15
+
+        // ★ 카테고리-타입 정합성: 급여(정규직)↔salary, 용역비(3.3%)↔freelancer 구분
+        const reCat = item.ai_category || item.final_category || ''
+        if (target.type === 'salary') {
+          if (reCat === '급여(정규직)' || reCat === '성과급지급' || reCat === '4대보험(회사부담)') score += 25
+          else if (reCat === '용역비(3.3%)' || reCat === '일용직급여') score -= 30
+        }
+        if (target.type === 'freelancer') {
+          if (reCat === '용역비(3.3%)' || reCat === '일용직급여') score += 25
+          else if (reCat === '급여(정규직)' || reCat === '성과급지급' || reCat === '4대보험(회사부담)') score -= 30
+        }
 
         if (score > 20) matchCandidates.push({ target, score })
       }
@@ -1347,7 +1429,7 @@ export async function PATCH(request: NextRequest) {
     if (body.bulk_classify && Array.isArray(body.queue_ids) && body.final_category) {
       const sb = getSupabaseAdmin()
       const { queue_ids, final_category, save_rules } = body
-      const PENDING_CATS = ['기타', '미분류', '']
+      const PENDING_CATS = ['미분류', '']
       const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
 
       // 일괄 카테고리 업데이트
@@ -1366,8 +1448,8 @@ export async function PATCH(request: NextRequest) {
             await sb.from('finance_rules').upsert({
               keyword: keyword.toLowerCase().trim(),
               category: final_category,
-              related_type: body.final_related_type || null,
-              related_id: body.final_related_id || null,
+              related_type: body.final_matched_type || null,
+              related_id: body.final_matched_id || null,
             }, { onConflict: 'keyword' })
             rulesSaved++
           } catch (e) {
@@ -1380,7 +1462,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, updated: queue_ids.length, rules_saved: rulesSaved })
     }
 
-    const { queue_id, final_category, final_related_type, final_related_id, save_as_rule, rule_keyword } = body
+    const { queue_id, final_category, final_matched_type, final_matched_id, save_as_rule, rule_keyword } = body
 
     if (!queue_id || !final_category) {
       return NextResponse.json({ error: 'queue_id, final_category 필요' }, { status: 400 })
@@ -1389,17 +1471,44 @@ export async function PATCH(request: NextRequest) {
     const sb = getSupabaseAdmin()
 
     // classification_queue 업데이트 — 카테고리에 따라 status 결정
-    const PENDING_CATS = ['기타', '미분류', '']
+    const PENDING_CATS = ['미분류', '']
     const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
     const updateData: Record<string, any> = {
       final_category,
       status: newStatus,
     }
-    // ★ final_related_type/id가 있으면 classification_queue에도 저장
-    if (final_related_type !== undefined) updateData.final_related_type = final_related_type || null
-    if (final_related_id !== undefined) updateData.final_related_id = final_related_id || null
+    // ★ 되돌리기(pending) 시 → final_matched_* 초기화 (이전 매칭 정보 제거)
+    if (newStatus === 'pending') {
+      updateData.final_matched_type = null
+      updateData.final_matched_id = null
+      updateData.final_matched_name = null
+    }
+    // ★ final_matched_type/id가 있으면 classification_queue에도 저장
+    if (final_matched_type !== undefined) updateData.final_matched_type = final_matched_type || null
+    if (final_matched_id !== undefined) updateData.final_matched_id = final_matched_id || null
 
-    console.log(`[PATCH classify] queue_id=${queue_id}, final_category=${final_category}, newStatus=${newStatus}, related_type=${final_related_type}, related_id=${final_related_id}`)
+    // ★ final_matched_name 조회 및 저장 (invest/jiip 연결 시)
+    if (final_matched_type && final_matched_id) {
+      try {
+        if (final_matched_type === 'invest') {
+          const { data: inv } = await sb.from('general_investments').select('investor_name').eq('id', final_matched_id).maybeSingle()
+          if (inv?.investor_name) updateData.final_matched_name = inv.investor_name
+        } else if (final_matched_type === 'jiip') {
+          const { data: jiip } = await sb.from('jiip_contracts').select('investor_name').eq('id', final_matched_id).maybeSingle()
+          if (jiip?.investor_name) updateData.final_matched_name = jiip.investor_name
+        } else if (final_matched_type === 'freelancer') {
+          const { data: fl } = await sb.from('freelancers').select('name').eq('id', final_matched_id).maybeSingle()
+          if (fl?.name) updateData.final_matched_name = fl.name
+        } else if (final_matched_type === 'salary' || final_matched_type === 'employee') {
+          const { data: emp } = await sb.from('employees').select('name').eq('id', final_matched_id).maybeSingle()
+          if (emp?.name) updateData.final_matched_name = emp.name
+        }
+      } catch (e) {
+        console.error('[PATCH classify] final_matched_name 조회 오류:', e)
+      }
+    }
+
+    console.log(`[PATCH classify] queue_id=${queue_id}, final_category=${final_category}, newStatus=${newStatus}, related_type=${final_matched_type}, related_id=${final_matched_id}, matched_name=${updateData.final_matched_name || 'N/A'}`)
 
     const { data: updated, error: updateErr } = await sb
       .from('classification_queue')
@@ -1432,8 +1541,8 @@ export async function PATCH(request: NextRequest) {
         await sb.from('finance_rules').upsert({
           keyword: rule_keyword.toLowerCase(),
           category: final_category,
-          related_type: final_related_type || null,
-          related_id: final_related_id || null,
+          related_type: final_matched_type || null,
+          related_id: final_matched_id || null,
         }, { onConflict: 'keyword' })
       } catch (e) {
         console.error('Rule save error:', e)
@@ -1442,9 +1551,10 @@ export async function PATCH(request: NextRequest) {
 
     // ★ 되돌리기(pending) 시 → transactions 테이블에서 매칭 거래 삭제 + 투자/지입 금액 재계산
     if (newStatus === 'pending' && updated) {
-      // 되돌리기 대상의 related_type/related_id 파악 (ai_matched 또는 final_related)
-      const revertRelatedType = updated.ai_matched_type || final_related_type || null
-      const revertRelatedId = updated.ai_matched_id || final_related_id || null
+      // 되돌리기 대상의 related_type/related_id 파악
+      // ★ final_matched_* 를 우선 참조 (확정 시 사용자가 지정한 값), 없으면 AI 값 사용
+      const revertRelatedType = updated.final_matched_type || updated.ai_matched_type || final_matched_type || null
+      const revertRelatedId = updated.final_matched_id || updated.ai_matched_id || final_matched_id || null
 
       try {
         // alternatives에서 source_data 추출 (다양한 형식 대응)
@@ -1488,7 +1598,7 @@ export async function PATCH(request: NextRequest) {
         console.error('[classify PATCH] 되돌리기 transactions 삭제 처리 오류:', e)
       }
 
-      // ★ 되돌리기 후 투자자 금액 재계산
+      // ★ 되돌리기 후 투자자 current_balance 재계산 (invest_amount 계약원금은 유지)
       if (revertRelatedType === 'invest' && revertRelatedId) {
         try {
           const { data: allTxs } = await sb
@@ -1500,15 +1610,15 @@ export async function PATCH(request: NextRequest) {
             return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
           }, 0)
           await sb.from('general_investments')
-            .update({ invest_amount: netAmount })
+            .update({ current_balance: netAmount })
             .eq('id', revertRelatedId)
-          console.log(`[classify PATCH] 되돌리기: 투자자 ${revertRelatedId} 순합계 재계산: ${netAmount}`)
+          console.log(`[classify PATCH] 되돌리기: 투자자 ${revertRelatedId} current_balance 재계산: ${netAmount}`)
         } catch (e) {
-          console.error('[classify PATCH] 되돌리기 투자자 금액 재계산 오류:', e)
+          console.error('[classify PATCH] 되돌리기 투자자 잔액 재계산 오류:', e)
         }
       }
 
-      // ★ 되돌리기 후 지입 계약 금액 재계산
+      // ★ 되돌리기 후 지입 계약 current_balance 재계산 (invest_amount는 유지)
       if (revertRelatedType === 'jiip' && revertRelatedId) {
         try {
           const { data: allTxs } = await sb
@@ -1520,11 +1630,11 @@ export async function PATCH(request: NextRequest) {
             return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
           }, 0)
           await sb.from('jiip_contracts')
-            .update({ invest_amount: netAmount })
+            .update({ current_balance: netAmount })
             .eq('id', revertRelatedId)
-          console.log(`[classify PATCH] 되돌리기: 지입 ${revertRelatedId} 순합계 재계산: ${netAmount}`)
+          console.log(`[classify PATCH] 되돌리기: 지입 ${revertRelatedId} current_balance 재계산: ${netAmount}`)
         } catch (e) {
-          console.error('[classify PATCH] 되돌리기 지입 금액 재계산 오류:', e)
+          console.error('[classify PATCH] 되돌리기 지입 잔액 재계산 오류:', e)
         }
       }
     }
@@ -1549,8 +1659,8 @@ export async function PATCH(request: NextRequest) {
 
         if (txDate && companyId) {
           const txUpdateData: Record<string, any> = { category: final_category }
-          if (final_related_type !== undefined) txUpdateData.related_type = final_related_type || null
-          if (final_related_id !== undefined) txUpdateData.related_id = final_related_id || null
+          if (final_matched_type !== undefined) txUpdateData.related_type = final_matched_type || null
+          if (final_matched_id !== undefined) txUpdateData.related_id = final_matched_id || null
 
           const { error: txUpdateErr, count: txUpdated } = await sb
             .from('transactions')
@@ -1561,54 +1671,55 @@ export async function PATCH(request: NextRequest) {
             .eq('amount', amount)
 
           if (txUpdateErr) console.error('[classify PATCH] 확정: transactions 업데이트 오류:', txUpdateErr)
-          else console.log(`[classify PATCH] 확정: transactions 업데이트 (${txDate}/${clientName}/${amount}) → category=${final_category}, related=${final_related_type}/${final_related_id}, count=${txUpdated}`)
+          else console.log(`[classify PATCH] 확정: transactions 업데이트 (${txDate}/${clientName}/${amount}) → category=${final_category}, related=${final_matched_type}/${final_matched_id}, count=${txUpdated}`)
         }
       } catch (e) {
         console.error('[classify PATCH] 확정: transactions 업데이트 처리 오류:', e)
       }
     }
 
-    // ★ 투자 연결 거래 확정 시 → 투자자 순합계(입금-출금) 재계산
-    if (newStatus === 'confirmed' && final_related_type === 'invest' && final_related_id) {
+    // ★ 투자 연결 거래 확정 시 → current_balance(통장잔액) 업데이트 (invest_amount 계약원금은 건드리지 않음)
+    if (newStatus === 'confirmed' && final_matched_type === 'invest' && final_matched_id) {
       try {
         const { data: allTxs } = await sb
           .from('transactions')
           .select('amount, type')
           .eq('related_type', 'invest')
-          .eq('related_id', final_related_id)
+          .eq('related_id', final_matched_id)
         if (allTxs && allTxs.length > 0) {
           const netAmount = allTxs.reduce((acc: number, cur: any) => {
             return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
           }, 0)
+          // current_balance 컬럼만 업데이트 (invest_amount 계약원금은 유지)
           await sb.from('general_investments')
-            .update({ invest_amount: netAmount })
-            .eq('id', final_related_id)
-          console.log(`[classify PATCH] 투자자 ${final_related_id} 순합계 업데이트: ${netAmount}`)
+            .update({ current_balance: netAmount })
+            .eq('id', final_matched_id)
+          console.log(`[classify PATCH] 투자자 ${final_matched_id} current_balance 업데이트: ${netAmount} (invest_amount 계약원금은 유지)`)
         }
       } catch (e) {
-        console.error('[classify PATCH] 투자자 금액 업데이트 오류:', e)
+        console.error('[classify PATCH] 투자자 잔액 업데이트 오류:', e)
       }
     }
 
-    // ★ 지입 연결 거래 확정 시 → 지입 계약 순합계 재계산
-    if (newStatus === 'confirmed' && final_related_type === 'jiip' && final_related_id) {
+    // ★ 지입 연결 거래 확정 시 → current_balance 업데이트 (invest_amount는 유지)
+    if (newStatus === 'confirmed' && final_matched_type === 'jiip' && final_matched_id) {
       try {
         const { data: allTxs } = await sb
           .from('transactions')
           .select('amount, type')
           .eq('related_type', 'jiip')
-          .eq('related_id', final_related_id)
+          .eq('related_id', final_matched_id)
         if (allTxs && allTxs.length > 0) {
           const netAmount = allTxs.reduce((acc: number, cur: any) => {
             return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
           }, 0)
           await sb.from('jiip_contracts')
-            .update({ invest_amount: netAmount })
-            .eq('id', final_related_id)
-          console.log(`[classify PATCH] 지입 ${final_related_id} 순합계 업데이트: ${netAmount}`)
+            .update({ current_balance: netAmount })
+            .eq('id', final_matched_id)
+          console.log(`[classify PATCH] 지입 ${final_matched_id} current_balance 업데이트: ${netAmount}`)
         }
       } catch (e) {
-        console.error('[classify PATCH] 지입 금액 업데이트 오류:', e)
+        console.error('[classify PATCH] 지입 잔액 업데이트 오류:', e)
       }
     }
 
@@ -1734,7 +1845,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // ★ 삭제 후 영향받은 투자/지입 금액 재계산
+    // ★ 삭제 후 영향받은 투자/지입 current_balance 재계산 (invest_amount 계약원금은 유지)
     for (const [key, rel] of affectedRelated.entries()) {
       try {
         const { data: allTxs } = await sb
@@ -1746,14 +1857,13 @@ export async function DELETE(request: NextRequest) {
           return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
         }, 0)
         const table = rel.type === 'invest' ? 'general_investments' : 'jiip_contracts'
-        const updatePayload: Record<string, any> = { invest_amount: netAmount }
-        // jiip_contracts와 general_investments 모두 updated_at 컬럼 없음
+        const updatePayload: Record<string, any> = { current_balance: netAmount }
         await sb.from(table)
           .update(updatePayload)
           .eq('id', rel.id)
-        console.log(`[classify DELETE] ${rel.type} ${rel.id} 순합계 재계산: ${netAmount}`)
+        console.log(`[classify DELETE] ${rel.type} ${rel.id} current_balance 재계산: ${netAmount}`)
       } catch (e) {
-        console.error(`[classify DELETE] ${rel.type} ${rel.id} 금액 재계산 오류:`, e)
+        console.error(`[classify DELETE] ${rel.type} ${rel.id} 잔액 재계산 오류:`, e)
       }
     }
 

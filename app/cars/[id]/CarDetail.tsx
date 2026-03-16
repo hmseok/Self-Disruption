@@ -99,7 +99,7 @@ function InvestInlineTab({ carId }: { carId: string }) {
   useEffect(() => {
     const load = async () => {
       // 이 차량에 연결된 투자 계약 조회
-      // general_investments에는 car_id가 없으므로, transactions에서 related_type='invest'이면서
+      // investors에는 car_id가 없으므로, transactions에서 related_type='invest'이면서
       // 같은 car에 연결된 것을 찾거나, 또는 invest 테이블에 car_ids 같은 필드가 있는지 확인
       const { data } = await supabase
         .from('general_investments')

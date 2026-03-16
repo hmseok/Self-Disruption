@@ -394,6 +394,185 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       }
 
       // ═════════════════════════════════════════
+      // B-0) 통장 거래 → 직접 파싱 (Gemini 우회: 누락 방지 + 비용 절감)
+      // ═════════════════════════════════════════
+      if (fileType === 'bank_statement') {
+        updateProgress(10);
+        setLogs(`🏧 통장 거래 직접 파싱 중... ${file.name} (${bodyRows.length}행)`);
+
+        // 헤더 컬럼 매핑 (다양한 은행 포맷 대응)
+        const headers = (headerRow || []).map((h: any) => String(h || '').replace(/\n/g, ' ').trim());
+        const findCol = (...keywords: string[]) => {
+          return headers.findIndex(h => keywords.some(kw => h.includes(kw)));
+        };
+
+        const noIdx = findCol('No', 'no', 'NO');
+        const dateIdx = findCol('거래일시', '거래일', '일시', '날짜');
+        const descIdx = findCol('적요');
+        const clientIdx = findCol('기재내용', '내용', '거래처');
+        // 지급/출금 컬럼 (잔액 컬럼 제외)
+        const withdrawIdx = headers.findIndex(h => /지급|출금|찾으신/.test(h) && !/잔액/.test(h));
+        // 입금 컬럼 (잔액/출금 컬럼 제외)
+        const depositIdx = headers.findIndex(h => /입금|맡기신/.test(h) && !/잔액|출금|지급/.test(h));
+        const branchIdx = findCol('취급점', '거래점');
+        const memoIdx = findCol('메모', '비고');
+
+        console.log(`[UploadContext] 통장 직접파싱 컬럼매핑: date=${dateIdx}, desc=${descIdx}, client=${clientIdx}, withdraw=${withdrawIdx}, deposit=${depositIdx}, branch=${branchIdx}, memo=${memoIdx}`);
+
+        if (dateIdx < 0 || (withdrawIdx < 0 && depositIdx < 0)) {
+          console.warn('[UploadContext] 통장 컬럼 매핑 실패 → Gemini 파싱으로 폴백');
+        } else {
+          // 직접 파싱 실행
+          const parseAmt = (v: any): number => {
+            if (v === null || v === undefined) return 0;
+            const s = String(v).replace(/[,\s원]/g, '').trim();
+            return Math.abs(Number(s) || 0);
+          };
+
+          const directParsed: any[] = [];
+          let skippedRows = 0;
+
+          for (const row of bodyRows) {
+            // 날짜 컬럼이 없거나 "총 N건" 등 요약행이면 스킵
+            const dateRaw = String(row[dateIdx] || '').trim();
+            if (!dateRaw || /^총\s/.test(dateRaw) || /합계/.test(dateRaw)) {
+              skippedRows++;
+              continue;
+            }
+
+            const wAmt = withdrawIdx >= 0 ? parseAmt(row[withdrawIdx]) : 0;
+            const dAmt = depositIdx >= 0 ? parseAmt(row[depositIdx]) : 0;
+            const amount = wAmt > 0 ? wAmt : dAmt;
+            const txType = wAmt > 0 ? 'expense' : 'income';
+
+            // 금액이 0이면 스킵 (예금신규 등 실거래 아님)
+            if (amount === 0) {
+              console.log(`[UploadContext] 통장 직접파싱: 금액 0원 스킵 (date=${dateRaw}, desc=${String(row[descIdx] || '').trim()})`);
+              skippedRows++;
+              continue;
+            }
+
+            // 날짜 포맷 변환
+            let txDate = '';
+            // 엑셀 시리얼 날짜 감지 (예: 46042.5568 → 2026-01-20 13:21:50)
+            const numVal = Number(dateRaw);
+            if (!isNaN(numVal) && numVal > 30000 && numVal < 60000) {
+              // XLSX.SSF.parse_date_code: 부동소수점 정밀도 문제 없이 정확한 변환
+              const parsed = XLSX.SSF.parse_date_code(numVal);
+              const yyyy = parsed.y;
+              const mm = String(parsed.m).padStart(2, '0');
+              const dd = String(parsed.d).padStart(2, '0');
+              const hh = String(parsed.H).padStart(2, '0');
+              const mi = String(parsed.M).padStart(2, '0');
+              const ss = String(parsed.S).padStart(2, '0');
+              txDate = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+              console.log(`[UploadContext] 시리얼 날짜 변환: ${dateRaw} → ${txDate}`);
+            } else {
+              // "2026.02.16 21:13:42" → "2026-02-16 21:13:42"
+              txDate = dateRaw.replace(/\./g, '-');
+              if (!/^\d{4}-\d{2}-\d{2}/.test(txDate)) {
+                txDate = dateRaw; // 비표준 → 그대로 유지
+              }
+            }
+
+            const clientRaw = String(row[clientIdx] || '').trim();
+            const descRaw = String(row[descIdx] || '').trim();
+            const branchRaw = branchIdx >= 0 ? String(row[branchIdx] || '').trim() : '';
+            const memoRaw = memoIdx >= 0 ? String(row[memoIdx] || '').trim() : '';
+
+            // description: 적요 + 취급점 (시간/거래처 제외)
+            const descParts = [descRaw, branchRaw].filter(Boolean);
+            const description = descParts.join(' / ') || '';
+
+            directParsed.push({
+              transaction_date: txDate,
+              client_name: clientRaw,
+              amount,
+              type: txType,
+              payment_method: 'Bank',
+              description,
+              card_number: '',
+              approval_number: '',
+              currency: 'KRW',
+            });
+          }
+
+          console.log(`[UploadContext] 통장 직접파싱 완료: ${directParsed.length}건 (스킵 ${skippedRows}건)`);
+          setLogs(`🏧 통장 직접 파싱 완료: ${directParsed.length}건`);
+
+          // transformItem 적용 + 분류 API + 중복 제거 (기존 AI 파싱 결과 처리와 동일)
+          let newTransactions = directParsed.map((item: any) => transformItem(item));
+
+          // 자동 분류/매칭 API 호출
+          if (newTransactions.length > 0 && companyIdRef.current) {
+            try {
+              setLogs(`🔍 세무 분류 중... (${newTransactions.length}건)`);
+              const classifyHeaders = await getAuthHeaders();
+              const analyzeRes = await fetch('/api/finance/classify', {
+                method: 'POST',
+                headers: classifyHeaders,
+                body: JSON.stringify({ transactions: newTransactions, company_id: companyIdRef.current }),
+              });
+              if (analyzeRes.ok) {
+                const { transactions: enriched } = await analyzeRes.json();
+                if (Array.isArray(enriched)) {
+                  newTransactions = enriched.map((item: any, idx: number) => ({
+                    ...newTransactions[idx],
+                    category: item.category || newTransactions[idx].category,
+                    related_type: item.related_type || newTransactions[idx].related_type,
+                    related_id: item.related_id || newTransactions[idx].related_id,
+                    matched_schedule_id: item.matched_schedule_id || null,
+                    match_score: item.match_score || 0,
+                    matched_contract_name: item.matched_contract_name || null,
+                    confidence: item.confidence || 0,
+                    classification_tier: item.classification_tier || 'manual',
+                    alternatives: item.alternatives || [],
+                    card_id: item.card_id || null,
+                    matched_employee_id: item.matched_employee_id || null,
+                    matched_employee_name: item.matched_employee_name || null,
+                    _queue_id: item._queue_id || null,
+                  }));
+                }
+              }
+            } catch (e) { console.error('분류 API 오류:', e); }
+          }
+
+          // 승인/취소 쌍 매칭
+          matchCancelPairs(newTransactions);
+
+          // 중복 제거
+          const prevFpCounts = new Map<string, number>(existingFpRef.current);
+          const usedFpCounts = new Map<string, number>();
+          const unique = newTransactions.filter(tx => {
+            const fp = txFingerprint(tx);
+            const existCount = prevFpCounts.get(fp) || 0;
+            const usedCount = usedFpCounts.get(fp) || 0;
+            if (usedCount < existCount) {
+              usedFpCounts.set(fp, usedCount + 1);
+              return false;
+            }
+            usedFpCounts.set(fp, usedCount + 1);
+            prevFpCounts.set(fp, existCount + 1);
+            existingFpRef.current.set(fp, existCount + 1);
+            return true;
+          });
+          const skipped = newTransactions.length - unique.length;
+          if (skipped > 0) {
+            setDuplicateSkipCount(prev => prev + skipped);
+            console.log(`[UploadContext] 중복 ${skipped}건 스킵됨`);
+          }
+
+          setResults(prev => {
+            const combined = [...prev, ...unique];
+            matchCancelPairsAcross(combined);
+            return combined;
+          });
+          updateProgress(100);
+          return; // 직접 파싱 완료 → Gemini 파싱 스킵
+        }
+      }
+
+      // ═════════════════════════════════════════
       // B) 카드 거래 / 통장 거래 / 카드 리포트 → AI 분석
       // ═════════════════════════════════════════
       const BATCH_SIZE = 30;
@@ -849,18 +1028,16 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     if (rawType === 'income' || rawType === '입금' || rawType === '수입') txType = 'income';
     else txType = 'expense';
 
-    // transaction_date에 시간이 포함된 경우 분리 (DB는 date 타입)
+    // transaction_date에 시간 포함 유지 (중복 구분 + 크로스 비교용)
+    // "2026-01-15 10:53:30" → 그대로 유지 (DB 저장 시 date 컬럼이면 자동 절삭)
     let txDate = item.transaction_date || '';
-    let txTime = '';
-    if (txDate.length > 10) {
-      // "2026-01-15 10:53:30" → date="2026-01-15", time="10:53:30"
-      txTime = txDate.substring(11).trim();
-      txDate = txDate.substring(0, 10);
-    }
-    // 시간 정보를 description에 추가 (중복 구분용)
     let finalDescription = item.description || '';
-    if (txTime && !finalDescription.includes(txTime)) {
-      finalDescription = finalDescription ? `${txTime} / ${finalDescription}` : txTime;
+    // description에 시간이 섞여있으면 제거 (Gemini가 시간을 description에 넣는 경우 대응)
+    if (txDate.length > 10) {
+      const txTime = txDate.substring(11).trim();
+      if (txTime && finalDescription.startsWith(txTime)) {
+        finalDescription = finalDescription.substring(txTime.length).replace(/^\s*[\/\|,]\s*/, '').trim();
+      }
     }
 
     return {

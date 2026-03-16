@@ -176,8 +176,8 @@ export default function ClassificationReviewPage() {
         body: JSON.stringify({
           queue_id: item.id,
           final_category: category,
-          final_related_type: overrides?.related_type || item.ai_related_type,
-          final_related_id: overrides?.related_id || item.ai_related_id,
+          final_matched_type: overrides?.related_type || item.ai_related_type,
+          final_matched_id: overrides?.related_id || item.ai_related_id,
           save_as_rule: false,
         }),
       })
@@ -198,7 +198,7 @@ export default function ClassificationReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           queue_id: item.id, final_category: category,
-          final_related_type: item.ai_related_type, final_related_id: item.ai_related_id,
+          final_matched_type: item.ai_related_type, final_matched_id: item.ai_related_id,
           save_as_rule: true, rule_keyword: keyword,
         }),
       })
@@ -218,8 +218,8 @@ export default function ClassificationReviewPage() {
         body: JSON.stringify({
           queue_id: item.id,
           final_category: '기타',
-          final_related_type: null,
-          final_related_id: null,
+          final_matched_type: null,
+          final_matched_id: null,
           save_as_rule: false,
         }),
       })
@@ -239,8 +239,8 @@ export default function ClassificationReviewPage() {
         body: JSON.stringify({
           queue_id: item.id,
           final_category: newCategory,
-          final_related_type: item.ai_related_type,
-          final_related_id: item.ai_related_id,
+          final_matched_type: item.ai_related_type,
+          final_matched_id: item.ai_related_id,
           save_as_rule: false,
         }),
       })

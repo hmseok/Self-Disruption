@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     totalExpired += jiipExpired.length
   }
 
-  // general_investments 만료 처리
+  // investors 만료 처리
   const { data: investExpired } = await sb
     .from('general_investments')
     .select('id, company_id, status')

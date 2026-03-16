@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     console.log('[finance-parser] fileType:', fileType, '| mimeType:', mimeType, '| dataLen:', data?.length);
 
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         generationConfig: {
             responseMimeType: "application/json",
             maxOutputTokens: 65536
@@ -38,7 +38,13 @@ export async function POST(req: NextRequest) {
       bank_statement: `⚠️ 중요: 이 데이터는 은행 통장 거래내역입니다.
 - payment_method는 반드시 "Bank"로 설정하세요.
 - card_number는 빈문자열로.
-- 적요/기재내용에서 거래처명을 client_name에 추출하세요.
+- ⚠️ client_name: "기재내용" 컬럼의 값을 원본 그대로 사용하세요! 은행접두사(기업, 국민, 농협, 카카 등)를 제거하지 마세요! 예: "기업윤민진"→"기업윤민진", "국민안경희"→"국민안경희", "농협임미자"→"농협임미자"
+- ⚠️⚠️⚠️ transaction_date 필수 규칙: "거래일시" 컬럼의 값에는 날짜와 시간이 모두 있습니다 (예: "2026.02.16 21:13:42").
+  반드시 "YYYY-MM-DD HH:mm:ss" 형식으로 변환하세요! 예: "2026.02.16 21:13:42" → "2026-02-16 21:13:42"
+  ❌ 절대 "2026-02-16"만 넣지 마세요! 시간(21:13:42)을 누락하면 안 됩니다!
+  ❌ 절대 시간을 description에 넣지 마세요! 시간은 오직 transaction_date에만!
+- ⚠️ description: "적요" 컬럼값과 "취급점" 컬럼값을 " / "로 연결하세요. 예: 적요="모바일", 취급점="서수원지점" → description="모바일 / 서수원지점"
+  ❌ description에 시간을 넣지 마세요! ❌ description에 거래처명(기재내용)을 넣지 마세요!
 
 ⚠️⚠️⚠️ 거래 금액(amount) 추출 규칙 (매우 중요!!!):
 ✅ 거래 금액으로 사용할 컬럼:
@@ -70,14 +76,23 @@ ${hint}
 데이터의 실제 기간을 반드시 확인하세요. 미래 날짜가 되면 안 됩니다.
 
 [결과 필드 — 반드시 모든 필드를 포함]
-- transaction_date: YYYY-MM-DD 형식 (예: ${currentYear}-01-15). 원본 데이터에 시간(HH:mm:ss 또는 HH:mm)이 있으면 반드시 YYYY-MM-DD HH:mm:ss 형식으로 포함 (예: ${currentYear}-01-15 10:53:30). 시간이 없으면 YYYY-MM-DD만 사용. ⚠️ 같은 날짜에 동일 금액 거래가 여러 건일 수 있으므로 시간을 반드시 보존!
-- client_name: 거래처명/가맹점명/사람이름 (입금, 출금, 이체 같은 거래유형 단어 제외)
+- transaction_date: ⚠️⚠️⚠️ 가장 중요한 규칙! 원본 "거래일시" 컬럼에 시간이 있으면 반드시 "YYYY-MM-DD HH:mm:ss" 형식으로 시간까지 포함하세요!
+  예시: 원본 "2026.02.16 21:13:42" → transaction_date: "${currentYear}-02-16 21:13:42" (시간 포함!)
+  예시: 원본 "2026.01.09 17:23:45" → transaction_date: "${currentYear}-01-09 17:23:45" (시간 포함!)
+  ❌ 잘못된 예: "2026-02-16" (시간 누락됨! 이렇게 하면 안 됩니다!)
+  시간이 없는 경우에만 YYYY-MM-DD 형식 사용. 같은 날짜에 동일 금액 거래가 여러 건일 수 있으므로 시간 보존은 필수!
+- client_name: "기재내용" 또는 "가맹점명" 컬럼 값을 원본 그대로 사용. ⚠️ 은행접두사(기업, 국민, 농협, 하나, 카카, 수협 등)를 제거하지 마세요! "기업윤민진"은 "기업윤민진" 그대로 유지. (입금, 출금, 이체 같은 거래유형 단어만 제외)
 - amount: 양수 숫자 (콤마 제거). 외화인 경우 원래 외화 금액 그대로 사용
 - currency: 통화코드 (기본값 "KRW"). 달러이면 "USD", 엔화이면 "JPY", 유로이면 "EUR" 등. $, ¥, €, US$ 등의 기호가 있거나 "달러", "USD", "미화" 등 표기가 있으면 해당 통화코드 사용
 - original_amount: 외화 원금액 (currency가 KRW가 아닌 경우에만 설정, 원화 결제금액이 별도로 있으면 amount에는 원화금액, original_amount에는 외화금액 설정)
 - type: "income" 또는 "expense"
 - payment_method: 반드시 "Card" 또는 "Bank" 중 하나만 사용
-- description: 적요, 기재내용, 취급점/거래점, 업종, 주소, 할부정보, 거래시간(HH:mm:ss) 등을 " / "로 연결. ⚠️ 통장 거래에서 취급점/거래점과 시간 정보가 있으면 반드시 description에 포함 (중복 거래 구분에 필수). 외화 거래인 경우 통화정보 포함 (예: "USD 결제 / 환율 1,350")
+- description: "적요" 컬럼과 "취급점" 컬럼을 " / "로 연결. ❌ 시간(HH:mm:ss)을 넣지 마세요! ❌ 거래처명(기재내용)을 넣지 마세요!
+  올바른 예: 적요="모바일", 취급점="서수원지점" → "모바일 / 서수원지점"
+  올바른 예: 적요="인터넷", 취급점="0199898" → "인터넷 / 0199898"
+  ❌ 잘못된 예: "21:13:42 / 인터넷 / 서수원지점" (시간이 들어감!)
+  ❌ 잘못된 예: "기업윤민진 / 인터넷" (거래처명이 들어감!)
+  외화 거래인 경우 통화정보 포함 (예: "USD 결제 / 환율 1,350")
 - card_number: 카드번호 문자열 (없으면 "")
 - approval_number: 승인번호 (없으면 "")
 
@@ -263,13 +278,14 @@ ${mimeType === 'text/csv' ? data : '(이미지 데이터)'}`;
           item.amount = Math.abs(Number(item.amount.replace(/[,\s]/g, '')) || 0);
         }
 
-        // 날짜 연도 보정
+        // 날짜 연도 보정 (시간 부분 보존)
         if (item.transaction_date) {
-          const dateMatch = item.transaction_date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          const dateMatch = item.transaction_date.match(/^(\d{4})-(\d{2})-(\d{2})(.*)/);
           if (dateMatch) {
             const year = parseInt(dateMatch[1]);
             const month = parseInt(dateMatch[2]);
             const day = parseInt(dateMatch[3]);
+            const timePart = dateMatch[4] || ''; // " HH:mm:ss" 부분 보존
             const txDate = new Date(year, month - 1, day);
             const today = new Date();
             const monthsDiff = (txDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30);
@@ -277,12 +293,33 @@ ${mimeType === 'text/csv' ? data : '(이미지 데이터)'}`;
             // 미래 3개월 이상이면 → 1년 전으로 보정 (2026-10-31 → 2025-10-31)
             if (monthsDiff > 3) {
               const correctedYear = year - 1;
-              item.transaction_date = `${correctedYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              item.transaction_date = `${correctedYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}${timePart}`;
               console.log(`[finance-parser] 날짜 보정: ${year}-${month}-${day} → ${correctedYear}-${month}-${day} (미래 날짜)`);
             }
             // 연도가 현재 연도와 3년 이상 차이나면 보정
             else if (Math.abs(year - currentYear) >= 3) {
-              item.transaction_date = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              item.transaction_date = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}${timePart}`;
+            }
+          }
+        }
+
+        // ⚠️ Gemini가 시간을 description에 넣고 transaction_date에 안 넣는 경우 보정
+        if (item.transaction_date && item.description) {
+          const hasTime = /\d{2}:\d{2}:\d{2}/.test(item.transaction_date);
+          if (!hasTime) {
+            // description에서 시간 패턴 찾기 (HH:mm:ss 형식)
+            const timeInDesc = item.description.match(/(\d{2}:\d{2}:\d{2})/);
+            if (timeInDesc) {
+              // transaction_date에 시간 추가
+              item.transaction_date = `${item.transaction_date} ${timeInDesc[1]}`;
+              // description에서 시간 제거 (앞뒤 구분자도 정리)
+              item.description = item.description
+                .replace(/\d{2}:\d{2}:\d{2}\s*[\/\|,]*\s*/g, '')
+                .replace(/\s*[\/\|,]*\s*\d{2}:\d{2}:\d{2}/g, '')
+                .replace(/^\s*[\/\|,]\s*/, '')
+                .replace(/\s*[\/\|,]\s*$/, '')
+                .trim();
+              console.log(`[finance-parser] 시간 보정: description → transaction_date (${timeInDesc[1]})`);
             }
           }
         }

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../../utils/supabase'
@@ -38,10 +38,10 @@ const Icons: any = {
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/tax': 'finance', '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance', '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/invest': 'invest', '/jiip': 'invest',
+  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance', '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance', '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/jiip': 'finance',
   '/db/pricing-standards': 'data', '/db/lotte': 'data',
 }
 
@@ -49,19 +49,20 @@ const PATH_TO_GROUP: Record<string, string> = {
 const NAME_OVERRIDES: Record<string, string> = {
   '/cars': '차량 관리',
   '/registration': '차량 등록증',
-  '/invest': '투자 정산 관리',
   '/insurance': '보험/가입',
   '/finance/upload': '카드/통장 관리',
-  '/finance/settlement': '지급 관리',
+  '/finance/settlement': '정산/계약 관리',
+  '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
   '/admin/payroll': '급여 관리',
   '/quotes': '견적 관리',
   '/quotes/pricing': '견적 작성',
   '/quotes/short-term': '단기 견적',
+  '/operations/intake': '접수/오더',
 }
 
 // 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
-const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip', '/quotes/pricing', '/quotes/short-term'])
+const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term'])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [
@@ -69,7 +70,6 @@ const BUSINESS_GROUPS = [
   { id: 'ops', label: '차량운영' },
   { id: 'sales', label: '영업' },
   { id: 'finance', label: '재무' },
-  { id: 'invest', label: '투자' },
   { id: 'data', label: '데이터 관리' },
 ]
 
@@ -86,22 +86,23 @@ const PLATFORM_MENUS = [
   { name: '개발자 모드', path: '/admin/developer', iconKey: 'Database' },
 ]
 
-// god_admin + master: 설정
-const SETTINGS_MENUS = [
+// god_admin + master: 설정 (회사 정보는 master 전용)
+const SETTINGS_MENUS_BASE = [
   { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
   { name: '계약 약관 관리', path: '/admin/contract-terms', iconKey: 'Doc' },
   { name: '메시지 센터', path: '/admin/message-templates', iconKey: 'Clipboard' },
 ]
+const COMPANY_INFO_MENU = { name: '회사 정보', path: '/db/codes', iconKey: 'Setting' }
 
 // ============================================
 // 메뉴 아이템 렌더링 헬퍼
 // ============================================
-function MenuItem({ item, pathname, accent }: { item: { name: string; path: string; iconKey: string }; pathname: string; accent?: boolean }) {
+function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; path: string; iconKey: string }; pathname: string; accent?: boolean; allPaths?: string[] }) {
   const Icon = Icons[item.iconKey] || Icons.Doc
-  // 하위 경로가 별도 메뉴로 존재하는 상위 경로는 정확 매칭만 적용
-  const exactMatchOnly = ['/admin', '/quotes', '/finance']
+  // "longest match wins" — 더 긴 경로의 메뉴가 있으면 상위 경로는 비활성
+  const hasMoreSpecificMatch = allPaths?.some(p => p !== item.path && p.length > item.path.length && pathname.startsWith(p) && p.startsWith(item.path))
   const isActive = pathname === item.path ||
-    (!exactMatchOnly.includes(item.path) && pathname.startsWith(item.path + '/'))
+    (!hasMoreSpecificMatch && pathname.startsWith(item.path + '/'))
 
   return (
     <Link
@@ -202,6 +203,18 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           const { data, error } = await supabase
             .from('system_modules').select('*').order('path')
           if (!error && data) {
+            // 빠진 모듈 자동 추가
+            const existingPaths = new Set(data.map((m: any) => m.path))
+            const REQUIRED_MODULES = [
+              { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
+              { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
+            ]
+            const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
+            if (missing.length > 0) {
+              const { data: inserted } = await supabase.from('system_modules').insert(missing).select()
+              if (inserted) data.push(...inserted)
+            }
+
             const seen = new Set<string>()
             const unique = data.filter((item: any) => {
               if (seen.has(item.path)) return false
@@ -221,6 +234,31 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       }
 
       if (!company) return
+
+      // 빠진 system_modules 자동 추가 + company_modules 활성화
+      const REQUIRED_MODULES = [
+        { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
+        { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
+      ]
+      const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
+      if (allSysMods) {
+        const existingPaths = new Set(allSysMods.map((m: any) => m.path))
+        const missingSys = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
+        if (missingSys.length > 0) {
+          const { data: inserted } = await supabase.from('system_modules').insert(missingSys).select()
+          if (inserted) allSysMods.push(...inserted)
+        }
+        // company_modules에 활성화 안 된 새 모듈 추가
+        const { data: compMods } = await supabase.from('company_modules').select('module_id').eq('company_id', company.id)
+        const existingModIds = new Set((compMods || []).map((cm: any) => cm.module_id))
+        for (const rm of REQUIRED_MODULES) {
+          const sysMod = allSysMods.find((m: any) => m.path === rm.path)
+          if (sysMod && !existingModIds.has(sysMod.id)) {
+            await supabase.from('company_modules').insert({ company_id: company.id, module_id: sysMod.id, is_active: true })
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('company_modules')
         .select(`is_active, module:system_modules ( id, name, path, icon_key )`)
@@ -293,6 +331,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         .map(m => ({ name: m.name, path: m.path, iconKey: m.iconKey })),
     }))
     .filter(g => g.items.length > 0)
+
+  // 모든 메뉴 경로 (longest match 계산용)
+  const allMenuPaths = dynamicMenus.map(m => m.path)
 
   const isPendingApproval = company && company.is_active === false && role !== 'god_admin'
   const showPlatform = role === 'god_admin'
@@ -455,7 +496,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="space-y-0.5">
                   {group.items.map(item => (
-                    <MenuItem key={item.path} item={item} pathname={pathname} />
+                    <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                   ))}
                 </div>
               </div>
@@ -468,7 +509,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               </div>
               <div className="space-y-0.5">
                 {WORK_ESSENTIALS_MENUS.map(item => (
-                  <MenuItem key={item.path} item={item} pathname={pathname} />
+                  <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                 ))}
               </div>
             </div>
@@ -485,7 +526,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="space-y-0.5">
                       {PLATFORM_MENUS.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} accent />
+                        <MenuItem key={item.path} item={item} pathname={pathname} accent allPaths={allMenuPaths} />
                       ))}
                     </div>
                   </div>
@@ -498,8 +539,9 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                       <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">설정</span>
                     </div>
                     <div className="space-y-0.5">
-                      {SETTINGS_MENUS.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} />
+                      {role !== 'god_admin' && <MenuItem item={COMPANY_INFO_MENU} pathname={pathname} allPaths={allMenuPaths} />}
+                      {SETTINGS_MENUS_BASE.map(item => (
+                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
                       ))}
                     </div>
                   </div>
@@ -570,90 +612,156 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 function UploadProgressWidget() {
   const pathname = usePathname()
   const [dismissed, setDismissed] = useState(false)
+  const [minimized, setMinimized] = useState(false)
+  const [pos, setPos] = useState({ x: 210, y: -1 }) // y=-1 → bottom 기반 초기 위치
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+  const widgetRef = useRef<HTMLDivElement>(null)
+
   let uploadContext: ReturnType<typeof useUpload> | null = null
   try { uploadContext = useUpload() } catch { return null }
   if (!uploadContext) return null
 
   const { status, progress, currentFileIndex, totalFiles, currentFileName, logs } = uploadContext
 
-  // 업로드 페이지에서는 위젯 숨기기 (페이지 자체에 진행률 표시)
   if (pathname === '/finance/upload') return null
 
-  // 처리 중 또는 결과가 있으면 표시
   const hasResults = uploadContext.results && uploadContext.results.length > 0
   const totalResultCount = hasResults ? uploadContext.results.length : 0
   const isProcessing = status === 'processing' || status === 'paused'
 
-  // 처리 중도 아니고 분류 대기 건도 없으면 숨기기
   if (!isProcessing && !hasResults) return null
-  // 업로드/분류 확정 페이지에서는 숨기기
   if (pathname === '/finance/review' || pathname === '/finance/upload') return null
-  // 사용자가 닫기 버튼 눌렀으면 숨기기 (분류 대기 알림만 — 업로드 처리 중에는 항상 표시)
   if (dismissed && !isProcessing) return null
 
-  return (
-    <div style={{
-      position: 'fixed', bottom: 24, left: 210, zIndex: 9999,
-      background: '#fff', borderRadius: 16, padding: '16px 20px', width: 320,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0',
-    }}>
-      {/* 닫기 버튼 (분류 대기 알림에만) */}
-      {!isProcessing && hasResults && (
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDismissed(true) }}
+  // 드래그 핸들러
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = widgetRef.current?.getBoundingClientRect()
+    if (!rect) return
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const dx = ev.clientX - dragRef.current.startX
+      const dy = ev.clientY - dragRef.current.startY
+      setPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy })
+    }
+    const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // 초기 위치 설정 (bottom: 24 → top 좌표로 변환)
+  const posStyle = pos.y === -1
+    ? { position: 'fixed' as const, bottom: 24, left: pos.x, zIndex: 9999 }
+    : { position: 'fixed' as const, top: pos.y, left: pos.x, zIndex: 9999 }
+
+  // 최소화 상태
+  if (minimized) {
+    return (
+      <div ref={widgetRef} style={{ ...posStyle, cursor: 'default' }}>
+        <div
+          onMouseDown={onDragStart}
+          onClick={() => setMinimized(false)}
           style={{
-            position: 'absolute', top: 8, right: 10,
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 16, color: '#94a3b8', lineHeight: 1, padding: '2px 4px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: isProcessing ? 'linear-gradient(135deg, #1e40af, #3b82f6)' : 'linear-gradient(135deg, #d97706, #f59e0b)',
+            padding: '8px 14px', borderRadius: 24, cursor: 'grab',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.2)', color: '#fff', userSelect: 'none',
           }}
-          title="닫기"
         >
-          ×
-        </button>
-      )}
-      {/* 업로드 처리 중 */}
-      {isProcessing && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {status === 'processing' ? (
-                <div style={{ width: 18, height: 18, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <span style={{ fontSize: 16 }}>⏸️</span>
-              )}
-              <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
-                {status === 'processing' ? '파일 분석 중' : '일시정지'}
-              </span>
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eff6ff', padding: '3px 8px', borderRadius: 6 }}>
+          {isProcessing ? (
+            <>
+              <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{progress}%</span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 13 }}>📋</span>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{totalResultCount}건 대기</span>
+            </>
+          )}
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={widgetRef} style={{
+      ...posStyle, width: 300, borderRadius: 14, overflow: 'hidden',
+      background: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+    }}>
+      {/* 헤더 (드래그 핸들) */}
+      <div
+        onMouseDown={onDragStart}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 12px',
+          background: isProcessing ? 'linear-gradient(135deg, #1e40af, #3b82f6)' : 'linear-gradient(135deg, #d97706, #f59e0b)',
+          cursor: 'grab', userSelect: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isProcessing ? (
+            <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          ) : (
+            <span style={{ fontSize: 14 }}>📋</span>
+          )}
+          <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>
+            {isProcessing ? (status === 'processing' ? '파일 분석 중' : '일시정지') : '분류 확정 대기'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {isProcessing && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: 10, marginRight: 4 }}>
               {totalFiles > 0 ? `${currentFileIndex + 1}/${totalFiles}` : `${progress}%`}
             </span>
-          </div>
-          <div style={{ background: '#f1f5f9', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg, #2d5fa8, #60a5fa)', borderRadius: 6, transition: 'width 0.5s', width: `${progress}%` }} />
-          </div>
-          <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {logs || currentFileName || '처리 중...'}
-          </p>
-        </>
-      )}
-      {/* 분류 확정 대기 알림 */}
-      {!isProcessing && hasResults && (
-        <a href="/finance/upload" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>📋</span>
-              <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>분류 확정 대기</span>
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: '#fef3c7', padding: '3px 8px', borderRadius: 6 }}>
+          )}
+          {!isProcessing && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: 10, marginRight: 4 }}>
               {totalResultCount}건
             </span>
-          </div>
-          <p style={{ fontSize: 11, color: '#64748b', margin: '6px 0 0 0' }}>
-            클릭하여 카드/통장 관리 페이지로 이동
-          </p>
-        </a>
-      )}
+          )}
+          <button onClick={(e) => { e.stopPropagation(); setMinimized(true) }}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', color: '#fff', fontSize: 14, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+            title="최소화">
+            ─
+          </button>
+          {!isProcessing && (
+            <button onClick={(e) => { e.stopPropagation(); setDismissed(true) }}
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 6px', color: '#fff', fontSize: 14, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+              title="닫기">
+              ×
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 본문 */}
+      <div style={{ padding: '12px 14px' }}>
+        {isProcessing && (
+          <>
+            <div style={{ background: '#f1f5f9', borderRadius: 6, height: 5, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ height: '100%', background: 'linear-gradient(90deg, #1e40af, #60a5fa)', borderRadius: 6, transition: 'width 0.5s', width: `${progress}%` }} />
+            </div>
+            <p style={{ fontSize: 11, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {logs || currentFileName || '처리 중...'}
+            </p>
+          </>
+        )}
+        {!isProcessing && hasResults && (
+          <a href="/finance/upload" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 12, color: '#475569', margin: 0, lineHeight: 1.5 }}>
+                분류 완료된 <strong style={{ color: '#d97706' }}>{totalResultCount}건</strong>이 확정을 기다리고 있습니다
+              </p>
+            </div>
+            <div style={{ flexShrink: 0, background: '#f59e0b', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 8 }}>
+              확인 →
+            </div>
+          </a>
+        )}
+      </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
