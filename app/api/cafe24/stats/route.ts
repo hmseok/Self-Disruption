@@ -17,11 +17,11 @@ export async function GET(req: NextRequest) {
     ] = await Promise.all([
       // 오늘 사고접수 건수
       pool.query(
-        `SELECT COUNT(*) as cnt FROM acrotpth WHERE otptgndt = DATE_FORMAT(NOW(), '%Y%m%d')`
+        `SELECT COUNT(*) as cnt FROM acrotpth WHERE otptrgst = 'R' AND otptgndt = DATE_FORMAT(NOW(), '%Y%m%d')`
       ),
       // 이번달 사고접수 건수
       pool.query(
-        `SELECT COUNT(*) as cnt FROM acrotpth WHERE otptgndt >= DATE_FORMAT(NOW(), '%Y%m01')`
+        `SELECT COUNT(*) as cnt FROM acrotpth WHERE otptrgst = 'R' AND otptgndt >= DATE_FORMAT(NOW(), '%Y%m01')`
       ),
       // 오늘 차량 출고 건수
       pool.query(
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       pool.query(
         `SELECT otptstat as status, COUNT(*) as cnt
          FROM acrotpth
-         WHERE otptgndt >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 30 DAY), '%Y%m%d')
+         WHERE otptrgst = 'R' AND otptgndt >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 30 DAY), '%Y%m%d')
          GROUP BY otptstat`
       ),
       // 최근 사고접수 5건
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
                 otptdsnm as repairShop, otptcanm as counterpart, otptstat as status,
                 otptacad as location
          FROM acrotpth
+         WHERE otptrgst = 'R'
          ORDER BY otptgndt DESC, otptgntm DESC
          LIMIT 5`
       ),

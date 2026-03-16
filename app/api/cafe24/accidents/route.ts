@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
 
     const pool = getCafe24Pool();
 
-    // 동적 WHERE 조건
-    const conditions: string[] = [];
+    // 동적 WHERE 조건 (otptrgst='R' : 렌터카 사고접수만)
+    const conditions: string[] = ["a.otptrgst = 'R'"];
     const params: any[] = [];
 
     if (fromDate) {
