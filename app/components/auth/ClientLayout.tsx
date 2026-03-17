@@ -39,6 +39,7 @@ const Icons: any = {
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
   '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops', '/rental': 'ops',
+  '/claims/accident-mgmt': 'claims', '/claims/billing-mgmt': 'claims',
   '/claims/intake': 'claims', '/claims/investigation': 'claims', '/claims/assessment': 'claims', '/claims/billing': 'claims', '/claims/rental': 'claims',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
   '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance', '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance', '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
@@ -61,6 +62,8 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/quotes/short-term': '단기 견적',
   '/operations/intake': '접수/오더',
   '/rental': '대차관리',
+  '/claims/accident-mgmt': '사고관리',
+  '/claims/billing-mgmt': '청구관리',
   '/claims/intake': '사고 접수',
   '/claims/investigation': '사고 조사',
   '/claims/assessment': '손해 사정',
@@ -69,7 +72,7 @@ const NAME_OVERRIDES: Record<string, string> = {
 }
 
 // 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
-const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term', '/accidents', '/rental'])
+const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term', '/accidents', '/rental', '/claims/intake', '/claims/investigation', '/claims/assessment', '/claims/billing', '/claims/rental'])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [
@@ -217,11 +220,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
               { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
               { path: '/rental', name: '대차관리', icon_key: 'Truck', description: '대차운영 프로세스 관리', plan_group: 'free' },
-              { path: '/claims/intake', name: '사고 접수', icon_key: 'ExclamationTriangle', description: '사고 접수 및 기본정보 입력', plan_group: 'free' },
-              { path: '/claims/investigation', name: '사고 조사', icon_key: 'Shield', description: '현장조사, 파손분석, 공장배정', plan_group: 'free' },
-              { path: '/claims/assessment', name: '손해 사정', icon_key: 'WrenchScrewdriver', description: '수리비 산정, 보험금 사정', plan_group: 'free' },
-              { path: '/claims/billing', name: '보험 청구', icon_key: 'Money', description: '보험 청구 및 지급 관리', plan_group: 'free' },
-              { path: '/claims/rental', name: '대차 관리', icon_key: 'Truck', description: '사고 대차 운영 관리', plan_group: 'free' },
+              { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
+              { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
             ]
             const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
             if (missing.length > 0) {
@@ -253,11 +253,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       const REQUIRED_MODULES = [
         { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
         { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
-        { path: '/claims/intake', name: '사고 접수', icon_key: 'ExclamationTriangle', description: '사고 접수 및 기본정보 입력', plan_group: 'free' },
-        { path: '/claims/investigation', name: '사고 조사', icon_key: 'Shield', description: '현장조사, 파손분석, 공장배정', plan_group: 'free' },
-        { path: '/claims/assessment', name: '손해 사정', icon_key: 'WrenchScrewdriver', description: '수리비 산정, 보험금 사정', plan_group: 'free' },
-        { path: '/claims/billing', name: '보험 청구', icon_key: 'Money', description: '보험 청구 및 지급 관리', plan_group: 'free' },
-        { path: '/claims/rental', name: '대차 관리', icon_key: 'Truck', description: '사고 대차 운영 관리', plan_group: 'free' },
+        { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
+        { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
       ]
       const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
       if (allSysMods) {
