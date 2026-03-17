@@ -105,9 +105,9 @@ export const ACCIDENT_COLS: [string, string][] = [
 
 // acrrentm (대차) 테이블 컬럼 → API alias 매핑
 export const RENTAL_COLS: [string, string][] = [
-  ['rentidno', 'staffId'],        // 담당자ID
-  ['rentmddt', 'receiptDate'],    // 접수일자
-  ['rentsrno', 'seqNo'],         // 일련번호
+  ['rentidno', 'rentStaffId'],        // 대차담당자ID (acrotpth staffId와 중복방지)
+  ['rentmddt', 'rentReceiptDate'],    // 대차접수일자
+  ['rentsrno', 'rentSeqNo'],         // 대차일련번호
   ['rentseqn', 'rentalSeq'],     // 대차순번
   ['rentstat', 'rentalStatus'],   // 대차상태
   ['rentrsdt', 'requestDate'],    // 대차요청일

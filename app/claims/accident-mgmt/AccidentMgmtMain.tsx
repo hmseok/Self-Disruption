@@ -12,24 +12,43 @@ type Memo = { content: string; createdBy: string; createdDate: string; createdTi
 // ============================================
 // Constants
 // ============================================
+// picbscdm OTPTSTAT — 실제 DB 코드
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  '10': { label: '접수', color: 'bg-red-500 text-white' },
-  '15': { label: '배정', color: 'bg-orange-500 text-white' },
-  '20': { label: '검수', color: 'bg-yellow-500 text-white' },
-  '30': { label: '공장', color: 'bg-blue-500 text-white' },
-  '40': { label: '입고', color: 'bg-purple-500 text-white' },
-  '45': { label: '조사', color: 'bg-cyan-500 text-white' },
-  '50': { label: '수리', color: 'bg-violet-500 text-white' },
-  '55': { label: '완료', color: 'bg-teal-500 text-white' },
-  '60': { label: '출고', color: 'bg-emerald-500 text-white' },
-  '70': { label: '청구', color: 'bg-amber-500 text-white' },
-  '80': { label: '사정', color: 'bg-orange-600 text-white' },
-  '85': { label: '지급', color: 'bg-lime-500 text-white' },
-  '90': { label: '종결', color: 'bg-green-600 text-white' },
+  '1': { label: '접수', color: 'bg-green-600 text-white' },
+  '2': { label: '입고', color: 'bg-blue-500 text-white' },
+  '3': { label: '출고', color: 'bg-emerald-500 text-white' },
+  '4': { label: '결재요청', color: 'bg-orange-500 text-white' },
+  '5': { label: '지급요청', color: 'bg-amber-500 text-white' },
+  '6': { label: '지급완료', color: 'bg-purple-500 text-white' },
+  '9': { label: '미종결', color: 'bg-red-500 text-white' },
+  'A': { label: '기안요청', color: 'bg-cyan-500 text-white' },
+  'B': { label: '기안처리중', color: 'bg-yellow-600 text-white' },
+  'C': { label: '지급요청', color: 'bg-lime-600 text-white' },
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  A: '자차', B: '대물', C: '대인', D: '자손', E: '무보험',
+// picbscdm CARSTYPE — 실비/턴키 구분
+const CATEGORY_MAP: Record<string, string> = {
+  S: '실비', T: '턴키',
+}
+
+// picbscdm PMOACBN — 사고지점(사고유형)
+const BRANCH_MAP: Record<string, string> = {
+  E: '긴출', G: '가해', J: '자차', K: '과실', P: '피해', B: 'B', D: 'D', M: 'M',
+}
+
+// picbscdm FACTGUBN — 등록유형
+const REGTYPE_MAP: Record<string, string> = {
+  '1': '법정검사', '2': '사고접수', '3': '정기점검', '4': '기타', 'I': '사고접수',
+}
+
+// picbscdm FACTTYPE — 대차/공장 유형
+const RENTAL_TYPE_MAP: Record<string, string> = {
+  A: '공장(일반)', B: '공장(P)', C: '정비업체(일반)', D: '정비업체(정기점검)',
+}
+
+// regStatus
+const REGSTATUS_MAP: Record<string, string> = {
+  R: '렌터카', C: 'C',
 }
 
 // ============================================
@@ -109,28 +128,27 @@ function AccidentDetail({ a, memos, memosLoading }: {
               <F label="사고일시" value={fDT(a.accidentDate, a.accidentTime)} bold accent />
               <F label="수변호" value={a.accidentNo} bold />
               <F label="상태" value={STATUS_MAP[a.status]?.label || a.status} bold />
-              <F label="대차" value={a.rentalYn === 'Y' ? '대차사용' : '대차미사용'} />
+              <F label="대차" value={a.rentalStatus ? '대차사용' : '대차미사용'} />
               <F label="과실" value={a.faultRate ? `${a.faultRate}%` : ''} bold />
             </div>
-            <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
-              {/* 사고구분 체크박스 스타일 */}
-              {['대인', '대물', '자차', '자손', '무보험'].map(cat => {
-                const catCode = Object.entries(CATEGORY_LABELS).find(([, v]) => v === cat)?.[0]
-                const isChecked = a.category === catCode
+            {/* 사고유형 표시: 사고지점(PMOACBN) 기반 */}
+            <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1">
+              {Object.entries(BRANCH_MAP).map(([code, label]) => {
+                const isActive = a.accidentBranch === code
                 return (
-                  <label key={cat} className="flex items-center gap-1 text-xs">
-                    <span className={`w-3.5 h-3.5 border rounded flex items-center justify-center text-[9px] ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-transparent'}`}>✓</span>
-                    <span className={isChecked ? 'font-bold text-slate-900' : 'text-slate-500'}>{cat}</span>
+                  <label key={code} className="flex items-center gap-1 text-xs">
+                    <span className={`w-3.5 h-3.5 border rounded flex items-center justify-center text-[9px] ${isActive ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-transparent'}`}>✓</span>
+                    <span className={isActive ? 'font-bold text-slate-900' : 'text-slate-500'}>{label}</span>
                   </label>
                 )
               })}
             </div>
             <div className="mt-1.5 space-y-1">
               <F label="사고장소" value={a.accidentLocation} bold />
-              <F label="사고지점" value={a.accidentBranch} />
-              <F label="사고원인" value={a.accidentReason} />
-              <F label="사고구분" value={a.accidentDi} />
-              <F label="사고피해" value={a.accidentDamage} />
+              <F label="사고지점" value={BRANCH_MAP[a.accidentBranch] || a.accidentBranch} />
+              <F label="사고원인" value={fYN(a.accidentReason)} />
+              <F label="사고구분" value={fYN(a.accidentDi)} />
+              <F label="사고피해" value={fYN(a.accidentDamage)} />
             </div>
             {a.accidentMemo && (
               <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-slate-800">
@@ -141,11 +159,11 @@ function AccidentDetail({ a, memos, memosLoading }: {
           </Sec>
 
           {/* ── 계약/차량 정보 ── */}
-          <Sec title="계약/차량 정보" icon="📋" open={false}>
+          <Sec title="계약/차량 정보" icon="📋">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="등록상태" value={a.regStatus} />
-              <F label="등록유형" value={a.regType} />
-              <F label="사고구분플래그" value={a.adFlag} />
+              <F label="등록상태" value={REGSTATUS_MAP[a.regStatus] || a.regStatus} />
+              <F label="등록유형" value={REGTYPE_MAP[a.regType] || a.regType} />
+              <F label="사고구분플래그" value={fYN(a.adFlag)} />
               <F label="접수자" value={a.createdBy} />
               <F label="접수일시" value={fDT(a.createdDate, a.createdTime)} />
               <F label="담당자ID" value={a.staffId} />
@@ -183,12 +201,12 @@ function AccidentDetail({ a, memos, memosLoading }: {
 
           {/* ── 대차관리 ── */}
           <Sec title="대차관리" icon="🚛">
-            {a.rentalYn !== 'Y' ? (
-              <p className="text-xs text-slate-400 italic">대차관리는 사고접수시 대차요청 체크시에만 사용가능합니다.</p>
+            {!a.rentalStatus ? (
+              <p className="text-xs text-slate-400 italic">대차 데이터 없음</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-                <F label="대차상태" value={a.rentalStatus} />
-                <F label="대차종류" value={a.rentalType} bold />
+                <F label="대차상태" value={STATUS_MAP[a.rentalStatus]?.label || a.rentalStatus} />
+                <F label="대차종류" value={RENTAL_TYPE_MAP[a.rentalType] || a.rentalType} bold />
                 <F label="대차업체" value={a.rentalFactory} bold />
                 <F label="대차차량" value={a.rentalCarNo ? `${a.rentalCarModel || ''} ${a.rentalCarNo}` : ''} />
                 <F label="시작일" value={`${fD(a.rentalFromDate)} ${fT(a.rentalFromTime)}`} />
@@ -237,7 +255,7 @@ function AccidentDetail({ a, memos, memosLoading }: {
                 <F label="보상명" value={a.bdName} />
                 <F label="파손부위" value={a.damageArea} bold accent />
                 <F label="예상금액" value={fWon(a.estimatedCost) ? `₩${fWon(a.estimatedCost)}` : ''} bold accent />
-                <F label="목표금액" value={fWon(a.targetAmount) ? `₩${fWon(a.targetAmount)}` : ''} />
+                <F label="목표금액" value={a.targetAmount === 'D' ? '대물' : a.targetAmount === 'C' ? '대인' : a.targetAmount} />
                 <F label="검사일자" value={fD(a.examDate)} />
                 <F label="정산" value={fYN(a.settlementYn)} />
                 <F label="면책" value={fYN(a.deductYn)} />
@@ -369,28 +387,32 @@ export default function AccidentMgmtMain() {
       )
     }
     result.sort((a, b) => {
-      const da = (a.receiptDate || '') + (a.createdTime || '')
-      const db = (b.receiptDate || '') + (b.createdTime || '')
+      const da = (a.accidentDate || a.receiptDate || '') + (a.accidentTime || a.createdTime || '')
+      const db = (b.accidentDate || b.receiptDate || '') + (b.accidentTime || b.createdTime || '')
       return db.localeCompare(da)
     })
     return result
   }, [accidents, search])
 
-  // Stats
+  // Stats — 실제 OTPTSTAT 코드 기반
   const stats = useMemo(() => ({
     전체: accidents.length,
-    접수: accidents.filter(a => ['10', '15'].includes(a.status)).length,
-    공장: accidents.filter(a => ['20', '30', '40'].includes(a.status)).length,
-    완료: accidents.filter(a => a.status === '90').length,
+    접수: accidents.filter(a => a.status === '1').length,
+    공장: accidents.filter(a => ['2', '3'].includes(a.status)).length,
+    완료: accidents.filter(a => a.status === '6').length,
   }), [accidents])
 
+  const getRowId = (a: Accident) => a.accidentNo || `${a.staffId}-${a.receiptDate}-${a.seqNo}`
+
   const handleExpand = (a: Accident) => {
-    const id = `${a.staffId}-${a.receiptDate}-${a.seqNo}`
+    const id = getRowId(a)
     if (expandedId === id) {
       setExpandedId(null)
     } else {
       setExpandedId(id)
-      loadMemos(a.staffId, a.receiptDate, a.seqNo)
+      if (a.staffId && a.receiptDate && a.seqNo) {
+        loadMemos(a.staffId, a.receiptDate, a.seqNo)
+      }
     }
   }
 
@@ -453,8 +475,8 @@ export default function AccidentMgmtMain() {
             </div>
 
             {/* ── Rows ── */}
-            {filtered.map((a) => {
-              const id = `${a.staffId}-${a.receiptDate}-${a.seqNo}`
+            {filtered.map((a, idx) => {
+              const id = getRowId(a) || `row-${idx}`
               const isExpanded = expandedId === id
               const st = STATUS_MAP[a.status]
 
@@ -488,7 +510,7 @@ export default function AccidentMgmtMain() {
                     </span>
                     <span className="col-span-2 text-slate-600 truncate">
                       {a.repairShopName || '-'}
-                      {a.rentalYn === 'Y' && <span className="text-green-600 ml-1">[대차]</span>}
+                      {a.rentalStatus && <span className="text-green-600 ml-1 font-bold">[대차]</span>}
                     </span>
                   </div>
 
