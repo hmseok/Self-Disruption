@@ -1,54 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCafe24Pool } from '../lib/db';
 
-// 사고접수 목록 조회
+// 대차(렌탈) 목록 조회 (acrrentm + acrotpth JOIN)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '100');
     const offset = (page - 1) * limit;
+    const status = searchParams.get('status') || '';
+    const search = searchParams.get('search') || '';
     const fromDate = searchParams.get('from') || '';
     const toDate = searchParams.get('to') || '';
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || '';
+    const type = searchParams.get('type') || ''; // 대차유형
 
     const pool = getCafe24Pool();
 
-    // 동적 WHERE 조건
     const conditions: string[] = [];
     const params: any[] = [];
 
+    if (status) {
+      conditions.push('r.rentstat = ?');
+      params.push(status);
+    }
+    if (type) {
+      conditions.push('r.renttype = ?');
+      params.push(type);
+    }
     if (fromDate) {
-      conditions.push('a.otptgndt >= ?');
+      conditions.push('r.rentfrdt >= ?');
       params.push(fromDate.replace(/-/g, ''));
     }
     if (toDate) {
-      conditions.push('a.otptgndt <= ?');
+      conditions.push('r.renttodt <= ?');
       params.push(toDate.replace(/-/g, ''));
     }
-    if (status) {
-      conditions.push('a.otptstat = ?');
-      params.push(status);
-    }
     if (search) {
-      conditions.push('(a.otptacnu LIKE ? OR a.otptdsnm LIKE ? OR a.otptcanm LIKE ? OR a.otptacad LIKE ?)');
-      const searchLike = `%${search}%`;
-      params.push(searchLike, searchLike, searchLike, searchLike);
+      conditions.push('(r.rentnums LIKE ? OR r.rentmodl LIKE ? OR a.otptacnu LIKE ? OR a.otptcanm LIKE ?)');
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
     }
 
-    const whereClause = conditions.length > 0
-      ? 'WHERE ' + conditions.join(' AND ')
-      : '';
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     // 총 건수
     const [countResult] = await pool.query(
-      `SELECT COUNT(*) as total FROM acrotpth a ${whereClause}`,
+      `SELECT COUNT(*) as total FROM acrrentm r
+       LEFT JOIN acrotpth a ON r.rentidno = a.otptidno AND r.rentmddt = a.otptmddt AND r.rentsrno = a.otptsrno
+       ${whereClause}`,
       params
     );
     const total = (countResult as any[])[0].total;
 
-    // 먼저 acrotpth 테이블의 컬럼 확인 (존재하지 않는 컬럼 방지)
+    // 사고 테이블 컬럼 동적 확인 (존재하지 않는 컬럼 방지)
     let extraAccidentCols = '';
     try {
       const [cols] = await pool.query(`SHOW COLUMNS FROM acrotpth`);
@@ -75,34 +79,12 @@ export async function GET(req: NextRequest) {
       console.warn('컬럼 확인 실패, 기본 컬럼만 사용:', e);
     }
 
-    // 목록 조회 (사고접수 + 대차정보 LEFT JOIN)
+    // 대차 목록 + 사고정보 JOIN
     const [rows] = await pool.query(
       `SELECT
-        a.otptacnu as accidentNo,
-        a.otptidno as staffId,
-        a.otptmddt as receiptDate,
-        a.otptsrno as seqNo,
-        a.otptacdt as accidentDate,
-        a.otptactm as accidentTime,
-        a.otptacad as accidentLocation,
-        a.otptacmo as accidentMemo,
-        a.otptacfe as faultRate,
-        a.otptdsnm as repairShopName,
-        a.otptcanm as counterpartName,
-        a.otptcahp as counterpartPhone,
-        a.otptcare as counterpartInsurance,
-        a.otpttwgn as towingYn,
-        a.otptstat as status,
-        a.otptdcyn as rentalYn,
-        a.otptrgst as regStatus,
-        a.otptmscs as category,
-        a.otptgnus as createdBy,
-        a.otptgndt as createdDate,
-        a.otptgntm as createdTime,
-        a.otptupus as updatedBy,
-        a.otptupdt as updatedDate,
-        a.otptuptm as updatedTime
-        ${extraAccidentCols},
+        r.rentidno as staffId,
+        r.rentmddt as receiptDate,
+        r.rentsrno as seqNo,
         r.rentnums as rentalCarNo,
         r.rentmodl as rentalCarModel,
         r.rentfrdt as rentalFromDate,
@@ -113,15 +95,38 @@ export async function GET(req: NextRequest) {
         r.renttype as rentalType,
         r.rentfacd as rentalFactory,
         r.rentmemo as rentalMemo,
-        r.rentcost as rentalDailyCost,
-        r.renttotal as rentalTotalCost,
-        r.rentdays as rentalDays
-      FROM acrotpth a
-      LEFT JOIN acrrentm r ON a.otptidno = r.rentidno
-        AND a.otptmddt = r.rentmddt
-        AND a.otptsrno = r.rentsrno
+        r.rentdlvr as deliveryMethod,
+        r.rentdldt as deliveryDate,
+        r.rentdltm as deliveryTime,
+        r.rentrtndt as returnDate,
+        r.rentrtntm as returnTime,
+        r.rentcost as dailyCost,
+        r.renttotal as totalCost,
+        r.rentdays as rentalDays,
+        r.rentgnus as createdBy,
+        r.rentgndt as createdDate,
+        r.rentgntm as createdTime,
+        a.otptacnu as accidentNo,
+        a.otptacdt as accidentDate,
+        a.otptactm as accidentTime,
+        a.otptacad as accidentLocation,
+        a.otptacmo as accidentMemo,
+        a.otptacfe as faultRate,
+        a.otptstat as accidentStatus,
+        a.otptdsnm as repairShopName,
+        a.otptcanm as counterpartName,
+        a.otptcahp as counterpartPhone,
+        a.otptcare as counterpartInsurance,
+        a.otpttwgn as towingYn,
+        a.otptmscs as category,
+        a.otptdcyn as rentalYn
+        ${extraAccidentCols}
+      FROM acrrentm r
+      LEFT JOIN acrotpth a ON r.rentidno = a.otptidno
+        AND r.rentmddt = a.otptmddt
+        AND r.rentsrno = a.otptsrno
       ${whereClause}
-      ORDER BY a.otptgndt DESC, a.otptgntm DESC
+      ORDER BY r.rentfrdt DESC, r.rentfrtm DESC
       LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
@@ -129,15 +134,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
     });
   } catch (error: any) {
-    console.error('카페24 사고접수 조회 에러:', error);
+    console.error('대차 목록 조회 에러:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

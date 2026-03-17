@@ -2,1287 +2,862 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../utils/supabase'
-import WorkflowBoard, { type AccidentCase, type WorkflowStage } from './WorkflowBoard'
-import WorkflowDetail from './WorkflowDetail'
 
 // ============================================
-// Types — 실제 accident_records DB 컬럼에 맞춤
+// Types
 // ============================================
-type AccidentRecord = {
-  id: number
-  company_id: string
-  car_id: number | null
-  contract_id: string | null
-  customer_id: number | null
-  accident_date: string
-  accident_time: string | null
-  accident_location: string
-  accident_type: string
-  fault_ratio: number
-  description: string
-  status: string
-  driver_name: string
-  driver_phone: string
-  driver_relation: string
-  counterpart_name: string
-  counterpart_phone: string
-  counterpart_vehicle: string
-  counterpart_insurance: string
-  insurance_company: string
-  insurance_claim_no: string
-  insurance_filed_at: string | null
-  insurance_status: string | null
-  police_reported: boolean
-  police_report_no: string | null
-  repair_shop_name: string
-  repair_start_date: string | null
-  repair_end_date: string | null
-  mileage_at_accident: number | null
-  estimated_repair_cost: number
-  actual_repair_cost: number
-  insurance_payout: number
-  customer_deductible: number
-  company_cost: number
-  replacement_car_id: number | null
-  replacement_start: string | null
-  replacement_end: string | null
-  replacement_cost: number | null
-  vehicle_condition: string | null
-  photos: string[] | null
-  documents: string[] | null
-  notes: string
-  handler_id: string | null
-  created_by: string | null
-  created_at: string
-  updated_at: string
-  source: string | null
-  jandi_raw: string | null
-  jandi_topic: string | null
+type Accident = {
+  accidentNo: string; staffId: string; receiptDate: string; seqNo: string
+  accidentDate: string; accidentTime: string; accidentLocation: string
+  accidentMemo: string; faultRate: string; repairShopName: string; repairShopPhone: string
+  deliveryMemo: string; counterpartName: string; counterpartPhone: string
+  counterpartVehicle: string; counterpartInsurance: string
+  towingYn: string; towingCompany: string; towingPhone: string
+  handoverName: string; handoverPhone: string
+  status: string; settlementYn: string; rentalYn: string; returnYn: string
+  regStatus: string; category: string; regType: string; completeYn: string
+  deductYn: string; createdBy: string; createdDate: string; createdTime: string
+  updatedBy: string; updatedDate: string; updatedTime: string
+  rentalCarNo: string; rentalCarModel: string; rentalFromDate: string
+  rentalFromTime: string; rentalToDate: string; rentalToTime: string
+  rentalStatus: string; rentalType: string; rentalFactory: string; rentalMemo: string
+  rentalDailyCost: string; rentalTotalCost: string; rentalDays: string
+  vehicleNo: string; vehicleName: string; insuranceCode: string; insuranceName: string
+  examType: string; accidentNote: string; damageArea: string; damageDetail: string
+  repairCost: string; insuranceCost: string
 }
 
-type Car = {
-  id: number
-  number: string
-  brand: string
-  model: string
+type ConsultMemo = {
+  staffId: string; receiptDate: string; seqNo: string; lineNo: string
+  memoDate: string; memoTime: string; memoType: string
+  memoTitle: string; memoContent: string; createdBy: string
+  createdDate: string; createdTime: string
 }
 
 // ============================================
 // Constants
 // ============================================
-const ACC_STATUS: Record<string, { label: string; color: string }> = {
-  reported:        { label: '신규접수', color: 'bg-blue-100 text-blue-700' },
-  insurance_filed: { label: '보험접수', color: 'bg-amber-100 text-amber-700' },
-  repairing:       { label: '수리중',   color: 'bg-purple-100 text-purple-700' },
-  settled:         { label: '정산완료', color: 'bg-cyan-100 text-cyan-700' },
-  closed:          { label: '종결',     color: 'bg-green-100 text-green-700' },
-  cancelled:       { label: '취소',     color: 'bg-gray-100 text-gray-500' },
+const STEPS = [
+  { code: '10', label: '사고접수', icon: '📋', color: '#ef4444', desc: '사고 발생 정보 입력 및 접수' },
+  { code: '15', label: '담당자배정', icon: '👤', color: '#f97316', desc: '현장/손사 담당자 배정' },
+  { code: '20', label: '검수', icon: '🔍', color: '#eab308', desc: '운행가능 여부 판단' },
+  { code: '40', label: '공장입고', icon: '🏭', color: '#3b82f6', desc: '수리 공장 배정 및 입고' },
+  { code: '50', label: '수리진행', icon: '🔧', color: '#8b5cf6', desc: '차량 수리 및 상태 업데이트' },
+  { code: '60', label: '출고', icon: '🚗', color: '#06b6d4', desc: '수리 완료 후 차량 출고' },
+  { code: '70', label: '청구/사정', icon: '💰', color: '#f59e0b', desc: '보험 청구 및 손해사정' },
+  { code: '90', label: '지급/종결', icon: '✅', color: '#22c55e', desc: '비용 지급 및 건 종결' },
+]
+
+const STATUS_MAP: Record<string, { label: string; bg: string }> = {
+  '10': { label: '사고접수', bg: 'bg-red-50 text-red-700 ring-red-200' },
+  '15': { label: '담당자배정', bg: 'bg-orange-50 text-orange-700 ring-orange-200' },
+  '20': { label: '검수중', bg: 'bg-yellow-50 text-yellow-700 ring-yellow-200' },
+  '30': { label: '공장배정', bg: 'bg-blue-50 text-blue-700 ring-blue-200' },
+  '40': { label: '공장입고', bg: 'bg-blue-50 text-blue-700 ring-blue-200' },
+  '45': { label: '조사중', bg: 'bg-purple-50 text-purple-700 ring-purple-200' },
+  '50': { label: '수리중', bg: 'bg-violet-50 text-violet-700 ring-violet-200' },
+  '55': { label: '수리완료', bg: 'bg-cyan-50 text-cyan-700 ring-cyan-200' },
+  '60': { label: '출고완료', bg: 'bg-cyan-50 text-cyan-700 ring-cyan-200' },
+  '70': { label: '청구중', bg: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  '80': { label: '손해사정', bg: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  '85': { label: '지급대기', bg: 'bg-lime-50 text-lime-700 ring-lime-200' },
+  '90': { label: '종결', bg: 'bg-green-50 text-green-700 ring-green-200' },
 }
 
-const ACC_TYPE: Record<string, string> = {
-  collision:        '충돌사고',
-  self_damage:      '자손사고',
-  hit_and_run:      '뺑소니',
-  theft:            '도난',
-  natural_disaster: '자연재해',
-  vandalism:        '파손',
-  fire:             '화재',
-  other:            '기타',
+const CAT_MAP: Record<string, string> = { 'A': '자차', 'B': '대물', 'C': '대인', 'D': '자손', 'E': '무보험', 'F': '도난' }
+
+const MEMO_TYPE: Record<string, { label: string; icon: string; border: string }> = {
+  'T': { label: '전화', icon: '📞', border: 'border-blue-200 bg-blue-50' },
+  'V': { label: '방문', icon: '🏢', border: 'border-green-200 bg-green-50' },
+  'S': { label: 'SMS', icon: '💬', border: 'border-purple-200 bg-purple-50' },
+  'M': { label: '메모', icon: '📝', border: 'border-slate-200 bg-slate-50' },
+  'E': { label: '이메일', icon: '📧', border: 'border-orange-200 bg-orange-50' },
+  'K': { label: '카톡', icon: '💛', border: 'border-yellow-200 bg-yellow-50' },
 }
 
-const VEHICLE_COND: Record<string, string> = {
-  minor: '경미',
-  repairable: '수리가능',
-  total_loss: '전손',
-}
-
-const INS_STATUS: Record<string, string> = {
-  none: '미접수',
-  filed: '접수',
-  processing: '심사중',
-  approved: '승인',
-  denied: '거절',
-  partial: '일부승인',
-}
-
-const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
-  jandi_accident:     { label: '잔디 사고',   color: 'bg-teal-100 text-teal-700' },
-  jandi_replacement:  { label: '잔디 대차',   color: 'bg-indigo-100 text-indigo-700' },
-  manual:             { label: '수동등록',     color: 'bg-gray-100 text-gray-600' },
-}
-
-// ============================================
-// Form default
-// ============================================
-const defaultFormData = {
-  car_id: '',
-  accident_date: new Date().toISOString().split('T')[0],
-  accident_time: '12:00',
-  accident_location: '',
-  accident_type: 'collision',
-  fault_ratio: 50,
-  description: '',
-  driver_name: '',
-  driver_phone: '',
-  driver_relation: '',
-  counterpart_name: '',
-  counterpart_phone: '',
-  counterpart_vehicle: '',
-  counterpart_insurance: '',
-  insurance_company: '',
-  insurance_claim_no: '',
-  police_reported: false,
-  police_report_no: '',
-  vehicle_condition: '',
-  repair_shop_name: '',
-  repair_start_date: '',
-  repair_end_date: '',
-  estimated_repair_cost: 0,
-  actual_repair_cost: 0,
-  insurance_payout: 0,
-  customer_deductible: 0,
-  company_cost: 0,
-  replacement_car_id: '',
-  replacement_start: '',
-  replacement_end: '',
-  replacement_cost: 0,
-  notes: '',
+const RENTAL_ST: Record<string, { label: string; color: string }> = {
+  'R': { label: '대차요청', color: 'bg-orange-100 text-orange-700' },
+  'C': { label: '계약작성', color: 'bg-blue-100 text-blue-700' },
+  'D': { label: '배차완료', color: 'bg-indigo-100 text-indigo-700' },
+  'U': { label: '운행중', color: 'bg-green-100 text-green-700' },
+  'W': { label: '회차대기', color: 'bg-yellow-100 text-yellow-700' },
+  'F': { label: '반납완료', color: 'bg-slate-100 text-slate-700' },
+  'S': { label: '대기', color: 'bg-gray-100 text-gray-700' },
+  'B': { label: '청구중', color: 'bg-amber-100 text-amber-700' },
+  'Z': { label: '종결', color: 'bg-green-100 text-green-700' },
 }
 
 // ============================================
-// Component
+// Helpers
 // ============================================
-export default function AccidentsMainPage() {
-  const { company, role, adminSelectedCompanyId, user } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+const fD = (d: string | null) => { if (!d || d.length < 8) return '-'; return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` }
+const fT = (t: string | null) => { if (!t || t.length < 4) return ''; return `${t.slice(0,2)}:${t.slice(2,4)}` }
+const fDT = (d: string | null, t: string | null) => { const dd = fD(d), tt = fT(t); return tt ? `${dd} ${tt}` : dd }
+const daysSince = (d: string | null) => {
+  if (!d || d.length < 8) return null
+  const t = new Date(`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`)
+  return Math.floor((Date.now() - t.getTime()) / 86400000)
+}
+const getStepIdx = (s: string) => {
+  const n = parseInt(s || '10')
+  if (n <= 10) return 0; if (n <= 15) return 1; if (n <= 20) return 2
+  if (n <= 40) return 3; if (n <= 55) return 4; if (n <= 60) return 5
+  if (n <= 80) return 6; return 7
+}
 
-  // Data
-  const [accidents, setAccidents] = useState<AccidentRecord[]>([])
-  const [cars, setCars] = useState<Car[]>([])
+function getChecklist(s: string): string[] {
+  const n = parseInt(s || '10')
+  if (n <= 10) return ['사고일시/장소 확인', '운전자 정보 확인', '상대방 정보 확인', '과실비율 확인', '견인 필요 여부', '고객 알림톡 발송']
+  if (n <= 15) return ['현장담당자 배정', '손사담당자 배정', '담당자 알림 발송', '배정 확인']
+  if (n <= 20) return ['운행가능 여부 판단', '견인/픽업 결정', '검수 결과 기록', '파손 상태 확인']
+  if (n <= 40) return ['공장 선정', '견인/탁송 배정', '입고 사진 촬영', '서류 확인', '입고 확인 문자']
+  if (n <= 55) return ['수리 기간 등록', '수리비 견적 등록', '수리 상태 업데이트', '부품 대기 확인']
+  if (n <= 60) return ['수리 완료 확인', '품질 검수', '출고 안내 문자', '출고일시 기록']
+  if (n <= 80) return ['청구 유형 확인', '손해사정 보고서', '과실 최종 확인', '구상처 확인']
+  return ['지급 승인', '공장 지급', '고객 보상', '구상 조정', '종결 보고서']
+}
+
+// ============================================
+// Main Component
+// ============================================
+export default function AccidentsMain() {
+  const { user, role } = useApp()
+  const [accidents, setAccidents] = useState<Accident[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedRowId, setExpandedRowId] = useState<number | null>(null)
-
-  // Tab & Filters
-  const [activeTab, setActiveTab] = useState<'all' | 'replacement' | 'accident'>('all')
+  const [selected, setSelected] = useState<Accident | null>(null)
+  const [memos, setMemos] = useState<ConsultMemo[]>([])
+  const [memosLoading, setMemosLoading] = useState(false)
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [detailTab, setDetailTab] = useState<'info'|'damage'|'timeline'|'rental'|'cost'|'docs'>('info')
+  const [mobileShowDetail, setMobileShowDetail] = useState(false)
 
-  // Modal
-  const [showModal, setShowModal] = useState(false)
-  const [editingAccident, setEditingAccident] = useState<AccidentRecord | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [modalSection, setModalSection] = useState(1)
-  const [formData, setFormData] = useState({ ...defaultFormData })
-
-  // Jandi raw message toggle
-  const [showJandiRaw, setShowJandiRaw] = useState(false)
-
-  // ── Workflow view state
-  const [mainView, setMainView] = useState<'workflow' | 'legacy'>('workflow')
-  const [selectedWorkflowCase, setSelectedWorkflowCase] = useState<AccidentCase | null>(null)
-  const [availableCarsForDispatch, setAvailableCarsForDispatch] = useState<{ id: number; number: string; brand: string; model: string; status: string }[]>([])
-
-  // 유휴 차량 조회 (배차준비용)
-  useEffect(() => {
-    if (!effectiveCompanyId) return
-    supabase
-      .from('cars')
-      .select('id,number,brand,model,status')
-      .eq('company_id', effectiveCompanyId)
-      .in('status', ['available', 'idle', '대기', '운행중'])
-      .order('brand')
-      .then(({ data }) => setAvailableCarsForDispatch(data || []))
-  }, [effectiveCompanyId])
-
-  // ── Workflow handlers
-  const handleWorkflowStageChange = async (caseId: number, newStage: WorkflowStage) => {
-    const { error } = await supabase
-      .from('accident_records')
-      .update({ workflow_stage: newStage })
-      .eq('id', caseId)
-    if (error) { console.error('단계 변경 실패:', error); return }
-    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, workflow_stage: newStage } as any : a))
-    if (selectedWorkflowCase?.id === caseId) {
-      setSelectedWorkflowCase(prev => prev ? { ...prev, workflow_stage: newStage } : null)
-    }
-  }
-
-  const handleChecklistToggle = async (caseId: number, checkKey: string, checked: boolean) => {
-    const acc = accidents.find(a => a.id === caseId) as any
-    if (!acc) return
-    const currentChecklist = acc.workflow_checklist || {}
-    const newChecklist = { ...currentChecklist, [checkKey]: checked }
-    const { error } = await supabase
-      .from('accident_records')
-      .update({ workflow_checklist: newChecklist })
-      .eq('id', caseId)
-    if (error) { console.error('체크리스트 업데이트 실패:', error); return }
-    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, workflow_checklist: newChecklist } as any : a))
-    if (selectedWorkflowCase?.id === caseId) {
-      setSelectedWorkflowCase(prev => prev ? { ...prev, workflow_checklist: newChecklist } : null)
-    }
-  }
-
-  const handleFieldUpdate = async (caseId: number, fields: Record<string, any>) => {
-    const { error } = await supabase
-      .from('accident_records')
-      .update(fields)
-      .eq('id', caseId)
-    if (error) { console.error('필드 업데이트 실패:', error); return }
-    setAccidents(prev => prev.map(a => a.id === caseId ? { ...a, ...fields } as any : a))
-    if (selectedWorkflowCase?.id === caseId) {
-      setSelectedWorkflowCase(prev => prev ? { ...prev, ...fields } : null)
-    }
-  }
-
-  const getCar = useCallback((id: any) => cars.find(c => Number(c.id) === Number(id)), [cars])
-
-  // AccidentRecord → AccidentCase 변환
-  const workflowCases: AccidentCase[] = useMemo(() => {
-    return accidents.map(a => {
-      const car = cars.find(c => Number(c.id) === Number(a.car_id))
-      return {
-        ...a,
-        car_number: car?.number || '',
-        car_model: car ? `${car.brand} ${car.model}` : '',
-        workflow_stage: (a as any).workflow_stage || 'accident_reported',
-        workflow_checklist: (a as any).workflow_checklist || {},
-        replacement_car_number: (a as any).replacement_car_number || '',
-        delivery_location: (a as any).delivery_location || '',
-        delivery_date: (a as any).delivery_date || '',
-        return_date: (a as any).return_date || '',
-        transport_company: (a as any).transport_company || '',
-        billing_amount: (a as any).billing_amount || 0,
-        payment_received: (a as any).payment_received || 0,
-        payment_date: (a as any).payment_date || '',
-        assigned_to: (a as any).assigned_to || '',
-      } as AccidentCase
-    })
-  }, [accidents, cars])
-
-  // ── Fetch
-  const fetchAccidents = useCallback(async () => {
-    if (!effectiveCompanyId) return
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('accident_records')
-      .select('*')
-      .eq('company_id', effectiveCompanyId)
-      .order('accident_date', { ascending: false })
-
-    if (error) console.error('사고 로딩 실패:', error.message)
-    setAccidents(data || [])
-    setLoading(false)
-  }, [effectiveCompanyId])
-
-  const fetchCars = useCallback(async () => {
-    if (!effectiveCompanyId) return
-    const { data } = await supabase
-      .from('cars')
-      .select('id,number,brand,model')
-      .eq('company_id', effectiveCompanyId)
-    setCars(data || [])
-  }, [effectiveCompanyId])
-
-  useEffect(() => {
-    if (effectiveCompanyId) {
-      fetchAccidents()
-      fetchCars()
-    }
-  }, [effectiveCompanyId, fetchAccidents, fetchCars])
-
-  // ── KPI
   const stats = useMemo(() => {
-    const now = new Date()
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    return {
-      total: accidents.length,
-      reported: accidents.filter(a => a.status === 'reported').length,
-      insuranceFiled: accidents.filter(a => a.status === 'insurance_filed').length,
-      repairing: accidents.filter(a => a.status === 'repairing').length,
-      settledMonth: accidents.filter(a =>
-        (a.status === 'settled' || a.status === 'closed') && a.updated_at >= monthStart
-      ).length,
-      replacementPending: accidents.filter(a =>
-        a.source === 'jandi_replacement' && a.status === 'reported'
-      ).length,
-      totalRepairCost: accidents.reduce((s, a) => s + (a.actual_repair_cost || 0), 0),
-      totalInsurancePayout: accidents.reduce((s, a) => s + (a.insurance_payout || 0), 0),
-    }
+    const total = accidents.length
+    const active = accidents.filter(a => parseInt(a.status) < 90).length
+    const billing = accidents.filter(a => ['70','80','85'].includes(a.status)).length
+    const closed = accidents.filter(a => a.status === '90').length
+    const rental = accidents.filter(a => a.rentalYn === 'Y').length
+    return { total, active, billing, closed, rental }
   }, [accidents])
 
-  // ── Tab filter
-  const tabFiltered = useMemo(() => {
-    if (activeTab === 'replacement') {
-      return accidents.filter(a => a.source === 'jandi_replacement' || a.replacement_car_id)
-    }
-    if (activeTab === 'accident') {
-      return accidents.filter(a => a.source !== 'jandi_replacement' || !a.source)
-    }
-    return accidents
-  }, [accidents, activeTab])
+  // Load
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const p = new URLSearchParams({ limit: '500' })
+      if (dateFrom) p.set('from', dateFrom)
+      if (dateTo) p.set('to', dateTo)
+      if (search) p.set('search', search)
+      const res = await fetch(`/api/cafe24/accidents?${p}`)
+      const json = await res.json()
+      if (json.success) setAccidents(json.data || [])
+    } catch (e) { console.error('사고 목록 에러:', e) }
+    finally { setLoading(false) }
+  }, [dateFrom, dateTo, search])
 
-  // ── Filter
-  const filteredAccidents = useMemo(() => {
-    const q = searchQuery.toLowerCase()
-    return tabFiltered.filter(acc => {
-      if (statusFilter !== 'all' && acc.status !== statusFilter) return false
-      if (typeFilter !== 'all' && acc.accident_type !== typeFilter) return false
-      if (q) {
-        const car = getCar(acc.car_id)
-        const searchable = [
-          car?.number, car?.brand, car?.model,
-          acc.driver_name, acc.accident_location,
-          acc.counterpart_name, acc.insurance_company,
-        ].filter(Boolean).join(' ').toLowerCase()
-        if (!searchable.includes(q)) return false
-      }
+  useEffect(() => { load() }, [load])
+
+  // Load memos
+  const loadMemos = useCallback(async (acc: Accident) => {
+    setMemosLoading(true)
+    try {
+      const p = new URLSearchParams({ staffId: acc.staffId, receiptDate: acc.receiptDate, seqNo: acc.seqNo })
+      const res = await fetch(`/api/cafe24/consultations?${p}`)
+      const json = await res.json()
+      if (json.success) setMemos(json.data || [])
+    } catch (e) { console.error('상담이력 에러:', e) }
+    finally { setMemosLoading(false) }
+  }, [])
+
+  const handleSelect = (acc: Accident) => {
+    setSelected(acc)
+    setDetailTab('info')
+    setMobileShowDetail(true)
+    loadMemos(acc)
+  }
+
+  // Filter
+  const filtered = useMemo(() => {
+    return accidents.filter(a => {
+      if (statusFilter === 'active') return parseInt(a.status) < 90
+      if (statusFilter === 'billing') return ['70','80','85'].includes(a.status)
+      if (statusFilter === 'closed') return a.status === '90'
       return true
     })
-  }, [tabFiltered, statusFilter, typeFilter, searchQuery, getCar])
+  }, [accidents, statusFilter])
 
-  // ── Status change
-  const handleStatusChange = async (accId: number, newStatus: string) => {
-    const acc = accidents.find(a => a.id === accId)
-    if (!acc) return
-    if (!confirm(`상태를 "${ACC_STATUS[newStatus]?.label || newStatus}"(으)로 변경하시겠습니까?`)) return
-
-    try {
-      await supabase.from('accident_records').update({ status: newStatus }).eq('id', accId)
-
-      if (acc.car_id) {
-        await supabase.from('vehicle_status_log').insert({
-          company_id: effectiveCompanyId,
-          car_id: acc.car_id,
-          old_status: acc.status,
-          new_status: newStatus,
-          related_type: 'accident',
-          related_id: String(accId),
-          changed_by: user?.id,
-        })
-      }
-      fetchAccidents()
-    } catch (error) {
-      console.error('상태 변경 실패:', error)
-    }
-  }
-
-  // ── Modal
-  const resetForm = () => {
-    setFormData({ ...defaultFormData })
-    setEditingAccident(null)
-    setModalSection(1)
-    setShowJandiRaw(false)
-  }
-
-  const openCreateModal = () => {
-    resetForm()
-    setShowModal(true)
-  }
-
-  const openEditModal = (acc: AccidentRecord) => {
-    setEditingAccident(acc)
-    setFormData({
-      car_id: acc.car_id ? String(acc.car_id) : '',
-      accident_date: acc.accident_date || defaultFormData.accident_date,
-      accident_time: acc.accident_time || '12:00',
-      accident_location: acc.accident_location || '',
-      accident_type: acc.accident_type || 'collision',
-      fault_ratio: acc.fault_ratio ?? 50,
-      description: acc.description || '',
-      driver_name: acc.driver_name || '',
-      driver_phone: acc.driver_phone || '',
-      driver_relation: acc.driver_relation || '',
-      counterpart_name: acc.counterpart_name || '',
-      counterpart_phone: acc.counterpart_phone || '',
-      counterpart_vehicle: acc.counterpart_vehicle || '',
-      counterpart_insurance: acc.counterpart_insurance || '',
-      insurance_company: acc.insurance_company || '',
-      insurance_claim_no: acc.insurance_claim_no || '',
-      police_reported: acc.police_reported || false,
-      police_report_no: acc.police_report_no || '',
-      vehicle_condition: acc.vehicle_condition || '',
-      repair_shop_name: acc.repair_shop_name || '',
-      repair_start_date: acc.repair_start_date || '',
-      repair_end_date: acc.repair_end_date || '',
-      estimated_repair_cost: acc.estimated_repair_cost || 0,
-      actual_repair_cost: acc.actual_repair_cost || 0,
-      insurance_payout: acc.insurance_payout || 0,
-      customer_deductible: acc.customer_deductible || 0,
-      company_cost: acc.company_cost || 0,
-      replacement_car_id: acc.replacement_car_id ? String(acc.replacement_car_id) : '',
-      replacement_start: acc.replacement_start || '',
-      replacement_end: acc.replacement_end || '',
-      replacement_cost: acc.replacement_cost || 0,
-      notes: acc.notes || '',
-    })
-    setShowModal(true)
-  }
-
-  const handleSave = async () => {
-    if (!effectiveCompanyId || !user) return
-    setSaving(true)
-    try {
-      const payload: Record<string, any> = {
-        company_id: effectiveCompanyId,
-        car_id: formData.car_id ? Number(formData.car_id) : null,
-        accident_date: formData.accident_date,
-        accident_time: formData.accident_time || null,
-        accident_location: formData.accident_location,
-        accident_type: formData.accident_type,
-        fault_ratio: formData.fault_ratio,
-        description: formData.description,
-        driver_name: formData.driver_name,
-        driver_phone: formData.driver_phone,
-        driver_relation: formData.driver_relation,
-        counterpart_name: formData.counterpart_name,
-        counterpart_phone: formData.counterpart_phone,
-        counterpart_vehicle: formData.counterpart_vehicle,
-        counterpart_insurance: formData.counterpart_insurance,
-        insurance_company: formData.insurance_company,
-        insurance_claim_no: formData.insurance_claim_no,
-        police_reported: formData.police_reported,
-        police_report_no: formData.police_report_no || null,
-        vehicle_condition: formData.vehicle_condition || null,
-        repair_shop_name: formData.repair_shop_name,
-        repair_start_date: formData.repair_start_date || null,
-        repair_end_date: formData.repair_end_date || null,
-        estimated_repair_cost: formData.estimated_repair_cost,
-        actual_repair_cost: formData.actual_repair_cost,
-        insurance_payout: formData.insurance_payout,
-        customer_deductible: formData.customer_deductible,
-        company_cost: formData.company_cost,
-        replacement_car_id: formData.replacement_car_id ? Number(formData.replacement_car_id) : null,
-        replacement_start: formData.replacement_start || null,
-        replacement_end: formData.replacement_end || null,
-        replacement_cost: formData.replacement_cost || null,
-        notes: formData.notes,
-      }
-
-      if (editingAccident) {
-        await supabase.from('accident_records').update(payload).eq('id', editingAccident.id)
-      } else {
-        payload.status = 'reported'
-        payload.source = 'manual'
-        payload.created_by = user.id
-        await supabase.from('accident_records').insert([payload])
-      }
-
-      setShowModal(false)
-      resetForm()
-      fetchAccidents()
-    } catch (error) {
-      console.error('저장 실패:', error)
-      alert('저장 중 오류가 발생했습니다.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // ── Status action buttons
-  const StatusActions = ({ acc, small }: { acc: AccidentRecord; small?: boolean }) => {
-    const cls = small
-      ? 'px-2 py-1 rounded-md text-[10px] font-bold flex-shrink-0'
-      : 'px-2.5 py-1 rounded-lg text-xs font-bold flex-shrink-0'
-
-    const nextStatusMap: Record<string, { status: string; label: string; color: string }[]> = {
-      reported:        [{ status: 'insurance_filed', label: '보험접수', color: 'bg-amber-100 text-amber-700 hover:bg-amber-200' }],
-      insurance_filed: [{ status: 'repairing', label: '수리시작', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' }],
-      repairing:       [{ status: 'settled', label: '정산완료', color: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200' }],
-      settled:         [{ status: 'closed', label: '종결', color: 'bg-green-100 text-green-700 hover:bg-green-200' }],
-    }
-
-    const actions = nextStatusMap[acc.status] || []
-
-    return (
-      <div className="flex gap-1.5">
-        <button
-          onClick={(e) => { e.stopPropagation(); openEditModal(acc) }}
-          className={`${cls} bg-blue-100 text-blue-700 hover:bg-blue-200`}
-        >
-          수정
-        </button>
-        {actions.map(a => (
-          <button
-            key={a.status}
-            onClick={(e) => { e.stopPropagation(); handleStatusChange(acc.id, a.status) }}
-            className={`${cls} ${a.color}`}
-          >
-            {a.label}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  // ── god_admin guard
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
-    return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Input helper
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 text-sm'
-  const labelCls = 'block font-bold text-gray-700 mb-1.5 text-sm'
-
+  // ============================================
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50/50 animate-fade-in">
-      {/* ── Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            {mainView === 'workflow' ? '📋 워크플로우' : '🚨 사고 관리'}
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            {mainView === 'workflow'
-              ? <>진행 중 <span className="font-bold text-steel-600">{workflowCases.filter(c => c.workflow_stage !== 'closed').length}</span>건</>
-              : <>전체 <span className="font-bold text-steel-600">{accidents.length}</span>건
-                {filteredAccidents.length !== accidents.length && ` / 검색 ${filteredAccidents.length}건`}</>
-            }
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* 뷰 전환 */}
-          <div className="flex bg-gray-100 rounded-xl p-1">
-            <button
-              onClick={() => setMainView('workflow')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                mainView === 'workflow' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              📋 워크플로우
-            </button>
-            <button
-              onClick={() => setMainView('legacy')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                mainView === 'legacy' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              📊 목록
-            </button>
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* ── Header ── */}
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">사고관리</span>
+              <span className="text-xs font-normal text-slate-400 hidden sm:inline">Accident Compensation</span>
+            </h1>
+            <p className="text-[11px] text-slate-400 mt-0.5">8단계 사고보상 프로세스 — 접수부터 지급/종결까지</p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap"
-          >
-            + 사고 등록
-          </button>
+          <button onClick={load} className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors text-sm">🔄</button>
         </div>
-      </div>
 
-      {/* ── Workflow Board View */}
-      {mainView === 'workflow' && (
-        <>
-          <WorkflowBoard
-            cases={workflowCases}
-            cars={cars as any}
-            onStageChange={handleWorkflowStageChange}
-            onCaseClick={(c) => setSelectedWorkflowCase(c)}
-            onChecklistToggle={handleChecklistToggle}
-          />
-          {selectedWorkflowCase && (
-            <WorkflowDetail
-              caseData={selectedWorkflowCase}
-              cars={cars as any}
-              availableCars={availableCarsForDispatch}
-              onClose={() => setSelectedWorkflowCase(null)}
-              onStageChange={handleWorkflowStageChange}
-              onChecklistToggle={handleChecklistToggle}
-              onFieldUpdate={handleFieldUpdate}
-            />
-          )}
-        </>
-      )}
-
-      {/* ── Legacy View (KPI + Table) */}
-      {mainView === 'legacy' && (
-      <div>
-      {/* ── KPI Cards */}
-      {accidents.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        {/* Stats */}
+        <div className="flex gap-2 mt-3 overflow-x-auto">
           {[
-            { label: '신규접수', value: stats.reported, unit: '건', accent: 'text-blue-600' },
-            { label: '보험접수', value: stats.insuranceFiled, unit: '건', accent: 'text-amber-600' },
-            { label: '수리중', value: stats.repairing, unit: '건', accent: 'text-purple-600' },
-            { label: '이달 정산', value: stats.settledMonth, unit: '건', accent: 'text-green-600' },
-            { label: '대차요청 대기', value: stats.replacementPending, unit: '건', accent: 'text-indigo-600' },
-            { label: '전체 사고', value: stats.total, unit: '건', accent: 'text-gray-700' },
-            { label: '총 수리비', value: stats.totalRepairCost, unit: '원', format: true, accent: 'text-red-600' },
-            { label: '보험금 수령', value: stats.totalInsurancePayout, unit: '원', format: true, accent: 'text-teal-600' },
-          ].map((kpi, i) => (
-            <div key={i} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-              <p className="text-xs text-gray-400 font-bold">{kpi.label}</p>
-              <p className={`text-lg md:text-xl font-black mt-0.5 ${kpi.accent}`}>
-                {(kpi as any).format ? kpi.value.toLocaleString() : kpi.value}
-                <span className="text-xs text-gray-400 ml-0.5 font-normal">{kpi.unit}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Tabs: 전체 / 대차요청 / 사고접수 */}
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1 w-fit">
-        {([
-          { key: 'all', label: '전체' },
-          { key: 'replacement', label: '대차요청' },
-          { key: 'accident', label: '사고접수' },
-        ] as { key: typeof activeTab; label: string }[]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
-              activeTab === tab.key
-                ? 'bg-white text-steel-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-            {tab.key === 'replacement' && stats.replacementPending > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-indigo-500 text-white text-[10px]">
-                {stats.replacementPending}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Filters: 1줄 통합 */}
-      <div className="flex flex-wrap gap-2 mb-4 items-center">
-        {/* 상태 칩 */}
-        <div className="flex gap-1.5 overflow-x-auto">
-          {['all', 'reported', 'insurance_filed', 'repairing', 'settled', 'closed'].map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                statusFilter === s
-                  ? 'bg-steel-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {s === 'all' ? '전체상태' : ACC_STATUS[s]?.label}
+            { key: 'all', label: '전체', val: stats.total, c: 'bg-slate-50 text-slate-700 ring-slate-200' },
+            { key: 'active', label: '진행중', val: stats.active, c: 'bg-red-50 text-red-600 ring-red-200' },
+            { key: 'billing', label: '청구/사정', val: stats.billing, c: 'bg-amber-50 text-amber-600 ring-amber-200' },
+            { key: 'closed', label: '종결', val: stats.closed, c: 'bg-green-50 text-green-600 ring-green-200' },
+          ].map(s => (
+            <button key={s.key} onClick={() => setStatusFilter(s.key)}
+              className={`flex-1 min-w-[80px] rounded-xl px-3 py-2.5 transition-all ${s.c} ${statusFilter === s.key ? 'ring-2 ring-offset-1 shadow-sm scale-[1.02]' : 'hover:shadow-sm'}`}>
+              <div className="text-xl font-bold">{s.val}</div>
+              <div className="text-[10px] font-medium opacity-70">{s.label}</div>
             </button>
           ))}
         </div>
 
-        {/* 사고유형 드롭다운 */}
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
-          className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-steel-500"
-        >
-          <option value="all">전체유형</option>
-          {Object.entries(ACC_TYPE).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-
-        {/* 검색 */}
-        <input
-          type="text"
-          placeholder="차량/운전자/장소 검색..."
-          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs flex-1 min-w-[180px] focus:outline-none focus:border-steel-500"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+        {/* Search */}
+        <div className="flex gap-2 mt-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <input type="text" placeholder="차량번호, 접수번호, 고객명, 보험사, 장소 검색..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-300 outline-none" />
+            <span className="absolute left-2.5 top-2.5 text-slate-400 text-sm">🔍</span>
+          </div>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-2 py-2 text-xs border border-slate-200 rounded-lg w-[130px]" />
+          <span className="self-center text-slate-400 text-xs">~</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-2 py-2 text-xs border border-slate-200 rounded-lg w-[130px]" />
+        </div>
       </div>
 
-      {/* ── Table / Cards */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-20 text-center text-gray-400 flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2" />
-            사고 데이터 로딩 중...
-          </div>
-        ) : filteredAccidents.length === 0 ? (
-          <div className="p-12 md:p-20 text-center text-gray-400 text-sm">
-            {searchQuery || statusFilter !== 'all' || typeFilter !== 'all'
-              ? '검색 조건에 맞는 사고가 없습니다.'
-              : '등록된 사고가 없습니다.'}
-          </div>
-        ) : (
-          <>
-            {/* ── Desktop Table */}
-            <div style={{ overflowX: 'auto' }} className="hidden md:block">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
-                  <tr>
-                    <th className="p-4">사고일</th>
-                    <th className="p-4">차량</th>
-                    <th className="p-4">유형/과실</th>
-                    <th className="p-4">상태</th>
-                    <th className="p-4">운전자</th>
-                    <th className="p-4">보험사</th>
-                    <th className="p-4 text-right">수리비</th>
-                    <th className="p-4">접수경로</th>
-                    <th className="p-4 text-center">액션</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredAccidents.map(acc => {
-                    const car = getCar(acc.car_id)
-                    const isExpanded = expandedRowId === acc.id
-                    return (
-                      <DesktopRow
-                        key={acc.id}
-                        acc={acc}
-                        car={car}
-                        isExpanded={isExpanded}
-                        getCar={getCar}
-                        onToggle={() => setExpandedRowId(isExpanded ? null : acc.id)}
-                        StatusActions={StatusActions}
-                      />
-                    )
-                  })}
-                </tbody>
-              </table>
+      {/* ── Main: Split View ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: List */}
+        <div className={`${selected ? 'hidden lg:block lg:w-[420px] lg:border-r border-slate-200' : 'flex-1'} bg-white overflow-y-auto`}>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                <span className="text-sm text-slate-500">사고 목록 로딩...</span>
+              </div>
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+              <span className="text-4xl mb-2">📋</span>
+              <p className="text-sm">조회된 사고건이 없습니다</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filtered.map((acc) => {
+                const st = STATUS_MAP[acc.status] || STATUS_MAP['10']
+                const days = daysSince(acc.accidentDate || acc.createdDate)
+                const isActive = selected?.staffId === acc.staffId && selected?.receiptDate === acc.receiptDate && selected?.seqNo === acc.seqNo
+                const si = getStepIdx(acc.status)
 
-            {/* ── Mobile Card View */}
-            <div className="md:hidden space-y-3 px-4 py-4">
-              {filteredAccidents.map(acc => {
-                const car = getCar(acc.car_id)
-                const isExpanded = expandedRowId === acc.id
                 return (
-                  <div
-                    key={acc.id}
-                    onClick={() => setExpandedRowId(isExpanded ? null : acc.id)}
-                    className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-md hover:border-steel-300 transition-all active:bg-steel-50"
-                  >
-                    {/* Header: Date and Status */}
-                    <div className="flex justify-between items-start mb-3 gap-2">
-                      <div>
-                        <div className="font-bold text-gray-900 text-sm">{acc.accident_date}</div>
-                        {acc.accident_time && <div className="text-xs text-gray-400 mt-0.5">{acc.accident_time}</div>}
+                  <div key={`${acc.staffId}-${acc.receiptDate}-${acc.seqNo}`}
+                    onClick={() => handleSelect(acc)}
+                    className={`px-4 py-3 cursor-pointer transition-all hover:bg-slate-50 ${isActive ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'border-l-4 border-l-transparent'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${st.bg}`}>{st.label}</span>
+                        {acc.accidentNo && <span className="text-[10px] text-slate-400 font-mono">#{acc.accidentNo}</span>}
+                        {acc.category && <span className="text-[9px] px-1 py-0.5 rounded bg-slate-100 text-slate-500">{CAT_MAP[acc.category] || acc.category}</span>}
                       </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${ACC_STATUS[acc.status]?.color || 'bg-gray-100 text-gray-600'}`}>
-                        {ACC_STATUS[acc.status]?.label || acc.status}
-                      </span>
-                    </div>
-
-                    {/* Car Info */}
-                    <div className="mb-3 pb-3 border-b border-gray-100">
-                      <div className="font-bold text-gray-800 text-sm">{car?.number || '-'}</div>
-                      {car && <div className="text-xs text-gray-500">{car.brand} {car.model}</div>}
-                    </div>
-
-                    {/* Key Details Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
-                      {/* Type/Fault */}
-                      <div>
-                        <span className="text-gray-400">유형</span>
-                        <div className="font-bold text-gray-800 mt-0.5">
-                          {ACC_TYPE[acc.accident_type] || acc.accident_type}
-                        </div>
-                        <div className="text-gray-500 mt-0.5">과실: {acc.fault_ratio}%</div>
-                      </div>
-
-                      {/* Insurance */}
-                      <div>
-                        <span className="text-gray-400">보험사</span>
-                        <div className="font-bold text-gray-800 mt-0.5">{acc.insurance_company || '-'}</div>
-                        {acc.insurance_claim_no && <div className="text-gray-500 mt-0.5">{acc.insurance_claim_no}</div>}
-                      </div>
-
-                      {/* Repair Cost */}
-                      <div>
-                        <span className="text-gray-400">수리비</span>
-                        <div className="font-bold text-gray-800 mt-0.5">
-                          {(acc.actual_repair_cost || acc.estimated_repair_cost || 0).toLocaleString()}
-                          <span className="text-xs text-gray-400 font-normal ml-1">원</span>
-                        </div>
-                      </div>
-
-                      {/* Source */}
-                      <div>
-                        <span className="text-gray-400">접수경로</span>
-                        <div className="mt-0.5">
-                          {acc.source && SOURCE_BADGE[acc.source] ? (
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold inline-block ${SOURCE_BADGE[acc.source].color}`}>
-                              {SOURCE_BADGE[acc.source].label}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">수동</span>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-1">
+                        {acc.rentalYn === 'Y' && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 font-medium">🚗대차</span>}
+                        {days !== null && days <= 3 && <span className="text-[9px] px-1 py-0.5 rounded bg-red-100 text-red-600 font-bold animate-pulse">NEW</span>}
                       </div>
                     </div>
-
-                    {/* Action Button */}
-                    <div className="pt-3 border-t border-gray-100">
-                      <StatusActions acc={acc} />
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span className="font-medium">{fD(acc.accidentDate)}</span>
+                      <span className="text-slate-300">|</span>
+                      <span>{acc.counterpartName || '상대미상'}</span>
+                      {acc.counterpartInsurance && <><span className="text-slate-300">|</span><span className="text-slate-500">{acc.counterpartInsurance}</span></>}
                     </div>
-
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                        <DetailCard title="사고 정보" items={[
-                          ['장소', acc.accident_location],
-                          ['차량상태', VEHICLE_COND[acc.vehicle_condition || ''] || acc.vehicle_condition],
-                          ['내용', acc.description],
-                        ]} />
-                        <DetailCard title="운전자" items={[
-                          ['이름', acc.driver_name],
-                          ['연락처', acc.driver_phone],
-                          ['관계', acc.driver_relation],
-                        ]} />
-                        <DetailCard title="상대방" items={[
-                          ['이름', acc.counterpart_name],
-                          ['연락처', acc.counterpart_phone],
-                          ['차량', acc.counterpart_vehicle],
-                          ['보험사', acc.counterpart_insurance],
-                        ]} />
-                        <DetailCard title="보험 처리" items={[
-                          ['자차보험', acc.insurance_company],
-                          ['접수번호', acc.insurance_claim_no],
-                          ['경찰접수', acc.police_report_no],
-                        ]} />
-                        <DetailCard title="비용 내역" items={[
-                          ['예상수리비', `${(acc.estimated_repair_cost || 0).toLocaleString()}원`],
-                          ['실제수리비', `${(acc.actual_repair_cost || 0).toLocaleString()}원`],
-                          ['보험금', `${(acc.insurance_payout || 0).toLocaleString()}원`],
-                          ['자기부담', `${(acc.customer_deductible || 0).toLocaleString()}원`],
-                          ['회사부담', `${(acc.company_cost || 0).toLocaleString()}원`],
-                        ]} />
-                        <DetailCard title="수리/대차" items={[
-                          ['정비소', acc.repair_shop_name],
-                          ['수리기간', acc.repair_start_date ? `${acc.repair_start_date} ~ ${acc.repair_end_date || '진행중'}` : '-'],
-                          ['대차', acc.replacement_car_id ? (getCar(acc.replacement_car_id)?.number || String(acc.replacement_car_id)) : '-'],
-                          ['대차기간', acc.replacement_start ? `${acc.replacement_start} ~ ${acc.replacement_end || '진행중'}` : '-'],
-                        ]} />
-                        {acc.notes && (
-                          <div className="p-3 bg-white rounded-lg border border-gray-200">
-                            <p className="font-bold text-gray-900 text-xs mb-1">메모</p>
-                            <p className="text-xs text-gray-600 whitespace-pre-wrap">{acc.notes}</p>
-                          </div>
-                        )}
-                        {acc.jandi_topic && (
-                          <div className="text-xs text-indigo-500">잔디 토픽: {acc.jandi_topic}</div>
-                        )}
+                    {acc.accidentLocation && <div className="text-[10px] text-slate-400 mt-1 truncate">📍 {acc.accidentLocation}</div>}
+                    {/* Mini progress bar */}
+                    <div className="flex gap-0.5 mt-2">
+                      {STEPS.map((step, i) => (
+                        <div key={step.code} className="h-1 flex-1 rounded-full transition-all" style={{ backgroundColor: i <= si ? step.color : '#e2e8f0' }} />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                        {acc.repairShopName && <span>🏭 {acc.repairShopName}</span>}
+                        {acc.faultRate && <span>⚖️ {acc.faultRate}%</span>}
                       </div>
-                    )}
+                      {days !== null && <span className={`text-[10px] font-medium ${days > 30 ? 'text-red-500' : days > 14 ? 'text-amber-500' : 'text-slate-400'}`}>{days}일 경과</span>}
+                    </div>
                   </div>
                 )
               })}
             </div>
-          </>
-        )}
-      </div>
-      </div>
-      )}
+          )}
+        </div>
 
-      {/* ── Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
-              <h2 className="text-lg md:text-xl font-bold text-gray-900">
-                {editingAccident ? '사고 수정' : '새 사고 등록'}
-                {editingAccident?.source && SOURCE_BADGE[editingAccident.source] && (
-                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold ${SOURCE_BADGE[editingAccident.source].color}`}>
-                    {SOURCE_BADGE[editingAccident.source].label}
-                  </span>
-                )}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
-
-            {/* Section tabs */}
-            <div className="sticky top-[60px] md:top-[68px] bg-white border-b border-gray-200 flex gap-1 overflow-x-auto px-4 md:px-5 z-10">
-              {[
-                { num: 1, label: '사고 정보' },
-                { num: 2, label: '당사자/보험' },
-                { num: 3, label: '수리/비용/대차' },
-                { num: 4, label: '메모' },
-              ].map(s => (
-                <button
-                  key={s.num}
-                  onClick={() => setModalSection(s.num)}
-                  className={`px-4 py-3 font-bold text-xs border-b-2 transition-colors whitespace-nowrap ${
-                    modalSection === s.num
-                      ? 'border-steel-600 text-steel-600'
-                      : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-4 md:p-5 space-y-4">
-              {/* ── Section 1: 사고 정보 */}
-              {modalSection === 1 && (
-                <>
+        {/* Right: Detail */}
+        {selected && (
+          <div className={`${mobileShowDetail ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-y-auto bg-slate-50`}>
+            {/* Detail Header */}
+            <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex-shrink-0">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { setSelected(null); setMobileShowDetail(false) }} className="lg:hidden p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">←</button>
                   <div>
-                    <label className={labelCls}>차량</label>
-                    <select value={formData.car_id} onChange={e => setFormData({ ...formData, car_id: e.target.value })} className={inputCls}>
-                      <option value="">차량 선택</option>
-                      {cars.map(c => <option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model}</option>)}
-                    </select>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">{selected.accidentNo ? `사고 #${selected.accidentNo}` : '사고 상세'}</h2>
+                    <p className="text-[11px] text-slate-500">{fDT(selected.accidentDate, selected.accidentTime)} · {selected.accidentLocation || '-'}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>사고일</label>
-                      <input type="date" value={formData.accident_date} onChange={e => setFormData({ ...formData, accident_date: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>시간</label>
-                      <input type="time" value={formData.accident_time} onChange={e => setFormData({ ...formData, accident_time: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>장소</label>
-                    <input type="text" value={formData.accident_location} onChange={e => setFormData({ ...formData, accident_location: e.target.value })} placeholder="사고 장소" className={inputCls} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>사고유형</label>
-                      <select value={formData.accident_type} onChange={e => setFormData({ ...formData, accident_type: e.target.value })} className={inputCls}>
-                        {Object.entries(ACC_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>과실비율: {formData.fault_ratio}%</label>
-                      <input type="range" min="0" max="100" value={formData.fault_ratio} onChange={e => setFormData({ ...formData, fault_ratio: parseInt(e.target.value) })} className="w-full mt-1" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>차량 상태</label>
-                    <select value={formData.vehicle_condition} onChange={e => setFormData({ ...formData, vehicle_condition: e.target.value })} className={inputCls}>
-                      <option value="">선택</option>
-                      <option value="minor">경미</option>
-                      <option value="repairable">수리가능</option>
-                      <option value="total_loss">전손</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>사고내용</label>
-                    <textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="사고 상세 설명" className={`${inputCls} resize-none`} rows={3} />
-                  </div>
-                </>
-              )}
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ring-1 ${(STATUS_MAP[selected.status] || STATUS_MAP['10']).bg}`}>
+                  {(STATUS_MAP[selected.status] || STATUS_MAP['10']).label}
+                </span>
+              </div>
 
-              {/* ── Section 2: 당사자/보험 */}
-              {modalSection === 2 && (
-                <>
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2">운전자 정보</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>이름</label>
-                      <input type="text" value={formData.driver_name} onChange={e => setFormData({ ...formData, driver_name: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>연락처</label>
-                      <input type="tel" value={formData.driver_phone} onChange={e => setFormData({ ...formData, driver_phone: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>관계</label>
-                    <input type="text" value={formData.driver_relation} onChange={e => setFormData({ ...formData, driver_relation: e.target.value })} placeholder="본인, 직원, 대표 등" className={inputCls} />
-                  </div>
-
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2 mt-4">상대방 정보</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>이름</label>
-                      <input type="text" value={formData.counterpart_name} onChange={e => setFormData({ ...formData, counterpart_name: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>연락처</label>
-                      <input type="tel" value={formData.counterpart_phone} onChange={e => setFormData({ ...formData, counterpart_phone: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>차량</label>
-                      <input type="text" value={formData.counterpart_vehicle} onChange={e => setFormData({ ...formData, counterpart_vehicle: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>상대 보험사</label>
-                      <input type="text" value={formData.counterpart_insurance} onChange={e => setFormData({ ...formData, counterpart_insurance: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2 mt-4">보험/경찰</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>자차 보험사</label>
-                      <input type="text" value={formData.insurance_company} onChange={e => setFormData({ ...formData, insurance_company: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>보험 접수번호</label>
-                      <input type="text" value={formData.insurance_claim_no} onChange={e => setFormData({ ...formData, insurance_claim_no: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input type="checkbox" checked={formData.police_reported} onChange={e => setFormData({ ...formData, police_reported: e.target.checked })} className="w-4 h-4" id="police_reported" />
-                    <label htmlFor="police_reported" className="font-bold text-gray-700 text-sm cursor-pointer">경찰 신고됨</label>
-                  </div>
-                  <div>
-                    <label className={labelCls}>경찰 접수번호</label>
-                    <input type="text" value={formData.police_report_no} onChange={e => setFormData({ ...formData, police_report_no: e.target.value })} placeholder="없으면 비워두세요" className={inputCls} />
-                  </div>
-                </>
-              )}
-
-              {/* ── Section 3: 수리/비용/대차 */}
-              {modalSection === 3 && (
-                <>
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2">수리 정보</h4>
-                  <div>
-                    <label className={labelCls}>정비소명</label>
-                    <input type="text" value={formData.repair_shop_name} onChange={e => setFormData({ ...formData, repair_shop_name: e.target.value })} className={inputCls} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>수리 시작일</label>
-                      <input type="date" value={formData.repair_start_date} onChange={e => setFormData({ ...formData, repair_start_date: e.target.value })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>수리 종료일</label>
-                      <input type="date" value={formData.repair_end_date} onChange={e => setFormData({ ...formData, repair_end_date: e.target.value })} className={inputCls} />
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2 mt-4">비용</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>예상 수리비</label>
-                      <input type="number" value={formData.estimated_repair_cost} onChange={e => setFormData({ ...formData, estimated_repair_cost: parseInt(e.target.value) || 0 })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>실제 수리비</label>
-                      <input type="number" value={formData.actual_repair_cost} onChange={e => setFormData({ ...formData, actual_repair_cost: parseInt(e.target.value) || 0 })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>보험금 수령</label>
-                      <input type="number" value={formData.insurance_payout} onChange={e => setFormData({ ...formData, insurance_payout: parseInt(e.target.value) || 0 })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>자기부담금 (면책금)</label>
-                      <input type="number" value={formData.customer_deductible} onChange={e => setFormData({ ...formData, customer_deductible: parseInt(e.target.value) || 0 })} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>회사 부담금</label>
-                      <input type="number" value={formData.company_cost} onChange={e => setFormData({ ...formData, company_cost: parseInt(e.target.value) || 0 })} className={inputCls} />
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold text-gray-900 text-sm border-b pb-2 mt-4">대차 차량</h4>
-                  <div>
-                    <label className={labelCls}>대차 차량</label>
-                    <select value={formData.replacement_car_id} onChange={e => setFormData({ ...formData, replacement_car_id: e.target.value })} className={inputCls}>
-                      <option value="">없음</option>
-                      {cars.map(c => <option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model}</option>)}
-                    </select>
-                  </div>
-                  {formData.replacement_car_id && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>대차 시작일</label>
-                        <input type="date" value={formData.replacement_start} onChange={e => setFormData({ ...formData, replacement_start: e.target.value })} className={inputCls} />
-                      </div>
-                      <div>
-                        <label className={labelCls}>대차 종료일</label>
-                        <input type="date" value={formData.replacement_end} onChange={e => setFormData({ ...formData, replacement_end: e.target.value })} className={inputCls} />
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ── Section 4: 메모 */}
-              {modalSection === 4 && (
-                <>
-                  <div>
-                    <label className={labelCls}>메모</label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="사고 처리 관련 추가 메모"
-                      className={`${inputCls} resize-none`}
-                      rows={6}
-                    />
-                  </div>
-                  {editingAccident?.jandi_raw && (
-                    <div className="border-t pt-4">
-                      <button
-                        onClick={() => setShowJandiRaw(!showJandiRaw)}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                      >
-                        {showJandiRaw ? '잔디 원본 접기 ▲' : '잔디 원본 메시지 보기 ▼'}
-                      </button>
-                      {showJandiRaw && (
-                        <div className="mt-2 p-3 bg-gray-50 rounded-lg border text-xs text-gray-600 whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
-                          {editingAccident.jandi_topic && (
-                            <div className="mb-2 font-bold text-indigo-700">토픽: {editingAccident.jandi_topic}</div>
-                          )}
-                          {editingAccident.jandi_raw}
+              {/* 8-Step Progress */}
+              <div className="flex items-center gap-0 overflow-x-auto pb-2">
+                {STEPS.map((step, i) => {
+                  const ci = getStepIdx(selected.status)
+                  const done = i < ci, active = i === ci, future = i > ci
+                  return (
+                    <div key={step.code} className="flex items-center flex-shrink-0">
+                      {i > 0 && <div className="w-4 sm:w-8 h-0.5 flex-shrink-0" style={{ backgroundColor: done || active ? step.color : '#e2e8f0' }} />}
+                      <div className="flex flex-col items-center group relative">
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm transition-all flex-shrink-0 ${active ? 'ring-4 ring-offset-2 shadow-lg scale-110' : done ? 'opacity-90' : 'opacity-40'}`}
+                          style={{ backgroundColor: future ? '#e2e8f0' : step.color, color: future ? '#94a3b8' : 'white' }}>
+                          {done ? '✓' : step.icon}
                         </div>
-                      )}
+                        <span className={`text-[9px] sm:text-[10px] mt-1 font-medium whitespace-nowrap ${active ? 'text-slate-900 font-bold' : done ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {step.label}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
+                  )
+                })}
+              </div>
             </div>
 
-            {/* Modal footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 md:p-5 flex gap-3 justify-between">
-              <div className="flex gap-2">
-                {modalSection > 1 && (
-                  <button onClick={() => setModalSection(modalSection - 1)} className="px-5 py-2 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">이전</button>
-                )}
-                {modalSection < 4 && (
-                  <button onClick={() => setModalSection(modalSection + 1)} className="px-5 py-2 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">다음</button>
-                )}
+            {/* Guide Banner */}
+            <div className="mx-4 sm:mx-6 mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg flex-shrink-0">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0">{STEPS[getStepIdx(selected.status)]?.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm">현재 단계: {STEPS[getStepIdx(selected.status)]?.label}</h3>
+                  <p className="text-xs text-blue-100 mt-0.5">{STEPS[getStepIdx(selected.status)]?.desc}</p>
+                  <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {getChecklist(selected.status).map((item, i) => (
+                      <label key={i} className="flex items-center gap-2 text-[11px] text-blue-100 bg-white/10 rounded-lg px-2.5 py-1.5 cursor-pointer hover:bg-white/20 transition-colors">
+                        <input type="checkbox" className="rounded border-white/30" />
+                        <span>{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowModal(false)} className="px-5 py-2 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">취소</button>
-                <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-gray-400 text-sm">
-                  {saving ? '저장중...' : '저장'}
-                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="px-4 sm:px-6 mt-4 flex-shrink-0">
+              <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto">
+                {([
+                  { key: 'info', label: '📋 접수정보' },
+                  { key: 'damage', label: '🚘 파손분석' },
+                  { key: 'timeline', label: `💬 상담${memos.length > 0 ? ` (${memos.length})` : ''}` },
+                  { key: 'rental', label: `🚗 대차${selected.rentalYn === 'Y' ? '' : ''}` },
+                  { key: 'cost', label: '💰 청구' },
+                  { key: 'docs', label: '📁 서류' },
+                ] as const).map(tab => (
+                  <button key={tab.key} onClick={() => setDetailTab(tab.key)}
+                    className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${detailTab === tab.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                    {tab.label}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="px-4 sm:px-6 py-4 flex-1">
+              {detailTab === 'info' && <InfoTab a={selected} />}
+              {detailTab === 'damage' && <DamageTab a={selected} />}
+              {detailTab === 'timeline' && <TimelineTab memos={memos} loading={memosLoading} />}
+              {detailTab === 'rental' && <RentalTab a={selected} />}
+              {detailTab === 'cost' && <CostTab a={selected} />}
+              {detailTab === 'docs' && <DocsTab />}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
 // ============================================
-// Sub-components
+// Info Tab
 // ============================================
-
-function DesktopRow({ acc, car, isExpanded, getCar, onToggle, StatusActions }: {
-  acc: AccidentRecord
-  car: Car | undefined
-  isExpanded: boolean
-  getCar: (id: any) => Car | undefined
-  onToggle: () => void
-  StatusActions: React.FC<{ acc: AccidentRecord; small?: boolean }>
-}) {
+function InfoTab({ a }: { a: Accident }) {
   return (
-    <>
-      <tr className="hover:bg-steel-50 transition-colors group cursor-pointer" onClick={onToggle}>
-        <td className="p-4 text-sm">
-          <div className="font-bold text-gray-900">{acc.accident_date}</div>
-          {acc.accident_time && <div className="text-xs text-gray-400 mt-0.5">{acc.accident_time}</div>}
-        </td>
-        <td className="p-4 text-sm">
-          <div className="font-bold text-gray-800">{car?.number || '-'}</div>
-          {car && <div className="text-xs text-gray-500">{car.brand} {car.model}</div>}
-        </td>
-        <td className="p-4 text-sm">
-          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
-            {ACC_TYPE[acc.accident_type] || acc.accident_type}
-          </span>
-          <span className="ml-1.5 text-xs text-gray-500">{acc.fault_ratio}%</span>
-        </td>
-        <td className="p-4 text-sm">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${ACC_STATUS[acc.status]?.color || 'bg-gray-100 text-gray-600'}`}>
-            {ACC_STATUS[acc.status]?.label || acc.status}
-          </span>
-        </td>
-        <td className="p-4 text-sm text-gray-800">{acc.driver_name || '-'}</td>
-        <td className="p-4 text-sm text-gray-800">
-          {acc.insurance_company || '-'}
-          {acc.insurance_claim_no && <div className="text-xs text-gray-400">{acc.insurance_claim_no}</div>}
-        </td>
-        <td className="p-4 text-sm text-right font-bold text-gray-800">
-          {(acc.actual_repair_cost || acc.estimated_repair_cost || 0).toLocaleString()}
-          <span className="text-xs text-gray-400 font-normal">원</span>
-        </td>
-        <td className="p-4 text-sm">
-          {acc.source && SOURCE_BADGE[acc.source] ? (
-            <span className={`px-2 py-0.5 rounded text-xs font-bold ${SOURCE_BADGE[acc.source].color}`}>
-              {SOURCE_BADGE[acc.source].label}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-400">수동</span>
-          )}
-        </td>
-        <td className="p-4 text-center">
-          <StatusActions acc={acc} />
-        </td>
-      </tr>
+    <div className="space-y-4">
+      <Card title="📋 사고 기본정보">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="사고일시" val={fDT(a.accidentDate, a.accidentTime)} />
+          <F label="사고장소" val={a.accidentLocation || '-'} />
+          <F label="사고번호" val={a.accidentNo || '-'} />
+          <F label="접수일시" val={fDT(a.createdDate, a.createdTime)} />
+          <F label="과실비율" val={a.faultRate ? `${a.faultRate}%` : '-'} hl />
+          <F label="사고유형" val={CAT_MAP[a.category] || a.category || '-'} />
+          <F label="견인여부" val={a.towingYn === 'Y' ? '✅ 필요' : '❌ 불요'} />
+          <F label="면책여부" val={a.deductYn === 'Y' ? '면책적용' : '-'} />
+        </div>
+        {a.accidentMemo && <div className="mt-3 bg-slate-50 rounded-lg p-3 text-sm text-slate-600"><span className="text-xs font-medium text-slate-500 block mb-1">사고내용</span>{a.accidentMemo}</div>}
+      </Card>
 
-      {isExpanded && (
-        <tr className="bg-gray-50 border-t-2 border-steel-200">
-          <td colSpan={9} className="p-6">
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <DetailCard title="사고 정보" items={[
-                ['장소', acc.accident_location],
-                ['차량상태', VEHICLE_COND[acc.vehicle_condition || ''] || acc.vehicle_condition],
-                ['내용', acc.description],
-              ]} />
-              <DetailCard title="운전자" items={[
-                ['이름', acc.driver_name],
-                ['연락처', acc.driver_phone],
-                ['관계', acc.driver_relation],
-              ]} />
-              <DetailCard title="상대방" items={[
-                ['이름', acc.counterpart_name],
-                ['연락처', acc.counterpart_phone],
-                ['차량', acc.counterpart_vehicle],
-                ['보험사', acc.counterpart_insurance],
-              ]} />
-              <DetailCard title="보험 처리" items={[
-                ['자차보험', acc.insurance_company],
-                ['접수번호', acc.insurance_claim_no],
-                ['경찰접수', acc.police_report_no],
-              ]} />
-              <DetailCard title="비용 내역" items={[
-                ['예상수리비', `${(acc.estimated_repair_cost || 0).toLocaleString()}원`],
-                ['실제수리비', `${(acc.actual_repair_cost || 0).toLocaleString()}원`],
-                ['보험금', `${(acc.insurance_payout || 0).toLocaleString()}원`],
-                ['자기부담', `${(acc.customer_deductible || 0).toLocaleString()}원`],
-                ['회사부담', `${(acc.company_cost || 0).toLocaleString()}원`],
-              ]} />
-              <DetailCard title="수리/대차" items={[
-                ['정비소', acc.repair_shop_name],
-                ['수리기간', acc.repair_start_date ? `${acc.repair_start_date} ~ ${acc.repair_end_date || '진행중'}` : '-'],
-                ['대차', acc.replacement_car_id ? (getCar(acc.replacement_car_id)?.number || String(acc.replacement_car_id)) : '-'],
-                ['대차기간', acc.replacement_start ? `${acc.replacement_start} ~ ${acc.replacement_end || '진행중'}` : '-'],
-              ]} />
-            </div>
-            {acc.notes && (
-              <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200">
-                <p className="font-bold text-gray-900 text-xs mb-1">메모</p>
-                <p className="text-xs text-gray-600 whitespace-pre-wrap">{acc.notes}</p>
-              </div>
-            )}
-            {acc.jandi_topic && (
-              <div className="mt-2 text-xs text-indigo-500">잔디 토픽: {acc.jandi_topic}</div>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
+      <Card title="⚠️ 상대방 정보" headerColor="bg-red-50 border-red-100 text-red-700">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="성명" val={a.counterpartName || '-'} />
+          <F label="연락처" val={a.counterpartPhone || '-'} href={a.counterpartPhone ? `tel:${a.counterpartPhone}` : undefined} />
+          <F label="차량" val={a.counterpartVehicle || '-'} />
+          <F label="보험사" val={a.counterpartInsurance || '-'} hl />
+        </div>
+      </Card>
+
+      <Card title="🏭 공장/수리 정보" headerColor="bg-blue-50 border-blue-100 text-blue-700">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="정비공장" val={a.repairShopName || '-'} />
+          <F label="공장 연락처" val={a.repairShopPhone || '-'} href={a.repairShopPhone ? `tel:${a.repairShopPhone}` : undefined} />
+          {a.towingYn === 'Y' && <><F label="견인업체" val={a.towingCompany || '-'} /><F label="견인 연락처" val={a.towingPhone || '-'} /></>}
+          <F label="인도자" val={a.handoverName || '-'} />
+          <F label="인도자 연락처" val={a.handoverPhone || '-'} />
+        </div>
+        {a.deliveryMemo && <div className="mt-3 bg-blue-50 rounded-lg p-3 text-sm text-blue-700"><span className="text-xs font-medium text-blue-500 block mb-1">배송메모</span>{a.deliveryMemo}</div>}
+      </Card>
+
+      <Card title="👤 처리자 정보">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="접수자" val={a.createdBy || '-'} />
+          <F label="최종수정" val={a.updatedBy || '-'} />
+          <F label="접수일시" val={fDT(a.createdDate, a.createdTime)} />
+          <F label="수정일시" val={fDT(a.updatedDate, a.updatedTime)} />
+        </div>
+      </Card>
+    </div>
   )
 }
 
-function DetailCard({ title, items }: { title: string; items: [string, string | undefined | null][] }) {
+// ============================================
+// Timeline Tab
+// ============================================
+function TimelineTab({ memos, loading }: { memos: ConsultMemo[]; loading: boolean }) {
+  if (loading) return <div className="flex items-center justify-center h-40"><div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin" /></div>
+  if (memos.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+      <span className="text-3xl mb-2">💬</span>
+      <p className="text-sm">등록된 상담이력이 없습니다</p>
+      <p className="text-[11px] mt-1">cafe24 ERP에 등록된 상담메모가 여기 표시됩니다</p>
+    </div>
+  )
+
   return (
-    <div className="bg-white p-3 rounded-lg border border-gray-200">
-      <p className="font-bold text-gray-900 text-xs mb-2">{title}</p>
-      <div className="space-y-1.5 text-xs">
-        {items.map(([label, value], i) => (
-          <div key={i} className="flex justify-between gap-2">
-            <span className="text-gray-400 flex-shrink-0">{label}</span>
-            <span className="font-bold text-gray-800 text-right break-all">{value || '-'}</span>
+    <div className="space-y-3">
+      <div className="text-xs text-slate-500 mb-2">총 <b>{memos.length}</b>건의 상담이력</div>
+      <div className="relative">
+        <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-200" />
+        {memos.map((m, i) => {
+          const mt = MEMO_TYPE[m.memoType] || MEMO_TYPE['M']
+          return (
+            <div key={`${m.lineNo}-${i}`} className="relative flex gap-3 pb-4">
+              <div className={`relative z-10 flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${mt.border}`}>
+                <span className="text-sm">{mt.icon}</span>
+              </div>
+              <div className={`flex-1 rounded-xl border p-3 shadow-sm ${mt.border}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/80 font-medium text-slate-600">{mt.label}</span>
+                    {m.memoTitle && <span className="text-xs font-medium text-slate-700">{m.memoTitle}</span>}
+                  </div>
+                  <span className="text-[10px] text-slate-400">{fD(m.memoDate)} {fT(m.memoTime)}</span>
+                </div>
+                {m.memoContent && <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{m.memoContent}</p>}
+                <div className="mt-2 text-[10px] text-slate-400">작성: {m.createdBy || '-'}</div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// Damage Tab (AI 파손 시뮬레이션)
+// ============================================
+function DamageTab({ a }: { a: Accident }) {
+  const [selectedZones, setSelectedZones] = useState<Set<string>>(new Set(a.damageArea ? a.damageArea.split(',').filter(Boolean) : []))
+
+  const toggleZone = (zone: string) => {
+    setSelectedZones(prev => {
+      const next = new Set(prev)
+      if (next.has(zone)) next.delete(zone); else next.add(zone)
+      return next
+    })
+  }
+
+  const zones = [
+    { id: 'FL', label: '좌측 전방', x: 30, y: 15, w: 40, h: 35 },
+    { id: 'FC', label: '전면 중앙', x: 75, y: 15, w: 50, h: 35 },
+    { id: 'FR', label: '우측 전방', x: 130, y: 15, w: 40, h: 35 },
+    { id: 'SL', label: '좌측면', x: 15, y: 55, w: 30, h: 90 },
+    { id: 'SR', label: '우측면', x: 155, y: 55, w: 30, h: 90 },
+    { id: 'RL', label: '좌측 후방', x: 30, y: 150, w: 40, h: 35 },
+    { id: 'RC', label: '후면 중앙', x: 75, y: 150, w: 50, h: 35 },
+    { id: 'RR', label: '우측 후방', x: 130, y: 150, w: 40, h: 35 },
+    { id: 'RF', label: '지붕', x: 55, y: 65, w: 90, h: 70 },
+    { id: 'HD', label: '후드(보닛)', x: 55, y: 22, w: 90, h: 28 },
+    { id: 'TK', label: '트렁크', x: 55, y: 152, w: 90, h: 28 },
+  ]
+
+  const damageLevel = selectedZones.size === 0 ? '미확인' : selectedZones.size <= 2 ? '경미' : selectedZones.size <= 4 ? '보통' : '심각'
+  const damageColor = selectedZones.size === 0 ? 'text-slate-500' : selectedZones.size <= 2 ? 'text-yellow-600' : selectedZones.size <= 4 ? 'text-orange-600' : 'text-red-600'
+
+  return (
+    <div className="space-y-4">
+      {/* AI Analysis Summary */}
+      <div className="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-4 text-white shadow-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">🤖</span>
+          <h3 className="font-bold text-sm">AI 사고 분석</h3>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="bg-white/10 rounded-lg p-2 text-center">
+            <div className="text-purple-200 text-[10px]">파손 정도</div>
+            <div className={`font-bold text-sm mt-0.5 ${selectedZones.size <= 2 ? '' : 'text-yellow-300'}`}>{damageLevel}</div>
+          </div>
+          <div className="bg-white/10 rounded-lg p-2 text-center">
+            <div className="text-purple-200 text-[10px]">파손 부위</div>
+            <div className="font-bold text-sm mt-0.5">{selectedZones.size}개소</div>
+          </div>
+          <div className="bg-white/10 rounded-lg p-2 text-center">
+            <div className="text-purple-200 text-[10px]">과실비율</div>
+            <div className="font-bold text-sm mt-0.5">{a.faultRate || '0'}%</div>
+          </div>
+        </div>
+        {a.accidentMemo && <p className="text-xs text-purple-100 mt-3 bg-white/10 rounded-lg p-2">{a.accidentMemo}</p>}
+      </div>
+
+      {/* Car Damage Simulation */}
+      <Card title="🚘 파손부위 시뮬레이션 (클릭하여 선택)">
+        <div className="flex flex-col items-center">
+          <svg viewBox="0 0 200 200" className="w-full max-w-[320px]" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.1))' }}>
+            {/* Car body outline - top-down view */}
+            <defs>
+              <linearGradient id="carGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style={{ stopColor: '#e2e8f0', stopOpacity: 1 }} />
+                <stop offset="100%" style={{ stopColor: '#cbd5e1', stopOpacity: 1 }} />
+              </linearGradient>
+            </defs>
+
+            {/* Main car body */}
+            <rect x="45" y="10" width="110" height="180" rx="20" fill="url(#carGrad)" stroke="#94a3b8" strokeWidth="1.5" />
+            {/* Windshield */}
+            <rect x="55" y="50" width="90" height="8" rx="3" fill="#bfdbfe" stroke="#93c5fd" strokeWidth="0.5" />
+            {/* Rear window */}
+            <rect x="55" y="142" width="90" height="8" rx="3" fill="#bfdbfe" stroke="#93c5fd" strokeWidth="0.5" />
+            {/* Side mirrors */}
+            <ellipse cx="40" cy="55" rx="8" ry="5" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="0.5" />
+            <ellipse cx="160" cy="55" rx="8" ry="5" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="0.5" />
+            {/* Wheels */}
+            <rect x="38" y="30" width="12" height="22" rx="4" fill="#475569" />
+            <rect x="150" y="30" width="12" height="22" rx="4" fill="#475569" />
+            <rect x="38" y="148" width="12" height="22" rx="4" fill="#475569" />
+            <rect x="150" y="148" width="12" height="22" rx="4" fill="#475569" />
+            {/* Headlights */}
+            <circle cx="65" cy="16" r="4" fill="#fef08a" stroke="#eab308" strokeWidth="0.5" />
+            <circle cx="135" cy="16" r="4" fill="#fef08a" stroke="#eab308" strokeWidth="0.5" />
+            {/* Taillights */}
+            <circle cx="65" cy="184" r="4" fill="#fca5a5" stroke="#ef4444" strokeWidth="0.5" />
+            <circle cx="135" cy="184" r="4" fill="#fca5a5" stroke="#ef4444" strokeWidth="0.5" />
+
+            {/* Clickable damage zones */}
+            {zones.map(z => {
+              const active = selectedZones.has(z.id)
+              return (
+                <g key={z.id} onClick={() => toggleZone(z.id)} style={{ cursor: 'pointer' }}>
+                  <rect
+                    x={z.x} y={z.y} width={z.w} height={z.h} rx={4}
+                    fill={active ? 'rgba(239,68,68,0.4)' : 'transparent'}
+                    stroke={active ? '#ef4444' : 'transparent'}
+                    strokeWidth={active ? 2 : 0}
+                    className="transition-all"
+                  />
+                  {active && (
+                    <>
+                      {/* Damage X marks */}
+                      <line x1={z.x+4} y1={z.y+4} x2={z.x+z.w-4} y2={z.y+z.h-4} stroke="#ef4444" strokeWidth="2" opacity="0.6" />
+                      <line x1={z.x+z.w-4} y1={z.y+4} x2={z.x+4} y2={z.y+z.h-4} stroke="#ef4444" strokeWidth="2" opacity="0.6" />
+                    </>
+                  )}
+                </g>
+              )
+            })}
+
+            {/* Direction labels */}
+            <text x="100" y="7" textAnchor="middle" fontSize="7" fill="#64748b" fontWeight="bold">전면 ▲</text>
+            <text x="100" y="198" textAnchor="middle" fontSize="7" fill="#64748b" fontWeight="bold">▼ 후면</text>
+            <text x="8" y="103" textAnchor="middle" fontSize="7" fill="#64748b" fontWeight="bold" transform="rotate(-90, 8, 103)">좌측</text>
+            <text x="192" y="103" textAnchor="middle" fontSize="7" fill="#64748b" fontWeight="bold" transform="rotate(90, 192, 103)">우측</text>
+          </svg>
+
+          {/* Selected zones list */}
+          <div className="w-full mt-4">
+            <div className="flex flex-wrap gap-1.5">
+              {zones.map(z => (
+                <button
+                  key={z.id}
+                  onClick={() => toggleZone(z.id)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-all border ${
+                    selectedZones.has(z.id)
+                      ? 'bg-red-50 text-red-700 border-red-300 ring-1 ring-red-200'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {selectedZones.has(z.id) ? '🔴 ' : '⚪ '}{z.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Damage Summary */}
+        {selectedZones.size > 0 && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-red-700">파손 요약</span>
+              <span className={`text-xs font-bold ${damageColor}`}>{damageLevel} ({selectedZones.size}개소)</span>
+            </div>
+            <div className="text-xs text-red-600">
+              파손부위: {Array.from(selectedZones).map(id => zones.find(z => z.id === id)?.label).join(', ')}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Damage Detail from DB */}
+      {(a.damageDetail || a.damageArea) && (
+        <Card title="📝 기존 파손 기록">
+          <div className="grid grid-cols-2 gap-4">
+            <F label="파손부위 코드" val={a.damageArea || '-'} />
+            <F label="파손상세" val={a.damageDetail || '-'} />
+          </div>
+        </Card>
+      )}
+
+      {/* AI Estimate */}
+      <Card title="🤖 AI 수리비 예상">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <span className="text-sm text-slate-600">예상 수리비 범위</span>
+            <span className="font-bold text-blue-600">
+              {selectedZones.size === 0 ? '-' :
+               selectedZones.size <= 2 ? '50만원 ~ 150만원' :
+               selectedZones.size <= 4 ? '150만원 ~ 400만원' : '400만원 이상'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <span className="text-sm text-slate-600">예상 수리 기간</span>
+            <span className="font-bold text-slate-700">
+              {selectedZones.size === 0 ? '-' :
+               selectedZones.size <= 2 ? '3~7일' :
+               selectedZones.size <= 4 ? '7~14일' : '14일 이상'}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 text-center">* AI 추정치이며, 실제 수리비는 공장 견적에 따라 다를 수 있습니다</p>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================
+// Rental Tab (대차업체/종류 포함)
+// ============================================
+const RENTAL_TYPE: Record<string, { label: string; color: string; desc: string }> = {
+  'M': { label: '정비대차', color: 'bg-emerald-100 text-emerald-700', desc: '렌트상품 포함 (무상)' },
+  'P': { label: '유상대차', color: 'bg-amber-100 text-amber-700', desc: '자차과실, 고객부담' },
+  'V': { label: '피해대차', color: 'bg-red-100 text-red-700', desc: '상대과실, 보험사청구' },
+}
+
+function RentalTab({ a }: { a: Accident }) {
+  if (a.rentalYn !== 'Y' || !a.rentalCarNo) return (
+    <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+      <span className="text-3xl mb-2">🚗</span>
+      <p className="text-sm">연결된 대차 정보가 없습니다</p>
+    </div>
+  )
+
+  const rs = RENTAL_ST[a.rentalStatus] || { label: a.rentalStatus || '-', color: 'bg-slate-100 text-slate-700' }
+  const rt = RENTAL_TYPE[a.rentalType] || null
+  const rentalDays = (() => {
+    if (!a.rentalFromDate || a.rentalFromDate.length < 8) return null
+    const from = new Date(`${a.rentalFromDate.slice(0,4)}-${a.rentalFromDate.slice(4,6)}-${a.rentalFromDate.slice(6,8)}`)
+    const to = a.rentalToDate && a.rentalToDate.length >= 8
+      ? new Date(`${a.rentalToDate.slice(0,4)}-${a.rentalToDate.slice(4,6)}-${a.rentalToDate.slice(6,8)}`)
+      : new Date()
+    return Math.max(1, Math.ceil((to.getTime() - from.getTime()) / 86400000))
+  })()
+  const daily = parseInt(a.rentalDailyCost) || 0
+  const total = parseInt(a.rentalTotalCost) || (daily * (rentalDays || 0))
+
+  return (
+    <div className="space-y-4">
+      {/* Rental Type Badge */}
+      {rt && (
+        <div className={`rounded-xl border p-4 ${rt.color.includes('emerald') ? 'border-emerald-200 bg-emerald-50' : rt.color.includes('amber') ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${rt.color}`}>{rt.label}</span>
+            <span className="text-xs text-slate-500">{rt.desc}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Rental Card */}
+      <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-lg">{a.rentalCarNo}</h3>
+            <p className="text-blue-100 text-sm">{a.rentalCarModel || '차종 미상'}</p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${rs.color}`}>{rs.label}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="bg-white/10 rounded-lg p-3">
+            <div className="text-blue-200 text-xs">시작</div>
+            <div className="font-semibold text-sm mt-0.5">{fDT(a.rentalFromDate, a.rentalFromTime)}</div>
+          </div>
+          <div className="bg-white/10 rounded-lg p-3">
+            <div className="text-blue-200 text-xs">종료(예정)</div>
+            <div className="font-semibold text-sm mt-0.5">{fDT(a.rentalToDate, a.rentalToTime)}</div>
+          </div>
+        </div>
+        {rentalDays && (
+          <div className="mt-3 bg-white/10 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-blue-200 text-xs">대차 기간</span>
+            <span className="font-bold text-lg">{rentalDays}일</span>
+          </div>
+        )}
+      </div>
+
+      {/* Rental Details with Company & Type */}
+      <Card title="📄 대차 상세정보">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="대차 차량" val={a.rentalCarNo} hl />
+          <F label="차종" val={a.rentalCarModel || '-'} />
+          <F label="대차업체(공장)" val={a.rentalFactory || '-'} hl />
+          <F label="대차종류" val={rt ? rt.label : a.rentalType || '-'} hl />
+          <F label="진행상태" val={rs.label} />
+          <F label="대차일수" val={a.rentalDays ? `${a.rentalDays}일` : rentalDays ? `${rentalDays}일` : '-'} />
+          <F label="일 단가" val={daily > 0 ? `${daily.toLocaleString()}원` : '-'} />
+          <F label="총 비용" val={total > 0 ? `${total.toLocaleString()}원` : '-'} hl />
+        </div>
+        {a.rentalMemo && <div className="mt-3 bg-blue-50 rounded-lg p-3 text-sm text-blue-700"><span className="text-xs font-medium text-blue-500 block mb-1">대차 메모</span>{a.rentalMemo}</div>}
+      </Card>
+
+      {/* Link to rental management */}
+      <a href="/rental" className="block text-center py-3 text-sm text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors font-medium">
+        🔗 대차관리 페이지에서 전체 보기 →
+      </a>
+    </div>
+  )
+}
+
+// ============================================
+// Cost Tab
+// ============================================
+function CostTab({ a }: { a: Accident }) {
+  return (
+    <div className="space-y-4">
+      <Card title="💰 비용/정산" headerColor="bg-amber-50 border-amber-100 text-amber-700">
+        <div className="grid grid-cols-2 gap-4">
+          <F label="정산여부" val={a.settlementYn === 'Y' ? '✅ 정산완료' : '⏳ 미정산'} hl />
+          <F label="면책여부" val={a.deductYn === 'Y' ? '면책적용' : '미적용'} />
+          <F label="과실비율" val={a.faultRate ? `${a.faultRate}%` : '-'} />
+          <F label="종결여부" val={a.completeYn === 'Y' ? '✅ 종결' : '진행중'} />
+        </div>
+        <div className="mt-4 p-4 bg-slate-50 rounded-lg">
+          <h4 className="text-xs font-bold text-slate-600 mb-3">📊 청구 프로세스 안내</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: '고객청구', desc: '면책금, 휴차료', icon: '👤' },
+              { label: '고객실비', desc: '실제 발생 비용', icon: '💳' },
+              { label: '캐피탈보상', desc: '리스/캐피탈사', icon: '🏦' },
+              { label: '보험구상', desc: '상대 보험사', icon: '🛡️' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-100">
+                <span className="text-lg">{item.icon}</span>
+                <div>
+                  <div className="text-xs font-medium text-slate-700">{item.label}</div>
+                  <div className="text-[10px] text-slate-400">{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================
+// Docs Tab
+// ============================================
+function DocsTab() {
+  const docs = [
+    { name: '사고사진', icon: '📸', desc: '현장/파손 사진' },
+    { name: '면허증', icon: '🪪', desc: '운전면허 사본' },
+    { name: '보험증권', icon: '📄', desc: '자동차보험 증권' },
+    { name: '수리견적', icon: '🔧', desc: '정비공장 견적서' },
+    { name: '사고확인서', icon: '📋', desc: '교통사고 확인서' },
+    { name: '진단서', icon: '🏥', desc: '상해 진단서' },
+  ]
+  return (
+    <Card title="📁 서류/사진 관리">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {docs.map(d => (
+          <div key={d.name} className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:border-blue-300 hover:bg-blue-50/50 transition-all cursor-pointer group">
+            <span className="text-2xl block group-hover:scale-110 transition-transform">{d.icon}</span>
+            <div className="text-xs font-medium text-slate-700 mt-2">{d.name}</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">{d.desc}</div>
+            <div className="text-[10px] text-blue-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 업로드</div>
           </div>
         ))}
+      </div>
+    </Card>
+  )
+}
+
+// ============================================
+// Shared: Card, Field
+// ============================================
+function Card({ title, headerColor, children }: { title: string; headerColor?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className={`px-4 py-3 border-b ${headerColor || 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+        <h3 className="text-sm font-bold">{title}</h3>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  )
+}
+
+function F({ label, val, hl, href }: { label: string; val: string; hl?: boolean; href?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] text-slate-400 font-medium mb-0.5">{label}</div>
+      <div className="text-sm text-slate-700">
+        {href ? <a href={href} className="text-blue-600 hover:underline">{val}</a> : <span className={hl ? 'font-bold text-blue-600' : ''}>{val}</span>}
       </div>
     </div>
   )

@@ -38,7 +38,7 @@ const Icons: any = {
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
+  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops', '/rental': 'ops',
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
   '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance', '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance', '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/jiip': 'finance',
@@ -59,6 +59,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/quotes/pricing': '견적 작성',
   '/quotes/short-term': '단기 견적',
   '/operations/intake': '접수/오더',
+  '/rental': '대차관리',
 }
 
 // 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
@@ -208,6 +209,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             const REQUIRED_MODULES = [
               { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
               { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
+              { path: '/rental', name: '대차관리', icon_key: 'Truck', description: '대차운영 프로세스 관리', plan_group: 'free' },
             ]
             const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
             if (missing.length > 0) {
@@ -239,6 +241,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       const REQUIRED_MODULES = [
         { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
         { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
+        { path: '/accidents', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수 및 처리 프로세스 관리', plan_group: 'free' },
+        { path: '/rental', name: '대차관리', icon_key: 'Truck', description: '대차운영 프로세스 관리', plan_group: 'free' },
       ]
       const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
       if (allSysMods) {
