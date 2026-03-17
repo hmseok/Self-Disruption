@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCafe24Pool } from '../lib/db';
+import { ACCIDENT_COLS, buildSelectCols } from '../lib/columns';
 
 // 테이블 컬럼 확인
 async function getTableCols(pool: any, table: string): Promise<Set<string>> {
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
 
     // 사고번호로 조회
     if (accidentNo) {
-      const accColSet = await getTableCols(pool, 'acrotpth');
+      const accResult = await buildSelectCols(pool, 'acrotpth', 'a', ACCIDENT_COLS);
       const orderBy = memoColSet.has('memodate') ? 'ORDER BY m.memodate DESC' + (memoColSet.has('memotime') ? ', m.memotime DESC' : '') : '';
 
       const [rows] = await pool.query(
@@ -81,13 +82,9 @@ export async function GET(req: NextRequest) {
 
     // 최근 상담이력 (전체)
     const limit = parseInt(searchParams.get('limit') || '100');
-    const accColSet = await getTableCols(pool, 'acrotpth');
-    const accCols: [string, string][] = [
-      ['otptacnu', 'accidentNo'], ['otptacdt', 'accidentDate'], ['otptstat', 'accidentStatus'],
-    ];
-    const accSelect = buildSelect('a', accCols, accColSet);
-    const selectParts = [memoSelect, accSelect].filter(Boolean).join(', ');
-    const joinClause = accSelect
+    const accResult = await buildSelectCols(pool, 'acrotpth', 'a', ACCIDENT_COLS);
+    const selectParts = [memoSelect, accResult.select].filter(Boolean).join(', ');
+    const joinClause = accResult.select
       ? `LEFT JOIN acrotpth a ON m.memoidno = a.otptidno AND m.memomddt = a.otptmddt AND m.memosrno = a.otptsrno`
       : '';
     const orderBy = memoColSet.has('memodate') ? 'ORDER BY m.memodate DESC' + (memoColSet.has('memotime') ? ', m.memotime DESC' : '') : '';
