@@ -417,17 +417,16 @@ export default function AccidentMgmtMain() {
     if (search) {
       const s = search.toLowerCase()
       result = result.filter(a =>
-        a.accidentNo?.toLowerCase().includes(s) || a.counterpartName?.toLowerCase().includes(s) ||
-        a.accidentLocation?.toLowerCase().includes(s) ||
-        a.repairShopName?.toLowerCase().includes(s) || a.counterpartVehicle?.toLowerCase().includes(s) ||
+        a.accidentNo?.toLowerCase().includes(s) || a.driverName?.toLowerCase().includes(s) ||
+        a.accidentLocation?.toLowerCase().includes(s) || a.notifierName?.toLowerCase().includes(s) ||
         a.carPlateNo?.toLowerCase().includes(s) || a.carModelName?.toLowerCase().includes(s) ||
         a.custName?.toLowerCase().includes(s) || a.carOwner?.toLowerCase().includes(s)
       )
     }
-    // 접수일시 기준 정렬 (otptgndt + otptgntm)
+    // 접수일시 기준 정렬 (createdDate > accidentDate fallback)
     result.sort((a, b) => {
-      const da = (a.createdDate || '') + (a.createdTime || '')
-      const db = (b.createdDate || '') + (b.createdTime || '')
+      const da = (a.createdDate || a.accidentDate || '') + (a.createdTime || a.accidentTime || '')
+      const db = (b.createdDate || b.accidentDate || '') + (b.createdTime || b.accidentTime || '')
       return db.localeCompare(da)
     })
     return result
@@ -525,7 +524,7 @@ export default function AccidentMgmtMain() {
                       ${isExpanded ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'}
                       ${idx % 2 === 0 && !isExpanded ? 'bg-white' : !isExpanded ? 'bg-slate-50/40' : ''}`}>
                     <span className="col-span-1"><StatusBadge status={a.status} /></span>
-                    <span className="col-span-2 text-slate-700 font-medium">{fD(a.createdDate)} <span className="text-slate-400">{fT(a.createdTime)}</span></span>
+                    <span className="col-span-2 text-slate-700 font-medium">{fD(a.createdDate || a.accidentDate)} <span className="text-slate-400">{fT(a.createdTime || a.accidentTime)}</span></span>
                     <span className="col-span-2 font-mono text-slate-800 font-semibold text-[12px]">{a.accidentNo || '-'}</span>
                     <span className="col-span-1 text-blue-700 font-bold text-[12px] truncate">{a.carPlateNo || '-'}</span>
                     <span className="col-span-1 text-[11px]">{CATEGORY_MAP[a.category] || a.category}</span>
