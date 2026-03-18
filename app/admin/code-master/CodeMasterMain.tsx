@@ -218,7 +218,7 @@ export default function CodeMasterMain() {
                         <input className="col-span-3 px-2 py-1 border rounded text-sm"
                           value={editForm.label ?? row.label} onChange={e => setEditForm({ ...editForm, label: e.target.value })} />
                         <input className="col-span-3 px-2 py-1 border rounded text-sm"
-                          value={editForm.description ?? row.description || ''} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                          value={editForm.description ?? (row.description || '')} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
                         <input className="col-span-1 px-2 py-1 border rounded text-sm text-center" type="number"
                           value={editForm.sort_order ?? row.sort_order} onChange={e => setEditForm({ ...editForm, sort_order: parseInt(e.target.value) })} />
                         <span className="col-span-1 text-center text-[10px] text-slate-400">{row.source}</span>
