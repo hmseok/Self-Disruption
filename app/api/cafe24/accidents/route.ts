@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     // 총 건수 (JOIN 포함해야 검색이 정확)
     const joinForCount = [
-      carResult.select ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno)` : '',
+      carResult.select ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno AND c2.carsfrdt <= a.otptmddt)` : '',
       custResult.select && carResult.select ? `LEFT JOIN pmccustm cu ON c.carscust = cu.custcode` : '',
     ].filter(Boolean).join(' ');
 
@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
         : '',
       carResult.select
         ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno
-           AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno)`
+           AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno AND c2.carsfrdt <= a.otptmddt)`
         : '',
       custResult.select && carResult.select
         ? `LEFT JOIN pmccustm cu ON c.carscust = cu.custcode`
