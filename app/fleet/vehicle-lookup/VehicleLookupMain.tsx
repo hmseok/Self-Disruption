@@ -2,36 +2,32 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
+import { useCodeMaster } from '../../hooks/useCodeMaster'
 
 type Vehicle = Record<string, any>
 type Customer = { custCode: string; custName: string; carCount: number }
 type Accident = Record<string, any>
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  R: { label: '이용중', color: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
-  H: { label: '해지', color: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
-  L: { label: '반납', color: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200' },
+// 차량상태 뱃지 색상 (UI 전용)
+const STATUS_COLORS: Record<string, string> = {
+  R: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  H: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+  L: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
 }
-const TYPE_MAP: Record<string, string> = { S: '실비', T: '턴키' }
-const INS_MAP: Record<string, string> = { N01: '렌터카공제조합', N02: '메리츠화재', N03: '삼성화재', N04: '흥국화재', N05: '악사다이렉트', N06: '현대해상', N07: 'DB', N99: '없음' }
-// BHJAGB — 자부담구분
-const JAGB_MAP: Record<string, string> = { '-': '모름', A: '정액', B: '정율', C: '모름' }
-// BHJACHA — 보험등급(자차수리부담)
-const JACHA_MAP: Record<string, string> = { A01: '메리츠캐피탈', A02: '스카이오토서비스', A03: 'GS엠비즈', A04: '효성캐피탈', A05: '렌터카공제조합(자차)', a06: '삼성화재', A07: '라이드(주)', A99: '없음' }
-const ACBN_MAP: Record<string, string> = { B: '보물', D: '단독', E: '기타', G: '가해', H: '긴출', J: '자차', K: '과실', M: '면책', O: '정비', P: '피해', Q: '검사', S: '긴출' }
-const ACC_STATUS: Record<string, string> = { '1': '접수', '2': '입고', '3': '수리중', '4': '출고' }
+const STATUS_DOTS: Record<string, string> = { R: 'bg-emerald-500', H: 'bg-red-500', L: 'bg-slate-400' }
 
 const fD = (d?: string) => { if (!d || d.length < 8) return '-'; return `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}` }
 const fT = (t?: string) => { if (!t || t.length < 4) return ''; return `${t.slice(0,2)}:${t.slice(2,4)}` }
 
-function StatusBadge({ status }: { status: string }) {
-  const st = STATUS_MAP[status]
-  return st ? (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${st.color}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${status === 'R' ? 'bg-emerald-500' : status === 'H' ? 'bg-red-500' : 'bg-slate-400'}`} />
-      {st.label}
+function StatusBadge({ status, decode }: { status: string; decode: (g: string, c: string) => string }) {
+  const color = STATUS_COLORS[status] || 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+  const dot = STATUS_DOTS[status] || 'bg-slate-400'
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      {decode('CARSSTAT', status)}
     </span>
-  ) : <span className="text-xs text-slate-400">{status}</span>
+  )
 }
 
 function Cell({ label, children }: { label: string; children?: React.ReactNode }) {
@@ -46,8 +42,8 @@ function Cell({ label, children }: { label: string; children?: React.ReactNode }
 // ═══════════════════════════════════════════════
 // Vehicle Detail Panel
 // ═══════════════════════════════════════════════
-function VehicleDetail({ v, historyData, accidents, loading }: {
-  v: Vehicle; historyData: Vehicle[]; accidents: Accident[]; loading: boolean
+function VehicleDetail({ v, historyData, accidents, loading, decode }: {
+  v: Vehicle; historyData: Vehicle[]; accidents: Accident[]; loading: boolean; decode: (g: string, c: string) => string
 }) {
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white border-x border-b border-slate-200 rounded-b-xl">
@@ -57,7 +53,7 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
         <div><span className="text-slate-400">차량코드</span> <span className="font-mono ml-1">{v.carIdno}</span></div>
         <div><span className="text-slate-400">차량명</span> <span className="ml-1">{v.carModelName}</span></div>
         <div><span className="text-slate-400">거래처</span> <span className="font-bold ml-1">{v.custName}</span></div>
-        <div className="ml-auto"><StatusBadge status={v.carStatus} /></div>
+        <div className="ml-auto"><StatusBadge status={v.carStatus} decode={decode} /></div>
       </div>
 
       {loading ? (
@@ -78,8 +74,8 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
                 <Cell label="차량번호"><span className="text-blue-700 font-bold text-[15px]">{v.carPlateNo}</span></Cell>
                 <Cell label="차량명">{v.carModelName}</Cell>
-                <Cell label="이용상태"><StatusBadge status={v.carStatus} /></Cell>
-                <Cell label="서비스유형"><span className={`px-2 py-0.5 rounded text-xs font-bold ${v.carType === 'T' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{TYPE_MAP[v.carType] || v.carType}</span></Cell>
+                <Cell label="이용상태"><StatusBadge status={v.carStatus} decode={decode} /></Cell>
+                <Cell label="서비스유형"><span className={`px-2 py-0.5 rounded text-xs font-bold ${v.carType === 'T' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{decode('CARSTYPE', v.carType)}</span></Cell>
                 <Cell label="차대번호">{v.carVin || '-'}</Cell>
                 <Cell label="차량등록일">{fD(v.carRegDate)}</Cell>
                 <Cell label="주행거리">{v.carMileage ? `${Number(v.carMileage).toLocaleString()}km` : '-'}</Cell>
@@ -118,7 +114,7 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
               </div>
               {/* 보험 */}
               <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
-                <Cell label="보험사"><span className="font-bold">{INS_MAP[v.carInsCode] || v.carInsCode || '-'}</span></Cell>
+                <Cell label="보험사"><span className="font-bold">{decode('BHNAME', v.carInsCode)}</span></Cell>
                 <Cell label="보험가입일">{fD(v.carInsFrom)}</Cell>
                 <Cell label="보험만료일">{fD(v.carInsTo)}</Cell>
                 <Cell label="긴급출동">{v.carEmergency === 'Y' ? '유' : '무'}</Cell>
@@ -126,11 +122,11 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
                 <Cell label="대인">{v.carInsDi || '-'}</Cell>
                 <Cell label="대물">{v.carInsDm || '-'}</Cell>
                 <Cell label="자손">{v.carInsJs || '-'}</Cell>
-                <Cell label="자부담구분">{JAGB_MAP[v.carInsGn] || v.carInsGn || '-'}</Cell>
+                <Cell label="자부담구분">{decode('BHJAGB', v.carInsGn)}</Cell>
                 <Cell label="면책금(최소)">{v.carDeductMin ? `${Number(v.carDeductMin).toLocaleString()}원` : '-'}</Cell>
                 <Cell label="면책금(최대)">{v.carDeductMax ? `${Number(v.carDeductMax).toLocaleString()}원` : '-'}</Cell>
                 <Cell label="자기부담율">{v.carInsFC ? `${v.carInsFC}%` : '-'}</Cell>
-                <Cell label="자차수리부담">{JACHA_MAP[v.carInsClass] || v.carInsClass || '-'}</Cell>
+                <Cell label="자차수리부담">{decode('BHJACHA', v.carInsClass)}</Cell>
               </div>
               {v.carInsEtc && (
                 <div className="pt-2 grid grid-cols-1 gap-y-2">
@@ -166,9 +162,9 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
                   <div key={i} className={`px-4 py-2 grid grid-cols-6 gap-2 text-xs border-b border-slate-100 ${i === 0 ? 'bg-blue-50' : ''}`}>
                     <span className="font-medium">{fD(h.carFromDate)}</span>
                     <span>{fD(h.carToDate)}</span>
-                    <span><StatusBadge status={h.carStatus} /></span>
+                    <span><StatusBadge status={h.carStatus} decode={decode} /></span>
                     <span className="truncate">{h.carModelName}</span>
-                    <span>{TYPE_MAP[h.carType] || h.carType}</span>
+                    <span>{decode('CARSTYPE', h.carType)}</span>
                     <span className="text-slate-400">{fD(h.carFromDate)}</span>
                   </div>
                 ))}
@@ -192,10 +188,10 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
                 </div>
                 {accidents.map((a, i) => (
                   <div key={i} className="px-4 py-2 grid grid-cols-7 gap-2 text-xs border-b border-slate-100 hover:bg-slate-50">
-                    <span><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${a.status === '1' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{ACC_STATUS[a.status] || a.status}</span></span>
+                    <span><span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${a.status === '1' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{decode('OTPTSTAT', a.status)}</span></span>
                     <span>{fD(a.createdDate)} {fT(a.createdTime)}</span>
                     <span className="font-mono text-[11px]">{a.accidentNo}</span>
-                    <span>{ACBN_MAP[a.accidentType] || a.accidentType}</span>
+                    <span>{decode('OTPTACBN', a.accidentType)}</span>
                     <span className={`font-bold ${parseInt(a.faultRate) >= 100 ? 'text-red-600' : 'text-slate-600'}`}>{a.faultRate ? `${a.faultRate}%` : '-'}</span>
                     <span className="truncate">{a.accidentLocation}</span>
                     <span>{a.driverName}</span>
@@ -215,6 +211,7 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
 // ═══════════════════════════════════════════════
 export default function VehicleLookupMain() {
   const { user } = useApp()
+  const { decode } = useCodeMaster()
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -372,12 +369,12 @@ export default function VehicleLookupMain() {
                     className={`px-5 py-3 grid grid-cols-12 gap-2 items-center cursor-pointer border-b border-slate-100 transition-all text-[13px]
                       ${isExpanded ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'}
                       ${idx % 2 === 0 && !isExpanded ? 'bg-white' : !isExpanded ? 'bg-slate-50/40' : ''}`}>
-                    <span className="col-span-1"><StatusBadge status={v.carStatus} /></span>
+                    <span className="col-span-1"><StatusBadge status={v.carStatus} decode={decode} /></span>
                     <span className="col-span-2 text-blue-700 font-bold">{v.carPlateNo || '-'}</span>
                     <span className="col-span-3 text-slate-700 truncate">{v.carModelName || '-'}</span>
                     <span className="col-span-1">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${v.carType === 'T' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {TYPE_MAP[v.carType] || v.carType}
+                        {decode('CARSTYPE', v.carType)}
                       </span>
                     </span>
                     <span className="col-span-2 text-slate-600 truncate">{v.custName || v.carOwner || '-'}</span>
@@ -393,7 +390,7 @@ export default function VehicleLookupMain() {
                       ) : <span className="text-slate-300">1</span>}
                     </span>
                   </div>
-                  {isExpanded && <VehicleDetail v={v} historyData={historyData} accidents={accidents} loading={detailLoading} />}
+                  {isExpanded && <VehicleDetail v={v} historyData={historyData} accidents={accidents} loading={detailLoading} decode={decode} />}
                 </div>
               )
             })}
