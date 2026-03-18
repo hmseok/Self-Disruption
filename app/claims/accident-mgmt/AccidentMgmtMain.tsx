@@ -85,7 +85,10 @@ function KpiCard({ label, value, color, icon }: { label: string; value: number; 
 // ═══════════════════════════════════════════════
 // Detail Panel
 // ═══════════════════════════════════════════════
-function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]; memosLoading: boolean }) {
+function AccidentDetail({ a, memos, memosLoading, decode, getGroup }: {
+  a: Accident; memos: Memo[]; memosLoading: boolean;
+  decode: (g: string, c: string) => string; getGroup: (g: string) => Record<string, string>
+}) {
   const branchLabel = decode('OTPTACBN', a.accidentType)
 
   return (
@@ -498,7 +501,7 @@ export default function AccidentMgmtMain() {
                     <span className="col-span-1 text-slate-700 truncate font-medium">{a.driverName || '-'}</span>
                     <span className="col-span-1 text-slate-600 truncate text-[11px]">{a.custName || a.carOwner || '-'}</span>
                   </div>
-                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} />}
+                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} decode={decode} getGroup={getGroup} />}
                 </div>
               )
             })}
