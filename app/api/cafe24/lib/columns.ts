@@ -23,13 +23,14 @@ export const ACCIDENT_COLS: [string, string][] = [
   ['otptacfe', 'faultRate'],     // 과실비율
   ['otptacbn', 'accidentType'],   // ★ 사고구분 (OTPTACBN: B=보물,D=단독,G=가해,K=과실,P=피해 등)
   ['otptacrn', 'vehicleRunnable'],// ★ 차량상태 (Y=운행가능,N=운행불가능) — 기존 accidentReason 잘못매핑
-  ['otptacdi', 'accidentDi'],    // 사고구분유무 (Y/N)
-  ['otptacdm', 'accidentDamage'],// 사고피해유무 (Y/N)
-  ['otptacjc', 'accidentJc'],    // 사고관할 (Y/N)
-  ['otptacjs', 'accidentJs'],    // 사고관할서 (Y/N)
-  ['otptacmb', 'driverMobile'],  // 운전자 핸드폰
-  ['otptacno', 'driverTel'],     // 운전자 전화
-  ['otptacph', 'accidentPhoto'], // 사고사진
+  // ── ★ 보험유형 Y/N 체크박스 (소스코드 api_accident.php에서 확인) ──
+  ['otptacdi', 'chkBodyInjury'],  // ★ 대인 (Y/N) — 기존 accidentDi 잘못매핑
+  ['otptacdm', 'chkProperty'],    // ★ 대물 (Y/N) — 기존 accidentDamage 잘못매핑
+  ['otptacjc', 'chkOwnCar'],     // ★ 자차 (Y/N) — 기존 accidentJc 잘못매핑
+  ['otptacjs', 'chkOwnLoss'],    // ★ 자손 (Y/N) — 기존 accidentJs 잘못매핑
+  ['otptacmb', 'chkUninsured'],  // ★ 무보험 (Y/N) — 기존 driverMobile 잘못매핑
+  ['otptacno', 'chkOnScene'],    // ★ 현장출동 (Y/N) — 기존 driverTel 잘못매핑
+  ['otptacph', 'chkEmergTow'],   // ★ 긴급견인 (Y/N) — 기존 accidentPhoto 잘못매핑
   ['otptacet', 'accidentEtc'],   // 사고기타
   ['otptadfg', 'adFlag'],        // 사고구분플래그
 

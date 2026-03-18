@@ -170,10 +170,32 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
                 )
               })}
             </div>
+            {/* ★ 보험유형 체크박스 (소스코드 확인: 각 Y/N 플래그) */}
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <span className="text-[10px] text-slate-400 font-medium mr-1">사고구분</span>
+              {[
+                { key: 'chkBodyInjury', label: '대인' },
+                { key: 'chkProperty', label: '대물' },
+                { key: 'chkOwnCar', label: '자차' },
+                { key: 'chkOwnLoss', label: '자손' },
+                { key: 'chkUninsured', label: '무보험' },
+                { key: 'chkOnScene', label: '현장출동' },
+                { key: 'chkEmergTow', label: '긴급견인' },
+              ].map(({ key, label }) => {
+                const checked = a[key] === 'Y'
+                return (
+                  <div key={key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors
+                    ${checked ? 'bg-red-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400'}`}>
+                    {checked && <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                    {label}
+                  </div>
+                )
+              })}
+            </div>
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-2">
               <Cell label="사고장소" span={2}>{a.accidentLocation}</Cell>
-              <Cell label="운행가능">{VEHICLE_RUN_MAP[a.vehicleRunnable] || a.vehicleRunnable || '-'}</Cell>
-              <Cell label="피해유무">{a.accidentDamage === 'Y' ? <span className="text-red-500">유</span> : '무'}</Cell>
+              <Cell label="차량상태">{VEHICLE_RUN_MAP[a.vehicleRunnable] || a.vehicleRunnable || '-'}</Cell>
+              <Cell label="사고기타">{a.accidentEtc || '-'}</Cell>
             </div>
             {a.accidentMemo && (
               <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-900 leading-relaxed">
@@ -214,10 +236,8 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
           {/* 당사차 운전자 */}
           <Section title="당사차 운전자 / 통보자" color="border-indigo-500">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
-              <Cell label="운전자 연락처">{a.driverMobile === 'N' ? '-' : a.driverMobile}</Cell>
-              <Cell label="운전자 전화">{a.driverTel === 'N' || a.driverTel === 'Y' ? '-' : a.driverTel}</Cell>
               <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
-              <Cell label="관할여부">{a.accidentJc === 'Y' ? '유' : '무'}</Cell>
+              <Cell label="비고">{a.repairShopRe || '-'}</Cell>
             </div>
           </Section>
 
@@ -257,7 +277,6 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
               <Cell label="공장명"><span className="font-bold text-blue-700">{a.repairShopName || '-'}</span></Cell>
               <Cell label="공장코드">{a.repairShopCode || '-'}</Cell>
               <Cell label="대표여부">{a.repairShopRep === 'Y' ? 'Y' : 'N'}</Cell>
-              <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
               <Cell label="전화번호">{a.repairShopPhone || '-'}</Cell>
               <Cell label="팩스">{a.repairShopVp || '-'}</Cell>
               <Cell label="주소">{a.repairShopAddr || '-'}</Cell>

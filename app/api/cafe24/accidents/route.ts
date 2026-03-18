@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
     }
 
-    // 동적 WHERE
-    const conditions: string[] = [];
+    // 동적 WHERE — ★ otptrgst='R' 필수 (소프트 삭제 필터, C=취소 제외)
+    const conditions: string[] = ["a.otptrgst = 'R'"];
     const params: any[] = [];
 
     if (fromDate && accResult.colSet.has('otptgndt')) {
