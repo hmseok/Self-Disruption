@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCafe24Pool } from '../lib/db';
-import { CAR_COLS, CUST_COLS, buildSelectCols } from '../lib/columns';
 
-// 거래처 차량조회 API — 차량 목록 + 거래처 목록 + 차량 히스토리
+// 직접 SQL — buildSelectCols 우회 (동적 컬럼 감지 실패 방지)
+const CAR_SELECT = `
+  c.carsidno as carIdno, c.carscust as carCustCode, c.carsnums as carPlateNo,
+  c.carsodnm as carModelName, c.carsstat as carStatus, c.carstype as carType,
+  c.carsuser as carOwner, c.carscosv as carServiceType,
+  c.carscofr as carContractFrom, c.carscoto as carContractTo,
+  c.carsfrdt as carFromDate, c.carstodt as carToDate,
+  c.carsbocd as carInsCode, c.carsbomn as carDeductMin, c.carsboag as carAgeLimit,
+  c.carsbocl as carInsClass, c.carsusnm as carContactName,
+  c.carsushp as carContactPhone, c.carsusad as carAddress
+`.trim();
+const CUST_SELECT = `cu.custcode as custCode, cu.custname as custName, cu.custhpno as custPhone, cu.custaddr as custAddr`;
+const CUST_JOIN = 'LEFT JOIN pmccustm cu ON c.carscust = cu.custcode';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,22 +28,11 @@ export async function GET(req: NextRequest) {
     const history = searchParams.get('history') === 'true';
 
     const pool = getCafe24Pool();
-    const [carResult, custResult] = await Promise.all([
-      buildSelectCols(pool, 'pmccarsm', 'c', CAR_COLS),
-      buildSelectCols(pool, 'pmccustm', 'cu', CUST_COLS),
-    ]);
 
-    if (!carResult.select) {
-      return NextResponse.json({ success: true, data: [], customers: [] });
-    }
-
-    const selectParts = [carResult.select, custResult.select].filter(Boolean).join(', ');
-    const custJoin = custResult.select ? 'LEFT JOIN pmccustm cu ON c.carscust = cu.custcode' : '';
-
-    // ── 특정 차량 히스토리 조회 ──
+    // ── 특정 차량 히스토리 ──
     if (history && carId) {
       const [rows] = await pool.query(
-        `SELECT ${selectParts} FROM pmccarsm c ${custJoin} WHERE c.carsidno = ? ORDER BY c.carsfrdt DESC`, [carId]
+        `SELECT ${CAR_SELECT}, ${CUST_SELECT} FROM pmccarsm c ${CUST_JOIN} WHERE c.carsidno = ? ORDER BY c.carsfrdt DESC`, [carId]
       );
       const [accidents] = await pool.query(
         `SELECT a.otptacnu as accidentNo, a.otptacdt as accidentDate, a.otptactm as accidentTime,
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, data: rows, accidents });
     }
 
-    // ── 거래처 목록 (차량 보유 거래처만) ──
+    // ── 거래처 목록 ──
     const [customers] = await pool.query(
       `SELECT cu.custcode as custCode, cu.custname as custName,
               COUNT(DISTINCT c.carsidno) as carCount
@@ -54,31 +55,27 @@ export async function GET(req: NextRequest) {
        ORDER BY cu.custname`
     );
 
-    // ── 차량 목록 (최신 히스토리 기준) ──
+    // ── WHERE 조건 ──
     const conditions: string[] = [];
     const params: any[] = [];
     if (custCode) { conditions.push('c.carscust = ?'); params.push(custCode); }
     if (status) { conditions.push('c.carsstat = ?'); params.push(status); }
     if (search) {
-      const sc: string[] = [];
-      if (carResult.colSet.has('carsnums')) sc.push('c.carsnums LIKE ?');
-      if (carResult.colSet.has('carsodnm')) sc.push('c.carsodnm LIKE ?');
-      if (carResult.colSet.has('carsuser')) sc.push('c.carsuser LIKE ?');
-      if (custResult.colSet.has('custname')) sc.push('cu.custname LIKE ?');
-      if (sc.length) { conditions.push(`(${sc.join(' OR ')})`); sc.forEach(() => params.push(`%${search}%`)); }
+      conditions.push('(c.carsnums LIKE ? OR c.carsodnm LIKE ? OR c.carsuser LIKE ? OR cu.custname LIKE ?)');
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
     }
-    // 차량별 최신 레코드만
     conditions.push(`c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = c.carsidno)`);
     const where = 'WHERE ' + conditions.join(' AND ');
 
-    const [countResult] = await pool.query(`SELECT COUNT(*) as total FROM pmccarsm c ${custJoin} ${where}`, params);
+    const [countResult] = await pool.query(`SELECT COUNT(*) as total FROM pmccarsm c ${CUST_JOIN} ${where}`, params);
     const total = (countResult as any[])[0].total;
 
     const [rows] = await pool.query(
-      `SELECT ${selectParts},
+      `SELECT ${CAR_SELECT}, ${CUST_SELECT},
               (SELECT COUNT(*) FROM acrotpth a WHERE a.otptidno = c.carsidno AND a.otptrgst = 'R') as accidentCount,
               (SELECT COUNT(*) FROM pmccarsm c3 WHERE c3.carsidno = c.carsidno) as historyCount
-       FROM pmccarsm c ${custJoin} ${where}
+       FROM pmccarsm c ${CUST_JOIN} ${where}
        ORDER BY c.carsstat ASC, c.carsnums ASC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
