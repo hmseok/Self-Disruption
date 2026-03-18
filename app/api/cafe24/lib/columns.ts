@@ -1,12 +1,12 @@
 // ============================================
 // Cafe24 DB 컬럼 매핑 (실제 DB 구조 기반)
-// 2026-03-17 SHOW COLUMNS 확인 완료
+// 2026-03-18 SHOW COLUMNS + picbscdm + JOIN 분석 완료
 // ============================================
 
 // acrotpth (사고접수) 테이블 컬럼 → API alias 매핑
 export const ACCIDENT_COLS: [string, string][] = [
   // ── 키/식별 ──
-  ['otptidno', 'staffId'],        // 담당자ID
+  ['otptidno', 'carId'],          // ★ 차량ID (pmccarsm.carsidno FK) — 기존에 staffId로 잘못 매핑됨
   ['otptmddt', 'receiptDate'],    // 접수일자
   ['otptsrno', 'seqNo'],         // 일련번호
   ['otptacnu', 'accidentNo'],    // 사고번호
@@ -128,6 +128,43 @@ export const RENTAL_COLS: [string, string][] = [
   ['rentupus', 'updatedBy'],      // 수정자
   ['rentupdt', 'updatedDate'],    // 수정일
   ['rentuptm', 'updatedTime'],    // 수정시간
+];
+
+// pmccarsm (차량마스터) — acrotpth.otptidno = pmccarsm.carsidno
+export const CAR_COLS: [string, string][] = [
+  ['carsidno', 'carIdno'],        // 차량ID
+  ['carscust', 'carCustCode'],    // 고객코드 (pmccustm FK)
+  ['carsnums', 'carPlateNo'],     // ★ 차량번호 (196허2101)
+  ['carsodnm', 'carModelName'],   // 차량명칭
+  ['carsstat', 'carStatus'],      // 차량상태 (R=이용중, H=해지, L=반납)
+  ['carstype', 'carType'],        // 실비/턴키 (S/T)
+  ['carsuser', 'carOwner'],       // 소유자/계약자
+  ['carscosv', 'carServiceType'], // 서비스형태 코드
+  ['carscofr', 'carContractFrom'],// 계약시작일
+  ['carscoto', 'carContractTo'],  // 계약종료일
+  ['carsfrdt', 'carFromDate'],    // 이용시작일
+  ['carstodt', 'carToDate'],      // 이용종료일
+  ['carsmodl', 'carModelCode'],   // 차량모델코드
+  ['carsbocd', 'carInsCode'],     // 보험사코드 (BHNAME)
+  ['carsbomn', 'carDeductMin'],   // 면책금(최소)
+  ['carsbomx', 'carDeductMax'],   // 면책금(최대)
+  ['carsboag', 'carAgeLimit'],    // 연령한정
+  ['carsbocl', 'carInsClass'],    // 보험등급
+  ['carsusnm', 'carContactName'], // 담당자명
+  ['carsushp', 'carContactPhone'],// 담당자전화
+  ['carsustl', 'carContactTel'],  // 담당자연락처
+  ['carsusad', 'carAddress'],     // 주소
+  ['carsadgp', 'carZipCode'],     // 우편번호
+];
+
+// pmccustm (고객마스터) — pmccarsm.carscust = pmccustm.custcode
+export const CUST_COLS: [string, string][] = [
+  ['custcode', 'custCode'],       // 고객코드
+  ['custname', 'custName'],       // 고객명 (회사명)
+  ['custhpno', 'custPhone'],      // 고객전화
+  ['custtelo', 'custTel'],        // 고객유선
+  ['custfaxo', 'custFax'],        // 팩스
+  ['custaddr', 'custAddr'],       // 주소
 ];
 
 // 공통: 테이블 컬럼 동적 확인 후 SELECT 절 생성

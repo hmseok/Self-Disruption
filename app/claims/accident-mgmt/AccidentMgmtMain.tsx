@@ -104,12 +104,14 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white border-x border-b border-slate-200 rounded-b-xl">
       {/* 요약 배너 */}
-      <div className="px-5 py-3 bg-slate-800 text-white flex items-center gap-6 text-xs">
-        <div><span className="text-slate-400">사고번호</span> <span className="font-mono font-bold ml-1">{a.accidentNo}</span></div>
+      <div className="px-5 py-3 bg-slate-800 text-white flex items-center gap-6 text-xs flex-wrap">
+        <div><span className="text-slate-400">차량번호</span> <span className="font-bold text-cyan-300 ml-1 text-sm">{a.carPlateNo || '-'}</span></div>
+        <div><span className="text-slate-400">차량코드</span> <span className="font-mono ml-1">{a.carId}</span></div>
+        <div><span className="text-slate-400">접수번호</span> <span className="font-mono font-bold ml-1">{a.accidentNo}</span></div>
         <div><span className="text-slate-400">사고일시</span> <span className="font-bold ml-1">{fDT(a.accidentDate, a.accidentTime)}</span></div>
         <div><span className="text-slate-400">과실</span> <span className="font-bold text-amber-300 ml-1">{a.faultRate ? `${a.faultRate}%` : '-'}</span></div>
         <div><span className="text-slate-400">유형</span> <span className="ml-1">{CATEGORY_MAP[a.category] || a.category}</span></div>
-        <div><span className="text-slate-400">사고지점</span> <span className="ml-1">{branchLabel}</span></div>
+        <div><span className="text-slate-400">지점</span> <span className="ml-1">{branchLabel}</span></div>
         <div className="ml-auto"><StatusBadge status={a.status} /></div>
       </div>
 
@@ -153,17 +155,27 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             )}
           </Section>
 
-          {/* 계약/차량 */}
+          {/* 계약/차량 — pmccarsm + pmccustm */}
           <Section title="계약 / 차량 정보" color="border-blue-500">
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
+              <Cell label="차량번호"><span className="text-blue-700 font-bold text-[15px]">{a.carPlateNo}</span></Cell>
+              <Cell label="차량명칭"><span className="font-medium">{a.carModelName}</span></Cell>
+              <Cell label="차량상태">{a.carStatus === 'R' ? '이용중' : a.carStatus === 'H' ? '해지' : a.carStatus === 'L' ? '반납' : a.carStatus}</Cell>
+              <Cell label="유형">{CATEGORY_MAP[a.carType] || a.carType || CATEGORY_MAP[a.category] || a.category}</Cell>
+              <Cell label="계약자/소유자"><span className="font-bold">{a.carOwner || a.custName}</span></Cell>
+              <Cell label="고객사">{a.custName}</Cell>
+              <Cell label="연락처">{a.carContactPhone || a.custPhone}</Cell>
+              <Cell label="주소" span={2}>{a.carAddress || a.custAddr}</Cell>
+              <Cell label="보험사코드">{a.carInsCode}</Cell>
+              <Cell label="면책금">{a.carDeductMin ? `${Number(a.carDeductMin).toLocaleString()}원` : '-'}</Cell>
+              <Cell label="연령한정">{a.carAgeLimit}</Cell>
+              <Cell label="계약기간">{a.carContractFrom ? `${fD(a.carContractFrom)} ~ ${fD(a.carContractTo)}` : '-'}</Cell>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
               <Cell label="등록상태">{REGSTATUS_MAP[a.regStatus] || a.regStatus}</Cell>
               <Cell label="등록유형">{REGTYPE_MAP[a.regType] || a.regType}</Cell>
               <Cell label="접수자">{a.createdBy}</Cell>
               <Cell label="접수일시">{fDT(a.createdDate, a.createdTime)}</Cell>
-              <Cell label="담당자ID">{a.staffId}</Cell>
-              <Cell label="그룹ID">{a.groupId}</Cell>
-              <Cell label="채널ID">{a.channelId}</Cell>
-              <Cell label="사고구분플래그">{a.adFlag === 'Y' ? '유' : '무'}</Cell>
             </div>
           </Section>
 
@@ -331,10 +343,10 @@ export default function AccidentMgmtMain() {
 
   useEffect(() => { load() }, [load])
 
-  const loadMemos = useCallback(async (staffId: string, receiptDate: string, seqNo: string) => {
+  const loadMemos = useCallback(async (carId: string, receiptDate: string, seqNo: string) => {
     setMemosLoading(true); setMemos([])
     try {
-      const p = new URLSearchParams({ staffId, receiptDate, seqNo })
+      const p = new URLSearchParams({ staffId: carId, receiptDate, seqNo })
       const res = await fetch(`/api/cafe24/consultations?${p}`)
       const json = await res.json()
       if (json.success) {
@@ -355,7 +367,9 @@ export default function AccidentMgmtMain() {
       result = result.filter(a =>
         a.accidentNo?.toLowerCase().includes(s) || a.counterpartName?.toLowerCase().includes(s) ||
         a.accidentLocation?.toLowerCase().includes(s) || a.accidentMobile?.toLowerCase().includes(s) ||
-        a.repairShopName?.toLowerCase().includes(s) || a.counterpartVehicle?.toLowerCase().includes(s)
+        a.repairShopName?.toLowerCase().includes(s) || a.counterpartVehicle?.toLowerCase().includes(s) ||
+        a.carPlateNo?.toLowerCase().includes(s) || a.carModelName?.toLowerCase().includes(s) ||
+        a.custName?.toLowerCase().includes(s) || a.carOwner?.toLowerCase().includes(s)
       )
     }
     result.sort((a, b) => {
@@ -373,11 +387,11 @@ export default function AccidentMgmtMain() {
     완료: accidents.filter(a => a.status === '6').length,
   }), [accidents])
 
-  const getRowId = (a: Accident) => a.accidentNo || `${a.staffId}-${a.receiptDate}-${a.seqNo}`
+  const getRowId = (a: Accident) => a.accidentNo || `${a.carId}-${a.receiptDate}-${a.seqNo}`
   const handleExpand = (a: Accident) => {
     const id = getRowId(a)
     if (expandedId === id) { setExpandedId(null) }
-    else { setExpandedId(id); if (a.staffId && a.receiptDate && a.seqNo) loadMemos(a.staffId, a.receiptDate, a.seqNo) }
+    else { setExpandedId(id); if (a.carId && a.receiptDate && a.seqNo) loadMemos(a.carId, a.receiptDate, a.seqNo) }
   }
 
   return (
@@ -438,7 +452,8 @@ export default function AccidentMgmtMain() {
               <span className="col-span-1">상태</span>
               <span className="col-span-2">사고일시</span>
               <span className="col-span-2">사고번호</span>
-              <span className="col-span-3">장소</span>
+              <span className="col-span-1">차량번호</span>
+              <span className="col-span-2">장소</span>
               <span className="col-span-1 text-center">과실</span>
               <span className="col-span-2">상대방</span>
               <span className="col-span-1">공장/대차</span>
@@ -458,7 +473,8 @@ export default function AccidentMgmtMain() {
                     <span className="col-span-1"><StatusBadge status={a.status} /></span>
                     <span className="col-span-2 text-slate-700 font-medium">{fD(a.accidentDate)} <span className="text-slate-400">{fT(a.accidentTime)}</span></span>
                     <span className="col-span-2 font-mono text-slate-800 font-semibold text-[12px]">{a.accidentNo || '-'}</span>
-                    <span className="col-span-3 text-slate-600 truncate">{a.accidentLocation || '-'}</span>
+                    <span className="col-span-1 text-blue-700 font-bold text-[12px] truncate">{a.carPlateNo || '-'}</span>
+                    <span className="col-span-2 text-slate-600 truncate">{a.accidentLocation || '-'}</span>
                     <span className="col-span-1 text-center">
                       <span className={`font-bold ${parseInt(a.faultRate) >= 100 ? 'text-red-600' : parseInt(a.faultRate) >= 50 ? 'text-orange-600' : 'text-slate-600'}`}>
                         {a.faultRate ? `${a.faultRate}%` : '-'}
