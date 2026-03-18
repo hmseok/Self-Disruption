@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     // 총 건수 (JOIN 포함해야 검색이 정확)
     const joinForCount = [
-      carResult.select ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno AND a.otptmddt = c.carsfrdt` : '',
+      carResult.select ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno)` : '',
       custResult.select && carResult.select ? `LEFT JOIN pmccustm cu ON c.carscust = cu.custcode` : '',
     ].filter(Boolean).join(' ');
 
@@ -85,12 +85,14 @@ export async function GET(req: NextRequest) {
     // JOIN 조건
     // ★ 핵심: acrotpth.otptidno = pmccarsm.carsidno (차량ID)
     //         pmccarsm.carscust = pmccustm.custcode (고객코드)
+    // pmccarsm에 동일 carsidno 여러 행 가능 → 가장 최근(MAX carsfrdt) 레코드 사용
     const joins = [
       rentResult.select
         ? `LEFT JOIN acrrentm r ON a.otptidno = r.rentidno AND a.otptmddt = r.rentmddt AND a.otptsrno = r.rentsrno`
         : '',
       carResult.select
-        ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno AND a.otptmddt = c.carsfrdt`
+        ? `LEFT JOIN pmccarsm c ON a.otptidno = c.carsidno
+           AND c.carsfrdt = (SELECT MAX(c2.carsfrdt) FROM pmccarsm c2 WHERE c2.carsidno = a.otptidno)`
         : '',
       custResult.select && carResult.select
         ? `LEFT JOIN pmccustm cu ON c.carscust = cu.custcode`
