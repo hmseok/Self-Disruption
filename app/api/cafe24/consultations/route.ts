@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     const memoCols: [string, string][] = [
       ['memoidno', 'staffId'], ['memomddt', 'receiptDate'], ['memosrno', 'seqNo'],
       ['memoline', 'lineNo'], ['memodate', 'memoDate'], ['memotime', 'memoTime'],
-      ['memotype', 'memoType'], ['memotitl', 'memoTitle'], ['memoctnt', 'memoContent'],
+      ['memotype', 'memoType'], ['memotitl', 'memoTitle'], ['memoctnt', 'memoContent'], ['memotext', 'memoContent2'],
       ['memognus', 'createdBy'], ['memogndt', 'createdDate'], ['memogntm', 'createdTime'],
     ];
 

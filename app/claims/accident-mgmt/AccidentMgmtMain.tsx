@@ -367,7 +367,7 @@ export default function AccidentMgmtMain() {
       const json = await res.json()
       if (json.success) {
         setMemos((json.data || []).map((m: any) => ({
-          content: m.memoContent || m.content || '',
+          content: m.memoContent || m.memoContent2 || m.content || '',
           createdBy: m.createdBy || '', createdDate: m.createdDate || '',
           createdTime: m.createdTime || '', memoType: m.memoType || '',
         })))
