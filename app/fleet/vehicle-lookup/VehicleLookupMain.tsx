@@ -14,6 +14,10 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 }
 const TYPE_MAP: Record<string, string> = { S: '실비', T: '턴키' }
 const INS_MAP: Record<string, string> = { N01: '렌터카공제조합', N02: '메리츠화재', N03: '삼성화재', N04: '흥국화재', N05: '악사다이렉트', N06: '현대해상', N07: 'DB', N99: '없음' }
+// BHJAGB — 자부담구분
+const JAGB_MAP: Record<string, string> = { '-': '모름', A: '정액', B: '정율', C: '모름' }
+// BHJACHA — 보험등급(자차수리부담)
+const JACHA_MAP: Record<string, string> = { A01: '메리츠캐피탈', A02: '스카이오토서비스', A03: 'GS엠비즈', A04: '효성캐피탈', A05: '렌터카공제조합(자차)', a06: '삼성화재', A07: '라이드(주)', A99: '없음' }
 const ACBN_MAP: Record<string, string> = { B: '보물', D: '단독', E: '기타', G: '가해', H: '긴출', J: '자차', K: '과실', M: '면책', O: '정비', P: '피해', Q: '검사', S: '긴출' }
 const ACC_STATUS: Record<string, string> = { '1': '접수', '2': '입고', '3': '수리중', '4': '출고' }
 
@@ -79,7 +83,7 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
                 <Cell label="차대번호">{v.carVin || '-'}</Cell>
                 <Cell label="차량등록일">{fD(v.carRegDate)}</Cell>
                 <Cell label="주행거리">{v.carMileage ? `${Number(v.carMileage).toLocaleString()}km` : '-'}</Cell>
-                <Cell label="차량모델코드">{v.carModelCode || '-'}</Cell>
+                <Cell label="서비스상품">{v.carServiceType || '-'}</Cell>
               </div>
               {/* 계약/소유자 */}
               <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
@@ -122,13 +126,17 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
                 <Cell label="대인">{v.carInsDi || '-'}</Cell>
                 <Cell label="대물">{v.carInsDm || '-'}</Cell>
                 <Cell label="자손">{v.carInsJs || '-'}</Cell>
-                <Cell label="자부담구분">{v.carInsGn || '-'}</Cell>
+                <Cell label="자부담구분">{JAGB_MAP[v.carInsGn] || v.carInsGn || '-'}</Cell>
                 <Cell label="면책금(최소)">{v.carDeductMin ? `${Number(v.carDeductMin).toLocaleString()}원` : '-'}</Cell>
                 <Cell label="면책금(최대)">{v.carDeductMax ? `${Number(v.carDeductMax).toLocaleString()}원` : '-'}</Cell>
-                <Cell label="자가부담금">{v.carInsFC || '-'}</Cell>
-                <Cell label="보험등급">{v.carInsClass || '-'}</Cell>
-                {v.carInsEtc && <Cell label="기타특약">{v.carInsEtc}</Cell>}
+                <Cell label="자기부담율">{v.carInsFC ? `${v.carInsFC}%` : '-'}</Cell>
+                <Cell label="자차수리부담">{JACHA_MAP[v.carInsClass] || v.carInsClass || '-'}</Cell>
               </div>
+              {v.carInsEtc && (
+                <div className="pt-2 grid grid-cols-1 gap-y-2">
+                  <Cell label="기타특약"><span className="text-slate-700">{v.carInsEtc}</span></Cell>
+                </div>
+              )}
               {/* 금액 */}
               {(v.amtMaintenance || v.amtAccident || v.amtExam) && (
                 <div className="pt-3 border-t border-slate-100 grid grid-cols-3 gap-x-6 gap-y-4">
