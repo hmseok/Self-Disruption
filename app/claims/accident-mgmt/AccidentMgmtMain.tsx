@@ -25,19 +25,37 @@ const STATUS_MAP: Record<string, { label: string; dot: string; bg: string }> = {
   'C': { label: '지급요청', dot: 'bg-lime-400', bg: 'bg-lime-50 text-lime-700 ring-1 ring-lime-200' },
 }
 const CATEGORY_MAP: Record<string, string> = { S: '실비', T: '턴키' }
-const BRANCH_MAP: Record<string, string> = { E: '긴출', G: '가해', J: '자차', K: '과실', P: '피해', B: 'B', D: 'D', M: 'M' }
+
+// OTPTACBN — 사고구분 (★ ERP 기초코드관리에서 확인)
+const ACCIDENT_TYPE_MAP: Record<string, string> = {
+  B: '보물', D: '단독', E: '기타', G: '가해', H: '긴출',
+  J: '자차', K: '과실', M: '면책', O: '정비', P: '피해', Q: '검사', S: '긴출',
+}
+
+// OTPTDSLI — 운전자면허종류 (★ 사업자번호가 아님!)
+const LICENSE_MAP: Record<string, string> = { '1B': '1종보통', '1D': '1종대형', '2A': '2종오토', '2B': '2종보통' }
+
+// OTPTACRN — 차량운행상태 (★ 사고원인이 아님!)
+const VEHICLE_RUN_MAP: Record<string, string> = { Y: '운행가능', N: '운행불가' }
+
 const REGTYPE_MAP: Record<string, string> = { '1': '법정검사', '2': '사고접수', '3': '정기점검', '4': '기타', 'I': '사고접수' }
 const RENTAL_TYPE_MAP: Record<string, string> = { A: '공장(일반)', B: '공장(P)', C: '정비업체(일반)', D: '정비업체(정기점검)' }
 const REGSTATUS_MAP: Record<string, string> = { R: '렌터카', C: 'C' }
 
-// picbscdm BHNAME — 보험사 코드
+// BHNAME — 보험사
 const INSURANCE_MAP: Record<string, string> = {
   N01: '렌터카공제조합', N02: '메리츠화재', N03: '삼성화재', N04: '흥국화재',
   N05: '악사다이렉트', N06: '현대해상', N07: 'DB', N99: '보험사없음',
 }
 
-// picbscdm CARSSTAT — 차량상태
+// CARSSTAT — 차량이용상태
 const CAR_STATUS_MAP: Record<string, string> = { R: '이용중', H: '해지', L: '반납' }
+
+// UCMTEDFG — 입금관리상태
+const PAYMENT_MAP: Record<string, string> = { '-': '지급요청', P: '지급중', Y: '지급완료' }
+
+// CAMOLEVL — 고객성향
+const CUSTOMER_LEVEL_MAP: Record<string, string> = { '1': '좋음', '2': '보통', '3': '나쁨' }
 
 // ═══════════════════════════════════════════════
 // Helpers
@@ -108,7 +126,7 @@ function KpiCard({ label, value, color, icon }: { label: string; value: number; 
 // Detail Panel
 // ═══════════════════════════════════════════════
 function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]; memosLoading: boolean }) {
-  const branchLabel = BRANCH_MAP[a.accidentBranch] || a.accidentBranch || '-'
+  const branchLabel = ACCIDENT_TYPE_MAP[a.accidentType] || a.accidentType || '-'
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white border-x border-b border-slate-200 rounded-b-xl">
@@ -141,8 +159,8 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             {/* 구분 체크 */}
             <div className="mt-3 flex items-center gap-3 flex-wrap">
               <span className="text-[10px] text-slate-400 font-medium mr-1">구분</span>
-              {Object.entries(BRANCH_MAP).map(([code, label]) => {
-                const active = a.accidentBranch === code
+              {Object.entries(ACCIDENT_TYPE_MAP).map(([code, label]) => {
+                const active = a.accidentType === code
                 return (
                   <div key={code} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors
                     ${active ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>
@@ -154,7 +172,7 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             </div>
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-2">
               <Cell label="사고장소" span={2}>{a.accidentLocation}</Cell>
-              <Cell label="원인유무">{a.accidentReason === 'Y' ? <span className="text-red-500">유</span> : '무'}</Cell>
+              <Cell label="운행가능">{VEHICLE_RUN_MAP[a.vehicleRunnable] || a.vehicleRunnable || '-'}</Cell>
               <Cell label="피해유무">{a.accidentDamage === 'Y' ? <span className="text-red-500">유</span> : '무'}</Cell>
             </div>
             {a.accidentMemo && (
@@ -196,10 +214,10 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
           {/* 당사차 운전자 */}
           <Section title="당사차 운전자 / 통보자" color="border-indigo-500">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
-              <Cell label="운전자 연락처">{a.accidentMobile === 'N' ? '-' : a.accidentMobile}</Cell>
-              <Cell label="운전자 전화">{a.accidentTel === 'N' || a.accidentTel === 'Y' ? '-' : a.accidentTel}</Cell>
+              <Cell label="운전자 연락처">{a.driverMobile === 'N' ? '-' : a.driverMobile}</Cell>
+              <Cell label="운전자 전화">{a.driverTel === 'N' || a.driverTel === 'Y' ? '-' : a.driverTel}</Cell>
+              <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
               <Cell label="관할여부">{a.accidentJc === 'Y' ? '유' : '무'}</Cell>
-              <Cell label="관할서">{a.accidentJs === 'Y' ? '유' : '무'}</Cell>
             </div>
           </Section>
 
@@ -239,7 +257,7 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
               <Cell label="공장명"><span className="font-bold text-blue-700">{a.repairShopName || '-'}</span></Cell>
               <Cell label="공장코드">{a.repairShopCode || '-'}</Cell>
               <Cell label="대표여부">{a.repairShopRep === 'Y' ? 'Y' : 'N'}</Cell>
-              <Cell label="구분코드">{a.repairShopLicense || '-'}</Cell>
+              <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
               <Cell label="전화번호">{a.repairShopPhone || '-'}</Cell>
               <Cell label="팩스">{a.repairShopVp || '-'}</Cell>
               <Cell label="주소">{a.repairShopAddr || '-'}</Cell>
@@ -380,7 +398,7 @@ export default function AccidentMgmtMain() {
       const s = search.toLowerCase()
       result = result.filter(a =>
         a.accidentNo?.toLowerCase().includes(s) || a.counterpartName?.toLowerCase().includes(s) ||
-        a.accidentLocation?.toLowerCase().includes(s) || a.accidentMobile?.toLowerCase().includes(s) ||
+        a.accidentLocation?.toLowerCase().includes(s) ||
         a.repairShopName?.toLowerCase().includes(s) || a.counterpartVehicle?.toLowerCase().includes(s) ||
         a.carPlateNo?.toLowerCase().includes(s) || a.carModelName?.toLowerCase().includes(s) ||
         a.custName?.toLowerCase().includes(s) || a.carOwner?.toLowerCase().includes(s)

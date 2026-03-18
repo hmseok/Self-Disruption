@@ -21,22 +21,22 @@ export const ACCIDENT_COLS: [string, string][] = [
   ['otptacad', 'accidentLocation'], // 사고장소
   ['otptacmo', 'accidentMemo'],  // 사고내용
   ['otptacfe', 'faultRate'],     // 과실비율
-  ['otptacbn', 'accidentBranch'],// 사고지점
-  ['otptacrn', 'accidentReason'],// 사고원인
-  ['otptacdi', 'accidentDi'],    // 사고구분
-  ['otptacdm', 'accidentDamage'],// 사고피해
-  ['otptacjc', 'accidentJc'],    // 사고관할
-  ['otptacjs', 'accidentJs'],    // 사고관할서
-  ['otptacmb', 'accidentMobile'],// 사고자핸드폰
-  ['otptacno', 'accidentTel'],   // 사고자전화
+  ['otptacbn', 'accidentType'],   // ★ 사고구분 (OTPTACBN: B=보물,D=단독,G=가해,K=과실,P=피해 등)
+  ['otptacrn', 'vehicleRunnable'],// ★ 차량상태 (Y=운행가능,N=운행불가능) — 기존 accidentReason 잘못매핑
+  ['otptacdi', 'accidentDi'],    // 사고구분유무 (Y/N)
+  ['otptacdm', 'accidentDamage'],// 사고피해유무 (Y/N)
+  ['otptacjc', 'accidentJc'],    // 사고관할 (Y/N)
+  ['otptacjs', 'accidentJs'],    // 사고관할서 (Y/N)
+  ['otptacmb', 'driverMobile'],  // 운전자 핸드폰
+  ['otptacno', 'driverTel'],     // 운전자 전화
   ['otptacph', 'accidentPhoto'], // 사고사진
   ['otptacet', 'accidentEtc'],   // 사고기타
   ['otptadfg', 'adFlag'],        // 사고구분플래그
 
   // ── 정비공장 ──
   ['otptdsnm', 'repairShopName'],  // 공장명
-  ['otptdsrp', 'repairShopRep'],   // 공장대표
-  ['otptdsli', 'repairShopLicense'],// 공장사업자번호
+  ['otptdsrp', 'repairShopRep'],   // 공장대표여부 (Y/N)
+  ['otptdsli', 'driverLicense'],   // ★ 운전자면허종류 (OTPTDSLI: 1B=1종보통,1D=1종대형,2A=2종오토,2B=2종보통) — 기존 사업자번호 잘못매핑
   ['otptdshp', 'repairShopPhone'], // 공장전화
   ['otptdsvp', 'repairShopVp'],    // 공장팩스
   ['otptdsvd', 'repairShopAddr'],  // 공장주소
