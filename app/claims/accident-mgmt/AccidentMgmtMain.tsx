@@ -236,22 +236,30 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
           {/* 당사차 운전자 */}
           <Section title="당사차 운전자 / 통보자" color="border-indigo-500">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
+              <Cell label="운전자"><span className="font-bold">{a.driverName || '-'}</span></Cell>
+              <Cell label="연락처"><span className="text-blue-700 font-bold">{a.driverPhone || '-'}</span></Cell>
               <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
-              <Cell label="비고">{a.repairShopRe || '-'}</Cell>
+              <Cell label="생년월일">{a.driverBirth || '-'}</Cell>
+              <Cell label="계약자관계">{a.driverRelation || '-'}</Cell>
+              <Cell label="통보자">{a.notifierName || '-'}</Cell>
+              <Cell label="통보자연락처">{a.notifierPhone || '-'}</Cell>
+              <Cell label="운전자관계">{a.driverRelType || '-'}</Cell>
             </div>
           </Section>
 
           {/* 상대차량 */}
           <Section title="상대차량" color="border-orange-500">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
-              <Cell label="운전자"><span className="font-bold">{a.counterpartName || '-'}</span></Cell>
-              <Cell label="연락처"><span className="font-bold text-blue-700">{a.counterpartPhone || '-'}</span></Cell>
-              <Cell label="차량번호">{a.counterpartVehicle || '-'}</Cell>
-              <Cell label="차량정보">{a.counterpartVehicleDesc || '-'}</Cell>
-              <Cell label="보험사">{a.counterpartInsurance || '-'}</Cell>
-              <Cell label="상대과실">{a.counterpartFault === 'N' ? '무' : a.counterpartFault === 'Y' ? '유' : '-'}</Cell>
+              <Cell label="차량번호">{a.oppCarNo || '-'}</Cell>
+              <Cell label="차량정보">{a.oppCarInfo || '-'}</Cell>
+              <Cell label="보험접수번호">{a.insuranceAccNo || '-'}</Cell>
+              <Cell label="대물담당자">{a.propDamageStaff || '-'}</Cell>
+              <Cell label="대물담당자HP"><span className="text-blue-700">{a.propDamagePhone || '-'}</span></Cell>
+              <Cell label="공장입고여부">{a.factoryInYn === 'Y' ? '입고' : '미입고'}</Cell>
             </div>
           </Section>
+
+          {/* 기존 상대차량 섹션은 위 운전자/통보자 + 상대차량으로 재구성됨 */}
 
           {/* 대차관리 */}
           <Section title="대차관리" color="border-emerald-500" defaultOpen={!!a.rentalStatus}>
@@ -274,17 +282,10 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
           {/* 공장배정 */}
           <Section title="공장배정 (정비)" color="border-yellow-500">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
-              <Cell label="공장명"><span className="font-bold text-blue-700">{a.repairShopName || '-'}</span></Cell>
               <Cell label="공장코드">{a.repairShopCode || '-'}</Cell>
-              <Cell label="대표여부">{a.repairShopRep === 'Y' ? 'Y' : 'N'}</Cell>
-              <Cell label="전화번호">{a.repairShopPhone || '-'}</Cell>
-              <Cell label="팩스">{a.repairShopVp || '-'}</Cell>
-              <Cell label="주소">{a.repairShopAddr || '-'}</Cell>
-              <Cell label="담당자">{a.repairShopUser || '-'}</Cell>
-              <Cell label="담당자 연락처">{a.repairShopTel || '-'}</Cell>
-              <Cell label="은행">{a.repairShopBh || '-'}</Cell>
-              <Cell label="계좌번호">{a.repairShopBn || '-'}</Cell>
-              <Cell label="처리결과">{a.repairShopRs || '-'}</Cell>
+              <Cell label="공장입고">{a.factoryInYn === 'Y' ? '입고완료' : '미입고'}</Cell>
+              <Cell label="수리희망지">{a.repairLocation || '-'}</Cell>
+              <Cell label="처리결과">{a.repairShopResult || '-'}</Cell>
             </div>
           </Section>
 
@@ -423,9 +424,10 @@ export default function AccidentMgmtMain() {
         a.custName?.toLowerCase().includes(s) || a.carOwner?.toLowerCase().includes(s)
       )
     }
+    // 접수일시 기준 정렬 (otptgndt + otptgntm)
     result.sort((a, b) => {
-      const da = (a.accidentDate || a.receiptDate || '') + (a.accidentTime || a.createdTime || '')
-      const db = (b.accidentDate || b.receiptDate || '') + (b.accidentTime || b.createdTime || '')
+      const da = (a.createdDate || '') + (a.createdTime || '')
+      const db = (b.createdDate || '') + (b.createdTime || '')
       return db.localeCompare(da)
     })
     return result
@@ -501,13 +503,14 @@ export default function AccidentMgmtMain() {
             {/* Table Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-5 py-2.5 grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               <span className="col-span-1">상태</span>
-              <span className="col-span-2">사고일시</span>
+              <span className="col-span-2">접수일시</span>
               <span className="col-span-2">사고번호</span>
               <span className="col-span-1">차량번호</span>
+              <span className="col-span-1">유형</span>
               <span className="col-span-2">장소</span>
               <span className="col-span-1 text-center">과실</span>
-              <span className="col-span-2">상대방</span>
-              <span className="col-span-1">공장/대차</span>
+              <span className="col-span-1">운전자</span>
+              <span className="col-span-1">거래처</span>
             </div>
 
             {/* Table Rows */}
@@ -522,23 +525,18 @@ export default function AccidentMgmtMain() {
                       ${isExpanded ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'}
                       ${idx % 2 === 0 && !isExpanded ? 'bg-white' : !isExpanded ? 'bg-slate-50/40' : ''}`}>
                     <span className="col-span-1"><StatusBadge status={a.status} /></span>
-                    <span className="col-span-2 text-slate-700 font-medium">{fD(a.accidentDate)} <span className="text-slate-400">{fT(a.accidentTime)}</span></span>
+                    <span className="col-span-2 text-slate-700 font-medium">{fD(a.createdDate)} <span className="text-slate-400">{fT(a.createdTime)}</span></span>
                     <span className="col-span-2 font-mono text-slate-800 font-semibold text-[12px]">{a.accidentNo || '-'}</span>
                     <span className="col-span-1 text-blue-700 font-bold text-[12px] truncate">{a.carPlateNo || '-'}</span>
+                    <span className="col-span-1 text-[11px]">{CATEGORY_MAP[a.category] || a.category}</span>
                     <span className="col-span-2 text-slate-600 truncate">{a.accidentLocation || '-'}</span>
                     <span className="col-span-1 text-center">
                       <span className={`font-bold ${parseInt(a.faultRate) >= 100 ? 'text-red-600' : parseInt(a.faultRate) >= 50 ? 'text-orange-600' : 'text-slate-600'}`}>
                         {a.faultRate ? `${a.faultRate}%` : '-'}
                       </span>
                     </span>
-                    <span className="col-span-2 text-slate-600 truncate">
-                      <span className="font-medium">{a.counterpartName || '-'}</span>
-                      {a.counterpartInsurance && a.counterpartInsurance !== '-' && <span className="text-slate-400 text-[11px] ml-1">({a.counterpartInsurance})</span>}
-                    </span>
-                    <span className="col-span-1 text-slate-600 truncate text-[12px]">
-                      {a.repairShopName || '-'}
-                      {a.rentalStatus && <span className="inline-flex items-center ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded">대차</span>}
-                    </span>
+                    <span className="col-span-1 text-slate-700 truncate font-medium">{a.driverName || '-'}</span>
+                    <span className="col-span-1 text-slate-600 truncate text-[11px]">{a.custName || a.carOwner || '-'}</span>
                   </div>
                   {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} />}
                 </div>

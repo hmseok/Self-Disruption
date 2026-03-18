@@ -34,35 +34,35 @@ export const ACCIDENT_COLS: [string, string][] = [
   ['otptacet', 'accidentEtc'],   // 사고기타
   ['otptadfg', 'adFlag'],        // 사고구분플래그
 
-  // ── 정비공장 ──
-  ['otptdsnm', 'repairShopName'],  // 공장명
-  ['otptdsrp', 'repairShopRep'],   // 공장대표여부 (Y/N)
-  ['otptdsli', 'driverLicense'],   // ★ 운전자면허종류 (OTPTDSLI: 1B=1종보통,1D=1종대형,2A=2종오토,2B=2종보통) — 기존 사업자번호 잘못매핑
-  ['otptdshp', 'repairShopPhone'], // 공장전화
-  ['otptdsvp', 'repairShopVp'],    // 공장팩스
-  ['otptdsvd', 'repairShopAddr'],  // 공장주소
-  ['otptdsbh', 'repairShopBh'],    // 공장은행
-  ['otptdsbn', 'repairShopBn'],    // 공장계좌
-  ['otptdsus', 'repairShopUser'],  // 공장담당
-  ['otptdstl', 'repairShopTel'],   // 공장담당전화
-  ['otptdsre', 'repairShopRe'],    // 공장비고
-  ['otptdscd', 'repairShopCode'],  // 공장코드
-  ['otptdsrs', 'repairShopRs'],    // 공장결과
-  ['otptdspk', 'repairShopPk'],    // 공장주차
-  ['otptdsmo', 'repairShopMemo'],  // 탁송메모
+  // ── ★ 운전자/통보자 (소스코드 accident.view.php에서 확인) ──
+  ['otptdsnm', 'driverName'],     // ★ 운전자명 — 기존 repairShopName 잘못매핑
+  ['otptdsrp', 'driverNotifySame'], // 운전자=통보자동일 (Y/N)
+  ['otptdsli', 'driverLicense'],   // 운전자면허종류 (1B=1종보통 등)
+  ['otptdshp', 'driverPhone'],    // ★ 운전자연락처 — 기존 repairShopPhone 잘못매핑
+  ['otptdsvp', 'driverVp'],       // 운전자부가
+  ['otptdsvd', 'driverAddr'],     // 운전자주소
+  ['otptdsbh', 'driverBirth'],    // ★ 생년월일 — 기존 repairShopBh(공장은행) 잘못매핑
+  ['otptdsbn', 'insuranceAccNo'], // ★ 보험접수번호 — 기존 repairShopBn(공장계좌) 잘못매핑
+  ['otptdsus', 'propDamageStaff'],// ★ 대물담당자 — 기존 repairShopUser 잘못매핑
+  ['otptdstl', 'propDamagePhone'],// ★ 대물담당자HP — 기존 repairShopTel 잘못매핑
+  ['otptdsre', 'driverRelation'], // ★ 계약자와의관계 — 기존 repairShopRe(공장비고) 잘못매핑
+  ['otptdscd', 'repairShopCode'],  // 공장코드 (FACTTYPE)
+  ['otptdsrs', 'repairShopResult'],// 공장결과
+  ['otptdspk', 'repairLocation'], // 수리희망지
+  ['otptdsmo', 'towingMemo'],     // 탁송메모
 
   // ── 견인 ──
   ['otpttwgn', 'towingYn'],       // 견인여부
   ['otpttwnm', 'towingCompany'],  // 견인업체
   ['otpttwhp', 'towingPhone'],    // 견인전화
 
-  // ── 상대방 ──
-  ['otptcanm', 'counterpartName'],      // 상대방성명
-  ['otptcahp', 'counterpartPhone'],     // 상대방전화
-  ['otptcavp', 'counterpartVehicle'],   // 상대방차량번호
-  ['otptcavd', 'counterpartVehicleDesc'],// 상대방차량정보
-  ['otptcare', 'counterpartInsurance'], // 상대방보험사
-  ['otptftyn', 'counterpartFault'],     // 상대과실여부
+  // ── 통보자/상대차량 (소스코드 확인) ──
+  ['otptcanm', 'notifierName'],   // ★ 통보자명 — 기존 counterpartName 잘못매핑
+  ['otptcahp', 'notifierPhone'],  // 통보자전화
+  ['otptcavp', 'oppCarNo'],      // 상대차량번호
+  ['otptcavd', 'oppCarInfo'],    // 상대차량정보
+  ['otptcare', 'driverRelType'], // ★ 운전자관계 — 기존 counterpartInsurance(보험사) 잘못매핑
+  ['otptftyn', 'factoryInYn'],   // ★ 공장입고여부 — 기존 counterpartFault(상대과실) 잘못매핑
 
   // ── 인수자 ──
   ['otpttonm', 'handoverName'],   // 인수자성명
@@ -123,12 +123,12 @@ export const RENTAL_COLS: [string, string][] = [
   ['rentmodl', 'rentalCarModel'], // 대차차종
   ['rentfacd', 'rentalFactory'],  // 대차업체
   ['rentmemo', 'rentalMemo'],     // 대차메모
-  ['rentgnus', 'createdBy'],      // 등록자
-  ['rentgndt', 'createdDate'],    // 등록일
-  ['rentgntm', 'createdTime'],    // 등록시간
-  ['rentupus', 'updatedBy'],      // 수정자
-  ['rentupdt', 'updatedDate'],    // 수정일
-  ['rentuptm', 'updatedTime'],    // 수정시간
+  ['rentgnus', 'rentCreatedBy'],   // 대차등록자 (acrotpth createdBy와 충돌방지)
+  ['rentgndt', 'rentCreatedDate'], // 대차등록일
+  ['rentgntm', 'rentCreatedTime'], // 대차등록시간
+  ['rentupus', 'rentUpdatedBy'],   // 대차수정자
+  ['rentupdt', 'rentUpdatedDate'], // 대차수정일
+  ['rentuptm', 'rentUpdatedTime'], // 대차수정시간
 ];
 
 // pmccarsm (차량마스터) — acrotpth.otptidno = pmccarsm.carsidno
