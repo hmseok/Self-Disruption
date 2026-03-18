@@ -69,23 +69,74 @@ function VehicleDetail({ v, historyData, accidents, loading }: {
               <div className="w-1 h-4 bg-blue-500 rounded-full" />
               <span className="text-[13px] font-bold text-slate-700">차량 / 계약 정보</span>
             </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
+            <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
+              {/* 기본 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
                 <Cell label="차량번호"><span className="text-blue-700 font-bold text-[15px]">{v.carPlateNo}</span></Cell>
                 <Cell label="차량명">{v.carModelName}</Cell>
                 <Cell label="이용상태"><StatusBadge status={v.carStatus} /></Cell>
                 <Cell label="서비스유형"><span className={`px-2 py-0.5 rounded text-xs font-bold ${v.carType === 'T' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{TYPE_MAP[v.carType] || v.carType}</span></Cell>
+                <Cell label="차대번호">{v.carVin || '-'}</Cell>
+                <Cell label="차량등록일">{fD(v.carRegDate)}</Cell>
+                <Cell label="주행거리">{v.carMileage ? `${Number(v.carMileage).toLocaleString()}km` : '-'}</Cell>
+                <Cell label="차량모델코드">{v.carModelCode || '-'}</Cell>
+              </div>
+              {/* 계약/소유자 */}
+              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
                 <Cell label="계약자/소유자"><span className="font-bold">{v.carOwner}</span></Cell>
-                <Cell label="거래처">{v.custName}</Cell>
-                <Cell label="연락처">{v.carContactPhone || v.custPhone}</Cell>
-                <Cell label="주소">{v.carAddress || v.custAddr}</Cell>
+                <Cell label="거래처"><span className="font-bold">{v.custName}</span></Cell>
+                <Cell label="연락처"><span className="text-blue-700">{v.carContactPhone || v.custPhone || '-'}</span></Cell>
+                <Cell label="담당자">{v.carContactName || '-'}</Cell>
+                <Cell label="주소" >{v.carAddress || v.custAddr || '-'}</Cell>
+                <Cell label="계약번호">{v.carContractNo || '-'}</Cell>
+                <Cell label="계약기간(월)">{v.carContractMonths ? `${v.carContractMonths}개월` : '-'}</Cell>
+                <Cell label="약정거리">{v.carContractKm ? `${Number(v.carContractKm).toLocaleString()}km` : '-'}</Cell>
                 <Cell label="계약기간">{v.carContractFrom ? `${fD(v.carContractFrom)} ~ ${fD(v.carContractTo)}` : '-'}</Cell>
                 <Cell label="이용기간">{v.carFromDate ? `${fD(v.carFromDate)} ~ ${fD(v.carToDate)}` : '-'}</Cell>
-                <Cell label="보험사">{INS_MAP[v.carInsCode] || v.carInsCode}</Cell>
-                <Cell label="면책금">{v.carDeductMin ? `${Number(v.carDeductMin).toLocaleString()}원` : '-'}</Cell>
-                <Cell label="연령한정">{v.carAgeLimit ? `${v.carAgeLimit}세` : '-'}</Cell>
-                <Cell label="보험등급">{v.carInsClass}</Cell>
               </div>
+              {/* 계약사항 체크 */}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="text-[10px] text-slate-400 mb-2">계약사항</div>
+                <div className="flex gap-3">
+                  {[
+                    { key: 'chkInspection', label: '정기점검' },
+                    { key: 'chkAccident', label: '사고처리' },
+                    { key: 'chkRental', label: '대차가능' },
+                    { key: 'chkLegal', label: '법정검사' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs
+                      ${v[key] === 'Y' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      {v[key] === 'Y' && <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* 보험 */}
+              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+                <Cell label="보험사"><span className="font-bold">{INS_MAP[v.carInsCode] || v.carInsCode || '-'}</span></Cell>
+                <Cell label="보험가입일">{fD(v.carInsFrom)}</Cell>
+                <Cell label="보험만료일">{fD(v.carInsTo)}</Cell>
+                <Cell label="긴급출동">{v.carEmergency === 'Y' ? '유' : '무'}</Cell>
+                <Cell label="연령한정">{v.carAgeLimit ? `${v.carAgeLimit}세` : '-'}</Cell>
+                <Cell label="대인">{v.carInsDi || '-'}</Cell>
+                <Cell label="대물">{v.carInsDm || '-'}</Cell>
+                <Cell label="자손">{v.carInsJs || '-'}</Cell>
+                <Cell label="자부담구분">{v.carInsGn || '-'}</Cell>
+                <Cell label="면책금(최소)">{v.carDeductMin ? `${Number(v.carDeductMin).toLocaleString()}원` : '-'}</Cell>
+                <Cell label="면책금(최대)">{v.carDeductMax ? `${Number(v.carDeductMax).toLocaleString()}원` : '-'}</Cell>
+                <Cell label="자가부담금">{v.carInsFC || '-'}</Cell>
+                <Cell label="보험등급">{v.carInsClass || '-'}</Cell>
+                {v.carInsEtc && <Cell label="기타특약">{v.carInsEtc}</Cell>}
+              </div>
+              {/* 금액 */}
+              {(v.amtMaintenance || v.amtAccident || v.amtExam) && (
+                <div className="pt-3 border-t border-slate-100 grid grid-cols-3 gap-x-6 gap-y-4">
+                  <Cell label="정비비">{v.amtMaintenance ? `${Number(v.amtMaintenance).toLocaleString()}원` : '-'}</Cell>
+                  <Cell label="사고총당금">{v.amtAccident ? `${Number(v.amtAccident).toLocaleString()}원` : '-'}</Cell>
+                  <Cell label="검사비">{v.amtExam ? `${Number(v.amtExam).toLocaleString()}원` : '-'}</Cell>
+                </div>
+              )}
             </div>
           </div>
 

@@ -8,9 +8,20 @@ const CAR_SELECT = `
   c.carsuser as carOwner, c.carscosv as carServiceType,
   c.carscofr as carContractFrom, c.carscoto as carContractTo,
   c.carsfrdt as carFromDate, c.carstodt as carToDate,
-  c.carsbocd as carInsCode, c.carsbomn as carDeductMin, c.carsboag as carAgeLimit,
-  c.carsbocl as carInsClass, c.carsusnm as carContactName,
-  c.carsushp as carContactPhone, c.carsusad as carAddress
+  c.carscode as carVin, c.carscono as carContractNo,
+  c.carscomp as carContractCompany, c.carscotm as carContractMonths,
+  c.carscokm as carContractKm, c.carskilo as carMileage,
+  c.carsstdt as carRegDate, c.carsmodl as carModelCode,
+  c.carsbocd as carInsCode, c.carsbofr as carInsFrom, c.carsboto as carInsTo,
+  c.carsbodi as carInsDi, c.carsbodm as carInsDm, c.carsbojs as carInsJs,
+  c.carsbogn as carInsGn, c.carsbomn as carDeductMin, c.carsbomx as carDeductMax,
+  c.carsbofc as carInsFC, c.carsbocl as carInsClass, c.carsboag as carAgeLimit,
+  c.carsboet as carInsEtc, c.carsboso as carEmergency,
+  c.carsusnm as carContactName, c.carsushp as carContactPhone,
+  c.carsustl as carContactTel, c.carsusad as carAddress, c.carsadgp as carZipCode,
+  c.carstayn as chkInspection, c.carsotyn as chkAccident,
+  c.carsdcyn as chkRental, c.carsgsyn as chkLegal,
+  c.carsjamt as amtMaintenance, c.carsuamt as amtAccident, c.carseamt as amtExam
 `.trim();
 const CUST_SELECT = `cu.custcode as custCode, cu.custname as custName, cu.custhpno as custPhone, cu.custaddr as custAddr`;
 const CUST_JOIN = 'LEFT JOIN pmccustm cu ON c.carscust = cu.custcode';
