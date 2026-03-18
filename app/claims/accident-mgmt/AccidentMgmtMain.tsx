@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
+import { useCodeMaster } from '../../hooks/useCodeMaster'
 
 // ═══════════════════════════════════════════════
 // Types
@@ -9,53 +10,13 @@ import { useApp } from '../../context/AppContext'
 type Accident = Record<string, string>
 type Memo = { content: string; createdBy: string; createdDate: string; createdTime: string; memoType: string }
 
-// ═══════════════════════════════════════════════
-// Code Maps (picbscdm 기반)
-// ═══════════════════════════════════════════════
-const STATUS_MAP: Record<string, { label: string; dot: string; bg: string }> = {
-  '1': { label: '접수', dot: 'bg-emerald-400', bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
-  '2': { label: '입고', dot: 'bg-blue-400', bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
-  '3': { label: '출고', dot: 'bg-cyan-400', bg: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
-  '4': { label: '결재요청', dot: 'bg-orange-400', bg: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' },
-  '5': { label: '지급요청', dot: 'bg-amber-400', bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
-  '6': { label: '지급완료', dot: 'bg-violet-400', bg: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' },
-  '9': { label: '미종결', dot: 'bg-red-400', bg: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
-  'A': { label: '기안요청', dot: 'bg-sky-400', bg: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' },
-  'B': { label: '기안처리중', dot: 'bg-yellow-400', bg: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200' },
-  'C': { label: '지급요청', dot: 'bg-lime-400', bg: 'bg-lime-50 text-lime-700 ring-1 ring-lime-200' },
+// 상태 뱃지 색상 (UI 전용 — 코드 라벨은 useCodeMaster에서)
+const STATUS_COLORS: Record<string, { dot: string; bg: string }> = {
+  '1': { dot: 'bg-emerald-400', bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  '2': { dot: 'bg-blue-400', bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+  '3': { dot: 'bg-cyan-400', bg: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
+  '4': { dot: 'bg-orange-400', bg: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' },
 }
-const CATEGORY_MAP: Record<string, string> = { S: '실비', T: '턴키' }
-
-// OTPTACBN — 사고구분 (★ ERP 기초코드관리에서 확인)
-const ACCIDENT_TYPE_MAP: Record<string, string> = {
-  B: '보물', D: '단독', E: '기타', G: '가해', H: '긴출',
-  J: '자차', K: '과실', M: '면책', O: '정비', P: '피해', Q: '검사', S: '긴출',
-}
-
-// OTPTDSLI — 운전자면허종류 (★ 사업자번호가 아님!)
-const LICENSE_MAP: Record<string, string> = { '1B': '1종보통', '1D': '1종대형', '2A': '2종오토', '2B': '2종보통' }
-
-// OTPTACRN — 차량운행상태 (★ 사고원인이 아님!)
-const VEHICLE_RUN_MAP: Record<string, string> = { Y: '운행가능', N: '운행불가' }
-
-const REGTYPE_MAP: Record<string, string> = { '1': '법정검사', '2': '사고접수', '3': '정기점검', '4': '기타', 'I': '사고접수' }
-const RENTAL_TYPE_MAP: Record<string, string> = { A: '공장(일반)', B: '공장(P)', C: '정비업체(일반)', D: '정비업체(정기점검)' }
-const REGSTATUS_MAP: Record<string, string> = { R: '렌터카', C: 'C' }
-
-// BHNAME — 보험사
-const INSURANCE_MAP: Record<string, string> = {
-  N01: '렌터카공제조합', N02: '메리츠화재', N03: '삼성화재', N04: '흥국화재',
-  N05: '악사다이렉트', N06: '현대해상', N07: 'DB', N99: '보험사없음',
-}
-
-// CARSSTAT — 차량이용상태
-const CAR_STATUS_MAP: Record<string, string> = { R: '이용중', H: '해지', L: '반납' }
-
-// UCMTEDFG — 입금관리상태
-const PAYMENT_MAP: Record<string, string> = { '-': '지급요청', P: '지급중', Y: '지급완료' }
-
-// CAMOLEVL — 고객성향
-const CUSTOMER_LEVEL_MAP: Record<string, string> = { '1': '좋음', '2': '보통', '3': '나쁨' }
 
 // ═══════════════════════════════════════════════
 // Helpers
@@ -98,13 +59,12 @@ function Section({ title, color = 'border-slate-300', children, defaultOpen = tr
 }
 
 // 상태 뱃지
-function StatusBadge({ status }: { status: string }) {
-  const st = STATUS_MAP[status]
-  if (!st) return <span className="text-xs text-slate-400">{status}</span>
+function StatusBadge({ status, decode }: { status: string; decode: (g: string, c: string) => string }) {
+  const st = STATUS_COLORS[status] || { dot: 'bg-slate-400', bg: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200' }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${st.bg}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-      {st.label}
+      {decode('OTPTSTAT', status)}
     </span>
   )
 }
@@ -126,7 +86,7 @@ function KpiCard({ label, value, color, icon }: { label: string; value: number; 
 // Detail Panel
 // ═══════════════════════════════════════════════
 function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]; memosLoading: boolean }) {
-  const branchLabel = ACCIDENT_TYPE_MAP[a.accidentType] || a.accidentType || '-'
+  const branchLabel = decode('OTPTACBN', a.accidentType)
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white border-x border-b border-slate-200 rounded-b-xl">
@@ -137,9 +97,9 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
         <div><span className="text-slate-400">접수번호</span> <span className="font-mono font-bold ml-1">{a.accidentNo}</span></div>
         <div><span className="text-slate-400">사고일시</span> <span className="font-bold ml-1">{fDT(a.accidentDate, a.accidentTime)}</span></div>
         <div><span className="text-slate-400">과실</span> <span className="font-bold text-amber-300 ml-1">{a.faultRate ? `${a.faultRate}%` : '-'}</span></div>
-        <div><span className="text-slate-400">유형</span> <span className="ml-1">{CATEGORY_MAP[a.category] || a.category}</span></div>
+        <div><span className="text-slate-400">유형</span> <span className="ml-1">{decode('CARSTYPE', a.category)}</span></div>
         <div><span className="text-slate-400">지점</span> <span className="ml-1">{branchLabel}</span></div>
-        <div className="ml-auto"><StatusBadge status={a.status} /></div>
+        <div className="ml-auto"><StatusBadge status={a.status} decode={decode} /></div>
       </div>
 
       <div className="flex flex-col xl:flex-row">
@@ -153,13 +113,13 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
               <Cell label="접수번호"><span className="font-mono">{a.accidentNo}</span></Cell>
               <Cell label="과실"><span className="text-red-600 font-bold">{a.faultRate ? `${a.faultRate}%` : '-'}</span></Cell>
               <Cell label="구분">{branchLabel}</Cell>
-              <Cell label="서비스유형">{CATEGORY_MAP[a.category] || a.category}</Cell>
+              <Cell label="서비스유형">{decode('CARSTYPE', a.category)}</Cell>
               <Cell label="대차여부">{a.rentalStatus ? <span className="text-emerald-600 font-bold">사용</span> : <span className="text-slate-400">미사용</span>}</Cell>
             </div>
             {/* 구분 체크 */}
             <div className="mt-3 flex items-center gap-3 flex-wrap">
               <span className="text-[10px] text-slate-400 font-medium mr-1">구분</span>
-              {Object.entries(ACCIDENT_TYPE_MAP).map(([code, label]) => {
+              {Object.entries(getGroup('OTPTACBN')).map(([code, label]) => {
                 const active = a.accidentType === code
                 return (
                   <div key={code} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors
@@ -194,7 +154,7 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             </div>
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-2">
               <Cell label="사고장소" span={2}>{a.accidentLocation}</Cell>
-              <Cell label="차량상태">{VEHICLE_RUN_MAP[a.vehicleRunnable] || a.vehicleRunnable || '-'}</Cell>
+              <Cell label="차량상태">{decode('OTPTACRN', a.vehicleRunnable)}</Cell>
               <Cell label="사고기타">{a.accidentEtc || '-'}</Cell>
             </div>
             {a.accidentMemo && (
@@ -210,8 +170,8 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
               <Cell label="차량번호"><span className="text-blue-700 font-bold text-[15px]">{a.carPlateNo || '-'}</span></Cell>
               <Cell label="차량명">{a.carModelName || '-'}</Cell>
-              <Cell label="이용상태">{CAR_STATUS_MAP[a.carStatus] || a.carStatus || '-'}</Cell>
-              <Cell label="서비스유형">{CATEGORY_MAP[a.carType] || a.carType || CATEGORY_MAP[a.category] || a.category}</Cell>
+              <Cell label="이용상태">{decode('CARSSTAT', a.carStatus)}</Cell>
+              <Cell label="서비스유형">{decode('CARSTYPE', a.carType || a.category)}</Cell>
             </div>
             <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
               <Cell label="계약자">{a.carOwner || '-'}</Cell>
@@ -220,14 +180,14 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
               <Cell label="주소">{a.carAddress || a.custAddr || '-'}</Cell>
             </div>
             <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
-              <Cell label="보험사">{INSURANCE_MAP[a.carInsCode] || a.carInsCode || '-'}</Cell>
+              <Cell label="보험사">{decode('BHNAME', a.carInsCode)}</Cell>
               <Cell label="면책금">{a.carDeductMin ? `${Number(a.carDeductMin).toLocaleString()}원` : '-'}</Cell>
               <Cell label="연령한정">{a.carAgeLimit ? `${a.carAgeLimit}세` : '-'}</Cell>
               <Cell label="계약기간">{a.carContractFrom ? `${fD(a.carContractFrom)} ~ ${fD(a.carContractTo)}` : '-'}</Cell>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
-              <Cell label="등록상태">{REGSTATUS_MAP[a.regStatus] || a.regStatus}</Cell>
-              <Cell label="등록유형">{REGTYPE_MAP[a.regType] || a.regType}</Cell>
+              <Cell label="등록상태">{a.regStatus === 'R' ? '렌터카' : a.regStatus}</Cell>
+              <Cell label="등록유형">{decode('FACTGUBN', a.regType)}</Cell>
               <Cell label="접수자">{a.createdBy || '-'}</Cell>
               <Cell label="접수일시">{fDT(a.createdDate, a.createdTime) || '-'}</Cell>
             </div>
@@ -238,7 +198,7 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
               <Cell label="운전자"><span className="font-bold">{a.driverName || '-'}</span></Cell>
               <Cell label="연락처"><span className="text-blue-700 font-bold">{a.driverPhone || '-'}</span></Cell>
-              <Cell label="면허종류">{LICENSE_MAP[a.driverLicense] || a.driverLicense || '-'}</Cell>
+              <Cell label="면허종류">{decode('OTPTDSLI', a.driverLicense)}</Cell>
               <Cell label="생년월일">{a.driverBirth || '-'}</Cell>
               <Cell label="계약자관계">{a.driverRelation || '-'}</Cell>
               <Cell label="통보자">{a.notifierName || '-'}</Cell>
@@ -267,8 +227,8 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
               <div className="text-xs text-slate-400 py-2 text-center">대차 데이터 없음</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
-                <Cell label="대차상태"><StatusBadge status={a.rentalStatus} /></Cell>
-                <Cell label="대차종류"><span className="font-bold">{RENTAL_TYPE_MAP[a.rentalType] || a.rentalType}</span></Cell>
+                <Cell label="대차상태"><StatusBadge status={a.rentalStatus} decode={decode} /></Cell>
+                <Cell label="대차종류"><span className="font-bold">{decode('FACTTYPE', a.rentalType)}</span></Cell>
                 <Cell label="대차업체"><span className="font-bold">{a.rentalFactory}</span></Cell>
                 <Cell label="대차차량">{a.rentalCarNo ? `${a.rentalCarModel || ''} ${a.rentalCarNo}` : '-'}</Cell>
                 <Cell label="시작일">{fDT(a.rentalFromDate, a.rentalFromTime)}</Cell>
@@ -376,6 +336,7 @@ function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]
 // ═══════════════════════════════════════════════
 export default function AccidentMgmtMain() {
   const { user } = useApp()
+  const { decode, getGroup } = useCodeMaster()
   const [accidents, setAccidents] = useState<Accident[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -523,11 +484,11 @@ export default function AccidentMgmtMain() {
                     className={`px-5 py-3 grid grid-cols-12 gap-2 items-center cursor-pointer border-b border-slate-100 transition-all text-[13px]
                       ${isExpanded ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'}
                       ${idx % 2 === 0 && !isExpanded ? 'bg-white' : !isExpanded ? 'bg-slate-50/40' : ''}`}>
-                    <span className="col-span-1"><StatusBadge status={a.status} /></span>
+                    <span className="col-span-1"><StatusBadge status={a.status} decode={decode} /></span>
                     <span className="col-span-2 text-slate-700 font-medium">{fD(a.createdDate || a.accidentDate)} <span className="text-slate-400">{fT(a.createdTime || a.accidentTime)}</span></span>
                     <span className="col-span-2 font-mono text-slate-800 font-semibold text-[12px]">{a.accidentNo || '-'}</span>
                     <span className="col-span-1 text-blue-700 font-bold text-[12px] truncate">{a.carPlateNo || '-'}</span>
-                    <span className="col-span-1 text-[11px]">{CATEGORY_MAP[a.category] || a.category}</span>
+                    <span className="col-span-1 text-[11px]">{decode('CARSTYPE', a.category)}</span>
                     <span className="col-span-2 text-slate-600 truncate">{a.accidentLocation || '-'}</span>
                     <span className="col-span-1 text-center">
                       <span className={`font-bold ${parseInt(a.faultRate) >= 100 ? 'text-red-600' : parseInt(a.faultRate) >= 50 ? 'text-orange-600' : 'text-slate-600'}`}>
