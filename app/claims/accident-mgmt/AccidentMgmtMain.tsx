@@ -3,314 +3,302 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 
-// ============================================
-// Type
-// ============================================
+// ═══════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════
 type Accident = Record<string, string>
 type Memo = { content: string; createdBy: string; createdDate: string; createdTime: string; memoType: string }
 
-// ============================================
-// Constants
-// ============================================
-// picbscdm OTPTSTAT — 실제 DB 코드
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  '1': { label: '접수', color: 'bg-green-600 text-white' },
-  '2': { label: '입고', color: 'bg-blue-500 text-white' },
-  '3': { label: '출고', color: 'bg-emerald-500 text-white' },
-  '4': { label: '결재요청', color: 'bg-orange-500 text-white' },
-  '5': { label: '지급요청', color: 'bg-amber-500 text-white' },
-  '6': { label: '지급완료', color: 'bg-purple-500 text-white' },
-  '9': { label: '미종결', color: 'bg-red-500 text-white' },
-  'A': { label: '기안요청', color: 'bg-cyan-500 text-white' },
-  'B': { label: '기안처리중', color: 'bg-yellow-600 text-white' },
-  'C': { label: '지급요청', color: 'bg-lime-600 text-white' },
+// ═══════════════════════════════════════════════
+// Code Maps (picbscdm 기반)
+// ═══════════════════════════════════════════════
+const STATUS_MAP: Record<string, { label: string; dot: string; bg: string }> = {
+  '1': { label: '접수', dot: 'bg-emerald-400', bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  '2': { label: '입고', dot: 'bg-blue-400', bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' },
+  '3': { label: '출고', dot: 'bg-cyan-400', bg: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200' },
+  '4': { label: '결재요청', dot: 'bg-orange-400', bg: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' },
+  '5': { label: '지급요청', dot: 'bg-amber-400', bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  '6': { label: '지급완료', dot: 'bg-violet-400', bg: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' },
+  '9': { label: '미종결', dot: 'bg-red-400', bg: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
+  'A': { label: '기안요청', dot: 'bg-sky-400', bg: 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' },
+  'B': { label: '기안처리중', dot: 'bg-yellow-400', bg: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200' },
+  'C': { label: '지급요청', dot: 'bg-lime-400', bg: 'bg-lime-50 text-lime-700 ring-1 ring-lime-200' },
 }
+const CATEGORY_MAP: Record<string, string> = { S: '실비', T: '턴키' }
+const BRANCH_MAP: Record<string, string> = { E: '긴출', G: '가해', J: '자차', K: '과실', P: '피해', B: 'B', D: 'D', M: 'M' }
+const REGTYPE_MAP: Record<string, string> = { '1': '법정검사', '2': '사고접수', '3': '정기점검', '4': '기타', 'I': '사고접수' }
+const RENTAL_TYPE_MAP: Record<string, string> = { A: '공장(일반)', B: '공장(P)', C: '정비업체(일반)', D: '정비업체(정기점검)' }
+const REGSTATUS_MAP: Record<string, string> = { R: '렌터카', C: 'C' }
 
-// picbscdm CARSTYPE — 실비/턴키 구분
-const CATEGORY_MAP: Record<string, string> = {
-  S: '실비', T: '턴키',
-}
-
-// picbscdm PMOACBN — 사고지점(사고유형)
-const BRANCH_MAP: Record<string, string> = {
-  E: '긴출', G: '가해', J: '자차', K: '과실', P: '피해', B: 'B', D: 'D', M: 'M',
-}
-
-// picbscdm FACTGUBN — 등록유형
-const REGTYPE_MAP: Record<string, string> = {
-  '1': '법정검사', '2': '사고접수', '3': '정기점검', '4': '기타', 'I': '사고접수',
-}
-
-// picbscdm FACTTYPE — 대차/공장 유형
-const RENTAL_TYPE_MAP: Record<string, string> = {
-  A: '공장(일반)', B: '공장(P)', C: '정비업체(일반)', D: '정비업체(정기점검)',
-}
-
-// regStatus
-const REGSTATUS_MAP: Record<string, string> = {
-  R: '렌터카', C: 'C',
-}
-
-// ============================================
+// ═══════════════════════════════════════════════
 // Helpers
-// ============================================
-const fD = (d?: string | null) => {
-  if (!d || d.length < 8) return '-'
-  return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`
-}
-const fT = (t?: string | null) => {
-  if (!t || t.length < 4) return ''
-  return `${t.slice(0, 2)}:${t.slice(2, 4)}`
-}
-const fDT = (d?: string | null, t?: string | null) => {
-  const dd = fD(d); const tt = fT(t)
-  return tt ? `${dd} ${tt}` : dd
-}
-const fYN = (v?: string | null) => (!v ? '' : v === 'Y' ? 'Y' : v === 'N' ? 'N' : v)
-const fWon = (v?: string | null) => {
-  if (!v || !v.trim()) return ''
-  const n = parseInt(v)
-  return isNaN(n) ? v : n.toLocaleString()
-}
+// ═══════════════════════════════════════════════
+const fD = (d?: string | null) => { if (!d || d.length < 8) return ''; return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}` }
+const fT = (t?: string | null) => { if (!t || t.length < 4) return ''; return `${t.slice(0, 2)}:${t.slice(2, 4)}` }
+const fDT = (d?: string | null, t?: string | null) => { const dd = fD(d); const tt = fT(t); return tt ? `${dd} ${tt}` : dd }
 
-// ============================================
-// Field display component (ERP 스타일)
-// ============================================
-function F({ label, value, w, bold, accent }: {
-  label: string; value?: string | null; w?: string; bold?: boolean; accent?: boolean
-}) {
+// ═══════════════════════════════════════════════
+// Sub Components
+// ═══════════════════════════════════════════════
+
+// 필드 (테이블 셀 스타일)
+function Cell({ label, children, span = 1 }: { label: string; children?: React.ReactNode; span?: number }) {
   return (
-    <div className={`flex items-baseline gap-1 ${w || ''}`}>
-      <span className="text-[11px] text-slate-500 whitespace-nowrap flex-shrink-0">{label}</span>
-      <span className={`text-[13px] ${bold ? 'font-bold' : ''} ${accent ? 'text-blue-700' : 'text-slate-900'} truncate`}>
-        {value?.trim() || '-'}
-      </span>
+    <div className={`${span > 1 ? 'col-span-' + span : ''}`}>
+      <div className="text-[10px] font-medium text-slate-400 mb-0.5 tracking-wide uppercase">{label}</div>
+      <div className="text-[13px] text-slate-800 font-medium leading-snug min-h-[18px]">{children || <span className="text-slate-300">-</span>}</div>
     </div>
   )
 }
 
-// Section title (ERP 스타일 ▶ 헤더)
-function Sec({ title, icon, children, open = true }: {
-  title: string; icon?: string; children: React.ReactNode; open?: boolean
+// 섹션 헤더 (좌측 컬러 바)
+function Section({ title, color = 'border-slate-300', children, defaultOpen = true }: {
+  title: string; color?: string; children: React.ReactNode; defaultOpen?: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(open)
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden mb-2">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 transition-colors text-left"
-      >
-        <span className="text-[10px] text-slate-400">{isOpen ? '▼' : '▶'}</span>
-        {icon && <span className="text-sm">{icon}</span>}
-        <span className="text-xs font-bold text-slate-700">{title}</span>
+    <div className={`border-l-[3px] ${color} bg-white rounded-r-lg shadow-sm mb-3 overflow-hidden`}>
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors">
+        <span className="text-[13px] font-bold text-slate-700 tracking-tight">{title}</span>
+        <svg className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
-      {isOpen && <div className="px-3 py-2 bg-white">{children}</div>}
+      {open && <div className="px-4 pb-3 pt-1">{children}</div>}
     </div>
   )
 }
 
-// ============================================
-// Detail Panel — ERP 기준 사고접수 상세
-// ============================================
-function AccidentDetail({ a, memos, memosLoading }: {
-  a: Accident; memos: Memo[]; memosLoading: boolean
-}) {
+// 상태 뱃지
+function StatusBadge({ status }: { status: string }) {
+  const st = STATUS_MAP[status]
+  if (!st) return <span className="text-xs text-slate-400">{status}</span>
   return (
-    <div className="bg-white border border-slate-200 border-t-0 rounded-b-lg">
-      {/* ── 2컬럼 레이아웃: 좌측=상세, 우측=상담내역 ── */}
-      <div className="flex flex-col lg:flex-row">
-        {/* ===== 좌측: 사고 상세 ===== */}
-        <div className="flex-1 p-3 space-y-0 lg:border-r lg:border-slate-200 min-w-0">
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${st.bg}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+      {st.label}
+    </span>
+  )
+}
 
-          {/* ── 사고상세내역 ── */}
-          <Sec title="사고상세내역" icon="🚗">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="사고일시" value={fDT(a.accidentDate, a.accidentTime)} bold accent />
-              <F label="수변호" value={a.accidentNo} bold />
-              <F label="상태" value={STATUS_MAP[a.status]?.label || a.status} bold />
-              <F label="대차" value={a.rentalStatus ? '대차사용' : '대차미사용'} />
-              <F label="과실" value={a.faultRate ? `${a.faultRate}%` : ''} bold />
+// KPI 카드
+function KpiCard({ label, value, color, icon }: { label: string; value: number; color: string; icon: string }) {
+  return (
+    <div className={`flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-sm hover:shadow-md transition-shadow`}>
+      <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center text-white text-lg`}>{icon}</div>
+      <div>
+        <div className="text-[22px] font-bold text-slate-900 leading-none">{value.toLocaleString()}</div>
+        <div className="text-[11px] text-slate-500 mt-0.5">{label}</div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// Detail Panel
+// ═══════════════════════════════════════════════
+function AccidentDetail({ a, memos, memosLoading }: { a: Accident; memos: Memo[]; memosLoading: boolean }) {
+  const branchLabel = BRANCH_MAP[a.accidentBranch] || a.accidentBranch || '-'
+
+  return (
+    <div className="bg-gradient-to-b from-slate-50 to-white border-x border-b border-slate-200 rounded-b-xl">
+      {/* 요약 배너 */}
+      <div className="px-5 py-3 bg-slate-800 text-white flex items-center gap-6 text-xs">
+        <div><span className="text-slate-400">사고번호</span> <span className="font-mono font-bold ml-1">{a.accidentNo}</span></div>
+        <div><span className="text-slate-400">사고일시</span> <span className="font-bold ml-1">{fDT(a.accidentDate, a.accidentTime)}</span></div>
+        <div><span className="text-slate-400">과실</span> <span className="font-bold text-amber-300 ml-1">{a.faultRate ? `${a.faultRate}%` : '-'}</span></div>
+        <div><span className="text-slate-400">유형</span> <span className="ml-1">{CATEGORY_MAP[a.category] || a.category}</span></div>
+        <div><span className="text-slate-400">사고지점</span> <span className="ml-1">{branchLabel}</span></div>
+        <div className="ml-auto"><StatusBadge status={a.status} /></div>
+      </div>
+
+      <div className="flex flex-col xl:flex-row">
+        {/* ===== 좌측: 상세 정보 ===== */}
+        <div className="flex-1 p-4 space-y-0 min-w-0">
+
+          {/* 사고상세 */}
+          <Section title="사고 상세내역" color="border-red-500">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-5 gap-y-3">
+              <Cell label="사고일시">{fDT(a.accidentDate, a.accidentTime)}</Cell>
+              <Cell label="사고번호"><span className="font-mono">{a.accidentNo}</span></Cell>
+              <Cell label="과실비율"><span className="text-red-600 font-bold">{a.faultRate ? `${a.faultRate}%` : '-'}</span></Cell>
+              <Cell label="사고지점">{branchLabel}</Cell>
+              <Cell label="유형">{CATEGORY_MAP[a.category] || a.category}</Cell>
+              <Cell label="대차">{a.rentalStatus ? <span className="text-emerald-600 font-bold">사용</span> : <span className="text-slate-400">미사용</span>}</Cell>
             </div>
-            {/* 사고유형 표시: 사고지점(PMOACBN) 기반 */}
-            <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-1">
+            {/* 사고유형 체크 */}
+            <div className="mt-3 flex items-center gap-4 flex-wrap">
               {Object.entries(BRANCH_MAP).map(([code, label]) => {
-                const isActive = a.accidentBranch === code
+                const active = a.accidentBranch === code
                 return (
-                  <label key={code} className="flex items-center gap-1 text-xs">
-                    <span className={`w-3.5 h-3.5 border rounded flex items-center justify-center text-[9px] ${isActive ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-transparent'}`}>✓</span>
-                    <span className={isActive ? 'font-bold text-slate-900' : 'text-slate-500'}>{label}</span>
-                  </label>
+                  <div key={code} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors
+                    ${active ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>
+                    {active && <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
+                    {label}
+                  </div>
                 )
               })}
             </div>
-            <div className="mt-1.5 space-y-1">
-              <F label="사고장소" value={a.accidentLocation} bold />
-              <F label="사고지점" value={BRANCH_MAP[a.accidentBranch] || a.accidentBranch} />
-              <F label="사고원인" value={fYN(a.accidentReason)} />
-              <F label="사고구분" value={fYN(a.accidentDi)} />
-              <F label="사고피해" value={fYN(a.accidentDamage)} />
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-2">
+              <Cell label="사고장소" span={2}>{a.accidentLocation}</Cell>
+              <Cell label="사고원인">{a.accidentReason === 'Y' ? <span className="text-red-500">유</span> : '무'}</Cell>
+              <Cell label="사고피해">{a.accidentDamage === 'Y' ? <span className="text-red-500">유</span> : '무'}</Cell>
             </div>
             {a.accidentMemo && (
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-slate-800">
-                <span className="text-[10px] text-yellow-700 font-bold">사고내용: </span>
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-900 leading-relaxed">
+                <span className="font-bold text-amber-700 mr-1">사고내용</span>
                 {a.accidentMemo}
               </div>
             )}
-          </Sec>
+          </Section>
 
-          {/* ── 계약/차량 정보 ── */}
-          <Sec title="계약/차량 정보" icon="📋">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="등록상태" value={REGSTATUS_MAP[a.regStatus] || a.regStatus} />
-              <F label="등록유형" value={REGTYPE_MAP[a.regType] || a.regType} />
-              <F label="사고구분플래그" value={fYN(a.adFlag)} />
-              <F label="접수자" value={a.createdBy} />
-              <F label="접수일시" value={fDT(a.createdDate, a.createdTime)} />
-              <F label="담당자ID" value={a.staffId} />
-              <F label="그룹ID" value={a.groupId} />
-              <F label="채널ID" value={a.channelId} />
+          {/* 계약/차량 */}
+          <Section title="계약 / 차량 정보" color="border-blue-500">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-5 gap-y-3">
+              <Cell label="등록상태">{REGSTATUS_MAP[a.regStatus] || a.regStatus}</Cell>
+              <Cell label="등록유형">{REGTYPE_MAP[a.regType] || a.regType}</Cell>
+              <Cell label="접수자">{a.createdBy}</Cell>
+              <Cell label="접수일시">{fDT(a.createdDate, a.createdTime)}</Cell>
+              <Cell label="담당자ID">{a.staffId}</Cell>
+              <Cell label="그룹ID">{a.groupId}</Cell>
+              <Cell label="채널ID">{a.channelId}</Cell>
+              <Cell label="사고구분플래그">{a.adFlag === 'Y' ? '유' : '무'}</Cell>
             </div>
-          </Sec>
+          </Section>
 
-          {/* ── 당사차 (운전자/통보자) ── */}
-          <Sec title="당사차 운전자/연락처" icon="👤">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="사고자HP" value={a.accidentMobile} bold />
-              <F label="사고자전화" value={a.accidentTel} />
-              <F label="사고관할" value={a.accidentJc} />
-              <F label="사고관할서" value={a.accidentJs} />
+          {/* 운전자/연락처 */}
+          <Section title="당사차 운전자 / 연락처" color="border-indigo-500">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
+              <Cell label="사고자HP">{a.accidentMobile === 'N' ? '-' : a.accidentMobile}</Cell>
+              <Cell label="사고자전화">{a.accidentTel === 'N' ? '-' : a.accidentTel}</Cell>
+              <Cell label="사고관할">{a.accidentJc === 'Y' ? '유' : '무'}</Cell>
+              <Cell label="사고관할서">{a.accidentJs === 'Y' ? '유' : '무'}</Cell>
             </div>
-            {a.accidentEtc && (
-              <div className="mt-1.5">
-                <F label="기타" value={a.accidentEtc} />
-              </div>
-            )}
-          </Sec>
+          </Section>
 
-          {/* ── 상대차량 ── */}
-          <Sec title="상대차량" icon="🚙">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="운전자" value={a.counterpartName} bold />
-              <F label="연락처" value={a.counterpartPhone} bold />
-              <F label="차량번호" value={a.counterpartVehicle} />
-              <F label="차량정보" value={a.counterpartVehicleDesc} />
-              <F label="보험사" value={a.counterpartInsurance} bold />
-              <F label="상대과실" value={fYN(a.counterpartFault)} />
+          {/* 상대차량 */}
+          <Section title="상대차량 정보" color="border-orange-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
+              <Cell label="운전자"><span className="font-bold">{a.counterpartName}</span></Cell>
+              <Cell label="연락처"><span className="font-bold text-blue-700">{a.counterpartPhone}</span></Cell>
+              <Cell label="차량번호">{a.counterpartVehicle}</Cell>
+              <Cell label="차량정보">{a.counterpartVehicleDesc}</Cell>
+              <Cell label="보험사">{a.counterpartInsurance}</Cell>
+              <Cell label="상대과실">{a.counterpartFault === 'N' ? '무' : '유'}</Cell>
             </div>
-          </Sec>
+          </Section>
 
-          {/* ── 대차관리 ── */}
-          <Sec title="대차관리" icon="🚛">
+          {/* 대차관리 */}
+          <Section title="대차관리" color="border-emerald-500" defaultOpen={!!a.rentalStatus}>
             {!a.rentalStatus ? (
-              <p className="text-xs text-slate-400 italic">대차 데이터 없음</p>
+              <div className="text-xs text-slate-400 py-2 text-center">대차 데이터 없음</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-                <F label="대차상태" value={STATUS_MAP[a.rentalStatus]?.label || a.rentalStatus} />
-                <F label="대차종류" value={RENTAL_TYPE_MAP[a.rentalType] || a.rentalType} bold />
-                <F label="대차업체" value={a.rentalFactory} bold />
-                <F label="대차차량" value={a.rentalCarNo ? `${a.rentalCarModel || ''} ${a.rentalCarNo}` : ''} />
-                <F label="시작일" value={`${fD(a.rentalFromDate)} ${fT(a.rentalFromTime)}`} />
-                <F label="종료일" value={`${fD(a.rentalToDate)} ${fT(a.rentalToTime)}`} />
-                <F label="이용자" value={a.rentalUser} />
-                <F label="이용자HP" value={a.rentalUserPhone} />
-                {a.rentalMemo && <F label="메모" value={a.rentalMemo} w="col-span-2" />}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
+                <Cell label="대차상태"><StatusBadge status={a.rentalStatus} /></Cell>
+                <Cell label="대차종류"><span className="font-bold">{RENTAL_TYPE_MAP[a.rentalType] || a.rentalType}</span></Cell>
+                <Cell label="대차업체"><span className="font-bold">{a.rentalFactory}</span></Cell>
+                <Cell label="대차차량">{a.rentalCarNo ? `${a.rentalCarModel || ''} ${a.rentalCarNo}` : '-'}</Cell>
+                <Cell label="시작일">{fDT(a.rentalFromDate, a.rentalFromTime)}</Cell>
+                <Cell label="종료일">{fDT(a.rentalToDate, a.rentalToTime)}</Cell>
+                <Cell label="이용자">{a.rentalUser}</Cell>
+                <Cell label="이용자HP">{a.rentalUserPhone}</Cell>
               </div>
             )}
-          </Sec>
+          </Section>
 
-          {/* ── 공장배정 ── */}
-          <Sec title="공장배정 (공장)" icon="🔧">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="공장명" value={a.repairShopName} bold accent />
-              <F label="공장코드" value={a.repairShopCode} />
-              <F label="대표" value={a.repairShopRep} />
-              <F label="사업자번호" value={a.repairShopLicense} />
-              <F label="전화" value={a.repairShopPhone} />
-              <F label="팩스" value={a.repairShopVp} />
-              <F label="주소" value={a.repairShopAddr} w="col-span-2" />
-              <F label="담당자" value={a.repairShopUser} />
-              <F label="담당전화" value={a.repairShopTel} />
-              <F label="은행" value={a.repairShopBh} />
-              <F label="계좌" value={a.repairShopBn} />
-              <F label="결과" value={a.repairShopRs} />
+          {/* 공장배정 */}
+          <Section title="공장배정" color="border-yellow-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
+              <Cell label="공장명"><span className="font-bold text-blue-700">{a.repairShopName}</span></Cell>
+              <Cell label="공장코드">{a.repairShopCode}</Cell>
+              <Cell label="대표">{a.repairShopRep === 'Y' ? 'Y' : 'N'}</Cell>
+              <Cell label="사업자번호">{a.repairShopLicense}</Cell>
+              <Cell label="전화">{a.repairShopPhone}</Cell>
+              <Cell label="팩스">{a.repairShopVp}</Cell>
+              <Cell label="주소" span={2}>{a.repairShopAddr}</Cell>
+              <Cell label="담당자">{a.repairShopUser}</Cell>
+              <Cell label="담당전화">{a.repairShopTel}</Cell>
+              <Cell label="은행">{a.repairShopBh}</Cell>
+              <Cell label="계좌">{a.repairShopBn}</Cell>
+              <Cell label="결과">{a.repairShopRs}</Cell>
             </div>
-            {a.repairShopMemo && (
-              <div className="mt-1.5"><F label="탁송메모" value={a.repairShopMemo} /></div>
-            )}
-          </Sec>
+          </Section>
 
-          {/* ── 인수자/보상 ── */}
-          <Sec title="인수자 / 보상처리" icon="🤝" open={false}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <F label="인수자" value={a.handoverName} />
-              <F label="전화" value={a.handoverPhone} />
-              <F label="담당" value={a.handoverUser} />
-              <F label="은행" value={a.handoverBm} />
-              <F label="계좌" value={a.handoverBn} />
-              <F label="예금주" value={a.handoverBu} />
+          {/* 인수자/보상 */}
+          <Section title="인수자 / 보상처리" color="border-purple-500" defaultOpen={false}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
+              <Cell label="인수자">{a.handoverName}</Cell>
+              <Cell label="전화">{a.handoverPhone}</Cell>
+              <Cell label="담당">{a.handoverUser}</Cell>
+              <Cell label="은행">{a.handoverBm}</Cell>
+              <Cell label="계좌">{a.handoverBn}</Cell>
+              <Cell label="예금주">{a.handoverBu}</Cell>
             </div>
-            <div className="mt-2 pt-2 border-t border-slate-100">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-                <F label="보상번호" value={a.bdNo} bold />
-                <F label="보상명" value={a.bdName} />
-                <F label="파손부위" value={a.damageArea} bold accent />
-                <F label="예상금액" value={fWon(a.estimatedCost) ? `₩${fWon(a.estimatedCost)}` : ''} bold accent />
-                <F label="목표금액" value={a.targetAmount === 'D' ? '대물' : a.targetAmount === 'C' ? '대인' : a.targetAmount} />
-                <F label="검사일자" value={fD(a.examDate)} />
-                <F label="정산" value={fYN(a.settlementYn)} />
-                <F label="면책" value={fYN(a.deductYn)} />
-                <F label="완료" value={fYN(a.completeYn)} />
-                <F label="반납" value={fYN(a.returnYn)} />
-                <F label="보험구분" value={a.insuranceFlag} />
-                <F label="보험담당" value={a.insuranceUser} />
-              </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
+              <Cell label="보상번호">{a.bdNo}</Cell>
+              <Cell label="보상명">{a.bdName}</Cell>
+              <Cell label="목표금액">{a.targetAmount === 'D' ? '대물' : a.targetAmount === 'C' ? '대인' : a.targetAmount}</Cell>
+              <Cell label="검사일자">{fD(a.examDate)}</Cell>
+              <Cell label="정산">{a.settlementYn === 'Y' ? <span className="text-emerald-600 font-bold">완료</span> : '미완료'}</Cell>
+              <Cell label="면책">{a.deductYn === 'Y' ? '적용' : '-'}</Cell>
+              <Cell label="완료">{a.completeYn === 'Y' ? <span className="text-emerald-600 font-bold">완료</span> : '미완료'}</Cell>
+              <Cell label="반납">{a.returnYn === 'Y' ? '완료' : '-'}</Cell>
             </div>
-          </Sec>
+          </Section>
         </div>
 
-        {/* ===== 우측: 상담내역 ===== */}
-        <div className="lg:w-80 flex-shrink-0 p-3 border-t lg:border-t-0 border-slate-200">
-          <div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1">
-            <span>💬</span> 상담내용
-          </div>
-          {memosLoading ? (
-            <p className="text-xs text-slate-400">로딩중...</p>
-          ) : memos.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">상담 이력이 없습니다.</p>
-          ) : (
-            <div className="space-y-1.5 max-h-96 overflow-y-auto">
-              {memos.map((m, i) => (
-                <div key={i} className="bg-slate-50 border border-slate-100 rounded p-2">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-bold text-blue-700">{m.createdBy || '-'}</span>
-                    <span className="text-[10px] text-slate-400">{fDT(m.createdDate, m.createdTime)}</span>
-                  </div>
-                  <p className="text-xs text-slate-800 whitespace-pre-wrap">{m.content}</p>
-                </div>
-              ))}
+        {/* ===== 우측: 상담내역 + 이력 ===== */}
+        <div className="xl:w-[340px] flex-shrink-0 p-4 border-t xl:border-t-0 xl:border-l border-slate-200 bg-slate-50/50">
+          {/* 상담내용 */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-4 bg-blue-500 rounded-full" />
+              <span className="text-[13px] font-bold text-slate-700">상담내용</span>
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">{memos.length}</span>
             </div>
-          )}
+            {memosLoading ? (
+              <div className="flex items-center gap-2 py-6 justify-center text-slate-400 text-xs">
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                불러오는 중...
+              </div>
+            ) : memos.length === 0 ? (
+              <div className="text-xs text-slate-400 text-center py-6 bg-white rounded-lg border border-dashed border-slate-200">상담 이력이 없습니다</div>
+            ) : (
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                {memos.map((m, i) => (
+                  <div key={i} className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition-shadow">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{m.createdBy || '-'}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{fDT(m.createdDate, m.createdTime)}</span>
+                    </div>
+                    <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* 기타파손부위 */}
+          {/* 파손부위 */}
           {a.damageArea && (
-            <div className="mt-4">
-              <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <span>🔴</span> 기타파손부위
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-4 bg-red-500 rounded-full" />
+                <span className="text-[13px] font-bold text-slate-700">파손부위</span>
               </div>
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800 font-medium">
-                {a.damageArea}
-              </div>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-[13px] text-red-800 font-medium">{a.damageArea}</div>
             </div>
           )}
 
           {/* 수정이력 */}
-          <div className="mt-4">
-            <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-              <span>📋</span> 수정이력
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1 h-4 bg-slate-400 rounded-full" />
+              <span className="text-[13px] font-bold text-slate-700">수정이력</span>
             </div>
-            <div className="text-[11px] text-slate-500 space-y-0.5">
-              <p>등록: {a.createdBy} {fDT(a.createdDate, a.createdTime)}</p>
-              {a.updatedBy && <p>수정: {a.updatedBy} {fDT(a.updatedDate, a.updatedTime)}</p>}
+            <div className="bg-white rounded-lg border border-slate-200 p-3 text-[11px] text-slate-500 space-y-1">
+              {a.createdBy && <div className="flex justify-between"><span>등록: <b className="text-slate-700">{a.createdBy}</b></span><span>{fDT(a.createdDate, a.createdTime)}</span></div>}
+              {a.updatedBy && <div className="flex justify-between"><span>수정: <b className="text-slate-700">{a.updatedBy}</b></span><span>{fDT(a.updatedDate, a.updatedTime)}</span></div>}
             </div>
           </div>
         </div>
@@ -319,9 +307,9 @@ function AccidentDetail({ a, memos, memosLoading }: {
   )
 }
 
-// ============================================
-// Main
-// ============================================
+// ═══════════════════════════════════════════════
+// Main Component
+// ═══════════════════════════════════════════════
 export default function AccidentMgmtMain() {
   const { user } = useApp()
   const [accidents, setAccidents] = useState<Accident[]>([])
@@ -331,26 +319,20 @@ export default function AccidentMgmtMain() {
   const [memos, setMemos] = useState<Memo[]>([])
   const [memosLoading, setMemosLoading] = useState(false)
 
-  // Load accidents
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/cafe24/accidents?limit=500`)
       const json = await res.json()
       if (json.success) setAccidents(json.data || [])
-    } catch (e) {
-      console.error('사고접수 로드 에러:', e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error('사고접수 로드 에러:', e) }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // Load memos when expanding
   const loadMemos = useCallback(async (staffId: string, receiptDate: string, seqNo: string) => {
-    setMemosLoading(true)
-    setMemos([])
+    setMemosLoading(true); setMemos([])
     try {
       const p = new URLSearchParams({ staffId, receiptDate, seqNo })
       const res = await fetch(`/api/cafe24/consultations?${p}`)
@@ -358,32 +340,22 @@ export default function AccidentMgmtMain() {
       if (json.success) {
         setMemos((json.data || []).map((m: any) => ({
           content: m.memoContent || m.content || '',
-          createdBy: m.createdBy || '',
-          createdDate: m.createdDate || '',
-          createdTime: m.createdTime || '',
-          memoType: m.memoType || '',
+          createdBy: m.createdBy || '', createdDate: m.createdDate || '',
+          createdTime: m.createdTime || '', memoType: m.memoType || '',
         })))
       }
-    } catch {
-      // ignore
-    } finally {
-      setMemosLoading(false)
-    }
+    } catch { /* ignore */ }
+    finally { setMemosLoading(false) }
   }, [])
 
-  // Filter & sort
   const filtered = useMemo(() => {
     let result = [...accidents]
     if (search) {
       const s = search.toLowerCase()
       result = result.filter(a =>
-        a.accidentNo?.toLowerCase().includes(s) ||
-        a.counterpartName?.toLowerCase().includes(s) ||
-        a.accidentLocation?.toLowerCase().includes(s) ||
-        a.accidentMobile?.toLowerCase().includes(s) ||
-        a.repairShopName?.toLowerCase().includes(s) ||
-        a.damageArea?.toLowerCase().includes(s) ||
-        a.counterpartVehicle?.toLowerCase().includes(s)
+        a.accidentNo?.toLowerCase().includes(s) || a.counterpartName?.toLowerCase().includes(s) ||
+        a.accidentLocation?.toLowerCase().includes(s) || a.accidentMobile?.toLowerCase().includes(s) ||
+        a.repairShopName?.toLowerCase().includes(s) || a.counterpartVehicle?.toLowerCase().includes(s)
       )
     }
     result.sort((a, b) => {
@@ -394,133 +366,123 @@ export default function AccidentMgmtMain() {
     return result
   }, [accidents, search])
 
-  // Stats — 실제 OTPTSTAT 코드 기반
   const stats = useMemo(() => ({
     전체: accidents.length,
     접수: accidents.filter(a => a.status === '1').length,
-    공장: accidents.filter(a => ['2', '3'].includes(a.status)).length,
+    입고: accidents.filter(a => a.status === '2').length,
     완료: accidents.filter(a => a.status === '6').length,
   }), [accidents])
 
   const getRowId = (a: Accident) => a.accidentNo || `${a.staffId}-${a.receiptDate}-${a.seqNo}`
-
   const handleExpand = (a: Accident) => {
     const id = getRowId(a)
-    if (expandedId === id) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(id)
-      if (a.staffId && a.receiptDate && a.seqNo) {
-        loadMemos(a.staffId, a.receiptDate, a.seqNo)
-      }
-    }
+    if (expandedId === id) { setExpandedId(null) }
+    else { setExpandedId(id); if (a.staffId && a.receiptDate && a.seqNo) loadMemos(a.staffId, a.receiptDate, a.seqNo) }
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
-      {/* ── Header ── */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex-shrink-0">
+    <div className="flex flex-col h-full bg-slate-100">
+      {/* ═══ Header ═══ */}
+      <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 px-6 py-4 flex-shrink-0 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-base font-bold text-slate-900">
-              사고관리
-              <span className="text-xs font-normal text-slate-400 ml-2">w_acr0101a</span>
-            </h1>
+            <h1 className="text-lg font-bold text-white tracking-tight">사고관리</h1>
+            <p className="text-[11px] text-slate-400 mt-0.5">Accident Management System</p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-600">
-            <span>전체 <b className="text-slate-900">{stats.전체}</b></span>
-            <span>접수 <b className="text-red-600">{stats.접수}</b></span>
-            <span>공장 <b className="text-blue-600">{stats.공장}</b></span>
-            <span>완료 <b className="text-green-600">{stats.완료}</b></span>
+          <div className="flex gap-3">
+            <KpiCard label="전체 사고" value={stats.전체} color="bg-slate-600" icon="Σ" />
+            <KpiCard label="접수" value={stats.접수} color="bg-emerald-600" icon="▶" />
+            <KpiCard label="입고" value={stats.입고} color="bg-blue-600" icon="⬇" />
+            <KpiCard label="지급완료" value={stats.완료} color="bg-violet-600" icon="✓" />
           </div>
         </div>
       </div>
 
-      {/* ── Search ── */}
-      <div className="px-4 py-2 flex-shrink-0 bg-white border-b border-slate-200">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="차량번호, 고객명, 연락처 검색..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <button
-            onClick={load}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700"
-          >
+      {/* ═══ Search Bar ═══ */}
+      <div className="px-6 py-3 flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text" placeholder="사고번호, 고객명, 차량번호, 장소 검색..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 placeholder:text-slate-400 transition-all"
+            />
+          </div>
+          <button onClick={load}
+            className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:bg-blue-800 shadow-sm transition-colors flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             조회
           </button>
         </div>
       </div>
 
-      {/* ── 사고 목록 테이블 + 상세 ── */}
-      <div className="flex-1 overflow-y-auto">
+      {/* ═══ Data Grid ═══ */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-slate-400 text-sm">로딩중...</div>
+          <div className="flex flex-col items-center justify-center h-48 gap-3">
+            <div className="w-8 h-8 border-3 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+            <span className="text-sm text-slate-500">데이터를 불러오는 중...</span>
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-slate-400 text-sm">데이터가 없습니다</div>
+          <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-400">
+            <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            <span className="text-sm">검색 결과가 없습니다</span>
+          </div>
         ) : (
-          <div>
-            {/* ── Table header ── */}
-            <div className="sticky top-0 z-10 bg-slate-100 border-b border-slate-300 px-4 py-1.5 grid grid-cols-12 gap-1 text-[11px] font-bold text-slate-600">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Table Header */}
+            <div className="bg-slate-50 border-b border-slate-200 px-5 py-2.5 grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               <span className="col-span-1">상태</span>
               <span className="col-span-2">사고일시</span>
               <span className="col-span-2">사고번호</span>
-              <span className="col-span-2">장소</span>
-              <span className="col-span-1">과실</span>
+              <span className="col-span-3">장소</span>
+              <span className="col-span-1 text-center">과실</span>
               <span className="col-span-2">상대방</span>
-              <span className="col-span-2">공장/대차</span>
+              <span className="col-span-1">공장/대차</span>
             </div>
 
-            {/* ── Rows ── */}
+            {/* Table Rows */}
             {filtered.map((a, idx) => {
               const id = getRowId(a) || `row-${idx}`
               const isExpanded = expandedId === id
-              const st = STATUS_MAP[a.status]
 
               return (
                 <div key={id}>
-                  {/* Row */}
-                  <div
-                    onClick={() => handleExpand(a)}
-                    className={`px-4 py-2 grid grid-cols-12 gap-1 items-center cursor-pointer border-b border-slate-100 hover:bg-blue-50 transition-colors text-xs ${isExpanded ? 'bg-blue-50 border-blue-200' : ''}`}
-                  >
-                    <span className="col-span-1">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${st?.color || 'bg-gray-400 text-white'}`}>
-                        {st?.label || a.status}
+                  <div onClick={() => handleExpand(a)}
+                    className={`px-5 py-3 grid grid-cols-12 gap-2 items-center cursor-pointer border-b border-slate-100 transition-all text-[13px]
+                      ${isExpanded ? 'bg-blue-50 border-l-[3px] border-l-blue-600' : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'}
+                      ${idx % 2 === 0 && !isExpanded ? 'bg-white' : !isExpanded ? 'bg-slate-50/40' : ''}`}>
+                    <span className="col-span-1"><StatusBadge status={a.status} /></span>
+                    <span className="col-span-2 text-slate-700 font-medium">{fD(a.accidentDate)} <span className="text-slate-400">{fT(a.accidentTime)}</span></span>
+                    <span className="col-span-2 font-mono text-slate-800 font-semibold text-[12px]">{a.accidentNo || '-'}</span>
+                    <span className="col-span-3 text-slate-600 truncate">{a.accidentLocation || '-'}</span>
+                    <span className="col-span-1 text-center">
+                      <span className={`font-bold ${parseInt(a.faultRate) >= 100 ? 'text-red-600' : parseInt(a.faultRate) >= 50 ? 'text-orange-600' : 'text-slate-600'}`}>
+                        {a.faultRate ? `${a.faultRate}%` : '-'}
                       </span>
                     </span>
-                    <span className="col-span-2 text-slate-700">
-                      {fD(a.accidentDate)} {fT(a.accidentTime)}
-                    </span>
-                    <span className="col-span-2 font-mono text-slate-900 font-medium truncate">
-                      {a.accidentNo || '-'}
-                    </span>
                     <span className="col-span-2 text-slate-600 truncate">
-                      {a.accidentLocation || '-'}
+                      <span className="font-medium">{a.counterpartName || '-'}</span>
+                      {a.counterpartInsurance && a.counterpartInsurance !== '-' && <span className="text-slate-400 text-[11px] ml-1">({a.counterpartInsurance})</span>}
                     </span>
-                    <span className="col-span-1 text-slate-700">
-                      {a.faultRate ? `${a.faultRate}%` : '-'}
-                    </span>
-                    <span className="col-span-2 text-slate-600 truncate">
-                      {a.counterpartName || '-'}
-                      {a.counterpartInsurance ? ` (${a.counterpartInsurance})` : ''}
-                    </span>
-                    <span className="col-span-2 text-slate-600 truncate">
+                    <span className="col-span-1 text-slate-600 truncate text-[12px]">
                       {a.repairShopName || '-'}
-                      {a.rentalStatus && <span className="text-green-600 ml-1 font-bold">[대차]</span>}
+                      {a.rentalStatus && <span className="inline-flex items-center ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded">대차</span>}
                     </span>
                   </div>
-
-                  {/* Detail panel */}
-                  {isExpanded && (
-                    <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} />
-                  )}
+                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} />}
                 </div>
               )
             })}
+
+            {/* Footer */}
+            <div className="bg-slate-50 border-t border-slate-200 px-5 py-2.5 text-[11px] text-slate-500 flex justify-between items-center">
+              <span>총 <b className="text-slate-700">{filtered.length.toLocaleString()}</b>건</span>
+              <span>최근 갱신: {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
           </div>
         )}
       </div>
