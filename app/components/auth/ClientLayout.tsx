@@ -37,7 +37,7 @@ const Icons: any = {
 
 // 동적 메뉴 → 그룹 매핑
 const PATH_TO_GROUP: Record<string, string> = {
-  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
+  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle', '/fleet/vehicle-lookup': 'vehicle',
   '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops', '/rental': 'ops',
   '/claims/accident-mgmt': 'claims', '/claims/billing-mgmt': 'claims',
   '/claims/intake': 'claims', '/claims/investigation': 'claims', '/claims/assessment': 'claims', '/claims/billing': 'claims', '/claims/rental': 'claims',
@@ -52,6 +52,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/cars': '차량 관리',
   '/registration': '차량 등록증',
   '/insurance': '보험/가입',
+  '/fleet/vehicle-lookup': '거래처 차량조회',
   '/finance/upload': '카드/통장 관리',
   '/finance/settlement': '정산/계약 관리',
   '/finance/fleet': '차량 수익',
@@ -222,6 +223,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               { path: '/rental', name: '대차관리', icon_key: 'Truck', description: '대차운영 프로세스 관리', plan_group: 'free' },
               { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
               { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
+              { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
             ]
             const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
             if (missing.length > 0) {
@@ -255,6 +257,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
         { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
         { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
+        { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
       ]
       const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
       if (allSysMods) {
