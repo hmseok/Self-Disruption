@@ -221,6 +221,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           if (!error && data) {
             // 빠진 모듈 자동 추가
             const existingPaths = new Set(data.map((m: any) => m.path))
+            // 모듈 목록 (플랜 무관 — ON/OFF로만 제어)
             const REQUIRED_MODULES = [
               { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
               { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
@@ -228,6 +229,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
               { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
               { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
+              { path: '/fleet/factory-mgmt', name: '공장/협력업체 관리', icon_key: 'Truck', description: '공장/협력업체 현황 및 작업이력', plan_group: 'free' },
+              { path: '/admin/code-master', name: '기초코드 관리', icon_key: 'Database', description: '코드 마스터 관리 (Supabase)', plan_group: 'free' },
             ]
             const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
             if (missing.length > 0) {
@@ -256,12 +259,15 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       if (!company) return
 
       // 빠진 system_modules 자동 추가 + company_modules 활성화
+      // 모듈 목록 (플랜 무관 — ON/OFF로만 제어)
       const REQUIRED_MODULES = [
         { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
         { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
         { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
         { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
         { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
+        { path: '/fleet/factory-mgmt', name: '공장/협력업체 관리', icon_key: 'Truck', description: '공장/협력업체 현황 및 작업이력', plan_group: 'free' },
+        { path: '/admin/code-master', name: '기초코드 관리', icon_key: 'Database', description: '코드 마스터 관리 (Supabase)', plan_group: 'free' },
       ]
       const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
       if (allSysMods) {

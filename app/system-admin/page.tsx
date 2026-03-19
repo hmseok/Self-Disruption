@@ -925,35 +925,18 @@ export default function SystemAdminPage() {
                             {group.items.map(mod => {
                               const isActive = !!matrix[`${comp.id}_${mod.id}`]
                               const modPlan = getPlanInfo(mod.plan_group || 'free')
-                              const modulePlanIdx = getPlanIndex(mod.plan_group || 'free')
-                              const planIncluded = modulePlanIdx <= companyPlanIdx
-
-                              // Determine status
+                              // 플랜 무관 — ON/OFF로만 제어
                               let statusColor = '#e2e8f0'
                               let statusBg = 'white'
                               let statusOpacity = 0.5
                               let statusLabel = ''
 
-                              if (planIncluded && isActive) {
-                                // Module ON and included in plan (expected)
+                              if (isActive) {
                                 statusColor = '#3b82f6'
                                 statusBg = '#eff6ff'
                                 statusOpacity = 1
-                                statusLabel = '정상'
-                              } else if (planIncluded && !isActive) {
-                                // Module OFF but included in plan (warning)
-                                statusColor = '#dc2626'
-                                statusBg = '#fef2f2'
-                                statusOpacity = 1
-                                statusLabel = '⚠ 미활성'
-                              } else if (!planIncluded && isActive) {
-                                // Module ON but not in plan (override)
-                                statusColor = '#f97316'
-                                statusBg = '#fff7ed'
-                                statusOpacity = 1
-                                statusLabel = '수동활성'
+                                statusLabel = 'ON'
                               } else {
-                                // Module OFF and not in plan (normal)
                                 statusColor = '#cbd5e1'
                                 statusBg = '#f1f5f9'
                                 statusOpacity = 0.5
