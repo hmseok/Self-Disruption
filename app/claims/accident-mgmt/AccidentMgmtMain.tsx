@@ -9,6 +9,7 @@ import { useCodeMaster } from '../../hooks/useCodeMaster'
 // ═══════════════════════════════════════════════
 type Accident = Record<string, string>
 type Memo = { content: string; createdBy: string; createdDate: string; createdTime: string; memoType: string }
+type SmsRecord = { phone: string; subject: string; message: string; status: string; result: string; sendDate: string; sendTime: string; sendBy: string; smsTypeName: string }
 
 // 상태 뱃지 색상 (UI 전용 — 코드 라벨은 useCodeMaster에서)
 const STATUS_COLORS: Record<string, { dot: string; bg: string }> = {
@@ -85,8 +86,8 @@ function KpiCard({ label, value, color, icon }: { label: string; value: number; 
 // ═══════════════════════════════════════════════
 // Detail Panel
 // ═══════════════════════════════════════════════
-function AccidentDetail({ a, memos, memosLoading, decode, getGroup }: {
-  a: Accident; memos: Memo[]; memosLoading: boolean;
+function AccidentDetail({ a, memos, memosLoading, smsRecords, decode, getGroup }: {
+  a: Accident; memos: Memo[]; memosLoading: boolean; smsRecords: SmsRecord[];
   decode: (g: string, c: string) => string; getGroup: (g: string) => Record<string, string>
 }) {
   const branchLabel = decode('OTPTACBN', a.accidentType)
@@ -312,6 +313,36 @@ function AccidentDetail({ a, memos, memosLoading, decode, getGroup }: {
             )}
           </div>
 
+          {/* 문자 발송내역 */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-4 bg-green-500 rounded-full" />
+              <span className="text-[13px] font-bold text-slate-700">문자 전송내역</span>
+              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">{smsRecords.length}</span>
+            </div>
+            {smsRecords.length === 0 ? (
+              <div className="text-xs text-slate-400 text-center py-4 bg-white rounded-lg border border-dashed border-slate-200">발송 이력 없음</div>
+            ) : (
+              <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                {smsRecords.map((s, i) => (
+                  <div key={i} className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-sm transition-shadow">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${s.status === 'Y' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {s.status === 'Y' ? '성공' : '실패'}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{s.smsTypeName || '일반'}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{fD(s.sendDate)} {fT(s.sendTime)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mb-1">수신: {s.phone} · 발송: {s.sendBy}</div>
+                    <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap line-clamp-3">{s.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 파손부위 */}
           {a.damageArea && (
             <div className="mb-5">
@@ -352,6 +383,7 @@ export default function AccidentMgmtMain() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [memos, setMemos] = useState<Memo[]>([])
   const [memosLoading, setMemosLoading] = useState(false)
+  const [smsRecords, setSmsRecords] = useState<SmsRecord[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -366,18 +398,23 @@ export default function AccidentMgmtMain() {
   useEffect(() => { load() }, [load])
 
   const loadMemos = useCallback(async (carId: string, receiptDate: string, seqNo: string) => {
-    setMemosLoading(true); setMemos([])
+    setMemosLoading(true); setMemos([]); setSmsRecords([])
     try {
-      const p = new URLSearchParams({ staffId: carId, receiptDate, seqNo })
-      const res = await fetch(`/api/cafe24/consultations?${p}`)
-      const json = await res.json()
-      if (json.success) {
-        setMemos((json.data || []).map((m: any) => ({
+      // 상담내역 + 문자발송 동시 로드
+      const [memoRes, smsRes] = await Promise.all([
+        fetch(`/api/cafe24/consultations?${new URLSearchParams({ staffId: carId, receiptDate, seqNo })}`),
+        fetch(`/api/cafe24/sms?carId=${carId}&receiptDate=${receiptDate}`),
+      ])
+      const memoJson = await memoRes.json()
+      if (memoJson.success) {
+        setMemos((memoJson.data || []).map((m: any) => ({
           content: m.memoContent || m.memoContent2 || m.content || '',
           createdBy: m.createdBy || '', createdDate: m.createdDate || '',
           createdTime: m.createdTime || '', memoType: m.memoType || '',
         })))
       }
+      const smsJson = await smsRes.json()
+      if (smsJson.success) setSmsRecords(smsJson.data || [])
     } catch { /* ignore */ }
     finally { setMemosLoading(false) }
   }, [])
@@ -507,7 +544,7 @@ export default function AccidentMgmtMain() {
                     <span className="col-span-1 text-slate-700 truncate font-medium">{a.driverName || '-'}</span>
                     <span className="col-span-1 text-slate-600 truncate text-[11px]">{a.custName || a.carOwner || '-'}</span>
                   </div>
-                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} decode={decode} getGroup={getGroup} />}
+                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} smsRecords={smsRecords} decode={decode} getGroup={getGroup} />}
                 </div>
               )
             })}

@@ -85,8 +85,12 @@ export async function GET(req: NextRequest) {
       od.odergnus as factoryCreatedBy, fm.factname as factoryName, fm.facthpno as factoryPhone,
       fm.facttype as factoryType`;
 
+    // 문자 발송 건수 (crmsendh)
+    const smsCountSelect = `,
+      (SELECT COUNT(*) FROM crmsendh s WHERE s.sendidno = a.otptidno AND s.sendgndt = a.otptmddt) as smsCount`;
+
     // SELECT 조합
-    const selectParts = [accResult.select, rentResult.select, carResult.select, custResult.select].filter(Boolean).join(', ') + factorySelect;
+    const selectParts = [accResult.select, rentResult.select, carResult.select, custResult.select].filter(Boolean).join(', ') + factorySelect + smsCountSelect;
 
     // JOIN 조건
     // ★ 핵심: acrotpth.otptidno = pmccarsm.carsidno (차량ID)
