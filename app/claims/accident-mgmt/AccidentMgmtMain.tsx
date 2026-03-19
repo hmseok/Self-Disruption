@@ -86,8 +86,10 @@ function KpiCard({ label, value, color, icon }: { label: string; value: number; 
 // ═══════════════════════════════════════════════
 // Detail Panel
 // ═══════════════════════════════════════════════
-function AccidentDetail({ a, memos, memosLoading, smsRecords, decode, getGroup }: {
-  a: Accident; memos: Memo[]; memosLoading: boolean; smsRecords: SmsRecord[];
+type CarAccident = { accidentNo: string; accidentDate: string; accidentTime: string; accidentType: string; faultRate: string; accidentLocation: string; driverName: string; status: string }
+
+function AccidentDetail({ a, memos, memosLoading, smsRecords, carAccidents, decode, getGroup }: {
+  a: Accident; memos: Memo[]; memosLoading: boolean; smsRecords: SmsRecord[]; carAccidents: CarAccident[];
   decode: (g: string, c: string) => string; getGroup: (g: string) => Record<string, string>
 }) {
   const branchLabel = decode('OTPTACBN', a.accidentType)
@@ -284,6 +286,31 @@ function AccidentDetail({ a, memos, memosLoading, smsRecords, decode, getGroup }
 
         {/* ===== 우측: 상담내역 + 이력 ===== */}
         <div className="xl:w-[340px] flex-shrink-0 p-4 border-t xl:border-t-0 xl:border-l border-slate-200 bg-slate-50/50">
+          {/* 차량 사고이력 타임라인 */}
+          {carAccidents.length > 1 && (
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-orange-500 rounded-full" />
+                <span className="text-[13px] font-bold text-slate-700">이 차량 사고이력</span>
+                <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">{carAccidents.length}</span>
+              </div>
+              <div className="space-y-1.5">
+                {carAccidents.map((ca, i) => {
+                  const isCurrent = ca.accidentNo === a.accidentNo
+                  return (
+                    <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${isCurrent ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isCurrent ? 'bg-white' : 'bg-slate-400'}`} />
+                      <span className="font-medium">{fD(ca.accidentDate)}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isCurrent ? 'bg-white/20' : 'bg-slate-100'}`}>{decode('OTPTACBN', ca.accidentType)}</span>
+                      <span className={`font-bold ${isCurrent ? '' : parseInt(ca.faultRate) >= 100 ? 'text-red-600' : ''}`}>{ca.faultRate ? `${ca.faultRate}%` : '-'}</span>
+                      {isCurrent && <span className="ml-auto text-[9px] opacity-70">현재</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 상담내용 */}
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-3">
@@ -384,6 +411,7 @@ export default function AccidentMgmtMain() {
   const [memos, setMemos] = useState<Memo[]>([])
   const [memosLoading, setMemosLoading] = useState(false)
   const [smsRecords, setSmsRecords] = useState<SmsRecord[]>([])
+  const [carAccidents, setCarAccidents] = useState<CarAccident[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -398,12 +426,13 @@ export default function AccidentMgmtMain() {
   useEffect(() => { load() }, [load])
 
   const loadMemos = useCallback(async (carId: string, receiptDate: string, seqNo: string) => {
-    setMemosLoading(true); setMemos([]); setSmsRecords([])
+    setMemosLoading(true); setMemos([]); setSmsRecords([]); setCarAccidents([])
     try {
-      // 상담내역 + 문자발송 동시 로드
-      const [memoRes, smsRes] = await Promise.all([
+      // 상담내역 + 문자발송 + 차량사고이력 동시 로드
+      const [memoRes, smsRes, histRes] = await Promise.all([
         fetch(`/api/cafe24/consultations?${new URLSearchParams({ staffId: carId, receiptDate, seqNo })}`),
         fetch(`/api/cafe24/sms?carId=${carId}&receiptDate=${receiptDate}`),
+        fetch(`/api/cafe24/vehicles?history=true&carId=${carId}`),
       ])
       const memoJson = await memoRes.json()
       if (memoJson.success) {
@@ -415,6 +444,8 @@ export default function AccidentMgmtMain() {
       }
       const smsJson = await smsRes.json()
       if (smsJson.success) setSmsRecords(smsJson.data || [])
+      const histJson = await histRes.json()
+      if (histJson.success) setCarAccidents(histJson.accidents || [])
     } catch { /* ignore */ }
     finally { setMemosLoading(false) }
   }, [])
@@ -544,7 +575,7 @@ export default function AccidentMgmtMain() {
                     <span className="col-span-1 text-slate-700 truncate font-medium">{a.driverName || '-'}</span>
                     <span className="col-span-1 text-slate-600 truncate text-[11px]">{a.custName || a.carOwner || '-'}</span>
                   </div>
-                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} smsRecords={smsRecords} decode={decode} getGroup={getGroup} />}
+                  {isExpanded && <AccidentDetail a={a} memos={memos} memosLoading={memosLoading} smsRecords={smsRecords} carAccidents={carAccidents} decode={decode} getGroup={getGroup} />}
                 </div>
               )
             })}
