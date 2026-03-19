@@ -245,7 +245,13 @@ function AccidentDetail({ a, memos, memosLoading, decode, getGroup }: {
           {/* 공장배정 */}
           <Section title="공장배정 (정비)" color="border-yellow-500">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3">
-              <Cell label="공장코드">{a.repairShopCode || '-'}</Cell>
+              <Cell label="공장명"><span className="font-bold text-blue-700">{a.factoryName || '-'}</span></Cell>
+              <Cell label="공장코드">{a.factoryCode || a.repairShopCode || '-'}</Cell>
+              <Cell label="공장유형">{decode('FACTTYPE', a.factoryType)}</Cell>
+              <Cell label="공장연락처"><span className="text-blue-700">{a.factoryPhone || '-'}</span></Cell>
+              <Cell label="배정상태">{a.factoryStatus === 'C' ? '배정완료' : a.factoryStatus === 'X' ? '취소' : a.factoryStatus || '미배정'}</Cell>
+              <Cell label="배정일시">{a.factoryDate ? `${fD(a.factoryDate)} ${fT(a.factoryTime)}` : '-'}</Cell>
+              <Cell label="배정담당">{a.factoryUser || a.factoryCreatedBy || '-'}</Cell>
               <Cell label="공장입고">{a.factoryInYn === 'Y' ? '입고완료' : '미입고'}</Cell>
               <Cell label="수리희망지">{a.repairLocation || '-'}</Cell>
               <Cell label="처리결과">{a.repairShopResult || '-'}</Cell>

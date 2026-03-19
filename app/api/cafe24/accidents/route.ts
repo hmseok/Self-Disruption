@@ -79,8 +79,14 @@ export async function GET(req: NextRequest) {
     );
     const total = (countResult as any[])[0].total;
 
+    // 공장배정 (ajaoderh + pmcfactm) — 직접 SQL
+    const factorySelect = `, od.oderfact as factoryCode, od.oderstat as factoryStatus,
+      od.oderacdt as factoryDate, od.oderactm as factoryTime, od.oderuser as factoryUser,
+      od.odergnus as factoryCreatedBy, fm.factname as factoryName, fm.facthpno as factoryPhone,
+      fm.facttype as factoryType`;
+
     // SELECT 조합
-    const selectParts = [accResult.select, rentResult.select, carResult.select, custResult.select].filter(Boolean).join(', ');
+    const selectParts = [accResult.select, rentResult.select, carResult.select, custResult.select].filter(Boolean).join(', ') + factorySelect;
 
     // JOIN 조건
     // ★ 핵심: acrotpth.otptidno = pmccarsm.carsidno (차량ID)
@@ -97,6 +103,9 @@ export async function GET(req: NextRequest) {
       custResult.select && carResult.select
         ? `LEFT JOIN pmccustm cu ON c.carscust = cu.custcode`
         : '',
+      // 공장배정 (ajaoderh + pmcfactm)
+      `LEFT JOIN ajaoderh od ON a.otptidno = od.oderidno AND a.otptmddt = od.odermddt AND a.otptsrno = od.odersrno AND od.oderstat <> 'X'`,
+      `LEFT JOIN pmcfactm fm ON od.oderfact = fm.factcode`,
     ].filter(Boolean).join('\n       ');
 
     const [rows] = await pool.query(
