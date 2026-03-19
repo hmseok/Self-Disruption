@@ -46,6 +46,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/jiip': 'finance',
   '/db/pricing-standards': 'data', '/db/lotte': 'data',
   '/admin/code-master': 'admin',
+  '/fleet/factory-mgmt': 'ops',
 }
 
 // 메뉴명 오버라이드
@@ -55,6 +56,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/insurance': '보험/가입',
   '/fleet/vehicle-lookup': '거래처 차량조회',
   '/admin/code-master': '기초코드 관리',
+  '/fleet/factory-mgmt': '공장/협력업체 관리',
   '/finance/upload': '카드/통장 관리',
   '/finance/settlement': '정산/계약 관리',
   '/finance/fleet': '차량 수익',
