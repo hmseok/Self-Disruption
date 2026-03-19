@@ -30,6 +30,7 @@ import ExpenseReceiptScreen from '../screens/detail/ExpenseReceiptScreen'
 // 사고팀 화면
 import AccidentDashboardScreen from '../screens/tabs/AccidentDashboardScreen'
 import AccidentCaseDetailScreen from '../screens/detail/AccidentCaseDetailScreen'
+import ReportFormScreen from '../screens/detail/ReportFormScreen'
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 const Stack = createNativeStackNavigator<DetailStackParamList>()
@@ -144,6 +145,7 @@ export default function MainNavigator() {
       {/* 사고팀 화면 */}
       <Stack.Screen name="AccidentDashboard" component={AccidentDashboardScreen} options={{ title: '사고 관리', headerShown: false }} />
       <Stack.Screen name="AccidentCaseDetail" component={AccidentCaseDetailScreen} options={{ title: '사고건 상세' }} />
+      <Stack.Screen name="ReportForm" component={ReportFormScreen} options={({ route }: any) => ({ title: route.params?.reportLabel || '보고서 작성' })} />
     </Stack.Navigator>
   )
 }
