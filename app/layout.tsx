@@ -14,13 +14,13 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Self-Disruption ERP',
-  description: 'Enterprise Business Solution',
+  title: 'FMI ERP - 주식회사 에프엠아이',
+  description: '대차사업 전사 운영 시스템',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Self-Disruption',
+    title: 'FMI ERP',
   },
   other: {
     'mobile-web-app-capable': 'yes',

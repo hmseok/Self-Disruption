@@ -107,7 +107,7 @@ interface Customer {
 export default function QuoteCreator() {
   const router = useRouter()
   const { company: appCompany, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : appCompany?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : appCompany?.id
   const printRef = useRef<HTMLDivElement>(null)
 
   // 데이터

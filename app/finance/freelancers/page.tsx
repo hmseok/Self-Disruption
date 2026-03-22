@@ -17,7 +17,7 @@ const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인'
 
 export default function FreelancersPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [loading, setLoading] = useState(true)
   const [freelancers, setFreelancers] = useState<any[]>([])
@@ -456,7 +456,7 @@ export default function FreelancersPage() {
   const activeCount = freelancers.filter(f => f.is_active).length
   const inactiveCount = freelancers.filter(f => !f.is_active).length
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

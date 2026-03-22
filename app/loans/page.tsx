@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 
 export default function LoanListPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const router = useRouter()
   const [loans, setLoans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,10 +30,10 @@ export default function LoanListPage() {
   useEffect(() => { fetchData() }, [company, role, adminSelectedCompanyId])
 
   const fetchData = async () => {
-    if (!company && role !== 'god_admin') return
+    if (!company && role !== 'admin') return
     setLoading(true)
     let query = supabase.from('loans').select('*, cars(number, brand, model)')
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (company) {
       query = query.eq('company_id', company.id)
@@ -192,7 +192,7 @@ export default function LoanListPage() {
     c.number.includes(carSearchTerm) || (c.brand || '').includes(carSearchTerm) || (c.model || '').includes(carSearchTerm)
   )
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="bg-white rounded-2xl border border-gray-200 p-20 text-center">

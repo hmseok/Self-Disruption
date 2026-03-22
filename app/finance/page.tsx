@@ -41,7 +41,7 @@ const router = useRouter()
   }, [filterDate, company, adminSelectedCompanyId])
 
   const fetchTransactions = async () => {
-    if (!company && role !== 'god_admin') return
+    if (!company && role !== 'admin') return
     setLoading(true)
     const [year, month] = filterDate.split('-').map(Number)
     const lastDay = new Date(year, month, 0).getDate()
@@ -50,7 +50,7 @@ const router = useRouter()
       .from('transactions')
       .select('*')
 
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (company) {
       query = query.eq('company_id', company.id)
@@ -85,10 +85,10 @@ const router = useRouter()
   }
 
   // 현재 사용할 company_id 결정
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const handleSave = async () => {
-      if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
+      if (role === 'admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if (!form.amount || !form.client_name) return alert('필수 항목을 입력해주세요.')
       const { error } = await supabase.from('transactions').insert({
           ...form, amount: Number(form.amount.replace(/,/g, '')), company_id: effectiveCompanyId
@@ -115,7 +115,7 @@ const router = useRouter()
   }
 
   const generateMonthlySchedule = async () => {
-      if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
+      if (role === 'admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if(!confirm(`${filterDate}월 정기 지출을 일괄 생성하시겠습니까?`)) return;
       setLoading(true)
       try {

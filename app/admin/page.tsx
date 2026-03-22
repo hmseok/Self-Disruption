@@ -6,7 +6,7 @@ import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 
 // ============================================
-// 회사/가입 관리 — god_admin + 회사 + 사용자 통합
+// 회사/가입 관리 — admin + 회사 + 사용자 통합
 // ============================================
 
 type UserProfile = {
@@ -39,13 +39,13 @@ export default function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'active'>('all')
 
   useEffect(() => {
-    if (user && (role === 'god_admin' || role === 'master')) fetchData()
+    if (user && (role === 'admin')) fetchData()
   }, [user, company, role])
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      if (role === 'god_admin') {
+      if (role === 'admin') {
         // 1) 회사 목록
         const { data: companiesData } = await supabase
           .from('companies')
@@ -64,12 +64,12 @@ export default function AdminDashboard() {
         }
         setCompanies(companiesWithUsers)
 
-        // 3) 미배정 사용자 (회사 없고 god_admin도 아닌)
+        // 3) 미배정 사용자 (회사 없고 admin도 아닌)
         const { data: orphanData } = await supabase
           .from('profiles')
           .select('id, email, employee_name, role, is_active, created_at')
           .is('company_id', null)
-          .neq('role', 'god_admin')
+          .not('role', 'in', '("admin","admin")')
           .order('created_at', { ascending: false })
         setUnassignedUsers(orphanData || [])
 
@@ -168,14 +168,14 @@ export default function AdminDashboard() {
 
   // ===== 역할 배지 렌더러 =====
   const roleBadge = (r: string) => {
-    if (r === 'god_admin') return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white uppercase tracking-wider">GOD ADMIN</span>
+    if (r === 'admin') return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white uppercase tracking-wider">GOD ADMIN</span>
     if (r === 'master') return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-steel-100 text-steel-700">관리자</span>
     return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-500">직원</span>
   }
 
   // ===== 활성 토글 버튼 =====
   const activeToggle = (u: UserProfile) => {
-    if (role === 'god_admin' && u.role !== 'god_admin') {
+    if (role === 'admin' && u.role !== 'admin') {
       return (
         <button
           onClick={() => toggleUserActive(u.id, u.is_active)}
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
                   사업자등록증
                 </a>
               )}
-              {role === 'god_admin' && (
+              {role === 'admin' && (
                 <label className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${
                   comp.business_registration_url
                     ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -277,7 +277,7 @@ export default function AdminDashboard() {
 
         {/* 액션 버튼 */}
         <div className="flex gap-2 flex-shrink-0">
-          {!comp.is_active && role === 'god_admin' && (
+          {!comp.is_active && role === 'admin' && (
             <>
               <button
                 onClick={() => approveCompany(comp.id)}
@@ -293,7 +293,7 @@ export default function AdminDashboard() {
               </button>
             </>
           )}
-          {comp.is_active && role === 'god_admin' && (
+          {comp.is_active && role === 'admin' && (
             <button
               onClick={() => {
                 setAdminSelectedCompanyId(comp.id)
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
         {/* 헤더 */}
         <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            🏢 {role === 'god_admin' ? '회사/가입 관리' : '회사 관리'}
+            🏢 {role === 'admin' ? '회사/가입 관리' : '회사 관리'}
           </h1>
         </div>
 
@@ -372,7 +372,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ===== 미배정 사용자 ===== */}
-        {role === 'god_admin' && unassignedUsers.length > 0 && (
+        {role === 'admin' && unassignedUsers.length > 0 && (
           <div className="mb-6 md:mb-8">
             <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider mb-3">
               미배정 사용자 ({unassignedUsers.length})

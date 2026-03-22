@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 
 // ============================================
-// 개발자 모드 (god_admin 전용)
+// 개발자 모드 (admin 전용)
 // 플랫폼 관리자 현황 + 초대 코드 발급 및 관리
 // ============================================
 
@@ -36,7 +36,7 @@ export default function DeveloperPage() {
   const [inviteEmailStatus, setInviteEmailStatus] = useState<'none' | 'sent' | 'error'>('none')
 
   useEffect(() => {
-    if (!appLoading && role !== 'god_admin') {
+    if (!appLoading && role !== 'admin') {
       alert('접근 권한이 없습니다.')
       router.replace('/dashboard')
     }
@@ -48,7 +48,7 @@ export default function DeveloperPage() {
     const { data } = await supabase
       .from('profiles')
       .select('id, email, employee_name, role, is_active, created_at')
-      .eq('role', 'god_admin')
+      .in('role', ['admin', 'admin'])
       .order('created_at', { ascending: true })
     setGodAdmins(data || [])
     setAdminsLoading(false)
@@ -68,7 +68,7 @@ export default function DeveloperPage() {
   }
 
   useEffect(() => {
-    if (!appLoading && role === 'god_admin') {
+    if (!appLoading && role === 'admin') {
       loadGodAdmins()
       loadInvites()
     }
@@ -76,7 +76,7 @@ export default function DeveloperPage() {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
 
-  if (appLoading || role !== 'god_admin') {
+  if (appLoading || role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
@@ -346,7 +346,7 @@ export default function DeveloperPage() {
         {/* 안내 */}
         <div className="mt-6 p-3 md:p-4 bg-steel-50 rounded-xl border border-steel-100">
           <p className="text-[11px] md:text-xs text-steel-700">
-            <strong>개발자 모드:</strong> 이 페이지는 플랫폼 최고 관리자(god_admin)만 접근할 수 있습니다.
+            <strong>개발자 모드:</strong> 이 페이지는 플랫폼 최고 관리자(admin)만 접근할 수 있습니다.
             초대 코드를 통해 새로운 플랫폼 관리자를 추가하거나, 시스템 전반의 개발/디버깅 도구를 관리합니다.
           </p>
         </div>

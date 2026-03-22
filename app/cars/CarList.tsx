@@ -43,7 +43,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
         .from('cars') // 👈 여기가 핵심! vehicles -> cars 로 수정
         .select('*')
 
-      if (role === 'god_admin') {
+      if (role === 'admin') {
         if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
       } else if (company) {
         query = query.eq('company_id', company.id)
@@ -102,7 +102,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   // 운용률 계산
   const utilizationRate = stats.total > 0 ? Math.round(((stats.rented) / stats.total) * 100) : 0
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
@@ -174,7 +174,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
               {
                 label: '+ 등록',
                 onClick: () => {
-                  if (role === 'god_admin' && !adminSelectedCompanyId) {
+                  if (role === 'admin' && !adminSelectedCompanyId) {
                     alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
                     return
                   }
@@ -281,7 +281,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
             </div>
         ) : filteredCars.length === 0 ? (
             <div className="p-12 md:p-20 text-center text-gray-400 text-sm">
-                {role === 'god_admin' && !adminSelectedCompanyId ? (
+                {role === 'admin' && !adminSelectedCompanyId ? (
                   <div>
                     <span className="text-4xl block mb-3">🏢</span>
                     <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>

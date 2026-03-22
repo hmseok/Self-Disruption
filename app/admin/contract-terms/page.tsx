@@ -184,8 +184,8 @@ export default function ContractTermsPage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newVersion, setNewVersion] = useState({ version: '', title: '자동차 장기대여 약관', description: '', effective_from: '' })
 
-  // god_admin은 선택된 회사 우선, 일반 admin은 본인 회사
-  const companyId = (role === 'god_admin')
+  // admin은 선택된 회사 우선, 일반 admin은 본인 회사
+  const companyId = (role === 'admin')
     ? (adminSelectedCompanyId || allCompanies?.[0]?.id || company?.id || null)
     : (company?.id || null)
 

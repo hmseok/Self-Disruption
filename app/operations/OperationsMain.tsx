@@ -146,7 +146,7 @@ const BILLING_STATUS: Record<string, { label: string; color: string }> = {
 // ============================================
 export default function OperationsMainPage() {
   const { company, role, adminSelectedCompanyId, user } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // Data states
   const [operations, setOperations] = useState<Operation[]>([])
@@ -388,9 +388,9 @@ export default function OperationsMainPage() {
   }
 
   // ============================================
-  // Render - god_admin check
+  // Render - admin check
   // ============================================
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

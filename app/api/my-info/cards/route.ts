@@ -21,9 +21,9 @@ async function verifyUser(request: NextRequest) {
   return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
 }
 
-// god_admin의 경우 company_id 오버라이드 가능
+// admin의 경우 company_id 오버라이드 가능
 function getEffectiveCompanyId(user: any, requestCompanyId?: string | null): string {
-  if (user.role === 'god_admin' && requestCompanyId) {
+  if (user.role === 'admin' && requestCompanyId) {
     return requestCompanyId
   }
   return user.company_id

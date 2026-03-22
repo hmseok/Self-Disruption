@@ -6,8 +6,7 @@ import { useApp } from '../context/AppContext'
 
 // ============================================
 // Admin Layout - 관리자 영역 권한 체크
-// god_admin + master 접근 가능
-// 사이드바는 ClientLayout에서 통합 제공
+// admin 역할만 접근 가능
 // ============================================
 
 export default function AdminLayout({
@@ -27,8 +26,8 @@ export default function AdminLayout({
       return
     }
 
-    // god_admin 또는 master만 접근 가능
-    if (role !== 'god_admin' && role !== 'master') {
+    // admin만 접근 가능
+    if (role !== 'admin') {
       router.replace('/dashboard')
       return
     }

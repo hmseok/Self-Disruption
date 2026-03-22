@@ -17,7 +17,7 @@ const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인'
 
 export default function FreelancersPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [loading, setLoading] = useState(true)
   const [freelancers, setFreelancers] = useState<any[]>([])

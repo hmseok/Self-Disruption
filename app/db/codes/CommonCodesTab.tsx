@@ -27,7 +27,7 @@ const DEFAULT_GROUPS = [
 export default function CommonCodesTab() {
   const supabase = createClientComponentClient()
   const { role } = useApp()
-  const isAdmin = role === 'god_admin' || role === 'master'
+  const isAdmin = role === 'admin'
 
   const [codes, setCodes] = useState<CodeRecord[]>([])
   const [loading, setLoading] = useState(true)

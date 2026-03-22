@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
       const { data: { user } } = await sb.auth.getUser(token)
       if (!user) return NextResponse.json({ error: '인증 실패' }, { status: 401 })
       const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single()
-      if (!profile || profile.role !== 'god_admin') {
-        return NextResponse.json({ error: 'god_admin만 실행 가능' }, { status: 403 })
+      if (!profile || profile.role !== 'admin') {
+        return NextResponse.json({ error: 'admin만 실행 가능' }, { status: 403 })
       }
     }
   } else {

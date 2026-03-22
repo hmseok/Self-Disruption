@@ -27,7 +27,7 @@ async function verifyAdmin(request: NextRequest) {
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
   return { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name }
 }
 

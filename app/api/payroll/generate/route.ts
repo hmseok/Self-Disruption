@@ -27,7 +27,7 @@ async function verifyAdmin(request: NextRequest) {
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles').select('role, company_id').eq('id', user.id).single()
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
   return { ...user, role: profile.role, company_id: profile.company_id }
 }
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   if (!/^\d{4}-\d{2}$/.test(pay_period)) {
     return NextResponse.json({ error: 'pay_period 형식: YYYY-MM' }, { status: 400 })
   }
-  if (admin.role === 'master' && company_id !== admin.company_id) {
+  if (admin.role === 'admin' && company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 

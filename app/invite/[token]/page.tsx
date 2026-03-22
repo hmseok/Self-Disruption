@@ -218,7 +218,7 @@ export default function InviteAcceptPage() {
           <div className="mt-8 space-y-3 text-white/60 text-sm">
             {invite?.department?.name && <p>부서: <span className="text-white font-bold">{invite.department.name}</span></p>}
             {invite?.position?.name && <p>직급: <span className="text-white font-bold">{invite.position.name}</span></p>}
-            <p>권한: <span className="text-white font-bold">{invite?.role === 'master' ? '관리자' : '직원'}</span></p>
+            <p>권한: <span className="text-white font-bold">{invite?.role === 'admin' ? '관리자' : '직원'}</span></p>
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function InviteAcceptPage() {
           <div className="lg:hidden bg-steel-50 rounded-xl p-4 text-sm space-y-1">
             {invite?.department?.name && <p className="text-gray-600">부서: <span className="font-bold text-gray-900">{invite.department.name}</span></p>}
             {invite?.position?.name && <p className="text-gray-600">직급: <span className="font-bold text-gray-900">{invite.position.name}</span></p>}
-            <p className="text-gray-600">권한: <span className="font-bold text-gray-900">{invite?.role === 'master' ? '관리자' : '직원'}</span></p>
+            <p className="text-gray-600">권한: <span className="font-bold text-gray-900">{invite?.role === 'admin' ? '관리자' : '직원'}</span></p>
           </div>
 
           {formError && (

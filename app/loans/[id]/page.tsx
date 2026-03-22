@@ -8,7 +8,7 @@ export default function LoanDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const isNew = params.id === 'new'
   const loanId = isNew ? null : params.id
 
@@ -122,7 +122,7 @@ export default function LoanDetailPage() {
   }
 
   const handleSave = async () => {
-    if (isNew && role === 'god_admin' && !adminSelectedCompanyId) return alert('회사를 먼저 선택해주세요.')
+    if (isNew && role === 'admin' && !adminSelectedCompanyId) return alert('회사를 먼저 선택해주세요.')
     if (!loan.car_id || !loan.finance_name) return alert('차량과 금융사는 필수 입력입니다.')
     const payload = {
       ...loan,

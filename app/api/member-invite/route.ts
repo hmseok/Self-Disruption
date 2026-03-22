@@ -36,7 +36,7 @@ async function verifyAdmin(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
   return { ...user, role: profile.role, company_id: profile.company_id }
 }
 
@@ -238,10 +238,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '카카오/SMS 발송 시 전화번호가 필요합니다.' }, { status: 400 })
     }
 
-    if (admin.role === 'master' && admin.company_id !== company_id) {
+    if (admin.role === 'admin' && admin.company_id !== company_id) {
       return NextResponse.json({ error: '자기 회사에만 초대할 수 있습니다.' }, { status: 403 })
     }
-    if (role === 'master' && admin.role !== 'god_admin') {
+    if (role === 'admin' && admin.role !== 'admin') {
       return NextResponse.json({ error: '관리자 초대는 플랫폼 관리자만 가능합니다.' }, { status: 403 })
     }
 
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
     // 회사명 조회
     const { data: company } = await sb.from('companies').select('name').eq('id', company_id).single()
     const companyName = company?.name || '회사'
-    const roleLabel = role === 'master' ? '관리자' : '직원'
+    const roleLabel = role === 'admin' ? '관리자' : '직원'
 
     // 직급/부서명 조회
     let positionName = ''
@@ -362,7 +362,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id') || admin.company_id
     const statusFilter = searchParams.get('status')
 
-    if (admin.role === 'master' && companyId !== admin.company_id) {
+    if (admin.role === 'admin' && companyId !== admin.company_id) {
       return NextResponse.json({ error: '권한 없음' }, { status: 403 })
     }
 
@@ -447,7 +447,7 @@ export async function DELETE(request: NextRequest) {
 
   if (!invite) return NextResponse.json({ error: '초대를 찾을 수 없습니다.' }, { status: 404 })
 
-  if (admin.role === 'master' && invite.company_id !== admin.company_id) {
+  if (admin.role === 'admin' && invite.company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 

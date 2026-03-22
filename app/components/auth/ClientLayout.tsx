@@ -76,8 +76,17 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/claims/rental': '대차 관리',
 }
 
-// 숨길 메뉴 경로 (프리랜서는 급여관리에 통합됨)
-const HIDDEN_PATHS = new Set(['/finance/review', '/finance/freelancers', '/admin/freelancers', '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term', '/accidents', '/rental', '/claims/intake', '/claims/investigation', '/claims/assessment', '/claims/billing', '/claims/rental'])
+// 숨길 메뉴 경로 (FMI 단일회사 — 불필요한 플랫폼/구독 메뉴 제거)
+const HIDDEN_PATHS = new Set([
+  '/finance/review', '/finance/freelancers', '/admin/freelancers',
+  '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term',
+  '/accidents', '/rental', '/claims/intake', '/claims/investigation',
+  '/claims/assessment', '/claims/billing', '/claims/rental',
+  // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
+  '/system-admin',           // 모듈 구독관리
+  '/admin/developer',        // 개발자 도구
+  '/admin/contracts',        // 회사/가입 관리 (플랫폼)
+])
 
 // 비즈니스 그룹 (표시 순서)
 const BUSINESS_GROUPS = [
@@ -95,14 +104,7 @@ const WORK_ESSENTIALS_MENUS = [
   { name: '영수증제출', path: '/work-essentials/receipts', iconKey: 'Clipboard' },
 ]
 
-// god_admin 전용: 플랫폼 관리
-const PLATFORM_MENUS = [
-  { name: '회사/가입 관리', path: '/admin', iconKey: 'Admin' },
-  { name: '구독 관리', path: '/system-admin', iconKey: 'Setting' },
-  { name: '개발자 모드', path: '/admin/developer', iconKey: 'Database' },
-]
-
-// god_admin + master: 설정 (회사 정보는 master 전용)
+// admin 전용 설정 메뉴
 const SETTINGS_MENUS_BASE = [
   { name: '조직/권한 관리', path: '/admin/employees', iconKey: 'Users' },
   { name: '계약 약관 관리', path: '/admin/contract-terms', iconKey: 'Doc' },
@@ -153,7 +155,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user, company, role, position, permissions, loading, allCompanies, adminSelectedCompanyId, setAdminSelectedCompanyId, menuRefreshKey } = useApp()
+  const { user, role, position, permissions, loading, menuRefreshKey } = useApp()
   const { hasPageAccess } = usePermission()
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
@@ -184,145 +186,44 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [pathname])
 
-  // 동적 메뉴 로드
+  // ★ 메뉴 로드 (단일회사 — system_modules 직접 + 직원별 권한 필터)
   useEffect(() => {
     const fetchMenus = async () => {
-      if (role === 'god_admin') {
-        if (adminSelectedCompanyId) {
-          // god_admin이 특정 회사 선택 → 해당 회사의 활성 모듈만 표시
-          const { data, error } = await supabase
-            .from('company_modules')
-            .select(`is_active, module:system_modules ( id, name, path, icon_key )`)
-            .eq('company_id', adminSelectedCompanyId)
-            .eq('is_active', true)
-
-          if (!error && data) {
-            const seen = new Set<string>()
-            setDynamicMenus(
-              data
-                .filter((item: any) => {
-                  if (seen.has(item.module.path)) return false
-                  if (HIDDEN_PATHS.has(item.module.path)) return false
-                  seen.add(item.module.path)
-                  return true
-                })
-                .map((item: any) => ({
-                  id: item.module.id,
-                  name: NAME_OVERRIDES[item.module.path] || item.module.name,
-                  path: item.module.path,
-                  iconKey: item.module.icon_key,
-                }))
-            )
-          }
-        } else {
-          // god_admin 전체 보기 → 모든 모듈 표시
-          const { data, error } = await supabase
-            .from('system_modules').select('*').order('path')
-          if (!error && data) {
-            // 빠진 모듈 자동 추가
-            const existingPaths = new Set(data.map((m: any) => m.path))
-            // 모듈 목록 (플랜 무관 — ON/OFF로만 제어)
-            const REQUIRED_MODULES = [
-              { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
-              { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
-              { path: '/rental', name: '대차관리', icon_key: 'Truck', description: '대차운영 프로세스 관리', plan_group: 'free' },
-              { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
-              { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
-              { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
-              { path: '/fleet/factory-mgmt', name: '공장/협력업체 관리', icon_key: 'Truck', description: '공장/협력업체 현황 및 작업이력', plan_group: 'free' },
-              { path: '/admin/code-master', name: '기초코드 관리', icon_key: 'Database', description: '코드 마스터 관리 (Supabase)', plan_group: 'free' },
-            ]
-            const missing = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
-            if (missing.length > 0) {
-              const { data: inserted } = await supabase.from('system_modules').insert(missing).select()
-              if (inserted) data.push(...inserted)
-            }
-
-            const seen = new Set<string>()
-            const unique = data.filter((item: any) => {
-              if (seen.has(item.path)) return false
-              if (HIDDEN_PATHS.has(item.path)) return false
-              seen.add(item.path)
-              return true
-            })
-            setDynamicMenus(unique.map((item: any) => ({
-              id: item.id,
-              name: NAME_OVERRIDES[item.path] || item.name,
-              path: item.path,
-              iconKey: item.icon_key,
-            })))
-          }
-        }
-        return
-      }
-
-      if (!company) return
-
-      // 빠진 system_modules 자동 추가 + company_modules 활성화
-      // 모듈 목록 (플랜 무관 — ON/OFF로만 제어)
-      const REQUIRED_MODULES = [
-        { path: '/finance/fleet', name: '차량 수익', icon_key: 'Chart', description: '차량별 수익 현황 분석', plan_group: 'free' },
-        { path: '/operations/intake', name: '접수/오더', icon_key: 'Clipboard', description: '잔디 접수 및 오더 관리', plan_group: 'free' },
-        { path: '/claims/accident-mgmt', name: '사고관리', icon_key: 'ExclamationTriangle', description: '사고접수~공장지급 통합관리', plan_group: 'free' },
-        { path: '/claims/billing-mgmt', name: '청구관리', icon_key: 'Money', description: '대차~보험청구~종결 통합관리', plan_group: 'free' },
-        { path: '/fleet/vehicle-lookup', name: '거래처 차량조회', icon_key: 'Car', description: '거래처별 차량 현황 및 히스토리 조회', plan_group: 'free' },
-        { path: '/fleet/factory-mgmt', name: '공장/협력업체 관리', icon_key: 'Truck', description: '공장/협력업체 현황 및 작업이력', plan_group: 'free' },
-        { path: '/admin/code-master', name: '기초코드 관리', icon_key: 'Database', description: '코드 마스터 관리 (Supabase)', plan_group: 'free' },
-      ]
-      const { data: allSysMods } = await supabase.from('system_modules').select('id, path')
-      if (allSysMods) {
-        const existingPaths = new Set(allSysMods.map((m: any) => m.path))
-        const missingSys = REQUIRED_MODULES.filter(m => !existingPaths.has(m.path))
-        if (missingSys.length > 0) {
-          const { data: inserted } = await supabase.from('system_modules').insert(missingSys).select()
-          if (inserted) allSysMods.push(...inserted)
-        }
-        // company_modules에 활성화 안 된 새 모듈 추가
-        const { data: compMods } = await supabase.from('company_modules').select('module_id').eq('company_id', company.id)
-        const existingModIds = new Set((compMods || []).map((cm: any) => cm.module_id))
-        for (const rm of REQUIRED_MODULES) {
-          const sysMod = allSysMods.find((m: any) => m.path === rm.path)
-          if (sysMod && !existingModIds.has(sysMod.id)) {
-            await supabase.from('company_modules').insert({ company_id: company.id, module_id: sysMod.id, is_active: true })
-          }
-        }
-      }
-
+      // system_modules에서 전체 모듈 로드
       const { data, error } = await supabase
-        .from('company_modules')
-        .select(`is_active, module:system_modules ( id, name, path, icon_key )`)
-        .eq('company_id', company.id)
-        .eq('is_active', true)
+        .from('system_modules')
+        .select('*')
+        .order('path')
 
       if (!error && data) {
         const seen = new Set<string>()
         const allMenus = data
           .filter((item: any) => {
-            if (seen.has(item.module.path)) return false
-            if (HIDDEN_PATHS.has(item.module.path)) return false
-            seen.add(item.module.path)
+            if (seen.has(item.path)) return false
+            if (HIDDEN_PATHS.has(item.path)) return false
+            seen.add(item.path)
             return true
           })
           .map((item: any) => ({
-            id: item.module.id,
-            name: NAME_OVERRIDES[item.module.path] || item.module.name,
-            path: item.module.path,
-            iconKey: item.module.icon_key,
+            id: item.id,
+            name: NAME_OVERRIDES[item.path] || item.name,
+            path: item.path,
+            iconKey: item.icon_key,
           }))
+
+        // admin → 전체 메뉴, user → 권한 있는 메뉴만
         setDynamicMenus(
-          allMenus.filter((m: any) => role === 'master' || hasPageAccess(m.path))
+          role === 'admin'
+            ? allMenus
+            : allMenus.filter((m: any) => hasPageAccess(m.path))
         )
       }
     }
-    if (!loading && (company || role === 'god_admin')) {
-      // 승인 대기 중인 회사는 메뉴 로드하지 않음
-      if (company && company.is_active === false && role !== 'god_admin') {
-        setDynamicMenus([])
-        return
-      }
+    if (!loading) {
       fetchMenus()
     }
-  }, [company, loading, role, adminSelectedCompanyId, menuRefreshKey, permissions])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, role, menuRefreshKey])
 
   // 로그아웃 상태 → 로그인 페이지로 즉시 이동 (useEffect로 감싸서 렌더링 중 setState 방지)
   useEffect(() => {
@@ -364,9 +265,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // 모든 메뉴 경로 (longest match 계산용)
   const allMenuPaths = dynamicMenus.map(m => m.path)
 
-  const isPendingApproval = company && company.is_active === false && role !== 'god_admin'
-  const showPlatform = role === 'god_admin'
-  const showSettings = !isPendingApproval && (role === 'god_admin' || role === 'master')
+  const showSettings = role === 'admin'
 
   return (
     <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f9fafb', overflowX: 'hidden', overflowY: 'hidden' }}>
@@ -383,26 +282,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* 로고 */}
-            <span className="text-sm font-bold text-white tracking-tight flex-shrink-0">Self-Disruption</span>
+            <span className="text-sm font-bold text-white tracking-tight flex-shrink-0">FMI ERP</span>
 
-            {/* god_admin 업체 선택 */}
-            {role === 'god_admin' && allCompanies.length > 0 && (
-              <select
-                value={adminSelectedCompanyId || ''}
-                onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
-                className="ml-auto flex-1 min-w-0 max-w-48 bg-steel-800/80 text-white text-xs font-medium rounded-md px-2 py-1.5 border border-steel-800 focus:outline-none focus:border-sky-500 cursor-pointer truncate"
-              >
-                <option value="">전체 보기</option>
-                {allCompanies.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            )}
-
-            {/* 일반 사용자: 회사명 표시 */}
-            {role !== 'god_admin' && company?.name && (
-              <span className="ml-auto text-xs text-steel-300 truncate">{company.name}</span>
-            )}
+            {/* FMI 단일회사 표시 */}
+            <span className="ml-auto text-xs text-sky-300 font-medium truncate">주식회사 에프엠아이</span>
           </div>
         </div>
       )}
@@ -420,7 +303,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           {/* 로고 */}
           <div className="px-5 py-4 flex items-center justify-between border-b border-steel-800">
             <span className="text-lg font-black text-white tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')}>
-              Self-Disruption
+              FMI ERP
             </span>
             <button onClick={() => setIsSidebarOpen(false)} className="text-steel-400 hover:text-white lg:hidden">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -432,33 +315,16 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             <div className="bg-steel-800/50 rounded-lg px-3 py-3 border border-steel-700/30">
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
-                <div className="text-white font-bold text-sm truncate">
-                  {company?.is_platform ? 'Platform Admin' : (company?.name || '회사 미배정')}
-                </div>
-                {!company?.is_platform && company?.plan && (
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    company.plan === 'max' ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white' :
-                    company.plan === 'pro' ? 'bg-blue-500 text-white' :
-                    company.plan === 'basic' ? 'bg-green-500 text-white' :
-                    'bg-steel-700 text-steel-200'
-                  }`}>
-                    {company.plan === 'max' ? 'MAX' : company.plan === 'pro' ? 'PRO' : company.plan === 'basic' ? 'BASIC' : 'FREE'}
-                  </span>
-                )}
-                {company?.is_platform && (
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-600 text-white flex-shrink-0">
-                    ADMIN
-                  </span>
-                )}
+                <div className="text-white font-bold text-sm truncate">주식회사 에프엠아이</div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-600 text-white flex-shrink-0">FMI</span>
               </div>
               {/* 역할 + 직급 */}
               <div className="mt-2 flex gap-1 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                  role === 'god_admin' ? 'bg-sky-900/80 text-sky-300' :
-                  role === 'master' ? 'bg-blue-900/80 text-blue-300' :
+                  role === 'admin' ? 'bg-blue-900/80 text-blue-300' :
                   'bg-steel-800 text-steel-300'
                 }`}>
-                  {role === 'god_admin' ? 'GOD ADMIN' : role === 'master' ? '관리자' : '직원'}
+                  {role === 'admin' ? '관리자' : '직원'}
                 </span>
                 {position && (
                   <span className="text-[9px] bg-green-900/80 text-green-300 px-1.5 py-0.5 rounded font-bold">
@@ -466,38 +332,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                   </span>
                 )}
               </div>
-              {/* 승인 대기 상태 */}
-              {company && company.is_active === false && role !== 'god_admin' && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
-                  <span className="text-[10px] font-bold text-yellow-400">승인 대기중</span>
-                </div>
-              )}
-              {/* 회사 미배정 안내 (god_admin은 플랫폼 회사가 있으므로 해당 없음) */}
-              {!company && role !== 'god_admin' && !loading && (
-                <p className="mt-2 text-[10px] text-yellow-400">관리자에게 회사 배정을 요청하세요</p>
-              )}
             </div>
           </div>
 
-          {/* god_admin 회사 선택 */}
-          {role === 'god_admin' && allCompanies.length > 0 && (
-            <div className="px-3 pb-3">
-              <div className="bg-sky-900/30 rounded-lg px-3 py-2.5 border border-sky-700/30">
-                <label className="text-[9px] font-bold text-sky-400 uppercase tracking-wider block mb-1.5">회사 선택</label>
-                <select
-                  value={adminSelectedCompanyId || ''}
-                  onChange={(e) => setAdminSelectedCompanyId(e.target.value || null)}
-                  className="w-full bg-steel-800 text-white text-xs font-bold rounded-md px-2 py-1.5 border border-steel-700 focus:outline-none focus:border-sky-500 cursor-pointer"
-                >
-                  <option value="">전체 보기</option>
-                  {allCompanies.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
+          {/* FMI 단일회사 */}
 
           {/* 메뉴 영역 */}
           <nav className="flex-1 px-3 pb-4 overflow-y-auto">
@@ -544,37 +382,19 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* 구분선 + 관리 영역 */}
-            {(showPlatform || showSettings) && (
+            {showSettings && (
               <div className="border-t border-steel-800 mt-3 pt-3">
-
-                {/* 플랫폼 관리 (god_admin) */}
-                {showPlatform && (
-                  <div className="mb-3">
-                    <div className="px-3 mb-1">
-                      <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">플랫폼</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {PLATFORM_MENUS.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} accent allPaths={allMenuPaths} />
-                      ))}
-                    </div>
+                <div className="mb-3">
+                  <div className="px-3 mb-1">
+                    <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">설정</span>
                   </div>
-                )}
-
-                {/* 설정 (god_admin + master) */}
-                {showSettings && (
-                  <div className="mb-3">
-                    <div className="px-3 mb-1">
-                      <span className="text-[10px] font-bold text-steel-400 uppercase tracking-wider">설정</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {role !== 'god_admin' && <MenuItem item={COMPANY_INFO_MENU} pathname={pathname} allPaths={allMenuPaths} />}
-                      {SETTINGS_MENUS_BASE.map(item => (
-                        <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
-                      ))}
-                    </div>
+                  <div className="space-y-0.5">
+                    <MenuItem item={COMPANY_INFO_MENU} pathname={pathname} allPaths={allMenuPaths} />
+                    {SETTINGS_MENUS_BASE.map(item => (
+                      <MenuItem key={item.path} item={item} pathname={pathname} allPaths={allMenuPaths} />
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             )}
           </nav>

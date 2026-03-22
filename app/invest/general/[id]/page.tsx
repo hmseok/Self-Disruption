@@ -35,7 +35,7 @@ export default function GeneralInvestDetail() {
   const router = useRouter()
   const params = useParams()
   const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const isNew = params.id === 'new'
   const id = isNew ? null : params.id
 
@@ -262,7 +262,7 @@ export default function GeneralInvestDetail() {
   }
 
   const handleSave = async () => {
-    if (isNew && role === 'god_admin' && !adminSelectedCompanyId) return alert('회사를 먼저 선택해주세요.')
+    if (isNew && role === 'admin' && !adminSelectedCompanyId) return alert('회사를 먼저 선택해주세요.')
     if (!item.investor_name) return alert('투자자 성명은 필수입니다.')
 
     const payload = { ...item, investor_address: item.investor_address, investor_address_detail: item.investor_address_detail }

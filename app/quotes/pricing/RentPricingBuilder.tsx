@@ -799,7 +799,7 @@ export default function RentPricingBuilder() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const printRef = useRef<HTMLDivElement>(null)
   const initialLoadDone = useRef(false)
 
@@ -996,10 +996,10 @@ export default function RentPricingBuilder() {
           }
         }
 
-        // 차량 목록 — god_admin '전체 보기' 시 전체 조회 (보험 페이지와 동일)
+        // 차량 목록 — admin '전체 보기' 시 전체 조회 (보험 페이지와 동일)
         {
           let carQuery = supabase.from('cars').select('*').order('created_at', { ascending: false })
-          if (role === 'god_admin') {
+          if (role === 'admin') {
             if (adminSelectedCompanyId) carQuery = carQuery.eq('company_id', adminSelectedCompanyId)
             // 전체 보기(미선택) 시 필터 없이 전체 조회
           } else if (company?.id) {

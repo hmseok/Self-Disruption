@@ -591,7 +591,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_fmi_vehicles_updated AT BEFORE UPDATE ON fmi_vehicles FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+CREATE TRIGGER trg_fmi_vehicles_updated_at BEFORE UPDATE ON fmi_vehicles FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER trg_fmi_accidents_updated_at BEFORE UPDATE ON fmi_accidents FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER trg_fmi_rentals_updated_at BEFORE UPDATE ON fmi_rentals FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 CREATE TRIGGER trg_fmi_claims_updated_at BEFORE UPDATE ON fmi_claims FOR EACH ROW EXECUTE FUNCTION update_timestamp();

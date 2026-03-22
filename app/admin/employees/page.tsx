@@ -11,7 +11,7 @@ import DarkHeader from '../../components/DarkHeader'
 // 조직/권한 통합 관리 페이지 (2-Tab 구조)
 // Tab 1: 조직 관리 (직원, 직급, 부서, 초대)
 // Tab 2: 페이지 권한 (사용자별 직접 설정)
-// master/god_admin만 접근 가능
+// master/admin만 접근 가능
 // ============================================
 
 const DATA_SCOPES = [
@@ -59,7 +59,7 @@ type UserPermMap = {
 }
 
 const ROLE_LABELS: Record<string, { label: string; bg: string }> = {
-  god_admin: { label: 'GOD ADMIN', bg: 'bg-sky-100 text-sky-700' },
+  admin: { label: 'GOD ADMIN', bg: 'bg-sky-100 text-sky-700' },
   master:    { label: '관리자', bg: 'bg-steel-100 text-steel-700' },
   user:      { label: '직원', bg: 'bg-slate-100 text-slate-600' },
 }
@@ -96,10 +96,10 @@ export default function OrgManagementPage() {
   const [savingPermsFor, setSavingPermsFor] = useState<string | null>(null)
   const [selectedPermUserId, setSelectedPermUserId] = useState<string | null>(null)
 
-  const activeCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const activeCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   useEffect(() => {
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) {
         loadAll()
       } else {
@@ -116,7 +116,7 @@ export default function OrgManagementPage() {
   }, [company, role, adminSelectedCompanyId])
 
   useEffect(() => {
-    if (activeTab === 'organization' && activeCompanyId && ['god_admin', 'master'].includes(role || '')) {
+    if (activeTab === 'organization' && activeCompanyId && ['admin', 'admin', 'master'].includes(role || '')) {
       loadInvitations()
     }
   }, [activeTab, activeCompanyId, role])
@@ -282,7 +282,7 @@ export default function OrgManagementPage() {
   }
 
   const loadInvitations = async () => {
-    if (!activeCompanyId || !['god_admin', 'master'].includes(role || '')) return
+    if (!activeCompanyId || !['admin', 'admin', 'master'].includes(role || '')) return
     setLoadingInvitations(true)
     try {
       const token = await getAccessToken()
@@ -340,8 +340,8 @@ export default function OrgManagementPage() {
 
   const saveEdit = async () => {
     if (!editingEmp) return
-    if (role === 'master' && editForm.role === 'god_admin') {
-      alert('god_admin 권한은 부여할 수 없습니다.')
+    if (role === 'admin' && editForm.role === 'admin') {
+      alert('admin 권한은 부여할 수 없습니다.')
       return
     }
     setSavingEdit(true)
@@ -457,7 +457,7 @@ export default function OrgManagementPage() {
   const GROUP_ORDER = ['차량 자산', '차량 운영', '대고객 영업', '경영 지원', '파트너 자금', '데이터 관리', '기타']
   const moduleGroups = GROUP_ORDER.filter(g => activeModules.some(m => m.group === g))
 
-  // 선택 가능한 직원 목록 (god_admin/master 제외 - 이미 전체 접근)
+  // 선택 가능한 직원 목록 (admin/master 제외 - 이미 전체 접근)
   const assignableEmployees = employees.filter(e => e.role === 'user' && e.is_active !== false)
 
   const TABS = [
@@ -469,12 +469,12 @@ export default function OrgManagementPage() {
   const EmployeeCard = ({ emp }: { emp: any }) => {
     const r = ROLE_LABELS[emp.role] || ROLE_LABELS.user
     const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
-      god_admin: { bg: '#e0f2fe', color: '#0369a1' },
+      admin: { bg: '#e0f2fe', color: '#0369a1' },
       master: { bg: '#e8eef7', color: '#2d5fa8' },
       user: { bg: '#f1f5f9', color: '#64748b' },
     }
     const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
-    const avatarBg = emp.role === 'god_admin' ? '#0ea5e9' : emp.role === 'master' ? '#2d5fa8' : '#94a3b8'
+    const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'admin' ? '#2d5fa8' : '#94a3b8'
     return (
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
@@ -526,14 +526,14 @@ export default function OrgManagementPage() {
         ] : []}
       />
 
-      {role === 'god_admin' && !adminSelectedCompanyId && (
+      {role === 'admin' && !adminSelectedCompanyId && (
         <div style={{ padding: 20, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 16, marginBottom: 24 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: 0 }}>사이드바에서 회사를 선택해주세요.</p>
           <p style={{ fontSize: 12, color: '#3b82f6', marginTop: 4 }}>조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
         </div>
       )}
 
-      {role === 'god_admin' && !adminSelectedCompanyId ? null : (
+      {role === 'admin' && !adminSelectedCompanyId ? null : (
         <>
           {/* ═══ 통계 카드 ═══ */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
@@ -1000,7 +1000,7 @@ export default function OrgManagementPage() {
                       style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
                       <option value="user">직원</option>
                       <option value="master">관리자</option>
-                      {role === 'god_admin' && <option value="god_admin">GOD ADMIN</option>}
+                      {role === 'admin' && <option value="admin">GOD ADMIN</option>}
                     </select>
                   </div>
                   <div>
@@ -1044,7 +1044,7 @@ export default function OrgManagementPage() {
             </div>
 
             {/* 직원 탈퇴 */}
-            {editingEmp.id !== user?.id && editingEmp.role !== 'god_admin' && (
+            {editingEmp.id !== user?.id && editingEmp.role !== 'admin' && (
               <div style={{ padding: '12px 24px', borderTop: '1px solid #fecaca', background: '#fef2f2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>

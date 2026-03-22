@@ -67,7 +67,7 @@ function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'account
 
 export default function ClassificationReviewPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -463,7 +463,7 @@ export default function ClassificationReviewPage() {
     })
   }
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 16px', minHeight: '100vh', background: '#f8fafc' }}>
         <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>

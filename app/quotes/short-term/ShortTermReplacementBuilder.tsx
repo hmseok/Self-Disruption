@@ -144,7 +144,7 @@ const calcRate = (base: number, pct: number) => Math.round(base * pct / 100)
 export default function ShortTermReplacementBuilder() {
   const { company, role, adminSelectedCompanyId } = useApp()
   const router = useRouter()
-  const cid = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const cid = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [subTab, setSubTab] = useState<SubTab>('settings')
   const [loading, setLoading] = useState(false)

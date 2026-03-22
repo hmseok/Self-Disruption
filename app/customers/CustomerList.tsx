@@ -208,13 +208,13 @@ export default function CustomerPage() {
     supply_amount: '', tax_amount: '', description: ''
   })
 
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // ── 고객 목록 조회 ──
   const fetchCustomers = useCallback(async () => {
-    if (!company && role !== 'god_admin') { setLoading(false); return }
+    if (!company && role !== 'admin') { setLoading(false); return }
     let query = supabase.from('customers').select('*')
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (company) {
       query = query.eq('company_id', company.id)
@@ -696,7 +696,7 @@ export default function CustomerPage() {
   // ─────────────────────────────────────────────
   // 메인 렌더링
   // ─────────────────────────────────────────────
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

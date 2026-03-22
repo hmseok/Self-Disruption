@@ -6,57 +6,54 @@ import type { Profile, UserPagePermission, Position, Department } from '../types
 
 // ============================================
 // AppContext - 전역 상태 (사용자 + 권한)
+// FMI 단독 ERP (주식회사 에프엠아이)
 // ============================================
 
 type AppContextType = {
   user: any
   profile: Profile | null
-  company: any
-  role: string
+  role: string                    // 'admin' | 'user'
   position: Position | null
   department: Department | null
   permissions: UserPagePermission[]
   loading: boolean
-  refreshAuth: () => Promise<void>     // 외부에서 새로고침 호출용
-  // god_admin 회사 선택 기능
-  allCompanies: any[]
-  adminSelectedCompanyId: string | null  // null = 전체, string = 특정 회사
-  setAdminSelectedCompanyId: (id: string | null) => void
+  refreshAuth: () => Promise<void>
   // 사이드바 메뉴 새로고침 트리거
   menuRefreshKey: number
   triggerMenuRefresh: () => void
+  // ★ 하위 호환: 기존 코드에서 참조하는 필드 (제거 전 과도기)
+  company: any
+  allCompanies: any[]
+  adminSelectedCompanyId: string | null
+  setAdminSelectedCompanyId: (id: string | null) => void
 }
 
 const AppContext = createContext<AppContextType>({
   user: null,
   profile: null,
-  company: null,
   role: '',
   position: null,
   department: null,
   permissions: [],
   loading: true,
   refreshAuth: async () => {},
+  menuRefreshKey: 0,
+  triggerMenuRefresh: () => {},
+  // 하위 호환
+  company: null,
   allCompanies: [],
   adminSelectedCompanyId: null,
   setAdminSelectedCompanyId: () => {},
-  menuRefreshKey: 0,
-  triggerMenuRefresh: () => {},
 })
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [company, setCompany] = useState<any>(null)
   const [role, setRole] = useState('')
   const [position, setPosition] = useState<Position | null>(null)
   const [department, setDepartment] = useState<Department | null>(null)
   const [permissions, setPermissions] = useState<UserPagePermission[]>([])
   const [loading, setLoading] = useState(true)
-
-  // god_admin 회사 선택 상태
-  const [allCompanies, setAllCompanies] = useState<any[]>([])
-  const [adminSelectedCompanyId, setAdminSelectedCompanyId] = useState<string | null>(null)
 
   // 사이드바 메뉴 새로고침 키
   const [menuRefreshKey, setMenuRefreshKey] = useState(0)
@@ -70,20 +67,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const clearState = () => {
     setUser(null)
     setProfile(null)
-    setCompany(null)
     setRole('')
     setPosition(null)
     setDepartment(null)
     setPermissions([])
-    setAllCompanies([])
-    setAdminSelectedCompanyId(null)
   }
 
-  // ★ 프로필 데이터 로드 (getSession 호출 없음)
+  // ★ 프로필 데이터 로드
   const loadUserData = async (authUser: any) => {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
-    setLoading(true)  // ★ 모바일 레이스컨디션 방지: 프로필 로드 중에는 로딩 상태 유지
+    setLoading(true)
     try {
       setUser(authUser)
 
@@ -91,7 +85,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select(`
           *,
-          companies(*),
           position:positions(*),
           department:departments(*)
         `)
@@ -103,38 +96,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (profileData) {
-        console.log('AppContext 로드 완료:', profileData.role, profileData.position?.name)
+        // ★ role 매핑: admin/master → admin (DB 마이그레이션 전 과도기)
+        let mappedRole = profileData.role || 'user'
+        if (mappedRole === 'admin' || mappedRole === 'master') {
+          mappedRole = 'admin'
+        }
+
+        console.log('AppContext 로드 완료:', mappedRole, profileData.position?.name)
         setProfile(profileData as Profile)
-        setRole(profileData.role || 'user')
-        setCompany(profileData.companies)
+        setRole(mappedRole)
         setPosition(profileData.position || null)
         setDepartment(profileData.department || null)
 
-        // ★ 사용자별 페이지 권한 로드 (단순!)
-        if (profileData.company_id) {
-          const { data: permsData } = await supabase
-            .from('user_page_permissions')
-            .select('*')
-            .eq('user_id', authUser.id)
+        // ★ 페이지 권한 로드 (사용자 기준)
+        const { data: permsData } = await supabase
+          .from('user_page_permissions')
+          .select('*')
+          .eq('user_id', authUser.id)
 
-          setPermissions(permsData || [])
-        }
-
-        if (profileData.role === 'god_admin') {
-          // ★ god_admin: 실제 고객사 목록만 로드 (is_platform 제외)
-          const { data: companiesData } = await supabase
-            .from('companies')
-            .select('id, name, plan, is_active, is_platform')
-            .eq('is_active', true)
-            .order('name')
-          // 플랫폼 회사는 선택 목록에서 제외
-          setAllCompanies((companiesData || []).filter((c: any) => !c.is_platform))
-        }
+        setPermissions(permsData || [])
       } else {
         setRole('user')
       }
 
-      // ★ 로드 완료 표시 → 이후 SIGNED_IN 이벤트 무시
       isLoadedRef.current = true
     } catch (error: any) {
       console.error('AppContext 로딩 에러:', error)
@@ -144,7 +128,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // refreshAuth: 외부에서 강제 새로고침 (설정 변경 등)
+  // refreshAuth: 외부에서 강제 새로고침
   const refreshAuth = async () => {
     isLoadedRef.current = false
     isFetchingRef.current = false
@@ -155,7 +139,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // ★ onAuthStateChange 하나로 통합 — fetchSession/getSession 별도 호출 안 함
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth:', event, isLoadedRef.current ? '(loaded, skip)' : '(processing)')
@@ -168,13 +151,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // ★ 핵심: 이미 로드 완료 상태면 SIGNED_IN/INITIAL_SESSION 전부 무시
         if (isLoadedRef.current) return
 
         if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
           loadUserData(session.user)
         } else if (event === 'INITIAL_SESSION' && !session) {
-          // 세션 없음 → 로그인 페이지 표시
           clearState()
           setLoading(false)
         }
@@ -184,22 +165,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // ★ 하위 호환용 company 객체 (FMI 고정)
+  const fmiCompany = {
+    id: 'fmi-single',
+    name: '주식회사 에프엠아이',
+    is_active: true,
+  }
+
   return (
     <AppContext.Provider value={{
       user,
       profile,
-      company,
       role,
       position,
       department,
       permissions,
       loading,
       refreshAuth,
-      allCompanies,
-      adminSelectedCompanyId,
-      setAdminSelectedCompanyId,
       menuRefreshKey,
       triggerMenuRefresh,
+      // 하위 호환
+      company: fmiCompany,
+      allCompanies: [fmiCompany],
+      adminSelectedCompanyId: fmiCompany.id,
+      setAdminSelectedCompanyId: () => {},
     }}>
       {children}
     </AppContext.Provider>

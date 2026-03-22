@@ -25,7 +25,7 @@ async function verifyAdmin(request: NextRequest) {
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
   return { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name }
 }
 
@@ -54,7 +54,7 @@ export async function GET(
 
   if (error || !data) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
 
-  if (admin.role === 'master' && data.company_id !== admin.company_id) {
+  if (admin.role === 'admin' && data.company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
@@ -90,7 +90,7 @@ export async function PATCH(
 
   if (fetchErr || !existing) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
   if (existing.status === 'paid') return NextResponse.json({ error: '지급 완료된 명세서는 수정할 수 없습니다.' }, { status: 400 })
-  if (admin.role === 'master' && existing.company_id !== admin.company_id) {
+  if (admin.role === 'admin' && existing.company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
@@ -169,7 +169,7 @@ export async function POST(
     .single()
 
   if (fetchErr || !payslip) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
-  if (admin.role === 'master' && payslip.company_id !== admin.company_id) {
+  if (admin.role === 'admin' && payslip.company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 

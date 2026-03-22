@@ -43,7 +43,7 @@ function mapInsType(brand: string): string {
 export default function BenchmarkPage() {
   const supabase = createClientComponentClient()
   const { role } = useApp()
-  const isAdmin = role === 'god_admin' || role === 'master'
+  const isAdmin = role === 'admin'
 
   // 데이터
   const [benchmarks, setBenchmarks] = useState<any[]>([])

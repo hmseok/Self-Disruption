@@ -93,7 +93,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const fetchList = async () => {
     let query = supabase.from('cars').select('*')
 
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (company) {
       query = query.eq('company_id', company.id)
@@ -121,7 +121,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
   // 🚀 [업그레이드] PDF 지원 + 브랜드 분석 로직
   // 현재 사용할 company_id 결정
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // 드래그 앤 드롭 핸들러
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }
@@ -155,7 +155,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
   const processFiles = async (files: FileList) => {
       if (!files?.length) return
-      if (role === 'god_admin' && !adminSelectedCompanyId) {
+      if (role === 'admin' && !adminSelectedCompanyId) {
         alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
         return
       }
@@ -297,7 +297,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   }
 
   const handleRegister = async () => {
-    if (role === 'god_admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
+    if (role === 'admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.\n사이드바에서 회사를 선택한 후 등록해주세요.')
     if (!carNum) return alert('차량번호 입력')
     if (!vin) return alert('차대번호 입력')
 
@@ -342,7 +342,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

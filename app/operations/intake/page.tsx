@@ -95,7 +95,7 @@ function extractJandi(raw: string | null, notes: string | null) {
 // ============================================
 export default function IntakePage() {
   const { user, company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [cafe24Records, setCafe24Records] = useState<AccidentRecord[]>([])
   const [cafe24Loading, setCafe24Loading] = useState(false)

@@ -115,7 +115,7 @@ const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인'
 export default function PayrollPage() {
   const router = useRouter()
   const { company, role, adminSelectedCompanyId } = useApp()
-  const cid = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const cid = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [tab, setTab] = useState<Tab>('ledger')
   const [loading, setLoading] = useState(false)
@@ -614,7 +614,7 @@ export default function PayrollPage() {
   ]
 
   // ── 회사 미선택 ──
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: C.gray50 }}>
         <div style={{ ...sectionCard, padding: '80px 20px', textAlign: 'center' }}>

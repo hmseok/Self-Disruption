@@ -53,7 +53,7 @@ const compressImage = async (file: File): Promise<File> => {
 export default function InsuranceListPage() {
 const router = useRouter()
 const { company, role, adminSelectedCompanyId } = useApp()
-const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const [list, setList] = useState<any[]>([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
@@ -84,7 +84,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
       .from('cars')
       .select(`id, number, model, brand, vin, insurance_contracts (id, company, end_date, premium, status)`)
 
-    if (role === 'god_admin') {
+    if (role === 'admin') {
       if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
     } else if (company) {
       query = query.eq('company_id', company.id)
@@ -392,7 +392,7 @@ const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : compa
     return end >= today && end <= thirtyDaysLater
   }).sort((a, b) => new Date(a.insurance.end_date).getTime() - new Date(b.insurance.end_date).getTime())
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

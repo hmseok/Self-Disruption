@@ -179,7 +179,7 @@ export default function MaintenanceMainPage() {
     notes: '',
   })
 
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // Helper functions for lookups
   const getCar = (id: any) => cars.find(c => c.id === Number(id) || c.id === id)
@@ -519,7 +519,7 @@ export default function MaintenanceMainPage() {
     return 'text-gray-500'
   }
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

@@ -75,7 +75,7 @@ const PAGE_NAMES: Record<string, string> = {
   // 직장인필수
   '/work-essentials/my-info': '내 정보',
   '/work-essentials/receipts': '영수증제출',
-  // 플랫폼 (god_admin)
+  // 플랫폼 (admin)
   '/admin': '회사/가입 관리',
   '/system-admin': '구독 관리',
   '/admin/developer': '개발자 모드',

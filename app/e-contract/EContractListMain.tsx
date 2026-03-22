@@ -51,7 +51,7 @@ export default function EContractListMain() {
   const f = (n: number) => Math.round(n || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
 
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // ── Fetch data ──
   useEffect(() => {
@@ -114,7 +114,7 @@ export default function EContractListMain() {
   // ============================================================================
   // RENDER
   // ============================================================================
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

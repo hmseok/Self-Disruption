@@ -102,7 +102,7 @@ export default function MessageTemplatesPage() {
 
   // 권한 확인
   useEffect(() => {
-    if (!appLoading && role !== 'master' && role !== 'god_admin') {
+    if (!appLoading && role !== 'admin') {
       alert('접근 권한이 없습니다.')
       router.replace('/dashboard')
     }

@@ -40,7 +40,7 @@ export default function CollectionsPage() {
   const [sendChannel, setSendChannel] = useState<'sms' | 'email'>('sms')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   useEffect(() => {
     fetchSchedules()
@@ -49,7 +49,7 @@ export default function CollectionsPage() {
 
   // ── 데이터 조회 ──
   const fetchSchedules = async () => {
-    if (!effectiveCompanyId && role !== 'god_admin') return
+    if (!effectiveCompanyId && role !== 'admin') return
     setLoading(true)
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token
@@ -206,7 +206,7 @@ export default function CollectionsPage() {
     { key: 'completed', label: '수금완료', count: completedSchedules.length, color: 'text-green-600' },
   ]
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

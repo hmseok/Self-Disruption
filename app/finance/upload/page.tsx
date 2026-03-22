@@ -760,7 +760,7 @@ function UploadContent() {
   const [splitRows, setSplitRows] = useState<Array<{ amount: number; memo: string; related_type: string; related_id: string }>>([])
   const [splitVer, setSplitVer] = useState(0) // 균등분할/추가 등 외부 리셋 시 key 갱신용
 
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // ── Initialize ──
   const hasLoadedFromQueue = useRef(false)
@@ -3578,7 +3578,7 @@ function UploadContent() {
   const [customCategories, setCustomCategories] = useState<Array<{ group: string; items: string[] }>>([])  // 사용자 추가 중그룹/세부항목
 
   // ── Guard: Company Selection ──
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>

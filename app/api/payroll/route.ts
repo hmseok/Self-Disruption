@@ -23,7 +23,7 @@ async function verifyAdmin(request: NextRequest) {
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles').select('role, company_id').eq('id', user.id).single()
-  if (!profile || !['god_admin', 'master'].includes(profile.role)) return null
+  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
   return { ...user, role: profile.role, company_id: profile.company_id }
 }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const companyId = searchParams.get('company_id') || admin.company_id
 
-  if (admin.role === 'master' && companyId !== admin.company_id) {
+  if (admin.role === 'admin' && companyId !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   if (!company_id || !employee_id) {
     return NextResponse.json({ error: '회사 ID와 직원 ID가 필요합니다.' }, { status: 400 })
   }
-  if (admin.role === 'master' && company_id !== admin.company_id) {
+  if (admin.role === 'admin' && company_id !== admin.company_id) {
     return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 

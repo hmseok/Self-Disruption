@@ -1,11 +1,11 @@
 // ============================================
 // RBAC 타입 정의 - 권한 시스템
+// FMI 단독 ERP (주식회사 에프엠아이)
 // ============================================
 
 // 직급
 export interface Position {
   id: string
-  company_id: string
   name: string        // 대표, 이사, 팀장, 사원
   level: number       // 1=최상위, 숫자 클수록 하위
   description?: string
@@ -16,46 +16,33 @@ export interface Position {
 // 부서
 export interface Department {
   id: string
-  company_id: string
   name: string        // 경영지원, 영업, 차량관리
   description?: string
   created_at: string
   updated_at: string
 }
 
-// 프로필 (확장)
+// 프로필
 export interface Profile {
   id: string
-  company_id: string
-  role: 'god_admin' | 'master' | 'user'
-  is_super_admin: boolean
+  role: 'admin' | 'user'
   position_id?: string
   department_id?: string
   employee_name?: string
   phone?: string
+  email?: string
   is_active: boolean
+  is_approved: boolean       // 가입 승인 여부
   // 조인된 데이터
   position?: Position
   department?: Department
-  companies?: Company
-}
-
-// 회사
-export interface Company {
-  id: string
-  name: string
-  business_number?: string
-  plan: string
-  owner_id: string
-  created_at: string
 }
 
 // ============================================
-// 사용자별 페이지 권한 (신규 단순 방식)
+// 사용자별 페이지 권한
 // ============================================
 export interface UserPagePermission {
   id: string
-  company_id: string
   user_id: string
   page_path: string
   can_view: boolean
@@ -75,3 +62,14 @@ export type PermissionAction = 'view' | 'create' | 'edit' | 'delete'
 
 // 데이터 범위
 export type DataScope = 'all' | 'department' | 'own'
+
+// ============================================
+// 하위 호환 타입 (마이그레이션 과도기)
+// ============================================
+export interface Company {
+  id: string
+  name: string
+  business_number?: string
+  owner_id?: string
+  created_at?: string
+}

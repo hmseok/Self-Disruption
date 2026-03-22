@@ -34,7 +34,7 @@ async function verifyPlatformAdmin(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'god_admin') return null
+  if (!profile || profile.role !== 'admin') return null
   return user
 }
 

@@ -39,7 +39,7 @@ const DEFAULT_COMPANY: CompanyData = {
 
 export default function CompanySettingsTab() {
   const { company, role, adminSelectedCompanyId, refreshAuth } = useApp()
-  const isGodAdmin = role === 'god_admin'
+  const isGodAdmin = role === 'admin'
   const openPostcode = useDaumPostcodePopup()
 
   const [data, setData] = useState<CompanyData>(DEFAULT_COMPANY)
@@ -49,7 +49,7 @@ export default function CompanySettingsTab() {
   const [hasChanges, setHasChanges] = useState(false)
   const [savedData, setSavedData] = useState<CompanyData>(DEFAULT_COMPANY)
 
-  // 일반 사용자: 본인 회사만 편집, god_admin: 선택한 회사 편집
+  // 일반 사용자: 본인 회사만 편집, admin: 선택한 회사 편집
   const targetCompanyId = isGodAdmin ? (adminSelectedCompanyId || company?.id) : company?.id
 
   const loadCompany = useCallback(async () => {

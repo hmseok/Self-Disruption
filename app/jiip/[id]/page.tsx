@@ -126,7 +126,7 @@ export default function JiipDetailPage() {
   // ── 데이터 조회 ──
   const fetchCars = async () => {
     let query = supabase.from('cars').select('id, number, brand, model, company_id, purchase_price')
-    if (role !== 'god_admin' && company?.id) query = query.eq('company_id', company.id)
+    if (role !== 'admin' && company?.id) query = query.eq('company_id', company.id)
     const { data } = await query.order('number', { ascending: true })
     setCars(data || [])
   }

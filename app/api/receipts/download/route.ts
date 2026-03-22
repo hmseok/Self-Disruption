@@ -122,8 +122,8 @@ export async function GET(request: NextRequest) {
 
   if (!month) return NextResponse.json({ error: 'month 파라미터 필요' }, { status: 400 })
 
-  const companyId = (user.role === 'god_admin' && overrideCompanyId) ? overrideCompanyId : user.company_id
-  if (user.role === 'god_admin' && !overrideCompanyId) {
+  const companyId = (user.role === 'admin' && overrideCompanyId) ? overrideCompanyId : user.company_id
+  if (user.role === 'admin' && !overrideCompanyId) {
     return NextResponse.json({ error: '회사를 선택해주세요' }, { status: 400 })
   }
 

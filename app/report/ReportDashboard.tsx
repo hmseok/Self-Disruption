@@ -99,7 +99,7 @@ export default function ReportDashboard() {
   // 기간 필터
   const [periodMonths, setPeriodMonths] = useState(6) // 최근 N개월
 
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const pathname = usePathname()
 
@@ -115,11 +115,11 @@ export default function ReportDashboard() {
   }, [effectiveCompanyId])
 
   const fetchAllData = async () => {
-    if (!effectiveCompanyId && role !== 'god_admin') return
+    if (!effectiveCompanyId && role !== 'admin') return
     setLoading(true)
 
     const companyFilter = (q: any) => {
-      if (role === 'god_admin') {
+      if (role === 'admin') {
         if (adminSelectedCompanyId) return q.eq('company_id', adminSelectedCompanyId)
         return q
       }
@@ -224,7 +224,7 @@ export default function ReportDashboard() {
     { key: 'partner', label: '투자/파트너' },
   ]
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

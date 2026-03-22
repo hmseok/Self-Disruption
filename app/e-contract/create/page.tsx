@@ -44,7 +44,7 @@ interface InsurancePolicy {
 export default function CreateContractPage() {
   const router = useRouter();
   const { company, role, adminSelectedCompanyId } = useApp();
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id;
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id;
   // supabase is imported from utils
 
   // State management
@@ -364,8 +364,8 @@ export default function CreateContractPage() {
     `${c.brand} ${c.model} ${c.number}`.toLowerCase().includes(carSearchText.toLowerCase())
   );
 
-  // 회사 미선택 (god_admin)
-  if (role === 'god_admin' && !companyId) {
+  // 회사 미선택 (admin)
+  if (role === 'admin' && !companyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

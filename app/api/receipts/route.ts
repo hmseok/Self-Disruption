@@ -21,9 +21,9 @@ async function verifyUser(request: NextRequest) {
   return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
 }
 
-// god_admin의 경우 company_id 오버라이드 가능
+// admin의 경우 company_id 오버라이드 가능
 function getEffectiveCompanyId(user: any, requestCompanyId?: string | null): string {
-  if (user.role === 'god_admin' && requestCompanyId) {
+  if (user.role === 'admin' && requestCompanyId) {
     return requestCompanyId
   }
   return user.company_id
@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
   const overrideCompanyId = searchParams.get('company_id')
   const companyId = getEffectiveCompanyId(user, overrideCompanyId)
 
-  // god_admin인데 company_id가 없으면 차단
-  if (user.role === 'god_admin' && !overrideCompanyId) {
+  // admin인데 company_id가 없으면 차단
+  if (user.role === 'admin' && !overrideCompanyId) {
     return NextResponse.json({ error: '회사를 선택해주세요', data: [], months: [] }, { status: 400 })
   }
 
@@ -113,8 +113,8 @@ export async function POST(request: NextRequest) {
 
     const companyId = getEffectiveCompanyId(user, bodyCompanyId)
 
-    // god_admin인데 company_id가 없으면 차단
-    if (user.role === 'god_admin' && !bodyCompanyId) {
+    // admin인데 company_id가 없으면 차단
+    if (user.role === 'admin' && !bodyCompanyId) {
       return NextResponse.json({ error: '회사를 선택해주세요' }, { status: 400 })
     }
 

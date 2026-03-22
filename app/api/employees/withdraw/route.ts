@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 // 직원 탈퇴 API
 // - profile 비활성화 + 회사 연결 해제
 // - Supabase Auth 사용자 삭제 (선택)
-// - master/god_admin만 가능
+// - master/admin만 가능
 // ============================================
 
 function getSupabaseAdmin() {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       .eq('id', authUser.id)
       .single()
 
-    if (!requester || !['god_admin', 'master'].includes(requester.role)) {
+    if (!requester || !['admin', 'master'].includes(requester.role)) {
       return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 })
     }
 
@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
     if (target.id === requester.id) {
       return NextResponse.json({ error: '자기 자신은 탈퇴시킬 수 없습니다.' }, { status: 400 })
     }
-    // - god_admin은 다른 god_admin 탈퇴 불가
-    if (target.role === 'god_admin') {
+    // - admin은 다른 admin 탈퇴 불가
+    if (target.role === 'admin') {
       return NextResponse.json({ error: 'GOD ADMIN은 탈퇴시킬 수 없습니다.' }, { status: 403 })
     }
     // - master는 자기 회사 직원만
-    if (requester.role === 'master' && target.company_id !== requester.company_id) {
+    if (requester.role === 'admin' && target.company_id !== requester.company_id) {
       return NextResponse.json({ error: '다른 회사의 직원은 탈퇴시킬 수 없습니다.' }, { status: 403 })
     }
 

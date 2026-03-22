@@ -237,7 +237,7 @@ export default function QuoteCalculator() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // 공통 상태
   const [loading, setLoading] = useState(false)
@@ -545,7 +545,7 @@ export default function QuoteCalculator() {
   // ============================================================
 
   const handleSaveQuote = async (status: 'draft' | 'active') => {
-    if (role === 'god_admin' && !adminSelectedCompanyId) {
+    if (role === 'admin' && !adminSelectedCompanyId) {
       return alert('⚠️ 회사를 먼저 선택해주세요.')
     }
     if (!selectedCar) return alert('차량을 선택해주세요.')

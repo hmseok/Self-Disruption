@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js'
  * GET /api/admin/contracts
  *
  * 계약 목록 + 통계 + 필터 + 검색 + 페이지네이션
- * god_admin은 company_id 없이 전체 조회 가능
+ * admin은 company_id 없이 전체 조회 가능
  */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -28,14 +28,14 @@ export async function GET(req: NextRequest) {
     const sb = createClient(supabaseUrl, supabaseServiceKey)
     const offset = (page - 1) * limit
 
-    // god_admin 여부 확인 (company_id 없이 전체 조회 허용)
+    // admin 여부 확인 (company_id 없이 전체 조회 허용)
     if (!companyId) {
       const { data: profile } = await sb
         .from('profiles')
         .select('role')
         .eq('id', auth.userId)
         .single()
-      if (profile?.role !== 'god_admin') {
+      if (profile?.role !== 'admin') {
         return NextResponse.json({ error: 'company_id가 필요합니다.' }, { status: 400 })
       }
     }

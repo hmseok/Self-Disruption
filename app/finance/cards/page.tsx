@@ -26,7 +26,7 @@ const matchCardCompany = (raw: string): string => {
 
 export default function CorporateCardsPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'god_admin' ? adminSelectedCompanyId : company?.id
+  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   const [loading, setLoading] = useState(true)
   const [cards, setCards] = useState<any[]>([])
@@ -763,7 +763,7 @@ export default function CorporateCardsPage() {
   const totalMonthlyCount = Object.values(cardUsage).reduce((s, u) => s + u.count, 0)
   const activeCards = cards.filter(c => c.is_active).length
 
-  if (role === 'god_admin' && !adminSelectedCompanyId) {
+  if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ padding: '80px 48px', textAlign: 'center', color: '#9ca3af', fontSize: 14, background: '#fff', borderRadius: 16 }}>
