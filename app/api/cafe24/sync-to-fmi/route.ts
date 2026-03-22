@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getCafe24Pool as getPool } from '../lib/db';
 
-// Supabase 서비스 클라이언트
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Supabase 서비스 클라이언트 (lazy 초기화 - 빌드 타임에 env 없을 수 있음)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // ============================================================
 // 카페24 사고접수 → FMI 사고 테이블 동기화
@@ -155,6 +157,7 @@ function parseRegion(location: string): { sido: string | null; sigungu: string |
 // ============================================================
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = await req.json().catch(() => ({}));
     const { mode = 'incremental', days = 7 } = body;
     // mode: 'full' = 전체, 'incremental' = 최근 N일
@@ -263,6 +266,7 @@ export async function POST(req: NextRequest) {
 // ============================================================
 export async function GET(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action') || 'status';
 

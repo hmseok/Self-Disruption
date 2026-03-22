@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 // GET /api/codes — 코드마스터 조회
 // ?group=OTPTSTAT → 특정 그룹
@@ -12,6 +14,7 @@ const supabase = createClient(
 // (없으면 전체)
 export async function GET(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
     const group = searchParams.get('group') || '';
     const groups = searchParams.get('groups') || '';
@@ -60,6 +63,7 @@ export async function GET(req: NextRequest) {
 // POST /api/codes — 코드 추가/수정
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = await req.json();
     const { action, data } = body;
 
