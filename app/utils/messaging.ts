@@ -30,7 +30,7 @@ interface SendEmailParams {
 }
 
 interface LogMessageSendParams {
-  companyId: string
+  companyId?: string
   templateKey?: string
   channel: MessageChannel
   recipient: string
@@ -319,7 +319,6 @@ export async function logMessageSend(params: LogMessageSendParams): Promise<bool
     const sb = getSupabaseAdmin()
 
     const { error } = await sb.from('message_send_logs').insert({
-      company_id: companyId,
       template_key: templateKey,
       channel,
       recipient,
@@ -400,7 +399,6 @@ export async function sendWithTemplate(params: SendWithTemplateParams): Promise<
     const { data: companyTemplate, error: compErr } = await sb
       .from('message_templates')
       .select('*')
-      .eq('company_id', companyId)
       .eq('template_key', templateKey)
       .eq('channel', channel)
       .limit(1)

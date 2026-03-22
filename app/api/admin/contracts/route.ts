@@ -44,7 +44,6 @@ export async function GET(req: NextRequest) {
     let statsQuery = sb
       .from('contracts')
       .select('id, status, created_at, end_date')
-    if (companyId) statsQuery = statsQuery.eq('company_id', companyId)
 
     const { data: allContracts, error: statsError } = await statsQuery
     if (statsError) {
@@ -78,8 +77,6 @@ export async function GET(req: NextRequest) {
     let query = sb
       .from('contracts')
       .select('*', { count: 'exact' })
-    if (companyId) query = query.eq('company_id', companyId)
-    query = query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -147,7 +144,6 @@ export async function GET(req: NextRequest) {
       contract_pdf_url: c.contract_pdf_url || null,
       created_at: c.created_at,
       updated_at: c.updated_at,
-      company_id: c.company_id,
       car: carsMap[c.car_id] || null,
       signature: sigsMap[c.signature_id] || null,
     }))

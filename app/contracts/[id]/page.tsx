@@ -215,15 +215,8 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
         }
       }
 
-      // 회사 정보 조회
+      // 회사 정보는 quote_detail에서 활용
       let company: any = null
-      const companyId = contract.company_id || quote?.company_id
-      if (companyId) {
-        const { data: compData, error: compErr } = await supabase
-          .from('companies').select('*').eq('id', companyId).single()
-        if (compErr) console.error('Company fetch error:', compErr.message)
-        company = compData
-      }
 
       // 서명 데이터 조회
       let signatureData = null

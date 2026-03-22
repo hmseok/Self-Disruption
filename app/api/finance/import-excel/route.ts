@@ -15,7 +15,7 @@ function getSupabaseAdmin() {
 }
 
 // 전체 데이터 페이지네이션 조회
-async function fetchAll(sb: ReturnType<typeof getSupabaseAdmin>, table: string, company_id: string, select: string) {
+async function fetchAll(sb: ReturnType<typeof getSupabaseAdmin>, table: string, select: string, _company_id?: string) {
   const PAGE = 1000
   let all: any[] = []
   let offset = 0
@@ -23,7 +23,6 @@ async function fetchAll(sb: ReturnType<typeof getSupabaseAdmin>, table: string, 
     const { data, error } = await sb
       .from(table)
       .select(select)
-      .eq('company_id', company_id)
       .is('deleted_at', null)
       .range(offset, offset + PAGE - 1)
     if (error) throw error
@@ -45,12 +44,11 @@ export async function POST(request: NextRequest) {
     const sb = getSupabaseAdmin()
 
     // 1) 기존 transactions 조회
-    const transactions = await fetchAll(sb, 'transactions', company_id,
+    const transactions = await fetchAll(sb, 'transactions',
       'id, transaction_date, client_name, amount, description, payment_method')
 
     // 2) 기존 classification_queue 전체 조회 (pending + confirmed — 중복 삽입 방지용)
-    const cqAll = await fetchAll(sb, 'classification_queue', company_id,
-      'id, source_data, status')
+    const cqAll = await fetchAll(sb, 'classification_queue', 'id, source_data, status')
 
     // 3) transactions를 (date, abs_amount) → 배열로 그룹핑
     const txMap = new Map<string, any[]>()

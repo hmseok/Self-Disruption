@@ -485,12 +485,12 @@ export default function CarDetailPage() {
           <div className="p-8 flex-1 bg-gray-50/50">
              {/* 📊 손익 탭 */}
              {activeTab === 'pnl' && (
-               <PnlTab carId={carId!} companyId={car?.company_id} car={car} />
+               <PnlTab carId={carId!} car={car} />
              )}
 
              {/* 💳 수익/정산 탭 */}
              {activeTab === 'settlement' && (
-               <CarSettlementTab carId={carId!} companyId={car?.company_id} car={car} />
+               <CarSettlementTab carId={carId!} car={car} />
              )}
 
              {/* 📋 기본 정보 탭 */}

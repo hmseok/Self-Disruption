@@ -235,7 +235,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       const { data } = await supabase
         .from('transactions')
         .select('transaction_date, client_name, amount, type, approval_number, description, card_number')
-        .eq('company_id', companyId)
+        
         .order('transaction_date', { ascending: false })
         .limit(5000);
       if (data && data.length > 0) {
@@ -511,7 +511,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
               const analyzeRes = await fetch('/api/finance/classify', {
                 method: 'POST',
                 headers: classifyHeaders,
-                body: JSON.stringify({ transactions: newTransactions, company_id: companyIdRef.current }),
+                body: JSON.stringify({ transactions: newTransactions }),
               });
               if (analyzeRes.ok) {
                 const { transactions: enriched } = await analyzeRes.json();
@@ -661,7 +661,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             const analyzeRes = await fetch('/api/finance/classify', {
               method: 'POST',
               headers: classifyHeaders,
-              body: JSON.stringify({ transactions: newTransactions, company_id: companyIdRef.current }),
+              body: JSON.stringify({ transactions: newTransactions }),
             });
             if (analyzeRes.ok) {
               const { transactions: enriched } = await analyzeRes.json();
@@ -855,7 +855,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const { data: existing } = await supabase
           .from('corporate_cards')
           .select('id')
-          .eq('company_id', companyIdRef.current)
+          
           .like('card_number', `%${last4}`);
 
         if (existing && existing.length > 0) {
@@ -874,7 +874,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         } else {
           // 신규 등록
           await supabase.from('corporate_cards').insert({
-            company_id: companyIdRef.current,
             card_company: cardCompany,
             card_number: cardNumber,
             holder_name: isShared ? '공용' : holderName,

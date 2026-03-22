@@ -250,17 +250,14 @@ export async function POST(request: NextRequest) {
     // ── DB: 차량 조회
     const { data: car } = await supabase
       .from('cars')
-      .select('id, company_id, number, brand, model, status')
+      .select('id, number, brand, model, status')
       .or(`number.ilike.%${cleanCarNum}%`)
       .limit(1)
       .single()
 
     // 회사 ID 결정
-    let companyId = car?.company_id
-    if (!companyId) {
-      const { data: defaultCompany } = await supabase.from('companies').select('id').limit(1).single()
-      companyId = defaultCompany?.id
-    }
+    const { data: defaultCompany } = await supabase.from('companies').select('id').limit(1).single()
+    const companyId = defaultCompany?.id
     if (!companyId) {
       return jandiResponse('⚠️ 회사 정보를 찾을 수 없습니다.', '#FF9800')
     }
@@ -273,7 +270,6 @@ export async function POST(request: NextRequest) {
         .from('contracts')
         .select('id, customer_id')
         .eq('car_id', car.id)
-        .eq('company_id', companyId)
         .eq('status', 'active')
         .limit(1)
         .single()
@@ -283,7 +279,6 @@ export async function POST(request: NextRequest) {
 
     // ── 1) accident_records INSERT (사고 내역 보관)
     const accidentInsert: Record<string, any> = {
-      company_id: companyId,
       car_id: car?.id || null,
       contract_id: contractId,
       customer_id: customerId,
@@ -338,7 +333,6 @@ export async function POST(request: NextRequest) {
     const { data: availableCars } = await supabase
       .from('cars')
       .select('id, number, brand, model, trim, year, status')
-      .eq('company_id', companyId)
       .in('status', ['available', 'idle', '대기'])
       .order('brand', { ascending: true })
       .limit(10)
@@ -366,7 +360,6 @@ export async function POST(request: NextRequest) {
     if (car) {
       await supabase.from('cars').update({ status: 'accident' }).eq('id', car.id)
       await supabase.from('vehicle_status_log').insert({
-        company_id: companyId,
         car_id: car.id,
         old_status: car.status || 'active',
         new_status: 'accident',

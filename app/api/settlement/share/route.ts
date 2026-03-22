@@ -22,9 +22,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 type SettlementItem = {
@@ -70,7 +70,6 @@ type CreateShareRequest = {
   transaction_details?: Record<string, TransactionDetail[]>  // carId_month → 거래내역[]
   bank_info?: BankInfo
   message?: string
-  company_id: string
 }
 
 function generateToken(): string {
@@ -96,8 +95,7 @@ export async function POST(request: NextRequest) {
       breakdown,
       transaction_details,
       bank_info,
-      message,
-      company_id
+      message
     } = body
 
     // 필드 검증
@@ -110,14 +108,6 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'items 배열 필수' }, { status: 400 })
     }
-    if (!company_id?.trim()) {
-      return NextResponse.json({ error: 'company_id 필수' }, { status: 400 })
-    }
-
-    // 회사 권한 확인
-    if (admin.company_id !== company_id) {
-      return NextResponse.json({ error: '해당 회사에 대한 권한 없음' }, { status: 403 })
-    }
 
     const sb = getSupabaseAdmin()
     const token = generateToken()
@@ -125,7 +115,6 @@ export async function POST(request: NextRequest) {
     // 공유 레코드 생성
     const insertData: Record<string, any> = {
       token,
-      company_id,
       recipient_name: recipient_name.trim(),
       recipient_phone: recipient_phone?.replace(/[^0-9]/g, '') || null,
       settlement_month: settlement_month.trim(),

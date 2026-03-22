@@ -14,7 +14,7 @@ function getSupabaseAdmin() {
 }
 
 // ── 전체 데이터 페이지네이션 조회 (1000건 제한 해결) ──
-async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, company_id: string) {
+async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, _company_id?: string) {
   const PAGE_SIZE = 1000
   let allTxs: any[] = []
   let offset = 0
@@ -24,7 +24,6 @@ async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, com
     const { data, error } = await sb
       .from('transactions')
       .select('id, transaction_date, client_name, amount, payment_method, description, created_at')
-      .eq('company_id', company_id)
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)

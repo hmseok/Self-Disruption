@@ -26,9 +26,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 export async function POST(request: NextRequest) {
@@ -44,9 +44,6 @@ export async function POST(request: NextRequest) {
   if (!/^\d{4}-\d{2}$/.test(pay_period)) {
     return NextResponse.json({ error: 'pay_period 형식: YYYY-MM' }, { status: 400 })
   }
-  if (admin.role === 'admin' && company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
 
   const sb = getSupabaseAdmin()
 
@@ -54,7 +51,6 @@ export async function POST(request: NextRequest) {
   const { data: salarySettings, error: ssErr } = await sb
     .from('employee_salaries')
     .select('*')
-    .eq('company_id', company_id)
     .eq('is_active', true)
 
   if (ssErr) return NextResponse.json({ error: ssErr.message }, { status: 500 })
@@ -66,7 +62,6 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await sb
     .from('payslips')
     .select('employee_id')
-    .eq('company_id', company_id)
     .eq('pay_period', pay_period)
 
   const existingSet = new Set((existing || []).map((e: any) => e.employee_id))
@@ -79,7 +74,6 @@ export async function POST(request: NextRequest) {
   const { data: expenseTransactions } = await sb
     .from('transactions')
     .select('*')
-    .eq('company_id', company_id)
     .eq('related_type', 'expense_claim')
     .gte('transaction_date', periodStart)
     .lt('transaction_date', nextMonth)
@@ -101,7 +95,6 @@ export async function POST(request: NextRequest) {
   const { data: mealExpenses } = await sb
     .from('meal_expense_monthly')
     .select('*')
-    .eq('company_id', company_id)
     .eq('year_month', pay_period)
     .in('status', ['approved', 'pending'])
 
@@ -127,7 +120,6 @@ export async function POST(request: NextRequest) {
   const { data: cardSpending } = await sb
     .from('classification_queue')
     .select('card_id, amount')
-    .eq('company_id', company_id)
     .gte('transaction_date', periodStart)
     .lt('transaction_date', nextMonth)
 
@@ -135,7 +127,6 @@ export async function POST(request: NextRequest) {
   const { data: cardAssignments } = await sb
     .from('corporate_cards')
     .select('id, assigned_to')
-    .eq('company_id', company_id)
     .not('assigned_to', 'is', null)
 
   const cardToEmployee: Record<string, string> = {}

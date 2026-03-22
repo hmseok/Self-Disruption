@@ -125,8 +125,7 @@ export default function JiipDetailPage() {
 
   // ── 데이터 조회 ──
   const fetchCars = async () => {
-    let query = supabase.from('cars').select('id, number, brand, model, company_id, purchase_price')
-    if (role !== 'admin' && company?.id) query = query.eq('company_id', company.id)
+    let query = supabase.from('cars').select('id, number, brand, model, purchase_price')
     const { data } = await query.order('number', { ascending: true })
     setCars(data || [])
   }
@@ -310,11 +309,8 @@ export default function JiipDetailPage() {
 
   const handleSave = async () => {
     if (!item.car_id || !item.investor_name) return alert('차량과 투자자 정보는 필수입니다.')
-    const selectedCar = cars.find(c => c.id == item.car_id)
-    if (!selectedCar?.company_id) return alert('선택된 차량의 회사 정보를 찾을 수 없습니다.')
 
     const payload = {
-      company_id: selectedCar.company_id,
       car_id: item.car_id, investor_name: item.investor_name, investor_phone: item.investor_phone,
       investor_reg_number: item.investor_reg_number, investor_email: item.investor_email,
       investor_address: item.investor_address, investor_address_detail: item.investor_address_detail,

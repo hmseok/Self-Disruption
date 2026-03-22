@@ -269,7 +269,6 @@ export default function GeneralInvestDetail() {
     payload.invest_amount = Number(payload.invest_amount)
     payload.interest_rate = Number(payload.interest_rate)
     payload.payment_day = Number(payload.payment_day)
-    if (isNew) payload.company_id = effectiveCompanyId
 
     const { error } = isNew
       ? await supabase.from('general_investments').insert(payload)

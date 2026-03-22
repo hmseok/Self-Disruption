@@ -18,7 +18,6 @@ type VariableMeta = {
 
 type MessageTemplate = {
   id: string
-  company_id: string
   template_key: string
   name: string
   description: string
@@ -40,7 +39,6 @@ type MessageTemplate = {
 
 type MessageSendLog = {
   id: string
-  company_id: string
   template_key: string
   channel: 'sms' | 'kakao' | 'email' | 'push'
   recipient: string
@@ -98,7 +96,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function MessageTemplatesPage() {
   const router = useRouter()
-  const { company, role, adminSelectedCompanyId, loading: appLoading } = useApp()
+  const { company, role, loading: appLoading } = useApp()
 
   // 권한 확인
   useEffect(() => {
@@ -133,7 +131,7 @@ export default function MessageTemplatesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
 
-  const companyId = adminSelectedCompanyId || company?.id
+  const companyId = company?.id
 
   // 템플릿 로드
   const loadTemplates = async () => {
@@ -144,7 +142,7 @@ export default function MessageTemplatesPage() {
       const { data, error: fetchError } = await supabase
         .from('message_templates')
         .select('*')
-        .eq('company_id', companyId)
+        
         .order('sort_order', { ascending: true })
         .order('template_key', { ascending: true })
 
@@ -165,7 +163,7 @@ export default function MessageTemplatesPage() {
           const { count } = await supabase
             .from('message_send_logs')
             .select('id', { count: 'exact', head: true })
-            .eq('company_id', companyId)
+            
             .eq('template_key', template.template_key)
 
           return {
@@ -192,7 +190,7 @@ export default function MessageTemplatesPage() {
       let query = supabase
         .from('message_send_logs')
         .select('*')
-        .eq('company_id', companyId)
+        
 
       if (selectedStatus !== 'all') query = query.eq('status', selectedStatus)
       if (selectedChannel !== 'all') query = query.eq('channel', selectedChannel)
@@ -251,7 +249,7 @@ export default function MessageTemplatesPage() {
           .from('message_templates')
           .insert([{
             ...template,
-            company_id: companyId,
+            
             sort_order: templates.length,
             is_active: true,
             is_system: false,
@@ -436,7 +434,7 @@ export default function MessageTemplatesPage() {
                     setIsCreateMode(true)
                     setEditingTemplate({
                       id: '',
-                      company_id: companyId || '',
+                      
                       template_key: '',
                       name: '',
                       description: '',

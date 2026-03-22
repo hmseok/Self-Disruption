@@ -23,7 +23,6 @@ type Transaction = {
   payment_method: string
   related_type?: string
   related_id?: string
-  company_id: string
 }
 
 type SettlementItem = {
@@ -170,8 +169,8 @@ const nfSign = (num: number) => num > 0 ? `+${nf(num)}` : nf(num)
 // ============================================
 export default function SettlementDashboard() {
   const router = useRouter()
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const effectiveCompanyId = company?.id
 
   // 상태
   const [activeTab, setActiveTab] = useState<'contracts' | 'revenue' | 'settlement' | 'pnl' | 'execute'>('contracts')
@@ -275,14 +274,14 @@ export default function SettlementDashboard() {
 
   useEffect(() => {
     fetchAllData()
-  }, [filterDate, company, adminSelectedCompanyId, pathname])
+  }, [filterDate, company, pathname])
 
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
     const onFocus = () => fetchAllData()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [filterDate, company, adminSelectedCompanyId])
+  }, [filterDate, company])
 
   // shareHistory가 로드되면: 정산월 자동 감지 + 이체 미리보기 빌드 (execute 탭일 때만)
   useEffect(() => {
@@ -318,26 +317,26 @@ export default function SettlementDashboard() {
       // 거래 내역 (당월)
       (() => {
         let q = supabase.from('transactions').select('*')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.gte('transaction_date', startDate).lte('transaction_date', endDate)
           .order('transaction_date', { ascending: false })
       })(),
       // 지입 계약 (contract_start_date 포함)
       (() => {
         let q = supabase.from('jiip_contracts').select('*, cars(number, model, owner_bank, owner_account, owner_account_holder)').eq('status', 'active')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q
       })(),
       // 투자자 (cars 조인 없이 — investors에 car_id FK 없을 수 있음)
       (() => {
         let q = supabase.from('general_investments').select('*').eq('status', 'active')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q
       })(),
       // 대출
       (() => {
         let q = supabase.from('loans').select('*, cars(number)')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q
       })(),
       // 전체 정산 거래 (미수 누적 확인용 — 최근 12개월) — id 포함 (취소 시 직접 삭제용)
@@ -347,14 +346,14 @@ export default function SettlementDashboard() {
         let q = supabase.from('transactions').select('id, related_type, related_id, transaction_date, amount, type')
           .in('related_type', ['jiip_share', 'invest', 'loan'])
           .eq('type', 'expense')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.gte('transaction_date', past12Start)
       })(),
       // 차량별 거래 내역 (최근 12개월 — 지입 수익배분 계산용)
       (() => {
         let q = supabase.from('transactions').select('related_type, related_id, type, amount, transaction_date, category, client_name, description')
           .eq('related_type', 'car')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.gte('transaction_date', past12Start)
       })(),
       // 통장분류 내역 (당월 confirmed 건)
@@ -362,7 +361,7 @@ export default function SettlementDashboard() {
         let q = supabase.from('classification_queue').select('*')
           .in('status', ['confirmed', 'auto_confirmed'])
           .is('deleted_at', null)
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('created_at', { ascending: false }).limit(500)
       })(),
       // 정산 발송 이력 (당월 + 직전월 — 새로고침 시 정산월 자동 감지용)
@@ -371,7 +370,7 @@ export default function SettlementDashboard() {
         const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
         let q = supabase.from('settlement_shares')
           .select('id, recipient_name, recipient_phone, settlement_month, total_amount, created_at, paid_at, items')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.in('settlement_month', [filterDate, prevMonth]).order('created_at', { ascending: false })
       })(),
       // 투자금 입금 내역 (투자금 변동 추적 — 테이블 없으면 빈 배열)
@@ -379,7 +378,7 @@ export default function SettlementDashboard() {
         try {
           let q = supabase.from('investment_deposits')
             .select('id, investment_id, deposit_date, amount, memo')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          
           return await q.order('deposit_date', { ascending: true })
         } catch { return { data: [], error: null } }
       })(),
@@ -388,19 +387,19 @@ export default function SettlementDashboard() {
         let q = supabase.from('transactions')
           .select('id, transaction_date, amount, type, related_type, related_id, category, client_name, description')
           .eq('related_type', 'invest')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('transaction_date', { ascending: true })
       })(),
       // ── 계약 현황 탭: 전체 지입 계약 (모든 상태) ──
       (() => {
         let q = supabase.from('jiip_contracts').select('*, car:cars ( number, model )')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('created_at', { ascending: false })
       })(),
       // ── 계약 현황 탭: 전체 투자 계약 (모든 상태) ──
       (() => {
         let q = supabase.from('general_investments').select('*')
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('created_at', { ascending: false })
       })(),
       // ── 계약 현황 탭: 정산 거래 (jiip_share + invest) ──
@@ -408,7 +407,7 @@ export default function SettlementDashboard() {
         let q = supabase.from('transactions')
           .select('id, related_type, related_id, transaction_date, amount, type, category, client_name, memo')
           .in('related_type', ['jiip_share', 'invest'])
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('transaction_date', { ascending: false })
       })(),
       // ── 계약 현황 탭: 전체 기간 지급완료 settlement_shares (누적 지급 계산용) ──
@@ -416,7 +415,7 @@ export default function SettlementDashboard() {
         let q = supabase.from('settlement_shares')
           .select('id, recipient_name, settlement_month, total_amount, paid_at, items')
           .not('paid_at', 'is', null)
-        if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+        
         return q.order('paid_at', { ascending: false })
       })(),
     ])
@@ -1121,7 +1120,7 @@ export default function SettlementDashboard() {
           payment_method: '통장',
           related_type: relatedType,
           related_id: String(item.relatedId),
-          company_id: effectiveCompanyId,
+          
         }
       })
 
@@ -1447,7 +1446,7 @@ export default function SettlementDashboard() {
         const { data: matchTxs, error: findErr } = await supabase
           .from('transactions')
           .select('id, related_type, related_id, transaction_date')
-          .eq('company_id', effectiveCompanyId)
+          
           .in('related_type', ['jiip_share', 'invest', 'loan', relatedType])
 
         if (findErr) throw findErr
@@ -1750,7 +1749,7 @@ export default function SettlementDashboard() {
               })(),
               bank_info: r.bankInfo || undefined,
               message: smsModal.customNote || undefined,
-              company_id: effectiveCompanyId,
+              
             }),
           })
           if (shareRes.ok) {
@@ -1790,7 +1789,7 @@ export default function SettlementDashboard() {
             })),
           })),
           channel: notifyChannel,
-          company_id: effectiveCompanyId,
+          
         }),
       })
       const data = await res.json()
@@ -1858,7 +1857,7 @@ export default function SettlementDashboard() {
                   items: [],
                 }],
                 channel: 'sms',
-                company_id: effectiveCompanyId,
+                
               }),
             }).then(async r => {
               if (r.ok) {
@@ -1914,7 +1913,7 @@ export default function SettlementDashboard() {
             body: JSON.stringify({
               recipients: [{ name: share.recipient_name, phone: share.recipient_phone, message: paidMsg, totalAmount: share.total_amount, items: [] }],
               channel: 'sms',
-              company_id: effectiveCompanyId,
+              
             }),
           }).catch(() => {})
         })
@@ -1955,7 +1954,7 @@ export default function SettlementDashboard() {
   // ============================================
   // 렌더링
   // ============================================
-  if (role === 'admin' && !adminSelectedCompanyId) {
+  if (!company) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

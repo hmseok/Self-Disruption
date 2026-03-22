@@ -8,7 +8,7 @@ import { supabase } from '../../utils/supabase'
 // Types
 // ============================================
 type AccidentRecord = {
-  id: number; company_id: string; car_id: number | null; contract_id: string | null
+  id: number; car_id: number | null; contract_id: string | null
   customer_id: number | null; accident_date: string; accident_time: string | null
   accident_location: string; accident_type: string; fault_ratio: number
   description: string; status: string; driver_name: string; driver_phone: string
@@ -94,8 +94,8 @@ function extractJandi(raw: string | null, notes: string | null) {
 // Main Component
 // ============================================
 export default function IntakePage() {
-  const { user, company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { user, company, role } = useApp()
+  const companyId = company?.id
 
   const [cafe24Records, setCafe24Records] = useState<AccidentRecord[]>([])
   const [cafe24Loading, setCafe24Loading] = useState(false)
@@ -132,10 +132,10 @@ export default function IntakePage() {
       const [carsR, opsR] = await Promise.all([
         supabase.from('cars')
           .select('id,number,brand,model,status,ownership_type,detailed_status')
-          .eq('company_id', companyId).order('number'),
+          .order('number'),
         supabase.from('vehicle_operations')
           .select('*,car:cars!vehicle_operations_car_id_fkey(number,brand,model)')
-          .eq('company_id', companyId).in('status', ['scheduled', 'preparing', 'inspecting', 'in_transit']).limit(100),
+          .in('status', ['scheduled', 'preparing', 'inspecting', 'in_transit']).limit(100),
       ])
       if (carsR.data) setCars(carsR.data)
       if (opsR.data) setOperations(opsR.data as any)
@@ -171,7 +171,7 @@ export default function IntakePage() {
 
         return {
           id: -(idx + 1), // negative ID to avoid collision with supabase
-          company_id: '', car_id: null, contract_id: null, customer_id: null,
+           car_id: null, contract_id: null, customer_id: null,
           accident_date: accDate, accident_time: accTime,
           accident_location: r.accidentLocation || '', accident_type: 'collision',
           fault_ratio: parseInt(r.faultRate) || 0,
@@ -226,7 +226,7 @@ export default function IntakePage() {
     if (!selectedId || !companyId) { setCustomerNotes([]); return }
     const rec = cafe24Records.find(r => r.id === selectedId)
     if (!rec?.customer_id) { setCustomerNotes([]); return }
-    supabase.from('customer_notes').select('*').eq('customer_id', rec.customer_id).eq('company_id', companyId)
+    supabase.from('customer_notes').select('*').eq('customer_id', rec.customer_id)
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => { if (data) setCustomerNotes(data) })
   }, [selectedId, companyId, cafe24Records])
 
@@ -290,9 +290,9 @@ export default function IntakePage() {
   const addNote = async () => {
     if (!selected?.customer_id || !newNote.trim() || !companyId) return
     setSavingNote(true)
-    await supabase.from('customer_notes').insert({ customer_id: selected.customer_id, company_id: companyId, author_name: user?.name || '시스템', note_type: '상담', content: newNote.trim() })
+    await supabase.from('customer_notes').insert({ customer_id: selected.customer_id, author_name: user?.name || '시스템', note_type: '상담', content: newNote.trim() })
     setNewNote('')
-    const { data } = await supabase.from('customer_notes').select('*').eq('customer_id', selected.customer_id).eq('company_id', companyId).order('created_at', { ascending: false }).limit(30)
+    const { data } = await supabase.from('customer_notes').select('*').eq('customer_id', selected.customer_id).order('created_at', { ascending: false }).limit(30)
     if (data) setCustomerNotes(data)
     setSavingNote(false)
   }

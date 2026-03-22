@@ -566,7 +566,6 @@ export default function QuoteCalculator() {
       margin: margin,
       status: status,
       expires_at: expiresAt,
-      company_id: effectiveCompanyId,
     }
 
     if (isEditing && editingQuoteId) {

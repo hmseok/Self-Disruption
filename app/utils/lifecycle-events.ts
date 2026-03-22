@@ -59,7 +59,6 @@ export async function recordLifecycleEvent(input: LifecycleEventInput): Promise<
   try {
     const sb = createClient(supabaseUrl, supabaseServiceKey)
     await sb.from('quote_lifecycle_events').insert([{
-      company_id: input.companyId,
       quote_id: input.quoteId,
       contract_id: input.contractId || null,
       event_type: input.eventType,
@@ -96,7 +95,6 @@ export async function recordViewedEvent(input: LifecycleEventInput & { ip: strin
     }
 
     await sb.from('quote_lifecycle_events').insert([{
-      company_id: input.companyId,
       quote_id: input.quoteId,
       event_type: 'viewed',
       metadata: { ip: input.ip, ...input.metadata },

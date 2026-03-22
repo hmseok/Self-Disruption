@@ -25,7 +25,6 @@ export type RuleType =
 
 export interface AssignmentRule {
   id: string
-  company_id: string
   rule_type: RuleType
   rule_value: string          // 매칭할 값 (예: "우리금융캐피탈", "서울특별시")
   handler_id: string          // 배정할 담당자 user_id
@@ -44,7 +43,6 @@ export interface HandlerWorkload {
 
 export interface AccidentForAssignment {
   id: number
-  company_id: string
   accident_location: string   // 사고장소
   repair_shop_name: string    // 공장명
   notes: string               // 거래처 등 파싱된 정보 포함
@@ -189,13 +187,12 @@ export async function assignHandler(
   const { data: rules, error: rulesErr } = await supabase
     .from('assignment_rules')
     .select('*, handler:profiles!assignment_rules_handler_id_fkey(employee_name)')
-    .eq('company_id', accident.company_id)
     .eq('is_active', true)
     .order('priority', { ascending: true })
 
   if (rulesErr || !rules || rules.length === 0) {
     // 룰 없으면 밸런스 기반으로 fallback
-    return await assignByBalance(supabase, accident.company_id)
+    return await assignByBalance(supabase)
   }
 
   // ── 2. 사고 건에서 매칭 데이터 추출
@@ -210,7 +207,7 @@ export async function assignHandler(
     const ruleValue = rule.rule_value.trim()
 
     // 담당자 가용성 체크
-    const available = await isHandlerAvailable(supabase, rule.handler_id, accident.company_id)
+    const available = await isHandlerAvailable(supabase, rule.handler_id)
     if (!available) continue
 
     switch (rule.rule_type) {
@@ -295,22 +292,20 @@ export async function assignHandler(
   }
 
   // ── 4. 룰 매칭 실패 → 밸런스 기반 배정
-  return await assignByBalance(supabase, accident.company_id)
+  return await assignByBalance(supabase)
 }
 
 // ── 담당자 가용성 체크 ──────────────────────────
 
 async function isHandlerAvailable(
   supabase: SupabaseClient,
-  handlerId: string,
-  companyId: string
+  handlerId: string
 ): Promise<boolean> {
   // handler_capacity 테이블에서 확인
   const { data: capacity } = await supabase
     .from('handler_capacity')
     .select('max_cases, is_available')
     .eq('handler_id', handlerId)
-    .eq('company_id', companyId)
     .maybeSingle()
 
   // capacity 설정 없으면 기본 사용 가능
@@ -322,7 +317,6 @@ async function isHandlerAvailable(
     .from('accident_records')
     .select('id', { count: 'exact', head: true })
     .eq('handler_id', handlerId)
-    .eq('company_id', companyId)
     .in('status', ['reported', 'insurance_filed', 'repairing'])
 
   return (count || 0) < (capacity.max_cases || 999)
@@ -331,15 +325,13 @@ async function isHandlerAvailable(
 // ── 밸런스 기반 배정 (가장 여유 있는 담당자) ──────
 
 async function assignByBalance(
-  supabase: SupabaseClient,
-  companyId: string
+  supabase: SupabaseClient
 ): Promise<AssignmentResult> {
 
   // 사고팀 소속 활성 담당자 목록
   const { data: handlers } = await supabase
     .from('handler_capacity')
     .select('handler_id, max_cases, is_available, handler:profiles!handler_capacity_handler_id_fkey(employee_name)')
-    .eq('company_id', companyId)
     .eq('is_available', true)
 
   if (!handlers || handlers.length === 0) {
@@ -360,7 +352,6 @@ async function assignByBalance(
       .from('accident_records')
       .select('id', { count: 'exact', head: true })
       .eq('handler_id', h.handler_id)
-      .eq('company_id', companyId)
       .in('status', ['reported', 'insurance_filed', 'repairing'])
 
     const active = count || 0
@@ -461,7 +452,6 @@ export async function suggestAssignment(
   const { data: handlers } = await supabase
     .from('handler_capacity')
     .select('handler_id, max_cases, is_available, handler:profiles!handler_capacity_handler_id_fkey(employee_name)')
-    .eq('company_id', accident.company_id)
     .eq('is_available', true)
 
   const alternatives: AssignmentResult[] = []

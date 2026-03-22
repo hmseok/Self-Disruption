@@ -31,7 +31,7 @@ export async function POST(
     // 1. 계약 확인
     const { data: contract, error: cErr } = await sb
       .from('contracts')
-      .select('id, company_id, quote_id, contract_pdf_url')
+      .select('id, quote_id, contract_pdf_url')
       .eq('id', contractId)
       .single()
 
@@ -54,7 +54,7 @@ export async function POST(
 
     // 3. Supabase Storage 업로드
     const timestamp = Date.now()
-    const filePath = `${contract.company_id}/${contractId}/contract_${timestamp}.pdf`
+    const filePath = `${contractId}/contract_${timestamp}.pdf`
 
     const { error: uploadErr } = await sb.storage
       .from('contract-pdfs')
@@ -86,17 +86,6 @@ export async function POST(
         contract_pdf_stored_at: new Date().toISOString(),
       }).eq('id', contractId)
 
-      // 라이프사이클 이벤트
-      if (contract.quote_id || quoteId) {
-        recordLifecycleEvent({
-          companyId: contract.company_id,
-          quoteId: contract.quote_id || quoteId,
-          contractId,
-          eventType: 'pdf_stored',
-          metadata: { storage_bucket: 'contracts', file_path: fallbackPath },
-        })
-      }
-
       return NextResponse.json({ success: true, pdf_url: publicUrl })
     }
 
@@ -111,25 +100,13 @@ export async function POST(
 
     // 5. contract_documents에도 기록
     await sb.from('contract_documents').insert([{
-      company_id: contract.company_id,
       contract_id: contractId,
       document_type: 'signed_contract',
       file_name: `계약서_${contractId.slice(0, 8)}.pdf`,
       file_url: publicUrl,
       file_size: buffer.length,
       notes: '서명 완료 후 자동 저장',
-    }]).catch(() => {}) // 테이블 미존재 시 무시
-
-    // 6. 라이프사이클 이벤트
-    if (contract.quote_id || quoteId) {
-      recordLifecycleEvent({
-        companyId: contract.company_id,
-        quoteId: contract.quote_id || quoteId,
-        contractId,
-        eventType: 'pdf_stored',
-        metadata: { storage_bucket: 'contract-pdfs', file_path: filePath },
-      })
-    }
+    }]).then(() => {}, () => {}) // 테이블 미존재 시 무시
 
     return NextResponse.json({ success: true, pdf_url: publicUrl })
   } catch (e: any) {

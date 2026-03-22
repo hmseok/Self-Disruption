@@ -26,8 +26,8 @@ async function verifyUser(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
 }
 
 // 숫자 포맷
@@ -141,7 +141,7 @@ export async function POST(
 
     // 2. 템플릿 기반 발송 시도 → 실패 시 fallback
     const templateResult = await sendWithTemplate({
-      companyId: quote.company_id || user.company_id,
+      companyId: quote.company_id!,
       templateKey: 'quote_share',
       channel,
       recipient,
@@ -189,7 +189,7 @@ export async function POST(
 
       // fallback 로그 저장
       await logMessageSend({
-        companyId: quote.company_id || user.company_id,
+        companyId: quote.company_id!,
         templateKey: 'quote_share_fallback',
         channel,
         recipient,
@@ -214,7 +214,7 @@ export async function POST(
 
       // 라이프사이클 이벤트 기록
       recordLifecycleEvent({
-        companyId: quote.company_id || user.company_id,
+        companyId: quote.company_id!,
         quoteId,
         eventType: 'sent',
         channel,

@@ -999,12 +999,6 @@ export default function RentPricingBuilder() {
         // 차량 목록 — admin '전체 보기' 시 전체 조회 (보험 페이지와 동일)
         {
           let carQuery = supabase.from('cars').select('*').order('created_at', { ascending: false })
-          if (role === 'admin') {
-            if (adminSelectedCompanyId) carQuery = carQuery.eq('company_id', adminSelectedCompanyId)
-            // 전체 보기(미선택) 시 필터 없이 전체 조회
-          } else if (company?.id) {
-            carQuery = carQuery.eq('company_id', company.id)
-          }
           const { data: carsData, error: carsError } = await carQuery
           if (carsError) console.error('차량 목록 로드 실패:', carsError.message)
           setCars(carsData || [])
@@ -1058,7 +1052,6 @@ export default function RentPricingBuilder() {
     supabase
       .from('contract_terms')
       .select('id, insurance_coverage, quote_notices, calc_params')
-      .eq('company_id', effectiveCompanyId)
       .eq('status', 'active')
       .single()
       .then(({ data, error }) => {
@@ -1477,7 +1470,6 @@ export default function RentPricingBuilder() {
     const { data } = await supabase
       .from('new_car_prices')
       .select('*')
-      .eq('company_id', effectiveCompanyId)
       .order('created_at', { ascending: false })
     // 상세모델명(model)이 다르면 별도 항목으로 유지
     setSavedCarPrices(data || [])
@@ -1489,7 +1481,6 @@ export default function RentPricingBuilder() {
     const { data } = await supabase
       .from('pricing_worksheets')
       .select('*, cars(id, number, brand, model, trim, year, fuel, is_used, is_commercial)')
-      .eq('company_id', effectiveCompanyId)
       .order('updated_at', { ascending: false })
     setSavedWorksheets(data || [])
   }, [effectiveCompanyId])
@@ -1506,7 +1497,7 @@ export default function RentPricingBuilder() {
     if (!effectiveCompanyId) return
     const fetchCustomers = async () => {
       const [custRes, compRes] = await Promise.all([
-        supabase.from('customers').select('*').eq('company_id', effectiveCompanyId).order('name'),
+        supabase.from('customers').select('*').order('name'),
         supabase.from('companies').select('*').eq('id', effectiveCompanyId).single(),
       ])
       if (custRes.data) setCustomers(custRes.data)
@@ -1813,7 +1804,6 @@ export default function RentPricingBuilder() {
       // 저장 목록에 바로 추가 — 상세모델명(model_detail)을 가격표 제목으로 사용
       const displayModel = data.model_detail || data.model
       const payload = {
-        company_id: effectiveCompanyId,
         brand: data.brand,
         model: displayModel,
         year: data.year,
@@ -1825,7 +1815,6 @@ export default function RentPricingBuilder() {
       const { data: existing, error: findErr } = await supabase
         .from('new_car_prices')
         .select('id')
-        .eq('company_id', effectiveCompanyId)
         .eq('brand', data.brand)
         .eq('model', displayModel)
         .eq('year', data.year)
@@ -1893,7 +1882,6 @@ export default function RentPricingBuilder() {
     try {
       const displayModel = newCarResult.model_detail || newCarResult.model
       const payload = {
-        company_id: effectiveCompanyId,
         brand: newCarResult.brand,
         model: displayModel,
         year: newCarResult.year,
@@ -1904,7 +1892,6 @@ export default function RentPricingBuilder() {
       const { data: existing } = await supabase
         .from('new_car_prices')
         .select('id')
-        .eq('company_id', effectiveCompanyId)
         .eq('brand', newCarResult.brand)
         .eq('model', displayModel)
         .eq('year', newCarResult.year)
@@ -2578,7 +2565,6 @@ export default function RentPricingBuilder() {
     if (!selectedCar || !effectiveCompanyId) return
 
     const { data, error } = await supabase.from('market_comparisons').insert([{
-      company_id: effectiveCompanyId,
       car_id: selectedCar.id,
       ...newComp
     }]).select().single()
@@ -2602,7 +2588,6 @@ export default function RentPricingBuilder() {
     setSaving(true)
 
     const baseData = {
-      company_id: effectiveCompanyId,
       factory_price: factoryPrice,
       purchase_price: purchasePrice,
       current_market_value: calculations.currentMarketValue,
@@ -2663,7 +2648,6 @@ export default function RentPricingBuilder() {
         const { data: existing } = await supabase
           .from('pricing_worksheets')
           .select('id')
-          .eq('company_id', effectiveCompanyId)
           .eq('car_id', selectedCar.id)
           .maybeSingle()
 
@@ -2825,7 +2809,6 @@ export default function RentPricingBuilder() {
       const rawCustomerId = customerMode === 'select' ? selectedCustomerId : null
 
       const basePayload: Record<string, any> = {
-        company_id: cleanId(effectiveCompanyId),
         car_id: cleanId(rawCarId),
         customer_id: cleanId(rawCustomerId),
         start_date: startDate,
@@ -2844,7 +2827,7 @@ export default function RentPricingBuilder() {
         worksheet_id: cleanId(currentWorksheetId),
       }
 
-      console.log('Quote save payload:', { company_id: basePayload.company_id, car_id: basePayload.car_id, customer_id: basePayload.customer_id })
+      console.log('Quote save payload:', { car_id: basePayload.car_id, customer_id: basePayload.customer_id })
 
       // 저장 시도 순서:
       // 1) 풀 페이로드 → 2) _id 컬럼 제거 → 3) 최소 페이로드
@@ -2855,7 +2838,6 @@ export default function RentPricingBuilder() {
       delete noFkPayload.customer_id
       delete noFkPayload.worksheet_id
       const minPayload = {
-        company_id: basePayload.company_id,
         start_date: startDate,
         end_date: endDate,
         deposit,

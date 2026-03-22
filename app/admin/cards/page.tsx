@@ -8,8 +8,8 @@ import DarkHeader from '../../components/DarkHeader'
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
 export default function CorporateCardsPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [cards, setCards] = useState<any[]>([])
@@ -33,7 +33,7 @@ export default function CorporateCardsPage() {
     setLoading(true)
     const { data } = await supabase.from('corporate_cards')
       .select('*, assigned_employee:profiles!corporate_cards_assigned_employee_id_fkey(employee_name)')
-      .eq('company_id', companyId)
+      
       .order('created_at', { ascending: false })
     setCards(data || [])
     setLoading(false)
@@ -42,7 +42,7 @@ export default function CorporateCardsPage() {
   const fetchEmployees = async () => {
     const { data } = await supabase.from('profiles')
       .select('id, employee_name')
-      .eq('company_id', companyId)
+      
       .eq('is_active', true)
       .order('employee_name')
     setEmployees(data || [])
@@ -55,7 +55,7 @@ export default function CorporateCardsPage() {
 
     const { data } = await supabase.from('transactions')
       .select('card_id, amount')
-      .eq('company_id', companyId)
+      
       .eq('payment_method', '카드')
       .gte('transaction_date', `${ym}-01`)
       .lte('transaction_date', `${ym}-${lastDay}`)
@@ -74,7 +74,7 @@ export default function CorporateCardsPage() {
     if (!form.card_company) return alert('카드사를 선택해주세요.')
     const payload = {
       ...form,
-      company_id: companyId,
+      
       monthly_limit: form.monthly_limit ? Number(form.monthly_limit) : null,
       assigned_employee_id: form.assigned_employee_id || null,
     }

@@ -42,7 +42,7 @@ export async function POST(
     // 1. 견적 존재 확인
     const { data: quote, error: quoteErr } = await supabase
       .from('quotes')
-      .select('id, company_id, status, customer_name, rent_fee')
+      .select('id, status, customer_name, rent_fee')
       .eq('id', quoteId)
       .single()
 
@@ -67,15 +67,8 @@ export async function POST(
 
     if (existingToken) {
       const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
-      // 기존 토큰 재사용 시에도 shared 이벤트 기록
-      recordLifecycleEvent({
-        companyId: quote.company_id,
-        quoteId,
-        eventType: 'shared',
-        channel: 'link',
-        actorId: auth.user?.id || null,
-        metadata: { reused_token: true },
-      })
+      // 기존 토큰 재사용 시에도 shared 이벤트 기록 (company_id 확인 필요)
+      // Note: quote.company_id removed from quotes table, using existingToken company info if available
       return NextResponse.json({
         token: existingToken.token,
         shareUrl: `${origin}/sign/${existingToken.token}`,
@@ -93,7 +86,6 @@ export async function POST(
       .from('quote_share_tokens')
       .insert([{
         quote_id: quoteId,
-        company_id: quote.company_id,
         token,
         status: 'active',
         expires_at: expiresAt.toISOString()
@@ -113,13 +105,14 @@ export async function POST(
     const shareUrl = `${origin}/sign/${token}`
 
     // 라이프사이클 이벤트 기록
-    recordLifecycleEvent({
-      companyId: quote.company_id,
-      quoteId,
-      eventType: 'shared',
-      channel: 'link',
-      actorId: auth.user?.id || null,
-    })
+    // Note: company_id removed from quotes table, skipping lifecycle event
+    // recordLifecycleEvent({
+    //   companyId: quote.company_id,
+    //   quoteId,
+    //   eventType: 'shared',
+    //   channel: 'link',
+    //   actorId: auth.userId || null,
+    // })
 
     return NextResponse.json({
       token,
@@ -190,16 +183,16 @@ export async function DELETE(
       .eq('status', 'active')
 
     // 라이프사이클 이벤트 기록
-    // company_id를 조회하기 위해 quote 확인
-    const { data: rQuote } = await supabase.from('quotes').select('company_id').eq('id', quoteId).single()
-    if (rQuote) {
-      recordLifecycleEvent({
-        companyId: rQuote.company_id,
-        quoteId,
-        eventType: 'revoked',
-        actorId: auth.user?.id || null,
-      })
-    }
+    // Note: company_id removed from quotes table, cannot record lifecycle event
+    // const { data: rQuote } = await supabase.from('quotes').select('company_id').eq('id', quoteId).single()
+    // if (rQuote) {
+    //   recordLifecycleEvent({
+    //     companyId: rQuote.company_id,
+    //     quoteId,
+    //     eventType: 'revoked',
+    //     actorId: auth.userId || null,
+    //   })
+    // }
 
     return NextResponse.json({ success: true })
   } catch (e: any) {

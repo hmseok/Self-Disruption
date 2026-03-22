@@ -58,7 +58,7 @@ export default function AdminDashboard() {
           const { data: users } = await supabase
             .from('profiles')
             .select('id, email, employee_name, role, is_active, created_at')
-            .eq('company_id', comp.id)
+            
             .order('role', { ascending: true })
           companiesWithUsers.push({ ...comp, users: users || [] })
         }
@@ -77,7 +77,7 @@ export default function AdminDashboard() {
         const { data: users } = await supabase
           .from('profiles')
           .select('id, email, employee_name, role, is_active, created_at')
-          .eq('company_id', company.id)
+          
         setCompanies([{ ...company, users: users || [] }])
       }
     } catch (err) {
@@ -87,19 +87,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const approveCompany = async (companyId: string) => {
-    const { data, error } = await supabase.rpc('approve_company', { target_company_id: companyId })
-    if (error) { alert('승인 실패: ' + error.message) }
-    else if (data && !data.success) { alert('승인 실패: ' + data.error) }
-    else { fetchData() }
-  }
-
-  const rejectCompany = async (companyId: string) => {
-    if (!confirm('이 회사 가입 요청을 거부하시겠습니까? 관련 데이터가 삭제됩니다.')) return
-    const { data, error } = await supabase.rpc('reject_company', { target_company_id: companyId })
-    if (error) { alert('거부 실패: ' + error.message) }
-    else { fetchData() }
-  }
+  // approve/reject company RPC 삭제됨 (단독 ERP 전환)
 
   const toggleUserActive = async (userId: string, currentActive: boolean) => {
     const action = currentActive ? '비활성화' : '활성화'
@@ -277,22 +265,6 @@ export default function AdminDashboard() {
 
         {/* 액션 버튼 */}
         <div className="flex gap-2 flex-shrink-0">
-          {!comp.is_active && role === 'admin' && (
-            <>
-              <button
-                onClick={() => approveCompany(comp.id)}
-                className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
-              >
-                승인
-              </button>
-              <button
-                onClick={() => rejectCompany(comp.id)}
-                className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-colors"
-              >
-                거부
-              </button>
-            </>
-          )}
           {comp.is_active && role === 'admin' && (
             <button
               onClick={() => {

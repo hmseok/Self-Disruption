@@ -188,7 +188,7 @@ function parseQueueItem(q: any) {
 
   return {
     id: q.id,
-    company_id: q.company_id,
+    
     transaction_id: q.transaction_id,
     source_type: q.source_type || (sd.payment_method === '카드' ? 'card_statement' : 'bank_statement'),
     source_data: {
@@ -228,7 +228,7 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
   let query = supabase
     .from('classification_queue')
     .select('*', { count: 'exact' })
-    .eq('company_id', companyId)
+    
     .is('deleted_at', null)
 
   if (status === 'pending') {
@@ -261,7 +261,7 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
   const { data: txData, count: txCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact' })
-    .eq('company_id', companyId)
+    
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(5000)
@@ -270,7 +270,7 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
     const cat = tx.category || '미분류'
     const isPending = !tx.category || tx.category === '미분류' || tx.category === ''
     return {
-      id: tx.id, company_id: tx.company_id,
+      id: tx.id,
       source_data: {
         transaction_date: tx.transaction_date || '', client_name: tx.client_name || '',
         description: tx.description || '', amount: tx.amount || 0,
@@ -305,7 +305,7 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
     const { data: orphaned } = await supabase
       .from('classification_queue')
       .select('id, transaction_id, final_category, final_matched_type, final_matched_id, source_data, company_id')
-      .eq('company_id', companyId)
+      
       .eq('status', 'confirmed')
       .is('deleted_at', null)
 
@@ -340,7 +340,7 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
     for (const q of orphansWithoutTx) {
       const sd = q.source_data || {}
       const txPayload: Record<string, any> = {
-        company_id: q.company_id || companyId,
+        
         transaction_date: sd.transaction_date || '',
         client_name: sd.client_name || '',
         description: sd.description || '',
@@ -375,7 +375,7 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
   const { data: txData, error: txError, count: txCount } = await supabase
     .from('transactions')
     .select('*', { count: 'exact' })
-    .eq('company_id', companyId)
+    
     .is('deleted_at', null)
     .order('transaction_date', { ascending: false })
     .limit(limit)
@@ -387,7 +387,7 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
 
   const items = (txData || []).map((tx: any) => ({
     id: tx.id,
-    company_id: tx.company_id,
+    
     transaction_id: tx.id,
     transaction_date: tx.transaction_date || '',
     source_data: {
@@ -624,7 +624,7 @@ const DEFAULT_RULES = [
 
 function UploadContent() {
   const router = useRouter()
-  const { company, role, adminSelectedCompanyId } = useApp()
+  const { company, role } = useApp()
 
   // ── Upload Context ──
   const {
@@ -760,16 +760,14 @@ function UploadContent() {
   const [splitRows, setSplitRows] = useState<Array<{ amount: number; memo: string; related_type: string; related_id: string }>>([])
   const [splitVer, setSplitVer] = useState(0) // 균등분할/추가 등 외부 리셋 시 key 갱신용
 
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
-
   // ── Initialize ──
   const hasLoadedFromQueue = useRef(false)
 
   useEffect(() => {
     fetchBasicData()
     fetchStats()  // 항상 통계 로드
-    if (effectiveCompanyId) {
-      setCompanyId(effectiveCompanyId)
+    if (company?.id) {
+      setCompanyId(company.id)
       // cleanupStaleQueue 제거: 확정 항목을 자동 삭제하지 않음
       // 결과가 비어있고 처리 중이 아닐 때 → classification_queue에서 복원
       if (results.length === 0 && status !== 'processing' && !hasLoadedFromQueue.current) {
@@ -785,7 +783,7 @@ function UploadContent() {
         return () => clearTimeout(timer)
       }
     }
-  }, [company, effectiveCompanyId])
+  }, [company])
 
   useEffect(() => {
     if (activeTab === 'classify' || activeTab === 'confirmed') {
@@ -802,7 +800,7 @@ function UploadContent() {
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [effectiveCompanyId, activeTab])
+  }, [activeTab])
 
   // 팝오버 외부 클릭 시 닫기
   useEffect(() => {
@@ -816,20 +814,20 @@ function UploadContent() {
   }, [linkPopoverId])
 
   const fetchBasicData = async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     try {
       const [c, i, j, cc, lo, ins, ct, emp, fl] = await Promise.all([
-        supabase.from('cars').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('general_investments').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('jiip_contracts').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('corporate_cards').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('loans').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('insurance_contracts').select('*').eq('company_id', effectiveCompanyId),
-        supabase.from('contracts').select('id, car_id, customer_id, customer_name, status, deposit, monthly_rent, start_date, end_date').eq('company_id', effectiveCompanyId).in('status', ['active', 'expired']),
-        supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id').eq('company_id', effectiveCompanyId),
-        supabase.from('freelancers').select('id, name, service_type, is_active').eq('company_id', effectiveCompanyId).eq('is_active', true),
+        supabase.from('cars').select('*'),
+        supabase.from('general_investments').select('*'),
+        supabase.from('jiip_contracts').select('*'),
+        supabase.from('corporate_cards').select('*'),
+        supabase.from('loans').select('*'),
+        supabase.from('insurance_contracts').select('*'),
+        supabase.from('contracts').select('id, car_id, customer_id, customer_name, status, deposit, monthly_rent, start_date, end_date').in('status', ['active', 'expired']),
+        supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id'),
+        supabase.from('freelancers').select('id, name, service_type, is_active').eq('is_active', true),
       ])
-      console.log('[fetchBasicData] effectiveCompanyId:', effectiveCompanyId)
+      console.log('[fetchBasicData] company?.id:', company?.id)
       console.log('[fetchBasicData] profiles result:', { count: emp.data?.length, error: emp.error, sample: emp.data?.[0] })
       setCars(c.data || [])
       setInvestors(i.data || [])
@@ -846,11 +844,11 @@ function UploadContent() {
   }
 
   const fetchStats = useCallback(async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     try {
       const [pData, cData] = await Promise.all([
-        fetchQueueDirect(effectiveCompanyId, 'pending', 1),
-        fetchConfirmedTransactions(effectiveCompanyId, 1, true),
+        fetchQueueDirect(company?.id, 'pending', 1),
+        fetchConfirmedTransactions(company?.id, 1, true),
       ])
       const pendingCount = pData.total || 0
       const confirmedCount = cData.total || 0
@@ -859,15 +857,15 @@ function UploadContent() {
     } catch (e) {
       console.error(e)
     }
-  }, [effectiveCompanyId])
+  }, [company?.id])
 
   // ── 초기 로드: 이미 저장된 confirmed queue 항목 자동 정리 ──
   // API를 사용하여 source_data를 정규화된 형태로 가져옴 (alternatives 내부 포함)
   const cleanupStaleQueue = useCallback(async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     try {
       // 클라이언트사이드 직접 조회 (source_data 정규화 처리됨)
-      const json = await fetchQueueDirect(effectiveCompanyId, 'confirmed', 500)
+      const json = await fetchQueueDirect(company?.id, 'confirmed', 500)
       const confirmedItems = json.items || []
       if (confirmedItems.length === 0) return
 
@@ -878,7 +876,7 @@ function UploadContent() {
       const { data: existingTxs } = await supabase
         .from('transactions')
         .select('transaction_date, client_name, amount')
-        .eq('company_id', effectiveCompanyId)
+        
         .gte('transaction_date', sortedDates[0])
         .lte('transaction_date', sortedDates[sortedDates.length - 1])
 
@@ -917,10 +915,10 @@ function UploadContent() {
     } catch (e) {
       console.error('[cleanupStaleQueue] 오류:', e)
     }
-  }, [effectiveCompanyId, fetchStats])
+  }, [company?.id, fetchStats])
 
   const fetchReviewItems = useCallback(async () => {
-    if (!effectiveCompanyId) {
+    if (!company?.id) {
       setLoading(false)
       return
     }
@@ -929,8 +927,8 @@ function UploadContent() {
       // classify 탭 = classification_queue pending, confirmed 탭 = transactions 테이블
       console.log(`[fetchReviewItems] 호출: activeTab=${activeTab}`)
       const data = activeTab === 'confirmed'
-        ? await fetchConfirmedTransactions(effectiveCompanyId, 5000)
-        : await fetchQueueDirect(effectiveCompanyId, 'pending', 2000)
+        ? await fetchConfirmedTransactions(company?.id, 5000)
+        : await fetchQueueDirect(company?.id, 'pending', 2000)
       let loadedItems = data.items || []
 
       console.log(`[fetchReviewItems] 직접 조회 응답: ${loadedItems.length}건 (total=${data.total}, source=${data.source})`)
@@ -959,29 +957,29 @@ function UploadContent() {
     try {
       if (activeTab === 'confirmed') {
         // 현재 확정완료 탭 → 분류관리(pending) 카운트 갱신
-        const otherData = await fetchQueueDirect(effectiveCompanyId, 'pending', 1)
+        const otherData = await fetchQueueDirect(company?.id, 'pending', 1)
         setStats(prev => ({ ...prev, pending: otherData.total || 0 }))
       } else {
         // 현재 분류관리 탭 → 확정완료(transactions) 카운트 갱신 (고아 복구 skip)
-        const otherData = await fetchConfirmedTransactions(effectiveCompanyId, 1, true)
+        const otherData = await fetchConfirmedTransactions(company?.id, 1, true)
         setStats(prev => ({ ...prev, confirmed: otherData.total || 0 }))
       }
     } catch (e) { /* 무시 */ }
-  }, [effectiveCompanyId, activeTab])
+  }, [company?.id, activeTab])
 
   const fetchReviewRelated = useCallback(async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     const [j, i, f, e] = await Promise.all([
-      supabase.from('jiip_contracts').select('id, investor_name').eq('company_id', effectiveCompanyId),
-      supabase.from('general_investments').select('id, investor_name').eq('company_id', effectiveCompanyId),
-      supabase.from('freelancers').select('id, name, service_type, is_active').eq('company_id', effectiveCompanyId).eq('is_active', true),
-      supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id').eq('company_id', effectiveCompanyId),
+      supabase.from('jiip_contracts').select('id, investor_name'),
+      supabase.from('general_investments').select('id, investor_name'),
+      supabase.from('freelancers').select('id, name, service_type, is_active').eq('is_active', true),
+      supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id'),
     ])
     setReviewJiips(j.data || [])
     setReviewInvestors(i.data || [])
     setFreelancers(f.data || [])
     setEmployees(e.data || [])
-  }, [effectiveCompanyId])
+  }, [company?.id])
 
   // 법인카드 번호 매칭 헬퍼 (현재 + 과거 카드번호 모두 체크)
   const findCardByNumber = useCallback((cardNumber: string | null | undefined) => {
@@ -1315,7 +1313,7 @@ function UploadContent() {
 
   // ── 소프트 삭제 실행 함수 ──
   const executeSoftDelete = async (targetIds: string[]) => {
-    if (!effectiveCompanyId || targetIds.length === 0) return
+    if (!company?.id || targetIds.length === 0) return
     setDeleting(true)
     try {
       const tableName = activeTab === 'confirmed' ? 'transactions' : 'classification_queue'
@@ -1338,13 +1336,13 @@ function UploadContent() {
 
   // ── 휴지통 복원 함수 ──
   const handleRestoreDeleted = async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     const tables = ['transactions', 'classification_queue'] as const
     let restoredTotal = 0
     for (const tbl of tables) {
       const { data, error } = await supabase.from(tbl)
         .update({ deleted_at: null })
-        .eq('company_id', effectiveCompanyId)
+        
         .not('deleted_at', 'is', null)
         .select('id')
       if (!error && data) restoredTotal += data.length
@@ -1359,7 +1357,7 @@ function UploadContent() {
 
   // ── 일괄 삭제 핸들러 (현재 필터 기준) → 모달 표시 ──
   const handleDeleteAll = () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     const targetItems = sourceFilteredItems
     if (targetItems.length === 0) return alert('삭제할 항목이 없습니다.')
     const statusLabel = activeTab === 'confirmed' ? '확정 완료' : '분류 대기'
@@ -1376,7 +1374,7 @@ function UploadContent() {
 
   // ── 선택 삭제 핸들러 → 모달 표시 ──
   const handleDeleteSelected = () => {
-    if (!effectiveCompanyId || selectedIds.size === 0) return
+    if (!company?.id || selectedIds.size === 0) return
     const selected = items.filter(i => selectedIds.has(i.id))
     const totalAmount = selected.reduce((sum, i: any) => sum + Math.abs(i.amount || i.source_data?.amount || 0), 0)
     setDeleteModal({
@@ -1605,7 +1603,7 @@ function UploadContent() {
     // 확정된 항목만 저장
     const confirmedResults = results.filter(r => uploadConfirmedIds.has(r.id))
     if (confirmedResults.length === 0) return alert('확정된 항목이 없습니다.\n먼저 항목을 확정(✅)한 후 전체 저장해주세요.')
-    if (!effectiveCompanyId) return alert('회사를 먼저 선택해주세요. 상단 메뉴에서 회사를 선택 후 저장하세요.')
+    if (!company?.id) return alert('회사를 먼저 선택해주세요. 상단 메뉴에서 회사를 선택 후 저장하세요.')
 
     // ── 개수 기반 중복 체크 (같은 날짜+거래처+금액이 여러 건일 수 있으므로 Set이 아닌 개수로 비교) ──
     const dates = confirmedResults.map(r => r.transaction_date).filter(Boolean)
@@ -1619,7 +1617,7 @@ function UploadContent() {
       const { data: existing } = await supabase
         .from('transactions')
         .select('transaction_date, client_name, amount, payment_method, description, type')
-        .eq('company_id', effectiveCompanyId)
+        
         .gte('transaction_date', minDate)
         .lte('transaction_date', maxDate)
 
@@ -1702,7 +1700,7 @@ function UploadContent() {
         scheduleLinks.push({ schedule_id: item.matched_schedule_id, tx_index: idx, amount: item.amount })
       }
       return {
-        company_id: effectiveCompanyId,
+        
         transaction_date: item.transaction_date,
         client_name: item.client_name,
         amount: item.amount,
@@ -1765,7 +1763,7 @@ function UploadContent() {
       }
 
       // classification_queue 정리 — API를 통해 삭제 (RLS 우회, service_role_key 사용)
-      if (effectiveCompanyId) {
+      if (company?.id) {
         try {
           // 1) _queue_id가 있는 항목은 직접 삭제
           const queueIds = uniqueResults.map(r => (r as any)._queue_id).filter(Boolean)
@@ -1780,7 +1778,7 @@ function UploadContent() {
           if (itemsWithoutQueueId.length > 0) {
             console.log(`[handleBulkSave] _queue_id 없는 항목 ${itemsWithoutQueueId.length}건 → API 매칭 삭제`)
             // 클라이언트사이드 직접 조회 (source_data 정규화됨)
-            const qData = await fetchQueueDirect(effectiveCompanyId, 'pending', 2000)
+            const qData = await fetchQueueDirect(company?.id, 'pending', 2000)
             const qItems = qData.items || []
 
             if (qItems.length > 0) {
@@ -1893,7 +1891,7 @@ function UploadContent() {
             const flagRes = await fetch('/api/finance/flags', {
               method: 'POST',
               headers: flagHeaders,
-              body: JSON.stringify({ company_id: effectiveCompanyId, flags }),
+              body: JSON.stringify({  flags }),
             })
             if (flagRes.ok) {
               const flagData = await flagRes.json()
@@ -2027,7 +2025,7 @@ function UploadContent() {
           const { data: existingTx } = await supabase
             .from('transactions')
             .select('id')
-            .eq('company_id', item.company_id || effectiveCompanyId)
+            
             .eq('transaction_date', sd.transaction_date || '')
             .eq('client_name', sd.client_name || '')
             .eq('amount', matchAmount)
@@ -2046,7 +2044,7 @@ function UploadContent() {
           } else {
             // 진짜 새 거래 → 신규 생성
             const txPayload: Record<string, any> = {
-              company_id: item.company_id || effectiveCompanyId,
+              
               transaction_date: sd.transaction_date || '',
               client_name: sd.client_name || '',
               description: sd.description || '',
@@ -2157,7 +2155,7 @@ function UploadContent() {
         const sd = item.source_data || {}
         const origTxId = item.transaction_id || item.id // 확정완료 탭에서는 id가 곧 transaction_id
         const { error: insErr } = await supabase.from('classification_queue').insert({
-          company_id: effectiveCompanyId,
+          
           transaction_id: origTxId, // ★ 원본 트랜잭션 ID 보존 — 재확정 시 복원에 필요
           status: 'pending',
           ai_category: item.ai_category || sd.category || '미분류',
@@ -2289,7 +2287,7 @@ function UploadContent() {
   }
 
   const handleAiReclassify = async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     if (!confirm('미분류/기타 거래를 AI로 자동 분류하시겠습니까?\nGemini AI가 거래 내용을 분석하여 계정과목을 추천합니다.')) return
     setAiClassifying(true)
     setAiResult(null)
@@ -2297,7 +2295,7 @@ function UploadContent() {
       const res = await fetch('/api/finance/reclassify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_id: effectiveCompanyId }),
+        body: JSON.stringify({}),
       })
       if (res.ok) {
         const data = await res.json()
@@ -2330,14 +2328,14 @@ function UploadContent() {
   // ── 재매칭: 기존 항목의 연결(프리랜서/직원 등)만 다시 실행 ──
   const [reMatching, setReMatching] = useState(false)
   const handleReMatch = async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     if (!confirm('모든 대기 항목의 연결(매칭)을 다시 실행하시겠습니까?\n프리랜서, 직원, 차량 등 연결이 최신 데이터로 업데이트됩니다.')) return
     setReMatching(true)
     try {
       const res = await fetch('/api/finance/classify', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_id: effectiveCompanyId }),
+        body: JSON.stringify({}),
       })
       if (res.ok) {
         const data = await res.json()
@@ -2409,7 +2407,7 @@ function UploadContent() {
   }
 
   const handleCheckDuplicates = async () => {
-    if (!effectiveCompanyId) return
+    if (!company?.id) return
     setDuplicateInfo({ count: 0, checking: true })
     try {
       let memoryDupCount = 0
@@ -2452,7 +2450,7 @@ function UploadContent() {
           const { data: queueItems } = await supabase
             .from('classification_queue')
             .select('id, source_data, status')
-            .eq('company_id', effectiveCompanyId)
+            
             .is('deleted_at', null)
             .in('status', ['pending', 'auto_confirmed', 'confirmed'])
 
@@ -2477,7 +2475,7 @@ function UploadContent() {
           const { data: txItems } = await supabase
             .from('transactions')
             .select('transaction_date, client_name, amount, payment_method, description, type')
-            .eq('company_id', effectiveCompanyId)
+            
             .is('deleted_at', null)
             .gte('transaction_date', minDate.slice(0, 10))
             .lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
@@ -2650,7 +2648,7 @@ function UploadContent() {
       }
 
       // ── 3) DB(transactions) 내부 중복 감지 — 항상 실행 ──
-      const res = await fetch(`/api/finance/dedup?company_id=${effectiveCompanyId}`)
+      const res = await fetch(`/api/finance/dedup?company_id=${company?.id}`)
       let dbData: any = null
       if (res.ok) {
         dbData = await res.json()
@@ -2762,7 +2760,7 @@ function UploadContent() {
           const delRes = await fetch('/api/finance/dedup', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ company_id: effectiveCompanyId }),
+            body: JSON.stringify({}),
           })
           if (delRes.ok) {
             const delData = await delRes.json()
@@ -2800,7 +2798,7 @@ function UploadContent() {
 
         const { data: qItems } = await supabase
           .from('classification_queue').select('id, source_data')
-          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .is('deleted_at', null)
           .in('status', ['pending', 'auto_confirmed', 'confirmed'])
         if (qItems) {
           for (const q of qItems) {
@@ -2813,7 +2811,7 @@ function UploadContent() {
         }
         const { data: tItems } = await supabase
           .from('transactions').select('id, transaction_date, client_name, amount, description')
-          .eq('company_id', effectiveCompanyId).is('deleted_at', null)
+          .is('deleted_at', null)
           .gte('transaction_date', minDate.slice(0, 10)).lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
         if (tItems) {
           for (const tx of tItems) {
@@ -3578,7 +3576,7 @@ function UploadContent() {
   const [customCategories, setCustomCategories] = useState<Array<{ group: string; items: string[] }>>([])  // 사용자 추가 중그룹/세부항목
 
   // ── Guard: Company Selection ──
-  if (role === 'admin' && !adminSelectedCompanyId) {
+  if (!company) {
     return (
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>
@@ -3589,7 +3587,7 @@ function UploadContent() {
     )
   }
 
-  if (!effectiveCompanyId) {
+  if (!company?.id) {
     return (
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
@@ -4992,7 +4990,7 @@ function UploadContent() {
                           const { data: { session } } = await supabase.auth.getSession()
                           for (const item of unclassifiedItems) {
                             const payload = {
-                              company_id: effectiveCompanyId,
+                              
                               items: [{
                                 transaction_date: item.transaction_date,
                                 type: item.type,
@@ -5624,7 +5622,7 @@ function UploadContent() {
                   </span>
                   <div style={{ width: 1, height: 20, background: '#334155' }} />
                   <button onClick={async () => {
-                    if (!effectiveCompanyId) return alert('회사를 먼저 선택해주세요.')
+                    if (!company?.id) return alert('회사를 먼저 선택해주세요.')
                     const selectedItems = filteredResults.filter(r => uploadSelectedIds.has(r.id))
                     if (selectedItems.length === 0) return
                     if (!confirm(`${selectedItems.length}건을 확정 저장하시겠습니까?\n확정된 항목은 DB에 저장되어 '확정완료' 탭에서 확인할 수 있습니다.`)) return
@@ -5633,7 +5631,7 @@ function UploadContent() {
                       // DB에 저장할 payload 구성 (handleBulkSave와 동일한 형식)
                       const payload = selectedItems.map(item => {
                         return {
-                          company_id: effectiveCompanyId,
+                          
                           transaction_date: item.transaction_date,
                           client_name: item.client_name,
                           amount: item.amount,

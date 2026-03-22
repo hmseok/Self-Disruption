@@ -134,7 +134,7 @@ export default function ShortTermCalcPage() {
     const loadStamp = async () => {
       if (!companyId) return
       const { data } = await supabase.from('company_settings').select('value')
-        .eq('company_id', companyId).eq('key', 'pdf_defaults').maybeSingle()
+        .eq('key', 'pdf_defaults').maybeSingle()
       if (data?.value?.company_stamp) {
         setCompanyStamp(data.value.company_stamp)
       } else {
@@ -206,7 +206,6 @@ export default function ShortTermCalcPage() {
       }
 
       const basePayload: Record<string, any> = {
-        company_id: companyId,
         customer_name: inv.tenant_name.trim(),
         rent_fee: totalAmount,
         deposit: 0,

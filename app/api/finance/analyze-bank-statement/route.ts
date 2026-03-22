@@ -113,14 +113,14 @@ export async function POST(request: NextRequest) {
     // ── 1. 회사의 활성 계약 전체 조회 ──
     const [jiipRes, investRes, loanRes, rulesRes, scheduleRes] = await Promise.all([
       sb.from('jiip_contracts').select('id, investor_name, admin_fee, payout_day, status')
-        .eq('company_id', company_id).eq('status', 'active'),
+        .eq('status', 'active'),
       sb.from('general_investments').select('id, investor_name, invest_amount, interest_rate, payment_day, status')
-        .eq('company_id', company_id).eq('status', 'active'),
+        .eq('status', 'active'),
       sb.from('loans').select('id, finance_name, monthly_payment, payment_date, status')
-        .eq('company_id', company_id).eq('status', 'active'),
+        .eq('status', 'active'),
       sb.from('finance_rules').select('*'),
       sb.from('expected_payment_schedules').select('id, contract_type, contract_id, payment_date, expected_amount, status')
-        .eq('company_id', company_id).eq('status', 'pending'),
+        .eq('status', 'pending'),
     ])
 
     // 계약 통합 리스트 생성

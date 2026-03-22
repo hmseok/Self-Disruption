@@ -55,8 +55,8 @@ function useIsMobile() {
 }
 
 export default function ReceiptsPage() {
-  const { user, role, adminSelectedCompanyId, company } = useApp()
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { user, role, company } = useApp()
+  const effectiveCompanyId = company?.id
   const [items, setItems] = useState<ExpenseItem[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -352,7 +352,7 @@ export default function ReceiptsPage() {
         const saveRes = await fetch('/api/receipts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ items: itemsToSave, ...(effectiveCompanyId ? { company_id: effectiveCompanyId } : {}) }),
+          body: JSON.stringify({ items: itemsToSave }),
         })
         const saveJson = await saveRes.json()
 
@@ -500,7 +500,7 @@ export default function ReceiptsPage() {
     const res = await fetch('/api/receipts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ items: [merged], ...(effectiveCompanyId ? { company_id: effectiveCompanyId } : {}) }),
+      body: JSON.stringify({ items: [merged] }),
     })
     const json = await res.json()
 
@@ -807,19 +807,6 @@ export default function ReceiptsPage() {
             <button onClick={(e) => { e.stopPropagation(); if (item.id) handleDelete(item.id) }}
               style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '4px 4px' }} title="삭제">✕</button>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── admin 회사 미선택 시 차단 ──
-  if (role === 'admin' && !adminSelectedCompanyId) {
-    return (
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowX: 'hidden', boxSizing: 'border-box' }}>
-        <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500 }}>
-          <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>🏢</span>
-          <p style={{ fontWeight: 700, color: '#374151', fontSize: 16, marginBottom: 8 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p style={{ color: '#9ca3af', fontSize: 13 }}>법인카드 사용내역은 회사 기준으로 관리됩니다</p>
         </div>
       </div>
     )

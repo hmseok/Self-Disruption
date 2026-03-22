@@ -84,7 +84,7 @@ const getRecentMonths = (count: number): string[] => {
 // 메인 컴포넌트
 // ============================================
 export default function ReportDashboard() {
-  const { company, role, adminSelectedCompanyId } = useApp()
+  const { company, role } = useApp()
 
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -99,13 +99,13 @@ export default function ReportDashboard() {
   // 기간 필터
   const [periodMonths, setPeriodMonths] = useState(6) // 최근 N개월
 
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = company?.id
 
   const pathname = usePathname()
 
   useEffect(() => {
     fetchAllData()
-  }, [company, role, adminSelectedCompanyId, pathname])
+  }, [company, pathname])
 
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
@@ -115,16 +115,10 @@ export default function ReportDashboard() {
   }, [effectiveCompanyId])
 
   const fetchAllData = async () => {
-    if (!effectiveCompanyId && role !== 'admin') return
+    if (!effectiveCompanyId) return
     setLoading(true)
 
-    const companyFilter = (q: any) => {
-      if (role === 'admin') {
-        if (adminSelectedCompanyId) return q.eq('company_id', adminSelectedCompanyId)
-        return q
-      }
-      return q.eq('company_id', company?.id)
-    }
+    const companyFilter = (q: any) => q
 
     const [txRes, carRes, jiipRes, investRes, loanRes] = await Promise.all([
       companyFilter(supabase.from('transactions').select('*')).order('transaction_date', { ascending: false }),
@@ -223,17 +217,6 @@ export default function ReportDashboard() {
     { key: 'fleet', label: '차량 운용' },
     { key: 'partner', label: '투자/파트너' },
   ]
-
-  if (role === 'admin' && !adminSelectedCompanyId) {
-    return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (

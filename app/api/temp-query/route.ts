@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('vehicle_operations')
       .select('id, car_id, insurance_company_billing, insurance_payment_date, insurance_billing_status, replacement_start_date, replacement_end_date, notes, repair_shop_name')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .gte('insurance_payment_date', '2026-01-01')
       .lte('insurance_payment_date', '2026-12-31')
       .order('insurance_payment_date', { ascending: true });
@@ -29,7 +28,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, transaction_date, counterpart, description, amount, category, sub_category, related_type, related_id, memo')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .eq('type', 'income')
       .is('related_id', null)
       .order('transaction_date', { ascending: false })
@@ -42,7 +40,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, transaction_date, counterpart, description, amount, category, sub_category, related_type, related_id, memo')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .eq('type', 'income')
       .order('transaction_date', { ascending: false })
       .limit(100);
@@ -52,8 +49,7 @@ export async function GET(req: NextRequest) {
   if (action === 'cars') {
     const { data, error } = await supabase
       .from('cars')
-      .select('id, number, brand, model')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a');
+      .select('id, number, brand, model');
     return NextResponse.json({ data, error: error?.message });
   }
 
@@ -76,7 +72,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('vehicle_operations')
       .select('id, car_id, insurance_company_billing, insurance_payment_date, insurance_billing_status, replacement_start_date, replacement_end_date, notes, repair_shop_name')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .order('scheduled_date', { ascending: false })
       .limit(500);
     return NextResponse.json({ count: data?.length, data, error: error?.message });
@@ -87,7 +82,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('vehicle_operations')
       .select('id, car_id, insurance_company_billing, insurance_payment_date, replacement_start_date, replacement_end_date, notes, repair_shop_name')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .limit(500);
 
     if (error) return NextResponse.json({ error: error.message });
@@ -125,7 +119,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, transaction_date, client_name, description, amount, type, category, related_type, related_id, memo')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .in('amount', amounts)
       .order('transaction_date', { ascending: false });
     return NextResponse.json({ count: data?.length, data, error: error?.message });
@@ -136,7 +129,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, transaction_date, client_name, description, amount, type, category, related_type, related_id')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .eq('type', 'income')
       .gte('transaction_date', '2026-01-01')
       .order('transaction_date', { ascending: false })
@@ -149,7 +141,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .limit(3);
     return NextResponse.json({
       columns: data?.[0] ? Object.keys(data[0]) : [],
@@ -163,7 +154,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, transaction_date, client_name, description, amount, type, category, related_type, related_id, memo')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .or('client_name.ilike.%삼성%,client_name.ilike.%현대%,client_name.ilike.%메츠%,client_name.ilike.%DB손보%,client_name.ilike.%메리츠%,client_name.ilike.%디비%')
       .order('transaction_date', { ascending: false })
       .limit(30);
@@ -175,7 +165,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('classification_queue')
       .select('*')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .eq('final_matched_type', 'car')
       .limit(1);
     return NextResponse.json({ data: data?.[0], error: error?.message });
@@ -185,7 +174,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('classification_queue')
       .select('id, status, final_matched_type, final_matched_id, source_data, alternatives')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .eq('final_matched_type', 'car')
       .limit(20);
     return NextResponse.json({ count: data?.length, data: data?.map(d => ({id: d.id, type: d.final_matched_type, mid: d.final_matched_id, ai_type: d.ai_matched_type, ai_id: d.ai_matched_id, client: d.alternatives?.source_data?.client_name || d.source_data?.client_name})), error: error?.message });
@@ -196,7 +184,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('classification_queue')
       .select('id, status, ai_category, final_matched_type, final_matched_id, transaction_id, source_data, alternatives')
-      .eq('company_id', '971784ff-f42c-49cf-a4b5-32ce7883c00a')
       .is('final_matched_id', null)
       .limit(50);
     return NextResponse.json({ count: data?.length, data, error: error?.message });

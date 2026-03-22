@@ -33,11 +33,6 @@ export default function LoanListPage() {
     if (!company && role !== 'admin') return
     setLoading(true)
     let query = supabase.from('loans').select('*, cars(number, brand, model)')
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-    } else if (company) {
-      query = query.eq('company_id', company.id)
-    }
     const { data } = await query.order('created_at', { ascending: false })
     setLoans(data || [])
     setLoading(false)
@@ -147,7 +142,6 @@ export default function LoanListPage() {
     const d = pendingOcrData
 
     const payload: any = {
-      company_id: effectiveCompanyId,
       car_id: car.id,
       finance_name: d.finance_company || '',
       type: d.loan_type || '할부',

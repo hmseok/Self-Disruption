@@ -133,12 +133,10 @@ export default function CreateContractPage() {
         const [customersRes, carsRes] = await Promise.all([
           supabase
             .from('customers')
-            .select('*')
-            .eq('company_id', companyId),
+            .select('*'),
           supabase
             .from('cars')
-            .select('*')
-            .eq('company_id', companyId),
+            .select('*'),
         ]);
 
         if (customersRes.error) {
@@ -271,7 +269,6 @@ export default function CreateContractPage() {
       const { data, error } = await supabase
         .from('short_term_rental_contracts')
         .insert({
-          company_id: companyId,
           contract_number: contractNumber,
           status: asDraft ? 'draft' : 'pending_send',
 

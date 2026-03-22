@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic'
 /* ──────────────────────── 타입 ──────────────────────── */
 interface TermsSet {
   id: number
-  company_id: string
   version: string
   title: string
   description: string | null
@@ -35,7 +34,6 @@ interface Article {
 
 interface SpecialTerm {
   id: number
-  company_id: string
   label: string
   content: string
   contract_type: 'return' | 'buyout' | 'all'
@@ -90,7 +88,7 @@ const CONTRACT_CATEGORIES: Record<string, { label: string; emoji: string }> = {
 
 /* ──────────────────────── 메인 컴포넌트 ──────────────────────── */
 export default function ContractTermsPage() {
-  const { company, profile, role, adminSelectedCompanyId, allCompanies } = useApp()
+  const { company, profile, role, allCompanies } = useApp()
 
   // ── 탭 상태 ──
   const [tab, setTab] = useState<'versions' | 'articles' | 'special' | 'history' | 'insurance' | 'notices' | 'params' | 'pdf_template'>('versions')
@@ -186,7 +184,7 @@ export default function ContractTermsPage() {
 
   // admin은 선택된 회사 우선, 일반 admin은 본인 회사
   const companyId = (role === 'admin')
-    ? (adminSelectedCompanyId || allCompanies?.[0]?.id || company?.id || null)
+    ? (allCompanies?.[0]?.id || company?.id || null)
     : (company?.id || null)
 
   // ── PDF 기본값 로드/저장/미리보기 함수 ──
@@ -205,7 +203,7 @@ export default function ContractTermsPage() {
     const { data } = await supabase
       .from('contract_terms')
       .select('*')
-      .eq('company_id', companyId)
+      
       .eq('contract_category', selectedCategory)
       .eq('status', 'active')
       .limit(1)
@@ -243,7 +241,7 @@ export default function ContractTermsPage() {
       const { data: active } = await supabase
         .from('contract_terms')
         .select('id')
-        .eq('company_id', companyId)
+        
         .eq('contract_category', selectedCategory)
         .eq('status', 'active')
         .limit(1)
@@ -313,7 +311,7 @@ export default function ContractTermsPage() {
   /* ────────── 데이터 로드 ────────── */
   const fetchTermsSets = useCallback(async () => {
     if (!companyId) {
-      console.log('[약관] companyId가 없습니다. company:', company?.id, 'adminSelected:', adminSelectedCompanyId, 'allCompanies:', allCompanies?.length)
+      console.log('[약관] companyId가 없습니다. company:', company?.id, 'allCompanies:', allCompanies?.length)
       return
     }
     setLoading(true)
@@ -323,7 +321,7 @@ export default function ContractTermsPage() {
     const { data, error } = await supabase
       .from('contract_terms')
       .select('*')
-      .eq('company_id', companyId)
+      
       .eq('contract_category', selectedCategory)
       .order('created_at', { ascending: false })
 
@@ -337,7 +335,7 @@ export default function ContractTermsPage() {
         const { data: fbData, error: fbErr } = await supabase
           .from('contract_terms')
           .select('*')
-          .eq('company_id', companyId)
+          
           .order('created_at', { ascending: false })
         if (!fbErr && fbData) {
           setTermsSets(fbData)
@@ -367,7 +365,7 @@ export default function ContractTermsPage() {
     const { data, error } = await supabase
       .from('contract_special_terms')
       .select('*')
-      .eq('company_id', companyId)
+      
       .eq('contract_category', selectedCategory)
       .order('sort_order', { ascending: true })
     if (!error && data) {
@@ -378,7 +376,7 @@ export default function ContractTermsPage() {
       const { data: fbData } = await supabase
         .from('contract_special_terms')
         .select('*')
-        .eq('company_id', companyId)
+        
         .order('sort_order', { ascending: true })
       if (fbData) setSpecialTerms(fbData)
     }
@@ -456,7 +454,7 @@ export default function ContractTermsPage() {
     const { data, error } = await supabase
       .from('contract_terms')
       .insert({
-        company_id: companyId,
+        
         version: newVersion.version,
         title: newVersion.title,
         description: newVersion.description || null,
@@ -492,7 +490,7 @@ export default function ContractTermsPage() {
     const { data: newSet, error } = await supabase
       .from('contract_terms')
       .insert({
-        company_id: companyId,
+        
         version: versionName,
         title: source.title,
         description: `${source.version}에서 복사`,
@@ -545,7 +543,7 @@ export default function ContractTermsPage() {
     await supabase
       .from('contract_terms')
       .update({ status: 'archived', effective_to: new Date().toISOString().slice(0, 10) })
-      .eq('company_id', companyId)
+      
       .eq('status', 'active')
 
     // 선택 버전 → active
@@ -685,7 +683,7 @@ export default function ContractTermsPage() {
       }).eq('id', editingSpecial.id)
     } else {
       await supabase.from('contract_special_terms').insert({
-        company_id: companyId,
+        
         label: specialForm.label,
         content: specialForm.content,
         contract_type: specialForm.contract_type,
@@ -986,7 +984,6 @@ export default function ContractTermsPage() {
                   ? '회사를 먼저 선택해주세요.'
                   : '약관 버전을 새로 생성하거나, SQL 마이그레이션(030, 031)을 실행해주세요.'}
               </p>
-              <p className="text-xs text-gray-400 mt-1">company_id: {companyId || '없음'}</p>
             </div>
           ) : (
             <div className="space-y-3">

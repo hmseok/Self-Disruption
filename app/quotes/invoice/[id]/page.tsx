@@ -94,15 +94,7 @@ export default function InvoiceDetailPage() {
       if (error || !q) { setLoading(false); return }
       setQuote(q)
 
-      // 회사 정보
-      if (q.company_id) {
-        const { data: comp } = await supabase
-          .from('companies')
-          .select('name, phone, address, business_number, representative')
-          .eq('id', q.company_id)
-          .single()
-        setCompany(comp)
-      }
+      // 회사 정보는 quote_detail에서 활용
 
       // 공유 상태 확인
       if (q.signed_at) {

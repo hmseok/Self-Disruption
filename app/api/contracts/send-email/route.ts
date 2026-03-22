@@ -26,9 +26,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name }
+  return { ...user, role: profile.role, employee_name: profile.employee_name }
 }
 
 // ── 폴백용 이메일 HTML ──
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
   const { data: log, error: logErr } = await sb
     .from('contract_sending_logs')
     .insert({
-      company_id: contract.company_id, contract_type, contract_id,
+      contract_type, contract_id,
       recipient_email: recipient_email || null,
       recipient_phone: recipient_phone || null,
       send_channel, status: 'sent', created_by: admin.id,

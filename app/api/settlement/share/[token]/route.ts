@@ -98,7 +98,6 @@ export async function GET(
         .select('settlement_month, total_amount, items, created_at, paid_at')
         .eq('recipient_phone', share.recipient_phone)
         .eq('recipient_name', share.recipient_name)
-        .eq('company_id', share.company_id)
         .neq('id', share.id)
         .order('created_at', { ascending: false })
         .limit(50)

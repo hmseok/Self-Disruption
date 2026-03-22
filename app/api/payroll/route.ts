@@ -22,9 +22,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 // GET: 급여 설정 목록
@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
-  const companyId = searchParams.get('company_id') || admin.company_id
+  const companyId = searchParams.get('company_id')
 
-  if (admin.role === 'admin' && companyId !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+  if (!companyId) {
+    return NextResponse.json({ error: 'company_id 필수 파라미터입니다.' }, { status: 400 })
   }
 
   const sb = getSupabaseAdmin()
@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
         department:department_id(name)
       )
     `)
-    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -92,9 +91,6 @@ export async function POST(request: NextRequest) {
 
   if (!company_id || !employee_id) {
     return NextResponse.json({ error: '회사 ID와 직원 ID가 필요합니다.' }, { status: 400 })
-  }
-  if (admin.role === 'admin' && company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
   }
 
   const sb = getSupabaseAdmin()

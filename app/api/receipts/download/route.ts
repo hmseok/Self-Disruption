@@ -23,8 +23,8 @@ async function verifyUser(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await supabase
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
 }
 
 /** JS Date → Excel serial number (1900 date system, UTC to avoid timezone issues) */
@@ -118,14 +118,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl
   const month = searchParams.get('month') // YYYY-MM
-  const overrideCompanyId = searchParams.get('company_id')
 
   if (!month) return NextResponse.json({ error: 'month 파라미터 필요' }, { status: 400 })
-
-  const companyId = (user.role === 'admin' && overrideCompanyId) ? overrideCompanyId : user.company_id
-  if (user.role === 'admin' && !overrideCompanyId) {
-    return NextResponse.json({ error: '회사를 선택해주세요' }, { status: 400 })
-  }
 
   const supabase = getSupabaseAdmin()
 
@@ -137,7 +131,6 @@ export async function GET(request: NextRequest) {
   const { data: items, error } = await supabase
     .from('expense_receipts')
     .select('*')
-    .eq('company_id', companyId)
     .eq('user_id', user.id)
     .gte('expense_date', start)
     .lte('expense_date', end)

@@ -114,8 +114,8 @@ const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인'
 
 export default function PayrollPage() {
   const router = useRouter()
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const cid = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const cid = company?.id
 
   const [tab, setTab] = useState<Tab>('ledger')
   const [loading, setLoading] = useState(false)
@@ -202,7 +202,7 @@ export default function PayrollPage() {
     const { data, error } = await supabase
       .from('payslips')
       .select('*')
-      .eq('company_id', cid).eq('pay_period', payPeriod)
+      .eq('pay_period', payPeriod)
       .order('created_at', { ascending: false })
     if (error) console.error('payslips error:', error.message)
     // employee 정보는 settings에서 매칭
@@ -214,7 +214,7 @@ export default function PayrollPage() {
     const { data, error } = await supabase
       .from('employee_salaries')
       .select('*')
-      .eq('company_id', cid).eq('is_active', true)
+      .eq('is_active', true)
       .order('created_at', { ascending: false })
     if (error) console.error('settings error:', error.message)
     setSettings(data || [])
@@ -225,14 +225,14 @@ export default function PayrollPage() {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, employee_name, email, phone, position_id, department_id')
-      .eq('company_id', cid)
+      
     if (error) console.error('emps error:', error.message)
     setEmps(data || [])
   }, [cid])
 
   const fetchFreelancers = useCallback(async () => {
     if (!cid) return
-    let query = supabase.from('freelancers').select('*').eq('company_id', cid).order('name')
+    let query = supabase.from('freelancers').select('*').order('name')
     if (flFilter === 'active') query = query.eq('is_active', true)
     if (flFilter === 'inactive') query = query.eq('is_active', false)
     const { data } = await query
@@ -246,7 +246,7 @@ export default function PayrollPage() {
     const { data, error } = await supabase
       .from('freelancer_payments')
       .select('*, freelancers!freelancer_id(name, service_type)')
-      .eq('company_id', cid)
+      
       .gte('payment_date', `${payMonth}-01`)
       .lte('payment_date', `${payMonth}-${lastDay}`)
       .order('payment_date', { ascending: false })
@@ -254,7 +254,7 @@ export default function PayrollPage() {
       console.error('payments error:', error.message)
       // fallback: join 없이 재시도
       const { data: d2 } = await supabase.from('freelancer_payments').select('*')
-        .eq('company_id', cid).gte('payment_date', `${payMonth}-01`).lte('payment_date', `${payMonth}-${lastDay}`)
+        .gte('payment_date', `${payMonth}-01`).lte('payment_date', `${payMonth}-${lastDay}`)
         .order('payment_date', { ascending: false })
       setFlPayments(d2 || [])
     } else {
@@ -267,7 +267,7 @@ export default function PayrollPage() {
     const { data, error } = await supabase
       .from('meal_expense_monthly')
       .select('*')
-      .eq('company_id', cid).eq('year_month', mealPeriod)
+      .eq('year_month', mealPeriod)
       .order('excess_amount', { ascending: false })
     if (error) console.error('meals error:', error.message)
     setMeals(data || [])
@@ -275,13 +275,13 @@ export default function PayrollPage() {
 
   const fetchDepts = useCallback(async () => {
     if (!cid) return
-    const { data } = await supabase.from('departments').select('*').eq('company_id', cid)
+    const { data } = await supabase.from('departments').select('*')
     setDepartments(data || [])
   }, [cid])
 
   const fetchPositions = useCallback(async () => {
     if (!cid) return
-    const { data } = await supabase.from('positions').select('*').eq('company_id', cid)
+    const { data } = await supabase.from('positions').select('*')
     setPositions(data || [])
   }, [cid])
 
@@ -302,7 +302,7 @@ export default function PayrollPage() {
       const token = (await supabase.auth.getSession()).data.session?.access_token
       const res = await fetch('/api/payroll/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ company_id: cid, pay_period: payPeriod }),
+        body: JSON.stringify({  pay_period: payPeriod }),
       })
       const result = await res.json()
       if (res.ok) { alert(`${result.created}건 급여명세서 생성 완료`); fetchPayslips() }
@@ -323,7 +323,7 @@ export default function PayrollPage() {
     const baseSalary = fSalType === '연봉제' ? annualToMonthly(Number(fAnnual)) : Number(fBase)
 
     const payload: any = {
-      company_id: cid, employee_id: fEmpId, base_salary: baseSalary, allowances,
+       employee_id: fEmpId, base_salary: baseSalary, allowances,
       payment_day: Number(fPayDay), tax_type: fTax, bank_name: fBank || null,
       account_number: fAccNum || null, account_holder: fAccName || null, is_active: true,
       employment_type: fEmpType, salary_type: fSalType,
@@ -387,7 +387,7 @@ export default function PayrollPage() {
   // ────────────────────────────────────────
   const handleFlSave = async () => {
     if (!flForm.name) return alert('이름은 필수입니다.')
-    const payload = { ...flForm, company_id: cid }
+    const payload = { ...flForm}
     if (editingFl) {
       const { error } = await supabase.from('freelancers').update(payload).eq('id', editingFl.id)
       if (error) return alert('수정 실패: ' + error.message)
@@ -490,7 +490,7 @@ export default function PayrollPage() {
     setBulkProcessing(true); let saved = 0
     for (const item of toSave) {
       const { _row, _status, _note, ...payload } = item
-      const { error } = await supabase.from('freelancers').insert({ ...payload, company_id: cid })
+      const { error } = await supabase.from('freelancers').insert({ ...payload})
       if (error) { item._status = 'error'; item._note = error.message } else { item._status = 'saved'; item._note = '등록 완료'; saved++ }
     }
     setBulkData([...bulkData]); setBulkLogs(prev => [...prev, `${saved}명 등록 완료`])
@@ -516,7 +516,7 @@ export default function PayrollPage() {
     const gross = Number(payForm.gross_amount); const taxRate = Number(payForm.tax_rate)
     const taxAmount = Math.round(gross * taxRate / 100); const netAmount = gross - taxAmount
     const payload = {
-      company_id: cid, freelancer_id: payForm.freelancer_id, payment_date: payForm.payment_date,
+       freelancer_id: payForm.freelancer_id, payment_date: payForm.payment_date,
       gross_amount: gross, tax_rate: taxRate, tax_amount: taxAmount, net_amount: netAmount,
       description: payForm.description, status: payForm.status,
     }
@@ -529,7 +529,7 @@ export default function PayrollPage() {
     if (!confirm(`${p.freelancers?.name}에게 ${n(p.net_amount)}원 지급 확정하시겠습니까?`)) return
     await supabase.from('freelancer_payments').update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }).eq('id', p.id)
     await supabase.from('transactions').insert({
-      company_id: cid, transaction_date: p.payment_date, type: 'expense', category: '용역비(3.3%)',
+       transaction_date: p.payment_date, type: 'expense', category: '용역비(3.3%)',
       client_name: p.freelancers?.name || '프리랜서', amount: p.net_amount,
       description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
       payment_method: '이체', status: 'completed', related_type: 'freelancer',
@@ -537,7 +537,7 @@ export default function PayrollPage() {
     })
     if (p.tax_amount > 0) {
       await supabase.from('transactions').insert({
-        company_id: cid, transaction_date: p.payment_date, type: 'expense', category: '세금/공과금',
+         transaction_date: p.payment_date, type: 'expense', category: '세금/공과금',
         client_name: `원천세(${p.freelancers?.name})`, amount: p.tax_amount,
         description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
         payment_method: '이체', status: 'completed', related_type: 'freelancer',
@@ -614,7 +614,7 @@ export default function PayrollPage() {
   ]
 
   // ── 회사 미선택 ──
-  if (role === 'admin' && !adminSelectedCompanyId) {
+  if (!company) {
     return (
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: C.gray50 }}>
         <div style={{ ...sectionCard, padding: '80px 20px', textAlign: 'center' }}>
@@ -655,7 +655,7 @@ export default function PayrollPage() {
       <div style={{ display: 'flex', gap: 6, marginBottom: 24, overflowX: 'auto', paddingBottom: 4 }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
-            padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 800, border: 'none',
+            padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 800,
             cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
             background: tab === t.key ? C.steel : '#fff', color: tab === t.key ? '#fff' : C.gray500,
             boxShadow: tab === t.key ? '0 2px 8px rgba(45,95,168,0.25)' : `0 1px 2px rgba(0,0,0,0.05)`,

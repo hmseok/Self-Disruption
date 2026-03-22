@@ -17,8 +17,8 @@ async function verifyUser(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await supabase
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
 }
 
 // 버킷 확인 + 없으면 생성
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
     // 1. Supabase Storage에 이미지 업로드 (실패해도 계속 진행)
     let receiptUrl = ''
     const bucketName = 'receipts'
-    const fileName = `${user.company_id}/${user.id}/${Date.now()}.${ext}`
+    const fileName = `${user.id}/${Date.now()}.${ext}`
 
     try {
       await ensureBucket(supabase, bucketName)

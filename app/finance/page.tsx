@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import DarkHeader from '../components/DarkHeader'
 export default function FinancePage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
+  const { company, role } = useApp()
 
 // ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
 const router = useRouter()
@@ -31,14 +31,14 @@ const router = useRouter()
 
   const pathname = usePathname()
 
-  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, adminSelectedCompanyId, pathname])
+  useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, pathname])
 
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
     const onFocus = () => fetchTransactions()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [filterDate, company, adminSelectedCompanyId])
+  }, [filterDate, company])
 
   const fetchTransactions = async () => {
     if (!company && role !== 'admin') return
@@ -49,12 +49,6 @@ const router = useRouter()
     let query = supabase
       .from('transactions')
       .select('*')
-
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-    } else if (company) {
-      query = query.eq('company_id', company.id)
-    }
 
     const { data: txs, error } = await query
       .gte('transaction_date', `${filterDate}-01`)
@@ -84,14 +78,11 @@ const router = useRouter()
       setSummary({ income: inc, expense: exp, profit: inc - exp, pendingExpense: pending })
   }
 
-  // 현재 사용할 company_id 결정
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
-
   const handleSave = async () => {
-      if (role === 'admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
+      if (role === 'admin' && !company) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if (!form.amount || !form.client_name) return alert('필수 항목을 입력해주세요.')
       const { error } = await supabase.from('transactions').insert({
-          ...form, amount: Number(form.amount.replace(/,/g, '')), company_id: effectiveCompanyId
+          ...form, amount: Number(form.amount.replace(/,/g, ''))
       })
       if (error) alert('저장 실패: ' + error.message)
       else {
@@ -115,7 +106,7 @@ const router = useRouter()
   }
 
   const generateMonthlySchedule = async () => {
-      if (role === 'admin' && !adminSelectedCompanyId) return alert('⚠️ 회사를 먼저 선택해주세요.')
+      if (role === 'admin' && !company) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if(!confirm(`${filterDate}월 정기 지출을 일괄 생성하시겠습니까?`)) return;
       setLoading(true)
       try {
@@ -175,8 +166,7 @@ const router = useRouter()
           }
 
           if(newTxs.length > 0) {
-              const txsWithCompany = newTxs.map(tx => ({ ...tx, company_id: effectiveCompanyId }))
-              const { error } = await supabase.from('transactions').insert(txsWithCompany)
+              const { error } = await supabase.from('transactions').insert(newTxs)
               if(error) throw error
               alert(`✅ 신규 ${newTxs.length}건 생성 완료!`)
               setActiveTab('schedule')
@@ -197,7 +187,7 @@ const router = useRouter()
   const nf = (num: number) => num ? num.toLocaleString() : '0'
   const filteredList = list.filter(item => activeTab === 'ledger' ? item.status === 'completed' : item.status === 'pending')
 
-  if (!effectiveCompanyId && !loading) {
+  if (!company && !loading) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>

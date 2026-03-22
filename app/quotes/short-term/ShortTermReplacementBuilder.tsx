@@ -204,7 +204,7 @@ export default function ShortTermReplacementBuilder() {
   const loadLotteRates = async () => {
     if (!cid) return
     try {
-      const { data, error } = await supabase.from('lotte_reference_rates').select('*').eq('company_id', cid).eq('is_active', true).order('sort_order')
+      const { data, error } = await supabase.from('lotte_reference_rates').select('*').eq('is_active', true).order('sort_order')
       if (!error && data && data.length > 0) {
         setLotteRates(data)
         const latestDate = data[0]?.effective_date || data[0]?.updated_at
@@ -218,7 +218,7 @@ export default function ShortTermReplacementBuilder() {
   const loadRates = async () => {
     if (!cid) return
     try {
-      const { data, error } = await supabase.from('short_term_rates').select('*').eq('company_id', cid).eq('is_active', true).order('sort_order')
+      const { data, error } = await supabase.from('short_term_rates').select('*').eq('is_active', true).order('sort_order')
       if (!error && data && data.length > 0) {
         setRates(data)
         if (data[0]?.discount_percent) setGlobalDiscount(data[0].discount_percent)
@@ -236,10 +236,11 @@ export default function ShortTermReplacementBuilder() {
     if (!cid) return
     setSaving(true)
     try {
-      await supabase.from('lotte_reference_rates').delete().eq('company_id', cid)
+      // Note: company_id column has been removed from the table
+      // Each company now manages global rates
       const today = new Date().toISOString().split('T')[0]
       const payload = lotteRates.map((r, i) => ({
-        company_id: cid, lotte_category: r.lotte_category, vehicle_names: r.vehicle_names,
+        lotte_category: r.lotte_category, vehicle_names: r.vehicle_names,
         rate_6hrs: r.rate_6hrs || 0, rate_10hrs: r.rate_10hrs || 0,
         rate_1_3days: r.rate_1_3days, rate_4days: r.rate_4days, rate_5_6days: r.rate_5_6days,
         rate_7plus_days: r.rate_7plus_days, service_group: r.service_group,
@@ -260,9 +261,10 @@ export default function ShortTermReplacementBuilder() {
     if (!cid) return
     setSaving(true)
     try {
-      await supabase.from('short_term_rates').delete().eq('company_id', cid)
+      // Note: company_id column has been removed from the table
+      // Each company now manages global rates
       const payload = rates.map((r, i) => ({
-        company_id: cid, service_group: r.service_group, vehicle_class: r.vehicle_class,
+        service_group: r.service_group, vehicle_class: r.vehicle_class,
         displacement_range: r.displacement_range, daily_rate: r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, r.discount_percent) : r.daily_rate,
         lotte_base_rate: r.lotte_base_rate, discount_percent: r.discount_percent,
         calc_method: r.calc_method, sort_order: i + 1, is_active: true,
@@ -434,7 +436,7 @@ export default function ShortTermReplacementBuilder() {
         memo: contractMemo,
       }
       const { error } = await supabase.from('short_term_quotes').insert({
-        company_id: cid || null, quote_number: num, customer_name: customerName || customerCompany, customer_phone: customerPhone,
+        quote_number: num, customer_name: customerName || customerCompany, customer_phone: customerPhone,
         quote_detail: detail, discount_percent: globalDiscount, status: 'draft',
       })
       if (error) throw error
@@ -660,7 +662,6 @@ export default function ShortTermReplacementBuilder() {
       }
 
       const { data, error } = await supabase.from('quotes').insert({
-        company_id: cid,
         customer_name: '',
         rent_fee: qcResult.totalWithVat,
         deposit: 0,

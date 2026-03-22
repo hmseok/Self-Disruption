@@ -93,12 +93,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const fetchList = async () => {
     let query = supabase.from('cars').select('*')
 
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-    } else if (company) {
-      query = query.eq('company_id', company.id)
-    }
-
     const { data } = await query.order('created_at', { ascending: false })
     setCars(data || [])
   }
@@ -120,8 +114,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
   }
 
   // 🚀 [업그레이드] PDF 지원 + 브랜드 분석 로직
-  // 현재 사용할 company_id 결정
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
 
   // 드래그 앤 드롭 핸들러
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }
@@ -275,7 +267,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                   vehicle_age_expiry: cleanDate(result.vehicle_age_expiry),
                   fuel_type: result.fuel_type || '기타', year: detectedYear,
                   registration_image_url: urlData.publicUrl, status: 'available',
-                  notes: result.notes || '', company_id: effectiveCompanyId || null
+                  notes: result.notes || ''
               }])
 
               setProgress(prev => ({ ...prev, success: prev.success + 1 }))
@@ -315,8 +307,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
         purchase_price: finalPrice,
         fuel_type: selectedTrim?.fuel_type,
         vin: vin,
-        status: 'available',
-        company_id: effectiveCompanyId || null
+        status: 'available'
     }])
 
     if (error) alert('실패: ' + error.message)

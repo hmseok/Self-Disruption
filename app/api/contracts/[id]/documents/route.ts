@@ -96,13 +96,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { data: doc, error: dbErr } = await sb
       .from('contract_documents')
       .insert([{
-        company_id: contract.company_id,
         contract_id: contractId,
         document_type: documentType,
         file_name: file.name,
         file_url: fileUrl,
         file_size: buffer.length,
-        uploaded_by: auth.user?.id || null,
         notes,
       }])
       .select()

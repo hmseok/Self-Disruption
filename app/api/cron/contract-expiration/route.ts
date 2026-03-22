@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   // jiip_contracts 만료 처리
   const { data: jiipExpired } = await sb
     .from('jiip_contracts')
-    .select('id, company_id, status')
+    .select('id, status')
     .eq('status', 'active')
     .lt('contract_end_date', today)
 
@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
 
     // 이력 기록
     const histories = jiipExpired.map(c => ({
-      company_id: c.company_id,
       contract_type: 'jiip',
       contract_id: c.id,
       old_status: 'active',
@@ -67,7 +66,7 @@ export async function POST(request: NextRequest) {
   // investors 만료 처리
   const { data: investExpired } = await sb
     .from('general_investments')
-    .select('id, company_id, status')
+    .select('id, status')
     .eq('status', 'active')
     .lt('contract_end_date', today)
 
@@ -76,7 +75,6 @@ export async function POST(request: NextRequest) {
     await sb.from('general_investments').update({ status: 'expired' }).in('id', ids)
 
     const histories = investExpired.map(c => ({
-      company_id: c.company_id,
       contract_type: 'invest',
       contract_id: c.id,
       old_status: 'active',

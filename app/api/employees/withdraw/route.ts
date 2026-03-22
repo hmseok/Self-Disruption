@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // 2. 요청자 권한 확인
     const { data: requester } = await sb
       .from('profiles')
-      .select('id, role, company_id')
+      .select('id, role')
       .eq('id', authUser.id)
       .single()
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // 4. 대상 직원 조회
     const { data: target, error: targetErr } = await sb
       .from('profiles')
-      .select('id, email, role, company_id, employee_name')
+      .select('id, email, role, employee_name')
       .eq('id', employee_id)
       .single()
 
@@ -73,17 +73,12 @@ export async function POST(request: NextRequest) {
     if (target.role === 'admin') {
       return NextResponse.json({ error: 'GOD ADMIN은 탈퇴시킬 수 없습니다.' }, { status: 403 })
     }
-    // - master는 자기 회사 직원만
-    if (requester.role === 'admin' && target.company_id !== requester.company_id) {
-      return NextResponse.json({ error: '다른 회사의 직원은 탈퇴시킬 수 없습니다.' }, { status: 403 })
-    }
 
-    // 6. profile 비활성화 + 회사/직급/부서 연결 해제
+    // 6. profile 비활성화 + 직급/부서 연결 해제
     const { error: updateErr } = await sb
       .from('profiles')
       .update({
         is_active: false,
-        company_id: null,
         position_id: null,
         department_id: null,
         role: 'user',

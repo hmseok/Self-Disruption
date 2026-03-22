@@ -383,16 +383,16 @@ export async function POST(request: NextRequest) {
       jiipRes, investRes, loanRes, rulesRes, scheduleRes,
       salaryRes, freelancerRes, insuranceRes, carRes, cardRes, cardHistoryRes
     ] = await Promise.all([
-      safeQuery(sb.from('jiip_contracts').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('general_investments').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('loans').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('jiip_contracts').select('*')),
+      safeQuery(sb.from('general_investments').select('*')),
+      safeQuery(sb.from('loans').select('*')),
       safeQuery(sb.from('finance_rules').select('*')),
-      safeQuery(sb.from('expected_payment_schedules').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('employee_salaries').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('freelancers').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('insurance_contracts').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('cars').select('*').eq('company_id', company_id)),
-      safeQuery(sb.from('corporate_cards').select('*').eq('company_id', company_id)),
+      safeQuery(sb.from('expected_payment_schedules').select('*')),
+      safeQuery(sb.from('employee_salaries').select('*')),
+      safeQuery(sb.from('freelancers').select('*')),
+      safeQuery(sb.from('insurance_contracts').select('*')),
+      safeQuery(sb.from('cars').select('*')),
+      safeQuery(sb.from('corporate_cards').select('*')),
       safeQuery(sb.from('card_assignment_history').select('*')),
     ])
 
@@ -979,7 +979,6 @@ export async function GET(request: NextRequest) {
       let baseQuery = sb
         .from('classification_queue')
         .select('*', { count: 'exact' })
-        .eq('company_id', company_id)
         .is('deleted_at', null)
 
       if (status === 'pending') {
@@ -1008,7 +1007,6 @@ export async function GET(request: NextRequest) {
         let pageQuery = sb
           .from('classification_queue')
           .select('*', { count: 'exact' })
-          .eq('company_id', company_id)
           .is('deleted_at', null)
 
         if (status === 'pending') {
@@ -1043,9 +1041,9 @@ export async function GET(request: NextRequest) {
       // ★ invest/jiip 이름 조회 맵 (final_matched_id로 이름 해결)
       const nameMap: Record<string, string> = {}
       try {
-        const { data: invs } = await sb.from('general_investments').select('id, investor_name').eq('company_id', company_id)
+        const { data: invs } = await sb.from('general_investments').select('id, investor_name')
         ;(invs || []).forEach((i: any) => { nameMap[`invest_${i.id}`] = i.investor_name })
-        const { data: jiips } = await sb.from('jiip_contracts').select('id, investor_name').eq('company_id', company_id)
+        const { data: jiips } = await sb.from('jiip_contracts').select('id, investor_name')
         ;(jiips || []).forEach((j: any) => { nameMap[`jiip_${j.id}`] = j.investor_name })
       } catch (e) { console.error('[GET classify] nameMap 조회 오류:', e) }
 
@@ -1110,7 +1108,6 @@ export async function GET(request: NextRequest) {
 
         return {
           id: q.id,
-          company_id: q.company_id,
           transaction_id: q.transaction_id,
           source_type: q.source_type || (sd.payment_method === '카드' ? 'card_statement' : 'bank_statement'),
           source_data: {
@@ -1161,7 +1158,6 @@ export async function GET(request: NextRequest) {
     let txQuery = sb
       .from('transactions')
       .select('*', { count: 'exact' })
-      .eq('company_id', company_id)
       .is('deleted_at', null)
 
     const { data: txData, error: txError, count: txCount } = await txQuery
@@ -1175,7 +1171,6 @@ export async function GET(request: NextRequest) {
       const isPending = !tx.category || tx.category === '미분류' || tx.category === ''
       return {
         id: tx.id,
-        company_id: tx.company_id,
         source_data: {
           transaction_date: tx.transaction_date || '',
           client_name: tx.client_name || '',
@@ -1233,7 +1228,6 @@ export async function PUT(request: NextRequest) {
     const { data: queueItems, error: qErr } = await sb
       .from('classification_queue')
       .select('*')
-      .eq('company_id', company_id)
       .is('deleted_at', null)
       .in('status', ['pending', 'auto_confirmed'])
       .order('created_at', { ascending: false })
@@ -1248,13 +1242,13 @@ export async function PUT(request: NextRequest) {
       try { const r = await query; return r?.error ? { data: [] } : r } catch { return { data: [] } }
     }
     const [jiipRes, investRes, loanRes, salaryRes, freelancerRes, insuranceRes, carRes] = await Promise.all([
-      safeQ(sb.from('jiip_contracts').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('general_investments').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('loans').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('employee_salaries').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('freelancers').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('insurance_contracts').select('*').eq('company_id', company_id)),
-      safeQ(sb.from('cars').select('*').eq('company_id', company_id)),
+      safeQ(sb.from('jiip_contracts').select('*')),
+      safeQ(sb.from('general_investments').select('*')),
+      safeQ(sb.from('loans').select('*')),
+      safeQ(sb.from('employee_salaries').select('*')),
+      safeQ(sb.from('freelancers').select('*')),
+      safeQ(sb.from('insurance_contracts').select('*')),
+      safeQ(sb.from('cars').select('*')),
     ])
 
     const filterActive = (arr: any[]) => arr.filter(r => !r.status || r.status === 'active')
@@ -1528,7 +1522,6 @@ export async function PATCH(request: NextRequest) {
       const { count: confirmedTotal } = await sb
         .from('classification_queue')
         .select('id', { count: 'exact', head: true })
-        .eq('company_id', updated.company_id)
         .eq('status', 'confirmed')
       console.log(`[PATCH classify] 업데이트 완료. updated.status=${updated.status}, DB confirmed 총 수=${confirmedTotal}`)
     } catch (e) {
@@ -1578,7 +1571,6 @@ export async function PATCH(request: NextRequest) {
           let deleteQuery = sb
             .from('transactions')
             .delete()
-            .eq('company_id', companyId)
             .eq('transaction_date', txDate)
             .eq('client_name', clientName || '')
             .eq('amount', amount)
@@ -1665,7 +1657,6 @@ export async function PATCH(request: NextRequest) {
           const { error: txUpdateErr, count: txUpdated } = await sb
             .from('transactions')
             .update(txUpdateData)
-            .eq('company_id', companyId)
             .eq('transaction_date', txDate)
             .eq('client_name', clientName || '')
             .eq('amount', amount)
@@ -1754,7 +1745,6 @@ export async function DELETE(request: NextRequest) {
         // classification_queue에서 삭제 전 related 정보 수집
         const { data: queueItems } = await sb.from('classification_queue')
           .select('id, ai_matched_type, ai_matched_id')
-          .eq('company_id', company_id)
           .in('id', batch)
         if (queueItems) {
           for (const q of queueItems) {
@@ -1767,7 +1757,6 @@ export async function DELETE(request: NextRequest) {
         // classification_queue에서 삭제
         const { data: qd } = await sb.from('classification_queue')
           .delete()
-          .eq('company_id', company_id)
           .in('id', batch)
           .select('id')
         deleted += (qd?.length || 0)
@@ -1775,7 +1764,6 @@ export async function DELETE(request: NextRequest) {
         // transactions에서 삭제 전 related 정보 수집
         const { data: txItems } = await sb.from('transactions')
           .select('id, related_type, related_id')
-          .eq('company_id', company_id)
           .in('id', batch)
         if (txItems) {
           for (const t of txItems) {
@@ -1788,7 +1776,6 @@ export async function DELETE(request: NextRequest) {
         // transactions에서 삭제
         const { data: td } = await sb.from('transactions')
           .delete()
-          .eq('company_id', company_id)
           .in('id', batch)
           .select('id')
         deleted += (td?.length || 0)
@@ -1799,7 +1786,6 @@ export async function DELETE(request: NextRequest) {
         // classification_queue pending 삭제
         const { data: qd } = await sb.from('classification_queue')
           .delete()
-          .eq('company_id', company_id)
           .in('status', ['pending', 'auto_confirmed'])
           .select('id')
         deleted += (qd?.length || 0)
@@ -1807,14 +1793,12 @@ export async function DELETE(request: NextRequest) {
         // transactions 전체 삭제 (category 컬럼 없으면 모두 pending으로 간주)
         const { data: td } = await sb.from('transactions')
           .delete()
-          .eq('company_id', company_id)
           .select('id')
         deleted += (td?.length || 0)
       } else if (status === 'confirmed') {
         // classification_queue confirmed 삭제
         const { data: qd } = await sb.from('classification_queue')
           .delete()
-          .eq('company_id', company_id)
           .eq('status', 'confirmed')
           .select('id')
         deleted += (qd?.length || 0)
@@ -1823,7 +1807,6 @@ export async function DELETE(request: NextRequest) {
         try {
           const { data: td } = await sb.from('transactions')
             .delete()
-            .eq('company_id', company_id)
             .select('id')
           deleted += (td?.length || 0)
         } catch (e) {
@@ -1833,13 +1816,11 @@ export async function DELETE(request: NextRequest) {
         // all: 양쪽 테이블 모두 삭제
         const { data: qd } = await sb.from('classification_queue')
           .delete()
-          .eq('company_id', company_id)
           .select('id')
         deleted += (qd?.length || 0)
 
         const { data: td } = await sb.from('transactions')
           .delete()
-          .eq('company_id', company_id)
           .select('id')
         deleted += (td?.length || 0)
       }

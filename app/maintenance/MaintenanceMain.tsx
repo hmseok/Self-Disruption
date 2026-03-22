@@ -7,7 +7,6 @@ import Link from 'next/link'
 
 type MaintenanceRecord = {
   id: string
-  company_id: string
   car_id: string
   contract_id: string | null
   requested_date: string
@@ -51,7 +50,6 @@ type MaintenanceRecord = {
 
 type InspectionRecord = {
   id: string
-  company_id: string
   car_id: string
   inspection_type: 'periodic' | 'comprehensive' | 'new_registration' | 'structure_change' | 'tuning' | 'emission'
   due_date: string
@@ -117,7 +115,7 @@ const INSP_TYPE: Record<string, string> = {
 }
 
 export default function MaintenanceMainPage() {
-  const { company, role, adminSelectedCompanyId, user } = useApp()
+  const { company, role, user } = useApp()
 
   // Data
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([])
@@ -179,7 +177,7 @@ export default function MaintenanceMainPage() {
     notes: '',
   })
 
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = company?.id
 
   // Helper functions for lookups
   const getCar = (id: any) => cars.find(c => c.id === Number(id) || c.id === id)
@@ -191,7 +189,7 @@ export default function MaintenanceMainPage() {
     const { data, error } = await supabase
       .from('maintenance_records')
       .select('*')
-      .eq('company_id', effectiveCompanyId)
+      
       .order('requested_date', { ascending: false })
 
     if (error) {
@@ -208,7 +206,7 @@ export default function MaintenanceMainPage() {
     const { data, error } = await supabase
       .from('inspection_records')
       .select('*')
-      .eq('company_id', effectiveCompanyId)
+      
       .order('due_date', { ascending: true })
 
     if (error) {
@@ -224,7 +222,7 @@ export default function MaintenanceMainPage() {
     const { data, error } = await supabase
       .from('cars')
       .select('id,number,brand,model,trim,year')
-      .eq('company_id', effectiveCompanyId)
+      
 
     if (error) {
       console.error('차량 로딩 실패:', error)
@@ -299,7 +297,7 @@ export default function MaintenanceMainPage() {
       await supabase.from('maintenance_records').update(updates).eq('id', maintId)
 
       await supabase.from('vehicle_status_log').insert({
-        company_id: effectiveCompanyId,
+        
         car_id: maint.car_id,
         old_status: maint.status,
         new_status: newStatus,
@@ -330,7 +328,7 @@ export default function MaintenanceMainPage() {
       await supabase.from('inspection_records').update(updates).eq('id', inspId)
 
       await supabase.from('vehicle_status_log').insert({
-        company_id: effectiveCompanyId,
+        
         car_id: insp.car_id,
         old_status: insp.status,
         new_status: newStatus,
@@ -407,7 +405,7 @@ export default function MaintenanceMainPage() {
     try {
       const payload = {
         ...maintenanceFormData,
-        company_id: effectiveCompanyId,
+        
         status: editingMaintenance ? editingMaintenance.status : 'requested',
         created_by: editingMaintenance ? editingMaintenance.created_by : user.id,
       }
@@ -481,7 +479,7 @@ export default function MaintenanceMainPage() {
     try {
       const payload = {
         ...inspectionFormData,
-        company_id: effectiveCompanyId,
+        
         status: editingInspection ? editingInspection.status : 'scheduled',
         created_by: editingInspection ? editingInspection.created_by : user.id,
       }
@@ -519,7 +517,7 @@ export default function MaintenanceMainPage() {
     return 'text-gray-500'
   }
 
-  if (role === 'admin' && !adminSelectedCompanyId) {
+  if (!company) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

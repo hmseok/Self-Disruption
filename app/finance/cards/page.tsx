@@ -25,8 +25,8 @@ const matchCardCompany = (raw: string): string => {
 }
 
 export default function CorporateCardsPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [cards, setCards] = useState<any[]>([])
@@ -198,7 +198,7 @@ export default function CorporateCardsPage() {
     try {
       const { data, error } = await supabase.from('corporate_cards')
         .select('*')
-        .eq('company_id', companyId)
+        
         .order('created_at', { ascending: false })
       if (error) console.error('corporate_cards fetch error:', error.message)
       setCards(data || [])
@@ -213,7 +213,7 @@ export default function CorporateCardsPage() {
   const fetchEmployees = async () => {
     const { data } = await supabase.from('profiles')
       .select('id, employee_name')
-      .eq('company_id', companyId)
+      
       .eq('is_active', true)
       .order('employee_name')
     setEmployees(data || [])
@@ -222,7 +222,7 @@ export default function CorporateCardsPage() {
   const fetchCars = async () => {
     const { data } = await supabase.from('cars')
       .select('id, number, brand, model, status')
-      .eq('company_id', companyId)
+      
       .order('number')
     setCarsList(data || [])
   }
@@ -234,7 +234,7 @@ export default function CorporateCardsPage() {
 
     const { data } = await supabase.from('transactions')
       .select('card_id, amount')
-      .eq('company_id', companyId)
+      
       .eq('payment_method', '카드')
       .gte('transaction_date', `${ym}-01`)
       .lte('transaction_date', `${ym}-${lastDay}`)
@@ -271,7 +271,7 @@ export default function CorporateCardsPage() {
   const fetchLimitSettings = async () => {
     const { data } = await supabase.from('card_limit_settings')
       .select('*')
-      .eq('company_id', companyId)
+      
     const map: Record<string, number> = {}
     ;(data || []).forEach((d: any) => {
       map[`${d.limit_type}::${d.limit_key}`] = d.monthly_limit
@@ -288,7 +288,7 @@ export default function CorporateCardsPage() {
     // upsert
     const { data: existing } = await supabase.from('card_limit_settings')
       .select('id')
-      .eq('company_id', companyId)
+      
       .eq('limit_type', limitForm.type)
       .eq('limit_key', limitForm.key)
       .maybeSingle()
@@ -297,7 +297,7 @@ export default function CorporateCardsPage() {
       await supabase.from('card_limit_settings').update({ monthly_limit: amount }).eq('id', existing.id)
     } else {
       await supabase.from('card_limit_settings').insert({
-        company_id: companyId,
+        
         limit_type: limitForm.type,
         limit_key: limitForm.key,
         monthly_limit: amount,
@@ -312,7 +312,7 @@ export default function CorporateCardsPage() {
     if (!confirm(`"${key}" 한도 설정을 삭제하시겠습니까?`)) return
     await supabase.from('card_limit_settings')
       .delete()
-      .eq('company_id', companyId)
+      
       .eq('limit_type', type)
       .eq('limit_key', key)
     fetchLimitSettings()
@@ -349,7 +349,7 @@ export default function CorporateCardsPage() {
     if (limitSettings[limitKey]) {
       await supabase.from('card_limit_settings')
         .update({ limit_key: renameDept.to.trim() })
-        .eq('company_id', companyId)
+        
         .eq('limit_type', 'dept')
         .eq('limit_key', renameDept.from)
       fetchLimitSettings()
@@ -392,7 +392,7 @@ export default function CorporateCardsPage() {
 
     const payload = {
       ...form,
-      company_id: companyId,
+      
       monthly_limit: form.monthly_limit ? Number(form.monthly_limit) : null,
       assigned_employee_id: form.assigned_employee_id || null,
       assigned_car_id: form.assigned_car_id || null,
@@ -725,7 +725,7 @@ export default function CorporateCardsPage() {
       const { _selected, _duplicate, card_type, ...payload } = card
       const { error } = await supabase.from('corporate_cards').insert({
         ...payload,
-        company_id: companyId,
+        
         monthly_limit: payload.monthly_limit ? Number(payload.monthly_limit) : null,
         assigned_car_id: payload.assigned_car_id || null,
         expiry_date: payload.expiry_date || null,
@@ -762,17 +762,6 @@ export default function CorporateCardsPage() {
   const totalMonthlyUsage = Object.values(cardUsage).reduce((s, u) => s + u.total, 0)
   const totalMonthlyCount = Object.values(cardUsage).reduce((s, u) => s + u.count, 0)
   const activeCards = cards.filter(c => c.is_active).length
-
-  if (role === 'admin' && !adminSelectedCompanyId) {
-    return (
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: '#f9fafb' }}>
-        <div style={{ padding: '80px 48px', textAlign: 'center', color: '#9ca3af', fontSize: 14, background: '#fff', borderRadius: 16 }}>
-          <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🏢</span>
-          <p style={{ fontWeight: 700, color: '#4b5563', margin: 0 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading && cards.length === 0) {
     return (

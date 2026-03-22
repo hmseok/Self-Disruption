@@ -22,9 +22,9 @@ async function verifyUser(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 export async function POST(request: NextRequest) {
@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
 
     // 발송 로그 기록
     await logMessageSend({
-      companyId: currentUser.company_id,
       channel: 'sms',
       recipient: phone,
       recipientName: recipientName || '',

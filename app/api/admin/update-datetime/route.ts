@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
       const { data: txs, error: txErr } = await sb
         .from('transactions')
         .select('id, transaction_date, client_name, amount, type, category, description, related_type, related_id, status')
-        .eq('company_id', COMPANY_ID)
         .order('transaction_date', { ascending: true })
 
       if (txErr) {
@@ -170,7 +169,6 @@ export async function POST(request: NextRequest) {
       // Step 3: Insert unmatched Excel rows into classification_queue
       const { unmatchedRows } = body
       const queueItems = unmatchedRows.map((row: any) => ({
-        company_id: COMPANY_ID,
         ai_category: '미분류',
         ai_confidence: 0,
         ai_matched_type: null,
@@ -227,7 +225,6 @@ export async function POST(request: NextRequest) {
       const { data: queueItems, error: qErr } = await sb
         .from('classification_queue')
         .select('id, alternatives, status, created_at')
-        .eq('company_id', COMPANY_ID)
         .in('status', ['pending', 'confirmed', 'auto_confirmed'])
         .order('created_at', { ascending: false })
 
@@ -292,7 +289,6 @@ export async function POST(request: NextRequest) {
       const { data: txs, error: txErr } = await sb
         .from('transactions')
         .select('id, transaction_date, client_name, amount, type, category, related_type, related_id, description, status')
-        .eq('company_id', COMPANY_ID)
         .order('transaction_date', { ascending: true })
 
       if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 })
@@ -433,7 +429,6 @@ export async function POST(request: NextRequest) {
       const { data: sample, error: sErr } = await sb
         .from('transactions')
         .select('id, transaction_date')
-        .eq('company_id', COMPANY_ID)
         .limit(5)
 
       // Try to update one specific record and read it back
@@ -478,7 +473,6 @@ export async function POST(request: NextRequest) {
       const { data: queue, error: qErr } = await sb
         .from('classification_queue')
         .select('id, alternatives, status')
-        .eq('company_id', COMPANY_ID)
 
       if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 })
 
@@ -548,12 +542,10 @@ export async function POST(request: NextRequest) {
       const { data: txs, error: txErr } = await sb
         .from('transactions')
         .select('id, transaction_date, client_name, amount, type, status')
-        .eq('company_id', COMPANY_ID)
 
       const { data: queue, error: qErr } = await sb
         .from('classification_queue')
         .select('id, status, alternatives, created_at')
-        .eq('company_id', COMPANY_ID)
 
       if (txErr || qErr) return NextResponse.json({ error: txErr?.message || qErr?.message }, { status: 500 })
 

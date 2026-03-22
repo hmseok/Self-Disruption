@@ -48,7 +48,6 @@ export async function GET(request: NextRequest) {
   const { data: company } = await supabase
     .from('companies')
     .select('name, phone, address, representative')
-    .eq('id', tokenData.company_id)
     .single()
 
   // 접근 기록
@@ -59,7 +58,6 @@ export async function GET(request: NextRequest) {
 
   // viewed 이벤트 기록
   await supabase.from('quote_lifecycle_events').insert({
-    company_id: tokenData.company_id,
     quote_id: tokenData.quote_id,
     event_type: 'viewed',
     channel: 'link',
@@ -152,7 +150,6 @@ export async function POST(request: NextRequest) {
 
     // signed 이벤트
     await supabase.from('quote_lifecycle_events').insert({
-      company_id: tokenData.company_id,
       quote_id: tokenData.quote_id,
       event_type: 'signed',
       channel: 'link',

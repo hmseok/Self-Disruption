@@ -16,8 +16,8 @@ const TAX_TYPES = ['사업소득(3.3%)', '기타소득(8.8%)', '세금계산서'
 const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '기타']
 
 export default function FreelancersPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [freelancers, setFreelancers] = useState<any[]>([])
@@ -49,7 +49,7 @@ export default function FreelancersPage() {
 
   const fetchFreelancers = async () => {
     setLoading(true)
-    let query = supabase.from('freelancers').select('*').eq('company_id', companyId).order('name')
+    let query = supabase.from('freelancers').select('*').order('name')
     if (filter === 'active') query = query.eq('is_active', true)
     if (filter === 'inactive') query = query.eq('is_active', false)
     const { data } = await query
@@ -63,7 +63,7 @@ export default function FreelancersPage() {
     const { data } = await supabase
       .from('freelancer_payments')
       .select('*, freelancers(name, service_type)')
-      .eq('company_id', companyId)
+      
       .gte('payment_date', `${paymentMonth}-01`)
       .lte('payment_date', `${paymentMonth}-${lastDay}`)
       .order('payment_date', { ascending: false })
@@ -74,7 +74,7 @@ export default function FreelancersPage() {
 
   const handleSave = async () => {
     if (!form.name) return alert('이름은 필수입니다.')
-    const payload = { ...form, company_id: companyId }
+    const payload = { ...form }
 
     if (editingId) {
       const { error } = await supabase.from('freelancers').update(payload).eq('id', editingId)
@@ -106,7 +106,7 @@ export default function FreelancersPage() {
     const netAmount = gross - taxAmount
 
     const payload = {
-      company_id: companyId,
+      
       freelancer_id: payForm.freelancer_id,
       payment_date: payForm.payment_date,
       gross_amount: gross,
@@ -132,7 +132,7 @@ export default function FreelancersPage() {
 
     // 2. transactions에 자동 기록
     await supabase.from('transactions').insert({
-      company_id: companyId,
+      
       transaction_date: p.payment_date,
       type: 'expense',
       category: '용역비(3.3%)',
@@ -150,7 +150,7 @@ export default function FreelancersPage() {
     // 3. 원천세도 별도 기록
     if (p.tax_amount > 0) {
       await supabase.from('transactions').insert({
-        company_id: companyId,
+        
         transaction_date: p.payment_date,
         type: 'expense',
         category: '세금/공과금',

@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
   let query = sb
     .from('transaction_flags')
     .select('*')
-    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -58,7 +57,6 @@ export async function GET(request: NextRequest) {
   const { data: stats } = await sb
     .from('transaction_flags')
     .select('status')
-    .eq('company_id', companyId)
 
   const summary = {
     total: stats?.length || 0,
@@ -177,7 +175,6 @@ export async function PATCH(request: NextRequest) {
         : new Date().toISOString().slice(0, 7)
 
       adjustments.push({
-        company_id: flag.company_id,
         employee_id: flag.employee_id,
         year_month: yearMonth,
         adjustment_type: 'deduct',

@@ -65,7 +65,7 @@ const ROLE_LABELS: Record<string, { label: string; bg: string }> = {
 }
 
 export default function OrgManagementPage() {
-  const { user, company, role, adminSelectedCompanyId } = useApp()
+  const { user, company, role } = useApp()
 
   // 기본 데이터
   const [employees, setEmployees] = useState<any[]>([])
@@ -96,24 +96,20 @@ export default function OrgManagementPage() {
   const [savingPermsFor, setSavingPermsFor] = useState<string | null>(null)
   const [selectedPermUserId, setSelectedPermUserId] = useState<string | null>(null)
 
-  const activeCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const activeCompanyId = company?.id
 
   useEffect(() => {
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) {
-        loadAll()
-      } else {
-        setEmployees([])
-        setPositions([])
-        setDepartments([])
-        setActiveModules([])
-        setInvitations([])
-        setLoading(false)
-      }
-    } else if (company) {
+    if (company) {
       loadAll()
+    } else {
+      setEmployees([])
+      setPositions([])
+      setDepartments([])
+      setActiveModules([])
+      setInvitations([])
+      setLoading(false)
     }
-  }, [company, role, adminSelectedCompanyId])
+  }, [company])
 
   useEffect(() => {
     if (activeTab === 'organization' && activeCompanyId && ['admin', 'admin', 'master'].includes(role || '')) {
@@ -144,20 +140,20 @@ export default function OrgManagementPage() {
     const { data } = await supabase
       .from('profiles')
       .select('*, companies(*), position:positions(*), department:departments(*)')
-      .eq('company_id', activeCompanyId)
+      
       .order('created_at', { ascending: false })
     setEmployees(data || [])
   }
 
   const loadPositions = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase.from('positions').select('*').eq('company_id', activeCompanyId).order('level')
+    const { data } = await supabase.from('positions').select('*').order('level')
     setPositions(data || [])
   }
 
   const loadDepartments = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase.from('departments').select('*').eq('company_id', activeCompanyId).order('name')
+    const { data } = await supabase.from('departments').select('*').order('name')
     setDepartments(data || [])
   }
 
@@ -166,7 +162,7 @@ export default function OrgManagementPage() {
     const { data } = await supabase
       .from('company_modules')
       .select('module:system_modules(path, name)')
-      .eq('company_id', activeCompanyId)
+      
       .eq('is_active', true)
 
     if (data) {
@@ -187,7 +183,7 @@ export default function OrgManagementPage() {
     const { data } = await supabase
       .from('user_page_permissions')
       .select('*')
-      .eq('company_id', activeCompanyId)
+      
 
     const permsMap: Record<string, UserPermMap> = {}
     data?.forEach((p: any) => {
@@ -216,7 +212,7 @@ export default function OrgManagementPage() {
       const toInsert = Object.entries(userMap)
         .filter(([_, p]) => p.can_view || p.can_create || p.can_edit || p.can_delete)
         .map(([pagePath, p]) => ({
-          company_id: activeCompanyId,
+          
           user_id: userId,
           page_path: pagePath,
           can_view: p.can_view,
@@ -409,7 +405,7 @@ export default function OrgManagementPage() {
   const addPosition = async () => {
     if (!newPositionName.trim() || !activeCompanyId) return
     const { error } = await supabase.from('positions').insert({
-      company_id: activeCompanyId, name: newPositionName.trim(), level: newPositionLevel,
+       name: newPositionName.trim(), level: newPositionLevel,
     })
     if (error) alert('직급 추가 실패: ' + error.message)
     else { setNewPositionName(''); setNewPositionLevel(4); loadPositions() }
@@ -425,7 +421,7 @@ export default function OrgManagementPage() {
   const addDepartment = async () => {
     if (!newDeptName.trim() || !activeCompanyId) return
     const { error } = await supabase.from('departments').insert({
-      company_id: activeCompanyId, name: newDeptName.trim(),
+       name: newDeptName.trim(),
     })
     if (error) alert('부서 추가 실패: ' + error.message)
     else { setNewDeptName(''); loadDepartments() }
@@ -526,14 +522,7 @@ export default function OrgManagementPage() {
         ] : []}
       />
 
-      {role === 'admin' && !adminSelectedCompanyId && (
-        <div style={{ padding: 20, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 16, marginBottom: 24 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#1e40af', margin: 0 }}>사이드바에서 회사를 선택해주세요.</p>
-          <p style={{ fontSize: 12, color: '#3b82f6', marginTop: 4 }}>조직/권한 관리는 특정 회사를 선택한 상태에서 이용 가능합니다.</p>
-        </div>
-      )}
-
-      {role === 'admin' && !adminSelectedCompanyId ? null : (
+      {role === 'admin' && !company ? null : (
         <>
           {/* ═══ 통계 카드 ═══ */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>

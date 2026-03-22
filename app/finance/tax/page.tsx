@@ -84,20 +84,20 @@ export default function TaxManagementPage() {
         // 1. 급여 (payslips)
         supabase.from('payslips')
           .select('id, employee_id, pay_period, gross_salary, income_tax, local_income_tax, national_pension, health_insurance, long_care_insurance, employment_insurance, total_deductions, net_salary, tax_type, status, profiles!payslips_employee_id_fkey(full_name)')
-          .eq('company_id', effectiveCompanyId)
+          
           .eq('pay_period', filterMonth),
 
         // 2. 프리랜서 지급 (freelancer_payments)
         supabase.from('freelancer_payments')
           .select('id, freelancer_id, payment_date, gross_amount, tax_rate, tax_amount, net_amount, description, status, freelancers(name, tax_type)')
-          .eq('company_id', effectiveCompanyId)
+          
           .gte('payment_date', startDate)
           .lte('payment_date', endDate),
 
         // 3. 정산 거래 (지입배분/투자이자)
         supabase.from('transactions')
           .select('id, transaction_date, category, client_name, description, amount, related_type, related_id')
-          .eq('company_id', effectiveCompanyId)
+          
           .eq('type', 'expense')
           .eq('status', 'completed')
           .in('related_type', ['jiip_share', 'invest'])
@@ -107,14 +107,14 @@ export default function TaxManagementPage() {
         // 4. 세금계산서 발행 (customer_tax_invoices)
         supabase.from('customer_tax_invoices')
           .select('id, customer_id, invoice_number, issue_date, supply_amount, tax_amount, total_amount, description, status, customers(name)')
-          .eq('company_id', effectiveCompanyId)
+          
           .gte('issue_date', startDate)
           .lte('issue_date', endDate),
 
         // 5. 기존 신고 기록
         supabase.from('tax_filing_records')
           .select('*')
-          .eq('company_id', effectiveCompanyId)
+          
           .eq('tax_period', filterMonth),
       ])
 
@@ -415,7 +415,7 @@ export default function TaxManagementPage() {
     try {
       const existing = filingRecords.find(f => f.tax_type === taxType)
       const payload = {
-        company_id: effectiveCompanyId,
+        
         tax_period: filterMonth,
         tax_type: taxType,
         total_taxable_amount: isWithholding
@@ -824,7 +824,7 @@ function HistoryTab({ companyId }: { companyId: string }) {
       const { data } = await supabase
         .from('tax_filing_records')
         .select('*')
-        .eq('company_id', companyId)
+        
         .order('tax_period', { ascending: false })
         .limit(24)
       setRecords((data || []) as FilingRecord[])

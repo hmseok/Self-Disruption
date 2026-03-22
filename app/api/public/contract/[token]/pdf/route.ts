@@ -100,7 +100,6 @@ export async function GET(
       const { data: tv } = await supabase
         .from('contract_terms')
         .select('*')
-        .eq('company_id', company.id)
         .eq('status', 'active')
         .single()
       termsVersion = tv
@@ -126,7 +125,6 @@ export async function GET(
       const { data: specials } = await supabase
         .from('contract_special_terms')
         .select('content')
-        .eq('company_id', company.id)
         .eq('is_active', true)
         .eq('is_default', true)
         .in('contract_type', [contractType, 'all'])

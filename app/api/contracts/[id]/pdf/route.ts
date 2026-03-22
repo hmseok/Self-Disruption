@@ -22,7 +22,7 @@ export async function GET(
     // 계약 조회
     const { data: contract, error } = await sb
       .from('contracts')
-      .select('id, company_id, contract_pdf_url, customer_name')
+      .select('id, contract_pdf_url, customer_name')
       .eq('id', contractId)
       .single()
 

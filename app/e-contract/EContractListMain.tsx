@@ -62,7 +62,6 @@ export default function EContractListMain() {
         const { data: allContracts, error: contractsError } = await supabase
           .from('short_term_rental_contracts')
           .select('*')
-          .eq('company_id', companyId)
           .order('id', { ascending: false })
 
         if (contractsError) console.error('전자계약서 목록 로드 실패:', contractsError.message)

@@ -111,7 +111,6 @@ export async function GET(
       const { data: activeTerms } = await supabase
         .from('contract_terms')
         .select('id, version, title')
-        .eq('company_id', shareToken.company_id)
         .eq('status', 'active')
         .single()
 

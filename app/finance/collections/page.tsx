@@ -29,7 +29,7 @@ type Schedule = {
 type Tab = 'pending' | 'completed' | 'overdue'
 
 export default function CollectionsPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
+  const { company, role } = useApp()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('pending')
   const [schedules, setSchedules] = useState<Schedule[]>([])
@@ -40,12 +40,12 @@ export default function CollectionsPage() {
   const [sendChannel, setSendChannel] = useState<'sms' | 'email'>('sms')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const effectiveCompanyId = company?.id
 
   useEffect(() => {
     fetchSchedules()
     setSelectedIds(new Set())
-  }, [filterMonth, company, adminSelectedCompanyId])
+  }, [filterMonth, company])
 
   // ── 데이터 조회 ──
   const fetchSchedules = async () => {
@@ -68,7 +68,7 @@ export default function CollectionsPage() {
         .order('payment_date', { ascending: true })
 
       if (effectiveCompanyId) {
-        query = query.eq('company_id', effectiveCompanyId)
+        query = query
       }
 
       const { data, error } = await query
@@ -205,17 +205,6 @@ export default function CollectionsPage() {
     { key: 'overdue', label: '연체', count: overdueSchedules.length, color: 'text-red-600' },
     { key: 'completed', label: '수금완료', count: completedSchedules.length, color: 'text-green-600' },
   ]
-
-  if (role === 'admin' && !adminSelectedCompanyId) {
-    return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
-        </div>
-      </div>
-    )
-  }
 
   if (!effectiveCompanyId && !loading) {
     return (

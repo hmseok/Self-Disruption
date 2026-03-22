@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
     let query = sb
       .from('transactions')
       .select('*')
-      .eq('company_id', company_id)
 
     if (transaction_ids && transaction_ids.length > 0) {
       query = query.in('id', transaction_ids)

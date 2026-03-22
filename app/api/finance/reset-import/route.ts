@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     const { error: qDelErr } = await sb
       .from('classification_queue')
       .update({ deleted_at: now })
-      .eq('company_id', company_id)
       .is('deleted_at', null)
     if (qDelErr) console.error('Queue soft-delete error:', qDelErr.message)
 
@@ -33,7 +32,6 @@ export async function POST(request: NextRequest) {
     const { error: txDelErr } = await sb
       .from('transactions')
       .update({ deleted_at: now })
-      .eq('company_id', company_id)
       .is('deleted_at', null)
     if (txDelErr) console.error('Tx soft-delete error:', txDelErr.message)
 

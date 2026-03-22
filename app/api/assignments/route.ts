@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
             id, employee_name, phone, avatar_url
           )
         `)
-        .eq('company_id', companyId)
         .order('created_at')
 
       if (!handlers) return NextResponse.json({ handlers: [] })
@@ -58,14 +57,12 @@ export async function GET(request: NextRequest) {
           .from('accident_records')
           .select('id', { count: 'exact', head: true })
           .eq('handler_id', h.handler_id)
-          .eq('company_id', companyId)
           .in('status', ['reported', 'insurance_filed', 'repairing'])
 
         const { count: totalCount } = await supabase
           .from('accident_records')
           .select('id', { count: 'exact', head: true })
           .eq('handler_id', h.handler_id)
-          .eq('company_id', companyId)
 
         return {
           ...h,
@@ -88,7 +85,6 @@ export async function GET(request: NextRequest) {
             id, employee_name
           )
         `)
-        .eq('company_id', companyId)
         .order('priority')
         .order('rule_type')
 
@@ -146,7 +142,6 @@ export async function GET(request: NextRequest) {
           repair_shop_name, notes,
           car:cars(number, brand, model)
         `)
-        .eq('company_id', companyId)
         .is('handler_id', null)
         .in('status', ['reported', 'insurance_filed', 'repairing'])
         .order('accident_date', { ascending: false })
@@ -260,7 +255,6 @@ export async function POST(request: NextRequest) {
       const { data: unassigned } = await supabase
         .from('accident_records')
         .select('*')
-        .eq('company_id', company_id)
         .is('handler_id', null)
         .in('status', ['reported', 'insurance_filed', 'repairing'])
 

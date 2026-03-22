@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
       employee_name: user.employee_name,
       phone: user.phone,
       role: user.role,
-      company_id: user.company_id,
     },
     cards: cards || [],
   })

@@ -24,9 +24,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name }
+  return { ...user, role: profile.role, employee_name: profile.employee_name }
 }
 
 // GET: 급여명세서 상세 조회
@@ -54,15 +54,10 @@ export async function GET(
 
   if (error || !data) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
 
-  if (admin.role === 'admin' && data.company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
-
   // 급여 설정 정보도 함께 조회
   const { data: salaryInfo } = await sb
     .from('employee_salaries')
     .select('bank_name, account_number, account_holder, payment_day')
-    .eq('company_id', data.company_id)
     .eq('employee_id', data.employee_id)
     .single()
 
@@ -90,9 +85,6 @@ export async function PATCH(
 
   if (fetchErr || !existing) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
   if (existing.status === 'paid') return NextResponse.json({ error: '지급 완료된 명세서는 수정할 수 없습니다.' }, { status: 400 })
-  if (admin.role === 'admin' && existing.company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
 
   // 수정 가능한 필드
   const baseSalary = body.base_salary ?? existing.base_salary
@@ -169,9 +161,6 @@ export async function POST(
     .single()
 
   if (fetchErr || !payslip) return NextResponse.json({ error: '급여명세서를 찾을 수 없습니다.' }, { status: 404 })
-  if (admin.role === 'admin' && payslip.company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
 
   if (action === 'confirm') {
     if (payslip.status !== 'draft') {
@@ -210,7 +199,6 @@ export async function POST(
     const txRecords = [
       // 1. 실수령액 (통장 출금)
       {
-        company_id: payslip.company_id,
         transaction_date: paidDate,
         type: 'expense',
         client_name: emp?.employee_name || '직원',
@@ -236,7 +224,6 @@ export async function POST(
       )
       if (companyInsurance > 0) {
         txRecords.push({
-          company_id: payslip.company_id,
           transaction_date: paidDate,
           type: 'expense',
           client_name: '4대보험(회사부담)',
@@ -257,7 +244,6 @@ export async function POST(
     const totalTax = Number(payslip.income_tax || 0) + Number(payslip.local_income_tax || 0)
     if (totalTax > 0) {
       txRecords.push({
-        company_id: payslip.company_id,
         transaction_date: paidDate,
         type: 'expense',
         client_name: '원천세(급여)',

@@ -121,7 +121,6 @@ const BOARD_GROUPS = [
 
 export type AccidentCase = {
   id: number
-  company_id: string
   car_id: number | null
   car_number?: string
   car_model?: string

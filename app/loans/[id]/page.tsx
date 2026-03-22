@@ -130,7 +130,6 @@ export default function LoanDetailPage() {
       first_payment_date: loan.first_payment_date || null,
       quote_date: loan.quote_date || null, valid_date: loan.valid_date || null,
     }
-    if (isNew) payload.company_id = effectiveCompanyId
     const query = isNew ? supabase.from('loans').insert(payload) : supabase.from('loans').update(payload).eq('id', loanId)
     const { error } = await query
     if (error) alert('저장 실패: ' + error.message)

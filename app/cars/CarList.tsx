@@ -43,12 +43,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
         .from('cars') // 👈 여기가 핵심! vehicles -> cars 로 수정
         .select('*')
 
-      if (role === 'admin') {
-        if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-      } else if (company) {
-        query = query.eq('company_id', company.id)
-      }
-
       const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) {

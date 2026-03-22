@@ -11,7 +11,6 @@ import DispatchModal from './DispatchModal'
 // ============================================
 type Operation = {
   id: string
-  company_id: string
   operation_type: 'delivery' | 'return'
   contract_id: string | null
   car_id: string
@@ -55,7 +54,6 @@ type Operation = {
 
 type Schedule = {
   id: string
-  company_id: string
   car_id: string
   schedule_type: string
   start_date: string
@@ -69,7 +67,6 @@ type Schedule = {
 
 type Contract = {
   id: string
-  company_id: string
   car_id: any
   customer_id: any
   customer_name?: string
@@ -145,8 +142,8 @@ const BILLING_STATUS: Record<string, { label: string; color: string }> = {
 // Main Component
 // ============================================
 export default function OperationsMainPage() {
-  const { company, role, adminSelectedCompanyId, user } = useApp()
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role, user } = useApp()
+  const effectiveCompanyId = company?.id
 
   // Data states
   const [operations, setOperations] = useState<Operation[]>([])
@@ -185,7 +182,7 @@ export default function OperationsMainPage() {
     if (!effectiveCompanyId) return
     const { data, error } = await supabase
       .from('vehicle_operations').select('*')
-      .eq('company_id', effectiveCompanyId)
+      
       .order('scheduled_date', { ascending: false })
     if (error) console.error('작업 로딩 실패:', JSON.stringify(error))
     else setOperations(data || [])
@@ -195,7 +192,7 @@ export default function OperationsMainPage() {
     if (!effectiveCompanyId) return
     const { data, error } = await supabase
       .from('vehicle_schedules').select('*')
-      .eq('company_id', effectiveCompanyId)
+      
       .gte('end_date', timelineStart)
       .lte('start_date', timelineEnd)
     if (error) console.error('일정 로딩 실패:', JSON.stringify(error))
@@ -206,7 +203,7 @@ export default function OperationsMainPage() {
     if (!effectiveCompanyId) return
     const { data, error } = await supabase
       .from('contracts').select('*')
-      .eq('company_id', effectiveCompanyId)
+      
       .in('status', ['active', 'pending'])
     if (error) console.error('계약 로딩 실패:', JSON.stringify(error))
     setContracts(data || [])
@@ -216,7 +213,7 @@ export default function OperationsMainPage() {
     if (!effectiveCompanyId) return
     const { data, error } = await supabase
       .from('cars').select('id,number,brand,model,trim,year,status')
-      .eq('company_id', effectiveCompanyId)
+      
     if (error) console.error('차량 로딩 실패:', error)
     else setCars(data || [])
   }, [effectiveCompanyId])
@@ -225,7 +222,7 @@ export default function OperationsMainPage() {
     if (!effectiveCompanyId) return
     const { data } = await supabase
       .from('customers').select('id,name,phone')
-      .eq('company_id', effectiveCompanyId)
+      
     setCustomers(data || [])
   }, [effectiveCompanyId])
 
@@ -342,7 +339,7 @@ export default function OperationsMainPage() {
       }
       await supabase.from('vehicle_operations').update(updates).eq('id', opId)
       await supabase.from('vehicle_status_log').insert({
-        company_id: effectiveCompanyId,
+        
         car_id: op.car_id,
         old_status: op.status,
         new_status: newStatus,
@@ -390,7 +387,7 @@ export default function OperationsMainPage() {
   // ============================================
   // Render - admin check
   // ============================================
-  if (role === 'admin' && !adminSelectedCompanyId) {
+  if (!company) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">

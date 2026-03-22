@@ -54,8 +54,7 @@ export default function CarRegisterForm() {
     setLoading(true)
     const { error } = await supabase.from('cars').insert([{
       ...car,
-      status: 'available',
-      company_id: effectiveCompanyId
+      status: 'available'
     }])
 
     if (error) {

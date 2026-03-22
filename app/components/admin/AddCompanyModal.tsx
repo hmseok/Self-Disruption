@@ -35,7 +35,6 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
 
     // 모든 플랜에서 전체 모듈 활성화 (플랜별 제한은 추후 구독 관리에서)
     const records = modules.map(m => ({
-      company_id: companyId,
       module_id: m.id,
       is_active: true,
     }))

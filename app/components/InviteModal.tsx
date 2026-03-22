@@ -78,14 +78,12 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       supabase
         .from('departments')
         .select('id, name')
-        .eq('company_id', companyId)
         .order('name')
         .then(({ data }) => setDepartments(data || []))
 
       supabase
         .from('positions')
         .select('id, name')
-        .eq('company_id', companyId)
         .order('level')
         .then(({ data }) => setPositions(data || []))
 
@@ -93,7 +91,6 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
       supabase
         .from('company_modules')
         .select('module:system_modules(path, name)')
-        .eq('company_id', companyId)
         .eq('is_active', true)
         .then(({ data }) => {
           if (data) {
@@ -211,7 +208,6 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         },
         body: JSON.stringify({
           email,
-          company_id: companyId,
           position_id: positionId || null,
           department_id: departmentId || null,
           role,
@@ -244,7 +240,6 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             },
             body: JSON.stringify({
               email,
-              company_id: companyId,
               position_id: positionId || null,
               department_id: departmentId || null,
               role,

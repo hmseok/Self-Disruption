@@ -146,7 +146,7 @@ export default function QuoteCreator() {
     }
     const fetchData = async () => {
       const [custRes, compRes] = await Promise.all([
-        supabase.from('customers').select('*').eq('company_id', effectiveCompanyId).order('name'),
+        supabase.from('customers').select('*').order('name'),
         supabase.from('companies').select('*').eq('id', effectiveCompanyId).single(),
       ])
       if (custRes.data) setCustomers(custRes.data)
@@ -268,10 +268,7 @@ export default function QuoteCreator() {
     // 먼저 quotes 테이블의 실제 컬럼 조회
     try {
       // 방법 1: 기본 컬럼으로 insert 시도
-      // companyId: sessionStorage에서 전달받은 값 또는 현재 로그인 회사
-      const resolvedCompanyId = data.companyId || effectiveCompanyId
       const basePayload: Record<string, any> = {
-        company_id: resolvedCompanyId,
         car_id: (!car.id || String(car.id).startsWith('newcar-')) ? null : Number(car.id) || car.id,
         customer_id: customerMode === 'select' ? selectedCustomerId : null,
         start_date: startDate,

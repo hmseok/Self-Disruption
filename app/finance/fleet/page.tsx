@@ -56,8 +56,8 @@ interface CarPnl {
 
 export default function FleetPnlPage() {
   const router = useRouter()
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const effectiveCompanyId = role === 'admin' ? (adminSelectedCompanyId || company?.id) : company?.id
+  const { company, role } = useApp()
+  const effectiveCompanyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [cars, setCars] = useState<any[]>([])
@@ -94,7 +94,7 @@ export default function FleetPnlPage() {
         // 전체 차량
         (() => {
           let q = supabase.from('cars').select('id, number, model, brand, status, ownership_type')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q.order('number')
         })(),
         // 차량 연결 거래 (당월)
@@ -104,31 +104,31 @@ export default function FleetPnlPage() {
             .eq('related_type', 'car')
             .gte('transaction_date', startDate)
             .lte('transaction_date', endDate)
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q
         })(),
         // 대출/금융상품
         (() => {
           let q = supabase.from('loans').select('id, car_id, finance_name, type, monthly_payment, start_date, end_date')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q
         })(),
         // 보험
         (() => {
           let q = supabase.from('insurance_contracts').select('id, car_id, insurance_company, premium, start_date, end_date')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q
         })(),
         // 지입 계약
         (() => {
           let q = supabase.from('jiip_contracts').select('id, car_id, investor_name, admin_fee, share_ratio, status')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q.eq('status', 'active')
         })(),
         // 투자 계약
         (() => {
           let q = supabase.from('general_investments').select('id, car_id, investor_name, invest_amount, interest_rate, status')
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q.eq('status', 'active')
         })(),
         // 정산 거래 (지입/투자 — 당월)
@@ -138,7 +138,7 @@ export default function FleetPnlPage() {
             .in('related_type', ['jiip_share', 'invest'])
             .gte('transaction_date', startDate)
             .lte('transaction_date', endDate)
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q
         })(),
         // classification_queue 확정 건 (아직 transactions에 안 간 것)
@@ -147,7 +147,7 @@ export default function FleetPnlPage() {
             .select('id, source_data, final_category, final_matched_type, final_matched_id, status')
             .eq('final_matched_type', 'car')
             .in('status', ['confirmed', 'auto_confirmed'])
-          if (effectiveCompanyId) q = q.eq('company_id', effectiveCompanyId)
+          if (effectiveCompanyId) q = q
           return q
         })(),
       ])

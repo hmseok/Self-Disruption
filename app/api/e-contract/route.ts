@@ -14,7 +14,6 @@ export async function GET(req: Request) {
   let query = supabase
     .from('short_term_rental_contracts')
     .select('*')
-    .eq('company_id', company_id)
     .order('created_at', { ascending: false })
 
   if (status && status !== 'all') query = query.eq('status', status)

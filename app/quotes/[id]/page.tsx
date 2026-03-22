@@ -242,12 +242,7 @@ export default function QuoteDetailPage() {
         if (wsData) setWorksheet(wsData)
       }
 
-      if (quoteData.company_id) {
-        const { data: compData } = await supabase.from('companies').select('*').eq('id', quoteData.company_id).single()
-        if (compData) setCompany(compData)
-      }
-      // company_id로 조회 실패 시 quote_detail 내 company 정보 활용
-      // (이 시점에서 company state가 아직 null이면 아래에서 fallback 처리)
+      // quote_detail 내 company 정보 활용
 
       const { data: contractData } = await supabase.from('contracts').select('*').eq('quote_id', quoteId).single()
       let customerData = null
@@ -424,8 +419,7 @@ export default function QuoteDetailPage() {
       const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
         quote_id: quote.id, car_id: quote.car_id, customer_id: quote.customer_id || null,
         customer_name: quote.customer_name, start_date: quote.start_date, end_date: quote.end_date,
-        term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active',
-        company_id: quote.company_id,
+        term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active'
       }]).select().single()
       if (cErr) throw cErr
       const schedules = []

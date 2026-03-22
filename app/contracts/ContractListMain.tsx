@@ -52,7 +52,7 @@ export default function ContractListMain() {
 
       try {
         const { data: allContracts, error: contractsError } = await supabase
-          .from('contracts').select('*').eq('company_id', companyId).order('id', { ascending: false })
+          .from('contracts').select('*').order('id', { ascending: false })
         if (contractsError) console.error('계약 목록 로드 실패:', contractsError.message)
 
         const contractIds = (allContracts || []).map(c => c.id)

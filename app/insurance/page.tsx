@@ -84,12 +84,6 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
       .from('cars')
       .select(`id, number, model, brand, vin, insurance_contracts (id, company, end_date, premium, status)`)
 
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-    } else if (company) {
-      query = query.eq('company_id', company.id)
-    }
-
     const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) { console.error("리스트 로딩 실패:", error.message); return; }

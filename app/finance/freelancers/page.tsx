@@ -16,8 +16,8 @@ const TAX_TYPES = ['사업소득(3.3%)', '기타소득(8.8%)', '세금계산서'
 const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '기타']
 
 export default function FreelancersPage() {
-  const { company, role, adminSelectedCompanyId } = useApp()
-  const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id
+  const { company, role } = useApp()
+  const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [freelancers, setFreelancers] = useState<any[]>([])
@@ -58,7 +58,7 @@ export default function FreelancersPage() {
   const fetchFreelancers = async () => {
     setLoading(true)
     try {
-      let query = supabase.from('freelancers').select('*').eq('company_id', companyId).order('name')
+      let query = supabase.from('freelancers').select('*').order('name')
       if (filter === 'active') query = query.eq('is_active', true)
       if (filter === 'inactive') query = query.eq('is_active', false)
       const { data, error } = await query
@@ -79,7 +79,7 @@ export default function FreelancersPage() {
       const { data, error } = await supabase
         .from('freelancer_payments')
         .select('*, freelancers(name, service_type)')
-        .eq('company_id', companyId)
+        
         .gte('payment_date', `${paymentMonth}-01`)
         .lte('payment_date', `${paymentMonth}-${lastDay}`)
         .order('payment_date', { ascending: false })
@@ -300,7 +300,7 @@ export default function FreelancersPage() {
 
     for (const item of toSave) {
       const { _row, _status, _note, _source, _sheet, default_fee, ...payload } = item
-      const { error } = await supabase.from('freelancers').insert({ ...payload, company_id: companyId })
+      const { error } = await supabase.from('freelancers').insert({ ...payload})
       if (error) {
         item._status = 'error'
         item._note = error.message
@@ -336,7 +336,7 @@ export default function FreelancersPage() {
 
   const handleSave = async () => {
     if (!form.name) return alert('이름은 필수입니다.')
-    const payload = { ...form, company_id: companyId }
+    const payload = { ...form}
 
     if (editingId) {
       const { error } = await supabase.from('freelancers').update(payload).eq('id', editingId)
@@ -368,7 +368,7 @@ export default function FreelancersPage() {
     const netAmount = gross - taxAmount
 
     const payload = {
-      company_id: companyId,
+      
       freelancer_id: payForm.freelancer_id,
       payment_date: payForm.payment_date,
       gross_amount: gross,
@@ -392,7 +392,7 @@ export default function FreelancersPage() {
     await supabase.from('freelancer_payments').update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }).eq('id', p.id)
 
     await supabase.from('transactions').insert({
-      company_id: companyId,
+      
       transaction_date: p.payment_date,
       type: 'expense',
       category: '용역비(3.3%)',
@@ -409,7 +409,7 @@ export default function FreelancersPage() {
 
     if (p.tax_amount > 0) {
       await supabase.from('transactions').insert({
-        company_id: companyId,
+        
         transaction_date: p.payment_date,
         type: 'expense',
         category: '세금/공과금',
@@ -455,17 +455,6 @@ export default function FreelancersPage() {
 
   const activeCount = freelancers.filter(f => f.is_active).length
   const inactiveCount = freelancers.filter(f => !f.is_active).length
-
-  if (role === 'admin' && !adminSelectedCompanyId) {
-    return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading && freelancers.length === 0) {
     return (

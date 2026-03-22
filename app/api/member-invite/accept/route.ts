@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
       full_name: name,
       phone,
       invite_token: token,
-      invite_company_id: invite.company_id,
       role: invite.role,
       position_id: invite.position_id || null,
       department_id: invite.department_id || null,
@@ -97,7 +96,6 @@ export async function POST(request: NextRequest) {
 
   const profilePayload = {
     email: invite.email,
-    company_id: invite.company_id,
     role: invite.role,
     position_id: invite.position_id,
     department_id: invite.department_id,
@@ -117,20 +115,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'profile 업데이트 실패: ' + updateErr.message }, { status: 500 })
     }
 
-    // ★ 업데이트 후 company_id가 실제로 반영되었는지 검증
-    const { data: verifyProfile } = await sb.from('profiles').select('company_id').eq('id', userId).single()
-    if (!verifyProfile?.company_id) {
-      console.error('profile company_id 반영 실패! 재시도합니다.', { userId, invite_company_id: invite.company_id })
-      // 강제 재시도
-      const { error: retryErr } = await sb
-        .from('profiles')
-        .update({ company_id: invite.company_id, role: invite.role, is_active: true })
-        .eq('id', userId)
-      if (retryErr) {
-        console.error('profile 재시도도 실패:', retryErr.message)
-        return NextResponse.json({ error: 'profile 회사 배정 실패. 관리자에게 문의하세요.' }, { status: 500 })
-      }
-    }
   } else {
     const { error: insertErr } = await sb
       .from('profiles')
@@ -148,7 +132,6 @@ export async function POST(request: NextRequest) {
     const permsToInsert = pagePerms
       .filter((p: any) => p.can_view || p.can_create || p.can_edit || p.can_delete)
       .map((p: any) => ({
-        company_id: invite.company_id,
         user_id: userId,
         page_path: p.page_path,
         can_view: p.can_view || false,
@@ -176,5 +159,5 @@ export async function POST(request: NextRequest) {
     })
     .eq('id', invite.id)
 
-  return NextResponse.json({ success: true, company_id: invite.company_id, email: invite.email })
+  return NextResponse.json({ success: true, email: invite.email })
 }

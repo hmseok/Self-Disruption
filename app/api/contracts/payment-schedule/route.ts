@@ -22,9 +22,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 // POST: 결제 스케줄 생성
@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
 
   while (current <= endDate) {
     schedules.push({
-      company_id: contract.company_id,
       contract_type,
       contract_id,
       payment_date: current.toISOString().split('T')[0],

@@ -22,9 +22,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
   // 현재 상태 조회
   const { data: contract, error: fetchErr } = await sb
-    .from(tableName).select('status, company_id').eq('id', contract_id).single()
+    .from(tableName).select('status').eq('id', contract_id).single()
 
   if (fetchErr || !contract) {
     return NextResponse.json({ error: '계약을 찾을 수 없습니다.' }, { status: 404 })
@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
   const { error: historyErr } = await sb
     .from('contract_status_history')
     .insert({
-      company_id: contract.company_id,
       contract_type,
       contract_id,
       old_status: currentStatus,

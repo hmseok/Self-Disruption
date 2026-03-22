@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
 
     const { data: car, error: carErr } = await supabase
       .from('cars')
-      .select('id, company_id, number, brand, model, status')
+      .select('id, number, brand, model, status')
       .or(`number.ilike.%${cleanCarNum}%,number.ilike.%${cleanCarNum.replace(/(\d+)([가-힣])(\d+)/, '$1 $2 $3')}%`)
       .limit(1)
       .single()
@@ -283,14 +283,20 @@ export async function POST(request: NextRequest) {
       .from('contracts')
       .select('id, customer_id')
       .eq('car_id', car.id)
-      .eq('company_id', car.company_id)
       .eq('status', 'active')
       .limit(1)
       .single()
 
     // ── 9. 사고 등록
+    // 회사 ID 결정
+    const { data: defaultCompany } = await supabase.from('companies').select('id').limit(1).single()
+    const companyId = defaultCompany?.id
+    if (!companyId) {
+      return jandiResponse(`⚠️ 회사 정보를 찾을 수 없습니다.`, '#FF9800')
+    }
+
     return await insertAccidentRecord(supabase, {
-      companyId: car.company_id,
+      companyId,
       carId: car.id,
       carInfo: car,
       contractId: activeContract?.id,
@@ -401,7 +407,6 @@ async function insertAccidentRecord(
 
   // ── INSERT
   const insertData: Record<string, any> = {
-    company_id: companyId,
     car_id: carId,
     contract_id: contractId || null,
     customer_id: customerId || null,
@@ -459,7 +464,6 @@ async function insertAccidentRecord(
   try {
     const assignResult = await assignHandler(supabase, {
       id: accident.id,
-      company_id: companyId,
       accident_location: fields['사고장소'] || '',
       repair_shop_name: repair.repairLocation || '',
       notes: noteParts,
@@ -497,7 +501,6 @@ async function insertAccidentRecord(
     await supabase.from('cars').update({ status: 'accident' }).eq('id', carId)
 
     await supabase.from('vehicle_status_log').insert({
-      company_id: companyId,
       car_id: carId,
       old_status: carInfo?.status || 'active',
       new_status: 'accident',

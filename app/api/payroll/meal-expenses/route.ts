@@ -29,7 +29,6 @@ export async function GET(req: NextRequest) {
     const { data: existing } = await supabase
       .from('meal_expense_monthly')
       .select('*, employee:employee_id(id, employee_name, position:position_id(name), department:department_id(name))')
-      .eq('company_id', companyId)
       .eq('year_month', yearMonth)
       .order('excess_amount', { ascending: false })
 
@@ -46,14 +45,12 @@ export async function GET(req: NextRequest) {
     const { data: cards } = await supabase
       .from('corporate_cards')
       .select('id, card_number, assigned_employee_id, holder_name, card_alias')
-      .eq('company_id', companyId)
       .eq('is_active', true)
 
     // 식대 카테고리 거래 조회 (classification_queue에서)
     const { data: mealTxns } = await supabase
       .from('classification_queue')
       .select('id, card_id, source_data, ai_category')
-      .eq('company_id', companyId)
       .gte('source_data->>transaction_date', startDate)
       .lt('source_data->>transaction_date', nextMonth)
       .in('ai_category', ['복리후생(식대)'])
@@ -78,7 +75,6 @@ export async function GET(req: NextRequest) {
     const { data: salarySettings } = await supabase
       .from('employee_salaries')
       .select('employee_id, allowances')
-      .eq('company_id', companyId)
       .eq('is_active', true)
 
     const settingsMap: Record<string, number> = {}
@@ -130,13 +126,11 @@ export async function POST(req: NextRequest) {
     const { data: cards } = await supabase
       .from('corporate_cards')
       .select('id, card_number, assigned_employee_id, holder_name')
-      .eq('company_id', company_id)
       .eq('is_active', true)
 
     const { data: mealTxns } = await supabase
       .from('classification_queue')
       .select('id, card_id, source_data, ai_category')
-      .eq('company_id', company_id)
       .gte('source_data->>transaction_date', startDate)
       .lt('source_data->>transaction_date', nextMonth)
       .in('ai_category', ['복리후생(식대)'])
@@ -154,7 +148,6 @@ export async function POST(req: NextRequest) {
     const { data: salarySettings } = await supabase
       .from('employee_salaries')
       .select('employee_id, allowances')
-      .eq('company_id', company_id)
       .eq('is_active', true)
 
     const settingsMap: Record<string, number> = {}

@@ -111,7 +111,6 @@ export async function POST(
       const { data: activeTerms } = await supabase
         .from('contract_terms')
         .select('id')
-        .eq('company_id', shareToken.company_id)
         .eq('status', 'active')
         .single()
       if (activeTerms) termsVersionId = activeTerms.id
@@ -124,7 +123,6 @@ export async function POST(
       const { data: defaultSpecials } = await supabase
         .from('contract_special_terms')
         .select('content')
-        .eq('company_id', shareToken.company_id)
         .eq('is_active', true)
         .eq('is_default', true)
         .in('contract_type', [contractType, 'all'])
@@ -147,7 +145,6 @@ export async function POST(
         deposit: quote.deposit,
         monthly_rent: quote.rent_fee,
         status: 'active',
-        company_id: shareToken.company_id,
         signature_id: signature.id,
         ...(termsVersionId ? { terms_version_id: termsVersionId } : {}),
         ...(specialTermsText ? { special_terms: specialTermsText } : {}),

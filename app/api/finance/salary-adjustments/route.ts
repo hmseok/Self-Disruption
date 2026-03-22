@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
   let query = sb
     .from('salary_adjustments')
     .select('*')
-    .eq('company_id', companyId)
     .order('created_at', { ascending: false })
 
   if (employeeId) query = query.eq('employee_id', employeeId)

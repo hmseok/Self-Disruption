@@ -37,7 +37,7 @@ const BILLING_STATUS_LABELS: Record<string, { label: string; color: string }> = 
 
 export default function DispatchModal({
   editingOp, cars, contracts, customers,
-  effectiveCompanyId, userId, companyData,
+   userId, companyData,
   onClose, onCreated,
 }: Props) {
   const [dispatchType, setDispatchType] = useState<'long_term' | 'short_term' | 'replacement'>('long_term')
@@ -142,22 +142,22 @@ export default function DispatchModal({
   useEffect(() => {
     if (effectiveCompanyId && dispatchType === 'replacement') {
       supabase.from('accident_records').select('*')
-        .eq('company_id', effectiveCompanyId)
+        
         .in('status', ['reported', 'insurance_filed', 'repairing'])
         .order('accident_date', { ascending: false })
         .then(({ data }) => setAccidents(data || []))
     }
-  }, [effectiveCompanyId, dispatchType])
+  }, [ dispatchType])
 
   // Fetch short term quotes
   useEffect(() => {
     if (effectiveCompanyId && dispatchType === 'short_term') {
       supabase.from('short_term_quotes').select('*')
-        .eq('company_id', effectiveCompanyId)
+        
         .eq('status', 'active')
         .then(({ data }) => setShortTermQuotes(data || []))
     }
-  }, [effectiveCompanyId, dispatchType])
+  }, [ dispatchType])
 
   // Available cars
   const availableCars = useMemo(() => {
@@ -254,14 +254,14 @@ export default function DispatchModal({
   // Save - Long Term / basic dispatch
   // ============================================
   const handleSaveOperation = async () => {
-    if (!effectiveCompanyId || !userId) return
+    if (!company?.id || !userId) return
     if (!form.car_id) return alert('차량을 선택해주세요.')
     setSaving(true)
 
     try {
       const payload: any = {
         ...form,
-        company_id: effectiveCompanyId,
+        
         status: editingOp ? editingOp.status : 'scheduled',
         created_by: editingOp ? editingOp.created_by : userId,
         dispatch_category: 'regular',
@@ -276,7 +276,7 @@ export default function DispatchModal({
           const customer = customers.find(c => String(c.id) === String(form.customer_id))
           const title = `${form.operation_type === 'delivery' ? '출고' : '반납'} - ${customer?.name || contract?.customer_name || '미정'}`
           await supabase.from('vehicle_schedules').insert({
-            company_id: effectiveCompanyId,
+            
             car_id: form.car_id,
             schedule_type: form.operation_type,
             start_date: form.scheduled_date,
@@ -302,7 +302,7 @@ export default function DispatchModal({
   // Save - Insurance/Replacement dispatch
   // ============================================
   const handleSaveInsuranceDispatch = async () => {
-    if (!effectiveCompanyId || !userId) return
+    if (!company?.id || !userId) return
     if (!form.car_id) return alert('대차 차량을 선택해주세요.')
     if (!insuranceForm.replacement_start_date) return alert('대차 시작일을 입력해주세요.')
     if (insuranceForm.dispatch_category !== 'maintenance' && !insuranceForm.insurance_company_billing) {
@@ -312,7 +312,7 @@ export default function DispatchModal({
     setSaving(true)
     try {
       const payload: any = {
-        company_id: effectiveCompanyId,
+        
         operation_type: 'delivery', // 대차 출고
         car_id: Number(form.car_id),
         customer_id: form.customer_id || null,
@@ -355,7 +355,7 @@ export default function DispatchModal({
 
           // Create schedule for the replacement period
           await supabase.from('vehicle_schedules').insert({
-            company_id: effectiveCompanyId,
+            
             car_id: Number(form.car_id),
             schedule_type: 'accident_repair',
             start_date: insuranceForm.replacement_start_date,
@@ -395,7 +395,7 @@ export default function DispatchModal({
   // Save - Short Term
   // ============================================
   const handleCreateShortTermContract = async () => {
-    if (!effectiveCompanyId || !userId) return
+    if (!company?.id || !userId) return
     if (!form.car_id) return alert('차량을 선택해주세요.')
     if (!shortTermForm.customer_name) return alert('고객명을 입력해주세요.')
     if (!shortTermForm.daily_rate) return alert('일일 요금을 입력해주세요.')
@@ -403,7 +403,7 @@ export default function DispatchModal({
     setSaving(true)
     try {
       const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
-        company_id: effectiveCompanyId,
+        
         car_id: Number(form.car_id),
         customer_name: shortTermForm.customer_name,
         customer_phone: shortTermForm.customer_phone,
@@ -422,7 +422,7 @@ export default function DispatchModal({
       if (cErr) throw cErr
 
       await supabase.from('vehicle_operations').insert([{
-        company_id: effectiveCompanyId,
+        
         contract_id: contract.id,
         car_id: Number(form.car_id),
         operation_type: 'delivery',
@@ -437,7 +437,7 @@ export default function DispatchModal({
       }]).select()
 
       await supabase.from('vehicle_schedules').insert({
-        company_id: effectiveCompanyId,
+        
         car_id: Number(form.car_id),
         schedule_type: 'rental',
         start_date: shortTermForm.start_date,

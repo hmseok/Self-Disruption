@@ -10,7 +10,7 @@ export async function GET() {
   // 1. contract_terms 전체 조회 (service role = RLS 무시)
   const { data: allTerms, error: e1 } = await sb
     .from('contract_terms')
-    .select('id, company_id, version, title, contract_category, status, created_at')
+    .select('id, version, title, contract_category, status, created_at')
     .order('created_at', { ascending: false })
     .limit(20)
 

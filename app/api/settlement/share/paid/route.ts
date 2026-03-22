@@ -23,9 +23,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 export async function PATCH(request: NextRequest) {
@@ -52,7 +52,6 @@ export async function PATCH(request: NextRequest) {
         .from('settlement_shares')
         .update({ paid_at: now })
         .in('id', share_ids)
-        .eq('company_id', admin.company_id)
         .select('id, paid_at, items, total_amount, recipient_name, settlement_month, company_id')
 
       if (updateErr) {
@@ -82,7 +81,6 @@ export async function PATCH(request: NextRequest) {
             : `투자이자 ${share.recipient_name} ${item.monthLabel || ''}월분`
 
           txInserts.push({
-            company_id: share.company_id,
             transaction_date: todayStr,
             type: 'expense',
             status: 'completed',
@@ -101,7 +99,6 @@ export async function PATCH(request: NextRequest) {
         // items에 개별 항목이 없거나 relatedId가 없는 경우 → 총액으로 1건 생성
         if (txInserts.filter(t => t.memo === `settlement_share:${share.id}`).length === 0 && share.total_amount > 0) {
           txInserts.push({
-            company_id: share.company_id,
             transaction_date: todayStr,
             type: 'expense',
             status: 'completed',
@@ -140,7 +137,6 @@ export async function PATCH(request: NextRequest) {
         .from('settlement_shares')
         .update({ paid_at: null })
         .in('id', share_ids)
-        .eq('company_id', admin.company_id)
         .select('id, paid_at')
 
       if (error) {
@@ -154,7 +150,6 @@ export async function PATCH(request: NextRequest) {
         await sb
           .from('transactions')
           .delete()
-          .eq('company_id', admin.company_id)
           .eq('memo', memoPattern)
       }
 

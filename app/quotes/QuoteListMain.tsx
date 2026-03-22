@@ -483,7 +483,6 @@ export default function QuoteListPage() {
       const { data } = await supabase
         .from('company_settings')
         .select('value')
-        .eq('company_id', companyId)
         .eq('key', 'pdf_defaults')
         .maybeSingle()
       if (data?.value?.company_stamp) {
@@ -510,7 +509,7 @@ export default function QuoteListPage() {
     try {
       // Quotes
       const { data: quotesData, error: quotesError } = await supabase
-        .from('quotes').select('*').eq('company_id', companyId).order('id', { ascending: false })
+        .from('quotes').select('*').order('id', { ascending: false })
       if (quotesError) console.error('견적 목록 로드 실패:', quotesError.message)
 
       // Cars
@@ -527,7 +526,7 @@ export default function QuoteListPage() {
 
       // Short-term quotes
       const { data: stQuotesData } = await supabase
-        .from('short_term_quotes').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+        .from('short_term_quotes').select('*').order('created_at', { ascending: false })
       setShortQuotes(stQuotesData || [])
 
       // Customers
@@ -801,7 +800,6 @@ export default function QuoteListPage() {
       }
 
       const basePayload: Record<string, any> = {
-        company_id: companyId,
         customer_name: inv.tenant_name.trim(),
         rent_fee: totalAmount,
         deposit: 0,

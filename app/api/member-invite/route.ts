@@ -32,12 +32,12 @@ async function verifyAdmin(request: NextRequest) {
 
   const { data: profile } = await getSupabaseAdmin()
     .from('profiles')
-    .select('role, company_id')
+    .select('role')
     .eq('id', user.id)
     .single()
 
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 // ── 폴백용 하드코딩 SMS 템플릿 ──
@@ -90,7 +90,7 @@ async function sendInviteMessages(params: {
 
   let emailSent = false
   let emailError = ''
-  let kakaoResult: { success: boolean; error?: string; method?: string } = { success: false }
+  let kakaoResult: { success: boolean; error?: string; method?: string; resultCode?: string } = { success: false }
 
   const templateVars: Record<string, string> = {
     company_name: companyName,
@@ -238,9 +238,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '카카오/SMS 발송 시 전화번호가 필요합니다.' }, { status: 400 })
     }
 
-    if (admin.role === 'admin' && admin.company_id !== company_id) {
-      return NextResponse.json({ error: '자기 회사에만 초대할 수 있습니다.' }, { status: 403 })
-    }
+    // Note: company_id validation removed as company_id is no longer in profiles table
     if (role === 'admin' && admin.role !== 'admin') {
       return NextResponse.json({ error: '관리자 초대는 플랫폼 관리자만 가능합니다.' }, { status: 403 })
     }
@@ -257,7 +255,7 @@ export async function POST(request: NextRequest) {
     const { data: pendingInvite } = await sb
       .from('member_invitations')
       .select('id, token, expires_at')
-      .eq('email', email).eq('company_id', company_id)
+      .eq('email', email)
       .eq('status', 'pending').gt('expires_at', new Date().toISOString())
       .single()
 
@@ -359,11 +357,11 @@ export async function GET(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('company_id') || admin.company_id
+    const companyId = searchParams.get('company_id')
     const statusFilter = searchParams.get('status')
 
-    if (admin.role === 'admin' && companyId !== admin.company_id) {
-      return NextResponse.json({ error: '권한 없음' }, { status: 403 })
+    if (!companyId) {
+      return NextResponse.json({ error: 'company_id 필수 파라미터입니다.' }, { status: 400 })
     }
 
     const sb = getSupabaseAdmin()
@@ -371,7 +369,6 @@ export async function GET(request: NextRequest) {
     let query = sb
       .from('member_invitations')
       .select('id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id')
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
     if (statusFilter) query = query.eq('status', statusFilter)
@@ -446,10 +443,6 @@ export async function DELETE(request: NextRequest) {
     .single()
 
   if (!invite) return NextResponse.json({ error: '초대를 찾을 수 없습니다.' }, { status: 404 })
-
-  if (admin.role === 'admin' && invite.company_id !== admin.company_id) {
-    return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-  }
 
   if (invite.status !== 'pending') {
     return NextResponse.json({ error: '대기 중인 초대만 취소할 수 있습니다.' }, { status: 400 })

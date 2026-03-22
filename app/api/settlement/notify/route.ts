@@ -22,9 +22,9 @@ async function verifyAdmin(request: NextRequest) {
   const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, company_id').eq('id', user.id).single()
+    .from('profiles').select('role').eq('id', user.id).single()
   if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role, company_id: profile.company_id }
+  return { ...user, role: profile.role }
 }
 
 // 새 형식: 수신자별 통합 메시지
@@ -57,13 +57,8 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
     const body = await request.json()
-    const { channel = 'sms', company_id } = body as {
+    const { channel = 'sms' } = body as {
       channel: 'sms' | 'email'
-      company_id: string
-    }
-
-    if (!company_id) {
-      return NextResponse.json({ error: 'company_id 필수' }, { status: 400 })
     }
 
     const sb = getSupabaseAdmin()
@@ -100,7 +95,6 @@ export async function POST(request: NextRequest) {
 
           // 발송 로그
           await logMessageSend({
-            companyId: company_id,
             templateKey: 'settlement_notify',
             channel,
             recipient,
@@ -128,8 +122,7 @@ export async function POST(request: NextRequest) {
     // ── 이전 형식 호환: items 배열 ──
     else if (body.items && Array.isArray(body.items)) {
       const items = body.items as NotifyItem[]
-      const { data: company } = await sb.from('companies').select('name').eq('id', company_id).single()
-      const companyName = company?.name || '회사'
+      const companyName = '회사'
 
       for (const item of items) {
         try {
@@ -165,7 +158,6 @@ export async function POST(request: NextRequest) {
           }
 
           await logMessageSend({
-            companyId: company_id,
             templateKey: 'settlement_notify',
             channel,
             recipient,

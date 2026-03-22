@@ -9,7 +9,6 @@ import DarkHeader from '../components/DarkHeader'
 // ─────────────────────────────────────────────
 interface Customer {
   id: number
-  company_id: string
   name: string
   phone: string
   email: string
@@ -49,7 +48,6 @@ interface Customer {
 interface Payment {
   id: number
   customer_id: number
-  company_id: string
   contract_id: number | null
   amount: number
   payment_type: string
@@ -65,7 +63,6 @@ interface Payment {
 interface Note {
   id: number
   customer_id: number
-  company_id: string
   author_name: string
   note_type: string
   content: string
@@ -75,7 +72,6 @@ interface Note {
 interface TaxInvoice {
   id: number
   customer_id: number
-  company_id: string
   contract_id: number | null
   invoice_number: string
   issue_date: string
@@ -208,27 +204,19 @@ export default function CustomerPage() {
     supply_amount: '', tax_amount: '', description: ''
   })
 
-  const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
-
   // ── 고객 목록 조회 ──
   const fetchCustomers = useCallback(async () => {
     if (!company && role !== 'admin') { setLoading(false); return }
     let query = supabase.from('customers').select('*')
-    if (role === 'admin') {
-      if (adminSelectedCompanyId) query = query.eq('company_id', adminSelectedCompanyId)
-    } else if (company) {
-      query = query.eq('company_id', company.id)
-    }
     const { data } = await query.order('id', { ascending: false })
     setCustomers((data as Customer[]) || [])
     setLoading(false)
-  }, [company, role, adminSelectedCompanyId])
+  }, [company, role])
 
   useEffect(() => { fetchCustomers() }, [fetchCustomers])
 
   // ── 상세 데이터 조회 ──
   const fetchDetailData = useCallback(async (customerId: number) => {
-    if (!effectiveCompanyId) return
     // 계약 이력 (실제 contracts 테이블에서 조회)
     const { data: contractData } = await supabase
       .from('contracts')
@@ -272,7 +260,7 @@ export default function CustomerPage() {
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
     setTaxInvoices((invoiceData as TaxInvoice[]) || [])
-  }, [effectiveCompanyId])
+  }, [])
 
   // ── 필터링 & 정렬 ──
   const filteredCustomers = useMemo(() => {
@@ -320,14 +308,14 @@ export default function CustomerPage() {
   const sanitizePayload = useCallback((raw: any) => {
     if (!dbColumns || dbColumns.size === 0) {
       // 컬럼 정보가 없으면 기본 컬럼만 보냄
-      const base = ['name', 'phone', 'email', 'type', 'memo', 'company_id']
+      const base = ['name', 'phone', 'email', 'type', 'memo']
       const safe: any = {}
       base.forEach(k => { if (k in raw) safe[k] = raw[k] })
       return safe
     }
     const safe: any = {}
     Object.keys(raw).forEach(k => {
-      if (dbColumns.has(k) || k === 'company_id') safe[k] = raw[k]
+      if (dbColumns.has(k)) safe[k] = raw[k]
     })
     // id, created_at 은 insert시 제거
     delete safe.id
@@ -337,10 +325,9 @@ export default function CustomerPage() {
 
   // ── 고객 저장 (신규) ──
   const handleCreateCustomer = async () => {
-    if (!effectiveCompanyId) return alert('⚠️ 상단 메뉴에서 회사를 먼저 선택해주세요.')
     if (!newForm.name?.trim()) return alert('고객명은 필수입니다.')
 
-    const raw: any = { ...newForm, company_id: effectiveCompanyId }
+    const raw: any = { ...newForm }
     Object.keys(raw).forEach(k => { if (raw[k] === '') raw[k] = null })
     raw.name = newForm.name
     const payload = sanitizePayload(raw)
@@ -380,7 +367,6 @@ export default function CustomerPage() {
     if (!selectedCustomer || !newNote.trim()) return
     const { error } = await supabase.from('customer_notes').insert([{
       customer_id: selectedCustomer.id,
-      company_id: effectiveCompanyId,
       author_name: user?.user_metadata?.name || user?.email || '시스템',
       note_type: newNoteType,
       content: newNote,
@@ -395,7 +381,6 @@ export default function CustomerPage() {
     if (!selectedCustomer || !paymentForm.amount) return alert('금액을 입력해주세요.')
     const { error } = await supabase.from('customer_payments').insert([{
       customer_id: selectedCustomer.id,
-      company_id: effectiveCompanyId,
       amount: Number(paymentForm.amount),
       payment_type: paymentForm.payment_type,
       payment_method: paymentForm.payment_method,
@@ -416,7 +401,6 @@ export default function CustomerPage() {
     const tax = invoiceForm.tax_amount ? Number(invoiceForm.tax_amount) : Math.round(supply * 0.1)
     const { error } = await supabase.from('customer_tax_invoices').insert([{
       customer_id: selectedCustomer.id,
-      company_id: effectiveCompanyId,
       issue_date: invoiceForm.issue_date,
       supply_amount: supply,
       tax_amount: tax,

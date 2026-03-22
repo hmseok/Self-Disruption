@@ -17,17 +17,10 @@ async function verifyUser(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser(token)
   if (error || !user) return null
   const { data: profile } = await supabase
-    .from('profiles').select('role, company_id, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, company_id: profile.company_id, employee_name: profile.employee_name } : null
+    .from('profiles').select('role, employee_name').eq('id', user.id).single()
+  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
 }
 
-// admin의 경우 company_id 오버라이드 가능
-function getEffectiveCompanyId(user: any, requestCompanyId?: string | null): string {
-  if (user.role === 'admin' && requestCompanyId) {
-    return requestCompanyId
-  }
-  return user.company_id
-}
 
 // GET: 영수증/지출내역 목록 조회
 export async function GET(request: NextRequest) {
@@ -36,13 +29,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const { searchParams } = request.nextUrl
-  const overrideCompanyId = searchParams.get('company_id')
-  const companyId = getEffectiveCompanyId(user, overrideCompanyId)
-
-  // admin인데 company_id가 없으면 차단
-  if (user.role === 'admin' && !overrideCompanyId) {
-    return NextResponse.json({ error: '회사를 선택해주세요', data: [], months: [] }, { status: 400 })
-  }
 
   // list_months=true → DB에 데이터가 존재하는 월 목록 반환
   if (searchParams.get('list_months') === 'true') {
@@ -50,7 +36,6 @@ export async function GET(request: NextRequest) {
       .from('expense_receipts')
       .select('expense_date')
       .eq('user_id', user.id)
-      .eq('company_id', companyId)
       .order('expense_date', { ascending: false })
     if (error) return NextResponse.json({ months: [] })
     const monthSet = new Set<string>()
@@ -66,7 +51,6 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('expense_receipts')
     .select('*')
-    .eq('company_id', companyId)
     .eq('user_id', user.id)
     .order('expense_date', { ascending: false })
 
@@ -95,7 +79,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { items, receipt_url, company_id: bodyCompanyId } = body as {
+    const { items, receipt_url } = body as {
       items: Array<{
         expense_date: string
         card_number?: string
@@ -108,14 +92,6 @@ export async function POST(request: NextRequest) {
         memo?: string
       }>
       receipt_url?: string
-      company_id?: string
-    }
-
-    const companyId = getEffectiveCompanyId(user, bodyCompanyId)
-
-    // admin인데 company_id가 없으면 차단
-    if (user.role === 'admin' && !bodyCompanyId) {
-      return NextResponse.json({ error: '회사를 선택해주세요' }, { status: 400 })
     }
 
     if (!items || items.length === 0) {
@@ -153,7 +129,6 @@ export async function POST(request: NextRequest) {
 
     const makeInsertData = (withMemo: boolean) => newItems.map(item => {
       const row: Record<string, any> = {
-        company_id: companyId,
         user_id: user.id,
         user_name: user.employee_name || user.email?.split('@')[0] || '',
         expense_date: item.expense_date,
