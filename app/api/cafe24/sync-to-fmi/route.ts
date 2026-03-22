@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getPool } from '../lib/db';
+import { getCafe24Pool as getPool } from '../lib/db';
 
 // Supabase 서비스 클라이언트
 const supabase = createClient(
