@@ -50,9 +50,26 @@ export async function codefRequest(endpoint: string, body: object): Promise<any>
     body: JSON.stringify(body),
   })
 
-  if (!res.ok) {
-    throw new Error(`Codef API error: ${res.status} ${await res.text()}`)
+  // Codef API는 성공(200)이어도 에러일 수 있으므로 일단 텍스트로 읽음
+  const rawText = await res.text()
+
+  // Codef API 응답은 URL 인코딩된 JSON으로 옴 (%7B%22result%22... 형태)
+  let parsed: any
+  try {
+    const decoded = decodeURIComponent(rawText)
+    parsed = JSON.parse(decoded)
+  } catch {
+    // URL 인코딩이 아닌 경우 그대로 파싱 시도
+    try {
+      parsed = JSON.parse(rawText)
+    } catch {
+      throw new Error(`Codef API 응답 파싱 실패: ${rawText.slice(0, 200)}`)
+    }
   }
 
-  return res.json()
+  if (!res.ok) {
+    throw new Error(`Codef API error: ${res.status} ${JSON.stringify(parsed)}`)
+  }
+
+  return parsed
 }
