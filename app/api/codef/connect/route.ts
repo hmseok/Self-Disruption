@@ -24,9 +24,12 @@ function isCodefSuccess(result: any): boolean {
   return result?.result?.code === 'CF-00000'
 }
 
-// Codef 응답에서 에러 메시지 추출
+// Codef 응답에서 에러 메시지 추출 (코드 + 메시지 함께)
 function getCodefError(result: any): string {
-  return result?.result?.message || result?.result?.code || JSON.stringify(result)
+  const code = result?.result?.code || ''
+  const message = result?.result?.message || ''
+  if (code || message) return `[${code}] ${message}`.trim()
+  return JSON.stringify(result)
 }
 
 // POST: Create or add account to connectedId
@@ -41,6 +44,7 @@ export async function POST(req: NextRequest) {
       certFile,      // loginType '0': signCert.der base64
       keyFile,       // loginType '0': signPri.key base64
       certPassword,  // loginType '0': 인증서 비밀번호
+      identity,      // 사업자등록번호 (기업 계정 필수, 하이픈 없이)
       accountNumber, // 계좌/카드번호 (DB 저장용, 거래내역 조회 시 사용)
       connectedId,
     } = await req.json()
@@ -57,6 +61,9 @@ export async function POST(req: NextRequest) {
 
     let baseParams: Record<string, string>
 
+    // 사업자등록번호 정리 (하이픈 제거)
+    const cleanIdentity = identity?.replace(/-/g, '') || ''
+
     if (usedLoginType === '0') {
       // 공동인증서 방식
       const encryptedCertPassword = encryptPassword(certPassword)
@@ -70,6 +77,7 @@ export async function POST(req: NextRequest) {
         certFile: certFile,                // signCert.der base64
         keyFile: keyFile,                  // signPri.key base64
         certPassword: encryptedCertPassword,
+        ...(cleanIdentity && { identity: cleanIdentity }), // 사업자등록번호
       }
     } else {
       // ID/비밀번호 방식
@@ -82,6 +90,7 @@ export async function POST(req: NextRequest) {
         loginType: '1',
         id: loginId,
         password: encryptedPassword,
+        ...(cleanIdentity && { identity: cleanIdentity }), // 사업자등록번호
       }
     }
 

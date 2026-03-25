@@ -38,6 +38,7 @@ export default function CodefPage() {
     orgCode: '0020',
     loginType: '0',      // '0' = 공동인증서, '1' = ID/비밀번호
     loginId: '',
+    identity: '',        // 사업자등록번호
     accountNumber: '',
     password: '',
     certPassword: '',
@@ -145,6 +146,7 @@ export default function CodefPage() {
           loginId: !isCert ? form.loginId : undefined,
           password: !isCert ? form.password : undefined,
           // 공통
+          identity: form.identity || undefined,   // 사업자등록번호
           accountNumber: form.accountNumber,
           connectedId: form.action === 'add' ? form.connectedId : undefined,
         }),
@@ -154,7 +156,7 @@ export default function CodefPage() {
 
       if (result.success) {
         setMessage({ type: 'success', text: result.message })
-        setForm({ action: 'create', orgCode: '0020', loginType: '0', loginId: '', accountNumber: '', password: '', certPassword: '', connectedId: '' })
+        setForm({ action: 'create', orgCode: '0020', loginType: '0', loginId: '', identity: '', accountNumber: '', password: '', certPassword: '', connectedId: '' })
         setCertFile('')
         setKeyFile('')
         setShowForm(false)
@@ -395,6 +397,17 @@ export default function CodefPage() {
                   </div>
                 </>
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">사업자등록번호</label>
+                <input
+                  type="text"
+                  value={form.identity}
+                  onChange={(e) => setForm({ ...form, identity: e.target.value })}
+                  placeholder="사업자등록번호 (예: 032-88-01234)"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">계좌/카드번호</label>
