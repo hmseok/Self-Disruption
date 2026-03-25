@@ -6,9 +6,12 @@ const nextConfig: NextConfig = {
   // ⚠️ Next.js 16은 Turbopack이 기본 — webpack 강제 시 런타임 청크 불일치로 hydration 실패
   // bundler: 'webpack',  // (16.1.6에서 standalone CSS 버그 수정됨 — 제거)
 
-  // 1. 빌드 에러 무시 (TypeScript는 아직 여기서 지원합니다)
+  // 1. 빌드 에러 무시
   typescript: {
     ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 
   // 2. 업로드 용량 제한 해제

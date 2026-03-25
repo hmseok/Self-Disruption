@@ -181,7 +181,7 @@ export default function CodefPage() {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <DarkHeader />
+      <DarkHeader icon="Building2" title="은행/카드 자동연동" subtitle="Codef API로 거래내역을 자동 수집합니다" />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-white mb-8">Codef 금융 데이터 연동</h1>
