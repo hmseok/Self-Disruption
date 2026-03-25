@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { codefRequest } from '../lib/auth'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Bank organization codes
 const BANK_CODES = {
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
         raw_data: tx,
       }
 
-      const { data, error } = await supabase.from('transactions').insert(txData).select()
+      const { data, error } = await getSupabase().from('transactions').insert(txData).select()
 
       if (!error && data) {
         storedTransactions.push(data[0])
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Log sync
-    await supabase.from('codef_sync_logs').insert({
+    await getSupabase().from('codef_sync_logs').insert({
       sync_type: 'bank',
       org_name: BANK_CODES[orgCode as keyof typeof BANK_CODES],
       fetched: transactions.length,
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Bank fetch error:', error)
 
-    await supabase.from('codef_sync_logs').insert({
+    await getSupabase().from('codef_sync_logs').insert({
       sync_type: 'bank',
       status: 'error',
       error_message: error instanceof Error ? error.message : 'Unknown error',

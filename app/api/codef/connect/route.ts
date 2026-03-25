@@ -3,10 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 import { codefRequest } from '../lib/auth'
 import { encryptPassword } from '../lib/crypto'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Organization codes mapping
 const ORG_CODES: Record<string, { code: string; name: string; type: 'bank' | 'card' }> = {
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
       if (result.code === '0') {
         const newConnectedId = result.connectedId
         // Store in database
-        await supabase.from('codef_connections').insert({
+        await getSupabase().from('codef_connections').insert({
           connected_id: newConnectedId,
           org_type: orgInfo.type,
           org_code: orgCode,
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       if (result.code === '0') {
         // Store in database
-        await supabase.from('codef_connections').insert({
+        await getSupabase().from('codef_connections').insert({
           connected_id: connectedId,
           org_type: orgInfo.type,
           org_code: orgCode,
@@ -117,7 +119,7 @@ export async function POST(req: NextRequest) {
 // GET: List connected accounts
 export async function GET(req: NextRequest) {
   try {
-    const { data, error } = await supabase.from('codef_connections').select('*').eq('is_active', true)
+    const { data, error } = await getSupabase().from('codef_connections').select('*').eq('is_active', true)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
