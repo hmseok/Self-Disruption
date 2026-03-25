@@ -1,8 +1,15 @@
 steps:
-  # Docker 이미지 빌드
+  # 이전 이미지 풀 (캐시용, 실패해도 계속 진행)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'gcr.io/$PROJECT_ID/self-disruption:latest']
+    allowFailure: true
+
+  # Docker 이미지 빌드 (이전 이미지를 캐시로 활용)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--cache-from'
+      - 'gcr.io/$PROJECT_ID/self-disruption:latest'
       - '-t'
       - 'gcr.io/$PROJECT_ID/self-disruption:$_TAG'
       - '-t'

@@ -16,3 +16,13 @@ supabase
 .env*
 .vercel
 npm-debug.log
+
+# public 내 개발/미리보기용 임시 파일
+public/*.html
+public/*.js
+public/*.sql
+public/*.xlsx
+public/*.json
+public/reset-data.json
+public/excel_import.json
+public/excel_parsed2.json
