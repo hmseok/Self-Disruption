@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       baseParams = {
         countryCode: 'KR',
         businessType: orgInfo.businessType,
-        clientType: 'P',
+        clientType: 'B',                   // B: 기업 (은행기업 인증서)
         organization: orgCode,
         loginType: '0',
         certType: '1',                     // 1 = 공동인증서
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       baseParams = {
         countryCode: 'KR',
         businessType: orgInfo.businessType,
-        clientType: 'P',
+        clientType: 'B',                   // B: 기업
         organization: orgCode,
         loginType: '1',
         id: loginId,
