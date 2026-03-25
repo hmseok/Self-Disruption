@@ -36,6 +36,7 @@ export default function CodefPage() {
   const [form, setForm] = useState({
     action: 'create',
     orgCode: '0020',
+    loginId: '',
     accountNumber: '',
     password: '',
     connectedId: '',
@@ -87,7 +88,7 @@ export default function CodefPage() {
     e.preventDefault()
     setMessage(null)
 
-    if (!form.orgCode || !form.accountNumber || !form.password) {
+    if (!form.orgCode || !form.loginId || !form.accountNumber || !form.password) {
       setMessage({ type: 'error', text: '모든 필드를 입력해주세요.' })
       return
     }
@@ -99,6 +100,7 @@ export default function CodefPage() {
         body: JSON.stringify({
           action: form.action === 'create' ? 'create' : 'add',
           orgCode: form.orgCode,
+          loginId: form.loginId,
           accountNumber: form.accountNumber,
           password: form.password,
           connectedId: form.action === 'add' ? form.connectedId : undefined,
@@ -109,7 +111,7 @@ export default function CodefPage() {
 
       if (result.success) {
         setMessage({ type: 'success', text: result.message })
-        setForm({ action: 'create', orgCode: '0020', accountNumber: '', password: '', connectedId: '' })
+        setForm({ action: 'create', orgCode: '0020', loginId: '', accountNumber: '', password: '', connectedId: '' })
         setShowForm(false)
         await fetchConnections()
       } else {
@@ -257,6 +259,17 @@ export default function CodefPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 아이디</label>
+                <input
+                  type="text"
+                  value={form.loginId}
+                  onChange={(e) => setForm({ ...form, loginId: e.target.value })}
+                  placeholder="인터넷뱅킹 로그인 아이디"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">계좌/카드번호</label>
                 <input
                   type="text"
@@ -268,7 +281,7 @@ export default function CodefPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">비밀번호</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 비밀번호</label>
                 <input
                   type="password"
                   value={form.password}

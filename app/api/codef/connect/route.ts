@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
     const {
       action, // 'create' | 'add'
       orgCode,
-      accountNumber,
+      loginId,       // 인터넷뱅킹 로그인 아이디 (Codef id 필드)
+      accountNumber, // 계좌/카드번호 (DB 저장용, 거래내역 조회 시 사용)
       password,
       connectedId,
     } = await req.json()
@@ -45,19 +46,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid organization code' }, { status: 400 })
     }
 
-    // 계좌/카드번호에서 하이픈 제거
-    const cleanAccountNumber = accountNumber.replace(/-/g, '')
+    // 계좌/카드번호에서 하이픈 제거 (DB 저장 및 거래내역 조회용)
+    const cleanAccountNumber = accountNumber?.replace(/-/g, '') || ''
 
     const encryptedPassword = encryptPassword(password)
 
     // Codef API 공통 파라미터
+    // id = 인터넷뱅킹 로그인 아이디 (계좌번호 아님)
     const baseParams = {
       countryCode: 'KR',
       businessType: orgInfo.businessType,
       clientType: 'P',         // P: 개인, B: 기업
       organization: orgCode,
-      loginType: '1',           // 1: ID/비밀번호
-      id: cleanAccountNumber,
+      loginType: '1',           // 1: ID/비밀번호 방식
+      id: loginId,              // 인터넷뱅킹 아이디
       password: encryptedPassword,
     }
 
