@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch all connected accounts
-    const { data: connections, error: connError } = await supabase
+    const { data: connections, error: connError } = await getSupabase()
       .from('codef_connections')
       .select('*')
       .eq('is_active', true)
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             connectedId: connection.connected_id,
             orgCode: connection.org_code,
+            account: connection.account_number,
             startDate,
             endDate,
           }),
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
   try {
     const limit = req.nextUrl.searchParams.get('limit') || '20'
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('codef_sync_logs')
       .select('*')
       .order('synced_at', { ascending: false })

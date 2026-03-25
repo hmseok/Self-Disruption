@@ -28,31 +28,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid card code' }, { status: 400 })
     }
 
-    // Fetch approval list from Codef
-    const result = await codefRequest('/v1/kr/card/p/account/approval-list', {
-      connectedId,
+    const fmtStart = startDate.replace(/-/g, '')
+    const fmtEnd = endDate.replace(/-/g, '')
+
+    // Codef 승인내역 API: /v1/kr/card/b/account/approval-list
+    // inquiryType 필수값 (O): "0": 카드별, "1": 전체조회
+    const result = await codefRequest('/v1/kr/card/b/account/approval-list', {
       organization: orgCode,
-      startDate: startDate.replace(/-/g, ''),
-      endDate: endDate.replace(/-/g, ''),
+      connectedId,
+      startDate: fmtStart,
+      endDate: fmtEnd,
+      orderBy: '0',       // 0: 최신순
+      inquiryType: '1',   // 1: 전체조회 (필수)
+      identity: '',
+      loginTypeLevel: '2',
+      clientType: '0',
+      cardNo: '',
+      departmentCode: '',
+      transeType: '',
+      cardName: '',
+      duplicateCardIdx: '',
+      applicationType: '0',
+      memberStoreInfoType: '0',
     })
 
-    if (result.code !== '0') {
-      return NextResponse.json({ error: result.message || 'Failed to fetch approvals' }, { status: 400 })
+    console.log('[Codef Card] 응답:', JSON.stringify(result).slice(0, 500))
+
+    if (result?.result?.code !== 'CF-00000') {
+      await getSupabase().from('codef_sync_logs').insert({
+        sync_type: 'card',
+        org_name: CARD_CODES[orgCode as keyof typeof CARD_CODES],
+        fetched: 0,
+        inserted: 0,
+        status: 'error',
+        error_message: result?.result?.message || JSON.stringify(result?.result),
+      })
+      return NextResponse.json({
+        error: result?.result?.message || '카드 승인내역 조회 실패',
+        code: result?.result?.code,
+      }, { status: 400 })
     }
 
-    // Transform and store approvals
-    const approvals = result.data?.list || []
+    // 승인내역 파싱
+    // 단건=객체, 다건=리스트 형태로 반환
+    const rawList = result.resList || result.data || []
+    const approvalList: any[] = Array.isArray(rawList) ? rawList : [rawList]
     const storedApprovals = []
 
-    for (const approval of approvals) {
+    for (const approval of approvalList) {
+      // resUsedDate: yyyyMMdd
+      const usedDate = approval.resUsedDate
+        ? `${approval.resUsedDate.slice(0, 4)}-${approval.resUsedDate.slice(4, 6)}-${approval.resUsedDate.slice(6)}`
+        : null
+
       const txData = {
-        transaction_date: approval.approvalDate ? `${approval.approvalDate.slice(0, 4)}-${approval.approvalDate.slice(4, 6)}-${approval.approvalDate.slice(6)}` : null,
+        transaction_date: usedDate,
         type: 'expense',
-        amount: Math.abs(approval.approvalAmount || 0),
-        client_name: approval.merchantName || 'Unknown',
-        description: approval.approvalDetails || approval.merchantName || '',
+        amount: Math.abs(Number(approval.resUsedAmount || 0)),
+        client_name: approval.resMemberStoreName || '미상',
+        description: approval.resMemberStoreName || '',
         category: 'Import - Card',
-        payment_method: `${CARD_CODES[orgCode as keyof typeof CARD_CODES]}`,
+        payment_method: CARD_CODES[orgCode as keyof typeof CARD_CODES],
         status: 'completed',
         imported_from: 'codef_card',
         codef_org_code: orgCode,
@@ -60,39 +96,38 @@ export async function POST(req: NextRequest) {
       }
 
       const { data, error } = await getSupabase().from('transactions').insert(txData).select()
-
       if (!error && data) {
         storedApprovals.push(data[0])
       }
     }
 
-    // Log sync
     await getSupabase().from('codef_sync_logs').insert({
       sync_type: 'card',
       org_name: CARD_CODES[orgCode as keyof typeof CARD_CODES],
-      fetched: approvals.length,
+      fetched: approvalList.length,
       inserted: storedApprovals.length,
       status: 'success',
     })
 
-    return NextResponse.json(
-      {
-        success: true,
-        fetched: approvals.length,
-        inserted: storedApprovals.length,
-        approvals: storedApprovals,
-      },
-      { status: 200 }
-    )
+    return NextResponse.json({
+      success: true,
+      fetched: approvalList.length,
+      inserted: storedApprovals.length,
+      approvals: storedApprovals,
+    }, { status: 200 })
+
   } catch (error) {
     console.error('Card fetch error:', error)
-
     await getSupabase().from('codef_sync_logs').insert({
       sync_type: 'card',
       status: 'error',
+      fetched: 0,
+      inserted: 0,
       error_message: error instanceof Error ? error.message : 'Unknown error',
     })
-
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
