@@ -33,11 +33,15 @@ function getCodefError(result: any): string {
 export async function POST(req: NextRequest) {
   try {
     const {
-      action, // 'create' | 'add'
+      action,        // 'create' | 'add'
       orgCode,
-      loginId,       // 인터넷뱅킹 로그인 아이디 (Codef id 필드)
+      loginType,     // '0' = 공동인증서, '1' = ID/비밀번호
+      loginId,       // loginType '1': 인터넷뱅킹 로그인 아이디
+      password,      // loginType '1': 인터넷뱅킹 비밀번호
+      certFile,      // loginType '0': signCert.der base64
+      keyFile,       // loginType '0': signPri.key base64
+      certPassword,  // loginType '0': 인증서 비밀번호
       accountNumber, // 계좌/카드번호 (DB 저장용, 거래내역 조회 시 사용)
-      password,
       connectedId,
     } = await req.json()
 
@@ -49,18 +53,36 @@ export async function POST(req: NextRequest) {
     // 계좌/카드번호에서 하이픈 제거 (DB 저장 및 거래내역 조회용)
     const cleanAccountNumber = accountNumber?.replace(/-/g, '') || ''
 
-    const encryptedPassword = encryptPassword(password)
+    const usedLoginType = loginType || '1'
 
-    // Codef API 공통 파라미터
-    // id = 인터넷뱅킹 로그인 아이디 (계좌번호 아님)
-    const baseParams = {
-      countryCode: 'KR',
-      businessType: orgInfo.businessType,
-      clientType: 'P',         // P: 개인, B: 기업
-      organization: orgCode,
-      loginType: '1',           // 1: ID/비밀번호 방식
-      id: loginId,              // 인터넷뱅킹 아이디
-      password: encryptedPassword,
+    let baseParams: Record<string, string>
+
+    if (usedLoginType === '0') {
+      // 공동인증서 방식
+      const encryptedCertPassword = encryptPassword(certPassword)
+      baseParams = {
+        countryCode: 'KR',
+        businessType: orgInfo.businessType,
+        clientType: 'P',
+        organization: orgCode,
+        loginType: '0',
+        certType: '1',                     // 1 = 공동인증서
+        certFile: certFile,                // signCert.der base64
+        keyFile: keyFile,                  // signPri.key base64
+        certPassword: encryptedCertPassword,
+      }
+    } else {
+      // ID/비밀번호 방식
+      const encryptedPassword = encryptPassword(password)
+      baseParams = {
+        countryCode: 'KR',
+        businessType: orgInfo.businessType,
+        clientType: 'P',
+        organization: orgCode,
+        loginType: '1',
+        id: loginId,
+        password: encryptedPassword,
+      }
     }
 
     let result

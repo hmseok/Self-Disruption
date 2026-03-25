@@ -36,11 +36,15 @@ export default function CodefPage() {
   const [form, setForm] = useState({
     action: 'create',
     orgCode: '0020',
+    loginType: '0',      // '0' = 공동인증서, '1' = ID/비밀번호
     loginId: '',
     accountNumber: '',
     password: '',
+    certPassword: '',
     connectedId: '',
   })
+  const [certFile, setCertFile] = useState<string>('')     // signCert.der → base64
+  const [keyFile, setKeyFile] = useState<string>('')       // signPri.key → base64
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -84,13 +88,45 @@ export default function CodefPage() {
     }
   }
 
+  // 파일을 base64 문자열로 읽기
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // data:...;base64, 접두사 제거
+        const base64 = result.split(',')[1] || result
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleCertFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cert' | 'key') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const base64 = await readFileAsBase64(file)
+    if (type === 'cert') setCertFile(base64)
+    else setKeyFile(base64)
+  }
+
   const handleAddConnection = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage(null)
 
-    if (!form.orgCode || !form.loginId || !form.accountNumber || !form.password) {
-      setMessage({ type: 'error', text: '모든 필드를 입력해주세요.' })
-      return
+    const isCert = form.loginType === '0'
+
+    if (isCert) {
+      if (!form.orgCode || !certFile || !keyFile || !form.certPassword || !form.accountNumber) {
+        setMessage({ type: 'error', text: '기관, 인증서 파일(2개), 인증서 비밀번호, 계좌/카드번호를 모두 입력해주세요.' })
+        return
+      }
+    } else {
+      if (!form.orgCode || !form.loginId || !form.accountNumber || !form.password) {
+        setMessage({ type: 'error', text: '모든 필드를 입력해주세요.' })
+        return
+      }
     }
 
     try {
@@ -100,9 +136,16 @@ export default function CodefPage() {
         body: JSON.stringify({
           action: form.action === 'create' ? 'create' : 'add',
           orgCode: form.orgCode,
-          loginId: form.loginId,
+          loginType: form.loginType,
+          // 인증서 방식
+          certFile: isCert ? certFile : undefined,
+          keyFile: isCert ? keyFile : undefined,
+          certPassword: isCert ? form.certPassword : undefined,
+          // ID/비밀번호 방식
+          loginId: !isCert ? form.loginId : undefined,
+          password: !isCert ? form.password : undefined,
+          // 공통
           accountNumber: form.accountNumber,
-          password: form.password,
           connectedId: form.action === 'add' ? form.connectedId : undefined,
         }),
       })
@@ -111,7 +154,9 @@ export default function CodefPage() {
 
       if (result.success) {
         setMessage({ type: 'success', text: result.message })
-        setForm({ action: 'create', orgCode: '0020', loginId: '', accountNumber: '', password: '', connectedId: '' })
+        setForm({ action: 'create', orgCode: '0020', loginType: '0', loginId: '', accountNumber: '', password: '', certPassword: '', connectedId: '' })
+        setCertFile('')
+        setKeyFile('')
         setShowForm(false)
         await fetchConnections()
       } else {
@@ -258,16 +303,98 @@ export default function CodefPage() {
                 </select>
               </div>
 
+              {/* 로그인 방식 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 아이디</label>
-                <input
-                  type="text"
-                  value={form.loginId}
-                  onChange={(e) => setForm({ ...form, loginId: e.target.value })}
-                  placeholder="인터넷뱅킹 로그인 아이디"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
-                />
+                <label className="block text-sm font-medium text-gray-300 mb-2">로그인 방식</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, loginType: '0' })}
+                    className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
+                      form.loginType === '0'
+                        ? 'bg-blue-600 border-blue-500 text-white'
+                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    🔐 공동인증서
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, loginType: '1' })}
+                    className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
+                      form.loginType === '1'
+                        ? 'bg-blue-600 border-blue-500 text-white'
+                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    🔑 ID/비밀번호
+                  </button>
+                </div>
               </div>
+
+              {/* 공동인증서 방식 */}
+              {form.loginType === '0' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">인증서 파일 (signCert.der)</label>
+                    <p className="text-xs text-gray-500 mb-2">NPKI 폴더 안의 signCert.der 파일을 선택하세요</p>
+                    <input
+                      type="file"
+                      accept=".der"
+                      onChange={(e) => handleCertFileChange(e, 'cert')}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
+                    />
+                    {certFile && <p className="text-xs text-green-400 mt-1">✓ 인증서 파일 로드됨</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">개인키 파일 (signPri.key)</label>
+                    <p className="text-xs text-gray-500 mb-2">NPKI 폴더 안의 signPri.key 파일을 선택하세요</p>
+                    <input
+                      type="file"
+                      accept=".key"
+                      onChange={(e) => handleCertFileChange(e, 'key')}
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
+                    />
+                    {keyFile && <p className="text-xs text-green-400 mt-1">✓ 개인키 파일 로드됨</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">인증서 비밀번호</label>
+                    <input
+                      type="password"
+                      value={form.certPassword}
+                      onChange={(e) => setForm({ ...form, certPassword: e.target.value })}
+                      placeholder="공동인증서 비밀번호 (암호화되어 전송됩니다)"
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* ID/비밀번호 방식 */}
+              {form.loginType === '1' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 아이디</label>
+                    <input
+                      type="text"
+                      value={form.loginId}
+                      onChange={(e) => setForm({ ...form, loginId: e.target.value })}
+                      placeholder="인터넷뱅킹 로그인 아이디"
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 비밀번호</label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="인터넷뱅킹 로그인 비밀번호 (암호화되어 전송됩니다)"
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">계좌/카드번호</label>
@@ -276,17 +403,6 @@ export default function CodefPage() {
                   value={form.accountNumber}
                   onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
                   placeholder="계좌번호 또는 카드번호"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 비밀번호</label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="기관 비밀번호 (암호화되어 전송됩니다)"
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
                 />
               </div>
