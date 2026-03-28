@@ -55,6 +55,14 @@ ENV CODEF_PUBLIC_KEY=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArd5iIdcfWNfEOv0
 ENV CODEF_API_HOST=https://development.codef.io
 ENV CODEF_TOKEN_URL=https://oauth.codef.io/oauth/token
 
+# ============================================================
+# Google Cloud SQL (fmi_op) — Phase 3 이후 Supabase 대체
+# Connection: secondlife-485816:asia-northeast3:r-care-db
+# Public IP : 34.47.105.219:3306
+# Cloud Run에서는 Unix Socket 방식 사용 (가장 빠르고 안전)
+# ============================================================
+# ENV DATABASE_URL="mysql://root:FILL_PASSWORD@localhost/fmi_op?socket=/cloudsql/secondlife-485816:asia-northeast3:r-care-db"
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

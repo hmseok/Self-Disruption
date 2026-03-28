@@ -1,0 +1,431 @@
+// ============================================================
+// Prisma Schema — FMI ERP (Google Cloud SQL MySQL 8.0)
+// 생성일: 2026-03-27
+//
+// 전환 순서:
+//   Phase 2: 이 파일 작성 완료
+//   Phase 3: 테이블별로 API 라우트를 Supabase SDK → Prisma로 전환
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  // Cloud SQL Connector 드라이버 사용 (Cloud Run 환경)
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  // 로컬 개발: "mysql://user:pass@127.0.0.1:3307/fmi_erp"
+  // Cloud Run: Cloud SQL Connector 사용 (lib/prisma.ts 참조)
+}
+
+// ============================================================
+// 공통: auth.users 대체 (Firebase UID 기반, Phase 5 이후)
+// ============================================================
+model Profile {
+  id          String    @id @default(uuid()) @db.Char(36)
+  email       String    @unique
+  name        String?
+  role        String    @default("member") // admin, manager, member
+  is_active   Boolean   @default(true)
+  is_approved Boolean   @default(false)
+  avatar_url  String?
+  phone       String?
+  department  String?
+  position    String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  @@map("profiles")
+}
+
+// ============================================================
+// 대차 차량 관리
+// ============================================================
+model FmiVehicle {
+  id               String    @id @default(uuid()) @db.Char(36)
+  car_number       String    @unique
+  car_type         String?
+  car_brand        String?
+  car_model        String?
+  car_year         Int?
+  car_color        String?
+  vin              String?
+  ownership_type   String    @default("owned") // owned, external_rent, lease
+  rental_company   String?
+  rental_monthly_cost Decimal? @db.Decimal(12, 0)
+  rental_start_date   DateTime? @db.Date
+  rental_end_date     DateTime? @db.Date
+  rental_contract_no  String?
+  purchase_date    DateTime? @db.Date
+  purchase_price   Decimal?  @db.Decimal(12, 0)
+  depreciation_rate Decimal? @db.Decimal(5, 2)
+  investor         String?
+  investment_amount Decimal? @db.Decimal(12, 0)
+  investment_return_rate Decimal? @db.Decimal(5, 2)
+  investment_start_date DateTime? @db.Date
+  investment_end_date   DateTime? @db.Date
+  insurance_company String?
+  insurance_policy_no String?
+  insurance_expiry  DateTime? @db.Date
+  inspection_expiry DateTime? @db.Date
+  status           String    @default("available")
+  current_location String?
+  mileage          Int       @default(0)
+  notes            String?   @db.Text
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  rentals FmiRental[]
+  payments FmiPayment[]
+
+  @@index([status])
+  @@index([ownership_type])
+  @@map("fmi_vehicles")
+}
+
+// ============================================================
+// 사고 접수
+// ============================================================
+model FmiAccident {
+  id                    String    @id @default(uuid()) @db.Char(36)
+  cafe24_id             String?   @unique
+  receipt_no            String?
+  receipt_date          DateTime?
+  accident_date         DateTime?
+  accident_location     String?
+  accident_description  String?   @db.Text
+  accident_region_sido  String?
+  accident_region_sigungu String?
+  customer_name         String?
+  customer_phone        String?
+  customer_car_number   String?
+  customer_car_type     String?
+  counterpart_name      String?
+  counterpart_phone     String?
+  counterpart_car_number String?
+  counterpart_insurance String?
+  counterpart_claim_no  String?
+  insurance_company     String?
+  insurance_claim_no    String?
+  adjuster_name         String?
+  adjuster_phone        String?
+  fault_type            String?
+  fault_rate            Int?
+  repair_needed         Boolean   @default(false)
+  repair_shop           String?
+  estimated_repair_days Int?
+  estimated_repair_cost Decimal?  @db.Decimal(12, 0)
+  rental_needed         Boolean   @default(false)
+  rental_status         String    @default("none")
+  status                String    @default("received")
+  handler_id            String?   @db.Char(36)
+  handler_name          String?
+  source                String    @default("manual")
+  raw_data              Json?
+  notes                 String?   @db.Text
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  rentals FmiRental[]
+  timeline FmiRentalTimeline[]
+
+  @@index([status])
+  @@index([rental_status])
+  @@index([receipt_date])
+  @@index([insurance_company])
+  @@map("fmi_accidents")
+}
+
+// ============================================================
+// 대차건 관리 (핵심)
+// ============================================================
+model FmiRental {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  accident_id         String?   @db.Char(36)
+  rental_no           String?   @unique
+  customer_name       String
+  customer_phone      String?
+  customer_car_number String?
+  customer_car_type   String?
+  vehicle_id          String?   @db.Char(36)
+  vehicle_car_number  String?
+  vehicle_car_type    String?
+  insurance_company   String?
+  insurance_claim_no  String?
+  adjuster_name       String?
+  adjuster_phone      String?
+  dispatch_date       DateTime?
+  dispatch_location   String?
+  expected_return_date DateTime?
+  actual_return_date  DateTime?
+  rental_days         Int?
+  dispatch_mileage    Int?
+  return_mileage      Int?
+  driven_km           Int?
+  daily_rate          Decimal?  @db.Decimal(10, 0)
+  total_rental_fee    Decimal?  @db.Decimal(12, 0)
+  additional_charges  Decimal?  @default(0) @db.Decimal(12, 0)
+  deduction_amount    Decimal?  @default(0) @db.Decimal(12, 0)
+  final_claim_amount  Decimal?  @db.Decimal(12, 0)
+  return_condition    String?
+  return_fuel_level   String?
+  return_damage_yn    Boolean   @default(false)
+  return_damage_memo  String?   @db.Text
+  return_photos       Json?     // TEXT[] → JSON array
+  status              String    @default("pending")
+  handler_id          String?   @db.Char(36)
+  handler_name        String?
+  dispatcher_name     String?
+  notes               String?   @db.Text
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  accident  FmiAccident?  @relation(fields: [accident_id], references: [id])
+  vehicle   FmiVehicle?   @relation(fields: [vehicle_id], references: [id])
+  claims    FmiClaim[]
+  settlements FmiSettlement[]
+  payments  FmiPayment[]
+  timeline  FmiRentalTimeline[]
+
+  @@index([status])
+  @@index([accident_id])
+  @@index([vehicle_id])
+  @@index([insurance_company])
+  @@index([dispatch_date])
+  @@map("fmi_rentals")
+}
+
+// ============================================================
+// 보험 청구
+// ============================================================
+model FmiClaim {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  rental_id           String    @db.Char(36)
+  accident_id         String?   @db.Char(36)
+  claim_no            String?   @unique
+  insurance_company   String
+  insurance_claim_no  String?
+  rental_fee          Decimal?  @db.Decimal(12, 0)
+  additional_charges  Decimal?  @default(0) @db.Decimal(12, 0)
+  total_claim_amount  Decimal?  @db.Decimal(12, 0)
+  claim_method        String?
+  claim_date          DateTime?
+  claim_documents     Json?
+  claim_pdf_url       String?
+  fax_number          String?
+  fax_sent_at         DateTime?
+  response_date       DateTime?
+  approved_amount     Decimal?  @db.Decimal(12, 0)
+  rejected_amount     Decimal?  @db.Decimal(12, 0)
+  rejection_reason    String?   @db.Text
+  negotiation_memo    String?   @db.Text
+  status              String    @default("draft")
+  handler_id          String?   @db.Char(36)
+  handler_name        String?
+  notes               String?   @db.Text
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  rental      FmiRental  @relation(fields: [rental_id], references: [id])
+  settlements FmiSettlement[]
+
+  @@index([status])
+  @@index([rental_id])
+  @@index([insurance_company])
+  @@index([claim_date])
+  @@map("fmi_claims")
+}
+
+// ============================================================
+// 정산/입금
+// ============================================================
+model FmiSettlement {
+  id              String    @id @default(uuid()) @db.Char(36)
+  claim_id        String?   @db.Char(36)
+  rental_id       String?   @db.Char(36)
+  settlement_type String?
+  amount          Decimal   @db.Decimal(12, 0)
+  payment_date    DateTime? @db.Date
+  payment_method  String?
+  bank_name       String?
+  account_no      String?
+  depositor       String?
+  transaction_no  String?
+  matched         Boolean   @default(false)
+  match_difference Decimal? @db.Decimal(12, 0)
+  notes           String?   @db.Text
+  created_at      DateTime  @default(now())
+
+  claim  FmiClaim?  @relation(fields: [claim_id], references: [id])
+  rental FmiRental? @relation(fields: [rental_id], references: [id])
+
+  @@index([claim_id])
+  @@index([rental_id])
+  @@index([payment_date])
+  @@map("fmi_settlements")
+}
+
+// ============================================================
+// 지급 관리
+// ============================================================
+model FmiPayment {
+  id                String    @id @default(uuid()) @db.Char(36)
+  payment_category  String
+  payee_name        String
+  payee_bank        String?
+  payee_account     String?
+  payee_business_no String?
+  vehicle_id        String?   @db.Char(36)
+  rental_id         String?   @db.Char(36)
+  amount            Decimal   @db.Decimal(12, 0)
+  tax_amount        Decimal?  @default(0) @db.Decimal(12, 0)
+  total_amount      Decimal?  @db.Decimal(12, 0)
+  payment_date      DateTime? @db.Date
+  due_date          DateTime? @db.Date
+  payment_method    String?
+  payment_status    String    @default("pending")
+  is_recurring      Boolean   @default(false)
+  recurring_period  String?
+  recurring_start   DateTime? @db.Date
+  recurring_end     DateTime? @db.Date
+  notes             String?   @db.Text
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  vehicle FmiVehicle? @relation(fields: [vehicle_id], references: [id])
+  rental  FmiRental?  @relation(fields: [rental_id], references: [id])
+
+  @@index([payment_category])
+  @@index([payment_status])
+  @@index([payment_date])
+  @@map("fmi_payments")
+}
+
+// ============================================================
+// 대차 타임라인 (이력)
+// ============================================================
+model FmiRentalTimeline {
+  id             String    @id @default(uuid()) @db.Char(36)
+  rental_id      String    @db.Char(36)
+  accident_id    String?   @db.Char(36)
+  event_type     String
+  event_title    String
+  event_detail   String?   @db.Text
+  old_status     String?
+  new_status     String?
+  created_by     String?   @db.Char(36)
+  created_by_name String?
+  created_at     DateTime  @default(now())
+
+  rental   FmiRental   @relation(fields: [rental_id], references: [id])
+  accident FmiAccident? @relation(fields: [accident_id], references: [id])
+
+  @@index([rental_id])
+  @@index([created_at])
+  @@map("fmi_rental_timeline")
+}
+
+// ============================================================
+// 오픈뱅킹
+// ============================================================
+model OpenbankingAccount {
+  id           String    @id @default(uuid()) @db.Char(36)
+  user_seq_no  String?
+  fintech_use_num String? @unique
+  account_alias String?
+  bank_name    String?
+  account_num  String?
+  account_holder String?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  transactions OpenbankingTransaction[]
+
+  @@map("openbanking_accounts")
+}
+
+model OpenbankingTransaction {
+  id              String    @id @default(uuid()) @db.Char(36)
+  account_id      String?   @db.Char(36)
+  fintech_use_num String?
+  tran_date       String?
+  tran_time       String?
+  tran_type       String?
+  tran_amt        Decimal?  @db.Decimal(15, 0)
+  balance_amt     Decimal?  @db.Decimal(15, 0)
+  print_content   String?
+  branch_name     String?
+  created_at      DateTime  @default(now())
+
+  account OpenbankingAccount? @relation(fields: [account_id], references: [id])
+
+  @@index([account_id])
+  @@index([tran_date])
+  @@map("openbanking_transactions")
+}
+
+// ============================================================
+// Codef 연동
+// ============================================================
+model CodefConnection {
+  id           String    @id @default(uuid()) @db.Char(36)
+  connected_id String
+  org_type     String
+  org_code     String
+  org_name     String
+  account_number String?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@index([connected_id])
+  @@index([org_code])
+  @@map("codef_connections")
+}
+
+model CodefSyncLog {
+  id            String    @id @default(uuid()) @db.Char(36)
+  sync_type     String
+  org_name      String?
+  fetched       Int       @default(0)
+  inserted      Int       @default(0)
+  status        String    @default("success")
+  error_message String?   @db.Text
+  synced_at     DateTime  @default(now())
+
+  @@index([sync_type])
+  @@index([synced_at])
+  @@map("codef_sync_logs")
+}
+
+// ============================================================
+// 공통 코드
+// ============================================================
+model CodeMaster {
+  id         String    @id @default(uuid()) @db.Char(36)
+  category   String
+  code       String
+  value      String
+  sort_order Int       @default(0)
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+
+  @@unique([category, code])
+  @@map("code_master")
+}
+
+model CommonCode {
+  id         String    @id @default(uuid()) @db.Char(36)
+  category   String
+  code       String
+  value      String
+  sort_order Int       @default(0)
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+
+  @@unique([category, code])
+  @@map("common_codes")
+}
