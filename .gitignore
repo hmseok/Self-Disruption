@@ -53,3 +53,6 @@ mobile/SelfDisruptionApp/
 # Google/Firebase 서비스 키 (절대 커밋 금지)
 GoogleService-Info*.plist
 google-services.json
+
+# 마이그레이션 스크립트 (DB 비밀번호 포함 — 절대 커밋 금지)
+scripts/migrate/01_pgloader.load
