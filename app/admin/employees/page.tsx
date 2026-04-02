@@ -278,12 +278,12 @@ export default function OrgManagementPage() {
   }
 
   const loadInvitations = async () => {
-    if (!activeCompanyId || !['admin', 'admin', 'master'].includes(role || '')) return
+    if (!['admin', 'admin', 'master'].includes(role || '')) return
     setLoadingInvitations(true)
     try {
       const token = await getAccessToken()
       if (!token) { console.error('No valid session token'); setInvitations([]); return }
-      const response = await fetch(`/api/member-invite?company_id=${activeCompanyId}`, {
+      const response = await fetch(`/api/member-invite`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       const result = await response.json()
@@ -946,10 +946,10 @@ export default function OrgManagementPage() {
         )}
 
       {/* 초대 모달 */}
-      {activeCompanyId && (
+      {showInviteModal && (
         <InviteModal
-          companyName={company?.name || ''}
-          companyId={activeCompanyId}
+          companyName={company?.name || '주식회사 에프엠아이'}
+          companyId={activeCompanyId || ''}
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}
           onSuccess={() => { loadEmployees(); loadInvitations() }}

@@ -72,9 +72,9 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   const [showPerms, setShowPerms] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
-  // 부서/직급/모듈 로드
+  // 부서/직급/모듈 로드 (단독 ERP - companyId 불필요)
   useEffect(() => {
-    if (isOpen && companyId) {
+    if (isOpen) {
       supabase
         .from('departments')
         .select('id, name')
@@ -102,7 +102,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
           }
         })
     }
-  }, [isOpen, companyId])
+  }, [isOpen])
 
   // 모달 닫힐 때 초기화
   useEffect(() => {

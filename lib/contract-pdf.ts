@@ -213,15 +213,9 @@ export function buildContractHtml(data: ContractPdfData): string {
             <p style="font-size:10px;font-weight:700;color:#666;margin:0 0 12px;border-bottom:1px solid #eee;padding-bottom:6px;">임대인 (회사)</p>
             <p style="font-size:13px;font-weight:900;margin:0 0 4px;">${company.name || '(회사명)'}</p>
             <p style="font-size:10px;color:#555;margin:0 0 8px;">${company.representative ? `대표이사 ${company.representative}` : ''}</p>
-            ${company.logo_url ? `
-              <div style="text-align:center;margin-top:8px;">
-                <img src="${company.logo_url}" style="max-height:40px;opacity:0.8;" />
-              </div>
-            ` : `
-              <div style="text-align:center;margin-top:12px;">
-                <span style="font-size:10px;color:#aaa;border:1px dashed #ccc;padding:4px 12px;border-radius:4px;">(직인)</span>
-              </div>
-            `}
+            <div style="text-align:center;margin-top:8px;position:relative;">
+              <img src="/stamp.png" style="max-width:90px;max-height:90px;opacity:0.85;" crossorigin="anonymous" />
+            </div>
           </div>
         </td>
         <td style="width:50%;vertical-align:top;">

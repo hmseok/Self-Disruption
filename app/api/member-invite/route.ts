@@ -219,20 +219,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
-      email, company_id, position_id, department_id, role = 'user',
+      email, position_id, department_id, role = 'user',
       send_channel = 'email',
       recipient_phone = '',
       page_permissions = [],
     } = body
 
     console.log('[member-invite POST] 요청:', {
-      email, company_id, send_channel,
+      email, send_channel,
       recipient_phone: recipient_phone ? recipient_phone.substring(0, 7) + '***' : '(없음)',
       role, resend: !!body.resend,
     })
 
-    if (!email || !company_id) {
-      return NextResponse.json({ error: '이메일과 회사 ID가 필요합니다.' }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ error: '이메일이 필요합니다.' }, { status: 400 })
     }
     if (['kakao', 'sms', 'both'].includes(send_channel) && !recipient_phone) {
       return NextResponse.json({ error: '카카오/SMS 발송 시 전화번호가 필요합니다.' }, { status: 400 })
@@ -244,6 +244,14 @@ export async function POST(request: NextRequest) {
     }
 
     const sb = getSupabaseAdmin()
+
+    // 단독 ERP: DB에서 실제 회사 UUID 조회 (body의 company_id 사용 안 함)
+    const { data: fmiCompany } = await sb.from('companies').select('id, name').limit(1).single()
+    const company_id = fmiCompany?.id || null
+    const companyName = fmiCompany?.name || '주식회사 에프엠아이'
+    if (!company_id) {
+      return NextResponse.json({ error: '회사 정보를 찾을 수 없습니다.' }, { status: 500 })
+    }
 
     // 이미 가입된 이메일 확인
     const { data: existingProfile } = await sb.from('profiles').select('id').eq('email', email).single()
@@ -266,9 +274,6 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // 회사명 조회
-    const { data: company } = await sb.from('companies').select('name').eq('id', company_id).single()
-    const companyName = company?.name || '회사'
     const roleLabel = role === 'admin' ? '관리자' : '직원'
 
     // 직급/부서명 조회
@@ -360,10 +365,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id')
     const statusFilter = searchParams.get('status')
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'company_id 필수 파라미터입니다.' }, { status: 400 })
-    }
-
+    // 단독 ERP: company_id 파라미터 없어도 전체 조회 가능
     const sb = getSupabaseAdmin()
 
     let query = sb
