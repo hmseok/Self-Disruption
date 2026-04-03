@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
   sendWithTemplate, renderTemplate, buildEmailHTML, buildInfoTableHTML,
@@ -13,32 +14,9 @@ import {
 // ============================================
 
 async function verifyAdmin(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-
-  const token = authHeader.replace('Bearer ', '')
-  if (!token || token === 'undefined' || token === 'null') return null
-
-  // TODO: Phase 5 - Replace with Firebase Auth
-  // For now, extract userId from JWT payload (base64 decode)
-  let userId: string | null = null
-  try {
-    const parts = token.split('.')
-    if (parts.length === 3) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-      userId = payload.sub || payload.user_id
-    }
-  } catch {}
-
-  if (!userId) return null
-
-  // Get profile from database
-  const profile = await prisma.$queryRaw<any[]>`
-    SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
-  `
-
-  if (!profile || profile.length === 0 || !['admin', 'master'].includes(profile[0].role)) return null
-  return { id: userId, role: profile[0].role }
+  const user = await verifyUser(request)
+  if (!user || !['admin', 'master'].includes(user.role)) return null
+  return { id: user.id, role: user.role }
 }
 
 // ── 폴백용 하드코딩 SMS 템플릿 ──

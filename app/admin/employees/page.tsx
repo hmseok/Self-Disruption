@@ -5,12 +5,13 @@ import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
 import DarkHeader from '../../components/DarkHeader'
+import { auth } from '@/lib/firebase'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper
 // ────────────────────────────────────────────────────────────────
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
@@ -277,10 +278,8 @@ export default function OrgManagementPage() {
   // ===== 초대 관리 =====
   // ★ 세션 토큰 안전하게 가져오기 (만료 시 자동 갱신)
   const getAccessToken = async (): Promise<string> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
-    if (token) return token
-    // 세션 없으면 갱신 시도
-    return ''
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return token || ''
   }
 
   const loadInvitations = async () => {
@@ -381,7 +380,7 @@ export default function OrgManagementPage() {
     if (!confirm(confirmMsg)) return
     setWithdrawing(true)
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const res = await fetch('/api/employees/withdraw', {
         method: 'POST',
         headers: {

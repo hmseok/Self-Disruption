@@ -223,6 +223,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         },
         body: JSON.stringify({
           email,
+          company_id: companyId,
           position_id: positionId || null,
           department_id: departmentId || null,
           role,
@@ -232,7 +233,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         }),
       })
 
-      console.log('[InviteModal] 요청 전송:', { sendChannel, phone: phone || '(없음)', email })
+      console.log('[InviteModal] 요청 전송:', { sendChannel, phone: phone || '(없음)', email, companyId })
 
       // ★ JSON 파싱 안전 처리 (서버 에러 시 HTML 반환될 수 있음)
       let data: any
@@ -255,6 +256,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             },
             body: JSON.stringify({
               email,
+              company_id: companyId,
               position_id: positionId || null,
               department_id: departmentId || null,
               role,
