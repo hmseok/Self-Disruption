@@ -1,6 +1,20 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
-import { supabase } from '../../utils/supabase'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 차량별 손익 분석 탭
@@ -80,42 +94,33 @@ export default function PnlTab({ carId, companyId, car }: PnlTabProps) {
   const loadAll = async () => {
     setLoading(true)
     try {
+      const headers = await getAuthHeader()
+
       // 1. 이 차량에 연결된 거래내역 (직접 연결: related_type='car')
-      const txPromise = supabase
-        .from('transactions')
-        .select('id, transaction_date, type, category, client_name, description, amount, payment_method, related_type, related_id')
-        .eq('related_type', 'car')
-        .eq('related_id', String(carId))
-        .order('transaction_date', { ascending: false })
+      const txPromise = fetch(`/api/transactions?related_type=car&related_id=${String(carId)}`, { headers })
 
       // 2. 대출/금융상품
-      const loanPromise = supabase
-        .from('loans')
-        .select('id, finance_name, type, total_amount, monthly_payment, start_date, end_date')
-        .eq('car_id', carId)
+      const loanPromise = fetch(`/api/loans?car_id=${carId}`, { headers })
 
       // 3. 보험 계약
-      const insPromise = supabase
-        .from('insurance_contracts')
-        .select('id, insurance_company, premium, start_date, end_date, coverage_type')
-        .eq('car_id', carId)
+      const insPromise = fetch(`/api/insurance?car_id=${carId}`, { headers })
 
       // 4. classification_queue에서 확정된 것 (아직 transactions에 안 간 것)
-      const queuePromise = supabase
-        .from('classification_queue')
-        .select('id, source_data, final_category, final_matched_type, final_matched_id, status')
-        .eq('final_matched_type', 'car')
-        .eq('final_matched_id', String(carId))
-        .in('status', ['confirmed', 'auto_confirmed'])
+      const queuePromise = fetch(`/api/classification-queue?matched_type=car&matched_id=${String(carId)}&status=confirmed&status=auto_confirmed`, { headers })
 
       const [txRes, loanRes, insRes, queueRes] = await Promise.all([txPromise, loanPromise, insPromise, queuePromise])
 
+      const txJson = await txRes.json()
+      const loanJson = await loanRes.json()
+      const insJson = await insRes.json()
+      const queueJson = await queueRes.json()
+
       // transactions
-      const txData = txRes.data || []
+      const txData = txJson.data || []
 
       // queue에서 추가 (transactions에 없는 것만)
-      const txIds = new Set(txData.map(t => t.id))
-      const queueTx: TransactionRow[] = (queueRes.data || [])
+      const txIds = new Set(txData.map((t: any) => t.id))
+      const queueTx: TransactionRow[] = (queueJson.data || [])
         .filter((q: any) => !txIds.has(q.id))
         .map((q: any) => {
           const src = typeof q.source_data === 'string' ? JSON.parse(q.source_data) : (q.source_data || {})
@@ -134,8 +139,8 @@ export default function PnlTab({ carId, companyId, car }: PnlTabProps) {
         })
 
       setTransactions([...txData, ...queueTx])
-      setLoans(loanRes.data || [])
-      setInsurance(insRes.data || [])
+      setLoans(loanJson.data || [])
+      setInsurance(insJson.data || [])
     } catch (err) {
       console.error('손익 데이터 로드 실패:', err)
     } finally {

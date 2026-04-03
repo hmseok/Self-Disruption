@@ -2,11 +2,22 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useApp } from '../../context/AppContext'
-import { supabase } from '../../utils/supabase'
 
 type CodeRow = {
   id: string; group_code: string; group_name: string; code: string; label: string;
   sort_order: number; is_active: boolean; description: string; source: string; cafe24_group: string;
+}
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
 }
 
 export default function CodeMasterMain() {
@@ -21,17 +32,22 @@ export default function CodeMasterMain() {
 
   // 그룹 목록 로드
   const loadGroups = useCallback(async () => {
-    const { data } = await supabase
-      .from('code_master')
-      .select('group_code, group_name')
-      .order('group_code')
-    if (data) {
-      const map: Record<string, { name: string; count: number }> = {}
-      data.forEach((r: any) => {
-        if (!map[r.group_code]) map[r.group_code] = { name: r.group_name || '', count: 0 }
-        map[r.group_code].count++
-      })
-      setGroups(Object.entries(map).map(([k, v]) => ({ group_code: k, group_name: v.name, count: v.count })))
+    try {
+      const res = await fetch('/api/codes', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      const data = json.data || []
+
+      if (data) {
+        const map: Record<string, { name: string; count: number }> = {}
+        data.forEach((r: any) => {
+          if (!map[r.group_code]) map[r.group_code] = { name: r.group_name || '', count: 0 }
+          map[r.group_code].count++
+        })
+        setGroups(Object.entries(map).map(([k, v]) => ({ group_code: k, group_name: v.name, count: v.count })))
+      }
+    } catch (err) {
+      console.error('loadGroups error:', err)
     }
     setLoading(false)
   }, [])
@@ -39,13 +55,15 @@ export default function CodeMasterMain() {
   // 특정 그룹의 코드 로드
   const loadCodes = useCallback(async (grp: string) => {
     setSelectedGroup(grp)
-    const { data } = await supabase
-      .from('code_master')
-      .select('*')
-      .eq('group_code', grp)
-      .order('sort_order')
-      .order('code')
-    if (data) setCodes(data as CodeRow[])
+    try {
+      const res = await fetch(`/api/codes?category=${grp}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      const data = json.data || []
+      if (data) setCodes(data as CodeRow[])
+    } catch (err) {
+      console.error('loadCodes error:', err)
+    }
   }, [])
 
   useEffect(() => { loadGroups() }, [loadGroups])
@@ -58,37 +76,63 @@ export default function CodeMasterMain() {
       sort_order: editForm.sort_order ?? row.sort_order,
       is_active: editForm.is_active ?? row.is_active,
     }
-    await supabase.from('code_master').update(updates).eq('id', row.id)
-    setEditing(null)
-    setEditForm({})
-    loadCodes(selectedGroup)
+    try {
+      const res = await fetch(`/api/codes/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify(updates)
+      })
+      if (!res.ok) throw new Error('Update failed')
+      setEditing(null)
+      setEditForm({})
+      loadCodes(selectedGroup)
+    } catch (err) {
+      console.error('handleSave error:', err)
+    }
   }
 
   // 신규 추가
   const handleAdd = async () => {
     if (!editForm.code || !editForm.label) return
-    await supabase.from('code_master').insert({
-      group_code: selectedGroup,
-      group_name: groups.find(g => g.group_code === selectedGroup)?.group_name || '',
-      code: editForm.code,
-      label: editForm.label,
-      sort_order: editForm.sort_order || 0,
-      description: editForm.description || '',
-      source: 'manual',
-      is_active: true,
-    })
-    setIsAdding(false)
-    setEditForm({})
-    loadCodes(selectedGroup)
-    loadGroups()
+    try {
+      const res = await fetch('/api/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          group_code: selectedGroup,
+          group_name: groups.find(g => g.group_code === selectedGroup)?.group_name || '',
+          code: editForm.code,
+          label: editForm.label,
+          sort_order: editForm.sort_order || 0,
+          description: editForm.description || '',
+          source: 'manual',
+          is_active: true,
+        })
+      })
+      if (!res.ok) throw new Error('Create failed')
+      setIsAdding(false)
+      setEditForm({})
+      loadCodes(selectedGroup)
+      loadGroups()
+    } catch (err) {
+      console.error('handleAdd error:', err)
+    }
   }
 
   // 삭제
   const handleDelete = async (id: string) => {
     if (!confirm('이 코드를 삭제하시겠습니까?')) return
-    await supabase.from('code_master').delete().eq('id', id)
-    loadCodes(selectedGroup)
-    loadGroups()
+    try {
+      const res = await fetch(`/api/codes/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      loadCodes(selectedGroup)
+      loadGroups()
+    } catch (err) {
+      console.error('handleDelete error:', err)
+    }
   }
 
   // 새 그룹 추가
@@ -97,16 +141,25 @@ export default function CodeMasterMain() {
     if (!groupCode) return
     const groupName = prompt('그룹 설명을 입력하세요')
     if (!groupName) return
-    await supabase.from('code_master').insert({
-      group_code: groupCode.toUpperCase(),
-      group_name: groupName,
-      code: '*',
-      label: groupName,
-      sort_order: 0,
-      source: 'manual',
-      is_active: true,
-    })
-    loadGroups()
+    try {
+      const res = await fetch('/api/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          group_code: groupCode.toUpperCase(),
+          group_name: groupName,
+          code: '*',
+          label: groupName,
+          sort_order: 0,
+          source: 'manual',
+          is_active: true,
+        })
+      })
+      if (!res.ok) throw new Error('Create failed')
+      loadGroups()
+    } catch (err) {
+      console.error('handleAddGroup error:', err)
+    }
   }
 
   return (

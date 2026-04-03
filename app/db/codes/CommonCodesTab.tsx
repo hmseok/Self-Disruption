@@ -1,8 +1,22 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useApp } from '../../context/AppContext'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 interface CodeRecord {
   id: string
@@ -25,7 +39,6 @@ const DEFAULT_GROUPS = [
 ]
 
 export default function CommonCodesTab() {
-  const supabase = createClientComponentClient()
   const { role } = useApp()
   const isAdmin = role === 'admin'
 
@@ -48,26 +61,23 @@ export default function CommonCodesTab() {
   const loadCodes = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('common_codes')
-        .select('*')
-        .order('group_code')
-        .order('sort_order')
-        .order('code')
-      if (error) throw error
-      const rows = data || []
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/codes', { headers })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '로드 실패')
+      const rows = json.data || []
       setCodes(rows)
-      const uniqueGroups = [...new Set(rows.map(r => r.group_code))].sort()
+      const uniqueGroups = [...new Set(rows.map((r: CodeRecord) => r.group_code))].sort() as string[]
       setGroups(uniqueGroups)
       if (!selectedGroup && uniqueGroups.length > 0) {
-        setSelectedGroup(uniqueGroups[0])
+        setSelectedGroup(uniqueGroups[0] as string)
       }
     } catch (error) {
       console.error('공통코드 로드 실패:', error)
     } finally {
       setLoading(false)
     }
-  }, [supabase, selectedGroup])
+  }, [selectedGroup])
 
   useEffect(() => { loadCodes() }, [loadCodes])
 
@@ -79,14 +89,20 @@ export default function CommonCodesTab() {
     if (!groupCode) return
 
     try {
-      const { error } = await supabase.from('common_codes').insert({
-        group_code: groupCode.toUpperCase(),
-        code: newCode.code.toUpperCase(),
-        name: newCode.name,
-        sort_order: newCode.sort_order || 0,
-        is_active: true,
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          group_code: groupCode.toUpperCase(),
+          code: newCode.code.toUpperCase(),
+          name: newCode.name,
+          sort_order: newCode.sort_order || 0,
+          is_active: true,
+        })
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '추가 실패')
       setNewCode({ group_code: '', code: '', name: '', sort_order: 0 })
       setNewGroupCode('')
       setShowAddForm(false)
@@ -101,10 +117,14 @@ export default function CommonCodesTab() {
 
   const handleToggleActive = async (id: string, currentActive: boolean) => {
     try {
-      const { error } = await supabase.from('common_codes')
-        .update({ is_active: !currentActive })
-        .eq('id', id)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/codes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ is_active: !currentActive })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '변경 실패')
       setCodes(codes.map(c => c.id === id ? { ...c, is_active: !currentActive } : c))
     } catch (error) {
       console.error('상태 변경 실패:', error)
@@ -119,10 +139,14 @@ export default function CommonCodesTab() {
   const handleSaveEdit = async () => {
     if (!editingId) return
     try {
-      const { error } = await supabase.from('common_codes')
-        .update({ name: editData.name, sort_order: editData.sort_order })
-        .eq('id', editingId)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/codes/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ name: editData.name, sort_order: editData.sort_order })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '수정 실패')
       setCodes(codes.map(c => c.id === editingId ? { ...c, ...editData } : c))
       setEditingId(null)
     } catch (error) {
@@ -133,8 +157,13 @@ export default function CommonCodesTab() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`"${name}" 코드를 삭제하시겠습니까?`)) return
     try {
-      const { error } = await supabase.from('common_codes').delete().eq('id', id)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/codes/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '삭제 실패')
       setCodes(codes.filter(c => c.id !== id))
     } catch (error) {
       console.error('삭제 실패:', error)

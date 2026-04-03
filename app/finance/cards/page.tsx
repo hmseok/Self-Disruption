@@ -1,9 +1,20 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import * as XLSX from 'xlsx'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -108,9 +119,9 @@ export default function CorporateCardsPage() {
     if (!companyId) return
     setFlagLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`/api/finance/flags?company_id=${companyId}&status=${flagFilter}`, { headers })
       if (res.ok) {
         const data = await res.json()
@@ -125,9 +136,9 @@ export default function CorporateCardsPage() {
   const fetchSalaryAdjustments = async () => {
     if (!companyId) return
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`/api/finance/salary-adjustments?company_id=${companyId}&year_month=${salaryMonth}`, { headers })
       if (res.ok) {
         const data = await res.json()
@@ -141,9 +152,9 @@ export default function CorporateCardsPage() {
   const updateFlagStatus = async (flagIds: string[], newStatus: string) => {
     if (!companyId) return
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+      if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch('/api/finance/flags', {
         method: 'PATCH', headers,
         body: JSON.stringify({ flag_ids: flagIds, status: newStatus, create_salary_adjustment: newStatus === 'personal_confirmed' }),
@@ -196,12 +207,11 @@ export default function CorporateCardsPage() {
   const fetchCards = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('corporate_cards')
-        .select('*')
-        
-        .order('created_at', { ascending: false })
-      if (error) console.error('corporate_cards fetch error:', error.message)
-      setCards(data || [])
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/corporate-cards', { headers })
+      if (!res.ok) throw new Error('카드 조회 실패')
+      const json = await res.json()
+      setCards(json.data || [])
     } catch (e) {
       console.error('corporate_cards exception:', e)
       setCards([])
@@ -211,20 +221,29 @@ export default function CorporateCardsPage() {
   }
 
   const fetchEmployees = async () => {
-    const { data } = await supabase.from('profiles')
-      .select('id, employee_name')
-      
-      .eq('is_active', true)
-      .order('employee_name')
-    setEmployees(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/profiles?is_active=true', { headers })
+      if (!res.ok) throw new Error('직원 조회 실패')
+      const json = await res.json()
+      setEmployees(json.data || [])
+    } catch (e) {
+      console.error('profiles exception:', e)
+      setEmployees([])
+    }
   }
 
   const fetchCars = async () => {
-    const { data } = await supabase.from('cars')
-      .select('id, number, brand, model, status')
-      
-      .order('number')
-    setCarsList(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      if (!res.ok) throw new Error('차량 조회 실패')
+      const json = await res.json()
+      setCarsList(json.data || [])
+    } catch (e) {
+      console.error('cars exception:', e)
+      setCarsList([])
+    }
   }
 
   const fetchCardUsage = async () => {
@@ -232,33 +251,35 @@ export default function CorporateCardsPage() {
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
 
-    const { data } = await supabase.from('transactions')
-      .select('card_id, amount')
-      
-      .eq('payment_method', '카드')
-      .gte('transaction_date', `${ym}-01`)
-      .lte('transaction_date', `${ym}-${lastDay}`)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/transactions?payment_method=카드&from=${ym}-01&to=${ym}-${lastDay}`, { headers })
+      if (!res.ok) throw new Error('거래 조회 실패')
+      const json = await res.json()
+      const data = json.data || []
 
-    const usage: Record<string, { count: number; total: number }> = {}
-    ;(data || []).forEach((t: any) => {
-      if (!t.card_id) return
-      if (!usage[t.card_id]) usage[t.card_id] = { count: 0, total: 0 }
-      usage[t.card_id].count++
-      usage[t.card_id].total += Number(t.amount || 0)
-    })
-    setCardUsage(usage)
+      const usage: Record<string, { count: number; total: number }> = {}
+      ;(data || []).forEach((t: any) => {
+        if (!t.card_id) return
+        if (!usage[t.card_id]) usage[t.card_id] = { count: 0, total: 0 }
+        usage[t.card_id].count++
+        usage[t.card_id].total += Number(t.amount || 0)
+      })
+      setCardUsage(usage)
+    } catch (e) {
+      console.error('Card usage fetch error:', e)
+    }
   }
 
   // ──── 배정 이력 조회 ────
   const fetchAssignmentHistory = async (cardId: string) => {
     setHistoryLoading(true)
     try {
-      const { data, error } = await supabase.from('card_assignment_history')
-        .select('*')
-        .eq('card_id', cardId)
-        .order('assigned_at', { ascending: false })
-      if (error) console.error('assignment history fetch error:', error.message)
-      setAssignmentHistory(data || [])
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/card-assignment-history?card_id=${cardId}`, { headers })
+      if (!res.ok) throw new Error('배정 이력 조회 실패')
+      const json = await res.json()
+      setAssignmentHistory(json.data || [])
     } catch (e) {
       console.error('assignment history exception:', e)
       setAssignmentHistory([])
@@ -269,14 +290,20 @@ export default function CorporateCardsPage() {
 
   // ──── 한도 설정 CRUD ────
   const fetchLimitSettings = async () => {
-    const { data } = await supabase.from('card_limit_settings')
-      .select('*')
-      
-    const map: Record<string, number> = {}
-    ;(data || []).forEach((d: any) => {
-      map[`${d.limit_type}::${d.limit_key}`] = d.monthly_limit
-    })
-    setLimitSettings(map)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/card-limit-settings', { headers })
+      if (!res.ok) throw new Error('한도 설정 조회 실패')
+      const json = await res.json()
+      const map: Record<string, number> = {}
+      ;(json.data || []).forEach((d: any) => {
+        map[`${d.limit_type}::${d.limit_key}`] = d.monthly_limit
+      })
+      setLimitSettings(map)
+    } catch (e) {
+      console.error('limit settings exception:', e)
+      setLimitSettings({})
+    }
   }
 
   const getGroupLimit = (type: string, key: string) => limitSettings[`${type}::${key}`] || 0
@@ -285,37 +312,52 @@ export default function CorporateCardsPage() {
     if (!limitForm.key || !limitForm.amount) return alert('항목과 금액을 입력해주세요.')
     const amount = Number(limitForm.amount)
 
-    // upsert
-    const { data: existing } = await supabase.from('card_limit_settings')
-      .select('id')
-      
-      .eq('limit_type', limitForm.type)
-      .eq('limit_key', limitForm.key)
-      .maybeSingle()
+    try {
+      const headers = await getAuthHeader()
+      // First try to find existing
+      const checkRes = await fetch(`/api/card-limit-settings?type=${limitForm.type}&key=${limitForm.key}`, { headers })
+      const checkJson = await checkRes.json()
+      const existing = checkJson.data?.[0]
 
-    if (existing) {
-      await supabase.from('card_limit_settings').update({ monthly_limit: amount }).eq('id', existing.id)
-    } else {
-      await supabase.from('card_limit_settings').insert({
-        
-        limit_type: limitForm.type,
-        limit_key: limitForm.key,
-        monthly_limit: amount,
-      })
+      if (existing) {
+        await fetch(`/api/card-limit-settings/${existing.id}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ monthly_limit: amount })
+        })
+      } else {
+        await fetch('/api/card-limit-settings', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            limit_type: limitForm.type,
+            limit_key: limitForm.key,
+            monthly_limit: amount,
+          })
+        })
+      }
+      fetchLimitSettings()
+      setLimitForm({ type: 'card_company', key: '', amount: '' })
+      setEditingLimitKey(null)
+    } catch (e: any) {
+      alert('저장 실패: ' + e.message)
     }
-    fetchLimitSettings()
-    setLimitForm({ type: 'card_company', key: '', amount: '' })
-    setEditingLimitKey(null)
   }
 
   const deleteLimitSetting = async (type: string, key: string) => {
     if (!confirm(`"${key}" 한도 설정을 삭제하시겠습니까?`)) return
-    await supabase.from('card_limit_settings')
-      .delete()
-      
-      .eq('limit_type', type)
-      .eq('limit_key', key)
-    fetchLimitSettings()
+    try {
+      const headers = await getAuthHeader()
+      const checkRes = await fetch(`/api/card-limit-settings?type=${type}&key=${key}`, { headers })
+      const checkJson = await checkRes.json()
+      const existing = checkJson.data?.[0]
+      if (existing) {
+        await fetch(`/api/card-limit-settings/${existing.id}`, { method: 'DELETE', headers })
+      }
+      fetchLimitSettings()
+    } catch (e: any) {
+      alert('삭제 실패: ' + e.message)
+    }
   }
 
   // ──── 부서 관리 ────
@@ -328,33 +370,44 @@ export default function CorporateCardsPage() {
   const removeDepartment = async (dept: string) => {
     const cardsInDept = cards.filter(c => c.card_alias === dept)
     if (cardsInDept.length > 0 && !confirm(`"${dept}" 부서에 ${cardsInDept.length}장의 카드가 있습니다. 해당 카드의 부서를 초기화하고 삭제하시겠습니까?`)) return
-    // 해당 부서 카드의 card_alias 초기화
-    if (cardsInDept.length > 0) {
-      for (const c of cardsInDept) {
-        await supabase.from('corporate_cards').update({ card_alias: '' }).eq('id', c.id)
+    try {
+      const headers = await getAuthHeader()
+      // 해당 부서 카드의 card_alias 초기화
+      if (cardsInDept.length > 0) {
+        for (const c of cardsInDept) {
+          await fetch(`/api/corporate-cards/${c.id}`, { method: 'PATCH', headers, body: JSON.stringify({ card_alias: '' }) })
+        }
       }
+      setDepartments(departments.filter(d => d !== dept))
+      fetchCards()
+    } catch (e: any) {
+      alert('삭제 실패: ' + e.message)
     }
-    setDepartments(departments.filter(d => d !== dept))
-    fetchCards()
   }
   const renameDepartment = async () => {
     if (!renameDept || !renameDept.to.trim()) return
-    const cardsInDept = cards.filter(c => c.card_alias === renameDept.from)
-    for (const c of cardsInDept) {
-      await supabase.from('corporate_cards').update({ card_alias: renameDept.to.trim() }).eq('id', c.id)
+    try {
+      const headers = await getAuthHeader()
+      const cardsInDept = cards.filter(c => c.card_alias === renameDept.from)
+      for (const c of cardsInDept) {
+        await fetch(`/api/corporate-cards/${c.id}`, { method: 'PATCH', headers, body: JSON.stringify({ card_alias: renameDept.to.trim() }) })
+      }
+      setDepartments(departments.map(d => d === renameDept.from ? renameDept.to.trim() : d))
+      // 한도 설정도 변경
+      const limitKey = `dept::${renameDept.from}`
+      if (limitSettings[limitKey]) {
+        const checkRes = await fetch(`/api/card-limit-settings?type=dept&key=${renameDept.from}`, { headers })
+        const checkJson = await checkRes.json()
+        const existing = checkJson.data?.[0]
+        if (existing) {
+          await fetch(`/api/card-limit-settings/${existing.id}`, { method: 'PATCH', headers, body: JSON.stringify({ limit_key: renameDept.to.trim() }) })
+        }
+        fetchLimitSettings()
+      }
+      setRenameDept(null)
+    } catch (e: any) {
+      alert('변경 실패: ' + e.message)
     }
-    setDepartments(departments.map(d => d === renameDept.from ? renameDept.to.trim() : d))
-    // 한도 설정도 변경
-    const limitKey = `dept::${renameDept.from}`
-    if (limitSettings[limitKey]) {
-      await supabase.from('card_limit_settings')
-        .update({ limit_key: renameDept.to.trim() })
-        
-        .eq('limit_type', 'dept')
-        .eq('limit_key', renameDept.from)
-      fetchLimitSettings()
-    }
-    setRenameDept(null)
     fetchCards()
   }
 
@@ -401,52 +454,66 @@ export default function CorporateCardsPage() {
       previous_card_numbers: form.previous_card_numbers.filter((n: string) => n.trim()),
     }
 
-    if (editingId) {
-      // 배정자 변경 감지 → 히스토리 기록
-      const oldCard = cards.find(c => c.id === editingId)
-      const oldEmpId = oldCard?.assigned_employee_id || null
-      const newEmpId = payload.assigned_employee_id || null
+    try {
+      const headers = await getAuthHeader()
+      if (editingId) {
+        // 배정자 변경 감지 → 히스토리 기록
+        const oldCard = cards.find(c => c.id === editingId)
+        const oldEmpId = oldCard?.assigned_employee_id || null
+        const newEmpId = payload.assigned_employee_id || null
 
-      const { error } = await supabase.from('corporate_cards').update(payload).eq('id', editingId)
-      if (error) return alert('수정 실패: ' + error.message)
-
-      // 배정자가 변경된 경우 히스토리 기록
-      if (oldEmpId !== newEmpId) {
-        // 이전 배정자의 현재 이력 종료
-        if (oldEmpId) {
-          await supabase.from('card_assignment_history')
-            .update({ unassigned_at: new Date().toISOString() })
-            .eq('card_id', editingId)
-            .eq('employee_id', oldEmpId)
-            .is('unassigned_at', null)
+        const res = await fetch(`/api/corporate-cards/${editingId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) })
+        if (!res.ok) {
+          const json = await res.json()
+          return alert('수정 실패: ' + (json.error || '오류 발생'))
         }
-        // 새 배정자 이력 추가
-        if (newEmpId) {
-          const empName = employees.find(e => e.id === newEmpId)?.employee_name || '(알 수 없음)'
-          await supabase.from('card_assignment_history').insert({
-            card_id: editingId,
-            employee_id: newEmpId,
+
+        // 배정자가 변경된 경우 히스토리 기록
+        if (oldEmpId !== newEmpId) {
+          // 이전 배정자의 현재 이력 종료
+          if (oldEmpId) {
+            const histRes = await fetch(`/api/card-assignment-history?card_id=${editingId}&employee_id=${oldEmpId}`, { headers })
+            const histJson = await histRes.json()
+            const hist = histJson.data?.[0]
+            if (hist) {
+              await fetch(`/api/card-assignment-history/${hist.id}`, { method: 'PATCH', headers, body: JSON.stringify({ unassigned_at: new Date().toISOString() }) })
+            }
+          }
+          // 새 배정자 이력 추가
+          if (newEmpId) {
+            const empName = employees.find(e => e.id === newEmpId)?.employee_name || '(알 수 없음)'
+            await fetch('/api/card-assignment-history', { method: 'POST', headers, body: JSON.stringify({
+              card_id: editingId,
+              employee_id: newEmpId,
+              employee_name: empName,
+              assigned_at: new Date().toISOString(),
+              reason: assignReasonInput.trim() || null,
+            })})
+          }
+        }
+      } else {
+        const res = await fetch('/api/corporate-cards', { method: 'POST', headers, body: JSON.stringify(payload) })
+        if (!res.ok) {
+          const json = await res.json()
+          return alert('등록 실패: ' + (json.error || '오류 발생'))
+        }
+        const json = await res.json()
+        const inserted = json.data
+
+        // 신규 등록 시 배정자가 있으면 첫 히스토리 생성
+        if (inserted && payload.assigned_employee_id) {
+          const empName = employees.find(e => e.id === payload.assigned_employee_id)?.employee_name || '(알 수 없음)'
+          await fetch('/api/card-assignment-history', { method: 'POST', headers, body: JSON.stringify({
+            card_id: inserted.id,
+            employee_id: payload.assigned_employee_id,
             employee_name: empName,
             assigned_at: new Date().toISOString(),
-            reason: assignReasonInput.trim() || null,
-          })
+            reason: '신규 등록',
+          })})
         }
       }
-    } else {
-      const { data: inserted, error } = await supabase.from('corporate_cards').insert(payload).select('id').single()
-      if (error) return alert('등록 실패: ' + error.message)
-
-      // 신규 등록 시 배정자가 있으면 첫 히스토리 생성
-      if (inserted && payload.assigned_employee_id) {
-        const empName = employees.find(e => e.id === payload.assigned_employee_id)?.employee_name || '(알 수 없음)'
-        await supabase.from('card_assignment_history').insert({
-          card_id: inserted.id,
-          employee_id: payload.assigned_employee_id,
-          employee_name: empName,
-          assigned_at: new Date().toISOString(),
-          reason: '신규 등록',
-        })
-      }
+    } catch (e: any) {
+      return alert('저장 실패: ' + e.message)
     }
     alert('저장되었습니다.')
     setShowForm(false); setEditingId(null); setForm(emptyForm); setAssignReasonInput('')
@@ -469,8 +536,17 @@ export default function CorporateCardsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 카드를 삭제하시겠습니까?')) return
-    await supabase.from('corporate_cards').delete().eq('id', id)
-    fetchCards()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/corporate-cards/${id}`, { method: 'DELETE', headers })
+      if (!res.ok) {
+        const json = await res.json()
+        return alert('삭제 실패: ' + (json.error || '오류 발생'))
+      }
+      fetchCards()
+    } catch (e: any) {
+      alert('삭제 실패: ' + e.message)
+    }
   }
 
   // ──── 일괄 등록: 파일 처리 ────
@@ -671,9 +747,9 @@ export default function CorporateCardsPage() {
         reader.readAsDataURL(file)
       })
 
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (session?.access_token) authHeaders['Authorization'] = `Bearer ${session.access_token}`
+      if (token) authHeaders['Authorization'] = `Bearer ${token}`
 
       const res = await fetch('/api/ocr-card', {
         method: 'POST',
@@ -721,18 +797,31 @@ export default function CorporateCardsPage() {
     setBulkProcessing(true)
     let success = 0, fail = 0
 
-    for (const card of selected) {
-      const { _selected, _duplicate, card_type, ...payload } = card
-      const { error } = await supabase.from('corporate_cards').insert({
-        ...payload,
-        
-        monthly_limit: payload.monthly_limit ? Number(payload.monthly_limit) : null,
-        assigned_car_id: payload.assigned_car_id || null,
-        expiry_date: payload.expiry_date || null,
-        previous_card_numbers: (payload.previous_card_numbers && payload.previous_card_numbers.length > 0) ? payload.previous_card_numbers : [],
-      })
-      if (error) { fail++; console.error('bulk insert error:', error.message) }
-      else success++
+    try {
+      const headers = await getAuthHeader()
+      for (const card of selected) {
+        const { _selected, _duplicate, card_type, ...payload } = card
+        try {
+          const res = await fetch('/api/corporate-cards', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              ...payload,
+              monthly_limit: payload.monthly_limit ? Number(payload.monthly_limit) : null,
+              assigned_car_id: payload.assigned_car_id || null,
+              expiry_date: payload.expiry_date || null,
+              previous_card_numbers: (payload.previous_card_numbers && payload.previous_card_numbers.length > 0) ? payload.previous_card_numbers : [],
+            })
+          })
+          if (res.ok) success++
+          else { fail++; console.error('bulk insert error') }
+        } catch (e: any) {
+          fail++; console.error('bulk insert error:', e.message)
+        }
+      }
+    } catch (e: any) {
+      alert('일괄 등록 중 오류: ' + e.message)
+      return
     }
 
     setBulkProcessing(false)

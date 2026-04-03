@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { prisma } from '@/lib/prisma'
 
 // POST: 거래내역 조회 및 저장
 export async function POST(req: NextRequest) {
   try {
     const { startDate, endDate } = await req.json()
     const apiHost = process.env.OPENBANKING_API_HOST || 'https://testapi.openbanking.or.kr'
-    const supabase = getSupabase()
 
     // 등록된 모든 계좌 조회
-    const { data: accounts, error } = await supabase
-      .from('openbanking_accounts')
-      .select('*')
-      .eq('is_active', true)
+    const accounts = await prisma.$queryRaw<any[]>`
+      SELECT * FROM openbanking_accounts WHERE is_active = TRUE
+    `
 
-    if (error) throw error
     if (!accounts || accounts.length === 0) {
       return NextResponse.json({ error: '연동된 계좌가 없습니다.' }, { status: 400 })
     }
@@ -32,18 +22,17 @@ export async function POST(req: NextRequest) {
 
     for (const account of accounts) {
       try {
-        // 날짜 형식 변환 (YYYY-MM-DD → YYYYMMDD)
         const fromDate = startDate.replace(/-/g, '')
         const toDate = endDate.replace(/-/g, '')
 
         const params = new URLSearchParams({
           bank_tran_id: `${process.env.OPENBANKING_CLIENT_ID!.replace(/-/g, '').slice(0, 10)}U${Date.now()}`,
           fintech_use_num: account.fin_use_num,
-          inquiry_type: 'A',       // A: 전체
-          inquiry_base: 'D',       // D: 일자 기준
+          inquiry_type: 'A',
+          inquiry_base: 'D',
           from_date: fromDate,
           to_date: toDate,
-          sort_order: 'D',         // D: 내림차순
+          sort_order: 'D',
           tran_dtime: new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14),
         })
 
@@ -68,25 +57,27 @@ export async function POST(req: NextRequest) {
         totalFetched += transactions.length
 
         for (const tx of transactions) {
-          const { error: insertError } = await supabase
-            .from('openbanking_transactions')
-            .upsert({
-              fin_use_num: account.fin_use_num,
-              bank_code: account.bank_code,
-              bank_name: account.bank_name,
-              account_num_masked: account.account_num_masked,
-              tran_date: tx.tran_date,
-              tran_time: tx.tran_time,
-              tran_type: tx.tran_type,        // 1: 입금, 2: 출금
-              tran_type_name: tx.tran_type_name,
-              tran_amt: parseInt(tx.tran_amt || '0'),
-              after_balance_amt: parseInt(tx.after_balance_amt || '0'),
-              print_content: tx.print_content,
-              branch_name: tx.branch_name,
-              unique_tran_no: tx.unique_tran_no,
-            }, { onConflict: 'unique_tran_no' })
-
-          if (!insertError) totalInserted++
+          try {
+            await prisma.$executeRaw`
+              INSERT INTO openbanking_transactions
+                (id, account_id, fin_use_num, bank_code, bank_name,
+                 account_num_masked, tran_date, tran_time, tran_type,
+                 tran_type_name, tran_amt, after_balance_amt,
+                 print_content, branch_name, unique_tran_no, created_at)
+              VALUES
+                (UUID(), ${account.id}, ${account.fin_use_num},
+                 ${account.bank_code}, ${account.bank_name},
+                 ${account.account_num_masked}, ${tx.tran_date}, ${tx.tran_time},
+                 ${tx.tran_type}, ${tx.tran_type_name},
+                 ${parseInt(tx.tran_amt || '0')}, ${parseInt(tx.after_balance_amt || '0')},
+                 ${tx.print_content}, ${tx.branch_name}, ${tx.unique_tran_no},
+                 NOW())
+              ON DUPLICATE KEY UPDATE unique_tran_no = VALUES(unique_tran_no)
+            `
+            totalInserted++
+          } catch {
+            // 중복 등 에러 무시
+          }
         }
       } catch (err) {
         errors.push(`${account.bank_name}: ${err instanceof Error ? err.message : '알 수 없는 오류'}`)

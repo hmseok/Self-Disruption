@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
   sendWithTemplate, renderTemplate, buildEmailHTML, buildInfoTableHTML,
 } from '../../utils/messaging'
 
 // ============================================
-// 멤버 초대 API
+// 멤버 초대 API (Prisma 버전)
 // POST   → 초대 생성 + 이메일/카카오/SMS 발송
 // GET    → 초대 목록 조회
 // DELETE → 초대 취소 (status='canceled')
 // ============================================
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -27,17 +19,26 @@ async function verifyAdmin(request: NextRequest) {
   const token = authHeader.replace('Bearer ', '')
   if (!token || token === 'undefined' || token === 'null') return null
 
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
+  // TODO: Phase 5 - Replace with Firebase Auth
+  // For now, extract userId from JWT payload (base64 decode)
+  let userId: string | null = null
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+      userId = payload.sub || payload.user_id
+    }
+  } catch {}
 
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  if (!userId) return null
 
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+  // Get profile from database
+  const profile = await prisma.$queryRaw<any[]>`
+    SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
+  `
+
+  if (!profile || profile.length === 0 || !['admin', 'master'].includes(profile[0].role)) return null
+  return { id: userId, role: profile[0].role }
 }
 
 // ── 폴백용 하드코딩 SMS 템플릿 ──
@@ -210,7 +211,6 @@ async function sendInviteMessages(params: {
   return { emailSent, emailError, kakaoResult }
 }
 
-
 // POST: 초대 생성 + 발송 (이메일/카카오/SMS)
 export async function POST(request: NextRequest) {
   try {
@@ -243,29 +243,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '관리자 초대는 플랫폼 관리자만 가능합니다.' }, { status: 403 })
     }
 
-    const sb = getSupabaseAdmin()
-
-    // 단독 ERP: DB에서 실제 회사 UUID 조회 (body의 company_id 사용 안 함)
-    const { data: fmiCompany } = await sb.from('companies').select('id, name').limit(1).single()
-    const company_id = fmiCompany?.id || null
-    const companyName = fmiCompany?.name || '주식회사 에프엠아이'
+    // 단독 ERP: DB에서 실제 회사 UUID 조회
+    const fmiCompanies = await prisma.$queryRaw<any[]>`SELECT id, name FROM companies LIMIT 1`
+    const company_id = fmiCompanies.length > 0 ? fmiCompanies[0].id : null
+    const companyName = fmiCompanies.length > 0 ? fmiCompanies[0].name : '주식회사 에프엠아이'
     if (!company_id) {
       return NextResponse.json({ error: '회사 정보를 찾을 수 없습니다.' }, { status: 500 })
     }
 
     // 이미 가입된 이메일 확인
-    const { data: existingProfile } = await sb.from('profiles').select('id').eq('email', email).single()
-    if (existingProfile) {
+    const existingProfile = await prisma.$queryRaw<any[]>`
+      SELECT id FROM profiles WHERE email = ${email} LIMIT 1
+    `
+    if (existingProfile.length > 0) {
       return NextResponse.json({ error: '이미 가입된 이메일입니다.' }, { status: 409 })
     }
 
     // 중복 pending 초대 확인
-    const { data: pendingInvite } = await sb
-      .from('member_invitations')
-      .select('id, token, expires_at')
-      .eq('email', email)
-      .eq('status', 'pending').gt('expires_at', new Date().toISOString())
-      .single()
+    const pendingInvites = await prisma.$queryRaw<any[]>`
+      SELECT id, token, expires_at FROM member_invitations
+      WHERE email = ${email} AND status = 'pending' AND expires_at > ${new Date().toISOString()}
+      LIMIT 1
+    `
+    const pendingInvite = pendingInvites.length > 0 ? pendingInvites[0] : null
 
     if (pendingInvite && !body.resend) {
       return NextResponse.json({
@@ -274,18 +274,23 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
+
     const roleLabel = role === 'admin' ? '관리자' : '직원'
 
     // 직급/부서명 조회
     let positionName = ''
     let departmentName = ''
     if (position_id) {
-      const { data: pos } = await sb.from('positions').select('name').eq('id', position_id).single()
-      positionName = pos?.name || ''
+      const positions = await prisma.$queryRaw<any[]>`
+        SELECT name FROM positions WHERE id = ${position_id} LIMIT 1
+      `
+      positionName = positions.length > 0 ? positions[0].name : ''
     }
     if (department_id) {
-      const { data: dept } = await sb.from('departments').select('name').eq('id', department_id).single()
-      departmentName = dept?.name || ''
+      const departments = await prisma.$queryRaw<any[]>`
+        SELECT name FROM departments WHERE id = ${department_id} LIMIT 1
+      `
+      departmentName = departments.length > 0 ? departments[0].name : ''
     }
 
     // ── 재발송 경로 ──
@@ -312,22 +317,30 @@ export async function POST(request: NextRequest) {
 
     // ── 신규 초대 생성 ──
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const invitationToken = require('crypto').randomBytes(16).toString('hex')
 
-    const { data: invitation, error: insertErr } = await sb
-      .from('member_invitations')
-      .insert({
-        email, company_id,
-        position_id: position_id || null,
-        department_id: department_id || null,
-        role, invited_by: admin.id,
-        expires_at: expiresAt,
-        page_permissions: page_permissions || [],
-      })
-      .select('id, token')
-      .single()
+    const insertResult = await prisma.$executeRaw`
+      INSERT INTO member_invitations
+      (email, company_id, position_id, department_id, role, invited_by, expires_at, page_permissions, token, status, created_at)
+      VALUES (
+        ${email}, ${company_id},
+        ${position_id || null}, ${department_id || null},
+        ${role}, ${admin.id}, ${expiresAt},
+        ${JSON.stringify(page_permissions || [])},
+        ${invitationToken}, 'pending', NOW()
+      )
+    `
 
-    if (insertErr) {
-      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    const invitation = { id: '', token: invitationToken }
+    // Get the inserted ID
+    const invitations = await prisma.$queryRaw<any[]>`
+      SELECT id, token FROM member_invitations
+      WHERE token = ${invitationToken} LIMIT 1
+    `
+    if (invitations.length > 0) {
+      invitation.id = invitations[0].id
+    } else {
+      return NextResponse.json({ error: '초대 생성 실패' }, { status: 500 })
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
@@ -354,7 +367,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
 // GET: 초대 목록 조회
 export async function GET(request: NextRequest) {
   try {
@@ -365,22 +377,23 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id')
     const statusFilter = searchParams.get('status')
 
-    // 단독 ERP: company_id 파라미터 없어도 전체 조회 가능
-    const sb = getSupabaseAdmin()
+    // 단독 ERP: company_id 없어도 전체 조회 가능
+    let query = `
+      SELECT id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id
+      FROM member_invitations
+    `
+    const params: any[] = []
 
-    let query = sb
-      .from('member_invitations')
-      .select('id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id')
-      .order('created_at', { ascending: false })
-
-    if (statusFilter) query = query.eq('status', statusFilter)
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('[member-invite GET] query error:', error)
-      return NextResponse.json({ error: error.message, detail: error }, { status: 500 })
+    if (statusFilter) {
+      query += ` WHERE status = ?`
+      params.push(statusFilter)
     }
+    query += ` ORDER BY created_at DESC`
+
+    const data = await prisma.$queryRaw<any[]>(
+      query as any,
+      ...params
+    )
 
     // 수동 조인
     const positionIds = [...new Set((data || []).map((inv: any) => inv.position_id).filter(Boolean))]
@@ -392,15 +405,21 @@ export async function GET(request: NextRequest) {
     let inviterMap: Record<string, string> = {}
 
     if (positionIds.length > 0) {
-      const { data: positions } = await sb.from('positions').select('id, name').in('id', positionIds)
+      const positions = await prisma.$queryRaw<any[]>`
+        SELECT id, name FROM positions WHERE id IN (${positionIds.join(',')})
+      `
       if (positions) positionMap = Object.fromEntries(positions.map((p: any) => [p.id, { id: p.id, name: p.name }]))
     }
     if (departmentIds.length > 0) {
-      const { data: departments } = await sb.from('departments').select('id, name').in('id', departmentIds)
+      const departments = await prisma.$queryRaw<any[]>`
+        SELECT id, name FROM departments WHERE id IN (${departmentIds.join(',')})
+      `
       if (departments) departmentMap = Object.fromEntries(departments.map((d: any) => [d.id, { id: d.id, name: d.name }]))
     }
     if (inviterIds.length > 0) {
-      const { data: inviters } = await sb.from('profiles').select('id, employee_name').in('id', inviterIds)
+      const inviters = await prisma.$queryRaw<any[]>`
+        SELECT id, employee_name FROM profiles WHERE id IN (${inviterIds.join(',')})
+      `
       if (inviters) inviterMap = Object.fromEntries(inviters.map((p: any) => [p.id, p.employee_name || '']))
     }
 
@@ -415,7 +434,9 @@ export async function GET(request: NextRequest) {
     const now = new Date().toISOString()
     const expired = enrichedData.filter((inv: any) => inv.status === 'pending' && inv.expires_at < now)
     if (expired.length > 0) {
-      await sb.from('member_invitations').update({ status: 'expired' }).in('id', expired.map((e: any) => e.id))
+      await prisma.$executeRaw`
+        UPDATE member_invitations SET status = 'expired' WHERE id IN (${expired.map((e: any) => e.id).join(',')})
+      `
       expired.forEach((e: any) => { e.status = 'expired' })
     }
 
@@ -426,7 +447,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
 // DELETE: 초대 취소
 export async function DELETE(request: NextRequest) {
   const admin = await verifyAdmin(request)
@@ -436,13 +456,10 @@ export async function DELETE(request: NextRequest) {
   const inviteId = searchParams.get('id')
   if (!inviteId) return NextResponse.json({ error: '초대 ID가 필요합니다.' }, { status: 400 })
 
-  const sb = getSupabaseAdmin()
-
-  const { data: invite } = await sb
-    .from('member_invitations')
-    .select('company_id, status')
-    .eq('id', inviteId)
-    .single()
+  const invites = await prisma.$queryRaw<any[]>`
+    SELECT company_id, status FROM member_invitations WHERE id = ${inviteId} LIMIT 1
+  `
+  const invite = invites.length > 0 ? invites[0] : null
 
   if (!invite) return NextResponse.json({ error: '초대를 찾을 수 없습니다.' }, { status: 404 })
 
@@ -450,7 +467,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: '대기 중인 초대만 취소할 수 있습니다.' }, { status: 400 })
   }
 
-  const { error } = await sb.from('member_invitations').update({ status: 'canceled' }).eq('id', inviteId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  await prisma.$executeRaw`
+    UPDATE member_invitations SET status = 'canceled' WHERE id = ${inviteId}
+  `
   return NextResponse.json({ success: true })
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { sendSMS, logMessageSend } from '../../utils/messaging'
 
 // ============================================
@@ -7,24 +7,24 @@ import { sendSMS, logMessageSend } from '../../utils/messaging'
 // POST /api/send-sms
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  // TODO: Phase 5 - Replace with Firebase Auth verification
+  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
   if (!profile) return null
-  return { ...user, role: profile.role }
+  return { id: userId, ...profile }
 }
 
 export async function POST(request: NextRequest) {

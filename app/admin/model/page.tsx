@@ -1,11 +1,22 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase'
 
 // 아이콘
 const ChevronDown = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
 const ChevronUp = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
 const PlusIcon = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 export default function VehicleCodeManager() {
   const [models, setModels] = useState<any[]>([])
@@ -25,60 +36,89 @@ export default function VehicleCodeManager() {
   // 1. 모델+트림 데이터 조회
   const fetchModels = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('vehicle_model_codes')
-      .select(`
-        *,
-        vehicle_trims ( * )
-      `)
-      .order('created_at', { ascending: false })
-
-    if (error) console.error(error)
-    else setModels(data || [])
+    try {
+      const res = await fetch('/api/vehicle_models', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch')
+      setModels(json.data || [])
+    } catch (err) {
+      console.error('fetchModels error:', err)
+      setModels([])
+    }
     setLoading(false)
   }
 
   // 2. 모델 삭제
   const handleDeleteModel = async (id: number) => {
     if (!confirm('모델을 삭제하시겠습니까? 하위 트림도 모두 삭제됩니다.')) return
-    await supabase.from('vehicle_model_codes').delete().eq('id', id)
-    fetchModels()
+    try {
+      const res = await fetch(`/api/vehicle_models/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      fetchModels()
+    } catch (err) {
+      console.error('handleDeleteModel error:', err)
+    }
   }
 
   // 3. 트림 삭제
   const handleDeleteTrim = async (trimId: number) => {
     if (!confirm('해당 트림을 삭제하시겠습니까?')) return
-    await supabase.from('vehicle_trims').delete().eq('id', trimId)
-    fetchModels()
+    try {
+      const res = await fetch(`/api/vehicle_trims/${trimId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      fetchModels()
+    } catch (err) {
+      console.error('handleDeleteTrim error:', err)
+    }
   }
 
   // 4. 신규 모델 등록
   const handleCreateModel = async () => {
     if (!newModel.model_name) return alert('모델명을 입력하세요')
-    const { error } = await supabase.from('vehicle_model_codes').insert([{
-        ...newModel,
-        normalized_name: newModel.model_name.replace(/\s+/g, '').toUpperCase()
-    }])
-    if (error) alert('등록 실패: ' + error.message)
-    else {
-        setIsModelModalOpen(false)
-        setNewModel({ brand: '', model_name: '', year: new Date().getFullYear() })
-        fetchModels()
+    try {
+      const res = await fetch('/api/vehicle_models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          ...newModel,
+          normalized_name: newModel.model_name.replace(/\s+/g, '').toUpperCase()
+        })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Create failed')
+      setIsModelModalOpen(false)
+      setNewModel({ brand: '', model_name: '', year: new Date().getFullYear() })
+      fetchModels()
+    } catch (err: any) {
+      alert('등록 실패: ' + err.message)
     }
   }
 
   // 5. 신규 트림 등록
   const handleCreateTrim = async () => {
     if (!newTrim.trim_name || !targetModelId) return alert('트림명과 가격을 입력하세요')
-    const { error } = await supabase.from('vehicle_trims').insert([{
-        model_id: targetModelId,
-        ...newTrim
-    }])
-    if (error) alert('등록 실패: ' + error.message)
-    else {
-        setIsTrimModalOpen(false)
-        setNewTrim({ trim_name: '', price: 0, fuel_type: '전기' })
-        fetchModels()
+    try {
+      const res = await fetch('/api/vehicle_trims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          model_id: targetModelId,
+          ...newTrim
+        })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Create failed')
+      setIsTrimModalOpen(false)
+      setNewTrim({ trim_name: '', price: 0, fuel_type: '전기' })
+      fetchModels()
+    } catch (err: any) {
+      alert('등록 실패: ' + err.message)
     }
   }
 

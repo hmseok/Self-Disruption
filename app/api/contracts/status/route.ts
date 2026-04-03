@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // ============================================
 // 계약 상태 관리 API
@@ -7,24 +8,29 @@ import { createClient } from '@supabase/supabase-js'
 // GET  → 상태 변경 이력 조회
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+
+  // TODO: Phase 5 Firebase Auth - JWT decode to get userId
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+    const userId = decoded.sub || decoded.user_id
+    if (!userId) return null
+
+    const profile = await prisma.$queryRaw<any[]>`
+      SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
+    `
+    if (!profile || profile.length === 0 || !['admin', 'master'].includes(profile[0].role)) {
+      return null
+    }
+    return { id: userId, role: profile[0].role }
+  } catch {
+    return null
+  }
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -49,51 +55,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '유효하지 않은 계약 유형' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
   const tableName = contract_type === 'jiip' ? 'jiip_contracts' : 'general_investments'
 
-  // 현재 상태 조회
-  const { data: contract, error: fetchErr } = await sb
-    .from(tableName).select('status').eq('id', contract_id).single()
+  try {
+    // 현재 상태 조회
+    const contract = await prisma.$queryRaw<any[]>`
+      SELECT status FROM ${Prisma.raw(tableName)} WHERE id = ${contract_id} LIMIT 1
+    `
 
-  if (fetchErr || !contract) {
-    return NextResponse.json({ error: '계약을 찾을 수 없습니다.' }, { status: 404 })
+    if (!contract || contract.length === 0) {
+      return NextResponse.json({ error: '계약을 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    // 전환 유효성 검사
+    const currentStatus = contract[0].status || 'active'
+    const allowed = VALID_TRANSITIONS[currentStatus] || []
+    if (!allowed.includes(new_status)) {
+      return NextResponse.json({
+        error: `'${currentStatus}' → '${new_status}' 상태 전환이 허용되지 않습니다. 가능: ${allowed.join(', ') || '없음'}`,
+      }, { status: 400 })
+    }
+
+    // 상태 업데이트
+    await prisma.$executeRaw`
+      UPDATE ${Prisma.raw(tableName)} SET status = ${new_status} WHERE id = ${contract_id}
+    `
+
+    // 이력 기록
+    await prisma.$executeRaw`
+      INSERT INTO contract_status_history
+      (contract_type, contract_id, old_status, new_status, change_reason, changed_by, created_at)
+      VALUES (${contract_type}, ${contract_id}, ${currentStatus}, ${new_status}, ${reason || `manual_${new_status}`}, ${admin.id}, NOW())
+    `
+
+    return NextResponse.json({ success: true, old_status: currentStatus, new_status })
+  } catch (e: any) {
+    console.error('[contracts/status POST] 에러:', e.message)
+    return NextResponse.json({ error: '상태 업데이트 실패: ' + e.message }, { status: 500 })
   }
-
-  // 전환 유효성 검사
-  const currentStatus = contract.status || 'active'
-  const allowed = VALID_TRANSITIONS[currentStatus] || []
-  if (!allowed.includes(new_status)) {
-    return NextResponse.json({
-      error: `'${currentStatus}' → '${new_status}' 상태 전환이 허용되지 않습니다. 가능: ${allowed.join(', ') || '없음'}`,
-    }, { status: 400 })
-  }
-
-  // 상태 업데이트
-  const { error: updateErr } = await sb
-    .from(tableName).update({ status: new_status }).eq('id', contract_id)
-
-  if (updateErr) {
-    return NextResponse.json({ error: '상태 업데이트 실패: ' + updateErr.message }, { status: 500 })
-  }
-
-  // 이력 기록
-  const { error: historyErr } = await sb
-    .from('contract_status_history')
-    .insert({
-      contract_type,
-      contract_id,
-      old_status: currentStatus,
-      new_status,
-      change_reason: reason || `manual_${new_status}`,
-      changed_by: admin.id,
-    })
-
-  if (historyErr) {
-    console.error('이력 기록 실패:', historyErr.message)
-  }
-
-  return NextResponse.json({ success: true, old_status: currentStatus, new_status })
 }
 
 // GET: 상태 변경 이력
@@ -109,14 +108,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'contract_type, contract_id 필수' }, { status: 400 })
   }
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('contract_status_history')
-    .select('*, changer:changed_by(employee_name)')
-    .eq('contract_type', contractType)
-    .eq('contract_id', contractId)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  try {
+    const data = await prisma.$queryRaw<any[]>`
+      SELECT csh.*, p.employee_name as changer_employee_name
+      FROM contract_status_history csh
+      LEFT JOIN profiles p ON csh.changed_by = p.id
+      WHERE csh.contract_type = ${contractType} AND csh.contract_id = ${contractId}
+      ORDER BY csh.created_at DESC
+      LIMIT 50
+    `
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data })
+    return NextResponse.json({ data })
+  } catch (e: any) {
+    console.error('[contracts/status GET] 에러:', e.message)
+    return NextResponse.json({ error: '조회 실패: ' + e.message }, { status: 500 })
+  }
 }

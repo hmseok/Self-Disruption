@@ -2,9 +2,20 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../utils/supabase'
 import CalendarView from './CalendarView'
 import DispatchModal from './DispatchModal'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // Types
@@ -180,50 +191,67 @@ export default function OperationsMainPage() {
   // ============================================
   const fetchOperations = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('vehicle_operations').select('*')
-      
-      .order('scheduled_date', { ascending: false })
-    if (error) console.error('작업 로딩 실패:', JSON.stringify(error))
-    else setOperations(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/vehicle-operations', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setOperations(data || [])
+    } catch (error) {
+      console.error('작업 로딩 실패:', JSON.stringify(error))
+    }
   }, [effectiveCompanyId])
 
   const fetchSchedules = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('vehicle_schedules').select('*')
-      
-      .gte('end_date', timelineStart)
-      .lte('start_date', timelineEnd)
-    if (error) console.error('일정 로딩 실패:', JSON.stringify(error))
-    else setSchedules(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/vehicle-schedules?start=${timelineStart}&end=${timelineEnd}`, { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setSchedules(data || [])
+    } catch (error) {
+      console.error('일정 로딩 실패:', JSON.stringify(error))
+    }
   }, [effectiveCompanyId, timelineStart, timelineEnd])
 
   const fetchContracts = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('contracts').select('*')
-      
-      .in('status', ['active', 'pending'])
-    if (error) console.error('계약 로딩 실패:', JSON.stringify(error))
-    setContracts(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/contracts?status=active,pending', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setContracts(data || [])
+    } catch (error) {
+      console.error('계약 로딩 실패:', JSON.stringify(error))
+    }
   }, [effectiveCompanyId])
 
   const fetchCars = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('cars').select('id,number,brand,model,trim,year,status')
-      
-    if (error) console.error('차량 로딩 실패:', error)
-    else setCars(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setCars(data || [])
+    } catch (error) {
+      console.error('차량 로딩 실패:', error)
+    }
   }, [effectiveCompanyId])
 
   const fetchCustomers = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data } = await supabase
-      .from('customers').select('id,name,phone')
-      
-    setCustomers(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/customers', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setCustomers(data || [])
+    } catch (error) {
+      console.error('고객 로딩 실패:', error)
+    }
   }, [effectiveCompanyId])
 
   useEffect(() => {
@@ -337,16 +365,29 @@ export default function OperationsMainPage() {
         updates.completed_at = new Date().toISOString()
         updates.actual_date = new Date().toISOString().split('T')[0]
       }
-      await supabase.from('vehicle_operations').update(updates).eq('id', opId)
-      await supabase.from('vehicle_status_log').insert({
-        
-        car_id: op.car_id,
-        old_status: op.status,
-        new_status: newStatus,
-        related_type: 'operation',
-        related_id: opId,
-        changed_by: user?.id,
+      // Update operation status via API
+      const updateRes = await fetch(`/api/vehicle-operations/${opId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify(updates)
       })
+      if (!updateRes.ok) throw new Error('작업 상태 업데이트 실패')
+
+      // Log status change via API
+      const logRes = await fetch('/api/vehicle-status-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          car_id: op.car_id,
+          old_status: op.status,
+          new_status: newStatus,
+          related_type: 'operation',
+          related_id: opId,
+          changed_by: user?.id,
+        })
+      })
+      if (!logRes.ok) throw new Error('상태 로그 기록 실패')
+
       fetchOperations()
     } catch (error) {
       console.error('상태 변경 실패:', error)

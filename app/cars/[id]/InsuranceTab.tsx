@@ -1,6 +1,18 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
+
 export default function InsuranceTab({ carId }: { carId : string }) {
   const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,14 +30,12 @@ export default function InsuranceTab({ carId }: { carId : string }) {
   // 1. 보험 내역 불러오기
   const fetchInsurance = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('insurance_contracts')
-      .select('*')
-      .eq('car_id', carId)
-      .order('end_date', { ascending: false }) // 최신 만기일 순
-
-    if (error) console.error(error)
-    else setContracts(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/insurance?car_id=${carId}`, { headers })
+      const json = await res.json()
+      setContracts(json.data || [])
+    } catch (e) { console.error('[InsuranceTab]', e) }
     setLoading(false)
   }
 
@@ -34,23 +44,22 @@ export default function InsuranceTab({ carId }: { carId : string }) {
   // 2. 보험 저장하기
   const handleSave = async () => {
     if (!form.company) return alert('보험사를 입력해주세요.')
-
-    const { error } = await supabase.from('insurance_contracts').insert([{
-      car_id: carId,
-      ...form
-    }])
-
-    if (error) alert('저장 실패: ' + error.message)
-    else {
-      alert('✅ 보험 이력이 등록되었습니다.')
-      fetchInsurance() // 목록 새로고침
-    }
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/insurance', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ car_id: carId, ...form }),
+    })
+    const json = await res.json()
+    if (json.error) alert('저장 실패: ' + json.error)
+    else { alert('✅ 보험 이력이 등록되었습니다.'); fetchInsurance() }
   }
 
   // 3. 삭제하기
   const handleDelete = async (id: number) => {
     if(!confirm('삭제하시겠습니까?')) return;
-    await supabase.from('insurance_contracts').delete().eq('id', id)
+    const headers = await getAuthHeader()
+    await fetch(`/api/insurance/${id}`, { method: 'DELETE', headers })
     fetchInsurance()
   }
 

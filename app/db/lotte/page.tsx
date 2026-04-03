@@ -1,8 +1,22 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useApp } from '../../context/AppContext'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 벤치마크 비교 — 경쟁사 렌트가 vs 우리 원가 비교 분석
@@ -41,7 +55,6 @@ function mapInsType(brand: string): string {
 }
 
 export default function BenchmarkPage() {
-  const supabase = createClientComponentClient()
   const { role } = useApp()
   const isAdmin = role === 'admin'
 
@@ -80,21 +93,30 @@ export default function BenchmarkPage() {
   // ─── 데이터 로드 ───
   const loadAll = useCallback(async () => {
     setLoading(true)
-    const [b, d, ins, mnt, fin, br] = await Promise.all([
-      supabase.from('lotte_rentcar_db').select('*').order('created_at', { ascending: false }),
-      supabase.from('depreciation_db').select('*'),
-      supabase.from('insurance_rate_table').select('*'),
-      supabase.from('maintenance_cost_table').select('*'),
-      supabase.from('finance_rate_table').select('*'),
-      supabase.from('business_rules').select('*'),
-    ])
-    setBenchmarks(b.data || [])
-    setDepRates(d.data || [])
-    setInsuranceRates(ins.data || [])
-    setMaintCosts(mnt.data || [])
-    setFinanceRates(fin.data || [])
-    setBusinessRules(br.data || [])
-    setLoading(false)
+    try {
+      const headers = await getAuthHeader()
+      const [bRes, dRes, insRes, mntRes, finRes, brRes] = await Promise.all([
+        fetch('/api/lotte-rates', { headers }),
+        fetch('/api/pricing-standards?table=depreciation_db', { headers }),
+        fetch('/api/pricing-standards?table=insurance_rate_table', { headers }),
+        fetch('/api/pricing-standards?table=maintenance_cost_table', { headers }),
+        fetch('/api/pricing-standards?table=finance_rate_table', { headers }),
+        fetch('/api/business-rules', { headers }),
+      ])
+      const [b, d, ins, mnt, fin, br] = await Promise.all([
+        bRes.json(), dRes.json(), insRes.json(), mntRes.json(), finRes.json(), brRes.json()
+      ])
+      setBenchmarks(b.data || [])
+      setDepRates(d.data || [])
+      setInsuranceRates(ins.data || [])
+      setMaintCosts(mnt.data || [])
+      setFinanceRates(fin.data || [])
+      setBusinessRules(br.data || [])
+    } catch (e) {
+      console.error('데이터 로드 실패:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -206,18 +228,29 @@ export default function BenchmarkPage() {
     if (!aiResult) return
     const monthlyPrice = aiResult.pricing?.monthly_no_deposit || 0
     const meta = JSON.stringify(aiResult)
-    await supabase.from('lotte_rentcar_db').insert([{
-      brand: aiResult.brand || aiForm.brand,
-      model: aiResult.model || aiForm.model,
-      trim: `AI조회 · ${aiResult.confidence || 'medium'}`,
-      term: aiResult.term || aiForm.term,
-      deposit_rate: 0,
-      monthly_price: monthlyPrice,
-      memo: meta,
-    }])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/lotte-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          brand: aiResult.brand || aiForm.brand,
+          model: aiResult.model || aiForm.model,
+          trim: `AI조회 · ${aiResult.confidence || 'medium'}`,
+          term: aiResult.term || aiForm.term,
+          deposit_rate: 0,
+          monthly_price: monthlyPrice,
+          memo: meta,
+        })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '저장 실패')
+    } catch (e) {
+      console.error('AI 결과 저장 실패:', e)
+    }
     setShowAiModal(false)
     setAiResult(null)
-    loadAll()
+    await loadAll()
   }
 
   // ─── 수동 등록 ───
@@ -236,21 +269,46 @@ export default function BenchmarkPage() {
       early_termination: { summary: formData.early_termination },
       note: formData.memo,
     })
-    await supabase.from('lotte_rentcar_db').insert([{
-      brand: formData.brand, model: formData.model, trim: formData.trim,
-      term: formData.term, deposit_rate: formData.deposit_rate,
-      monthly_price: Number(formData.monthly_price), memo: meta,
-    }])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/lotte-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          brand: formData.brand, model: formData.model, trim: formData.trim,
+          term: formData.term, deposit_rate: formData.deposit_rate,
+          monthly_price: Number(formData.monthly_price), memo: meta,
+        })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '등록 실패')
+    } catch (e) {
+      console.error('수동 등록 실패:', e)
+      alert('등록에 실패했습니다.')
+      return
+    }
     setShowAddModal(false)
     setFormData({ competitor: '롯데렌터카', brand: '', model: '', trim: '', new_car_price: '', term: 48, deposit_rate: 0, monthly_price: '', insurance_summary: '', maintenance_summary: '', mileage_limit: '2만km/년', return_conditions: '', buyout_available: true, buyout_residual_rate: '', early_termination: '', source_url: '', memo: '' })
-    loadAll()
+    await loadAll()
   }
 
   const handleDelete = async (id: number) => {
     if (!confirm('삭제하시겠습니까?')) return
-    await supabase.from('lotte_rentcar_db').delete().eq('id', id)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/lotte-rates/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '삭제 실패')
+    } catch (e) {
+      console.error('삭제 실패:', e)
+      alert('삭제에 실패했습니다.')
+      return
+    }
     if (selectedItem?.id === id) setSelectedItem(null)
-    loadAll()
+    await loadAll()
   }
 
   // ─── 유틸 ───

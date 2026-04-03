@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 export default function CodeManager() {
   const [codes, setCodes] = useState<any[]>([])
@@ -16,18 +16,21 @@ export default function CodeManager() {
   // 데이터 불러오기
   const fetchCodes = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('common_codes')
-      .select('*')
-      .order('category', { ascending: true })
-      .order('sort_order', { ascending: true })
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/codes', { headers })
 
-    if (error) {
+      if (res.ok) {
+        const data = await res.json()
+        setCodes(data || [])
+      } else {
+        alert('데이터 로딩 실패: ' + res.statusText)
+      }
+    } catch (error: any) {
       alert('데이터 로딩 실패: ' + error.message)
-    } else {
-      setCodes(data || [])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -41,26 +44,31 @@ export default function CodeManager() {
       return
     }
 
-    const { error } = await supabase
-      .from('common_codes')
-      .insert([
-        {
-          category: newCategory.toUpperCase(), // 대문자로 자동 변환
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/codes', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: newCategory.toUpperCase(),
           code: newCode.toUpperCase(),
           value: newValue,
           sort_order: newOrder,
           is_active: true
-        }
-      ])
+        })
+      })
 
-    if (error) {
+      if (res.ok) {
+        alert('✅ 코드가 추가되었습니다!')
+        setNewCode('')
+        setNewValue('')
+        fetchCodes()
+      } else {
+        const error = await res.json()
+        alert('추가 실패: ' + (error.message || res.statusText))
+      }
+    } catch (error: any) {
       alert('추가 실패: ' + error.message)
-    } else {
-      alert('✅ 코드가 추가되었습니다!')
-      // 입력창 초기화
-      setNewCode('')
-      setNewValue('')
-      fetchCodes() // 목록 새로고침
     }
   }
 
@@ -68,15 +76,21 @@ export default function CodeManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('정말 삭제하시겠습니까?')) return
 
-    const { error } = await supabase
-      .from('common_codes')
-      .delete()
-      .eq('id', id)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/codes/${id}`, {
+        method: 'DELETE',
+        headers
+      })
 
-    if (error) {
+      if (res.ok) {
+        fetchCodes()
+      } else {
+        const error = await res.json()
+        alert('삭제 실패: ' + (error.message || res.statusText))
+      }
+    } catch (error: any) {
       alert('삭제 실패: ' + error.message)
-    } else {
-      fetchCodes()
     }
   }
 

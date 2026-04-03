@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+function serialize<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_, v) =>
+    typeof v === 'bigint' ? v.toString() : v
+  ));
 }
 
 // ============================================================
-// FMI 보험 청구 관리 API
+// FMI 보험 청구 관리 API (Prisma)
 // ============================================================
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action') || 'list';
     const status = searchParams.get('status');
@@ -24,30 +23,32 @@ export async function GET(req: NextRequest) {
 
     // 청구 현황 요약
     if (action === 'summary') {
-      const { data: claims } = await supabase
-        .from('fmi_claims')
-        .select('status, total_claim_amount, approved_amount');
+      const claims = await prisma.fmiClaim.findMany({
+        select: { status: true, total_claim_amount: true, approved_amount: true },
+      });
 
       const summary = {
-        total: claims?.length || 0,
+        total: claims.length,
         by_status: {} as Record<string, { count: number; amount: number }>,
         total_claimed: 0,
         total_approved: 0,
         total_pending: 0,
       };
 
-      claims?.forEach(c => {
+      claims.forEach(c => {
+        const claimAmt = Number(c.total_claim_amount ?? 0);
+        const approvedAmt = Number(c.approved_amount ?? 0);
+
         if (!summary.by_status[c.status]) {
           summary.by_status[c.status] = { count: 0, amount: 0 };
         }
         summary.by_status[c.status].count++;
-        summary.by_status[c.status].amount += c.total_claim_amount || 0;
-
-        summary.total_claimed += c.total_claim_amount || 0;
-        summary.total_approved += c.approved_amount || 0;
+        summary.by_status[c.status].amount += claimAmt;
+        summary.total_claimed += claimAmt;
+        summary.total_approved += approvedAmt;
 
         if (['sent', 'received', 'under_review'].includes(c.status)) {
-          summary.total_pending += c.total_claim_amount || 0;
+          summary.total_pending += claimAmt;
         }
       });
 
@@ -56,22 +57,27 @@ export async function GET(req: NextRequest) {
 
     // 보험사별 청구 현황
     if (action === 'by_insurance') {
-      const { data: claims } = await supabase
-        .from('fmi_claims')
-        .select('insurance_company, status, total_claim_amount, approved_amount');
+      const claims = await prisma.fmiClaim.findMany({
+        select: {
+          insurance_company: true,
+          status: true,
+          total_claim_amount: true,
+          approved_amount: true,
+        },
+      });
 
       const byInsurance: Record<string, { total: number; claimed: number; approved: number; pending: number }> = {};
 
-      claims?.forEach(c => {
+      claims.forEach(c => {
         const ins = c.insurance_company || '미지정';
         if (!byInsurance[ins]) {
           byInsurance[ins] = { total: 0, claimed: 0, approved: 0, pending: 0 };
         }
         byInsurance[ins].total++;
-        byInsurance[ins].claimed += c.total_claim_amount || 0;
-        byInsurance[ins].approved += c.approved_amount || 0;
+        byInsurance[ins].claimed += Number(c.total_claim_amount ?? 0);
+        byInsurance[ins].approved += Number(c.approved_amount ?? 0);
         if (['sent', 'received', 'under_review'].includes(c.status)) {
-          byInsurance[ins].pending += c.total_claim_amount || 0;
+          byInsurance[ins].pending += Number(c.total_claim_amount ?? 0);
         }
       });
 
@@ -79,29 +85,45 @@ export async function GET(req: NextRequest) {
     }
 
     // 청구 목록
-    let query = supabase
-      .from('fmi_claims')
-      .select('*, fmi_rentals(rental_no, customer_name, vehicle_car_number, rental_days)', { count: 'exact' })
-      .order('created_at', { ascending: false });
+    const where: Prisma.FmiClaimWhereInput = {};
+    if (status) where.status = status;
+    if (insurance) where.insurance_company = insurance;
+    if (from) where.claim_date = { gte: new Date(from) };
+    if (to) {
+      where.claim_date = {
+        ...(where.claim_date as object),
+        lte: new Date(to),
+      };
+    }
 
-    if (status) query = query.eq('status', status);
-    if (insurance) query = query.eq('insurance_company', insurance);
-    if (from) query = query.gte('claim_date', from);
-    if (to) query = query.lte('claim_date', to);
+    const [claims, total] = await prisma.$transaction([
+      prisma.fmiClaim.findMany({
+        where,
+        include: {
+          rental: {
+            select: {
+              rental_no: true,
+              customer_name: true,
+              vehicle_car_number: true,
+              rental_days: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.fmiClaim.count({ where }),
+    ]);
 
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    return NextResponse.json({ data, total: count });
+    return NextResponse.json({ data: serialize(claims), total });
 
   } catch (error: any) {
+    console.error('FMI Claims GET Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
     const body = await req.json();
     const { action, ...payload } = body;
 
@@ -110,21 +132,18 @@ export async function POST(req: NextRequest) {
       case 'send': {
         const { claim_id, claim_method, fax_number } = payload;
 
-        const { data, error } = await supabase
-          .from('fmi_claims')
-          .update({
+        const claim = await prisma.fmiClaim.update({
+          where: { id: claim_id },
+          data: {
             status: 'sent',
             claim_method,
             fax_number,
-            claim_date: new Date().toISOString(),
-            fax_sent_at: claim_method === 'fax' ? new Date().toISOString() : null,
-          })
-          .eq('id', claim_id)
-          .select()
-          .single();
+            claim_date: new Date(),
+            fax_sent_at: claim_method === 'fax' ? new Date() : null,
+          },
+        });
 
-        if (error) throw error;
-        return NextResponse.json({ success: true, data });
+        return NextResponse.json({ success: true, data: serialize(claim) });
       }
 
       // 보험사 응답 등록
@@ -135,42 +154,36 @@ export async function POST(req: NextRequest) {
         if (rejected_amount > 0 && approved_amount > 0) newStatus = 'partial_approved';
         else if (rejected_amount > 0 && !approved_amount) newStatus = 'rejected';
 
-        const { data, error } = await supabase
-          .from('fmi_claims')
-          .update({
+        const claim = await prisma.fmiClaim.update({
+          where: { id: claim_id },
+          data: {
             status: newStatus,
             approved_amount,
             rejected_amount,
             rejection_reason,
             negotiation_memo,
-            response_date: new Date().toISOString(),
-          })
-          .eq('id', claim_id)
-          .select()
-          .single();
+            response_date: new Date(),
+          },
+        });
 
-        if (error) throw error;
-        return NextResponse.json({ success: true, data });
+        return NextResponse.json({ success: true, data: serialize(claim) });
       }
 
       // 재청구
       case 'resubmit': {
         const { claim_id, new_amount, memo } = payload;
 
-        const { data, error } = await supabase
-          .from('fmi_claims')
-          .update({
+        const claim = await prisma.fmiClaim.update({
+          where: { id: claim_id },
+          data: {
             status: 'resubmitted',
-            total_claim_amount: new_amount || undefined,
+            ...(new_amount ? { total_claim_amount: new_amount } : {}),
             negotiation_memo: memo,
-            claim_date: new Date().toISOString(),
-          })
-          .eq('id', claim_id)
-          .select()
-          .single();
+            claim_date: new Date(),
+          },
+        });
 
-        if (error) throw error;
-        return NextResponse.json({ success: true, data });
+        return NextResponse.json({ success: true, data: serialize(claim) });
       }
 
       default:
@@ -178,6 +191,7 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error: any) {
+    console.error('FMI Claims POST Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

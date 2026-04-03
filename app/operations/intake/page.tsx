@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
-import { supabase } from '../../utils/supabase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // Types
@@ -129,16 +140,24 @@ export default function IntakePage() {
     if (!companyId) return
     setLoading(true)
     try {
-      const [carsR, opsR] = await Promise.all([
-        supabase.from('cars')
-          .select('id,number,brand,model,status,ownership_type,detailed_status')
-          .order('number'),
-        supabase.from('vehicle_operations')
-          .select('*,car:cars!vehicle_operations_car_id_fkey(number,brand,model)')
-          .in('status', ['scheduled', 'preparing', 'inspecting', 'in_transit']).limit(100),
+      const [carsRes, opsRes] = await Promise.all([
+        fetch('/api/cars?select=id,number,brand,model,status,ownership_type,detailed_status', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        }),
+        fetch('/api/vehicle-operations?status=scheduled,preparing,inspecting,in_transit&limit=100', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        })
       ])
-      if (carsR.data) setCars(carsR.data)
-      if (opsR.data) setOperations(opsR.data as any)
+      if (carsRes.ok) {
+        const carsJson = await carsRes.json()
+        if (carsJson.data) setCars(carsJson.data)
+      }
+      if (opsRes.ok) {
+        const opsJson = await opsRes.json()
+        if (opsJson.data) setOperations(opsJson.data as any)
+      }
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [companyId])
@@ -220,14 +239,17 @@ export default function IntakePage() {
     fetchCafe24()
   }, [fetchSupportData, fetchCafe24])
 
-
   // ── Notes fetch ──
   useEffect(() => {
     if (!selectedId || !companyId) { setCustomerNotes([]); return }
     const rec = cafe24Records.find(r => r.id === selectedId)
     if (!rec?.customer_id) { setCustomerNotes([]); return }
-    supabase.from('customer_notes').select('*').eq('customer_id', rec.customer_id)
-      .order('created_at', { ascending: false }).limit(30).then(({ data }) => { if (data) setCustomerNotes(data) })
+    const loadNotes = async () => {
+      const res = await fetch(`/api/customer-notes?customer_id=${rec.customer_id}`, { headers: await getAuthHeader() })
+      const json = await res.json()
+      if (json.data) setCustomerNotes(json.data)
+    }
+    loadNotes()
   }, [selectedId, companyId, cafe24Records])
 
   // ── Computed ──
@@ -274,8 +296,17 @@ export default function IntakePage() {
 
   // ── Actions ──
   const handleStageChange = async (id: number, stage: string) => {
-    await supabase.from('accident_records').update({ workflow_stage: stage, updated_at: new Date().toISOString() }).eq('id', id)
-    // Note: cafe24 records have negative IDs and cannot be updated in supabase
+    try {
+      const res = await fetch(`/api/accident-records/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ workflow_stage: stage, updated_at: new Date().toISOString() })
+      })
+      if (!res.ok) throw new Error('단계 업데이트 실패')
+      // Note: cafe24 records have negative IDs and cannot be updated via API
+    } catch (e) {
+      console.error('상태 변경 실패:', e)
+    }
   }
   const openSms = (name: string, phone: string) => { setSmsTarget({ name, phone }); setSmsMessage(''); setShowSmsModal(true) }
   const sendSms = async () => {
@@ -290,10 +321,11 @@ export default function IntakePage() {
   const addNote = async () => {
     if (!selected?.customer_id || !newNote.trim() || !companyId) return
     setSavingNote(true)
-    await supabase.from('customer_notes').insert({ customer_id: selected.customer_id, author_name: user?.name || '시스템', note_type: '상담', content: newNote.trim() })
+    await fetch('/api/customer-notes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ customer_id: selected.customer_id, note: newNote, company_id: companyId, created_by: user?.id }) })
     setNewNote('')
-    const { data } = await supabase.from('customer_notes').select('*').eq('customer_id', selected.customer_id).order('created_at', { ascending: false }).limit(30)
-    if (data) setCustomerNotes(data)
+    const notesRes = await fetch(`/api/customer-notes?customer_id=${selected.customer_id}`, { headers: await getAuthHeader() })
+    const notesJson = await notesRes.json()
+    if (notesJson.data) setCustomerNotes(notesJson.data)
     setSavingNote(false)
   }
   const toggleSort = (key: 'date' | 'id') => { if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortKey(key); setSortDir('desc') } }

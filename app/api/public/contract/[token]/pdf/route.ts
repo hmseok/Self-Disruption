@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM } from '@/lib/contract-terms'
 
@@ -7,11 +7,11 @@ import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM } from '@/li
  * GET /api/public/contract/[token]/pdf
  *
  * 서명 완료된 계약의 PDF 생성에 필요한 전체 데이터 반환
- * (실제 PDF 렌더링은 클라이언트에서 html2canvas + jsPDF로 수행)
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+function serialize<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
+}
 
 export async function GET(
   req: NextRequest,
@@ -23,112 +23,100 @@ export async function GET(
       return NextResponse.json({ error: '토큰이 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     // 1. 토큰 검증 — signed 상태만 허용
-    const { data: shareToken, error: tokenErr } = await supabase
-      .from('quote_share_tokens')
-      .select('*')
-      .eq('token', token)
-      .single()
+    const shareToken = await prisma.$queryRaw<any[]>`
+      SELECT * FROM quote_share_tokens WHERE token = ${token} LIMIT 1
+    `
 
-    if (tokenErr || !shareToken) {
+    if (!shareToken || shareToken.length === 0) {
       return NextResponse.json({ error: '유효하지 않은 링크입니다.' }, { status: 404 })
     }
-    if (shareToken.status !== 'signed') {
+    if (shareToken[0].status !== 'signed') {
       return NextResponse.json({ error: '서명이 완료되지 않은 견적입니다.' }, { status: 403 })
     }
 
     // 2. 견적 조회
-    const { data: quote } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('id', shareToken.quote_id)
-      .single()
+    const quote = await prisma.$queryRaw<any[]>`
+      SELECT * FROM quotes WHERE id = ${shareToken[0].quote_id} LIMIT 1
+    `
 
-    if (!quote) {
+    if (!quote || quote.length === 0) {
       return NextResponse.json({ error: '견적서를 찾을 수 없습니다.' }, { status: 404 })
     }
 
     // 3. 계약 조회
-    const { data: contract } = await supabase
-      .from('contracts')
-      .select('*')
-      .eq('quote_id', quote.id)
-      .single()
+    const contract = await prisma.$queryRaw<any[]>`
+      SELECT * FROM contracts WHERE quote_id = ${quote[0].id} LIMIT 1
+    `
 
     // 4. 차량 정보
     let car: any = null
-    if (quote.car_id) {
-      const { data } = await supabase.from('cars').select('*').eq('id', quote.car_id).single()
-      car = data
+    if (quote[0].car_id) {
+      const carData = await prisma.$queryRaw<any[]>`
+        SELECT * FROM cars WHERE id = ${quote[0].car_id} LIMIT 1
+      `
+      car = carData?.[0]
     }
 
     // 5. 고객 정보
     let customer: any = null
-    if (quote.customer_id) {
-      const { data } = await supabase.from('customers').select('*').eq('id', quote.customer_id).single()
-      customer = data
+    if (quote[0].customer_id) {
+      const customerData = await prisma.$queryRaw<any[]>`
+        SELECT * FROM customers WHERE id = ${quote[0].customer_id} LIMIT 1
+      `
+      customer = customerData?.[0]
     }
 
     // 6. 회사 정보
-    const { data: company } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', shareToken.company_id)
-      .single()
+    const company = await prisma.$queryRaw<any[]>`
+      SELECT * FROM companies WHERE id = ${shareToken[0].company_id} LIMIT 1
+    `
 
     // 7. 서명 데이터
-    const { data: signature } = await supabase
-      .from('customer_signatures')
-      .select('*')
-      .eq('token_id', shareToken.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+    const signature = await prisma.$queryRaw<any[]>`
+      SELECT * FROM customer_signatures WHERE token_id = ${shareToken[0].id}
+      ORDER BY created_at DESC LIMIT 1
+    `
 
-    // 8. 약관 조회 (계약에 연결된 버전 또는 회사 active 버전)
+    // 8. 약관 조회
     let termsArticles: any[] = []
     let termsVersion: any = null
 
-    const termsVersionId = contract?.terms_version_id || quote?.terms_version_id
+    const termsVersionId = contract?.[0]?.terms_version_id || quote[0]?.terms_version_id
     if (termsVersionId) {
-      const { data: tv } = await supabase.from('contract_terms').select('*').eq('id', termsVersionId).single()
-      termsVersion = tv
+      const tv = await prisma.$queryRaw<any[]>`
+        SELECT * FROM contract_terms WHERE id = ${termsVersionId} LIMIT 1
+      `
+      termsVersion = tv?.[0]
     }
     if (!termsVersion && company) {
-      const { data: tv } = await supabase
-        .from('contract_terms')
-        .select('*')
-        .eq('status', 'active')
-        .single()
-      termsVersion = tv
+      const tv = await prisma.$queryRaw<any[]>`
+        SELECT * FROM contract_terms WHERE status = 'active' LIMIT 1
+      `
+      termsVersion = tv?.[0]
     }
 
     if (termsVersion) {
-      const { data: arts } = await supabase
-        .from('contract_term_articles')
-        .select('*')
-        .eq('terms_id', termsVersion.id)
-        .order('article_number', { ascending: true })
+      const arts = await prisma.$queryRaw<any[]>`
+        SELECT * FROM contract_term_articles WHERE terms_id = ${termsVersion.id}
+        ORDER BY article_number ASC
+      `
       termsArticles = arts || []
     }
 
-    // DB 약관이 없으면 정적 약관(lib/contract-terms.ts)을 fallback으로 사용
     const useFallbackTerms = termsArticles.length === 0
 
     // 9. 특약사항
-    let specialTermsText = contract?.special_terms || ''
+    let specialTermsText = contract?.[0]?.special_terms || ''
     if (!specialTermsText && company) {
-      const detail = quote.quote_detail || {}
+      const detail = quote[0].quote_detail || {}
       const contractType = detail.contract_type || 'return'
-      const { data: specials } = await supabase
-        .from('contract_special_terms')
-        .select('content')
-        .eq('is_active', true)
-        .eq('is_default', true)
-        .in('contract_type', [contractType, 'all'])
-        .order('sort_order')
+      const specials = await prisma.$queryRaw<any[]>`
+        SELECT content FROM contract_special_terms
+        WHERE is_active = 1 AND is_default = 1
+        AND (contract_type = ${contractType} OR contract_type = 'all')
+        ORDER BY sort_order
+      `
       if (specials?.length) {
         specialTermsText = specials.map(s => s.content).join('\n\n')
       }
@@ -137,37 +125,37 @@ export async function GET(
     // 10. 납부 스케줄
     let paymentSchedule: any[] = []
     if (contract) {
-      const { data: ps } = await supabase
-        .from('payment_schedules')
-        .select('round_number, due_date, amount, vat')
-        .eq('contract_id', contract.id)
-        .order('round_number', { ascending: true })
+      const ps = await prisma.$queryRaw<any[]>`
+        SELECT round_number, due_date, amount, vat FROM payment_schedules
+        WHERE contract_id = ${contract[0].id}
+        ORDER BY round_number ASC
+      `
       paymentSchedule = ps || []
     }
 
     // 11. 응답 데이터 조합
-    const detail = quote.quote_detail || {}
+    const detail = quote[0].quote_detail || {}
     const carInfo = detail.car_info || {}
 
-    return NextResponse.json({
-      contractId: contract?.id || quote.id,
-      contractNumber: contract?.contract_number || null,
-      signedAt: quote.signed_at || signature?.created_at || new Date().toISOString(),
+    const data = {
+      contractId: contract?.[0]?.id || quote[0].id,
+      contractNumber: contract?.[0]?.contract_number || null,
+      signedAt: quote[0].signed_at || signature?.[0]?.created_at || new Date().toISOString(),
 
       company: {
-        name: company?.name || '',
-        business_number: company?.business_number || '',
-        representative: company?.representative || '',
-        address: company?.address || '',
-        phone: company?.phone || '',
-        logo_url: company?.logo_url || '',
+        name: company?.[0]?.name || '',
+        business_number: company?.[0]?.business_number || '',
+        representative: company?.[0]?.representative || '',
+        address: company?.[0]?.address || '',
+        phone: company?.[0]?.phone || '',
+        logo_url: company?.[0]?.logo_url || '',
       },
 
       customer: {
-        name: signature?.customer_name || customer?.name || quote.customer_name || '',
-        phone: signature?.customer_phone || customer?.phone || '',
-        email: signature?.customer_email || customer?.email || '',
-        address: customer?.address || '',
+        name: signature?.[0]?.customer_name || customer?.[0]?.name || quote[0].customer_name || '',
+        phone: signature?.[0]?.customer_phone || customer?.[0]?.phone || '',
+        email: signature?.[0]?.customer_email || customer?.[0]?.email || '',
+        address: customer?.[0]?.address || '',
       },
 
       car: {
@@ -184,10 +172,10 @@ export async function GET(
       terms: {
         contractType: detail.contract_type || 'return',
         termMonths: detail.term_months || 36,
-        startDate: quote.start_date || '',
-        endDate: quote.end_date || '',
-        monthlyRent: Math.round((quote.rent_fee || 0) / 1000) * 1000,  // 천원단위 반올림
-        deposit: quote.deposit || 0,
+        startDate: quote[0].start_date || '',
+        endDate: quote[0].end_date || '',
+        monthlyRent: Math.round((quote[0].rent_fee || 0) / 1000) * 1000,
+        deposit: quote[0].deposit || 0,
         prepayment: detail.prepayment || 0,
         annualMileage: detail.annualMileage || detail.baselineKm || 2,
         excessMileageRate: detail.excess_mileage_rate || 0,
@@ -197,10 +185,9 @@ export async function GET(
         buyoutPrice: detail.buyout_price || detail.residual_value || 0,
       },
 
-      signatureData: signature?.signature_data || null,
-      signatureIp: signature?.ip_address || null,
+      signatureData: signature?.[0]?.signature_data || null,
+      signatureIp: signature?.[0]?.ip_address || null,
 
-      // 약관 조항 배열 (DB 약관 우선, 없으면 정적 약관 fallback)
       termsArticles: useFallbackTerms
         ? CONTRACT_TERMS.map(t => ({ title: t.title, content: t.content }))
         : termsArticles.map(a => ({
@@ -213,7 +200,6 @@ export async function GET(
         effective_from: termsVersion.effective_from,
       } : (useFallbackTerms ? { version: 'v1.0', title: '자동차 장기대여 약관 (기본)', effective_from: null } : null),
 
-      // 부속 약관 (계약유형별)
       addendum: useFallbackTerms
         ? ((detail.contract_type || 'return') === 'buyout' ? BUYOUT_TYPE_ADDENDUM : RETURN_TYPE_ADDENDUM)
         : null,
@@ -226,8 +212,9 @@ export async function GET(
         amount: p.amount,
         vat: p.vat,
       })),
-    })
+    }
 
+    return NextResponse.json(serialize(data))
   } catch (e: any) {
     console.error('[public/contract/pdf] 에러:', e.message)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })

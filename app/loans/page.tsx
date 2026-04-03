@@ -1,8 +1,19 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 export default function LoanListPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
@@ -32,16 +43,20 @@ export default function LoanListPage() {
   const fetchData = async () => {
     if (!company && role !== 'admin') return
     setLoading(true)
-    let query = supabase.from('loans').select('*, cars(number, brand, model)')
-    const { data } = await query.order('created_at', { ascending: false })
-    setLoans(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/loans', { headers })
+      const json = await res.json()
+      setLoans(json.data || [])
+    } catch (e) { console.error('[loans fetchData]', e) }
     setLoading(false)
   }
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     if (!confirm('정말 삭제하시겠습니까?')) return
-    await supabase.from('loans').delete().eq('id', id)
+    const headers = await getAuthHeader()
+    await fetch(`/api/loans/${id}`, { method: 'DELETE', headers })
     fetchData()
   }
 
@@ -103,10 +118,18 @@ export default function LoanListPage() {
     try {
       setOcrLogs(prev => ['📤 파일 업로드 중...', ...prev])
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const fileName = `loan_quote_${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('contracts').upload(fileName, file)
-      if (uploadError) throw uploadError
-      const { data: { publicUrl } } = supabase.storage.from('contracts').getPublicUrl(fileName)
+      // GCS upload
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', 'loans')
+      const { Authorization } = await getAuthHeader()
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: Authorization ? { Authorization } : {},
+        body: uploadFormData,
+      })
+      const uploadJson = await uploadRes.json()
+      const publicUrl = uploadJson.url || ''
 
       setOcrLogs(prev => ['🤖 AI 견적서 분석 중...', ...prev])
       const base64 = await new Promise<string>((r) => {
@@ -124,8 +147,10 @@ export default function LoanListPage() {
       setOcrLogs(prev => ['✅ 견적서 인식 완료! 차량을 선택해주세요.', ...prev])
       setOcrProgress({ current: 1, total: 1 })
 
-      const { data: cars } = await supabase.from('cars').select('id, number, model, brand').order('number')
-      setAllCars(cars || [])
+      const headers = await getAuthHeader()
+      const carsRes = await fetch('/api/cars', { headers })
+      const carsJson = await carsRes.json()
+      setAllCars(carsJson.data || [])
       setPendingOcrData(ocrResult)
       setPendingAttachmentUrl(publicUrl)
       setCarSelectModal(true)
@@ -172,14 +197,20 @@ export default function LoanListPage() {
       attachments: pendingAttachmentUrl ? [{ name: '할부견적서', url: pendingAttachmentUrl, type: pendingAttachmentUrl.split('.').pop() || 'file' }] : []
     }
 
-    const { data, error } = await supabase.from('loans').insert(payload).select('id').single()
-    if (error) { alert('등록 실패: ' + error.message); return }
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/loans', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const json = await res.json()
+    if (json.error) { alert('등록 실패: ' + json.error); return }
 
     setCarSelectModal(false)
     setPendingOcrData(null)
     setPendingAttachmentUrl('')
     alert(`${car.number} 차량에 금융 정보가 등록되었습니다!`)
-    router.push(`/loans/${data.id}`)
+    router.push(`/loans/${json.data?.id}`)
   }
 
   const filteredModalCars = allCars.filter(c =>

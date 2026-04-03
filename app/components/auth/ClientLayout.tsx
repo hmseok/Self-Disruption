@@ -1,12 +1,13 @@
 'use client'
+import { auth } from '@/lib/firebase'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { usePermission } from '../../hooks/usePermission'
 import { UploadProvider, useUpload } from '@/app/context/UploadContext'
 import PageTitle from '../PageTitle'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 // ============================================
 // 아이콘
@@ -190,34 +191,36 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // ★ 메뉴 로드 (단일회사 — system_modules 직접 + 직원별 권한 필터)
   useEffect(() => {
     const fetchMenus = async () => {
-      // system_modules에서 전체 모듈 로드
-      const { data, error } = await supabase
-        .from('system_modules')
-        .select('*')
-        .order('path')
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/system_modules', { headers })
 
-      if (!error && data) {
-        const seen = new Set<string>()
-        const allMenus = data
-          .filter((item: any) => {
-            if (seen.has(item.path)) return false
-            if (HIDDEN_PATHS.has(item.path)) return false
-            seen.add(item.path)
-            return true
-          })
-          .map((item: any) => ({
-            id: item.id,
-            name: NAME_OVERRIDES[item.path] || item.name,
-            path: item.path,
-            iconKey: item.icon_key,
-          }))
+        if (res.ok) {
+          const data = await res.json()
+          const seen = new Set<string>()
+          const allMenus = data
+            .filter((item: any) => {
+              if (seen.has(item.path)) return false
+              if (HIDDEN_PATHS.has(item.path)) return false
+              seen.add(item.path)
+              return true
+            })
+            .map((item: any) => ({
+              id: item.id,
+              name: NAME_OVERRIDES[item.path] || item.name,
+              path: item.path,
+              iconKey: item.icon_key,
+            }))
 
-        // admin → 전체 메뉴, user → 권한 있는 메뉴만
-        setDynamicMenus(
-          role === 'admin'
-            ? allMenus
-            : allMenus.filter((m: any) => hasPageAccess(m.path))
-        )
+          // admin → 전체 메뉴, user → 권한 있는 메뉴만
+          setDynamicMenus(
+            role === 'admin'
+              ? allMenus
+              : allMenus.filter((m: any) => hasPageAccess(m.path))
+          )
+        }
+      } catch (error) {
+        console.error('Failed to load menus:', error)
       }
     }
     if (!loading) {
@@ -409,7 +412,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               <div className="overflow-hidden flex-1 min-w-0">
                 <p className="text-xs font-medium truncate text-steel-300">{user?.email}</p>
                 <button
-                  onClick={() => supabase.auth.signOut().then(() => router.push('/'))}
+                  onClick={() => import('firebase/auth').then(({signOut}) => signOut(auth)).then(() => router.push('/'))}
                   className="text-[10px] text-steel-400 hover:text-red-400 transition-colors"
                 >
                   로그아웃

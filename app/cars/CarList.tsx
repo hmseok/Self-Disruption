@@ -1,10 +1,21 @@
 'use client'
 
-import { supabase } from '../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 import DarkHeader from '../components/DarkHeader'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ✅ DB 컬럼명에 맞춰서 타입 정의 수정 (cars 테이블 기준)
 type Car = {
@@ -36,19 +47,22 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // 1. DB에서 차량 목록 가져오기 (테이블명: cars)
+  // 1. DB에서 차량 목록 가져오기 (/api/cars 경유 → MySQL)
   useEffect(() => {
     const fetchCars = async () => {
-      let query = supabase
-        .from('cars') // 👈 여기가 핵심! vehicles -> cars 로 수정
-        .select('*')
-
-      const { data, error } = await query.order('created_at', { ascending: false })
-
-      if (error) {
+      try {
+        const headers = await getAuthHeader()
+        const params = new URLSearchParams()
+        if (adminSelectedCompanyId) params.set('company_id', adminSelectedCompanyId)
+        const res = await fetch(`/api/cars?${params}`, { headers })
+        const json = await res.json()
+        if (json.error) {
+          console.error('데이터 로딩 실패:', json.error)
+        } else {
+          setCars(json.data || [])
+        }
+      } catch (error) {
         console.error('데이터 로딩 실패:', error)
-      } else {
-        setCars(data || [])
       }
       setLoading(false)
     }
@@ -337,9 +351,9 @@ const { company, role, adminSelectedCompanyId } = useApp()
                                     </span>
                                   )}
                                 </div>
-                                {car.is_used && car.purchase_mileage > 0 && (
+                                {car.is_used && (car.purchase_mileage || 0) > 0 && (
                                     <span className="text-[10px] text-gray-400 block mt-0.5">
-                                        구입시 {(car.purchase_mileage / 10000).toFixed(1)}만km
+                                        구입시 {((car.purchase_mileage || 0) / 10000).toFixed(1)}만km
                                     </span>
                                 )}
                             </td>

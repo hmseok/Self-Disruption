@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // GET /api/company?id=xxx — 회사 정보 조회
-// GET /api/company?columns=true — 컬럼명 조회 (디버그)
 export async function GET(req: NextRequest) {
   try {
     const companyId = req.nextUrl.searchParams.get('id')
@@ -13,18 +10,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: '회사 ID가 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { data, error } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', companyId)
-      .single()
+    const data = await prisma.$queryRaw<any[]>`SELECT * FROM companies WHERE id = ${companyId}`
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data[0])
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -40,21 +32,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: '회사 ID가 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     // 먼저 현재 데이터를 조회하여 실제 존재하는 컬럼만 업데이트
-    const { data: current, error: fetchErr } = await supabase
-      .from('companies')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const current = await prisma.$queryRaw<any[]>`SELECT * FROM companies WHERE id = ${id}`
 
-    if (fetchErr || !current) {
-      return NextResponse.json({ error: fetchErr?.message || '회사를 찾을 수 없습니다.' }, { status: 500 })
+    if (!current || current.length === 0) {
+      return NextResponse.json({ error: '회사를 찾을 수 없습니다.' }, { status: 404 })
     }
 
     // 실제 테이블에 존재하는 컬럼만 필터링
-    const existingColumns = Object.keys(current)
+    const existingColumns = Object.keys(current[0])
     const updatePayload: Record<string, any> = {}
     for (const [key, value] of Object.entries(fields)) {
       if (existingColumns.includes(key)) {
@@ -62,32 +48,22 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 없는 컬럼은 ALTER TABLE로 추가 시도
+    // 없는 컬럼: MySQL에서는 ALTER TABLE이 필요하므로 스킵하고 경고만 제공
     const missingColumns = Object.keys(fields).filter(k => !existingColumns.includes(k))
-    for (const col of missingColumns) {
-      try {
-        await supabase.rpc('exec_sql', {
-          sql: `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} TEXT DEFAULT ''`
-        }).throwOnError()
-        updatePayload[col] = fields[col]
-      } catch {
-        // rpc 없으면 스킵 — 나중에 수동으로 추가 필요
-        console.warn(`[company PATCH] 컬럼 ${col} 추가 실패 (수동 추가 필요)`)
-      }
+    if (missingColumns.length > 0) {
+      console.warn(`[company PATCH] 다음 컬럼이 존재하지 않습니다 (수동 추가 필요): ${missingColumns.join(', ')}`)
     }
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: '업데이트할 필드가 없습니다.', missingColumns }, { status: 400 })
     }
 
-    const { error } = await supabase
-      .from('companies')
-      .update(updatePayload)
-      .eq('id', id)
+    // Build UPDATE query
+    const setClauses = Object.entries(updatePayload)
+      .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
+      .join(', ')
 
-    if (error) {
-      return NextResponse.json({ error: error.message, columns: existingColumns, missingColumns }, { status: 500 })
-    }
+    await prisma.$executeRawUnsafe(`UPDATE companies SET ${setClauses} WHERE id = ?`, id)
 
     return NextResponse.json({ success: true, updated: Object.keys(updatePayload), missingColumns })
   } catch (e: any) {

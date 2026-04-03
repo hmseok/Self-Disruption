@@ -1,10 +1,12 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { useUpload } from '@/app/context/UploadContext'
+import { fetchFinanceData, updateFinanceRow, insertFinanceRows, deleteFinanceRow, batchUpdateFinanceRows, batchDeleteFinanceRows, getAuthHeader } from '@/app/utils/finance-upload'
+
+// For auth-dependent operations (bank sync, storage, etc.)
 // DarkHeader 제거 — A1 브랜드 스트라이프 디자인 적용
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -225,26 +227,15 @@ function parseQueueItem(q: any) {
 }
 
 async function fetchQueueDirect(companyId: string, status: string, limit: number) {
-  let query = supabase
-    .from('classification_queue')
-    .select('*', { count: 'exact' })
-    
-    .is('deleted_at', null)
-
-  if (status === 'pending') {
-    query = query.in('status', ['pending', 'auto_confirmed'])
-  } else if (status === 'confirmed') {
-    query = query.eq('status', 'confirmed')
-  }
-
-  const { data, error, count } = await query
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
-  if (error) {
-    console.error('[fetchQueueDirect] error:', error)
-    return { items: [], total: 0 }
-  }
+  const headers = await getAuthHeader()
+  const params = new URLSearchParams({
+    status,
+    limit: String(limit)
+  })
+  const res = await fetch(`/api/classification-queue?${params}`, { headers })
+  const json = await res.json()
+  const data = json.data ?? json ?? []
+  const count = json.count ?? data.length
 
   if (data && data.length > 0) {
     const items = data.map(parseQueueItem)
@@ -258,13 +249,11 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
   }
 
   // Fallback: transactions 테이블 (confirmed 또는 all 조회 시에만)
-  const { data: txData, count: txCount } = await supabase
-    .from('transactions')
-    .select('*', { count: 'exact' })
-    
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .limit(5000)
+  const txHeaders = await getAuthHeader()
+  const txRes = await fetch('/api/transactions?limit=5000&deleted=false', { headers: txHeaders })
+  const txJson = await txRes.json()
+  const txData = txJson.data ?? txJson ?? []
+  const txCount = txJson.count ?? txData.length
 
   const allItems = (txData || []).map((tx: any) => {
     const cat = tx.category || '미분류'
@@ -302,12 +291,10 @@ async function fetchQueueDirect(companyId: string, status: string, limit: number
 async function fetchConfirmedTransactions(companyId: string, limit: number, skipOrphanRecovery = false) {
   // ── 1) 고아 복구: confirmed queue 중 transaction_id가 없거나 soft-deleted된 건 복구 ──
   if (!skipOrphanRecovery) try {
-    const { data: orphaned } = await supabase
-      .from('classification_queue')
-      .select('id, transaction_id, final_category, final_matched_type, final_matched_id, source_data, company_id')
-      
-      .eq('status', 'confirmed')
-      .is('deleted_at', null)
+    const headers = await getAuthHeader()
+    const orphanRes = await fetch('/api/classification-queue?status=confirmed&deleted=false', { headers })
+    const orphanJson = await orphanRes.json()
+    const orphaned = orphanJson.data ?? orphanJson ?? []
 
     // 고아 복구: transaction_id가 없는 confirmed 건만 처리 (매번 전체 스캔 방지)
     const orphansWithoutTx = (orphaned || []).filter((q: any) => !q.transaction_id)
@@ -316,11 +303,9 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
     // transaction_id가 있지만 soft-deleted된 경우만 복원
     if (orphansWithTx.length > 0) {
       const txIds = orphansWithTx.map((q: any) => q.transaction_id)
-      const { data: deletedTxs } = await supabase
-        .from('transactions')
-        .select('id')
-        .in('id', txIds)
-        .not('deleted_at', 'is', null)
+      const txRes = await fetch(`/api/transactions?ids=${txIds.join(',')}&deleted=true`, { headers })
+      const txJson = await txRes.json()
+      const deletedTxs = txJson.data ?? txJson ?? []
 
       if (deletedTxs && deletedTxs.length > 0) {
         const deletedIds = new Set(deletedTxs.map((t: any) => t.id))
@@ -330,7 +315,12 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
           if (q.final_category) txUpdate.category = q.final_category
           if (q.final_matched_type !== undefined) txUpdate.related_type = q.final_matched_type
           if (q.final_matched_id !== undefined) txUpdate.related_id = q.final_matched_id
-          await supabase.from('transactions').update(txUpdate).eq('id', q.transaction_id)
+          const headers = await getAuthHeader()
+          await fetch(`/api/finance-upload?table=transactions&id=${q.transaction_id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(txUpdate),
+          })
           console.log(`[orphan-recovery] restored soft-deleted tx: ${q.transaction_id}`)
         }
       }
@@ -353,18 +343,26 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
       }
       if (q.final_matched_type) txPayload.related_type = q.final_matched_type
       if (q.final_matched_id) txPayload.related_id = q.final_matched_id
-      const { data: newTx, error: txErr } = await supabase
-        .from('transactions')
-        .insert(txPayload)
-        .select('id')
-        .single()
-      if (!txErr && newTx?.id) {
-        await supabase.from('classification_queue')
-          .update({ transaction_id: newTx.id })
-          .eq('id', q.id)
-        console.log(`[orphan-recovery] created new tx: ${newTx.id}, client: ${sd.client_name}`)
-      } else if (txErr) {
-        console.error(`[orphan-recovery] failed to create tx for queue ${q.id}:`, txErr.message)
+      const headers = await getAuthHeader()
+      const insertRes = await fetch('/api/finance-upload?table=transactions', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify([txPayload]),
+      })
+      if (insertRes.ok) {
+        const insertData = await insertRes.json()
+        const newTxId = insertData.data?.[0]?.id
+        if (newTxId) {
+          await fetch(`/api/finance-upload?table=classification_queue&id=${q.id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transaction_id: newTxId }),
+          })
+          console.log(`[orphan-recovery] created new tx: ${newTxId}, client: ${sd.client_name}`)
+        }
+      } else {
+        const error = await insertRes.json()
+        console.error(`[orphan-recovery] failed to create tx for queue ${q.id}:`, error.error)
       }
     }
   } catch (e) {
@@ -372,16 +370,14 @@ async function fetchConfirmedTransactions(companyId: string, limit: number, skip
   }
 
   // ── 2) 정상 조회 ──
-  const { data: txData, error: txError, count: txCount } = await supabase
-    .from('transactions')
-    .select('*', { count: 'exact' })
-    
-    .is('deleted_at', null)
-    .order('transaction_date', { ascending: false })
-    .limit(limit)
+  const headers = await getAuthHeader()
+  const txRes = await fetch(`/api/transactions?limit=${limit}&deleted=false`, { headers })
+  const txJson = await txRes.json()
+  const txData = txJson.data ?? txJson ?? []
+  const txCount = txJson.count ?? txData.length
 
-  if (txError) {
-    console.error('[fetchConfirmedTransactions] error:', txError)
+  if (!txRes.ok) {
+    console.error('[fetchConfirmedTransactions] error:', txRes.status)
     return { items: [], total: 0 }
   }
 
@@ -817,27 +813,27 @@ function UploadContent() {
     if (!company?.id) return
     try {
       const [c, i, j, cc, lo, ins, ct, emp, fl] = await Promise.all([
-        supabase.from('cars').select('*'),
-        supabase.from('general_investments').select('*'),
-        supabase.from('jiip_contracts').select('*'),
-        supabase.from('corporate_cards').select('*'),
-        supabase.from('loans').select('*'),
-        supabase.from('insurance_contracts').select('*'),
-        supabase.from('contracts').select('id, car_id, customer_id, customer_name, status, deposit, monthly_rent, start_date, end_date').in('status', ['active', 'expired']),
-        supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id'),
-        supabase.from('freelancers').select('id, name, service_type, is_active').eq('is_active', true),
+        fetchFinanceData('cars'),
+        fetchFinanceData('general_investments'),
+        fetchFinanceData('jiip_contracts'),
+        fetchFinanceData('corporate_cards'),
+        fetchFinanceData('loans'),
+        fetchFinanceData('insurance_contracts'),
+        fetchFinanceData('contracts'),
+        fetchFinanceData('profiles'),
+        fetchFinanceData('freelancers'),
       ])
       console.log('[fetchBasicData] company?.id:', company?.id)
-      console.log('[fetchBasicData] profiles result:', { count: emp.data?.length, error: emp.error, sample: emp.data?.[0] })
-      setCars(c.data || [])
-      setInvestors(i.data || [])
-      setJiips(j.data || [])
-      setCorpCards(cc.data || [])
-      setLoans(lo.data || [])
-      setInsurances(ins.data || [])
-      setContracts(ct.data || [])
-      setEmployees(emp.data || [])
-      setFreelancers(fl.data || [])
+      console.log('[fetchBasicData] profiles result:', { count: emp?.length, sample: emp?.[0] })
+      setCars(c || [])
+      setInvestors(i || [])
+      setJiips(j || [])
+      setCorpCards(cc || [])
+      setLoans(lo || [])
+      setInsurances(ins || [])
+      setContracts(ct || [])
+      setEmployees(emp || [])
+      setFreelancers(fl || [])
     } catch (err) {
       console.error('[fetchBasicData] error:', err)
     }
@@ -873,12 +869,10 @@ function UploadContent() {
       if (dates.length === 0) return
 
       const sortedDates = [...dates].sort()
-      const { data: existingTxs } = await supabase
-        .from('transactions')
-        .select('transaction_date, client_name, amount')
-        
-        .gte('transaction_date', sortedDates[0])
-        .lte('transaction_date', sortedDates[sortedDates.length - 1])
+      const headers = await getAuthHeader()
+      const txRes = await fetch(`/api/transactions?date_from=${sortedDates[0]}&date_to=${sortedDates[sortedDates.length - 1]}`, { headers })
+      const txJson = await txRes.json()
+      const existingTxs = txJson.data ?? txJson ?? []
 
       if (!existingTxs || existingTxs.length === 0) return
 
@@ -904,12 +898,14 @@ function UploadContent() {
 
       if (staleIds.length > 0) {
         console.log(`[cleanupStaleQueue] 이미 저장된 confirmed ${staleIds.length}건 자동 삭제`)
-        // 직접 Supabase에서 삭제
-        const { error: delErr } = await supabase
-          .from('classification_queue')
-          .delete()
-          .in('id', staleIds)
-        if (delErr) console.error('[cleanupStaleQueue] 삭제 오류:', delErr)
+        // 직접 API를 통해 삭제
+        const headers = await getAuthHeader()
+        const delRes = await fetch('/api/classification-queue/bulk-delete', {
+          method: 'DELETE',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: staleIds })
+        })
+        if (!delRes.ok) console.error('[cleanupStaleQueue] 삭제 오류:', delRes.status)
         await fetchStats()
       }
     } catch (e) {
@@ -943,7 +939,7 @@ function UploadContent() {
       setTotal(loadedItems.length)
 
       // ── 현재 탭의 stats를 실제 items 수로 즉시 보정 ──
-      if (status === 'confirmed') {
+      if (activeTab === 'confirmed') {
         setStats(prev => ({ ...prev, confirmed: loadedItems.length }))
       } else {
         setStats(prev => ({ ...prev, pending: loadedItems.length }))
@@ -969,16 +965,21 @@ function UploadContent() {
 
   const fetchReviewRelated = useCallback(async () => {
     if (!company?.id) return
-    const [j, i, f, e] = await Promise.all([
-      supabase.from('jiip_contracts').select('id, investor_name'),
-      supabase.from('general_investments').select('id, investor_name'),
-      supabase.from('freelancers').select('id, name, service_type, is_active').eq('is_active', true),
-      supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id'),
+    const headers = await getAuthHeader()
+    const [jRes, iRes, fRes, eRes] = await Promise.all([
+      fetch('/api/finance-upload?table=jiip_contracts', { headers }),
+      fetch('/api/finance-upload?table=general_investments', { headers }),
+      fetch('/api/finance-upload?table=freelancers', { headers }),
+      fetch('/api/finance-upload?table=profiles', { headers }),
     ])
-    setReviewJiips(j.data || [])
-    setReviewInvestors(i.data || [])
-    setFreelancers(f.data || [])
-    setEmployees(e.data || [])
+    const jData = jRes.ok ? await jRes.json() : { data: [] }
+    const iData = iRes.ok ? await iRes.json() : { data: [] }
+    const fData = fRes.ok ? await fRes.json() : { data: [] }
+    const eData = eRes.ok ? await eRes.json() : { data: [] }
+    setReviewJiips(jData.data || [])
+    setReviewInvestors(iData.data || [])
+    setFreelancers(fData.data || [])
+    setEmployees(eData.data || [])
   }, [company?.id])
 
   // 법인카드 번호 매칭 헬퍼 (현재 + 과거 카드번호 모두 체크)
@@ -1318,10 +1319,19 @@ function UploadContent() {
     try {
       const tableName = activeTab === 'confirmed' ? 'transactions' : 'classification_queue'
       const now = new Date().toISOString()
+      const headers = await getAuthHeader()
       for (let i = 0; i < targetIds.length; i += 50) {
         const batch = targetIds.slice(i, i + 50)
-        const { error: delErr } = await supabase.from(tableName).update({ deleted_at: now }).in('id', batch)
-        if (delErr) throw new Error(delErr.message)
+        const updateUrl = `/api/finance-upload?table=${tableName}&ids=${batch.join(',')}`
+        const res = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deleted_at: now }),
+        })
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(error.error)
+        }
       }
       alert(`${targetIds.length}건 삭제 완료 (휴지통으로 이동)`)
       setItems(prev => prev.filter(i => !targetIds.includes(i.id)))
@@ -1339,13 +1349,17 @@ function UploadContent() {
     if (!company?.id) return
     const tables = ['transactions', 'classification_queue'] as const
     let restoredTotal = 0
+    const headers = await getAuthHeader()
     for (const tbl of tables) {
-      const { data, error } = await supabase.from(tbl)
-        .update({ deleted_at: null })
-        
-        .not('deleted_at', 'is', null)
-        .select('id')
-      if (!error && data) restoredTotal += data.length
+      const res = await fetch(`/api/finance-upload?table=${tbl}&action=restore_deleted`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleted_at: null }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        restoredTotal += data.count || 0
+      }
     }
     if (restoredTotal > 0) {
       alert(`${restoredTotal}건 복원 완료`)
@@ -1415,12 +1429,15 @@ function UploadContent() {
     try {
       // ★ 확정완료 탭: item.id는 transactions 테이블 ID → transactions 직접 업데이트
       if (activeTab === 'confirmed') {
-        const { error: txErr } = await supabase
-          .from('transactions')
-          .update({ related_type: relatedType || null, related_id: relatedId || null })
-          .eq('id', itemId)
-        if (txErr) {
-          console.error('[handleLinkItem] transactions 업데이트 실패:', txErr)
+        const headers = await getAuthHeader()
+        const updateRes = await fetch(`/api/transactions/${itemId}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ related_type: relatedType || null, related_id: relatedId || null })
+        })
+        if (!updateRes.ok) {
+          const errJson = await updateRes.json()
+          console.error('[handleLinkItem] transactions 업데이트 실패:', errJson)
         } else {
           console.log(`[handleLinkItem] 확정항목 연결 변경: id=${itemId}, type=${relatedType || 'null'}, id=${relatedId || 'null'}`)
           setItems(prev => prev.map(i => i.id === itemId
@@ -1431,11 +1448,13 @@ function UploadContent() {
         return
       }
       // 분류 관리 탭: item.id는 classification_queue ID → classification_queue 업데이트
-      const { error: upErr } = await supabase
-        .from('classification_queue')
-        .update({ final_matched_type: relatedType, final_matched_id: relatedId })
-        .eq('id', itemId)
-      if (!upErr) {
+      const headers = await getAuthHeader()
+      const upRes = await fetch(`/api/classification-queue/${itemId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ final_matched_type: relatedType, final_matched_id: relatedId })
+      })
+      if (upRes.ok) {
         setItems(prev => prev.map(i => i.id === itemId ? { ...i, ai_related_type: relatedType, ai_related_id: relatedId } : i))
       }
     } catch (e) { console.error(e) }
@@ -1614,12 +1633,10 @@ function UploadContent() {
     let uniqueResults = [...confirmedResults]
 
     if (minDate && maxDate) {
-      const { data: existing } = await supabase
-        .from('transactions')
-        .select('transaction_date, client_name, amount, payment_method, description, type')
-        
-        .gte('transaction_date', minDate)
-        .lte('transaction_date', maxDate)
+      const headers = await getAuthHeader()
+      const txRes = await fetch(`/api/transactions?date_from=${minDate}&date_to=${maxDate}`, { headers })
+      const txJson = await txRes.json()
+      const existing = txJson.data ?? txJson ?? []
 
       if (existing && existing.length > 0) {
         // 기존 거래의 키별 개수 카운트 (description + type 포함으로 정확도 향상)
@@ -1667,9 +1684,17 @@ function UploadContent() {
       const dupQueueIds = duplicateItems.map(r => (r as any)._queue_id).filter(Boolean)
       if (dupQueueIds.length > 0) {
         try {
-          const { error: delErr } = await supabase.from('classification_queue').delete().in('id', dupQueueIds)
-          if (delErr) console.error('[handleBulkSave] 중복 항목 queue 삭제 오류:', delErr)
-          else console.log(`[handleBulkSave] 중복 항목 ${dupQueueIds.length}건 classification_queue에서 삭제`)
+          const headers = await getAuthHeader()
+          const res = await fetch(`/api/finance-upload?table=classification_queue&ids=${dupQueueIds.join(',')}`, {
+            method: 'DELETE',
+            headers,
+          })
+          if (!res.ok) {
+            const error = await res.json()
+            console.error('[handleBulkSave] 중복 항목 queue 삭제 오류:', error.error)
+          } else {
+            console.log(`[handleBulkSave] 중복 항목 ${dupQueueIds.length}건 classification_queue에서 삭제`)
+          }
         } catch (e) {
           console.error('[handleBulkSave] 중복 항목 queue 삭제 오류:', e)
         }
@@ -1744,20 +1769,30 @@ function UploadContent() {
       return alert('저장할 내역이 없습니다.')
     }
 
-    const { data: inserted, error } = await supabase.from('transactions').insert(payload).select('id')
+    const headers = await getAuthHeader()
+    const insertRes = await fetch('/api/finance-upload?table=transactions', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
 
-    if (error) {
-      alert('저장 실패: ' + error.message)
+    if (!insertRes.ok) {
+      const error = await insertRes.json()
+      alert('저장 실패: ' + error.error)
     } else {
+      const insertData = await insertRes.json()
+      const inserted = insertData.data
       let linkedCount = 0
       if (inserted && scheduleLinks.length > 0) {
         for (const link of scheduleLinks) {
           const txId = inserted[link.tx_index]?.id
           if (txId) {
-            const { error: schedErr } = await supabase.from('expected_payment_schedules')
-              .update({ matched_transaction_id: txId, status: 'completed', actual_amount: link.amount })
-              .eq('id', link.schedule_id)
-            if (!schedErr) linkedCount++
+            const schedRes = await fetch(`/api/finance-upload?table=expected_payment_schedules&id=${link.schedule_id}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ matched_transaction_id: txId, status: 'completed', actual_amount: link.amount }),
+            })
+            if (schedRes.ok) linkedCount++
           }
         }
       }
@@ -1768,9 +1803,17 @@ function UploadContent() {
           // 1) _queue_id가 있는 항목은 직접 삭제
           const queueIds = uniqueResults.map(r => (r as any)._queue_id).filter(Boolean)
           if (queueIds.length > 0) {
-            const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
-            if (delErr) console.error('[handleBulkSave] queue 삭제 오류:', delErr)
-            else console.log(`[handleBulkSave] classification_queue ${queueIds.length}건 삭제 (_queue_id 기반)`)
+            const headers = await getAuthHeader()
+            const delRes = await fetch(`/api/finance-upload?table=classification_queue&ids=${queueIds.join(',')}`, {
+              method: 'DELETE',
+              headers,
+            })
+            if (!delRes.ok) {
+              const error = await delRes.json()
+              console.error('[handleBulkSave] queue 삭제 오류:', error.error)
+            } else {
+              console.log(`[handleBulkSave] classification_queue ${queueIds.length}건 삭제 (_queue_id 기반)`)
+            }
           }
 
           // 2) _queue_id가 없는 항목은 cleanupStaleQueue로 처리 (API 기반)
@@ -1802,12 +1845,16 @@ function UploadContent() {
               }
 
               if (deleteIds.length > 0) {
-                const { error: delErr } = await supabase
-                  .from('classification_queue')
-                  .delete()
-                  .in('id', deleteIds)
-                if (delErr) console.error('[handleBulkSave] queue 삭제 오류:', delErr)
-                console.log(`[handleBulkSave] 직접 조회 매칭으로 classification_queue ${deleteIds.length}건 추가 삭제`)
+                const delRes = await fetch(`/api/finance-upload?table=classification_queue&ids=${deleteIds.join(',')}`, {
+                  method: 'DELETE',
+                  headers: await getAuthHeader(),
+                })
+                if (!delRes.ok) {
+                  const error = await delRes.json()
+                  console.error('[handleBulkSave] queue 삭제 오류:', error.error)
+                } else {
+                  console.log(`[handleBulkSave] 직접 조회 매칭으로 classification_queue ${deleteIds.length}건 추가 삭제`)
+                }
               }
             }
           }
@@ -1885,12 +1932,10 @@ function UploadContent() {
 
         if (flags.length > 0) {
           try {
-            const { data: { session: flagSession } } = await supabase.auth.getSession()
-            const flagHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-            if (flagSession?.access_token) flagHeaders['Authorization'] = `Bearer ${flagSession.access_token}`
+            const flagHeaders = await getAuthHeader()
             const flagRes = await fetch('/api/finance/flags', {
               method: 'POST',
-              headers: flagHeaders,
+              headers: { ...flagHeaders, 'Content-Type': 'application/json' },
               body: JSON.stringify({  flags }),
             })
             if (flagRes.ok) {
@@ -1916,21 +1961,21 @@ function UploadContent() {
         })
 
         // 각 투자자의 전체 거래 내역에서 순합계 계산 후 invest_amount 업데이트
+        const headers = await getAuthHeader()
         for (const [investorId] of investorMap) {
-          const { data: allTxs } = await supabase
-            .from('transactions')
-            .select('amount, type')
-            .eq('related_type', 'invest')
-            .eq('related_id', investorId)
-          if (allTxs) {
-            const netAmount = allTxs.reduce((acc, cur) => {
+          const txRes = await fetch(`/api/transactions?from=2020-01-01&to=${new Date().toISOString().slice(0, 10)}`, { headers })
+          const txData = txRes.ok ? await txRes.json() : { data: [] }
+          const allTxs = (txData.data || []).filter((t: any) => t.related_type === 'invest' && t.related_id === investorId)
+          if (allTxs && allTxs.length > 0) {
+            const netAmount = allTxs.reduce((acc: number, cur: any) => {
               return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
             }, 0)
-            const { error: upErr } = await supabase
-              .from('general_investments')
-              .update({ invest_amount: netAmount })
-              .eq('id', investorId)
-            if (!upErr) investUpdateCount++
+            const upRes = await fetch(`/api/finance-upload?table=general_investments&id=${investorId}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ invest_amount: netAmount }),
+            })
+            if (upRes.ok) investUpdateCount++
           }
         }
       }
@@ -1959,16 +2004,22 @@ function UploadContent() {
     const keyword = prompt(`'${item.client_name}' 규칙 저장`, item.client_name)
     if (!keyword) return
 
-    const { error } = await supabase.from('finance_rules').insert({
-      keyword,
-      category: item.category,
-      related_id: item.related_id,
-      related_type: item.related_type
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/finance-upload?table=finance_rules', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{
+        keyword,
+        category: item.category,
+        related_id: item.related_id,
+        related_type: item.related_type
+      }]),
     })
 
-    if (error) {
+    if (!res.ok) {
+      const error = await res.json()
       if (error.code === '23505') alert('이미 등록된 키워드입니다.')
-      else alert(error.message)
+      else alert(error.error || '오류 발생')
     } else {
       alert('✅ 규칙 저장 완료!')
     }
@@ -1989,16 +2040,19 @@ function UploadContent() {
     console.log(`[handleConfirm] 확정 시작: id=${item.id}, category=${category}, status=${newStatus}, relType=${relType}, relId=${relId}`)
     try {
       // 1) classification_queue 업데이트
+      const headers = await getAuthHeader()
       const updateData: Record<string, any> = { final_category: category, status: newStatus }
       if (relType !== undefined) updateData.final_matched_type = relType
       if (relId !== undefined) updateData.final_matched_id = relId
-      const { error: upErr } = await supabase
-        .from('classification_queue')
-        .update(updateData)
-        .eq('id', item.id)
+      const upRes = await fetch(`/api/finance-upload?table=classification_queue&id=${item.id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      })
 
-      if (upErr) {
-        console.error('[handleConfirm] classification_queue 업데이트 오류:', upErr)
+      if (!upRes.ok) {
+        const error = await upRes.json()
+        console.error('[handleConfirm] classification_queue 업데이트 오류:', error.error)
         return
       }
 
@@ -2013,33 +2067,48 @@ function UploadContent() {
           }
           if (relType !== undefined) txUpdate.related_type = relType
           if (relId !== undefined) txUpdate.related_id = relId
-          const { error: txErr } = await supabase
-            .from('transactions')
-            .update(txUpdate)
-            .eq('id', item.transaction_id)
-          if (txErr) console.error('[handleConfirm] transactions 업데이트 오류:', txErr)
-          else console.log(`[handleConfirm] transactions 업데이트 완료: txId=${item.transaction_id}`)
+          const headers = await getAuthHeader()
+          const txRes = await fetch(`/api/finance-upload?table=transactions&id=${item.transaction_id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(txUpdate),
+          })
+          if (!txRes.ok) {
+            const error = await txRes.json()
+            console.error('[handleConfirm] transactions 업데이트 오류:', error.error)
+          } else {
+            console.log(`[handleConfirm] transactions 업데이트 완료: txId=${item.transaction_id}`)
+          }
         } else {
           // 트랜잭션이 없으면 → 기존 동일 거래가 있는지 먼저 확인 후 연결 또는 신규 생성
           const matchAmount = sd.type === 'expense' ? -Math.abs(Number(sd.amount || 0)) : Math.abs(Number(sd.amount || 0))
-          const { data: existingTx } = await supabase
-            .from('transactions')
-            .select('id')
-            
-            .eq('transaction_date', sd.transaction_date || '')
-            .eq('client_name', sd.client_name || '')
-            .eq('amount', matchAmount)
-            .is('deleted_at', null)
-            .limit(1)
-            .single()
+          const headers = await getAuthHeader()
+          const txSearchUrl = `/api/transactions?from=2020-01-01&to=${new Date().toISOString().slice(0, 10)}`
+          const txSearchRes = await fetch(txSearchUrl, { headers })
+          const txSearchData = txSearchRes.ok ? await txSearchRes.json() : { data: [] }
+          const existingTx = (txSearchData.data || []).find((t: any) =>
+            t.transaction_date === (sd.transaction_date || '') &&
+            t.client_name === (sd.client_name || '') &&
+            t.amount === matchAmount &&
+            !t.deleted_at
+          )
 
           if (existingTx?.id) {
             // 기존 거래 발견 → 연결만 하고 카테고리 업데이트
             const txUpdate: Record<string, any> = { category }
             if (relType !== undefined) txUpdate.related_type = relType
             if (relId !== undefined) txUpdate.related_id = relId
-            await supabase.from('transactions').update(txUpdate).eq('id', existingTx.id)
-            await supabase.from('classification_queue').update({ transaction_id: existingTx.id }).eq('id', item.id)
+            const headers = await getAuthHeader()
+            await fetch(`/api/finance-upload?table=transactions&id=${existingTx.id}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify(txUpdate),
+            })
+            await fetch(`/api/finance-upload?table=classification_queue&id=${item.id}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transaction_id: existingTx.id }),
+            })
             console.log(`[handleConfirm] 기존 tx 연결: txId=${existingTx.id}`)
           } else {
             // 진짜 새 거래 → 신규 생성
@@ -2057,17 +2126,25 @@ function UploadContent() {
             }
             if (relType) txPayload.related_type = relType
             if (relId) txPayload.related_id = relId
-            const { data: newTx, error: txErr } = await supabase
-              .from('transactions')
-              .insert(txPayload)
-              .select('id')
-              .single()
-            if (txErr) {
-              console.error('[handleConfirm] transactions 신규 생성 오류:', txErr)
+            const headers = await getAuthHeader()
+            const insertRes = await fetch('/api/finance-upload?table=transactions', {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify([txPayload]),
+            })
+            if (!insertRes.ok) {
+              const error = await insertRes.json()
+              console.error('[handleConfirm] transactions 신규 생성 오류:', error.error)
             } else {
-              console.log(`[handleConfirm] transactions 신규 생성 완료: txId=${newTx?.id}`)
-              if (newTx?.id) {
-                await supabase.from('classification_queue').update({ transaction_id: newTx.id }).eq('id', item.id)
+              const insertData = await insertRes.json()
+              const newTxId = insertData.data?.[0]?.id
+              console.log(`[handleConfirm] transactions 신규 생성 완료: txId=${newTxId}`)
+              if (newTxId) {
+                await fetch(`/api/finance-upload?table=classification_queue&id=${item.id}`, {
+                  method: 'PATCH',
+                  headers: { ...headers, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ transaction_id: newTxId }),
+                })
               }
             }
           }
@@ -2135,12 +2212,17 @@ function UploadContent() {
     // 규칙 저장 (키워드가 있을 때만)
     if (keyword) {
       try {
-        await supabase.from('finance_rules').upsert({
-          keyword: keyword.toLowerCase(),
-          category,
-          related_type: item.ai_related_type || null,
-          related_id: item.ai_related_id || null,
-        }, { onConflict: 'keyword' })
+        const headers = await getAuthHeader()
+        await fetch('/api/finance-upload?table=finance_rules&action=upsert', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            keyword: keyword.toLowerCase(),
+            category,
+            related_type: item.ai_related_type || null,
+            related_id: item.ai_related_id || null,
+          }),
+        })
       } catch (e) {
         console.error('[handleConfirmWithRule] 규칙 저장 오류:', e)
       }
@@ -2154,37 +2236,46 @@ function UploadContent() {
         // transactions 테이블에서 온 항목 → classification_queue에 pending으로 복원 후 soft-delete
         const sd = item.source_data || {}
         const origTxId = item.transaction_id || item.id // 확정완료 탭에서는 id가 곧 transaction_id
-        const { error: insErr } = await supabase.from('classification_queue').insert({
-          
-          transaction_id: origTxId, // ★ 원본 트랜잭션 ID 보존 — 재확정 시 복원에 필요
-          status: 'pending',
-          ai_category: item.ai_category || sd.category || '미분류',
-          ai_matched_type: item.related_type || null,
-          ai_matched_id: item.related_id || null,
-          final_category: null,
-          final_matched_type: null,
-          final_matched_id: null,
-          source_data: {
-            transaction_date: sd.transaction_date || item.transaction_date || '',
-            client_name: sd.client_name || item.client_name || '',
-            amount: Math.abs(Number(sd.amount || item.amount || 0)),
-            type: sd.type || item.type || 'expense',
-            description: sd.description || item.description || '',
-            payment_method: sd.payment_method || item.payment_method || '통장',
-            card_id: sd.card_id || item.card_id || null,
-            memo: sd.memo || '',
-            source: 'revert_from_confirmed',
-          },
+        const headers = await getAuthHeader()
+        const insRes = await fetch('/api/finance-upload?table=classification_queue', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify([{
+            transaction_id: origTxId, // ★ 원본 트랜잭션 ID 보존 — 재확정 시 복원에 필요
+            status: 'pending',
+            ai_category: item.ai_category || sd.category || '미분류',
+            ai_matched_type: item.related_type || null,
+            ai_matched_id: item.related_id || null,
+            final_category: null,
+            final_matched_type: null,
+            final_matched_id: null,
+            source_data: {
+              transaction_date: sd.transaction_date || item.transaction_date || '',
+              client_name: sd.client_name || item.client_name || '',
+              amount: Math.abs(Number(sd.amount || item.amount || 0)),
+              type: sd.type || item.type || 'expense',
+              description: sd.description || item.description || '',
+              payment_method: sd.payment_method || item.payment_method || '통장',
+              card_id: sd.card_id || item.card_id || null,
+              memo: sd.memo || '',
+              source: 'revert_from_confirmed',
+            },
+          }]),
         })
-        if (insErr) {
-          alert(`되돌리기 실패: ${insErr.message}`)
+        if (!insRes.ok) {
+          const error = await insRes.json()
+          alert(`되돌리기 실패: ${error.error}`)
           return
         }
         // 원본 트랜잭션 soft-delete
-        const { error: delErr } = await supabase.from('transactions')
-          .update({ deleted_at: new Date().toISOString() }).eq('id', origTxId)
-        if (delErr) {
-          alert(`되돌리기 실패: ${delErr.message}`)
+        const delRes = await fetch(`/api/finance-upload?table=transactions&id=${origTxId}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+        })
+        if (!delRes.ok) {
+          const error = await delRes.json()
+          alert(`되돌리기 실패: ${error.error}`)
         } else {
           setItems(prev => prev.filter(i => i.id !== item.id))
           setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
@@ -2193,18 +2284,23 @@ function UploadContent() {
       } else {
         // classification_queue에서 온 항목 → 직접 status 변경
         // transaction_id가 있으면 해당 트랜잭션도 soft-delete
+        const headers = await getAuthHeader()
         if (item.transaction_id) {
-          await supabase.from('transactions')
-            .update({ deleted_at: new Date().toISOString() })
-            .eq('id', item.transaction_id)
+          await fetch(`/api/finance-upload?table=transactions&id=${item.transaction_id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+          })
           console.log(`[handleRevert] queue 항목의 연결 tx ${item.transaction_id} soft-delete`)
         }
-        const { error: upErr } = await supabase
-          .from('classification_queue')
-          .update({ final_category: '기타', status: 'pending', final_matched_type: null, final_matched_id: null })
-          .eq('id', item.id)
-        if (upErr) {
-          alert(`되돌리기 실패: ${upErr.message}`)
+        const upRes = await fetch(`/api/finance-upload?table=classification_queue&id=${item.id}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ final_category: '기타', status: 'pending', final_matched_type: null, final_matched_id: null }),
+        })
+        if (!upRes.ok) {
+          const error = await upRes.json()
+          alert(`되돌리기 실패: ${error.error}`)
         } else {
           setItems(prev => prev.filter(i => i.id !== item.id))
           setStats(prev => ({ pending: prev.pending + 1, confirmed: prev.confirmed - 1 }))
@@ -2222,22 +2318,28 @@ function UploadContent() {
       const newStatus = PENDING_CATS.includes(newCategory) ? 'pending' : 'confirmed'
       const relType = item.ai_related_type || null
       const relId = item.ai_related_id || null
-      const { error: upErr } = await supabase
-        .from('classification_queue')
-        .update({
+      const headers = await getAuthHeader()
+      const upRes = await fetch(`/api/finance-upload?table=classification_queue&id=${item.id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           final_category: newCategory,
           status: newStatus,
           final_matched_type: relType,
           final_matched_id: relId,
-        })
-        .eq('id', item.id)
-      if (!upErr) {
+        }),
+      })
+      if (upRes.ok) {
         // transactions 테이블도 동기화
         if (item.transaction_id) {
           const txUpdate: Record<string, any> = { category: newCategory }
           if (relType !== undefined) txUpdate.related_type = relType
           if (relId !== undefined) txUpdate.related_id = relId
-          await supabase.from('transactions').update(txUpdate).eq('id', item.transaction_id)
+          await fetch(`/api/finance-upload?table=transactions&id=${item.transaction_id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(txUpdate),
+          })
           console.log(`[handleChangeCategory] transactions 업데이트: txId=${item.transaction_id}, category=${newCategory}`)
         }
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, ai_category: newCategory, final_category: newCategory } : i))
@@ -2447,12 +2549,10 @@ function UploadContent() {
         if (minDate && maxDate) {
           // classification_queue 기존 항목 조회 (현재 업로드 결과의 _queue_id는 제외)
           const uploadQueueIds = results.map(r => (r as any)?._queue_id).filter(Boolean)
-          const { data: queueItems } = await supabase
-            .from('classification_queue')
-            .select('id, source_data, status')
-            
-            .is('deleted_at', null)
-            .in('status', ['pending', 'auto_confirmed', 'confirmed'])
+          const headers = await getAuthHeader()
+          const qRes = await fetch('/api/classification-queue?status=all&deleted=false', { headers })
+          const qJson = await qRes.json()
+          const queueItems = qJson.data ?? qJson ?? []
 
           // 크로스 키(날짜+금액) → DB 항목 상세정보 배열로 그룹핑
           type DbEntry = { name: string; date: string; amount: number; desc: string; type: string; source: 'queue' | 'tx'; used: boolean }
@@ -2472,13 +2572,9 @@ function UploadContent() {
           }
 
           // transactions 기존 항목 조회
-          const { data: txItems } = await supabase
-            .from('transactions')
-            .select('transaction_date, client_name, amount, payment_method, description, type')
-            
-            .is('deleted_at', null)
-            .gte('transaction_date', minDate.slice(0, 10))
-            .lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
+          const txRes = await fetch(`/api/transactions?date_from=${minDate.slice(0, 10)}&date_to=${maxDate.slice(0, 10)}`, { headers })
+          const txJson = await txRes.json()
+          const txItems = txJson.data ?? txJson ?? []
 
           if (txItems) {
             for (const tx of txItems) {
@@ -2733,7 +2829,12 @@ function UploadContent() {
             .map(idx => (results[idx] as any)?._queue_id)
             .filter(Boolean)
           if (queueIdsToDelete.length > 0) {
-            await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', queueIdsToDelete)
+            const headers = await getAuthHeader()
+            await fetch(`/api/finance-upload?table=classification_queue&ids=${queueIdsToDelete.join(',')}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+            })
           }
           deletedTotal += memoryDupCount
         }
@@ -2749,7 +2850,12 @@ function UploadContent() {
             removeResults(removeResultIds)
             const crossQueueIds = [...crossRemoveIdxSet].map(idx => (results[idx] as any)?._queue_id).filter(Boolean)
             if (crossQueueIds.length > 0) {
-              await supabase.from('classification_queue').update({ deleted_at: new Date().toISOString() }).in('id', crossQueueIds)
+              const headers = await getAuthHeader()
+              await fetch(`/api/finance-upload?table=classification_queue&ids=${crossQueueIds.join(',')}`, {
+                method: 'PATCH',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+              })
             }
           }
           deletedTotal += removeResultIds.size
@@ -2796,11 +2902,11 @@ function UploadContent() {
         type DbUpdateEntry = { id: string; name: string; table: string; used: boolean }
         const dbUpdateMap = new Map<string, DbUpdateEntry[]>()
 
-        const { data: qItems } = await supabase
-          .from('classification_queue').select('id, source_data')
-          .is('deleted_at', null)
-          .in('status', ['pending', 'auto_confirmed', 'confirmed'])
-        if (qItems) {
+        const headers = await getAuthHeader()
+        const qRes = await fetch('/api/finance-upload?table=classification_queue&action=for_cross_dedup', { headers })
+        const qData = qRes.ok ? await qRes.json() : { data: [] }
+        const qItems = qData.data || []
+        if (qItems && qItems.length > 0) {
           for (const q of qItems) {
             if (uploadQueueIds.includes(q.id)) continue
             const sd = q.source_data || {}
@@ -2809,11 +2915,12 @@ function UploadContent() {
             dbUpdateMap.get(ck)!.push({ id: q.id, name: sd.client_name || '', table: 'classification_queue', used: false })
           }
         }
-        const { data: tItems } = await supabase
-          .from('transactions').select('id, transaction_date, client_name, amount, description')
-          .is('deleted_at', null)
-          .gte('transaction_date', minDate.slice(0, 10)).lte('transaction_date', maxDate.slice(0, 10) + ' 23:59:59')
-        if (tItems) {
+        const fromDate = minDate.slice(0, 10)
+        const toDate = maxDate.slice(0, 10)
+        const tRes = await fetch(`/api/transactions?from=${fromDate}&to=${toDate}`, { headers })
+        const tData = tRes.ok ? await tRes.json() : { data: [] }
+        const tItems = (tData.data || []).filter((t: any) => !t.deleted_at)
+        if (tItems && tItems.length > 0) {
           for (const tx of tItems) {
             const ck = makeCrossKey(tx.transaction_date, tx.amount)
             if (!dbUpdateMap.has(ck)) dbUpdateMap.set(ck, [])
@@ -2823,7 +2930,7 @@ function UploadContent() {
 
         // 매칭된 항목 업데이트 (체크된 항목만 — uploadResultIdx로 정확히 식별)
         const updatePromises: Promise<any>[] = []
-        const updateResultIds = new Set<string>()
+        const updateResultIds = new Set<number>()
         for (const ri of activeResultIndices) {
           const r = results[ri]
           if (!r) continue
@@ -2837,25 +2944,37 @@ function UploadContent() {
           updateResultIds.add(r.id)
 
           if (m.table === 'transactions') {
-            updatePromises.push(supabase.from('transactions').update({
-              transaction_date: r.transaction_date,
-              client_name: r.client_name,
-              amount: r.amount,
-              description: r.description || '',
-              payment_method: r.payment_method || '',
-              category: r.category || r.ai_category || '',
-            }).eq('id', m.id))
+            updatePromises.push(
+              fetch(`/api/finance-upload?table=transactions&id=${m.id}`, {
+                method: 'PATCH',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  transaction_date: r.transaction_date,
+                  client_name: r.client_name,
+                  amount: r.amount,
+                  description: r.description || '',
+                  payment_method: r.payment_method || '',
+                  category: r.category || r.ai_category || '',
+                }),
+              })
+            )
           } else {
-            updatePromises.push(supabase.from('classification_queue').update({
-              source_data: {
-                transaction_date: r.transaction_date,
-                client_name: r.client_name,
-                amount: r.amount,
-                description: r.description || '',
-                payment_method: r.payment_method || '',
-              },
-              ai_category: r.category || r.ai_category || '',
-            }).eq('id', m.id))
+            updatePromises.push(
+              fetch(`/api/finance-upload?table=classification_queue&id=${m.id}`, {
+                method: 'PATCH',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  source_data: {
+                    transaction_date: r.transaction_date,
+                    client_name: r.client_name,
+                    amount: r.amount,
+                    description: r.description || '',
+                    payment_method: r.payment_method || '',
+                  },
+                  ai_category: r.category || r.ai_category || '',
+                }),
+              })
+            )
           }
           updatedCount++
         }
@@ -3526,7 +3645,7 @@ function UploadContent() {
 
   // 팝오버 위치 (fixed positioning for overflow clipping fix)
   const [catPopoverPos, setCatPopoverPos] = useState<{top: number; left: number; openUp: boolean; maxH?: number} | null>(null)
-  const [relPopoverPos, setRelPopoverPos] = useState<{top: number; left: number; openUp: boolean; maxH?: number} | null>(null)
+  const [relPopoverPos, setRelPopoverPos] = useState<{top: number; right: number; openUp: boolean; maxH?: number} | null>(null)
   const [linkPopoverPosFixed, setLinkPopoverPosFixed] = useState<{top: number; right: number; openUp: boolean} | null>(null)
 
   const calcPopPos = (el: HTMLElement, maxH = 340) => {
@@ -4987,10 +5106,10 @@ function UploadContent() {
                         if (unclassifiedItems.length === 0) return alert('미분류 거래가 없습니다.')
 
                         try {
-                          const { data: { session } } = await supabase.auth.getSession()
+                          const headers = await getAuthHeader()
                           for (const item of unclassifiedItems) {
                             const payload = {
-                              
+
                               items: [{
                                 transaction_date: item.transaction_date,
                                 type: item.type,
@@ -5005,7 +5124,7 @@ function UploadContent() {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
-                                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+                                ...headers,
                               },
                               body: JSON.stringify(payload),
                             })
@@ -5671,17 +5790,26 @@ function UploadContent() {
                         }
                       })
 
-                      const { error } = await supabase.from('transactions').insert(payload)
-                      if (error) {
-                        alert('저장 실패: ' + error.message)
+                      const headers = await getAuthHeader()
+                      const insertRes = await fetch('/api/finance-upload?table=transactions', {
+                        method: 'POST',
+                        headers: { ...headers, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                      })
+                      if (!insertRes.ok) {
+                        const error = await insertRes.json()
+                        alert('저장 실패: ' + error.error)
                         return
                       }
 
                       // classification_queue 정리 — 직접 삭제
                       const queueIds = selectedItems.map(r => (r as any)._queue_id).filter(Boolean)
                       if (queueIds.length > 0) {
-                        const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
-                        if (delErr) console.error('queue 삭제 오류:', delErr)
+                        const delRes = await fetch(`/api/finance-upload?table=classification_queue&ids=${queueIds.join(',')}`, {
+                          method: 'DELETE',
+                          headers,
+                        })
+                        if (!delRes.ok) console.error('queue 삭제 오류')
                       }
 
                       // ── 투자 연결 거래 → 투자자 순합계 업데이트 ──
@@ -5689,14 +5817,16 @@ function UploadContent() {
                       if (investTxs.length > 0) {
                         const investorIds = [...new Set(investTxs.map(tx => tx.related_id!))]
                         for (const investorId of investorIds) {
-                          const { data: allTxs } = await supabase
-                            .from('transactions').select('amount, type')
-                            .eq('related_type', 'invest').eq('related_id', investorId)
-                          if (allTxs) {
-                            const netAmount = allTxs.reduce((acc, cur) => acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0)), 0)
-                            await supabase.from('general_investments')
-                              .update({ invest_amount: netAmount })
-                              .eq('id', investorId)
+                          const txRes = await fetch(`/api/transactions?from=2020-01-01&to=${new Date().toISOString().slice(0, 10)}`, { headers })
+                          const txData = txRes.ok ? await txRes.json() : { data: [] }
+                          const allTxs = (txData.data || []).filter((t: any) => t.related_type === 'invest' && t.related_id === investorId)
+                          if (allTxs && allTxs.length > 0) {
+                            const netAmount = allTxs.reduce((acc: number, cur: any) => acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0)), 0)
+                            await fetch(`/api/finance-upload?table=general_investments&id=${investorId}`, {
+                              method: 'PATCH',
+                              headers: { ...headers, 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ invest_amount: netAmount }),
+                            })
                           }
                         }
                       }
@@ -5729,8 +5859,12 @@ function UploadContent() {
                     const queueIds = selectedItems.map(r => (r as any)._queue_id).filter(Boolean)
                     if (queueIds.length > 0) {
                       try {
-                        const { error: delErr } = await supabase.from('classification_queue').delete().in('id', queueIds)
-                        if (delErr) console.error('classification_queue 삭제 실패:', delErr)
+                        const headers = await getAuthHeader()
+                        const delRes = await fetch(`/api/finance-upload?table=classification_queue&ids=${queueIds.join(',')}`, {
+                          method: 'DELETE',
+                          headers,
+                        })
+                        if (!delRes.ok) console.error('classification_queue 삭제 실패')
                       } catch (e) {
                         console.error('삭제 오류:', e)
                       }
@@ -7423,7 +7557,16 @@ function UploadContent() {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                               <span style={{ fontSize: 11, fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '2px 8px', borderRadius: 6 }}>
-                                ⚠️ 유사 항목 {similarItems.length}건{dupModal.dupViewFilter !== 'all' ? ` (${dupModal.dupViewFilter === 'time_diff' ? '시간 다름' : dupModal.dupViewFilter === 'name_diff' ? '거래처 유사' : '적요 다름'} 필터)` : ''} — 검수 필요
+                                ⚠️ 유사 항목 {similarItems.length}건{(() => {
+                                  if (dupModal.dupViewFilter === 'all') return '';
+                                  const filterLabels: Record<string, string> = {
+                                    'exact': '정확일치',
+                                    'time_diff': '시간 다름',
+                                    'name_diff': '거래처 유사',
+                                    'desc_diff': '적요 다름'
+                                  };
+                                  return ` (${filterLabels[dupModal.dupViewFilter] || '기타'} 필터)`;
+                                })()} — 검수 필요
                               </span>
                               <span style={{ fontSize: 10, color: '#64748b' }}>체크 해제하면 중복처리에서 제외됩니다</span>
                               <span

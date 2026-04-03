@@ -1,8 +1,18 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ── 분류 카테고리 옵션 ──
 const CATEGORIES = [
@@ -115,16 +125,21 @@ export default function ClassificationReviewPage() {
 
   const fetchRelated = useCallback(async () => {
     if (!companyId) return
-    const [j, i, f, e] = await Promise.all([
-      supabase.from('jiip_contracts').select('id, investor_name'),
-      supabase.from('general_investments').select('id, investor_name'),
-      supabase.from('freelancers').select('id, name'),
-      supabase.from('profiles').select('id, employee_name, email, phone, position_id, department_id'),
-    ])
-    setJiips(j.data || [])
-    setInvestors(i.data || [])
-    setFreelancers(f.data || [])
-    setEmployees(e.data || [])
+    try {
+      const headers = await getAuthHeader()
+      const [jRes, iRes, fRes, eRes] = await Promise.all([
+        fetch('/api/jiip', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch('/api/investments', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch('/api/freelancers', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch('/api/profiles', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      ])
+      setJiips(jRes.data || [])
+      setInvestors(iRes.data || [])
+      setFreelancers(fRes.data || [])
+      setEmployees(eRes.data || [])
+    } catch (e) {
+      console.error('Failed to fetch related data:', e)
+    }
   }, [companyId])
 
   useEffect(() => { fetchItems() }, [fetchItems])
@@ -462,7 +477,6 @@ export default function ClassificationReviewPage() {
       return next
     })
   }
-
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f8fafc' }}>

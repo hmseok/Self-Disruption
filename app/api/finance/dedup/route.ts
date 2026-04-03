@@ -1,43 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ── 중복 거래 감지 & 삭제 API ──
 // GET: 중복 건수 조회
 // DELETE: 중복 건 삭제 (가장 먼저 등록된 것만 남기고 나머지 삭제)
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 // ── 전체 데이터 페이지네이션 조회 (1000건 제한 해결) ──
-async function fetchAllTransactions(sb: ReturnType<typeof getSupabaseAdmin>, _company_id?: string) {
-  const PAGE_SIZE = 1000
-  let allTxs: any[] = []
-  let offset = 0
-  let hasMore = true
-
-  while (hasMore) {
-    const { data, error } = await sb
-      .from('transactions')
-      .select('id, transaction_date, client_name, amount, payment_method, description, created_at')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1)
-
-    if (error) throw error
-    if (!data || data.length === 0) {
-      hasMore = false
-    } else {
-      allTxs = allTxs.concat(data)
-      offset += data.length
-      if (data.length < PAGE_SIZE) hasMore = false
-    }
-  }
-
+async function fetchAllTransactions(_company_id?: string) {
+  const allTxs = await prisma.$queryRaw<any[]>`
+    SELECT id, transaction_date, client_name, amount, payment_method, description, created_at
+    FROM transactions
+    WHERE deleted_at IS NULL
+    ORDER BY created_at ASC
+  `
   return allTxs
 }
 
@@ -63,8 +38,7 @@ export async function GET(request: NextRequest) {
     const company_id = searchParams.get('company_id')
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
 
-    const sb = getSupabaseAdmin()
-    const allTxs = await fetchAllTransactions(sb, company_id)
+    const allTxs = await fetchAllTransactions(company_id)
 
     // 해시로 그룹핑
     const groups = groupDuplicates(allTxs)
@@ -105,8 +79,7 @@ export async function DELETE(request: NextRequest) {
     const { company_id } = await request.json()
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
 
-    const sb = getSupabaseAdmin()
-    const allTxs = await fetchAllTransactions(sb, company_id)
+    const allTxs = await fetchAllTransactions(company_id)
 
     // 해시로 그룹핑
     const groups = groupDuplicates(allTxs)
@@ -128,13 +101,14 @@ export async function DELETE(request: NextRequest) {
     let totalDeleted = 0
     for (let i = 0; i < idsToDelete.length; i += 50) {
       const batch = idsToDelete.slice(i, i + 50)
-      const { error: delErr } = await sb
-        .from('transactions')
-        .update({ deleted_at: now })
-        .in('id', batch)
-
-      if (!delErr) totalDeleted += batch.length
-      else console.error('Delete batch error:', delErr.message)
+      try {
+        await prisma.$executeRaw`
+          UPDATE transactions SET deleted_at = ${now} WHERE id IN (${batch.join(',')})
+        `
+        totalDeleted += batch.length
+      } catch (delErr) {
+        console.error('Delete batch error:', delErr)
+      }
     }
 
     // NOTE: classification_queue는 건드리지 않음

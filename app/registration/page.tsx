@@ -1,8 +1,20 @@
 'use client'
-import { supabase } from '../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // --- [아이콘] ---
 const Icons = {
@@ -91,17 +103,18 @@ const { company, role, adminSelectedCompanyId } = useApp()
   }, [selectedTrim])
 
   const fetchList = async () => {
-    let query = supabase.from('cars').select('*')
-
-    const { data } = await query.order('created_at', { ascending: false })
+    const res = await fetch('/api/cars', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+    const json = await res.json()
+    const { data } = json
     setCars(data || [])
   }
 
   const fetchStandardCodes = async () => {
-    const { data } = await supabase.from('vehicle_standard_codes').select('*').order('model_name, price')
-    if (data) {
+    const response = await fetch('/api/vehicle-standard-codes', { headers: await getAuthHeader() })
+    const { data, error } = await response.json()
+    if (data && !error) {
         setStandardCodes(data)
-        const models = Array.from(new Set(data.map(d => d.model_name)))
+        const models = Array.from(new Set(data.map((d: any) => d.model_name)))
         setUniqueModels(models as string[])
     }
   }
@@ -109,7 +122,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm('정말 삭제하시겠습니까?')) return
-    await supabase.from('cars').delete().eq('id', id)
+    await fetch(`/api/cars/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
     fetchList()
   }
 
@@ -182,11 +195,20 @@ const { company, role, adminSelectedCompanyId } = useApp()
                   try { fileToUpload = await compressImage(originalFile); } catch (e) { console.warn("압축 실패"); }
               }
 
-              // Storage 업로드
+              // Storage 업로드 — GCS
               const ext = isPdf ? 'pdf' : 'jpg';
               const fileName = `reg_${Date.now()}_${i}.${ext}`
-              await supabase.storage.from('car_docs').upload(`registration/${fileName}`, fileToUpload, { upsert: true })
-              const { data: urlData } = supabase.storage.from('car_docs').getPublicUrl(`registration/${fileName}`)
+              const uploadFormData = new FormData()
+              uploadFormData.append('file', fileToUpload)
+              uploadFormData.append('folder', 'car_docs')
+              const { Authorization } = await getAuthHeader()
+              const uploadRes = await fetch('/api/upload', {
+                method: 'POST',
+                headers: Authorization ? { Authorization } : {},
+                body: uploadFormData,
+              })
+              const uploadJson = await uploadRes.json()
+              const urlData = { publicUrl: uploadJson.url || '' }
 
               // Base64 변환
               const base64 = await new Promise<string>((r) => {
@@ -199,10 +221,10 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
               // 인증 헤더 추가
               const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-              const { data: { session: authSession } } = await supabase.auth.getSession()
-              console.log('[Registration] auth session:', authSession ? `token=${authSession.access_token?.slice(0,20)}...` : 'NO SESSION')
-              if (authSession?.access_token) {
-                authHeaders['Authorization'] = `Bearer ${authSession.access_token}`
+              const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+              console.log('[Registration] auth session:', token ? `token=${token.slice(0,20)}...` : 'NO SESSION')
+              if (token) {
+                authHeaders['Authorization'] = `Bearer ${token}`
               } else {
                 console.error('[Registration] ⚠️ 인증 세션 없음 - 401 에러 발생 가능')
               }
@@ -231,7 +253,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
               let finalPrice = cleanNumber(result.purchase_price);
 
               // 중복 체크
-              const { data: existingCar } = await supabase.from('cars').select('id').eq('vin', detectedVin).maybeSingle();
+              const existingRes = await fetch(`/api/cars?vin=${encodeURIComponent(detectedVin)}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }); const existingCar = (await existingRes.json()).data?.[0] || null;
               if (existingCar) {
                   setProgress(prev => ({ ...prev, skipped: prev.skipped + 1 }))
                   setLogs(prev => [`⚠️ [중복] ${result.car_number} - 건너뜀`, ...prev])
@@ -240,16 +262,13 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
               // 1. 통합 테이블 갱신 (트림)
               if (detectedModel !== '미확인 모델' && result.trims?.length > 0) {
-                  await supabase.from('vehicle_standard_codes')
-                      .delete().eq('model_name', detectedModel).eq('year', detectedYear);
-
                   const modelCode = generateModelCode(detectedBrand, detectedModel, detectedYear);
                   const rowsToInsert = result.trims.map((t: any) => ({
                       brand: detectedBrand, model_name: detectedModel, model_code: modelCode,
                       year: detectedYear, trim_name: t.name, price: t.price || 0,
                       fuel_type: result.fuel_type || '기타', normalized_name: normalizeModelName(detectedModel)
                   }));
-                  await supabase.from('vehicle_standard_codes').insert(rowsToInsert);
+                  await fetch('/api/vehicle-standard-codes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(rowsToInsert) });
 
                   if (finalPrice === 0) {
                       const minPrice = Math.min(...result.trims.map((t:any) => t.price || 999999999));
@@ -258,17 +277,16 @@ const { company, role, adminSelectedCompanyId } = useApp()
               }
 
               // 2. 차량 등록
-              await supabase.from('cars').insert([{
-                  number: result.car_number || '임시번호', brand: detectedBrand, model: detectedModel,
-                  vin: detectedVin, owner_name: result.owner_name || '', location: result.location || '',
-                  purchase_price: finalPrice, displacement: cleanNumber(result.displacement),
-                  capacity: cleanNumber(result.capacity), registration_date: cleanDate(result.registration_date),
-                  inspection_end_date: cleanDate(result.inspection_end_date),
-                  vehicle_age_expiry: cleanDate(result.vehicle_age_expiry),
-                  fuel_type: result.fuel_type || '기타', year: detectedYear,
-                  registration_image_url: urlData.publicUrl, status: 'available',
-                  notes: result.notes || ''
-              }])
+              const carPayload = {
+                number: result.car_number || 'UNKNOWN',
+                brand: detectedBrand,
+                model: detectedModel,
+                year: detectedYear,
+                vin: detectedVin,
+                purchase_price: finalPrice,
+                fuel: result.fuel_type || null
+              };
+              await fetch('/api/cars', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(carPayload) })
 
               setProgress(prev => ({ ...prev, success: prev.success + 1 }))
               setLogs(prev => [`✅ [${detectedBrand}] ${detectedModel} 등록 완료 (${isPdf ? 'PDF' : 'IMG'})`, ...prev])
@@ -293,25 +311,29 @@ const { company, role, adminSelectedCompanyId } = useApp()
     if (!carNum) return alert('차량번호 입력')
     if (!vin) return alert('차대번호 입력')
 
-    const { data: existing } = await supabase.from('cars').select('id').eq('vin', vin).maybeSingle()
-    if (existing) return alert('❌ 이미 등록된 차대번호입니다.')
+    const existingRes = await fetch(`/api/cars?vin=${encodeURIComponent(vin)}`, { headers: await getAuthHeader() })
+    const { data: existingData } = await existingRes.json()
+    if (existingData && existingData.length > 0) return alert('❌ 이미 등록된 차대번호입니다.')
 
     setCreating(true)
     const fullModelName = `${selectedModelName} ${selectedTrim?.trim_name || ''}`
 
-    const { error } = await supabase.from('cars').insert([{
+    try {
+      const carPayload = {
         number: carNum,
-        brand: selectedTrim?.brand || '기타',
-        model: fullModelName,
-        year: selectedTrim?.year,
-        purchase_price: finalPrice,
-        fuel_type: selectedTrim?.fuel_type,
+        brand: selectedModelName,
+        model: selectedModelName,
+        trim: fullModelName,
         vin: vin,
-        status: 'available'
-    }])
-
-    if (error) alert('실패: ' + error.message)
-    else { alert('등록 완료'); setIsModalOpen(false); fetchList(); setCarNum(''); setVin(''); setSelectedModelName(''); setSelectedTrim(null); }
+        purchase_price: finalPrice
+      };
+      const res = await fetch('/api/cars', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(carPayload) })
+      const { error } = await res.json()
+      if (error) alert('실패: ' + error)
+      else { alert('등록 완료'); setIsModalOpen(false); fetchList(); setCarNum(''); setVin(''); setSelectedModelName(''); setSelectedTrim(null); }
+    } catch (err: any) {
+      alert('실패: ' + err.message)
+    }
     setCreating(false)
   }
 

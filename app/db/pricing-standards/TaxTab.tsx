@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, insertPricingStandardsRows, updatePricingStandardsRow, deletePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 interface TaxRecord {
   id?: number
@@ -66,8 +66,6 @@ const AGE_REDUCTION = [
 ]
 
 export default function TaxTab() {
-  const supabase = createClientComponentClient()
-
   const [rows, setRows] = useState<TaxRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -89,8 +87,7 @@ export default function TaxTab() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('vehicle_tax_table').select('*').order('tax_type', { ascending: true })
-      if (error) throw error
+      const data = await fetchPricingStandardsData('vehicle_tax_table')
       setRows(data || [])
     } catch (err) {
       console.error('Error:', err)
@@ -102,17 +99,15 @@ export default function TaxTab() {
   const addRow = async () => {
     try {
       const newRow = { tax_type: '영업용', fuel_category: '내연기관', cc_min: 0, cc_max: 2000, rate_per_cc: 18, fixed_annual: 0, education_tax_rate: 0, notes: '' }
-      const { data, error } = await supabase.from('vehicle_tax_table').insert([newRow]).select()
-      if (error) throw error
-      if (data && data[0]) setRows([...rows, data[0]])
+      await insertPricingStandardsRows('vehicle_tax_table', [newRow])
+      await fetchData()
     } catch (err) { console.error('Error:', err) }
   }
 
   const updateField = async (id: number | undefined, field: string, value: any) => {
     if (!id) return
     try {
-      const { error } = await supabase.from('vehicle_tax_table').update({ [field]: value }).eq('id', id)
-      if (error) throw error
+      await updatePricingStandardsRow('vehicle_tax_table', String(id), { [field]: value })
       setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r))
     } catch (err) { console.error('Error:', err) }
   }
@@ -120,8 +115,7 @@ export default function TaxTab() {
   const deleteRow = async (id: number | undefined) => {
     if (!id) return
     try {
-      const { error } = await supabase.from('vehicle_tax_table').delete().eq('id', id)
-      if (error) throw error
+      await deletePricingStandardsRow('vehicle_tax_table', String(id))
       setRows(rows.filter(r => r.id !== id))
     } catch (err) { console.error('Error:', err) }
   }

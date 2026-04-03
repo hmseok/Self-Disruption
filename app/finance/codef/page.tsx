@@ -1,8 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../../utils/supabase'
 import DarkHeader from '../../components/DarkHeader'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 interface Connection {
   id: string
@@ -62,10 +73,12 @@ export default function CodefPage() {
 
   const fetchConnections = async () => {
     try {
-      const { data, error } = await supabase.from('codef_connections').select('*').eq('is_active', true)
+      const headers = { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      const res = await fetch('/api/codef?is_active=true', { headers })
+      const data = await res.json()
 
-      if (error) throw error
-      setConnections(data || [])
+      if (!res.ok) throw new Error(data.error || '연동 계정을 불러오는데 실패했습니다.')
+      setConnections(data.data || [])
     } catch (error) {
       console.error('Failed to fetch connections:', error)
       setMessage({ type: 'error', text: '연동 계정을 불러오는데 실패했습니다.' })
@@ -74,14 +87,12 @@ export default function CodefPage() {
 
   const fetchLogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from('codef_sync_logs')
-        .select('*')
-        .order('synced_at', { ascending: false })
-        .limit(20)
+      const headers = { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      const res = await fetch('/api/codef/sync?limit=20', { headers })
+      const data = await res.json()
 
-      if (error) throw error
-      setLogs(data || [])
+      if (!res.ok) throw new Error(data.error)
+      setLogs(data.data || [])
     } catch (error) {
       console.error('Failed to fetch logs:', error)
     } finally {

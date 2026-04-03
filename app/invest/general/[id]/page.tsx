@@ -1,5 +1,5 @@
 'use client'
-import { supabase } from '../../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApp } from '../../../context/AppContext'
@@ -8,6 +8,21 @@ import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'
 import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
+
+// ─────────────────────────────────────────────
+// Auth helper (fetch-based API calls)
+// ─────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const KOREAN_BANKS = [
   'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행',
@@ -121,41 +136,55 @@ export default function GeneralInvestDetail() {
 
   // ── 데이터 조회 ──
   const fetchDetail = async () => {
-    const { data, error } = await supabase.from('general_investments').select('*').eq('id', id).single()
-    if (error) { alert('데이터 로드 실패'); router.back(); return }
-    setItem({
-      ...data,
-      investor_address: data.investor_address || '',
-      investor_address_detail: data.investor_address_detail || '',
-      investor_email: data.investor_email || '',
-      account_holder: data.account_holder || '',
-      invest_amount: data.invest_amount || 0,
-      interest_rate: data.interest_rate || 12,
-      payment_day: data.payment_day || 10,
-      signed_file_url: data.signed_file_url || '',
-      status: data.status || 'active',
-    })
-    setSendingEmail(data.investor_email || data.investor_phone || '')
-    setSendingPhone(data.investor_phone || '')
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/investments/${id}`, { headers })
+      const json = await res.json()
+      const data = json.data
+      if (json.error) { alert('데이터 로드 실패'); router.back(); return }
+      setItem({
+        ...data,
+        investor_address: data.investor_address || '',
+        investor_address_detail: data.investor_address_detail || '',
+        investor_email: data.investor_email || '',
+        account_holder: data.account_holder || '',
+        invest_amount: data.invest_amount || 0,
+        interest_rate: data.interest_rate || 12,
+        payment_day: data.payment_day || 10,
+        signed_file_url: data.signed_file_url || '',
+        status: data.status || 'active',
+      })
+      setSendingEmail(data.investor_email || data.investor_phone || '')
+      setSendingPhone(data.investor_phone || '')
+    } catch (err) {
+      console.error('fetchDetail error:', err)
+    }
     setLoading(false)
   }
 
   const fetchRealDeposit = async () => {
     // 입금과 출금을 모두 가져와서 순합계(입금 - 출금) 계산
-    const { data } = await supabase.from('transactions').select('amount, type').eq('related_type', 'invest').eq('related_id', id)
-    if (data) {
-      const net = data.reduce((acc, cur) => {
-        const amt = Math.abs(cur.amount || 0)
-        return acc + (cur.type === 'income' ? amt : -amt)
-      }, 0)
-      setRealDepositTotal(net)
+    try {
+      const headers = await getAuthHeader()
+      // TODO: Create /api/transactions endpoint
+      // const { data } = await supabase.from('transactions').select('amount, type').eq('related_type', 'invest').eq('related_id', id)
+      const data: any = null
+      if (data && Array.isArray(data)) {
+        const net = data.reduce((acc: any, cur: any) => {
+          const amt = Math.abs(cur.amount || 0)
+          return acc + (cur.type === 'income' ? amt : -amt)
+        }, 0)
+        setRealDepositTotal(net)
+      }
+    } catch (err) {
+      console.error('fetchRealDeposit error:', err)
     }
   }
 
   // ── API 호출 헬퍼 ──
   const getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { 'Authorization': `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return { 'Authorization': `Bearer ${token || ''}`, 'Content-Type': 'application/json' }
   }
 
   const loadSendingLogs = async () => {
@@ -218,13 +247,15 @@ export default function GeneralInvestDetail() {
   // 투자금 거래 내역 로드 (transactions 기반)
   const loadInvestTransactions = async () => {
     if (!id) return
-    const { data } = await supabase
-      .from('transactions')
-      .select('id, transaction_date, amount, type, category, client_name, description, status')
-      .eq('related_type', 'invest')
-      .eq('related_id', id)
-      .order('transaction_date', { ascending: true })
-    setInvestTxList(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/transactions?related_type=invest&related_id=${id}`, { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      setInvestTxList(data || [])
+    } catch (error) {
+      console.error('Failed to load investment transactions:', error)
+    }
   }
 
   const loadPaymentSchedule = async () => {
@@ -270,18 +301,37 @@ export default function GeneralInvestDetail() {
     payload.interest_rate = Number(payload.interest_rate)
     payload.payment_day = Number(payload.payment_day)
 
-    const { error } = isNew
-      ? await supabase.from('general_investments').insert(payload)
-      : await supabase.from('general_investments').update(payload).eq('id', id)
+    try {
+      const headers = await getAuthHeader()
+      const method = isNew ? 'POST' : 'PATCH'
+      const url = isNew ? '/api/investments' : `/api/investments/${id}`
 
-    if (error) alert('저장 실패: ' + error.message)
-    else { alert('저장되었습니다!'); router.push('/invest') }
+      const res = await fetch(url, {
+        method,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+
+      if (json.error) alert('저장 실패: ' + json.error)
+      else { alert('저장되었습니다!'); router.push('/invest') }
+    } catch (err) {
+      alert('저장 실패: ' + err)
+    }
   }
 
   const handleDelete = async () => {
     if (!confirm('삭제하시겠습니까?')) return
-    await supabase.from('general_investments').delete().eq('id', id)
-    router.push('/invest')
+    try {
+      const headers = await getAuthHeader()
+      await fetch(`/api/investments/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      router.push('/invest')
+    } catch (err) {
+      alert('삭제 실패: ' + err)
+    }
   }
 
   // ── 서명 ──
@@ -303,11 +353,28 @@ export default function GeneralInvestDetail() {
 
       const pdfBlob = pdf.output('blob')
       const fileName = `general_invest_${id}_${Date.now()}.pdf`
-      const { error: uploadError } = await supabase.storage.from('contracts').upload(fileName, pdfBlob, { contentType: 'application/pdf' })
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage.from('contracts').getPublicUrl(fileName)
-      await supabase.from('general_investments').update({ signed_file_url: publicUrl }).eq('id', id)
+      // GCS upload
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', new File([pdfBlob], fileName, { type: 'application/pdf' }))
+      uploadFormData.append('folder', 'contracts')
+      const { Authorization } = await getAuthHeader()
+      const uploadRes = await fetch('/api/upload/pdf', {
+        method: 'POST',
+        headers: Authorization ? { Authorization } : {},
+        body: uploadFormData,
+      })
+      const uploadJson = await uploadRes.json()
+      const publicUrl = uploadJson.url || ''
+      try {
+        const headers = await getAuthHeader()
+        await fetch(`/api/investments/${id}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signed_file_url: publicUrl })
+        })
+      } catch (err) {
+        console.error('Failed to update investment:', err)
+      }
 
       alert("서명 완료! PDF 저장됨.")
       setItem((prev: any) => ({ ...prev, signed_file_url: publicUrl }))

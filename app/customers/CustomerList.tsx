@@ -1,8 +1,22 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import DarkHeader from '../components/DarkHeader'
+
+// ─────────────────────────────────────────────
+// Auth helper (fetch-based API calls)
+// ─────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -207,9 +221,15 @@ export default function CustomerPage() {
   // ── 고객 목록 조회 ──
   const fetchCustomers = useCallback(async () => {
     if (!company && role !== 'admin') { setLoading(false); return }
-    let query = supabase.from('customers').select('*')
-    const { data } = await query.order('id', { ascending: false })
-    setCustomers((data as Customer[]) || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/customers', { headers })
+      const json = await res.json()
+      if (json.error) { alert(json.error); return }
+      setCustomers((json.data as Customer[]) || [])
+    } catch (err) {
+      console.error('fetchCustomers error:', err)
+    }
     setLoading(false)
   }, [company, role])
 
@@ -217,49 +237,29 @@ export default function CustomerPage() {
 
   // ── 상세 데이터 조회 ──
   const fetchDetailData = useCallback(async (customerId: number) => {
-    // 계약 이력 (실제 contracts 테이블에서 조회)
-    const { data: contractData } = await supabase
-      .from('contracts')
-      .select('id, customer_name, car_id, start_date, end_date, term_months, monthly_rent, deposit, status, created_at, quote_id')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    // 차량 정보 조회
-    const carIds = (contractData || []).map(c => c.car_id).filter(Boolean)
-    let carsMap: Record<string, any> = {}
-    if (carIds.length > 0) {
-      const { data: carData } = await supabase.from('cars').select('id, brand, model, number').in('id', carIds)
-      if (carData) carsMap = Object.fromEntries(carData.map(c => [c.id, c]))
+    try {
+      const headers = await getAuthHeader()
+
+      // 계약 이력 (실제 contracts 테이블에서 조회)
+      // TODO: Create /api/contracts endpoint for this
+
+      // 결제 이력
+      const payRes = await fetch(`/api/customers/${customerId}/payments`, { headers })
+      const payJson = await payRes.json()
+      setPayments((payJson.data as Payment[]) || [])
+
+      // 메모/상담
+      const noteRes = await fetch(`/api/customers/${customerId}/notes`, { headers })
+      const noteJson = await noteRes.json()
+      setNotes((noteJson.data as Note[]) || [])
+
+      // 세금계산서
+      const invRes = await fetch(`/api/customers/${customerId}/tax-invoices`, { headers })
+      const invJson = await invRes.json()
+      setTaxInvoices((invJson.data as TaxInvoice[]) || [])
+    } catch (err) {
+      console.error('fetchDetailData error:', err)
     }
-    setContracts((contractData || []).map(c => ({
-      ...c,
-      car_name: carsMap[c.car_id] ? `${carsMap[c.car_id].brand} ${carsMap[c.car_id].model} (${carsMap[c.car_id].number})` : '차량 미지정',
-      rental_period: c.term_months,
-      monthly_rental: c.monthly_rent,
-    })))
-
-    // 결제 이력
-    const { data: paymentData } = await supabase
-      .from('customer_payments')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    setPayments((paymentData as Payment[]) || [])
-
-    // 메모/상담
-    const { data: noteData } = await supabase
-      .from('customer_notes')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    setNotes((noteData as Note[]) || [])
-
-    // 세금계산서
-    const { data: invoiceData } = await supabase
-      .from('customer_tax_invoices')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    setTaxInvoices((invoiceData as TaxInvoice[]) || [])
   }, [])
 
   // ── 필터링 & 정렬 ──
@@ -332,11 +332,21 @@ export default function CustomerPage() {
     raw.name = newForm.name
     const payload = sanitizePayload(raw)
 
-    const { error } = await supabase.from('customers').insert([payload])
-    if (error) { alert('저장 실패: ' + error.message); return }
-    setShowNewModal(false)
-    setNewForm({ ...EMPTY_FORM })
-    fetchCustomers()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (json.error) { alert('저장 실패: ' + json.error); return }
+      setShowNewModal(false)
+      setNewForm({ ...EMPTY_FORM })
+      fetchCustomers()
+    } catch (err) {
+      alert('저장 실패: ' + err)
+    }
   }
 
   // ── 고객 수정 ──
@@ -347,51 +357,87 @@ export default function CustomerPage() {
     raw.name = editForm.name
     const payload = sanitizePayload(raw)
 
-    const { error } = await supabase.from('customers').update(payload).eq('id', selectedCustomer.id)
-    if (error) { alert('수정 실패: ' + error.message); return }
-    setIsEditing(false)
-    fetchCustomers()
-    setSelectedCustomer({ ...selectedCustomer, ...payload } as Customer)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (json.error) { alert('수정 실패: ' + json.error); return }
+      setIsEditing(false)
+      fetchCustomers()
+      setSelectedCustomer({ ...selectedCustomer, ...payload } as Customer)
+    } catch (err) {
+      alert('수정 실패: ' + err)
+    }
   }
 
   // ── 고객 삭제 ──
   const handleDeleteCustomer = async (id: number) => {
     if (!confirm('이 고객의 모든 데이터(결제/메모/계산서 이력 포함)가 삭제됩니다.\n정말 삭제하시겠습니까?')) return
-    await supabase.from('customers').delete().eq('id', id)
-    setSelectedCustomer(null)
-    fetchCustomers()
+    try {
+      const headers = await getAuthHeader()
+      await fetch(`/api/customers/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      setSelectedCustomer(null)
+      fetchCustomers()
+    } catch (err) {
+      alert('삭제 실패: ' + err)
+    }
   }
 
   // ── 상담메모 추가 ──
   const handleAddNote = async () => {
     if (!selectedCustomer || !newNote.trim()) return
-    const { error } = await supabase.from('customer_notes').insert([{
-      customer_id: selectedCustomer.id,
-      author_name: user?.user_metadata?.name || user?.email || '시스템',
-      note_type: newNoteType,
-      content: newNote,
-    }])
-    if (error) { alert('메모 저장 실패: ' + error.message); return }
-    setNewNote('')
-    fetchDetailData(selectedCustomer.id)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/customers/${selectedCustomer.id}/notes`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          author_name: user?.user_metadata?.name || user?.email || '시스템',
+          note_type: newNoteType,
+          content: newNote,
+        })
+      })
+      const json = await res.json()
+      if (json.error) { alert('메모 저장 실패: ' + json.error); return }
+      setNewNote('')
+      fetchDetailData(selectedCustomer.id)
+    } catch (err) {
+      alert('메모 저장 실패: ' + err)
+    }
   }
 
   // ── 결제 추가 ──
   const handleAddPayment = async () => {
     if (!selectedCustomer || !paymentForm.amount) return alert('금액을 입력해주세요.')
-    const { error } = await supabase.from('customer_payments').insert([{
-      customer_id: selectedCustomer.id,
-      amount: Number(paymentForm.amount),
-      payment_type: paymentForm.payment_type,
-      payment_method: paymentForm.payment_method,
-      description: paymentForm.description || null,
-      due_date: paymentForm.due_date || null,
-      status: paymentForm.status,
-    }])
-    if (error) { alert('결제 저장 실패: ' + error.message); return }
-    setShowPaymentForm(false)
-    setPaymentForm({ amount: '', payment_type: 'charge', payment_method: '카드', description: '', due_date: '', status: '미결제' })
-    fetchDetailData(selectedCustomer.id)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/customers/${selectedCustomer.id}/payments`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(paymentForm.amount),
+          payment_type: paymentForm.payment_type,
+          payment_method: paymentForm.payment_method,
+          description: paymentForm.description || null,
+          due_date: paymentForm.due_date || null,
+          status: paymentForm.status,
+        })
+      })
+      const json = await res.json()
+      if (json.error) { alert('결제 저장 실패: ' + json.error); return }
+      setShowPaymentForm(false)
+      setPaymentForm({ amount: '', payment_type: 'charge', payment_method: '카드', description: '', due_date: '', status: '미결제' })
+      fetchDetailData(selectedCustomer.id)
+    } catch (err) {
+      alert('결제 저장 실패: ' + err)
+    }
   }
 
   // ── 세금계산서 추가 ──
@@ -399,20 +445,29 @@ export default function CustomerPage() {
     if (!selectedCustomer || !invoiceForm.supply_amount) return alert('공급가액을 입력해주세요.')
     const supply = Number(invoiceForm.supply_amount)
     const tax = invoiceForm.tax_amount ? Number(invoiceForm.tax_amount) : Math.round(supply * 0.1)
-    const { error } = await supabase.from('customer_tax_invoices').insert([{
-      customer_id: selectedCustomer.id,
-      issue_date: invoiceForm.issue_date,
-      supply_amount: supply,
-      tax_amount: tax,
-      total_amount: supply + tax,
-      description: invoiceForm.description || null,
-      status: '발행',
-      sent_to_email: selectedCustomer.tax_email || selectedCustomer.email || null,
-    }])
-    if (error) { alert('계산서 저장 실패: ' + error.message); return }
-    setShowInvoiceForm(false)
-    setInvoiceForm({ issue_date: new Date().toISOString().split('T')[0], supply_amount: '', tax_amount: '', description: '' })
-    fetchDetailData(selectedCustomer.id)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/customers/${selectedCustomer.id}/tax-invoices`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issue_date: invoiceForm.issue_date,
+          supply_amount: supply,
+          tax_amount: tax,
+          total_amount: supply + tax,
+          description: invoiceForm.description || null,
+          status: '발행',
+          sent_to_email: selectedCustomer.tax_email || selectedCustomer.email || null,
+        })
+      })
+      const json = await res.json()
+      if (json.error) { alert('계산서 저장 실패: ' + json.error); return }
+      setShowInvoiceForm(false)
+      setInvoiceForm({ issue_date: new Date().toISOString().split('T')[0], supply_amount: '', tax_amount: '', description: '' })
+      fetchDetailData(selectedCustomer.id)
+    } catch (err) {
+      alert('계산서 저장 실패: ' + err)
+    }
   }
 
   // ── 고객 선택 ──

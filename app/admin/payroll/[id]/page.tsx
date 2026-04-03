@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../../context/AppContext'
 import { useRouter, useParams } from 'next/navigation'
 import { calculatePayroll } from '../../../utils/payroll-calc'
@@ -32,8 +32,8 @@ export default function PayslipDetailPage() {
   const [editMemo, setEditMemo] = useState('')
 
   const getAuthHeaders = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { 'Authorization': `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return { 'Authorization': `Bearer ${token || ''}`, 'Content-Type': 'application/json' }
   }, [])
 
   const loadPayslip = useCallback(async () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, insertPricingStandardsRows, updatePricingStandardsRow, deletePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 interface RegistrationCost {
   id: string
@@ -86,7 +86,6 @@ const REGISTRATION_GUIDE = [
 ]
 
 export default function RegistrationTab() {
-  const supabase = createClientComponentClient()
   const [rows, setRows] = useState<RegistrationCost[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -104,8 +103,7 @@ export default function RegistrationTab() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from('registration_cost_table').select('*').order('cost_type')
-      if (error) throw error
+      const data = await fetchPricingStandardsData('registration_cost_table')
       setRows(data || [])
     } catch (error) { console.error('Error:', error) }
     finally { setLoading(false) }
@@ -114,24 +112,21 @@ export default function RegistrationTab() {
   const handleAddRow = async () => {
     try {
       const newRow = { cost_type: '취득세', vehicle_category: '영업용', region: '서울', rate: 0, fixed_amount: 0, description: '', notes: '' }
-      const { data, error } = await supabase.from('registration_cost_table').insert([newRow]).select()
-      if (error) throw error
-      if (data) setRows([...rows, data[0]])
+      await insertPricingStandardsRows('registration_cost_table', [newRow])
+      await loadData()
     } catch (error) { console.error('Error:', error) }
   }
 
   const handleDeleteRow = async (id: string) => {
     try {
-      const { error } = await supabase.from('registration_cost_table').delete().eq('id', id)
-      if (error) throw error
+      await deletePricingStandardsRow('registration_cost_table', id)
       setRows(rows.filter(r => r.id !== id))
     } catch (error) { console.error('Error:', error) }
   }
 
   const handleUpdateField = async (id: string, field: keyof RegistrationCost, value: any) => {
     try {
-      const { error } = await supabase.from('registration_cost_table').update({ [field]: value }).eq('id', id)
-      if (error) throw error
+      await updatePricingStandardsRow('registration_cost_table', id, { [field]: value })
       setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r))
     } catch (error) { console.error('Error:', error) }
   }

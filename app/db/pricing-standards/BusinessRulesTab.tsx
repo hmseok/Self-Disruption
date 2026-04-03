@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, updatePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 interface BusinessRule {
   id: string
@@ -57,7 +57,6 @@ const KEY_DETAILS: Record<string, { label: string; unit: string; range: string; 
 }
 
 export default function BusinessRulesTab() {
-  const supabase = createClientComponentClient()
   const [rules, setRules] = useState<BusinessRule[]>([])
   const [loading, setLoading] = useState(true)
   const [savedId, setSavedId] = useState<string | null>(null)
@@ -68,8 +67,7 @@ export default function BusinessRulesTab() {
   const loadRules = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from('business_rules').select('*').order('key')
-      if (error) throw error
+      const data = await fetchPricingStandardsData('business_rules')
       setRules(data || [])
     } catch (error) { console.error('Error:', error) }
     finally { setLoading(false) }
@@ -77,8 +75,7 @@ export default function BusinessRulesTab() {
 
   const handleSave = async (id: string, newValue: any) => {
     try {
-      const { error } = await supabase.from('business_rules').update({ value: newValue }).eq('id', id)
-      if (error) throw error
+      await updatePricingStandardsRow('business_rules', id, { value: newValue })
       setRules(rules.map(r => r.id === id ? { ...r, value: newValue } : r))
       setSavedId(id)
       setTimeout(() => setSavedId(null), 2000)

@@ -50,7 +50,7 @@ async function loadCodes(): Promise<CodeMap> {
     _listeners.forEach(fn => fn())
     _listeners = []
   }
-  return _cache
+  return _cache || FALLBACK
 }
 
 // React Hook

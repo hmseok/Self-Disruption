@@ -1,9 +1,23 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 import DarkHeader from '../components/DarkHeader'
+
+// ─────────────────────────────────────────────
+// Auth helper (fetch-based API calls)
+// ─────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // --- [아이콘] ---
 const Icons = {
@@ -80,23 +94,33 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
   useEffect(() => { fetchList() }, [company, role, adminSelectedCompanyId])
 
   const fetchList = async () => {
-    let query = supabase
-      .from('cars')
-      .select(`id, number, model, brand, vin, insurance_contracts (id, company, end_date, premium, status)`)
-
-    const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) { console.error("리스트 로딩 실패:", error.message); return; }
-    const formatted = data?.map((car: any) => ({ ...car, insurance: car.insurance_contracts?.[0] || null }))
-    setList(formatted || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/insurance', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
+      const formatted = data?.map((car: any) => ({ ...car, insurance: car.insurance_contracts?.[0] || null }))
+      setList(formatted || [])
+    } catch (err) {
+      console.error("리스트 로딩 실패:", err)
+    }
   }
 
   const handleDeleteInsurance = async (e: React.MouseEvent, insuranceId: number) => {
       e.stopPropagation();
       if (!confirm("해당 보험 내역을 삭제하시겠습니까?")) return;
-      const { error } = await supabase.from('insurance_contracts').delete().eq('id', insuranceId);
-      if (error) alert("삭제 실패: " + error.message);
-      else { alert("삭제되었습니다."); fetchList(); }
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/insurance/${insuranceId}`, {
+          method: 'DELETE',
+          headers
+        })
+        const json = await res.json()
+        if (json.error) alert("삭제 실패: " + json.error);
+        else { alert("삭제되었습니다."); fetchList(); }
+      } catch (err) {
+        alert("삭제 실패: " + err)
+      }
   }
 
   // 드래그 앤 드롭 핸들러
@@ -138,8 +162,18 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
 
               const ext = isPdf ? 'pdf' : 'jpg';
               const fileName = `ins_${Date.now()}_${i}.${ext}`
-              await supabase.storage.from('car_docs').upload(`insurance/${fileName}`, fileToUpload, { upsert: true })
-              const { data: urlData } = supabase.storage.from('car_docs').getPublicUrl(`insurance/${fileName}`)
+              // GCS upload
+              const uploadFormData = new FormData()
+              uploadFormData.append('file', fileToUpload)
+              uploadFormData.append('folder', 'car_docs')
+              const { Authorization } = await getAuthHeader()
+              const uploadRes = await fetch('/api/upload', {
+                method: 'POST',
+                headers: Authorization ? { Authorization } : {},
+                body: uploadFormData,
+              })
+              const uploadJson = await uploadRes.json()
+              const urlData = { publicUrl: uploadJson.url || '' }
 
               const base64 = await new Promise<string>((r) => {
                   const reader = new FileReader(); reader.readAsDataURL(fileToUpload); reader.onload = () => r(reader.result as string);
@@ -165,7 +199,7 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
               if (!detectedVin || detectedVin.length < 10) {
                   newFailedItems.push({
                     fileName: originalFile.name, detectedVin: detectedVin || '',
-                    ocrResult: result, uploadedUrl: urlData.publicUrl,
+                    ocrResult: result, uploadedUrl: (urlData as any)?.publicUrl || '',
                     isCertificate: result.doc_type === 'certificate',
                     errorMsg: '차대번호(VIN) 식별 실패'
                   })
@@ -175,11 +209,14 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
               }
 
               // DB 차량 매칭
-              const { data: carData } = await supabase.from('cars').select('id, number, brand').ilike('vin', `%${detectedVin.slice(-6)}`).maybeSingle();
+              const headers = await getAuthHeader()
+              const carRes = await fetch(`/api/cars?vin=${encodeURIComponent(detectedVin.slice(-6))}`, { headers })
+              const carJson = await carRes.json()
+              const carData = carJson.data?.[0] || null;
               if (!carData) {
                   newFailedItems.push({
                     fileName: originalFile.name, detectedVin,
-                    ocrResult: result, uploadedUrl: urlData.publicUrl,
+                    ocrResult: result, uploadedUrl: (urlData as any)?.publicUrl || '',
                     isCertificate: result.doc_type === 'certificate',
                     errorMsg: `미등록 차대번호: ${detectedVin}`
                   })
@@ -188,7 +225,7 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
                   continue
               }
 
-              await saveInsuranceContract(result, carData, urlData.publicUrl)
+              await saveInsuranceContract(result, carData, (urlData as any)?.publicUrl || '')
               setProgress(prev => ({ ...prev, success: prev.success + 1 }))
 
           } catch (error: any) {
@@ -206,8 +243,13 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
           setRetryVin(newFailedItems[0].detectedVin)
           setRetryCarSearch('')
           // DB 차량 목록 (VIN 포함) 로드
-          const { data: cars } = await supabase.from('cars').select('id, number, model, brand, vin').order('number')
-          setRetryCars(cars || [])
+          try {
+            const carsRes = await fetch('/api/cars', { headers: await getAuthHeader() })
+            const carsJson = await carsRes.json()
+            setRetryCars(carsJson.data || [])
+          } catch (err) {
+            console.error('Failed to load cars:', err)
+          }
           setRetryModalOpen(true)
       }
   }
@@ -216,7 +258,16 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
   const saveInsuranceContract = async (ocrResult: any, carData: any, uploadedUrl: string) => {
       // 브랜드 업데이트
       if (ocrResult.brand && ocrResult.brand !== '기타' && (!carData.brand || carData.brand === '기타')) {
-          await supabase.from('cars').update({ brand: ocrResult.brand }).eq('id', carData.id);
+          try {
+            const headers = await getAuthHeader()
+            await fetch(`/api/cars/${carData.id}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ brand: ocrResult.brand })
+            })
+          } catch (err) {
+            console.error('Failed to update car brand:', err)
+          }
       }
 
       const isCertificate = ocrResult.doc_type === 'certificate';
@@ -253,22 +304,30 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
           payload.application_form_url = uploadedUrl;
       }
 
-      const { data: existingContract } = await supabase
-          .from('insurance_contracts')
-          .select('id')
-          .eq('car_id', carData.id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      // TODO: Get existing insurance contract - create /api/insurance/search endpoint or update GET to support search
+      const existingContract: { id?: string | number } | null = null; // Placeholder - need to implement search endpoint
 
-      if (existingContract) {
-          await supabase.from('insurance_contracts').update(payload).eq('id', existingContract.id);
-          setLogs(prev => [`✨ [업데이트] ${carData.number} 기존 내역에 파일 추가됨`, ...prev])
-      } else {
-          const { error: insertError } = await supabase.from('insurance_contracts').insert([payload]);
-          if (insertError) throw insertError;
-          setLogs(prev => [`✅ [신규등록] ${carData.number} (${isCertificate?'증명서':'청약서'})`, ...prev])
+      try {
+        const headers = await getAuthHeader()
+        if ((existingContract as any)?.id) {
+            await fetch(`/api/insurance/${(existingContract as any).id}`, {
+              method: 'PATCH',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            setLogs(prev => [`✨ [업데이트] ${carData.number} 기존 내역에 파일 추가됨`, ...prev])
+        } else {
+            const res = await fetch('/api/insurance', {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            setLogs(prev => [`✅ [신규등록] ${carData.number} (${isCertificate?'증명서':'청약서'})`, ...prev])
+        }
+      } catch (err) {
+        throw err
       }
   }
 
@@ -279,7 +338,10 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
       setRetryProcessing(true)
       try {
           const cleanVin = retryVin.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-          const { data: carData } = await supabase.from('cars').select('id, number, brand').ilike('vin', `%${cleanVin.slice(-6)}`).maybeSingle()
+          const headers = await getAuthHeader()
+          const carRes = await fetch(`/api/cars?vin=${encodeURIComponent(cleanVin.slice(-6))}`, { headers })
+          const carJson = await carRes.json()
+          const carData = carJson.data?.[0] || null
           if (!carData) { alert(`매칭 실패: "${cleanVin}" 끝 6자리와 일치하는 차량이 없습니다.`); setRetryProcessing(false); return }
           await saveInsuranceContract(item.ocrResult, carData, item.uploadedUrl)
           alert(`${carData.number} 차량에 등록 완료!`)
@@ -326,8 +388,14 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
   }
 
   const openCarSelector = async () => {
-    const { data } = await supabase.from('cars').select('id, number, model, brand').order('created_at', { ascending: false })
-    setAllCars(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      const json = await res.json()
+      setAllCars(json.data || [])
+    } catch (err) {
+      console.error('Failed to load cars:', err)
+    }
     setIsModalOpen(true)
   }
   const filteredCars = allCars.filter(car => car.number.includes(searchTerm))
@@ -547,7 +615,6 @@ const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.
           </div>
         </div>
       )}
-
 
       {/* ⚠️ 만기 임박 경고 배너 */}
       {expiringCars.length > 0 && !bulkProcessing && (

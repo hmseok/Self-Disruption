@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { auth } from '@/lib/firebase'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 
 // ============================================
 // 초대 가입 페이지 (공개 - 인증 불필요)
@@ -23,7 +24,6 @@ export default function InviteAcceptPage() {
   const params = useParams()
   const router = useRouter()
   const token = params.token as string
-  const supabase = createClientComponentClient()
 
   const [invite, setInvite] = useState<InviteInfo | null>(null)
   const [pageState, setPageState] = useState<'loading' | 'form' | 'expired' | 'error' | 'success'>('loading')
@@ -106,13 +106,15 @@ export default function InviteAcceptPage() {
       }
 
       // 2. 바로 로그인 (서버에서 이메일 인증 완료 상태로 생성됨)
-      const { error: loginErr } = await supabase.auth.signInWithPassword({
-        email: invite.email,
-        password,
-      })
+      let loginErr: any = null
+      try {
+        await signInWithEmailAndPassword(auth, invite.email, password)
+      } catch (err: any) {
+        loginErr = err
+        console.error('자동 로그인 실패:', err.message)
+      }
 
       if (loginErr) {
-        console.error('자동 로그인 실패:', loginErr.message)
         setFormError('가입은 완료되었으나 자동 로그인에 실패했습니다. 로그인 페이지로 이동합니다.')
         setSubmitting(false)
         setTimeout(() => router.push('/'), 3000)

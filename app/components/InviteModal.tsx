@@ -1,6 +1,7 @@
 'use client'
-import { supabase } from '../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useState, useEffect, useMemo } from 'react'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 interface Props {
   companyName: string
@@ -75,32 +76,50 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
   // 부서/직급/모듈 로드 (단독 ERP - companyId 불필요)
   useEffect(() => {
     if (isOpen) {
-      supabase
-        .from('departments')
-        .select('id, name')
-        .order('name')
-        .then(({ data }) => setDepartments(data || []))
+      const loadData = async () => {
+        const headers = await getAuthHeader()
 
-      supabase
-        .from('positions')
-        .select('id, name')
-        .order('level')
-        .then(({ data }) => setPositions(data || []))
-
-      // 활성 모듈 로드
-      supabase
-        .from('company_modules')
-        .select('module:system_modules(path, name)')
-        .eq('is_active', true)
-        .then(({ data }) => {
-          if (data) {
-            const seen = new Set<string>()
-            const modules = data
-              .filter((m: any) => m.module?.path && !seen.has(m.module.path) && seen.add(m.module.path))
-              .map((m: any) => ({ path: m.module.path, name: m.module.name }))
-            setActiveModules(modules)
+        // 부서 로드
+        try {
+          const res = await fetch('/api/departments', { headers })
+          if (res.ok) {
+            const data = await res.json()
+            setDepartments(data || [])
           }
-        })
+        } catch (error) {
+          console.error('Failed to load departments:', error)
+        }
+
+        // 직급 로드
+        try {
+          const res = await fetch('/api/positions', { headers })
+          if (res.ok) {
+            const data = await res.json()
+            setPositions(data || [])
+          }
+        } catch (error) {
+          console.error('Failed to load positions:', error)
+        }
+
+        // 활성 모듈 로드
+        try {
+          const res = await fetch('/api/company_modules', { headers })
+          if (res.ok) {
+            const data = await res.json()
+            if (data) {
+              const seen = new Set<string>()
+              const modules = data
+                .filter((m: any) => m.module?.path && !seen.has(m.module.path) && seen.add(m.module.path))
+                .map((m: any) => ({ path: m.module.path, name: m.module.name }))
+              setActiveModules(modules)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load company modules:', error)
+        }
+      }
+
+      loadData()
     }
   }, [isOpen])
 
@@ -192,19 +211,15 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
     const permissionsArray = Object.values(pagePerms).filter(p => p.can_view || p.can_create || p.can_edit || p.can_delete)
 
     try {
-      // ★ 세션 토큰 안전하게 가져오기 (만료 시 자동 갱신)
-      let { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession()
-        session = refreshed
-      }
-      if (!session?.access_token) throw new Error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
+      // ★ 세션 토큰 안전하게 가져오기
+      const token = auth.currentUser ? await auth.currentUser.getIdToken(true) : null
+      if (!token) throw new Error('로그인이 필요합니다. 페이지를 새로고침해주세요.')
 
       const res = await fetch('/api/member-invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           email,
@@ -236,7 +251,7 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
+              'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
               email,

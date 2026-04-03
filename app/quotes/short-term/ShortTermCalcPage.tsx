@@ -1,7 +1,22 @@
 'use client'
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../context/AppContext'
 import { useState, useEffect, useCallback } from 'react'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================================================
 // LOTTE QUICK RATE DATA (빠른 계산기용 — 1~3일 기준가)
@@ -133,20 +148,26 @@ export default function ShortTermCalcPage() {
   useEffect(() => {
     const loadStamp = async () => {
       if (!companyId) return
-      const { data } = await supabase.from('company_settings').select('value')
-        .eq('key', 'pdf_defaults').maybeSingle()
-      if (data?.value?.company_stamp) {
-        setCompanyStamp(data.value.company_stamp)
-      } else {
-        try {
-          const res = await fetch('/images/company_stamp.png')
-          if (res.ok) {
-            const blob = await res.blob()
-            const reader = new FileReader()
-            reader.onload = () => setCompanyStamp(reader.result as string)
-            reader.readAsDataURL(blob)
-          }
-        } catch {}
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/company/settings?key=pdf_defaults', { headers })
+        const json = await res.json()
+        const data = json.data
+        if (data?.value?.company_stamp) {
+          setCompanyStamp(data.value.company_stamp)
+        } else {
+          try {
+            const stampRes = await fetch('/images/company_stamp.png')
+            if (stampRes.ok) {
+              const blob = await stampRes.blob()
+              const reader = new FileReader()
+              reader.onload = () => setCompanyStamp(reader.result as string)
+              reader.readAsDataURL(blob)
+            }
+          } catch {}
+        }
+      } catch (e) {
+        console.error('회사 설정 로드 실패:', e)
       }
     }
     loadStamp()
@@ -214,19 +235,28 @@ export default function ShortTermCalcPage() {
         quote_detail: invoiceDetail,
       }
 
-      let { data, error } = await supabase.from('quotes').insert({
-        ...basePayload,
-        rental_type: '청구서',
-      }).select().single()
+      const headers = await getAuthHeader()
+      let res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          ...basePayload,
+          rental_type: '청구서',
+        })
+      })
+      let data = (await res.json()).data
 
-      if (error && error.message.includes('column')) {
+      if (!res.ok) {
         delete basePayload.quote_detail
-        const result = await supabase.from('quotes').insert({ ...basePayload, rental_type: '청구서' }).select().single()
-        data = result.data
-        error = result.error
+        res = await fetch('/api/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ ...basePayload, rental_type: '청구서' })
+        })
+        data = (await res.json()).data
       }
 
-      if (error) throw error
+      if (!res.ok) throw new Error('견적 저장 실패')
 
       if (download) {
         try {
@@ -615,11 +645,11 @@ export default function ShortTermCalcPage() {
                     const amount = f(calcSelected ? calcResult : invManualAmount)
                     const msg = `[에프엠아이 렌터카]\n${inv.tenant_name}님 청구서\n차종: ${carInfo}\n금액: ${amount}원\n감사합니다.`
                     try {
-                      const { data: { session } } = await supabase.auth.getSession()
-                      if (!session?.access_token) return alert('로그인이 필요합니다.')
+                      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+                      if (!token) return alert('로그인이 필요합니다.')
                       const res = await fetch('/api/send-sms', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                         body: JSON.stringify({ phone, message: msg, title: '청구서 안내', recipientName: inv.tenant_name }),
                       })
                       const result = await res.json()

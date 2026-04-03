@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
@@ -10,6 +9,14 @@ import {
   annualToMonthly, hourlyToMonthly, dailyToMonthly,
   ALLOWANCE_TYPES, DEDUCTION_TYPES, EMPLOYMENT_TYPES, SALARY_TYPES,
 } from '../../utils/payroll-calc'
+
+// ────────────────────────────────────────────────────────────────
+// Auth Helper
+// ────────────────────────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 // ════════════════════════════════════════════════════════════════
 // 급여 관리 통합 (v4 — 급여+프리랜서+용역비 통합)
@@ -199,11 +206,9 @@ export default function PayrollPage() {
 
   const fetchPayslips = useCallback(async () => {
     if (!cid) return
-    const { data, error } = await supabase
-      .from('payslips')
-      .select('*')
-      .eq('pay_period', payPeriod)
-      .order('created_at', { ascending: false })
+    const res = await fetch('/api/payslips', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (error) console.error('payslips error:', error.message)
     // employee 정보는 settings에서 매칭
     setPayslips(data || [])
@@ -211,52 +216,46 @@ export default function PayrollPage() {
 
   const fetchSettings = useCallback(async () => {
     if (!cid) return
-    const { data, error } = await supabase
-      .from('employee_salaries')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
+    const res = await fetch('/api/employee_salaries', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (error) console.error('settings error:', error.message)
     setSettings(data || [])
   }, [cid])
 
   const fetchEmps = useCallback(async () => {
     if (!cid) return
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, employee_name, email, phone, position_id, department_id')
-      
+    const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (error) console.error('emps error:', error.message)
     setEmps(data || [])
   }, [cid])
 
   const fetchFreelancers = useCallback(async () => {
     if (!cid) return
-    let query = supabase.from('freelancers').select('*').order('name')
-    if (flFilter === 'active') query = query.eq('is_active', true)
-    if (flFilter === 'inactive') query = query.eq('is_active', false)
-    const { data } = await query
-    setFreelancers(data || [])
+    const res = await fetch('/api/freelancers?order=name', { headers: await getAuthHeader() })
+    const json = await res.json()
+    let data = json.data || []
+    if (flFilter === 'active') data = data.filter((item: any) => item.is_active === true)
+    if (flFilter === 'inactive') data = data.filter((item: any) => item.is_active === false)
+    setFreelancers(data)
   }, [cid, flFilter])
 
   const fetchFlPayments = useCallback(async () => {
     if (!cid) return
     const [y, m] = payMonth.split('-').map(Number)
     const lastDay = new Date(y, m, 0).getDate()
-    const { data, error } = await supabase
-      .from('freelancer_payments')
-      .select('*, freelancers!freelancer_id(name, service_type)')
-      
-      .gte('payment_date', `${payMonth}-01`)
-      .lte('payment_date', `${payMonth}-${lastDay}`)
-      .order('payment_date', { ascending: false })
+    const res = await fetch('/api/freelancer_payments', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (error) {
       console.error('payments error:', error.message)
       // fallback: join 없이 재시도
-      const { data: d2 } = await supabase.from('freelancer_payments').select('*')
-        .gte('payment_date', `${payMonth}-01`).lte('payment_date', `${payMonth}-${lastDay}`)
-        .order('payment_date', { ascending: false })
-      setFlPayments(d2 || [])
+      const resRetry = await fetch('/api/freelancer_payments', { headers: await getAuthHeader() })
+      const jsonRetry = await resRetry.json()
+      const dataRetry = jsonRetry.data || []
+      setFlPayments(dataRetry)
     } else {
       setFlPayments(data || [])
     }
@@ -264,24 +263,22 @@ export default function PayrollPage() {
 
   const fetchMeals = useCallback(async () => {
     if (!cid) return
-    const { data, error } = await supabase
-      .from('meal_expense_monthly')
-      .select('*')
-      .eq('year_month', mealPeriod)
-      .order('excess_amount', { ascending: false })
+    const res = await fetch('/api/meal_expense_monthly', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (error) console.error('meals error:', error.message)
     setMeals(data || [])
   }, [cid, mealPeriod])
 
   const fetchDepts = useCallback(async () => {
     if (!cid) return
-    const { data } = await supabase.from('departments').select('*')
+    const res = await fetch('/api/departments', { headers: await getAuthHeader() }); const { data, error } = await res.json()
     setDepartments(data || [])
   }, [cid])
 
   const fetchPositions = useCallback(async () => {
     if (!cid) return
-    const { data } = await supabase.from('positions').select('*')
+    const res = await fetch('/api/positions', { headers: await getAuthHeader() }); const { data, error } = await res.json()
     setPositions(data || [])
   }, [cid])
 
@@ -299,7 +296,7 @@ export default function PayrollPage() {
     if (!confirm(`${payPeriod} 급여를 생성하시겠습니까?`)) return
     setGenerating(true)
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const token = localStorage.getItem('sb-auth-token')
       const res = await fetch('/api/payroll/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({  pay_period: payPeriod }),
@@ -335,10 +332,13 @@ export default function PayrollPage() {
     }
 
     if (editing) {
-      const { error } = await supabase.from('employee_salaries').update(payload).eq('id', editing.id)
+      const res = await fetch(`/api/employee_salaries/\${JSON.stringify(editing.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+      const error = !res.ok ? { message: 'Update failed' } : null
       if (error) return alert('수정 실패: ' + error.message)
     } else {
-      const { error } = await supabase.from('employee_salaries').insert(payload)
+      const res = await fetch('/api/employee_salaries', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+      const json = await res.json()
+      const { error } = json
       if (error) return alert('등록 실패: ' + error.message)
     }
     alert('저장 완료'); setShowModal(false); setEditing(null); fetchSettings()
@@ -389,10 +389,13 @@ export default function PayrollPage() {
     if (!flForm.name) return alert('이름은 필수입니다.')
     const payload = { ...flForm}
     if (editingFl) {
-      const { error } = await supabase.from('freelancers').update(payload).eq('id', editingFl.id)
+      const res = await fetch(`/api/freelancers/\${JSON.stringify(editingFl.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+      const error = !res.ok ? { message: 'Update failed' } : null
       if (error) return alert('수정 실패: ' + error.message)
     } else {
-      const { error } = await supabase.from('freelancers').insert(payload)
+      const res = await fetch('/api/freelancers', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+      const json = await res.json()
+      const { error } = json
       if (error) return alert('등록 실패: ' + error.message)
     }
     alert('저장되었습니다.'); setShowFlModal(false); setEditingFl(null); setFlForm(emptyFlForm); fetchFreelancers()
@@ -404,7 +407,7 @@ export default function PayrollPage() {
     setShowFlModal(true)
   }
   const handleToggleActive = async (f: any) => {
-    await supabase.from('freelancers').update({ is_active: !f.is_active }).eq('id', f.id)
+    await fetch(`/api/freelancers/\${JSON.stringify(f.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ is_active: !f.is_active }) })
     fetchFreelancers()
   }
   const formatPhone = (v: string) => v.replace(/[^0-9]/g, '').replace(/^(\d{2,3})(\d{3,4})(\d{4})$/, '$1-$2-$3')
@@ -490,7 +493,9 @@ export default function PayrollPage() {
     setBulkProcessing(true); let saved = 0
     for (const item of toSave) {
       const { _row, _status, _note, ...payload } = item
-      const { error } = await supabase.from('freelancers').insert({ ...payload})
+      const res = await fetch('/api/freelancers', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ ...payload}) })
+      const json = await res.json()
+      const error = json.error
       if (error) { item._status = 'error'; item._note = error.message } else { item._status = 'saved'; item._note = '등록 완료'; saved++ }
     }
     setBulkData([...bulkData]); setBulkLogs(prev => [...prev, `${saved}명 등록 완료`])
@@ -520,29 +525,31 @@ export default function PayrollPage() {
       gross_amount: gross, tax_rate: taxRate, tax_amount: taxAmount, net_amount: netAmount,
       description: payForm.description, status: payForm.status,
     }
-    const { error } = await supabase.from('freelancer_payments').insert(payload)
+    const res = await fetch('/api/freelancer_payments', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    const { error } = json
     if (error) return alert('등록 실패: ' + error.message)
     alert('지급 등록 완료'); setShowPayModal(false); setPayForm(emptyPayForm); fetchFlPayments()
   }
 
   const handlePaymentConfirm = async (p: any) => {
     if (!confirm(`${p.freelancers?.name}에게 ${n(p.net_amount)}원 지급 확정하시겠습니까?`)) return
-    await supabase.from('freelancer_payments').update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }).eq('id', p.id)
-    await supabase.from('transactions').insert({
+    await fetch(`/api/freelancer_payments/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }) })
+    await fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
        transaction_date: p.payment_date, type: 'expense', category: '용역비(3.3%)',
       client_name: p.freelancers?.name || '프리랜서', amount: p.net_amount,
       description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
       payment_method: '이체', status: 'completed', related_type: 'freelancer',
       related_id: p.freelancer_id, classification_source: 'auto_sync', confidence: 100,
-    })
+    }) })
     if (p.tax_amount > 0) {
-      await supabase.from('transactions').insert({
+      await fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
          transaction_date: p.payment_date, type: 'expense', category: '세금/공과금',
         client_name: `원천세(${p.freelancers?.name})`, amount: p.tax_amount,
         description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
         payment_method: '이체', status: 'completed', related_type: 'freelancer',
         related_id: p.freelancer_id, classification_source: 'auto_sync', confidence: 100,
-      })
+      }) })
     }
     alert('지급 확정 및 장부 반영 완료'); fetchFlPayments()
   }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from './utils/supabase'
+import { auth } from '@/lib/firebase'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification } from 'firebase/auth'
 
 // ============================================
 // FMI ERP ERP - Enterprise Auth Page
@@ -83,30 +84,42 @@ function AuthPage() {
   }, [])
 
   // 개별 중복 체크 함수들
+  const checkDup = async (field: string, value: string) => {
+    try {
+      const res = await fetch('/api/signup/check-dup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field, value }),
+      })
+      const { exists } = await res.json()
+      return exists === true
+    } catch { return false }
+  }
+
   const checkEmailDup = async (email: string) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return
-    const { data } = await supabase.rpc('check_email_exists', { check_email: email })
-    setDupCheck(prev => ({ ...prev, email: data === true ? false : true }))
+    const exists = await checkDup('email', email)
+    setDupCheck(prev => ({ ...prev, email: exists ? false : true }))
   }
 
   const checkPhoneDup = async (phone: string) => {
     const clean = phone.replace(/[^0-9]/g, '')
     if (clean.length < 10) return
-    const { data } = await supabase.rpc('check_phone_exists', { check_phone: phone })
-    setDupCheck(prev => ({ ...prev, phone: data === true ? false : true }))
+    const exists = await checkDup('phone', phone)
+    setDupCheck(prev => ({ ...prev, phone: exists ? false : true }))
   }
 
   const checkCompanyNameDup = async (name: string) => {
     if (name.trim().length < 2) return
-    const { data } = await supabase.rpc('check_company_name_exists', { check_name: name })
-    setDupCheck(prev => ({ ...prev, companyName: data === true ? false : true }))
+    const exists = await checkDup('company_name', name)
+    setDupCheck(prev => ({ ...prev, companyName: exists ? false : true }))
   }
 
   const checkBusinessNumberDup = async (bn: string) => {
     const clean = bn.replace(/[^0-9]/g, '')
     if (clean.length < 10) return
-    const { data } = await supabase.rpc('check_business_number_exists', { check_bn: bn })
-    setDupCheck(prev => ({ ...prev, businessNumber: data === true ? false : true }))
+    const exists = await checkDup('business_number', bn)
+    setDupCheck(prev => ({ ...prev, businessNumber: exists ? false : true }))
   }
 
   // 사업자명 정규화 (법인형태 제거 후 비교용)
@@ -304,14 +317,13 @@ function AuthPage() {
   useEffect(() => {
     let redirected = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // ★ INITIAL_SESSION 또는 SIGNED_IN에서 세션 있으면 1회만 리다이렉트
-      if (!redirected && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!redirected && firebaseUser) {
         redirected = true
         router.push('/dashboard')
       }
     })
-    return () => { subscription.unsubscribe() }
+    return () => { unsubscribe() }
   }, [])
 
   // 인증 대기 화면: 폴링으로 인증 완료 감지 → verified 뷰로 전환
@@ -319,8 +331,8 @@ function AuthPage() {
     if (view !== 'verify') return
 
     // onAuthStateChange: 다른 탭에서 인증 완료 시 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
         setMessage(null)
         setView('verified')
       }
@@ -329,19 +341,18 @@ function AuthPage() {
     // 4초마다 signInWithPassword 시도 → 인증 완료되면 성공
     const interval = setInterval(async () => {
       if (!formData.email || !formData.password) return
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      })
-      if (!error) {
+      try {
+        await signInWithEmailAndPassword(auth, formData.email, formData.password)
         clearInterval(interval)
         setMessage(null)
         setView('verified')
+      } catch (err: any) {
+        // not verified yet, continue polling
       }
     }, 4000)
 
     return () => {
-      subscription.unsubscribe()
+      unsubscribe()
       clearInterval(interval)
     }
   }, [view, formData.email, formData.password])
@@ -424,18 +435,10 @@ function AuthPage() {
     setLoading(true)
     setMessage(null)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      })
-      if (error) {
-        setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
-        setLoading(false)
-      } else {
-        router.push('/dashboard')
-      }
+      await signInWithEmailAndPassword(auth, formData.email, formData.password)
+      router.push('/dashboard')
     } catch (err: any) {
-      setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
+      setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
       setLoading(false)
     }
   }
@@ -538,61 +541,24 @@ function AuthPage() {
     setMessage(null)
 
     try {
-      // 4. 서버사이드 통합 검증 (최종 확인 — admin 가입은 스킵)
-      if (roleType !== 'admin') try {
-        const { data: validation, error: valError } = await supabase.rpc('validate_signup', {
-          p_email: formData.email,
-          p_phone: formData.phone,
-          p_company_name: roleType === 'founder' ? formData.companyName : null,
-          p_business_number: roleType === 'founder' ? formData.businessNumber : null,
-        })
+      // 4. 클라이언트사이드 중복 체크가 완료되었으므로 추가 검증 스킵
 
-        if (valError) {
-          console.error('Validation RPC error:', valError)
-        } else if (validation && !validation.valid) {
-          const errors = validation.errors as string[]
-          const errorMsgs: Record<string, string> = {
-            email_exists: '이미 사용 중인 이메일입니다.',
-            phone_exists: '이미 등록된 전화번호입니다.',
-            company_exists: '이미 등록된 회사명입니다.',
-            business_number_exists: '이미 등록된 사업자번호입니다.',
-          }
-          const firstError = errors[0]
-          setMessage({ text: errorMsgs[firstError] || '입력 정보가 중복됩니다.', type: 'error' })
-          setLoading(false)
-          return
-        }
-      } catch (err) {
-        console.error('Validation error:', err)
-      }
-
-      // 5. Supabase 회원가입 실행
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            full_name: formData.name,
-            phone: formData.phone,
-            role: 'user',  // FMI 단독 ERP — 모든 가입자는 user, 관리자 승격은 admin이 수동 처리
-            company_name: null,
-            business_number: null,
-            admin_invite_code: null,
-          }
-        }
-      })
-
-      if (error) {
+      // 5. Firebase 회원가입 실행
+      let signUpData: any
+      try {
+        const firebaseUser = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
+        await sendEmailVerification(firebaseUser.user)
+        signUpData = { user: firebaseUser.user }
+      } catch (error: any) {
         console.error('회원가입 에러:', error.message, error)
         // 사용자 친화적 에러 메시지 변환
         let friendlyMsg = error.message
-        if (error.message.includes('Database error')) {
-          friendlyMsg = '계정 생성 중 데이터베이스 오류가 발생했습니다. 관리자에게 문의하세요.'
-        } else if (error.message.includes('already registered')) {
+        if (error.code === 'auth/email-already-in-use') {
           friendlyMsg = '이미 등록된 이메일입니다.'
-        } else if (error.message.includes('valid password')) {
+        } else if (error.code === 'auth/weak-password') {
           friendlyMsg = '비밀번호가 유효하지 않습니다. (최소 8자)'
+        } else if (error.code === 'auth/invalid-email') {
+          friendlyMsg = '유효하지 않은 이메일입니다.'
         }
         setMessage({ text: friendlyMsg, type: 'error' })
         setLoading(false)
@@ -621,7 +587,9 @@ function AuthPage() {
   const handleResendEmail = async () => {
     if (verifyCountdown > 0) return
     setVerifyCountdown(60)
-    await supabase.auth.resend({ type: 'signup', email: formData.email })
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser)
+    }
     setMessage({ text: '인증 메일이 재발송되었습니다.', type: 'success' })
   }
 
@@ -629,18 +597,13 @@ function AuthPage() {
   const handleVerifyAndLogin = async () => {
     setLoading(true)
     setMessage(null)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: formData.email,
-      password: formData.password,
-    })
-
-    if (error) {
-      setMessage({ text: '이메일 인증이 아직 완료되지 않았습니다. 메일함을 확인해주세요.', type: 'error' })
-      setLoading(false)
-    } else {
+    try {
+      await signInWithEmailAndPassword(auth, formData.email, formData.password)
       setLoading(false)
       setView('verified')
+    } catch (err: any) {
+      setMessage({ text: '이메일 인증이 아직 완료되지 않았습니다. 메일함을 확인해주세요.', type: 'error' })
+      setLoading(false)
     }
   }
 
@@ -671,21 +634,18 @@ function AuthPage() {
     setLoading(true)
     setMessage(null)
     try {
-      // 이미 세션이 있을 수 있으므로 세션 확인 후 이동
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
+      // 이미 인증된 사용자 확인 후 이동
+      const currentUser = auth.currentUser
+      if (currentUser) {
         router.push('/dashboard')
         return
       }
-      // 세션이 없으면 다시 로그인 시도
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      })
-      if (error) {
-        setMessage({ text: '로그인 중 오류가 발생했습니다. 로그인 페이지에서 다시 시도해주세요.', type: 'error' })
-      } else {
+      // 인증이 없으면 다시 로그인 시도
+      try {
+        await signInWithEmailAndPassword(auth, formData.email, formData.password)
         router.push('/dashboard')
+      } catch (err: any) {
+        setMessage({ text: '로그인 중 오류가 발생했습니다. 로그인 페이지에서 다시 시도해주세요.', type: 'error' })
       }
     } catch (err: any) {
       setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
@@ -699,15 +659,10 @@ function AuthPage() {
     setLoading(true)
     setMessage(null)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: 'admin@self-disruption.com', password: 'password1234!!'
-      })
-      if (error) {
-        setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
-        setLoading(false)
-      }
+      await signInWithEmailAndPassword(auth, 'admin@self-disruption.com', 'password1234!!')
+      router.push('/dashboard')
     } catch (err: any) {
-      setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
+      setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
       setLoading(false)
     }
   }

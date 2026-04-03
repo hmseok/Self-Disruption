@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { requireAuth } from '../../../utils/auth-guard'
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 // ═══ GET: 특이건 목록 조회 ═══
 export async function GET(request: NextRequest) {
@@ -27,36 +20,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
-
-  let query = sb
-    .from('transaction_flags')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+  // Build dynamic WHERE clause
+  let whereClause = 'WHERE 1=1'
+  const params: any[] = []
 
   if (status) {
     if (status === 'unresolved') {
-      query = query.in('status', ['pending', 'reviewing'])
+      whereClause += ` AND status IN ('pending', 'reviewing')`
     } else {
-      query = query.eq('status', status)
+      whereClause += ` AND status = ?`
+      params.push(status)
     }
   }
-  if (flagType) query = query.eq('flag_type', flagType)
-  if (cardId) query = query.eq('card_id', cardId)
-  if (employeeId) query = query.eq('employee_id', employeeId)
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('[flags GET] error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (flagType) {
+    whereClause += ` AND flag_type = ?`
+    params.push(flagType)
+  }
+  if (cardId) {
+    whereClause += ` AND card_id = ?`
+    params.push(cardId)
+  }
+  if (employeeId) {
+    whereClause += ` AND employee_id = ?`
+    params.push(employeeId)
   }
 
+  const data = await prisma.$queryRaw<any[]>(
+    `SELECT * FROM transaction_flags ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?` as any,
+    ...params,
+    limit,
+    offset
+  )
+
   // 통계
-  const { data: stats } = await sb
-    .from('transaction_flags')
-    .select('status')
+  const stats = await prisma.$queryRaw<any[]>`
+    SELECT status FROM transaction_flags
+  `
 
   const summary = {
     total: stats?.length || 0,
@@ -82,20 +81,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'company_id, flags 배열 필요' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
-
   // 중복 플래그 방지: 같은 transaction_id + flag_type 조합 체크
   const newFlags = []
   for (const flag of flags) {
     if (flag.transaction_id) {
-      const { data: existing } = await sb
-        .from('transaction_flags')
-        .select('id')
-        .eq('transaction_id', flag.transaction_id)
-        .eq('flag_type', flag.flag_type)
-        .maybeSingle()
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT id FROM transaction_flags
+        WHERE transaction_id = ${flag.transaction_id} AND flag_type = ${flag.flag_type}
+        LIMIT 1
+      `
 
-      if (existing) continue // 이미 존재하면 스킵
+      if (existing.length > 0) continue // 이미 존재하면 스킵
     }
 
     newFlags.push({
@@ -119,17 +115,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ created: 0, message: '새로운 플래그 없음 (중복 제외)' })
   }
 
-  const { data, error } = await sb
-    .from('transaction_flags')
-    .insert(newFlags)
-    .select()
-
-  if (error) {
-    console.error('[flags POST] error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const createdItems = []
+  for (const flag of newFlags) {
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO transaction_flags
+        (company_id, transaction_id, queue_id, flag_type, flag_reason, severity, status,
+         transaction_date, client_name, amount, card_id, employee_id, employee_name, created_at)
+        VALUES (
+          ${flag.company_id}, ${flag.transaction_id}, ${flag.queue_id}, ${flag.flag_type},
+          ${flag.flag_reason}, ${flag.severity}, ${flag.status},
+          ${flag.transaction_date}, ${flag.client_name}, ${flag.amount},
+          ${flag.card_id}, ${flag.employee_id}, ${flag.employee_name}, NOW()
+        )
+      `
+      createdItems.push(flag)
+    } catch (e) {
+      console.error('[flags POST] insert error:', e)
+    }
   }
 
-  return NextResponse.json({ created: data?.length || 0, items: data })
+  return NextResponse.json({ created: createdItems.length, items: createdItems })
 }
 
 // ═══ PATCH: 특이건 상태 업데이트 (검토 처리) ═══
@@ -144,25 +150,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'flag_ids, status 필요' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
+  const resolvedAt = ['approved', 'personal_confirmed', 'dismissed'].includes(newStatus) ? new Date().toISOString() : null
 
-  const updateData: any = {
-    status: newStatus,
-    reviewer_id: auth.userId,
-    reviewer_note: reviewer_note || null,
-    resolved_at: ['approved', 'personal_confirmed', 'dismissed'].includes(newStatus) ? new Date().toISOString() : null,
+  // Update flags
+  for (const flagId of flag_ids) {
+    await prisma.$executeRaw`
+      UPDATE transaction_flags SET
+        status = ${newStatus},
+        reviewer_id = ${auth.userId},
+        reviewer_note = ${reviewer_note || null},
+        resolved_at = ${resolvedAt}
+      WHERE id = ${flagId}
+    `
   }
 
-  const { data, error } = await sb
-    .from('transaction_flags')
-    .update(updateData)
-    .in('id', flag_ids)
-    .select()
-
-  if (error) {
-    console.error('[flags PATCH] error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  // Get updated flags
+  const data = await prisma.$queryRaw<any[]>`
+    SELECT * FROM transaction_flags WHERE id IN (${flag_ids.join(',')})
+  `
 
   // 개인 사용 확정 시 급여 조정 자동 생성
   if (newStatus === 'personal_confirmed' && create_salary_adjustment !== false) {
@@ -182,26 +187,35 @@ export async function PATCH(request: NextRequest) {
         reason: `법인카드 개인사용 - ${flag.client_name || ''} (${flag.transaction_date || ''})`,
         source_transaction_id: flag.transaction_id || null,
         source_flag_id: flag.id,
-        status: 'pending',
       })
     }
 
     if (adjustments.length > 0) {
-      const { data: adjData, error: adjError } = await sb
-        .from('salary_adjustments')
-        .insert(adjustments)
-        .select()
+      for (const adj of adjustments) {
+        await prisma.$executeRaw`
+          INSERT INTO salary_adjustments
+          (employee_id, year_month, adjustment_type, amount, reason,
+           source_transaction_id, source_flag_id, status, created_at)
+          VALUES (
+            ${adj.employee_id}, ${adj.year_month}, ${adj.adjustment_type}, ${adj.amount},
+            ${adj.reason}, ${adj.source_transaction_id}, ${adj.source_flag_id}, 'pending', NOW()
+          )
+        `
+      }
 
-      if (adjError) {
-        console.error('[flags PATCH] salary_adjustment insert error:', adjError)
-      } else if (adjData) {
-        // 플래그에 salary_adjustment_id 연결
-        for (const adj of adjData) {
-          if (adj.source_flag_id) {
-            await sb.from('transaction_flags')
-              .update({ salary_adjustment_id: adj.id })
-              .eq('id', adj.source_flag_id)
-          }
+      // Get the newly created adjustments and link them to flags
+      for (const adj of adjustments) {
+        const adjId = await prisma.$queryRaw<any[]>`
+          SELECT id FROM salary_adjustments
+          WHERE source_flag_id = ${adj.source_flag_id}
+          LIMIT 1
+        `
+
+        if (adjId.length > 0) {
+          await prisma.$executeRaw`
+            UPDATE transaction_flags SET salary_adjustment_id = ${adjId[0].id}
+            WHERE id = ${adj.source_flag_id}
+          `
         }
       }
     }

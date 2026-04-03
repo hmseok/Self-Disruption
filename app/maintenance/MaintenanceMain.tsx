@@ -2,8 +2,19 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../utils/supabase'
 import Link from 'next/link'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 type MaintenanceRecord = {
   id: string
@@ -186,16 +197,14 @@ export default function MaintenanceMainPage() {
   const fetchMaintenanceRecords = useCallback(async () => {
     if (!effectiveCompanyId) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('maintenance_records')
-      .select('*')
-      
-      .order('requested_date', { ascending: false })
-
-    if (error) {
-      console.error('정비 기록 로딩 실패:', JSON.stringify(error))
-    } else {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/maintenance-records', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
       setMaintenanceRecords(data || [])
+    } catch (error) {
+      console.error('정비 기록 로딩 실패:', JSON.stringify(error))
     }
     setLoading(false)
   }, [effectiveCompanyId])
@@ -203,31 +212,28 @@ export default function MaintenanceMainPage() {
   // Fetch inspection records
   const fetchInspectionRecords = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('inspection_records')
-      .select('*')
-      
-      .order('due_date', { ascending: true })
-
-    if (error) {
-      console.error('검사 기록 로딩 실패:', JSON.stringify(error))
-    } else {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/inspection-records', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
       setInspectionRecords(data || [])
+    } catch (error) {
+      console.error('검사 기록 로딩 실패:', JSON.stringify(error))
     }
   }, [effectiveCompanyId])
 
   // Fetch cars
   const fetchCars = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data, error } = await supabase
-      .from('cars')
-      .select('id,number,brand,model,trim,year')
-      
-
-    if (error) {
-      console.error('차량 로딩 실패:', error)
-    } else {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
       setCars(data || [])
+    } catch (error) {
+      console.error('차량 로딩 실패:', error)
     }
   }, [effectiveCompanyId])
 
@@ -294,17 +300,9 @@ export default function MaintenanceMainPage() {
         updates.completed_at = new Date().toISOString()
       }
 
-      await supabase.from('maintenance_records').update(updates).eq('id', maintId)
+      await fetch(`/api/maintenance-records/${maintId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(updates) })
 
-      await supabase.from('vehicle_status_log').insert({
-        
-        car_id: maint.car_id,
-        old_status: maint.status,
-        new_status: newStatus,
-        related_type: 'maintenance',
-        related_id: maintId,
-        changed_by: user?.id,
-      })
+      await fetch('/api/vehicle-status-log', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ car_id: maint.car_id, status: newStatus, changed_at: new Date().toISOString(), note: `정비 상태: ${newStatus}` }) })
 
       fetchMaintenanceRecords()
     } catch (error) {
@@ -325,17 +323,9 @@ export default function MaintenanceMainPage() {
         updates.completed_at = new Date().toISOString()
       }
 
-      await supabase.from('inspection_records').update(updates).eq('id', inspId)
+      await fetch(`/api/inspection-records/${inspId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(updates) })
 
-      await supabase.from('vehicle_status_log').insert({
-        
-        car_id: insp.car_id,
-        old_status: insp.status,
-        new_status: newStatus,
-        related_type: 'inspection',
-        related_id: inspId,
-        changed_by: user?.id,
-      })
+      await fetch('/api/vehicle-status-log', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ car_id: insp.car_id, status: newStatus, changed_at: new Date().toISOString(), note: `검사 상태: ${newStatus}` }) })
 
       fetchInspectionRecords()
     } catch (error) {
@@ -411,9 +401,9 @@ export default function MaintenanceMainPage() {
       }
 
       if (editingMaintenance) {
-        await supabase.from('maintenance_records').update(payload).eq('id', editingMaintenance.id)
+        await fetch(`/api/maintenance-records/${editingMaintenance.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
       } else {
-        await supabase.from('maintenance_records').insert([payload])
+        await fetch('/api/maintenance-records', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([payload]) })
       }
 
       setShowMaintenanceModal(false)
@@ -485,9 +475,9 @@ export default function MaintenanceMainPage() {
       }
 
       if (editingInspection) {
-        await supabase.from('inspection_records').update(payload).eq('id', editingInspection.id)
+        await fetch(`/api/inspection-records/${editingInspection.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
       } else {
-        await supabase.from('inspection_records').insert([payload])
+        await fetch('/api/inspection-records', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([payload]) })
       }
 
       setShowInspectionModal(false)

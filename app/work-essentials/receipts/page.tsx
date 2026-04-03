@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../context/AppContext'
-import { supabase } from '../../utils/supabase'
 
 // ════════════════════════════════════════════
 // 영수증 제출 / 법인카드 사용내역 관리
@@ -112,8 +112,8 @@ export default function ReceiptsPage() {
   const { isMobile, ready: mobileReady } = useIsMobile()
 
   const getToken = async () => {
-    const s = await supabase.auth.getSession()
-    return s.data.session?.access_token || ''
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return token || ''
   }
 
   // ── 데이터 로드 ──

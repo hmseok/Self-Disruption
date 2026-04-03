@@ -1,10 +1,21 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import RentalContractPaper from '../components/RentalContractPaper'
 import RentalContractTerms from '../components/RentalContractTerms'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const STATUS_MAP: Record<string, { label: string; bg: string; color: string }> = {
   draft: { label: '초안', bg: '#f3f4f6', color: '#6b7280' },
@@ -28,8 +39,11 @@ export default function EContractDetailPage() {
   useEffect(() => {
     if (!id) return
     ;(async () => {
-      const { data } = await supabase.from('short_term_rental_contracts').select('*').eq('id', id).single()
-      setContract(data)
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/e-contract/${id}`, { headers })
+      const json = await res.json()
+      if (json.error) console.error('e-contract fetch error:', json.error)
+      setContract(json.data || null)
       setLoading(false)
     })()
   }, [id])
@@ -39,8 +53,14 @@ export default function EContractDetailPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!contract) return
-    const { error } = await supabase.from('short_term_rental_contracts').update({ status: newStatus }).eq('id', id)
-    if (!error) setContract({ ...contract, status: newStatus })
+    const headers = await getAuthHeader()
+    const res = await fetch(`/api/e-contract/${id}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    })
+    const json = await res.json()
+    if (!json.error) setContract({ ...contract, status: newStatus })
   }
 
   const handleCopySignLink = () => {

@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import * as path from 'path'
 import * as fs from 'fs'
 
 // JSZip is available as ExcelJS dependency
 const JSZip = require('jszip')
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
@@ -19,12 +18,11 @@ async function verifyUser(request: NextRequest) {
   const urlToken = request.nextUrl.searchParams.get('token')
   const token = authHeader?.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : urlToken
   if (!token) return null
-  const supabase = getSupabaseAdmin()
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await supabase
-    .from('profiles').select('role, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  const profiles = await prisma.$queryRaw<any[]>`SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  return profile ? { id: userId, role: profile.role, employee_name: profile.employee_name } : null
 }
 
 /** JS Date → Excel serial number (1900 date system, UTC to avoid timezone issues) */
@@ -121,24 +119,18 @@ export async function GET(request: NextRequest) {
 
   if (!month) return NextResponse.json({ error: 'month 파라미터 필요' }, { status: 400 })
 
-  const supabase = getSupabaseAdmin()
-
   // 데이터 조회
   const start = `${month}-01`
   const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
   const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
 
-  const { data: items, error } = await supabase
-    .from('expense_receipts')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('expense_date', start)
-    .lte('expense_date', end)
-    .order('expense_date', { ascending: true })
-
-  if (error) {
-    return NextResponse.json({ error: '조회 실패' }, { status: 500 })
-  }
+  const items = await prisma.$queryRaw<any[]>`
+    SELECT * FROM expense_receipts
+    WHERE user_id = ${user.id}
+    AND expense_date >= ${start}
+    AND expense_date <= ${end}
+    ORDER BY expense_date ASC
+  `
 
   // ── JSZip으로 템플릿 xlsx 직접 수정 ──
   const templatePath = path.join(process.cwd(), 'public', 'templates', 'expense_report_template.xlsx')
@@ -213,7 +205,7 @@ export async function GET(request: NextRequest) {
       totalAmount += amt
     }
     sheetXml = sheetXml.replace(
-      /<c r="G2"[^>]*>.*?<\/c>/s,
+      /<c r="G2"[^>]*>[\s\S]*?<\/c>/,
       `<c r="G2" s="84"><f>SUM(G5:G${lastDataRow})</f><v>${totalAmount}</v></c>`
     )
 

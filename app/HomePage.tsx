@@ -1,5 +1,4 @@
 'use client'
-import { supabase } from './utils/supabase'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
@@ -7,6 +6,18 @@ interface Car {
   id: number; number: string; brand: string; model: string;
   trim: string; year: number; fuel: string; status: string;
   purchase_price: number; created_at: string; image_url?: string;
+}
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
 }
 
 export default function DashboardPage() {
@@ -27,34 +38,50 @@ export default function DashboardPage() {
     const fetchData = async () => {
       setLoading(true)
 
-      // 1. 차량 목록 가져오기
-      const { data: carsData } = await supabase.from('cars').select('*').order('created_at', { ascending: false })
-      const carList = carsData || []
-      setCars(carList)
+      try {
+        // 1. 차량 목록 가져오기
+        const carsRes = await fetch('/api/cars', {
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        })
+        const carsJson = await carsRes.json()
+        const carList = carsJson.data || []
+        setCars(carList)
 
-      // 2. 활성 계약(매출) 가져오기
-      const { data: activeQuotes } = await supabase.from('quotes').select('rent_fee').eq('status', 'active')
-      const totalRevenue = activeQuotes?.reduce((sum, q) => sum + (q.rent_fee || 0), 0) || 0
+        // 2. 활성 계약(매출) 가져오기
+        const quotesRes = await fetch('/api/quotes?status=active', {
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        })
+        const quotesJson = await quotesRes.json()
+        const totalRevenue = quotesJson.data?.reduce((sum: number, q: any) => sum + (q.rent_fee || 0), 0) || 0
 
-      // 3. 금융 비용(지출 1) 가져오기
-      const { data: financeData } = await supabase.from('financial_products').select('monthly_payment')
-      const totalFinance = financeData?.reduce((sum, f) => sum + (f.monthly_payment || 0), 0) || 0
+        // 3. 금융 비용(지출 1) 가져오기
+        const financeRes = await fetch('/api/financial-products', {
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        })
+        const financeJson = await financeRes.json()
+        const totalFinance = financeJson.data?.reduce((sum: number, f: any) => sum + (f.monthly_payment || 0), 0) || 0
 
-      // 4. 보험료(지출 2) 가져오기 (연납 -> 월 환산)
-      const { data: insuranceData } = await supabase.from('insurance_contracts').select('total_premium')
-      const totalInsurance = insuranceData?.reduce((sum, i) => sum + Math.round((i.total_premium || 0) / 12), 0) || 0
+        // 4. 보험료(지출 2) 가져오기 (연납 -> 월 환산)
+        const insuranceRes = await fetch('/api/insurance-contracts', {
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+        })
+        const insuranceJson = await insuranceRes.json()
+        const totalInsurance = insuranceJson.data?.reduce((sum: number, i: any) => sum + Math.round((i.total_premium || 0) / 12), 0) || 0
 
-      // 5. 통계 집계
-      setStats({
-        totalCars: carList.length,
-        rented: carList.filter((c: any) => c.status === 'rented').length, // status가 rented인 차
-        available: carList.filter((c: any) => c.status === 'available').length, // status가 available인 차
-        monthlyRevenue: totalRevenue,
-        monthlyExpense: totalFinance + totalInsurance,
-        netProfit: totalRevenue - (totalFinance + totalInsurance)
-      })
-
-      setLoading(false)
+        // 5. 통계 집계
+        setStats({
+          totalCars: carList.length,
+          rented: carList.filter((c: any) => c.status === 'rented').length, // status가 rented인 차
+          available: carList.filter((c: any) => c.status === 'available').length, // status가 available인 차
+          monthlyRevenue: totalRevenue,
+          monthlyExpense: totalFinance + totalInsurance,
+          netProfit: totalRevenue - (totalFinance + totalInsurance)
+        })
+      } catch (error) {
+        console.error('Dashboard data fetch error:', error)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchData()
   }, [])

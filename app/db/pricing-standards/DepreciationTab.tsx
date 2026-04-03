@@ -1,7 +1,21 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────
 interface DepreciationRate {
@@ -83,8 +97,6 @@ const INDUSTRY_BENCHMARKS = [
 
 // ─── Component ────────────────────────────────────────────
 export default function DepreciationTab() {
-  const supabase = createClientComponentClient()
-
   // 데이터
   const [rates, setRates] = useState<DepreciationRate[]>([])
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
@@ -110,21 +122,24 @@ export default function DepreciationTab() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
+      const headers = await getAuthHeader()
       const [ratesRes, adjRes, histRes] = await Promise.all([
-        supabase.from('depreciation_rates').select('*').order('origin').order('vehicle_class').order('fuel_type'),
-        supabase.from('depreciation_adjustments').select('*').order('adjustment_type').order('factor', { ascending: false }),
-        supabase.from('depreciation_history').select('*').order('changed_at', { ascending: false }).limit(30),
+        fetch('/api/pricing-standards?table=depreciation_rates', { headers }),
+        fetch('/api/pricing-standards?table=depreciation_adjustments', { headers }),
+        fetch('/api/pricing-standards?table=depreciation_history', { headers }),
       ])
-      if (ratesRes.error) throw ratesRes.error
-      setRates(ratesRes.data || [])
-      setAdjustments(adjRes.data || [])
-      setHistory(histRes.data || [])
+      const [ratesData, adjData, histData] = await Promise.all([
+        ratesRes.json(), adjRes.json(), histRes.json()
+      ])
+      setRates(ratesData.data || [])
+      setAdjustments(adjData.data || [])
+      setHistory(histData.data || [])
     } catch (error) {
       console.error('데이터 로드 실패:', error)
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -153,18 +168,29 @@ export default function DepreciationTab() {
     if (String(oldValue) === String(newValue)) { setEditingCell(null); return }
 
     try {
-      const { error } = await supabase.from('depreciation_rates').update({ [field]: newValue }).eq('id', rowId)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/pricing-standards/depreciation_rates/${rowId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ [field]: newValue })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '업데이트 실패')
       setRates(rates.map(r => r.id === rowId ? { ...r, [field]: newValue } : r))
 
       // 이력 기록
-      await supabase.from('depreciation_history').insert({
-        source_table: 'depreciation_rates',
-        source_id: rowId,
-        changed_field: field,
-        old_value: String(oldValue),
-        new_value: String(newValue),
+      const histRes = await fetch('/api/pricing-standards/depreciation_history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          source_table: 'depreciation_rates',
+          source_id: rowId,
+          changed_field: field,
+          old_value: String(oldValue),
+          new_value: String(newValue),
+        })
       })
+      if (!histRes.ok) console.error('이력 기록 실패')
     } catch (error) {
       console.error('업데이트 실패:', error)
     } finally {
@@ -175,13 +201,19 @@ export default function DepreciationTab() {
   // ─── 행 추가/삭제 ────────────────────────────────────
   const handleAddRow = async () => {
     try {
-      const { data, error } = await supabase.from('depreciation_rates').insert([{
-        origin: '국산', vehicle_class: '중형_세단', fuel_type: '내연기관',
-        rate_1yr: 0, rate_2yr: 0, rate_3yr: 0, rate_4yr: 0, rate_5yr: 0,
-        description: '', is_active: true,
-      }]).select()
-      if (error) throw error
-      if (data?.[0]) setRates([...rates, data[0]])
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/pricing-standards/depreciation_rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          origin: '국산', vehicle_class: '중형_세단', fuel_type: '내연기관',
+          rate_1yr: 0, rate_2yr: 0, rate_3yr: 0, rate_4yr: 0, rate_5yr: 0,
+          description: '', is_active: true,
+        })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '행 추가 실패')
+      if (json.data?.[0]) setRates([...rates, json.data[0]])
     } catch (error) {
       console.error('행 추가 실패:', error)
     }
@@ -190,8 +222,13 @@ export default function DepreciationTab() {
   const handleDeleteRow = async (rowId: number) => {
     if (!confirm('정말 삭제하시겠습니까?')) return
     try {
-      const { error } = await supabase.from('depreciation_rates').delete().eq('id', rowId)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/pricing-standards/depreciation_rates/${rowId}`, {
+        method: 'DELETE',
+        headers
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '삭제 실패')
       setRates(rates.filter(r => r.id !== rowId))
     } catch (error) {
       console.error('삭제 실패:', error)
@@ -201,18 +238,28 @@ export default function DepreciationTab() {
   // ─── 보정 계수 토글 ──────────────────────────────────
   const handleToggleAdjustment = async (adj: Adjustment) => {
     try {
-      const { error } = await supabase.from('depreciation_adjustments')
-        .update({ is_active: !adj.is_active }).eq('id', adj.id)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/pricing-standards/depreciation_adjustments/${adj.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ is_active: !adj.is_active })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '변경 실패')
       setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, is_active: !a.is_active } : a))
 
-      await supabase.from('depreciation_history').insert({
-        source_table: 'depreciation_adjustments',
-        source_id: adj.id,
-        changed_field: 'is_active',
-        old_value: String(adj.is_active),
-        new_value: String(!adj.is_active),
+      const histRes = await fetch('/api/pricing-standards/depreciation_history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          source_table: 'depreciation_adjustments',
+          source_id: adj.id,
+          changed_field: 'is_active',
+          old_value: String(adj.is_active),
+          new_value: String(!adj.is_active),
+        })
       })
+      if (!histRes.ok) console.error('이력 기록 실패')
     } catch (error) {
       console.error('보정 계수 변경 실패:', error)
     }
@@ -221,18 +268,28 @@ export default function DepreciationTab() {
   const handleUpdateAdjustmentFactor = async (adj: Adjustment, newFactor: number) => {
     if (adj.factor === newFactor) return
     try {
-      const { error } = await supabase.from('depreciation_adjustments')
-        .update({ factor: newFactor }).eq('id', adj.id)
-      if (error) throw error
+      const authHeaders = await getAuthHeader();
+      const updateRes = await fetch(`/api/pricing-standards?table=depreciation_adjustments&id=${adj.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ factor: newFactor })
+      })
+      const updateData = await updateRes.json()
+      if (updateData.error) throw new Error(updateData.error)
       setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, factor: newFactor } : a))
 
-      await supabase.from('depreciation_history').insert({
-        source_table: 'depreciation_adjustments',
-        source_id: adj.id,
-        changed_field: 'factor',
-        old_value: String(adj.factor),
-        new_value: String(newFactor),
+      const histRes = await fetch('/api/pricing-standards?table=depreciation_history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          source_table: 'depreciation_adjustments',
+          source_id: adj.id,
+          changed_field: 'factor',
+          old_value: String(adj.factor),
+          new_value: String(newFactor),
+        })
       })
+      if (!histRes.ok) console.error('이력 기록 실패')
     } catch (error) {
       console.error('계수 업데이트 실패:', error)
     }

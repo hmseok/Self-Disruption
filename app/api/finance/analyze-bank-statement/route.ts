@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ============================================
 // 통장 거래 자동 분석 & 계약 매칭 API
 // POST: 파싱된 거래 배열 → 세무사 분류 + 계약 매칭
 // ============================================
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 // ── 세무사 기준 분류 규칙 ──
 const CATEGORY_RULES = [
@@ -108,24 +100,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'company_id가 필요합니다.' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // ── 1. 회사의 활성 계약 전체 조회 ──
     const [jiipRes, investRes, loanRes, rulesRes, scheduleRes] = await Promise.all([
-      sb.from('jiip_contracts').select('id, investor_name, admin_fee, payout_day, status')
-        .eq('status', 'active'),
-      sb.from('general_investments').select('id, investor_name, invest_amount, interest_rate, payment_day, status')
-        .eq('status', 'active'),
-      sb.from('loans').select('id, finance_name, monthly_payment, payment_date, status')
-        .eq('status', 'active'),
-      sb.from('finance_rules').select('*'),
-      sb.from('expected_payment_schedules').select('id, contract_type, contract_id, payment_date, expected_amount, status')
-        .eq('status', 'pending'),
+      prisma.$queryRaw<any[]>`SELECT id, investor_name, admin_fee, payout_day, status FROM jiip_contracts WHERE status = 'active'`,
+      prisma.$queryRaw<any[]>`SELECT id, investor_name, invest_amount, interest_rate, payment_day, status FROM general_investments WHERE status = 'active'`,
+      prisma.$queryRaw<any[]>`SELECT id, finance_name, monthly_payment, payment_date, status FROM loans WHERE status = 'active'`,
+      prisma.$queryRaw<any[]>`SELECT * FROM finance_rules`,
+      prisma.$queryRaw<any[]>`SELECT id, contract_type, contract_id, payment_date, expected_amount, status FROM expected_payment_schedules WHERE status = 'pending'`,
     ])
 
     // 계약 통합 리스트 생성
     const contracts: ContractInfo[] = [
-      ...(jiipRes.data || []).map(c => ({
+      ...(jiipRes || []).map(c => ({
         id: c.id,
         type: 'jiip' as const,
         name: c.investor_name || '',
@@ -133,7 +119,7 @@ export async function POST(request: NextRequest) {
         paymentDay: Number(c.payout_day) || 10,
         status: c.status,
       })),
-      ...(investRes.data || []).map(c => ({
+      ...(investRes || []).map(c => ({
         id: c.id,
         type: 'invest' as const,
         name: c.investor_name || '',
@@ -141,7 +127,7 @@ export async function POST(request: NextRequest) {
         paymentDay: Number(c.payment_day) || 10,
         status: c.status,
       })),
-      ...(loanRes.data || []).map(c => ({
+      ...(loanRes || []).map(c => ({
         id: c.id,
         type: 'loan' as const,
         name: c.finance_name || '',
@@ -151,8 +137,8 @@ export async function POST(request: NextRequest) {
       })),
     ]
 
-    const schedules: ScheduleInfo[] = (scheduleRes.data || []) as ScheduleInfo[]
-    const dbRules = (rulesRes.data || []) as any[]
+    const schedules: ScheduleInfo[] = (scheduleRes || []) as ScheduleInfo[]
+    const dbRules = (rulesRes || []) as any[]
 
     // ── 2. 각 거래 분석 ──
     const enriched = transactions.map((tx: any) => {

@@ -1,47 +1,53 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { supabase } from '../../supabaseClient'; // 경로 확인 필요
+'use client'
 
-// Props에 대한 타입 정의
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, ReactNode } from 'react';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+
 interface ProtectedRouteProps {
-  allowedRoles: string[]; // 허용된 역할들의 배열 (예: ['admin', 'partner'])
+  allowedRoles: string[];
+  children: ReactNode;
 }
 
-const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
+  const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user) {
-        // profiles 테이블에서 role 가져오기
-        // DB 응답 타입도 지정해주면 좋지만, 일단은 any 혹은 제네릭으로 처리
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        // 데이터가 있으면 role 설정, 없으면 기본값 'staff'
-        setRole(data?.role || 'staff');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken()
+          const res = await fetch('/api/profiles/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          if (res.ok) {
+            const profile = await res.json()
+            setRole(profile.role || 'staff')
+          } else {
+            setRole('staff')
+          }
+        } catch {
+          setRole('staff')
+        }
+      } else {
+        setRole(null)
       }
-      setLoading(false);
-    };
-
-    fetchUserRole();
+      setLoading(false)
+    })
+    return () => unsubscribe()
   }, []);
 
   if (loading) return <div>권한 확인 중...</div>;
 
-  // role이 null이거나 allowedRoles에 포함되지 않으면 차단
   if (!role || !allowedRoles.includes(role)) {
-    alert("접근 권한이 없습니다.");
-    return <Navigate to="/" replace />;
+    router.push('/');
+    return null;
   }
 
-  return <Outlet />;
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

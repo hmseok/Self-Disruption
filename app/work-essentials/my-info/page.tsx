@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../context/AppContext'
-import { supabase } from '../../utils/supabase'
 
 // ════════════════════════════════════════════
 // 내 정보 페이지 — 프로필 + 법인카드 관리
@@ -45,8 +45,8 @@ export default function MyInfoPage() {
   const [cardSaving, setCardSaving] = useState(false)
 
   const getToken = async () => {
-    const s = await supabase.auth.getSession()
-    return s.data.session?.access_token || ''
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return token || ''
   }
 
   // 데이터 로드

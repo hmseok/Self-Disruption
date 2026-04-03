@@ -1,9 +1,19 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import * as XLSX from 'xlsx'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const KOREAN_BANKS = [
   'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행',
@@ -58,12 +68,14 @@ export default function FreelancersPage() {
   const fetchFreelancers = async () => {
     setLoading(true)
     try {
-      let query = supabase.from('freelancers').select('*').order('name')
-      if (filter === 'active') query = query.eq('is_active', true)
-      if (filter === 'inactive') query = query.eq('is_active', false)
-      const { data, error } = await query
-      if (error) console.error('freelancers fetch error:', error.message)
-      setFreelancers(data || [])
+      const headers = await getAuthHeader()
+      let url = '/api/freelancers'
+      if (filter === 'active') url += '?is_active=true'
+      if (filter === 'inactive') url += '?is_active=false'
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('프리랜서 조회 실패')
+      const json = await res.json()
+      setFreelancers(json.data || [])
     } catch (e) {
       console.error('freelancers exception:', e)
       setFreelancers([])
@@ -74,17 +86,13 @@ export default function FreelancersPage() {
 
   const fetchPayments = async () => {
     try {
+      const headers = await getAuthHeader()
       const [y, m] = paymentMonth.split('-').map(Number)
       const lastDay = new Date(y, m, 0).getDate()
-      const { data, error } = await supabase
-        .from('freelancer_payments')
-        .select('*, freelancers(name, service_type)')
-        
-        .gte('payment_date', `${paymentMonth}-01`)
-        .lte('payment_date', `${paymentMonth}-${lastDay}`)
-        .order('payment_date', { ascending: false })
-      if (error) console.error('payments fetch error:', error.message)
-      setPayments(data || [])
+      const res = await fetch(`/api/freelancer-payments?from=${paymentMonth}-01&to=${paymentMonth}-${lastDay}`, { headers })
+      if (!res.ok) throw new Error('지급 내역 조회 실패')
+      const json = await res.json()
+      setPayments(json.data || [])
     } catch (e) {
       console.error('payments exception:', e)
       setPayments([])
@@ -300,15 +308,18 @@ export default function FreelancersPage() {
 
     for (const item of toSave) {
       const { _row, _status, _note, _source, _sheet, default_fee, ...payload } = item
-      const { error } = await supabase.from('freelancers').insert({ ...payload})
-      if (error) {
-        item._status = 'error'
-        item._note = error.message
-        failed++
-      } else {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/freelancers', { method: 'POST', headers, body: JSON.stringify(payload) })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || '등록 실패')
         item._status = 'saved'
         item._note = '등록 완료'
         saved++
+      } catch (error: any) {
+        item._status = 'error'
+        item._note = error.message
+        failed++
       }
     }
 
@@ -337,17 +348,28 @@ export default function FreelancersPage() {
   const handleSave = async () => {
     if (!form.name) return alert('이름은 필수입니다.')
     const payload = { ...form}
+    const headers = await getAuthHeader()
 
-    if (editingId) {
-      const { error } = await supabase.from('freelancers').update(payload).eq('id', editingId)
-      if (error) return alert('수정 실패: ' + error.message)
-    } else {
-      const { error } = await supabase.from('freelancers').insert(payload)
-      if (error) return alert('등록 실패: ' + error.message)
+    try {
+      if (editingId) {
+        const res = await fetch(`/api/freelancers/${editingId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) })
+        if (!res.ok) {
+          const json = await res.json()
+          return alert('수정 실패: ' + (json.error || '오류 발생'))
+        }
+      } else {
+        const res = await fetch('/api/freelancers', { method: 'POST', headers, body: JSON.stringify(payload) })
+        if (!res.ok) {
+          const json = await res.json()
+          return alert('등록 실패: ' + (json.error || '오류 발생'))
+        }
+      }
+      alert('저장되었습니다.')
+      setShowForm(false); setEditingId(null); setForm(emptyForm)
+      fetchFreelancers()
+    } catch (e: any) {
+      alert('오류: ' + e.message)
     }
-    alert('저장되었습니다.')
-    setShowForm(false); setEditingId(null); setForm(emptyForm)
-    fetchFreelancers()
   }
 
   const handleEdit = (f: any) => {
@@ -356,8 +378,11 @@ export default function FreelancersPage() {
   }
 
   const handleToggleActive = async (f: any) => {
-    await supabase.from('freelancers').update({ is_active: !f.is_active }).eq('id', f.id)
-    fetchFreelancers()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/freelancers/${f.id}`, { method: 'PATCH', headers, body: JSON.stringify({ is_active: !f.is_active }) })
+      if (res.ok) fetchFreelancers()
+    } catch (e) { console.error(e) }
   }
 
   const handlePaymentSave = async () => {
@@ -379,54 +404,81 @@ export default function FreelancersPage() {
       status: payForm.status,
     }
 
-    const { error } = await supabase.from('freelancer_payments').insert(payload)
-    if (error) return alert('등록 실패: ' + error.message)
-    alert('지급 등록 완료')
-    setShowPaymentForm(false); setPayForm(emptyPaymentForm)
-    fetchPayments()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/freelancer-payments', { method: 'POST', headers, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        const json = await res.json()
+        return alert('등록 실패: ' + (json.error || '오류 발생'))
+      }
+      alert('지급 등록 완료')
+      setShowPaymentForm(false); setPayForm(emptyPaymentForm)
+      fetchPayments()
+    } catch (e: any) {
+      alert('오류: ' + e.message)
+    }
   }
 
   const handlePaymentConfirm = async (p: any) => {
     if (!confirm(`${p.freelancers?.name}에게 ${Number(p.net_amount).toLocaleString()}원 지급 확정하시겠습니까?`)) return
 
-    await supabase.from('freelancer_payments').update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }).eq('id', p.id)
+    try {
+      const headers = await getAuthHeader()
 
-    await supabase.from('transactions').insert({
-      
-      transaction_date: p.payment_date,
-      type: 'expense',
-      category: '용역비(3.3%)',
-      client_name: p.freelancers?.name || '프리랜서',
-      amount: p.net_amount,
-      description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
-      payment_method: '이체',
-      status: 'completed',
-      related_type: 'freelancer',
-      related_id: p.freelancer_id,
-      classification_source: 'auto_sync',
-      confidence: 100,
-    })
-
-    if (p.tax_amount > 0) {
-      await supabase.from('transactions').insert({
-        
-        transaction_date: p.payment_date,
-        type: 'expense',
-        category: '세금/공과금',
-        client_name: `원천세(${p.freelancers?.name})`,
-        amount: p.tax_amount,
-        description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
-        payment_method: '이체',
-        status: 'completed',
-        related_type: 'freelancer',
-        related_id: p.freelancer_id,
-        classification_source: 'auto_sync',
-        confidence: 100,
+      // Update payment status
+      await fetch(`/api/freelancer-payments/${p.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] })
       })
-    }
 
-    alert('지급 확정 및 장부 반영 완료')
-    fetchPayments()
+      // Insert transaction for net amount
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          transaction_date: p.payment_date,
+          type: 'expense',
+          category: '용역비(3.3%)',
+          client_name: p.freelancers?.name || '프리랜서',
+          amount: p.net_amount,
+          description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
+          payment_method: '이체',
+          status: 'completed',
+          related_type: 'freelancer',
+          related_id: p.freelancer_id,
+          classification_source: 'auto_sync',
+          confidence: 100,
+        })
+      })
+
+      // Insert transaction for tax if applicable
+      if (p.tax_amount > 0) {
+        await fetch('/api/transactions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            transaction_date: p.payment_date,
+            type: 'expense',
+            category: '세금/공과금',
+            client_name: `원천세(${p.freelancers?.name})`,
+            amount: p.tax_amount,
+            description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
+            payment_method: '이체',
+            status: 'completed',
+            related_type: 'freelancer',
+            related_id: p.freelancer_id,
+            classification_source: 'auto_sync',
+            confidence: 100,
+          })
+        })
+      }
+
+      alert('지급 확정 및 장부 반영 완료')
+      fetchPayments()
+    } catch (e: any) {
+      alert('오류: ' + e.message)
+    }
   }
 
   const formatMoney = (n: number) => n ? Number(n).toLocaleString() : '0'
@@ -625,7 +677,7 @@ export default function FreelancersPage() {
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             style={{
-              padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
+              padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
               background: activeTab === tab.key ? '#0f172a' : '#fff',
               color: activeTab === tab.key ? '#fff' : '#6b7280',
               border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',

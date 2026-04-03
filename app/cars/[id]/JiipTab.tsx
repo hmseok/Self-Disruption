@@ -1,6 +1,18 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
+
 export default function JiipTab({ carId }: { carId: string }) {
   const [loading, setLoading] = useState(false)
 
@@ -13,26 +25,15 @@ export default function JiipTab({ carId }: { carId: string }) {
   // --- 데이터 불러오기 ---
   const fetchData = async () => {
     setLoading(true)
-
-    // 지입 정보 가져오기
-    const { data: jiipData } = await supabase
-      .from('jiip_contracts')
-      .select('*')
-      .eq('car_id', carId)
-      .single() // 한 명만 가져옴
-
-    if (jiipData) setJiip(jiipData)
-    else setJiip(null) // 없으면 null
-
-    // 투자자 목록 가져오기
-    const { data: investData } = await supabase
-      .from('investments')
-      .select('*')
-      .eq('car_id', carId)
-      .order('invest_date', { ascending: false })
-
-    if (investData) setInvestors(investData)
-
+    try {
+      const headers = await getAuthHeader()
+      const [jiipRes, investRes] = await Promise.all([
+        fetch(`/api/jiip?car_id=${carId}&single=true`, { headers }).then(r => r.json()),
+        fetch(`/api/investments?car_id=${carId}`, { headers }).then(r => r.json()),
+      ])
+      setJiip(jiipRes.data || null)
+      setInvestors(investRes.data || [])
+    } catch (e) { console.error('[JiipTab fetchData]', e) }
     setLoading(false)
   }
 
@@ -53,22 +54,14 @@ export default function JiipTab({ carId }: { carId: string }) {
 
   const handleSaveJiip = async () => {
     if (!jiipForm.owner_name) return alert('차주 이름은 필수입니다.')
-
     const payload = { car_id: carId, ...jiipForm }
-
-    let error
-    if (jiip?.id) {
-        // 수정 (Update)
-        const res = await supabase.from('jiip_contracts').update(payload).eq('id', jiip.id)
-        error = res.error
-    } else {
-        // 신규 등록 (Insert)
-        const res = await supabase.from('jiip_contracts').insert([payload])
-        error = res.error
-    }
-
-    if (error) alert('저장 실패: ' + error.message)
-    else { alert('✅ 지입 계약이 저장되었습니다.'); fetchData(); }
+    const headers = await getAuthHeader()
+    const res = jiip?.id
+      ? await fetch(`/api/jiip/${jiip.id}`, { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : await fetch('/api/jiip', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    if (json.error) alert('저장 실패: ' + json.error)
+    else { alert('✅ 지입 계약이 저장되었습니다.'); fetchData() }
   }
 
   // --- 투자자 등록 ---
@@ -78,23 +71,26 @@ export default function JiipTab({ carId }: { carId: string }) {
 
   const handleAddInvestor = async () => {
     if (!investForm.investor_name) return alert('투자자 이름은 필수입니다.')
-
-    const { error } = await supabase.from('investments').insert([{
-        car_id: carId, ...investForm
-    }])
-
-    if (error) alert('실패: ' + error.message)
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/investments', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ car_id: carId, ...investForm }),
+    })
+    const json = await res.json()
+    if (json.error) alert('실패: ' + json.error)
     else {
-        alert('✅ 투자자가 등록되었습니다.');
-        setInvestForm({ investor_name: '', invest_amount: 0, monthly_payout: 0, invest_date: new Date().toISOString().split('T')[0] }); // 초기화
-        fetchData();
+      alert('✅ 투자자가 등록되었습니다.')
+      setInvestForm({ investor_name: '', invest_amount: 0, monthly_payout: 0, invest_date: new Date().toISOString().split('T')[0] })
+      fetchData()
     }
   }
 
   const handleDeleteInvestor = async (id: number) => {
     if(confirm('삭제하시겠습니까?')) {
-        await supabase.from('investments').delete().eq('id', id)
-        fetchData()
+      const headers = await getAuthHeader()
+      await fetch(`/api/investments/${id}`, { method: 'DELETE', headers })
+      fetchData()
     }
   }
 

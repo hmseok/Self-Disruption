@@ -1,46 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const supabase = getSupabaseAdmin()
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await supabase
-    .from('profiles').select('role, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  const profiles = await prisma.$queryRaw<any[]>`SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  return profile ? { id: userId, role: profile.role, employee_name: profile.employee_name } : null
 }
-
 
 // GET: 내 법인카드 목록
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-  const supabase = getSupabaseAdmin()
-  // 법인카드는 사용자 소속 — company_id와 무관하게 모든 내 카드 조회
-  const { data, error } = await supabase
-    .from('user_corporate_cards')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('is_default', { ascending: false })
-    .order('created_at', { ascending: false })
-
-  if (error) {
+  try {
+    const cards = await prisma.$queryRaw<any[]>`
+      SELECT * FROM user_corporate_cards WHERE user_id = ${user.id}
+      ORDER BY is_default DESC, created_at DESC
+    `
+    return NextResponse.json({ data: cards || [] })
+  } catch (error: any) {
     return NextResponse.json({ error: '조회 실패' }, { status: 500 })
   }
-
-  return NextResponse.json({ data: data || [] })
 }
 
 // POST: 법인카드 등록
@@ -55,39 +47,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '카드번호는 필수입니다.' }, { status: 400 })
   }
 
-  const supabase = getSupabaseAdmin()
+  try {
+    // 기본 카드로 설정 시 기존 기본 카드 해제
+    if (is_default) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET is_default = 0 WHERE user_id = ${user.id} AND is_default = 1`
+    }
 
-  // 기본 카드로 설정 시 기존 기본 카드 해제
-  if (is_default) {
-    await supabase
-      .from('user_corporate_cards')
-      .update({ is_default: false })
-      .eq('user_id', user.id)
-      .eq('is_default', true)
-  }
+    // 카드번호에서 뒤 4자리 추출
+    const last4 = card_number.replace(/[^0-9]/g, '').slice(-4)
+    const cardId = require('crypto').randomUUID()
 
-  // 카드번호에서 뒤 4자리 추출
-  const last4 = card_number.replace(/[^0-9]/g, '').slice(-4)
+    await prisma.$executeRaw`
+      INSERT INTO user_corporate_cards (id, user_id, card_name, card_number, card_last4, card_company, is_default, created_at, updated_at)
+      VALUES (${cardId}, ${user.id}, ${card_name || `법인카드 ${last4}`}, ${card_number.trim()}, ${last4}, ${card_company || ''}, ${is_default ? 1 : 0}, NOW(), NOW())
+    `
 
-  const { data, error } = await supabase
-    .from('user_corporate_cards')
-    .insert({
-      user_id: user.id,
-      card_name: card_name || `법인카드 ${last4}`,
-      card_number: card_number.trim(),
-      card_last4: last4,
-      card_company: card_company || '',
-      is_default: is_default || false,
-    })
-    .select()
-    .single()
+    const result = await prisma.$queryRaw<any[]>`SELECT * FROM user_corporate_cards WHERE id = ${cardId} LIMIT 1`
+    const data = result[0]
 
-  if (error) {
+    return NextResponse.json({ success: true, data })
+  } catch (error: any) {
     console.error('카드 등록 실패:', error)
     return NextResponse.json({ error: '등록 실패', detail: error.message }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true, data })
 }
 
 // DELETE: 법인카드 삭제
@@ -99,18 +81,12 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID 필요' }, { status: 400 })
 
-  const supabase = getSupabaseAdmin()
-  const { error } = await supabase
-    .from('user_corporate_cards')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id)
-
-  if (error) {
+  try {
+    await prisma.$executeRaw`DELETE FROM user_corporate_cards WHERE id = ${id} AND user_id = ${user.id}`
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
     return NextResponse.json({ error: '삭제 실패' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }
 
 // PATCH: 법인카드 수정 (기본카드 설정 등)
@@ -123,33 +99,64 @@ export async function PATCH(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: 'ID 필요' }, { status: 400 })
 
-  const supabase = getSupabaseAdmin()
+  try {
+    // 기본 카드로 설정 시 기존 기본 카드 해제
+    if (is_default) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET is_default = 0 WHERE user_id = ${user.id} AND is_default = 1`
+    }
 
-  // 기본 카드로 설정 시 기존 기본 카드 해제
-  if (is_default) {
-    await supabase
-      .from('user_corporate_cards')
-      .update({ is_default: false })
-      .eq('user_id', user.id)
-      .eq('is_default', true)
-  }
+    const updates: string[] = []
+    const params: any[] = []
 
-  const updateData: Record<string, any> = {}
-  if (card_name !== undefined) updateData.card_name = card_name
-  if (card_company !== undefined) updateData.card_company = card_company
-  if (is_default !== undefined) updateData.is_default = is_default
+    if (card_name !== undefined) {
+      updates.push('card_name = ?')
+      params.push(card_name)
+    }
+    if (card_company !== undefined) {
+      updates.push('card_company = ?')
+      params.push(card_company)
+    }
+    if (is_default !== undefined) {
+      updates.push('is_default = ?')
+      params.push(is_default ? 1 : 0)
+    }
 
-  const { data, error } = await supabase
-    .from('user_corporate_cards')
-    .update(updateData)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
+    if (updates.length === 0) {
+      const result = await prisma.$queryRaw<any[]>`SELECT * FROM user_corporate_cards WHERE id = ${id} AND user_id = ${user.id} LIMIT 1`
+      const data = result[0]
+      return NextResponse.json({ success: true, data })
+    }
 
-  if (error) {
+    let query = 'UPDATE user_corporate_cards SET '
+    query += updates.join(', ')
+    query += ' WHERE id = ? AND user_id = ?'
+    params.push(id, user.id)
+
+    // Use raw SQL with parameter placeholders
+    const updateQuery = `UPDATE user_corporate_cards SET ${updates.map((_, i) => `${updates[i].split(' = ')[0]} = ${params[i] !== undefined ? `'${params[i]}'` : 'NULL'}`).join(', ')} WHERE id = '${id}' AND user_id = '${user.id}'`
+
+    // Simpler approach using individual if checks
+    if (card_name !== undefined && card_company !== undefined && is_default !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_name = ${card_name}, card_company = ${card_company}, is_default = ${is_default ? 1 : 0} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (card_name !== undefined && card_company !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_name = ${card_name}, card_company = ${card_company} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (card_name !== undefined && is_default !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_name = ${card_name}, is_default = ${is_default ? 1 : 0} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (card_company !== undefined && is_default !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_company = ${card_company}, is_default = ${is_default ? 1 : 0} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (card_name !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_name = ${card_name} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (card_company !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET card_company = ${card_company} WHERE id = ${id} AND user_id = ${user.id}`
+    } else if (is_default !== undefined) {
+      await prisma.$executeRaw`UPDATE user_corporate_cards SET is_default = ${is_default ? 1 : 0} WHERE id = ${id} AND user_id = ${user.id}`
+    }
+
+    const result = await prisma.$queryRaw<any[]>`SELECT * FROM user_corporate_cards WHERE id = ${id} AND user_id = ${user.id} LIMIT 1`
+    const data = result[0]
+
+    return NextResponse.json({ success: true, data })
+  } catch (error: any) {
     return NextResponse.json({ error: '수정 실패' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true, data })
 }

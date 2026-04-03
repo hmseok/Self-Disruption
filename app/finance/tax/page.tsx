@@ -1,8 +1,18 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo } from 'react'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 타입 정의
@@ -80,43 +90,29 @@ export default function TaxManagementPage() {
       const endDate = `${filterMonth}-${lastDay}`
 
       // 병렬로 모든 소스 조회
-      const [payslipRes, freelancerRes, settleTxRes, invoiceRes, filingRes] = await Promise.all([
+      const headers = await getAuthHeader()
+      const [payslipResp, freelancerResp, settleTxResp, invoiceResp, filingResp] = await Promise.all([
         // 1. 급여 (payslips)
-        supabase.from('payslips')
-          .select('id, employee_id, pay_period, gross_salary, income_tax, local_income_tax, national_pension, health_insurance, long_care_insurance, employment_insurance, total_deductions, net_salary, tax_type, status, profiles!payslips_employee_id_fkey(full_name)')
-          
-          .eq('pay_period', filterMonth),
+        fetch('/api/payslips?pay_period=' + filterMonth, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
 
         // 2. 프리랜서 지급 (freelancer_payments)
-        supabase.from('freelancer_payments')
-          .select('id, freelancer_id, payment_date, gross_amount, tax_rate, tax_amount, net_amount, description, status, freelancers(name, tax_type)')
-          
-          .gte('payment_date', startDate)
-          .lte('payment_date', endDate),
+        fetch(`/api/freelancer-payments?from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
 
         // 3. 정산 거래 (지입배분/투자이자)
-        supabase.from('transactions')
-          .select('id, transaction_date, category, client_name, description, amount, related_type, related_id')
-          
-          .eq('type', 'expense')
-          .eq('status', 'completed')
-          .in('related_type', ['jiip_share', 'invest'])
-          .gte('transaction_date', startDate)
-          .lte('transaction_date', endDate),
+        fetch(`/api/transactions?type=expense&status=completed&related_type=jiip_share,invest&from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
 
         // 4. 세금계산서 발행 (customer_tax_invoices)
-        supabase.from('customer_tax_invoices')
-          .select('id, customer_id, invoice_number, issue_date, supply_amount, tax_amount, total_amount, description, status, customers(name)')
-          
-          .gte('issue_date', startDate)
-          .lte('issue_date', endDate),
+        fetch(`/api/customer-tax-invoices?from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
 
         // 5. 기존 신고 기록
-        supabase.from('tax_filing_records')
-          .select('*')
-          
-          .eq('tax_period', filterMonth),
+        fetch(`/api/tax-filing-records?tax_period=${filterMonth}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
       ])
+
+      const payslipRes = payslipResp
+      const freelancerRes = freelancerResp
+      const settleTxRes = settleTxResp
+      const invoiceRes = invoiceResp
+      const filingRes = filingResp
 
       const items: TaxItem[] = []
 
@@ -220,11 +216,15 @@ export default function TaxManagementPage() {
       if (jiipTxs.length > 0) {
         // 지입 계약별 세금 유형 조회
         const jiipIds = [...new Set(jiipTxs.map((t: any) => t.related_id))]
-        const { data: jiipContracts } = await supabase
-          .from('jiip_contracts')
-          .select('id, tax_type, investor_name')
-          .in('id', jiipIds)
-        const jiipMap = new Map((jiipContracts || []).map((j: any) => [j.id, j]))
+        let jiipMap = new Map()
+        try {
+          const res = await fetch(`/api/jiip-contracts?ids=${jiipIds.join(',')}`, { headers })
+          const json = await res.json()
+          const jiipContracts = json.data ?? json ?? []
+          jiipMap = new Map((jiipContracts).map((j: any) => [j.id, j]))
+        } catch (err) {
+          console.error('Error fetching jiip contracts:', err)
+        }
 
         jiipTxs.forEach((tx: any) => {
           const contract = jiipMap.get(tx.related_id) as any
@@ -429,12 +429,17 @@ export default function TaxManagementPage() {
         updated_at: new Date().toISOString(),
       }
 
-      if (existing) {
-        await supabase.from('tax_filing_records').update(payload).eq('id', existing.id)
-      } else {
-        await supabase.from('tax_filing_records').insert(payload)
+      try {
+        const headers = await getAuthHeader()
+        if (existing) {
+          await fetch(`/api/tax-filing-records/${existing.id}`, { method: 'PATCH', headers, body: JSON.stringify(payload) })
+        } else {
+          await fetch('/api/tax-filing-records', { method: 'POST', headers, body: JSON.stringify(payload) })
+        }
+        fetchTaxData()
+      } catch (e: any) {
+        alert('신고 저장 실패: ' + e.message)
       }
-      fetchTaxData()
     } catch (err) {
       alert('신고 상태 저장 실패')
     }
@@ -444,8 +449,13 @@ export default function TaxManagementPage() {
     const existing = filingRecords.find(f => f.tax_type === taxType)
     if (!existing) return
     if (!confirm('신고 상태를 취소하시겠습니까?')) return
-    await supabase.from('tax_filing_records').update({ status: 'pending', filed_at: null, paid_at: null }).eq('id', existing.id)
-    fetchTaxData()
+    try {
+      const headers = await getAuthHeader()
+      await fetch(`/api/tax-filing-records/${existing.id}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'pending', filed_at: null, paid_at: null }) })
+      fetchTaxData()
+    } catch (e: any) {
+      alert('상태 변경 실패: ' + e.message)
+    }
   }
 
   // ============================================
@@ -820,17 +830,18 @@ function HistoryTab({ companyId }: { companyId: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase
-        .from('tax_filing_records')
-        .select('*')
-        
-        .order('tax_period', { ascending: false })
-        .limit(24)
-      setRecords((data || []) as FilingRecord[])
+    const fetchRecords = async () => {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/tax-filing-records?limit=24', { headers })
+        const json = await res.json()
+        setRecords((json.data ?? json ?? []) as FilingRecord[])
+      } catch (err) {
+        console.error('Error fetching filing records:', err)
+      }
       setLoading(false)
     }
-    fetch()
+    fetchRecords()
   }, [companyId])
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>

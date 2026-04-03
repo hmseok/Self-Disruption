@@ -1,7 +1,22 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+
+// ─────────────────────────────────────────────
+// Auth helper (fetch-based API calls)
+// ─────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
+
 const Icons = {
   Back: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
   Save: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
@@ -60,30 +75,36 @@ export default function InsuranceDetailPage() {
   }, [carId])
 
   const fetchData = async () => {
-    const { data: car } = await supabase.from('cars').select('*').eq('id', carId).single()
-    setCarInfo(car)
+    try {
+      const headers = await getAuthHeader()
 
-    const { data: insurance } = await supabase
-        .from('insurance_contracts')
-        .select('*')
-        .eq('car_id', carId)
-        .order('end_date', { ascending: false })
-        .limit(1)
-        .single()
+      // Fetch car info
+      const carRes = await fetch(`/api/cars/${carId}`, { headers })
+      const carJson = await carRes.json()
+      const car = carJson.data
+      setCarInfo(car)
 
-    if (insurance) setIns(insurance)
-    else if (car) setIns(prev => ({ ...prev, car_value: car.purchase_price }))
+      // Fetch insurance contracts for this car
+      const insRes = await fetch(`/api/insurance?car_id=${carId}`, { headers })
+      const insJson = await insRes.json()
+      const insurance = insJson.data?.[0]
+
+      if (insurance) setIns(insurance)
+      else if (car) setIns((prev: any) => ({ ...prev, car_value: car.purchase_price }))
+    } catch (err) {
+      console.error('fetchData error:', err)
+    }
     setLoading(false)
   }
 
   const handleChange = (field: string, value: any) => {
-    setIns(prev => ({ ...prev, [field]: value }))
+    setIns((prev: any) => ({ ...prev, [field]: value }))
   }
 
   const handleInstallmentChange = (index: number, field: string, value: any) => {
       const newInstallments = [...(ins.installments || [])];
       newInstallments[index] = { ...newInstallments[index], [field]: value };
-      setIns(prev => ({ ...prev, installments: newInstallments }));
+      setIns((prev: any) => ({ ...prev, installments: newInstallments }));
   }
 
   const handleSave = async () => {
@@ -96,29 +117,58 @@ export default function InsuranceDetailPage() {
         accessory_value: cleanNumber(ins.accessory_value)
     }
 
-    const query = ins.id
-        ? supabase.from('insurance_contracts').update(payload).eq('id', ins.id)
-        : supabase.from('insurance_contracts').insert([payload])
+    try {
+      const headers = await getAuthHeader()
+      const method = ins.id ? 'PATCH' : 'POST'
+      const url = ins.id ? `/api/insurance/${ins.id}` : '/api/insurance'
 
-    const { error } = await query
-    if (error) alert('저장 실패: ' + error.message)
-    else { alert('✅ 저장되었습니다!'); window.location.reload(); }
+      const res = await fetch(url, {
+        method,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (json.error) alert('저장 실패: ' + json.error)
+      else { alert('✅ 저장되었습니다!'); window.location.reload(); }
+    } catch (err) {
+      alert('저장 실패: ' + err)
+    }
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'application' | 'certificate') => {
     if (!e.target.files?.length) return
     const file = e.target.files[0]
     const fileExt = file.name.split('.').pop()
-    const fileName = `insurance/${carId}_${type}_${Date.now()}.${fileExt}`
 
-    const { error } = await supabase.storage.from('car_docs').upload(fileName, file)
-    if (error) return alert('업로드 실패')
+    // GCS upload
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    uploadFormData.append('folder', 'car_docs')
+    const { Authorization } = await getAuthHeader()
+    const uploadRes = await fetch('/api/upload', {
+      method: 'POST',
+      headers: Authorization ? { Authorization } : {},
+      body: uploadFormData,
+    })
+    const uploadJson = await uploadRes.json()
+    if (!uploadRes.ok) return alert('업로드 실패: ' + uploadJson.error)
 
-    const { data } = supabase.storage.from('car_docs').getPublicUrl(fileName)
+    const publicUrl = uploadJson.url || ''
     const fieldName = type === 'application' ? 'application_form_url' : 'certificate_url'
 
-    handleChange(fieldName, data.publicUrl)
-    if (ins.id) await supabase.from('insurance_contracts').update({ [fieldName]: data.publicUrl }).eq('id', ins.id)
+    handleChange(fieldName, publicUrl)
+    if (ins.id) {
+      try {
+        const headers = await getAuthHeader()
+        await fetch(`/api/insurance/${ins.id}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [fieldName]: publicUrl })
+        })
+      } catch (err) {
+        console.error('Failed to update insurance:', err)
+      }
+    }
     alert('업로드 완료')
   }
 

@@ -1,10 +1,25 @@
 'use client'
+import { auth } from '@/lib/firebase'
 
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 export const dynamic = "force-dynamic";
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 유틸
@@ -102,14 +117,16 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
   useEffect(() => {
     if (!quoteId) return
     setLoading(true)
-    const token = sessionStorage.getItem('supabase_access_token') || ''
-    fetch(`/api/quotes/${quoteId}/timeline`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(d => setEvents(d.events || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    ;(async () => {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+      fetch(`/api/quotes/${quoteId}/timeline`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.json())
+        .then(d => setEvents(d.events || []))
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    })()
   }, [quoteId])
 
   if (!quoteId || (events.length === 0 && !loading)) return null
@@ -225,39 +242,55 @@ export default function QuoteDetailPage() {
   useEffect(() => {
     const fetchQuoteDetail = async () => {
       if (!quoteId) return
-      const { data: quoteData, error } = await supabase.from('quotes').select('*').eq('id', quoteId).single()
-      if (error || !quoteData) { alert('견적서를 찾을 수 없습니다.'); router.push('/quotes'); return }
+      try {
+        const headers = await getAuthHeader()
 
-      let carData = null
-      if (quoteData.car_id) {
-        const { data } = await supabase.from('cars').select('*').eq('id', quoteData.car_id).single()
-        carData = data
+        const quoteRes = await fetch(`/api/quotes/${quoteId}`, { headers })
+        const quoteJson = await quoteRes.json()
+        const quoteData = quoteJson.data
+        if (quoteJson.error || !quoteData) { alert('견적서를 찾을 수 없습니다.'); router.push('/quotes'); return }
+
+        let carData = null
+        if (quoteData.car_id) {
+          const carRes = await fetch(`/api/cars/${quoteData.car_id}`, { headers })
+          const carJson = await carRes.json()
+          carData = carJson.data
+        }
+
+        if (quoteData.worksheet_id) {
+          const wsRes = await fetch(`/api/pricing-worksheets/${quoteData.worksheet_id}`, { headers })
+          const wsJson = await wsRes.json()
+          if (wsJson.data) setWorksheet(wsJson.data)
+        } else if (quoteData.car_id) {
+          const wsRes = await fetch(`/api/pricing-worksheets?car_id=${quoteData.car_id}`, { headers })
+          const wsJson = await wsRes.json()
+          if (wsJson.data && wsJson.data[0]) setWorksheet(wsJson.data[0])
+        }
+
+        // quote_detail 내 company 정보 활용
+
+        const contractRes = await fetch(`/api/contracts?quote_id=${quoteId}`, { headers })
+        const contractJson = await contractRes.json()
+        const contractData = contractJson.data ? contractJson.data[0] : null
+
+        let customerData = null
+        if (quoteData.customer_id) {
+          const custRes = await fetch(`/api/customers/${quoteData.customer_id}`, { headers })
+          const custJson = await custRes.json()
+          customerData = custJson.data
+        }
+
+        setQuote({ ...quoteData, car: carData, customer: customerData })
+        if (contractData) setLinkedContract(contractData)
+        // 고객 연락처 자동 세팅
+        const cust = customerData || quoteData.quote_detail?.manual_customer
+        if (cust?.phone) setSendPhone(cust.phone)
+        if (cust?.email) setSendEmail(cust.email)
+        setLoading(false)
+      } catch (err) {
+        console.error('Error fetching quote:', err)
+        setLoading(false)
       }
-
-      if (quoteData.worksheet_id) {
-        const { data: wsData } = await supabase.from('pricing_worksheets').select('*').eq('id', quoteData.worksheet_id).single()
-        if (wsData) setWorksheet(wsData)
-      } else if (quoteData.car_id) {
-        const { data: wsData } = await supabase.from('pricing_worksheets').select('*').eq('car_id', quoteData.car_id).order('updated_at', { ascending: false }).limit(1).single()
-        if (wsData) setWorksheet(wsData)
-      }
-
-      // quote_detail 내 company 정보 활용
-
-      const { data: contractData } = await supabase.from('contracts').select('*').eq('quote_id', quoteId).single()
-      let customerData = null
-      if (quoteData.customer_id) {
-        const { data: custData } = await supabase.from('customers').select('*').eq('id', quoteData.customer_id).single()
-        customerData = custData
-      }
-
-      setQuote({ ...quoteData, car: carData, customer: customerData })
-      if (contractData) setLinkedContract(contractData)
-      // 고객 연락처 자동 세팅
-      const cust = customerData || quoteData.quote_detail?.manual_customer
-      if (cust?.phone) setSendPhone(cust.phone)
-      if (cust?.email) setSendEmail(cust.email)
-      setLoading(false)
     }
     fetchQuoteDetail()
   }, [quoteId, router])
@@ -274,8 +307,7 @@ export default function QuoteDetailPage() {
     setShowShareModal(true)
     try {
       // Supabase 세션에서 access_token 가져오기
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch(`/api/quotes/${quoteId}/share`, {
         method: 'POST',
         headers: {
@@ -342,8 +374,7 @@ export default function QuoteDetailPage() {
   const handleRevokeShare = useCallback(async () => {
     if (!confirm('공유 링크를 비활성화하시겠습니까?')) return
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       await fetch(`/api/quotes/${quoteId}/share`, {
         method: 'DELETE',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -367,8 +398,7 @@ export default function QuoteDetailPage() {
     setSending(true)
     setSendResult(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch(`/api/quotes/${quoteId}/send`, {
         method: 'POST',
         headers: {
@@ -399,8 +429,14 @@ export default function QuoteDetailPage() {
     if (!confirm('이 견적을 보관하시겠습니까?')) return
     setUpdating(true)
     try {
-      const { error } = await supabase.from('quotes').update({ status: 'archived' }).eq('id', quoteId)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/quotes/${quoteId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
       alert('견적이 보관되었습니다.')
       setQuote({ ...quote, status: 'archived' })
     } catch (e: any) { alert('에러: ' + e.message) }
@@ -414,14 +450,23 @@ export default function QuoteDetailPage() {
     if (!confirm('이 견적서를 계약으로 전환하시겠습니까?\n계약 관리 페이지에서 확인할 수 있습니다.')) return
     setCreating(true)
     try {
+      const headers = await getAuthHeader()
       const detail = quote.quote_detail || {}
       const termMonths = detail.term_months || worksheet?.term_months || 36
-      const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
-        quote_id: quote.id, car_id: quote.car_id, customer_id: quote.customer_id || null,
-        customer_name: quote.customer_name, start_date: quote.start_date, end_date: quote.end_date,
-        term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active'
-      }]).select().single()
-      if (cErr) throw cErr
+
+      const contractRes = await fetch('/api/contracts', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quote_id: quote.id, car_id: quote.car_id, customer_id: quote.customer_id || null,
+          customer_name: quote.customer_name, start_date: quote.start_date, end_date: quote.end_date,
+          term_months: termMonths, deposit: quote.deposit, monthly_rent: quote.rent_fee, status: 'active'
+        }),
+      })
+      const contractJson = await contractRes.json()
+      const contract = contractJson.data
+      if (contractJson.error) throw new Error(contractJson.error)
+
       const schedules = []
       const rent = quote.rent_fee, vat = Math.round(rent * 0.1), startDate = new Date(quote.start_date)
       if (quote.deposit > 0) schedules.push({ contract_id: contract.id, round_number: 0, due_date: quote.start_date, amount: quote.deposit, vat: 0, status: 'unpaid' })
@@ -429,8 +474,17 @@ export default function QuoteDetailPage() {
         const d = new Date(startDate); d.setMonth(d.getMonth() + i)
         schedules.push({ contract_id: contract.id, round_number: i, due_date: d.toISOString().split('T')[0], amount: rent + vat, vat, status: 'unpaid' })
       }
-      await supabase.from('payment_schedules').insert(schedules)
-      if (quote.car_id) await supabase.from('cars').update({ status: 'rented' }).eq('id', quote.car_id)
+      // TODO Phase 4+: Create payment_schedules API (out of scope for file uploads)
+      // await fetch('/api/payment-schedules', { method: 'POST', headers, body: JSON.stringify(schedules) })
+
+      if (quote.car_id) {
+        await fetch(`/api/cars/${quote.car_id}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'rented' }),
+        })
+      }
+
       alert('계약 전환 완료! 계약 관리 페이지로 이동합니다.')
       router.push(`/contracts/${contract.id}`)
     } catch (e: any) { alert('에러: ' + e.message) }
@@ -602,8 +656,7 @@ export default function QuoteDetailPage() {
                   onClick={async () => {
                     try {
                       // 서명 데이터 가져오기
-                      const { data: { session } } = await supabase.auth.getSession()
-                      const authToken = session?.access_token || ''
+                      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : ''
                       const sigRes = await fetch(`/api/quotes/${quoteId}/share`, {
                         headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
                       })
@@ -618,8 +671,8 @@ export default function QuoteDetailPage() {
                         body: JSON.stringify({
                           company_name: quote?.company_name || '주식회사에프엠아이',
                           company_phone: quote?.company_phone || '',
-                          staff_name: profile?.name || '',
-                          staff_phone: profile?.phone || '',
+                          staff_name: detail?.staff_name || '',
+                          staff_phone: detail?.staff_phone || '',
                           tenant_name: quote?.customer_name || '',
                           tenant_phone: quote?.customer_phone || '',
                           tenant_birth: quote?.customer_birth || '',

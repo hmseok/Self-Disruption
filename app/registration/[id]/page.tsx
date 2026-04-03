@@ -1,8 +1,19 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // --- [UI 아이콘] ---
 const Icons = {
@@ -43,14 +54,30 @@ export default function RegistrationDetailPage() {
     if (!e.target.files?.length) return
     const file = e.target.files[0]
     const fileExt = file.name.split('.').pop()
-    const fileName = `registration/${carId}_${Date.now()}.${fileExt}`
 
-    const { error } = await supabase.storage.from('car_docs').upload(fileName, file)
-    if (error) return alert('업로드 실패: ' + error.message)
+    // GCS upload
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    uploadFormData.append('folder', 'car_docs')
+    const { Authorization } = await getAuthHeader()
+    const uploadRes = await fetch('/api/upload', {
+      method: 'POST',
+      headers: Authorization ? { Authorization } : {},
+      body: uploadFormData,
+    })
+    const uploadJson = await uploadRes.json()
+    if (!uploadRes.ok) return alert('업로드 실패: ' + uploadJson.error)
 
-    const { data } = supabase.storage.from('car_docs').getPublicUrl(fileName)
-    setCar((prev: any) => ({ ...prev, registration_image_url: data.publicUrl }))
-    if (carId) await supabase.from('cars').update({ registration_image_url: data.publicUrl }).eq('id', carId)
+    const publicUrl = uploadJson.url || ''
+    setCar((prev: any) => ({ ...prev, registration_image_url: publicUrl }))
+    if (carId) {
+      const authHeaders = await getAuthHeader()
+      await fetch(`/api/cars/${carId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ registration_image_url: publicUrl }),
+      })
+    }
     alert('업로드 완료')
   }
 
@@ -118,36 +145,39 @@ export default function RegistrationDetailPage() {
   // 비용 목록 조회
   const fetchCosts = async () => {
     setCostsLoading(true)
-    const { data, error } = await supabase
-      .from('car_costs')
-      .select('*')
-      .eq('car_id', carId)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true })
-    if (!error) setCosts(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/car-costs?car_id=${carId}`, { headers })
+      const json = await res.json()
+      setCosts(json.data ?? json ?? [])
+    } catch (err) {
+      console.error('Error fetching costs:', err)
+    }
     setCostsLoading(false)
   }
 
   // 대출 목록 조회
   const fetchLinkedLoans = async () => {
-    const { data } = await supabase
-      .from('loans')
-      .select('*')
-      .eq('car_id', carId)
-      .order('created_at', { ascending: false })
-    setLinkedLoans(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/loans?car_id=${carId}`, { headers })
+      const json = await res.json()
+      setLinkedLoans(json.data ?? json ?? [])
+    } catch (err) {
+      console.error('Error fetching loans:', err)
+    }
   }
 
   // 기본 항목 자동 생성 (신차/중고 구분)
   const initDefaultCosts = async (forceReset = false) => {
     if (costs.length > 0 && !forceReset) return
     if (forceReset) {
-      const { error: delErr } = await supabase.from('car_costs').delete().eq('car_id', Number(carId))
+      const delRes = await fetch(`/api/car-costs?car_id=${carId}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }); const delErr = (await delRes.json()).error
       if (delErr) { alert('삭제 실패: ' + delErr.message); return }
       setCosts([])
       // 차량매입가(purchase_price)도 0으로 초기화
       setCar((prev: any) => ({ ...prev, purchase_price: 0 }))
-      await supabase.from('cars').update({ purchase_price: 0 }).eq('id', carId)
+      await fetch(`/api/cars/${carId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ purchase_price: 0 }) })
     }
     const template = car.is_used ? usedCarCostItems : newCarCostItems
     const items = template.map(item => ({
@@ -156,7 +186,7 @@ export default function RegistrationDetailPage() {
       amount: 0,  // 초기화 시 모든 금액 0원
       notes: '',
     }))
-    const { error } = await supabase.from('car_costs').insert(items)
+    const insertRes = await fetch('/api/car-costs', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(items) }); const error = (await insertRes.json()).error
     if (error) {
       alert('생성 실패: ' + error.message)
     } else {
@@ -167,7 +197,7 @@ export default function RegistrationDetailPage() {
 
   // 비용 금액 수정
   const handleCostUpdate = async (costId: number, field: string, value: any) => {
-    const { error } = await supabase.from('car_costs').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', costId)
+    const updateRes = await fetch(`/api/car-costs/${costId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ [field]: value, updated_at: new Date().toISOString() }) }); const error = (await updateRes.json()).error
     if (!error) {
       setCosts(prev => prev.map(c => c.id === costId ? { ...c, [field]: value } : c))
       // '차량' 카테고리 금액 변경 시 → cars.purchase_price도 동기화
@@ -175,7 +205,7 @@ export default function RegistrationDetailPage() {
       if (costItem?.category === '차량' && field === 'amount') {
         const numVal = Number(value) || 0
         setCar((prev: any) => ({ ...prev, purchase_price: numVal }))
-        supabase.from('cars').update({ purchase_price: numVal }).eq('id', carId)
+        fetch(`/api/cars/${carId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ purchase_price: numVal }) })
       }
       // total_cost 캐시 업데이트
       updateTotalCost()
@@ -185,11 +215,7 @@ export default function RegistrationDetailPage() {
   // 사용자 항목 추가
   const handleAddCostItem = async () => {
     if (!newCostItem.item_name.trim()) return alert('항목명을 입력해주세요.')
-    const { error } = await supabase.from('car_costs').insert({
-      car_id: carId,
-      ...newCostItem,
-      sort_order: costs.length + 10,
-    })
+    const insertRes = await fetch('/api/car-costs', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ ...newCostItem, car_id: Number(carId) }) }); const error = (await insertRes.json()).error
     if (!error) {
       setNewCostItem({ category: '기타', item_name: '', amount: 0, notes: '' })
       fetchCosts()
@@ -199,7 +225,7 @@ export default function RegistrationDetailPage() {
   // 항목 삭제
   const handleDeleteCostItem = async (costId: number) => {
     if (!confirm('이 항목을 삭제하시겠습니까?')) return
-    const { error } = await supabase.from('car_costs').delete().eq('id', costId)
+    const delRes = await fetch(`/api/car-costs/${costId}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }); const error = (await delRes.json()).error
     if (!error) {
       setCosts(prev => prev.filter(c => c.id !== costId))
       updateTotalCost()
@@ -208,9 +234,9 @@ export default function RegistrationDetailPage() {
 
   // total_cost 캐시 업데이트
   const updateTotalCost = async () => {
-    const { data } = await supabase.from('car_costs').select('amount').eq('car_id', carId)
+    const costRes = await fetch(`/api/car-costs?car_id=${carId}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }); const data = (await costRes.json()).data
     const total = (data || []).reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
-    await supabase.from('cars').update({ total_cost: total }).eq('id', carId)
+    await fetch(`/api/cars/${carId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ total_cost: total }) })
     setCar((prev: any) => ({ ...prev, total_cost: total }))
   }
 
@@ -240,7 +266,7 @@ export default function RegistrationDetailPage() {
 
   const fetchCarData = async () => {
     try {
-        const { data, error } = await supabase.from('cars').select('*').eq('id', carId).single()
+        const carRes = await fetch(`/api/cars/${carId}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }); const carJson = await carRes.json(); const data = carJson.data; const error = carJson.error
         if (error || !data) { alert("데이터 로딩 실패"); router.push('/registration'); return; }
 
         setCar({
@@ -263,16 +289,19 @@ export default function RegistrationDetailPage() {
 
       // 모델명 뒤에서부터 단어를 하나씩 빼면서 DB 매칭 시도
       while (currentName.length > 0) {
-          const { data } = await supabase
-              .from('vehicle_standard_codes')
-              .select('*')
-              .ilike('model_name', currentName)
-              .order('price', { ascending: true });
+          try {
+            const headers = await getAuthHeader()
+            const res = await fetch(`/api/vehicle-standards?model_name=${encodeURIComponent(currentName)}`, { headers })
+            const json = await res.json()
+            const data = json.data ?? json
 
-          if (data && data.length > 0) {
-              foundTrims = data;
-              foundModelName = currentName;
-              break;
+            if (data && data.length > 0) {
+                foundTrims = data;
+                foundModelName = currentName;
+                break;
+            }
+          } catch (err) {
+            console.error('Error fetching vehicle standards:', err)
           }
 
           const lastSpace = currentName.lastIndexOf(' ');
@@ -314,14 +343,7 @@ export default function RegistrationDetailPage() {
     }
 
     // 3. DB 업데이트
-    const { error } = await supabase.from('cars').update({
-        ...car,
-        model: finalModelName, // 완성된 이름 저장
-        purchase_price: cleanNumber(car.purchase_price),
-        registration_date: cleanDate(car.registration_date),
-        inspection_end_date: cleanDate(car.inspection_end_date),
-        vehicle_age_expiry: cleanDate(car.vehicle_age_expiry)
-    }).eq('id', carId)
+    const updateRes = await fetch(`/api/cars/${carId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ model: finalModelName }) }); const error = (await updateRes.json()).error
 
     if (error) {
         alert('저장 실패: ' + error.message);
@@ -360,9 +382,6 @@ export default function RegistrationDetailPage() {
 
                 // 통합 테이블 갱신
                 if (detectedModel !== '미확인 모델' && result.trims?.length > 0) {
-                    await supabase.from('vehicle_standard_codes')
-                      .delete().eq('model_name', detectedModel).eq('year', detectedYear);
-
                     const rowsToInsert = result.trims.map((t: any) => ({
                         brand: '기타',
                         model_name: detectedModel,
@@ -371,7 +390,8 @@ export default function RegistrationDetailPage() {
                         price: t.price || 0,
                         fuel_type: result.fuel_type || '기타'
                     }));
-                    await supabase.from('vehicle_standard_codes').insert(rowsToInsert);
+                    const authHeader = await getAuthHeader();
+                    await fetch('/api/vehicle-standard-codes', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader }, body: JSON.stringify(rowsToInsert) });
                 }
 
                 // 화면 갱신

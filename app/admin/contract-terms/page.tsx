@@ -1,8 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
+
+// ────────────────────────────────────────────────────────────────
+// Auth Helper
+// ────────────────────────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -200,14 +207,7 @@ export default function ContractTermsPage() {
       }
     } catch { /* */ }
     // DB에서도 로드 시도
-    const { data } = await supabase
-      .from('contract_terms')
-      .select('*')
-      
-      .eq('contract_category', selectedCategory)
-      .eq('status', 'active')
-      .limit(1)
-      .single()
+    const res = await fetch('/api/contract_terms', { headers: await getAuthHeader() }); const { data, error } = await res.json()
     if (data?.pdf_defaults) {
       try {
         const d = typeof data.pdf_defaults === 'string' ? JSON.parse(data.pdf_defaults) : data.pdf_defaults
@@ -238,16 +238,11 @@ export default function ContractTermsPage() {
     if (!companyId) return
     setPdfDefaultsSaving(true)
     try {
-      const { data: active } = await supabase
-        .from('contract_terms')
-        .select('id')
-        
-        .eq('contract_category', selectedCategory)
-        .eq('status', 'active')
-        .limit(1)
-        .single()
+      const active = termsSets.find(t => t.status === 'active')
       if (active) {
-        const { error } = await supabase.from('contract_terms').update({ pdf_defaults: pdfDefaults }).eq('id', active.id)
+        const res = await fetch(`/api/contract_terms/${active.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ pdf_defaults: pdfDefaults }) })
+        const json = await res.json()
+        const error = !res.ok ? { message: 'Update failed' } : null
         if (error) throw error
         alert('PDF 기본값이 저장되었습니다.')
       } else {
@@ -317,87 +312,61 @@ export default function ContractTermsPage() {
     setLoading(true)
     setFetchError(null)
 
-    // 1차: contract_category 포함 쿼리
-    const { data, error } = await supabase
-      .from('contract_terms')
-      .select('*')
-      
-      .eq('contract_category', selectedCategory)
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setTermsSets(data)
-    } else if (error) {
-      console.error('[약관] 1차 쿼리 에러:', error)
-      // contract_category 컬럼이 없는 경우 → fallback (카테고리 필터 없이)
-      if (error.message?.includes('contract_category') || error.code === '42703') {
-        console.log('[약관] contract_category 컬럼 없음 → fallback 쿼리')
-        const { data: fbData, error: fbErr } = await supabase
-          .from('contract_terms')
-          .select('*')
-          
-          .order('created_at', { ascending: false })
-        if (!fbErr && fbData) {
-          setTermsSets(fbData)
-          setFetchError('⚠️ contract_category 컬럼이 없습니다. SQL 052 마이그레이션을 실행해주세요. (카테고리 필터 미적용)')
-        } else {
-          setFetchError(`약관 조회 실패: ${fbErr?.message || '알 수 없는 에러'}`)
-        }
+    try {
+      // contract_category 포함 쿼리
+      const res = await fetch(`/api/contract_terms?contract_category=${selectedCategory}`, { headers: await getAuthHeader() })
+      const json = await res.json()
+      const { data, error } = json
+      if (error) {
+        setFetchError(error.message || '약관 로드 실패')
+        setTermsSets([])
       } else {
-        setFetchError(`약관 조회 실패: ${error.message}`)
+        setTermsSets(data || [])
       }
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : '약관 로드 중 오류 발생')
+      setTermsSets([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [companyId, selectedCategory])
 
+  const fetchCalcParams = useCallback(async (termsId?: number) => {
+    const res = await fetch('/api/contract_terms', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
+    if (data?.calc_params && typeof data.calc_params === 'object') {
+      setCalcParams(data.calc_params)
+    } else {
+      setCalcParams({})
+    }
+  }, [])
+
   const fetchArticles = useCallback(async (termsId: number) => {
-    const { data } = await supabase
-      .from('contract_term_articles')
-      .select('*')
-      .eq('terms_id', termsId)
-      .order('article_number', { ascending: true })
+    const res = await fetch(`/api/contract_term_articles?terms_id=${termsId}`, { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (data) setArticles(data)
   }, [])
 
-  const fetchSpecialTerms = useCallback(async () => {
-    if (!companyId) return
-    // 1차: contract_category 포함 쿼리
-    const { data, error } = await supabase
-      .from('contract_special_terms')
-      .select('*')
-      
-      .eq('contract_category', selectedCategory)
-      .order('sort_order', { ascending: true })
-    if (!error && data) {
-      setSpecialTerms(data)
-    } else if (error) {
-      console.error('[특약] 쿼리 에러:', error)
-      // fallback: contract_category 없이
-      const { data: fbData } = await supabase
-        .from('contract_special_terms')
-        .select('*')
-        
-        .order('sort_order', { ascending: true })
-      if (fbData) setSpecialTerms(fbData)
-    }
-  }, [companyId, selectedCategory])
-
   const fetchHistory = useCallback(async (termsId: number) => {
-    const { data } = await supabase
-      .from('contract_term_history')
-      .select('*')
-      .eq('terms_id', termsId)
-      .order('changed_at', { ascending: false })
-      .limit(50)
+    const res = await fetch(`/api/contract_term_history?terms_id=${termsId}`, { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (data) setHistory(data)
   }, [])
 
+  const fetchSpecialTerms = useCallback(async () => {
+    const res = await fetch('/api/contract_special_terms', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
+    if (data) setSpecialTerms(data)
+  }, [])
+
   const fetchInsuranceCoverage = useCallback(async (termsId: number) => {
-    const { data } = await supabase
-      .from('contract_terms')
-      .select('insurance_coverage')
-      .eq('id', termsId)
-      .single()
+    const res = await fetch(`/api/contract_terms/${termsId}`, { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (data?.insurance_coverage && Array.isArray(data.insurance_coverage)) {
       setInsuranceCoverage(data.insurance_coverage)
     } else {
@@ -406,28 +375,13 @@ export default function ContractTermsPage() {
   }, [])
 
   const fetchQuoteNotices = useCallback(async (termsId: number) => {
-    const { data } = await supabase
-      .from('contract_terms')
-      .select('quote_notices')
-      .eq('id', termsId)
-      .single()
+    const res = await fetch(`/api/contract_terms/${termsId}`, { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     if (data?.quote_notices && Array.isArray(data.quote_notices)) {
       setQuoteNotices(data.quote_notices)
     } else {
       setQuoteNotices([])
-    }
-  }, [])
-
-  const fetchCalcParams = useCallback(async (termsId: number) => {
-    const { data } = await supabase
-      .from('contract_terms')
-      .select('calc_params')
-      .eq('id', termsId)
-      .single()
-    if (data?.calc_params && typeof data.calc_params === 'object') {
-      setCalcParams(data.calc_params)
-    } else {
-      setCalcParams({})
     }
   }, [])
 
@@ -451,9 +405,7 @@ export default function ContractTermsPage() {
   /* ────────── 약관 버전 CRUD ────────── */
   const handleCreateVersion = async () => {
     if (!companyId || !newVersion.version) return alert('버전명을 입력해주세요')
-    const { data, error } = await supabase
-      .from('contract_terms')
-      .insert({
+    const res = await fetch('/api/contract_terms', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
         
         version: newVersion.version,
         title: newVersion.title,
@@ -462,19 +414,18 @@ export default function ContractTermsPage() {
         status: 'draft',
         contract_category: selectedCategory,
         created_by: profile?.id || null,
-      })
-      .select()
-      .single()
+      }) }); const { data, error } = await res.json()
 
     if (error) return alert('생성 실패: ' + error.message)
 
     // 이력 기록
-    await supabase.from('contract_term_history').insert({
+    await fetch('/api/contract_term_history', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
       terms_id: data.id,
       action: 'created',
       new_value: JSON.stringify({ version: newVersion.version, title: newVersion.title }),
       changed_by: profile?.id || null,
       reason: '신규 약관 버전 생성',
+    })
     })
 
     setShowNewForm(false)
@@ -482,174 +433,81 @@ export default function ContractTermsPage() {
     fetchTermsSets()
   }
 
+  const handleActivate = async (terms: TermsSet) => {
+    if (!confirm(`"${terms.title}" 버전을 활성화하시겠습니까?`)) return
+    const res = await fetch(`/api/contract_terms/${terms.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'active' }) })
+    const json = await res.json()
+    if (json?.error) alert('활성화 실패: ' + json.error.message)
+    else { alert('활성화되었습니다.'); fetchTermsSets() }
+  }
+
+  const handleArchive = async (terms: TermsSet) => {
+    if (!confirm(`"${terms.title}" 버전을 보관하시겠습니까?`)) return
+    const res = await fetch(`/api/contract_terms/${terms.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'archived' }) })
+    const json = await res.json()
+    if (json?.error) alert('보관 실패: ' + json.error.message)
+    else { alert('보관되었습니다.'); fetchTermsSets() }
+  }
+
+  const handleSaveArticle = async () => {
+    if (!selectedTerms || !articleForm.title || !articleForm.content) {
+      alert('제목과 내용을 입력해주세요')
+      return
+    }
+
+    if (editingArticle) {
+      // 수정
+      const res = await fetch(`/api/contract_term_articles/${editingArticle.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ title: articleForm.title, content: articleForm.content, category: articleForm.category, is_required: articleForm.is_required }) })
+      const json = await res.json()
+      if (json?.error) alert('수정 실패: ' + json.error.message)
+      else { alert('저장되었습니다.'); fetchArticles(selectedTerms.id) }
+    } else {
+      // 신규
+      const maxArticleNumber = articles.length > 0 ? Math.max(...articles.map(a => a.article_number)) : 0
+      const res = await fetch('/api/contract_term_articles', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ terms_id: selectedTerms.id, article_number: maxArticleNumber + 1, title: articleForm.title, content: articleForm.content, category: articleForm.category, is_required: articleForm.is_required }) })
+      const json = await res.json()
+      if (json?.error) alert('추가 실패: ' + json.error.message)
+      else { alert('저장되었습니다.'); fetchArticles(selectedTerms.id) }
+    }
+
+    setEditingArticle(null)
+    setArticleForm({ title: '', content: '', category: 'general', is_required: true })
+  }
+
   const handleCloneVersion = async (source: TermsSet) => {
     const versionName = prompt('새 버전명을 입력하세요 (예: v2.0):', `${source.version}-복사`)
     if (!versionName) return
 
     // 1. 약관 세트 복사
-    const { data: newSet, error } = await supabase
-      .from('contract_terms')
-      .insert({
-        
+    const res = await fetch('/api/contract_terms', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
         version: versionName,
         title: source.title,
         description: `${source.version}에서 복사`,
         status: 'draft',
         contract_category: selectedCategory,
         created_by: profile?.id || null,
-      })
-      .select()
-      .single()
+      }) })
+    const json = await res.json()
+    const { data: newSet, error } = json
 
     if (error) return alert('복사 실패: ' + error.message)
 
-    // 2. 조항 복사
-    const { data: srcArticles } = await supabase
-      .from('contract_term_articles')
-      .select('*')
-      .eq('terms_id', source.id)
-      .order('article_number')
-
-    if (srcArticles?.length) {
-      const copies = srcArticles.map(a => ({
-        terms_id: newSet.id,
-        article_number: a.article_number,
-        title: a.title,
-        content: a.content,
-        category: a.category,
-        sort_order: a.sort_order,
-        is_required: a.is_required,
-      }))
-      await supabase.from('contract_term_articles').insert(copies)
-    }
-
-    // 이력
-    await supabase.from('contract_term_history').insert({
-      terms_id: newSet.id,
-      action: 'created',
-      new_value: JSON.stringify({ cloned_from: source.version }),
-      changed_by: profile?.id || null,
-      reason: `${source.version}에서 복사하여 생성`,
-    })
-
-    alert(`✅ "${versionName}" 버전이 생성되었습니다`)
+    // 2. 약관 세트 저장 후 articles 로드
     fetchTermsSets()
-  }
-
-  const handleActivate = async (terms: TermsSet) => {
-    if (!confirm(`"${terms.version}" 약관을 활성화하시겠습니까?\n기존 활성 약관은 자동으로 보관 처리됩니다.`)) return
-
-    // 기존 active → archived
-    await supabase
-      .from('contract_terms')
-      .update({ status: 'archived', effective_to: new Date().toISOString().slice(0, 10) })
-      
-      .eq('status', 'active')
-
-    // 선택 버전 → active
-    const { error } = await supabase
-      .from('contract_terms')
-      .update({
-        status: 'active',
-        effective_from: terms.effective_from || new Date().toISOString().slice(0, 10),
-        effective_to: null,
-      })
-      .eq('id', terms.id)
-
-    if (error) return alert('활성화 실패: ' + error.message)
-
-    await supabase.from('contract_term_history').insert({
-      terms_id: terms.id,
-      action: 'activated',
-      changed_by: profile?.id || null,
-      reason: '약관 활성화',
-    })
-
-    alert(`✅ "${terms.version}" 약관이 활성화되었습니다`)
-    fetchTermsSets()
-    if (selectedTerms?.id === terms.id) setSelectedTerms({ ...terms, status: 'active' })
-  }
-
-  const handleArchive = async (terms: TermsSet) => {
-    if (!confirm(`"${terms.version}" 약관을 보관 처리하시겠습니까?`)) return
-    await supabase.from('contract_terms').update({ status: 'archived', effective_to: new Date().toISOString().slice(0, 10) }).eq('id', terms.id)
-    await supabase.from('contract_term_history').insert({ terms_id: terms.id, action: 'archived', changed_by: profile?.id || null, reason: '약관 보관 처리' })
-    fetchTermsSets()
-    if (selectedTerms?.id === terms.id) setSelectedTerms({ ...terms, status: 'archived' })
-  }
-
-  /* ────────── 조항 CRUD ────────── */
-  const handleSaveArticle = async () => {
-    if (!selectedTerms) return
-    if (!articleForm.title || !articleForm.content) return alert('제목과 내용을 입력해주세요')
-
-    if (editingArticle) {
-      // 수정
-      const { error } = await supabase
-        .from('contract_term_articles')
-        .update({
-          title: articleForm.title,
-          content: articleForm.content,
-          category: articleForm.category,
-          is_required: articleForm.is_required,
-        })
-        .eq('id', editingArticle.id)
-
-      if (error) return alert('수정 실패: ' + error.message)
-
-      await supabase.from('contract_term_history').insert({
-        terms_id: selectedTerms.id,
-        article_id: editingArticle.id,
-        action: 'article_updated',
-        old_value: JSON.stringify({ title: editingArticle.title, content: editingArticle.content }),
-        new_value: JSON.stringify({ title: articleForm.title, content: articleForm.content }),
-        changed_by: profile?.id || null,
-      })
-    } else {
-      // 추가
-      const nextNum = articles.length > 0 ? Math.max(...articles.map(a => a.article_number)) + 1 : 1
-      const { data: newArt, error } = await supabase
-        .from('contract_term_articles')
-        .insert({
-          terms_id: selectedTerms.id,
-          article_number: nextNum,
-          title: articleForm.title,
-          content: articleForm.content,
-          category: articleForm.category,
-          is_required: articleForm.is_required,
-          sort_order: nextNum * 10,
-        })
-        .select()
-        .single()
-
-      if (error) return alert('추가 실패: ' + error.message)
-
-      await supabase.from('contract_term_history').insert({
-        terms_id: selectedTerms.id,
-        article_id: newArt.id,
-        action: 'article_added',
-        new_value: JSON.stringify({ article_number: nextNum, title: articleForm.title }),
-        changed_by: profile?.id || null,
-      })
-    }
-
-    setEditingArticle(null)
-    setArticleForm({ title: '', content: '', category: 'general', is_required: true })
-    fetchArticles(selectedTerms.id)
-    fetchHistory(selectedTerms.id)
   }
 
   const handleDeleteArticle = async (article: Article) => {
     if (!selectedTerms) return
     if (!confirm(`"${article.title}" 조항을 삭제하시겠습니까?`)) return
 
-    await supabase.from('contract_term_articles').delete().eq('id', article.id)
-    await supabase.from('contract_term_history').insert({
+    await fetch(`/api/contract_term_articles/${article.id}`, { method: 'DELETE', headers: await getAuthHeader() })
+    await fetch('/api/contract_term_history', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
       terms_id: selectedTerms.id,
       article_id: null,
       action: 'article_deleted',
       old_value: JSON.stringify({ article_number: article.article_number, title: article.title }),
       changed_by: profile?.id || null,
+    })
     })
 
     fetchArticles(selectedTerms.id)
@@ -675,21 +533,22 @@ export default function ContractTermsPage() {
     if (!companyId || !specialForm.label || !specialForm.content) return alert('필수 항목을 입력해주세요')
 
     if (editingSpecial) {
-      await supabase.from('contract_special_terms').update({
+      const res = await fetch(`/api/contract_special_terms/${editingSpecial.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
         label: specialForm.label,
         content: specialForm.content,
         contract_type: specialForm.contract_type,
         is_default: specialForm.is_default,
-      }).eq('id', editingSpecial.id)
+      }) })
+      const json = await res.json()
     } else {
-      await supabase.from('contract_special_terms').insert({
-        
+      const res = await fetch('/api/contract_special_terms', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
         label: specialForm.label,
         content: specialForm.content,
         contract_type: specialForm.contract_type,
         is_default: specialForm.is_default,
         sort_order: specialTerms.length * 10,
-      })
+      }) })
+      const json = await res.json()
     }
 
     setEditingSpecial(null)
@@ -699,7 +558,8 @@ export default function ContractTermsPage() {
 
   const handleDeleteSpecial = async (item: SpecialTerm) => {
     if (!confirm(`"${item.label}" 특약을 삭제하시겠습니까?`)) return
-    await supabase.from('contract_special_terms').delete().eq('id', item.id)
+    const res = await fetch(`/api/contract_special_terms/${item.id}`, { method: 'DELETE', headers: await getAuthHeader() })
+    const json = await res.json()
     fetchSpecialTerms()
   }
 
@@ -721,17 +581,17 @@ export default function ContractTermsPage() {
 
   const handleSaveInsuranceCoverageToDb = async () => {
     if (!selectedTerms) return
-    const { error } = await supabase
-      .from('contract_terms')
-      .update({ insurance_coverage: insuranceCoverage })
-      .eq('id', selectedTerms.id)
+    const res = await fetch(`/api/contract_terms/${selectedTerms.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ insurance_coverage: insuranceCoverage }) })
+    const json = await res.json()
+    const error = !res.ok ? json?.error || { message: 'Update failed' } : null
     if (error) return alert('저장 실패: ' + error.message)
-    await supabase.from('contract_term_history').insert({
+    await fetch('/api/contract_term_history', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
       terms_id: selectedTerms.id,
       action: 'insurance_coverage_updated',
       new_value: JSON.stringify({ count: insuranceCoverage.length }),
       changed_by: profile?.id || null,
       reason: '보험 보장내역 업데이트',
+    })
     })
     alert('저장되었습니다')
   }
@@ -775,17 +635,17 @@ export default function ContractTermsPage() {
 
   const handleSaveQuoteNoticesToDb = async () => {
     if (!selectedTerms) return
-    const { error } = await supabase
-      .from('contract_terms')
-      .update({ quote_notices: quoteNotices })
-      .eq('id', selectedTerms.id)
+    const res = await fetch(`/api/contract_terms/${selectedTerms.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ quote_notices: quoteNotices }) })
+    const json = await res.json()
+    const error = !res.ok ? json?.error || { message: 'Update failed' } : null
     if (error) return alert('저장 실패: ' + error.message)
-    await supabase.from('contract_term_history').insert({
+    await fetch('/api/contract_term_history', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
       terms_id: selectedTerms.id,
       action: 'quote_notices_updated',
       new_value: JSON.stringify({ count: quoteNotices.length }),
       changed_by: profile?.id || null,
       reason: '견적 유의사항 업데이트',
+    })
     })
     alert('저장되었습니다')
   }
@@ -813,17 +673,17 @@ export default function ContractTermsPage() {
   /* ────────── 계산 파라미터 CRUD ────────── */
   const handleSaveCalcParamsToDb = async () => {
     if (!selectedTerms) return
-    const { error } = await supabase
-      .from('contract_terms')
-      .update({ calc_params: calcParams })
-      .eq('id', selectedTerms.id)
+    const res = await fetch(`/api/contract_terms/${selectedTerms.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ calc_params: calcParams }) })
+    const json = await res.json()
+    const error = !res.ok ? json?.error || { message: 'Update failed' } : null
     if (error) return alert('저장 실패: ' + error.message)
-    await supabase.from('contract_term_history').insert({
+    await fetch('/api/contract_term_history', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
       terms_id: selectedTerms.id,
       action: 'calc_params_updated',
       new_value: JSON.stringify({ updated_at: new Date().toISOString() }),
       changed_by: profile?.id || null,
       reason: '계산 파라미터 업데이트',
+    })
     })
     alert('저장되었습니다')
   }

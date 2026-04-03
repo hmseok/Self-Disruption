@@ -1,33 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const supabase = getSupabaseAdmin()
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await supabase
-    .from('profiles').select('role, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
-}
-
-// 버킷 확인 + 없으면 생성
-async function ensureBucket(supabase: ReturnType<typeof getSupabaseAdmin>, bucketName: string) {
-  const { data: buckets } = await supabase.storage.listBuckets()
-  const exists = buckets?.some(b => b.name === bucketName)
-  if (!exists) {
-    await supabase.storage.createBucket(bucketName, { public: true, fileSizeLimit: 10 * 1024 * 1024 })
-  }
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  const profiles = await prisma.$queryRaw<any[]>`SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  return profile ? { id: userId, role: profile.role, employee_name: profile.employee_name } : null
 }
 
 // ═══════════════════════════════════════
@@ -301,31 +290,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '파일이 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = getSupabaseAdmin()
     const buffer = Buffer.from(await file.arrayBuffer())
     const base64 = buffer.toString('base64')
     const ext = file.name.split('.').pop() || 'jpg'
 
-    // 1. Supabase Storage에 이미지 업로드 (실패해도 계속 진행)
+    // 1. TODO: Phase 4 - migrate to Google Cloud Storage
     let receiptUrl = ''
-    const bucketName = 'receipts'
-    const fileName = `${user.id}/${Date.now()}.${ext}`
-
-    try {
-      await ensureBucket(supabase, bucketName)
-      const { error: uploadError } = await supabase
-        .storage.from(bucketName)
-        .upload(fileName, buffer, { contentType: file.type, upsert: false })
-
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(fileName)
-        receiptUrl = urlData?.publicUrl || ''
-      } else {
-        console.warn('Storage 업로드 실패 (계속 진행):', uploadError.message)
-      }
-    } catch (storageErr: any) {
-      console.warn('Storage 접근 실패 (계속 진행):', storageErr.message)
-    }
+    // const bucketName = 'receipts'
+    // const fileName = `${user.id}/${Date.now()}.${ext}`
+    // Google Cloud Storage upload would go here
+    console.log('Receipt image received but storage migration pending:', file.name)
 
     // 2. AI 분석: Gemini 우선, 실패 시 CLOVA OCR 폴백
     let parsedItems: ParsedReceipt[] = []

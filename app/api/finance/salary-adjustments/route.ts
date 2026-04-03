@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { requireAuth } from '../../../utils/auth-guard'
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 // ═══ GET: 급여 조정 목록 ═══
 export async function GET(request: NextRequest) {
@@ -24,22 +17,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
+  // Build dynamic WHERE clause
+  let whereClause = 'WHERE 1=1'
+  const params: any[] = []
 
-  let query = sb
-    .from('salary_adjustments')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (employeeId) query = query.eq('employee_id', employeeId)
-  if (yearMonth) query = query.eq('year_month', yearMonth)
-  if (status) query = query.eq('status', status)
-
-  const { data, error } = await query
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (employeeId) {
+    whereClause += ` AND employee_id = ?`
+    params.push(employeeId)
   }
+  if (yearMonth) {
+    whereClause += ` AND year_month = ?`
+    params.push(yearMonth)
+  }
+  if (status) {
+    whereClause += ` AND status = ?`
+    params.push(status)
+  }
+
+  const data = await prisma.$queryRaw<any[]>(
+    `SELECT * FROM salary_adjustments ${whereClause} ORDER BY created_at DESC` as any,
+    ...params
+  )
 
   // 직원별 월별 합계 계산
   const summaryByEmployee: Record<string, { deduct: number; add: number; net: number; name: string }> = {}
@@ -72,29 +70,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '필수 필드 누락' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
+  await prisma.$executeRaw`
+    INSERT INTO salary_adjustments
+    (company_id, employee_id, year_month, adjustment_type, amount, reason, source_transaction_id, status, memo, created_at)
+    VALUES (
+      ${company_id}, ${employee_id}, ${year_month}, ${adjustment_type},
+      ${Math.abs(Number(amount))}, ${reason}, ${source_transaction_id || null},
+      'pending', ${memo || null}, NOW()
+    )
+  `
 
-  const { data, error } = await sb
-    .from('salary_adjustments')
-    .insert({
-      company_id,
-      employee_id,
-      year_month,
-      adjustment_type,
-      amount: Math.abs(Number(amount)),
-      reason,
-      source_transaction_id: source_transaction_id || null,
-      status: 'pending',
-      memo: memo || null,
-    })
-    .select()
-    .single()
+  const data = await prisma.$queryRaw<any[]>`
+    SELECT * FROM salary_adjustments
+    WHERE employee_id = ${employee_id} AND year_month = ${year_month}
+    ORDER BY created_at DESC LIMIT 1
+  `
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json(data)
+  return NextResponse.json(data.length > 0 ? data[0] : {})
 }
 
 // ═══ PATCH: 급여 조정 상태 변경 (승인/적용/취소) ═══
@@ -109,23 +101,27 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'ids, status 필요' }, { status: 400 })
   }
 
-  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
 
-  const updateData: any = { status: newStatus }
   if (newStatus === 'approved') {
-    updateData.approved_by = auth.userId
-    updateData.approved_at = new Date().toISOString()
+    for (const id of ids) {
+      await prisma.$executeRaw`
+        UPDATE salary_adjustments SET
+          status = ${newStatus}, approved_by = ${auth.userId}, approved_at = ${now}
+        WHERE id = ${id}
+      `
+    }
+  } else {
+    for (const id of ids) {
+      await prisma.$executeRaw`
+        UPDATE salary_adjustments SET status = ${newStatus} WHERE id = ${id}
+      `
+    }
   }
 
-  const { data, error } = await sb
-    .from('salary_adjustments')
-    .update(updateData)
-    .in('id', ids)
-    .select()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  const data = await prisma.$queryRaw<any[]>`
+    SELECT * FROM salary_adjustments WHERE id IN (${ids.join(',')})
+  `
 
   return NextResponse.json({ updated: data?.length || 0, items: data })
 }

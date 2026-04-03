@@ -1,8 +1,19 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================================================
 // CONTRACT STATUS BADGE
@@ -51,34 +62,48 @@ export default function ContractListMain() {
       if (!companyId) { setLoading(false); return }
 
       try {
-        const { data: allContracts, error: contractsError } = await supabase
-          .from('contracts').select('*').order('id', { ascending: false })
-        if (contractsError) console.error('계약 목록 로드 실패:', contractsError.message)
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/contracts', { headers })
+        const json = await res.json()
+        if (json.error) {
+          console.error('계약 목록 로드 실패:', json.error)
+          return
+        }
+        const allContracts = json.data || []
 
-        const contractIds = (allContracts || []).map(c => c.id)
-        const { data: paymentsData } = contractIds.length > 0
-          ? await supabase.from('payment_schedules').select('contract_id, status').in('contract_id', contractIds)
-          : { data: [] }
+        const contractIds = allContracts.map((c: any) => c.id)
+        let paymentsData: any[] = []
+        if (contractIds.length > 0) {
+          const payRes = await fetch(`/api/contracts/payment-schedule?ids=${contractIds.join(',')}`, { headers })
+          const payJson = await payRes.json()
+          paymentsData = payJson.data || []
+        }
 
-        const customerIds = (allContracts || []).map(c => c.customer_id).filter(Boolean)
+        const customerIds = allContracts.map((c: any) => c.customer_id).filter(Boolean)
         const uniqueCustomerIds = [...new Set(customerIds)]
-        const { data: customersData } = uniqueCustomerIds.length > 0
-          ? await supabase.from('customers').select('id, name, phone, email').in('id', uniqueCustomerIds)
-          : { data: [] }
+        let customersData: any[] = []
+        if (uniqueCustomerIds.length > 0) {
+          const custRes = await fetch(`/api/customers?ids=${uniqueCustomerIds.join(',')}`, { headers })
+          const custJson = await custRes.json()
+          customersData = custJson.data || []
+        }
         const customersMap = new Map()
-        customersData?.forEach(c => customersMap.set(c.id, c))
+        customersData?.forEach((c: any) => customersMap.set(c.id, c))
 
-        const carIds = (allContracts || []).map(c => c.car_id).filter(Boolean)
+        const carIds = allContracts.map((c: any) => c.car_id).filter(Boolean)
         const uniqueCarIds = [...new Set(carIds)]
-        const { data: carsData } = uniqueCarIds.length > 0
-          ? await supabase.from('cars').select('*').in('id', uniqueCarIds as string[])
-          : { data: [] }
+        let carsData: any[] = []
+        if (uniqueCarIds.length > 0) {
+          const carRes = await fetch(`/api/cars?ids=${uniqueCarIds.join(',')}`, { headers })
+          const carJson = await carRes.json()
+          carsData = carJson.data || []
+        }
 
-        const combinedContracts = (allContracts || []).map(contract => {
-          const payments = (paymentsData || []).filter(p => p.contract_id === contract.id)
+        const combinedContracts = allContracts.map((contract: any) => {
+          const payments = paymentsData.filter(p => p.contract_id === contract.id)
           return {
             ...contract,
-            car: (carsData || []).find(c => c.id === contract.car_id),
+            car: carsData.find(c => c.id === contract.car_id),
             customer: customersMap.get(contract.customer_id),
             totalCount: payments.length,
             paidCount: payments.filter(p => p.status === 'paid').length,

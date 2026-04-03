@@ -1,7 +1,18 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '../utils/supabase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 type Props = {
   editingOp: any | null
@@ -37,9 +48,10 @@ const BILLING_STATUS_LABELS: Record<string, { label: string; color: string }> = 
 
 export default function DispatchModal({
   editingOp, cars, contracts, customers,
-   userId, companyData,
+   userId, companyData, effectiveCompanyId,
   onClose, onCreated,
 }: Props) {
+  const company = companyData
   const [dispatchType, setDispatchType] = useState<'long_term' | 'short_term' | 'replacement'>('long_term')
   const [saving, setSaving] = useState(false)
   const [shortTermQuotes, setShortTermQuotes] = useState<any[]>([])
@@ -140,24 +152,29 @@ export default function DispatchModal({
 
   // Fetch accidents (for replacement tab)
   useEffect(() => {
-    if (effectiveCompanyId && dispatchType === 'replacement') {
-      supabase.from('accident_records').select('*')
-        
-        .in('status', ['reported', 'insurance_filed', 'repairing'])
-        .order('accident_date', { ascending: false })
-        .then(({ data }) => setAccidents(data || []))
+    const fetchAccidents = async () => {
+      if (effectiveCompanyId && dispatchType === 'replacement') {
+        const res = await fetch('/api/accident-records', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+        const json = await res.json()
+        const { data } = json
+        setAccidents(data || [])
+      }
     }
-  }, [ dispatchType])
+    fetchAccidents()
+  }, [effectiveCompanyId, dispatchType])
 
   // Fetch short term quotes
   useEffect(() => {
-    if (effectiveCompanyId && dispatchType === 'short_term') {
-      supabase.from('short_term_quotes').select('*')
-        
-        .eq('status', 'active')
-        .then(({ data }) => setShortTermQuotes(data || []))
+    const fetchShortTermQuotes = async () => {
+      if (effectiveCompanyId && dispatchType === 'short_term') {
+        const res = await fetch('/api/short-term-quotes', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+        const json = await res.json()
+        const { data } = json
+        setShortTermQuotes(data || [])
+      }
     }
-  }, [ dispatchType])
+    fetchShortTermQuotes()
+  }, [effectiveCompanyId, dispatchType])
 
   // Available cars
   const availableCars = useMemo(() => {
@@ -268,25 +285,14 @@ export default function DispatchModal({
       }
 
       if (editingOp) {
-        await supabase.from('vehicle_operations').update(payload).eq('id', editingOp.id)
+        await fetch(`/api/vehicle-operations/${editingOp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
       } else {
-        const { data: inserted } = await supabase.from('vehicle_operations').insert([payload]).select()
+        const insertRes = await fetch('/api/vehicle-operations', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([payload]) }); const insertedJson = await insertRes.json(); const inserted = insertedJson.data
         if (inserted?.[0]) {
           const contract = contracts.find(c => c.id === form.contract_id)
           const customer = customers.find(c => String(c.id) === String(form.customer_id))
           const title = `${form.operation_type === 'delivery' ? '출고' : '반납'} - ${customer?.name || contract?.customer_name || '미정'}`
-          await supabase.from('vehicle_schedules').insert({
-            
-            car_id: form.car_id,
-            schedule_type: form.operation_type,
-            start_date: form.scheduled_date,
-            end_date: form.scheduled_date,
-            title,
-            color: form.operation_type === 'delivery' ? '#3b82f6' : '#f59e0b',
-            contract_id: form.contract_id || null,
-            operation_id: inserted[0].id,
-            created_by: userId,
-          })
+          await fetch('/api/vehicle-schedules', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ car_id: Number(form.car_id), schedule_type: form.operation_type === 'delivery' ? 'delivery' : 'return', start_date: form.scheduled_date, end_date: form.scheduled_date, title, color: '#3b82f6', operation_id: inserted[0].id, contract_id: form.contract_id, created_by: userId }) })
         }
       }
       onCreated()
@@ -345,40 +351,49 @@ export default function DispatchModal({
       }
 
       if (editingOp) {
-        await supabase.from('vehicle_operations').update(payload).eq('id', editingOp.id)
+        await fetch(`/api/vehicle-operations/${editingOp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
       } else {
-        const { data: inserted } = await supabase.from('vehicle_operations').insert([payload]).select()
+        const insertRes = await fetch('/api/vehicle-operations', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([payload]) }); const insertedJson = await insertRes.json(); const inserted = insertedJson.data
 
         if (inserted?.[0]) {
           const car = cars.find(c => String(c.id) === String(form.car_id))
           const catLabel = DISPATCH_CATEGORY_LABELS[insuranceForm.dispatch_category]?.label || '대차'
 
           // Create schedule for the replacement period
-          await supabase.from('vehicle_schedules').insert({
-            
-            car_id: Number(form.car_id),
-            schedule_type: 'accident_repair',
-            start_date: insuranceForm.replacement_start_date,
-            end_date: insuranceForm.replacement_end_date || insuranceForm.replacement_start_date,
-            title: `${catLabel} - ${insuranceForm.customer_name || '고객'}`,
-            color: '#f59e0b', // amber for replacement
-            accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
-            operation_id: inserted[0].id,
-            created_by: userId,
+          const schedRes = await fetch('/api/vehicle-schedules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+            body: JSON.stringify({
+              car_id: Number(form.car_id),
+              schedule_type: 'accident_repair',
+              start_date: insuranceForm.replacement_start_date,
+              end_date: insuranceForm.replacement_end_date || insuranceForm.replacement_start_date,
+              title: `${catLabel} - ${insuranceForm.customer_name || '고객'}`,
+              color: '#f59e0b',
+              accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
+              operation_id: inserted[0].id,
+              created_by: userId,
+            })
           })
+          if (!schedRes.ok) throw new Error('일정 생성 실패')
 
           // Update accident record's replacement info
           if (insuranceForm.accident_id) {
-            await supabase.from('accident_records').update({
-              replacement_car_id: Number(form.car_id),
-              replacement_start: insuranceForm.replacement_start_date,
-              replacement_end: insuranceForm.replacement_end_date || null,
-              replacement_cost: insuranceCompanyShare,
-            }).eq('id', Number(insuranceForm.accident_id))
+            const accRes = await fetch(`/api/accident-records/${insuranceForm.accident_id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+              body: JSON.stringify({
+                replacement_car_id: Number(form.car_id),
+                replacement_start: insuranceForm.replacement_start_date,
+                replacement_end: insuranceForm.replacement_end_date || null,
+                replacement_cost: insuranceCompanyShare,
+              })
+            })
+            if (!accRes.ok) throw new Error('사고기록 업데이트 실패')
           }
 
           // Update car status
-          await supabase.from('cars').update({ status: 'rented' }).eq('id', Number(form.car_id))
+          await fetch(`/api/cars/${form.car_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'rented' }) })
         }
       }
 
@@ -402,53 +417,45 @@ export default function DispatchModal({
 
     setSaving(true)
     try {
-      const { data: contract, error: cErr } = await supabase.from('contracts').insert([{
-        
-        car_id: Number(form.car_id),
-        customer_name: shortTermForm.customer_name,
-        customer_phone: shortTermForm.customer_phone,
-        contract_type: 'rent',
-        dispatch_type: 'short_term',
-        start_date: shortTermForm.start_date,
-        end_date: shortTermForm.end_date,
-        daily_rate: shortTermForm.daily_rate,
-        total_amount: shortTermTotal,
-        deposit: shortTermForm.deposit,
-        monthly_rent: shortTermForm.daily_rate * 30,
-        short_term_quote_id: shortTermForm.selected_quote_id || null,
-        status: 'active',
-        created_by: userId,
-      }]).select().single()
+      const contractRes = await fetch('/api/contracts', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([{ car_id: Number(form.car_id), contract_type: 'short_term', customer_name: shortTermForm.customer_name, customer_phone: shortTermForm.customer_phone || '', start_date: shortTermForm.start_date, end_date: shortTermForm.end_date, total_amount: shortTermTotal, daily_rate: shortTermForm.daily_rate, company_id: company.id, created_by: userId }]) }); const contractJson = await contractRes.json(); const contract = contractJson.data?.[0]; const cErr = contractJson.error
       if (cErr) throw cErr
 
-      await supabase.from('vehicle_operations').insert([{
-        
-        contract_id: contract.id,
-        car_id: Number(form.car_id),
-        operation_type: 'delivery',
-        scheduled_date: shortTermForm.start_date,
-        scheduled_time: form.scheduled_time || '10:00',
-        location: form.location || '',
-        location_address: form.location_address || '',
-        handler_name: form.handler_name || '',
-        status: 'scheduled',
-        created_by: userId,
-        dispatch_category: 'regular',
-      }]).select()
-
-      await supabase.from('vehicle_schedules').insert({
-        
-        car_id: Number(form.car_id),
-        schedule_type: 'rental',
-        start_date: shortTermForm.start_date,
-        end_date: shortTermForm.end_date,
-        title: `단기 - ${shortTermForm.customer_name}`,
-        color: '#8b5cf6',
-        contract_id: contract.id,
-        created_by: userId,
+      const opRes = await fetch('/api/vehicle-operations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          contract_id: contract.id,
+          car_id: Number(form.car_id),
+          operation_type: 'delivery',
+          scheduled_date: shortTermForm.start_date,
+          scheduled_time: form.scheduled_time || '10:00',
+          location: form.location || '',
+          location_address: form.location_address || '',
+          handler_name: form.handler_name || '',
+          status: 'scheduled',
+          created_by: userId,
+          dispatch_category: 'regular',
+        })
       })
+      if (!opRes.ok) throw new Error('배차 생성 실패')
 
-      await supabase.from('cars').update({ status: 'rented' }).eq('id', Number(form.car_id))
+      const schedRes = await fetch('/api/vehicle-schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          car_id: Number(form.car_id),
+          schedule_type: 'rental',
+          start_date: shortTermForm.start_date,
+          end_date: shortTermForm.end_date,
+          title: `단기 - ${shortTermForm.customer_name}`,
+          color: '#8b5cf6',
+          contract_id: contract.id,
+          created_by: userId,
+        })
+      })
+      if (!schedRes.ok) throw new Error('일정 생성 실패')
+
+      await fetch(`/api/cars/${form.car_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'rented' }) })
 
       alert(`단기대차 계약이 생성되었습니다.\n기간: ${shortTermForm.start_date} ~ ${shortTermForm.end_date}\n총액: ${shortTermTotal.toLocaleString()}원`)
       onCreated()

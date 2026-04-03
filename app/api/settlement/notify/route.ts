@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { sendSMS, sendEmail, logMessageSend } from '../../../utils/messaging'
 
 // ============================================
@@ -7,24 +7,24 @@ import { sendSMS, sendEmail, logMessageSend } from '../../../utils/messaging'
 // POST → 수신자별 통합 메시지 발송 (SMS/이메일)
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  // TODO: Phase 5 - Replace with Firebase Auth verification
+  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  if (!profile || !['admin', 'master'].includes(profile.role)) return null
+  return { id: userId, ...profile }
 }
 
 // 새 형식: 수신자별 통합 메시지
@@ -60,8 +60,6 @@ export async function POST(request: NextRequest) {
     const { channel = 'sms' } = body as {
       channel: 'sms' | 'email'
     }
-
-    const sb = getSupabaseAdmin()
 
     const results: { name: string; success: boolean; error?: string }[] = []
 
@@ -127,11 +125,10 @@ export async function POST(request: NextRequest) {
       for (const item of items) {
         try {
           const tableName = item.type === 'jiip' ? 'jiip_contracts' : 'general_investments'
-          const { data: contract } = await sb
-            .from(tableName)
-            .select('*')
-            .eq('id', item.relatedId)
-            .single()
+          const contracts = await prisma.$queryRaw<any[]>`
+            SELECT * FROM ${tableName} WHERE id = ${item.relatedId} LIMIT 1
+          `
+          const contract = contracts[0]
 
           if (!contract) {
             results.push({ name: item.name, success: false, error: '계약 정보 없음' })

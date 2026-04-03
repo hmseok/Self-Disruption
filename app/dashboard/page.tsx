@@ -3,7 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '../utils/supabase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 import { useApp } from '../context/AppContext'
 import { usePermission } from '../hooks/usePermission'
 
@@ -35,7 +46,6 @@ type OpsStats = {
   activeAccidents: number
   accidentsThisMonth: any[]
 }
-
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -86,111 +96,17 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      // ========================================
-      // FMI 비즈니스 통계 — 전부 병렬 로드
-      // ========================================
-      {
-        // ★ 1차 병렬: 핵심 KPI 8개 + 모듈 동시 로드
-        const [
-          { data: compModules },
-          { data: carData },
-          { count: custCount },
-          { data: investData },
-          { count: jiipCount },
-          { data: revenueData },
-          { data: financeData },
-          { data: insuranceData },
-        ] = await Promise.all([
-          supabase.from('system_modules').select('path').eq('is_active', true),
-          supabase.from('cars').select('id, status', { count: 'exact' }),
-          supabase.from('customers').select('id', { count: 'exact', head: true }),
-          supabase.from('general_investments').select('invest_amount'),
-          supabase.from('jiip_contracts').select('id', { count: 'exact', head: true }),
-          supabase.from('quotes').select('rent_fee').eq('status', 'active'),
-          supabase.from('financial_products').select('monthly_payment'),
-          supabase.from('insurance_contracts').select('total_premium'),
-        ])
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/dashboard', { headers })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      const { modules, stats: s, opsStats: ops, collectionStats: col } = json.data
 
-        // 모듈 설정 (FMI 단독 — 전체 모듈 활성)
-        if (compModules) {
-          setActiveModules(new Set(compModules.map((m: any) => m.path).filter(Boolean)))
-        } else {
-          setActiveModules(new Set())
-        }
-
-        const cars = carData || []
-        const totalInvest = (investData || []).reduce((sum: number, i: any) => sum + (i.invest_amount || 0), 0)
-        const monthlyRevenue = (revenueData || []).reduce((sum: number, q: any) => sum + (q.rent_fee || 0), 0)
-        const totalFinance = (financeData || []).reduce((sum: number, f: any) => sum + (f.monthly_payment || 0), 0)
-        const totalInsurance = (insuranceData || []).reduce((sum: number, i: any) => sum + Math.round((i.total_premium || 0) / 12), 0)
-
-        setStats({
-          totalCars: cars.length,
-          availableCars: cars.filter((c: any) => c.status === 'available').length,
-          rentedCars: cars.filter((c: any) => c.status === 'rented').length,
-          maintenanceCars: cars.filter((c: any) => c.status === 'maintenance').length,
-          totalCustomers: custCount || 0,
-          activeInvestments: (investData || []).length,
-          totalInvestAmount: totalInvest,
-          jiipContracts: jiipCount || 0,
-          monthlyRevenue,
-          monthlyExpense: totalFinance + totalInsurance,
-          netProfit: monthlyRevenue - (totalFinance + totalInsurance),
-        })
-
-        // ★ 2차 병렬: 차량운영 + 수금
-        {
-          const today = new Date().toISOString().split('T')[0]
-          const weekAgo = new Date()
-          weekAgo.setDate(weekAgo.getDate() + 7)
-          const weekLater = weekAgo.toISOString().split('T')[0]
-          const monthStart = today.substring(0, 7) + '-01'
-          const nowMonth = new Date().toISOString().slice(0, 7)
-          const [yr, mo] = nowMonth.split('-').map(Number)
-          const lastDayOfMonth = new Date(yr, mo, 0).getDate()
-
-          const [delivRes, retRes, maintRes, maintShopRes, inspDueRes, inspOverRes, accActiveRes, accMonthRes, { data: schedData }] = await Promise.all([
-            supabase.from('vehicle_operations').select('id, scheduled_date, scheduled_time, status, operation_type, car:cars(number,brand,model), customer:customers(name)').eq('operation_type', 'delivery').eq('scheduled_date', today).order('scheduled_time'),
-            supabase.from('vehicle_operations').select('id, scheduled_date, scheduled_time, status, operation_type, car:cars(number,brand,model), customer:customers(name)').eq('operation_type', 'return').eq('scheduled_date', today).order('scheduled_time'),
-            supabase.from('maintenance_records').select('id', { count: 'exact', head: true }).in('status', ['requested', 'approved']),
-            supabase.from('maintenance_records').select('id', { count: 'exact', head: true }).eq('status', 'in_shop'),
-            supabase.from('inspection_records').select('id', { count: 'exact', head: true }).lte('due_date', weekLater).gte('due_date', today).in('status', ['scheduled', 'in_progress']),
-            supabase.from('inspection_records').select('id', { count: 'exact', head: true }).lt('due_date', today).in('status', ['scheduled', 'in_progress', 'overdue']),
-            supabase.from('accident_records').select('id', { count: 'exact', head: true }).in('status', ['reported', 'insurance_filed', 'repairing']),
-            supabase.from('accident_records').select('id, accident_date, accident_type, status, car:cars(number,brand,model)').gte('accident_date', monthStart).order('accident_date', { ascending: false }).limit(3),
-            supabase.from('expected_payment_schedules').select('status, expected_amount, actual_amount, payment_date').gte('payment_date', `${nowMonth}-01`).lte('payment_date', `${nowMonth}-${String(lastDayOfMonth).padStart(2, '0')}`),
-          ])
-
-          setOpsStats({
-            todayDeliveries: delivRes.data || [],
-            todayReturns: retRes.data || [],
-            maintenanceWaiting: maintRes.count || 0,
-            maintenanceInShop: maintShopRes.count || 0,
-            inspectionsDueSoon: inspDueRes.count || 0,
-            inspectionsOverdue: inspOverRes.count || 0,
-            activeAccidents: accActiveRes.count || 0,
-            accidentsThisMonth: accMonthRes.data || [],
-          })
-
-          if (schedData) {
-            const pending = schedData.filter((s: any) => s.status === 'pending' && s.payment_date >= today)
-            const overdue = schedData.filter((s: any) => s.status === 'pending' && s.payment_date < today)
-            const completed = schedData.filter((s: any) => s.status === 'completed' || s.status === 'partial')
-            const totalExpected = schedData.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0)
-            const totalActual = completed.reduce((a: number, s: any) => a + Number(s.actual_amount || s.expected_amount || 0), 0)
-            setCollectionStats({
-              pendingAmount: pending.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0),
-              pendingCount: pending.length,
-              completedAmount: totalActual,
-              completedCount: completed.length,
-              overdueAmount: overdue.reduce((a: number, s: any) => a + Number(s.expected_amount || 0), 0),
-              overdueCount: overdue.length,
-              collectionRate: totalExpected > 0 ? Math.round((totalActual / totalExpected) * 100) : 0,
-            })
-          }
-        }
-      }
-
+      setActiveModules(new Set(modules || []))
+      setStats(s)
+      setOpsStats(ops)
+      setCollectionStats(col)
     } catch (err) {
       console.error('대시보드 로딩 에러:', err)
     } finally {
@@ -228,8 +144,6 @@ export default function DashboardPage() {
       </div>
     )
   }
-
-
 
   // ============================================
   // FMI 비즈니스 대시보드

@@ -11,7 +11,7 @@
 // 수동 배정 시에는 이 엔진을 거치지 않고 직접 handler_id 설정
 // ============================================
 
-import { SupabaseClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ── 타입 ─────────────────────────────────────
 
@@ -168,10 +168,9 @@ export function extractFaultType(jandi_raw: string | null, notes: string, fault_
   return ''
 }
 
-// ── 메인 배정 엔진 ─────────────────────────────
+// ── 메인 배정 엔진 ─────────────────────────
 
 export async function assignHandler(
-  supabase: SupabaseClient,
   accident: AccidentForAssignment
 ): Promise<AssignmentResult> {
 
@@ -184,15 +183,17 @@ export async function assignHandler(
   }
 
   // ── 1. 활성 룰 조회 (우선순위 순)
-  const { data: rules, error: rulesErr } = await supabase
-    .from('assignment_rules')
-    .select('*, handler:profiles!assignment_rules_handler_id_fkey(employee_name)')
-    .eq('is_active', true)
-    .order('priority', { ascending: true })
+  const rules = await prisma.$queryRaw<any[]>`
+    SELECT ar.*, p.employee_name as handler_employee_name
+    FROM assignment_rules ar
+    LEFT JOIN profiles p ON ar.handler_id = p.id
+    WHERE ar.is_active = 1
+    ORDER BY ar.priority ASC
+  `
 
-  if (rulesErr || !rules || rules.length === 0) {
+  if (!rules || rules.length === 0) {
     // 룰 없으면 밸런스 기반으로 fallback
-    return await assignByBalance(supabase)
+    return await assignByBalance()
   }
 
   // ── 2. 사고 건에서 매칭 데이터 추출
@@ -203,11 +204,11 @@ export async function assignHandler(
 
   // ── 3. 룰 순회 매칭
   for (const rule of rules) {
-    const handlerName = rule.handler?.employee_name || ''
+    const handlerName = rule.handler_employee_name || ''
     const ruleValue = rule.rule_value.trim()
 
     // 담당자 가용성 체크
-    const available = await isHandlerAvailable(supabase, rule.handler_id)
+    const available = await isHandlerAvailable(rule.handler_id)
     if (!available) continue
 
     switch (rule.rule_type) {
@@ -292,47 +293,49 @@ export async function assignHandler(
   }
 
   // ── 4. 룰 매칭 실패 → 밸런스 기반 배정
-  return await assignByBalance(supabase)
+  return await assignByBalance()
 }
 
 // ── 담당자 가용성 체크 ──────────────────────────
 
 async function isHandlerAvailable(
-  supabase: SupabaseClient,
   handlerId: string
 ): Promise<boolean> {
   // handler_capacity 테이블에서 확인
-  const { data: capacity } = await supabase
-    .from('handler_capacity')
-    .select('max_cases, is_available')
-    .eq('handler_id', handlerId)
-    .maybeSingle()
+  const capacity = await prisma.$queryRaw<any[]>`
+    SELECT max_cases, is_available
+    FROM handler_capacity
+    WHERE handler_id = ${handlerId}
+    LIMIT 1
+  `
 
   // capacity 설정 없으면 기본 사용 가능
-  if (!capacity) return true
-  if (!capacity.is_available) return false
+  if (!capacity || capacity.length === 0) return true
+  if (!capacity[0].is_available) return false
 
   // 현재 활성 건 수 확인
-  const { count } = await supabase
-    .from('accident_records')
-    .select('id', { count: 'exact', head: true })
-    .eq('handler_id', handlerId)
-    .in('status', ['reported', 'insurance_filed', 'repairing'])
+  const countResult = await prisma.$queryRaw<any[]>`
+    SELECT COUNT(*) as count
+    FROM accident_records
+    WHERE handler_id = ${handlerId}
+    AND status IN ('reported', 'insurance_filed', 'repairing')
+  `
 
-  return (count || 0) < (capacity.max_cases || 999)
+  const count = countResult[0]?.count || 0
+  return count < (capacity[0].max_cases || 999)
 }
 
 // ── 밸런스 기반 배정 (가장 여유 있는 담당자) ──────
 
-async function assignByBalance(
-  supabase: SupabaseClient
-): Promise<AssignmentResult> {
+async function assignByBalance(): Promise<AssignmentResult> {
 
   // 사고팀 소속 활성 담당자 목록
-  const { data: handlers } = await supabase
-    .from('handler_capacity')
-    .select('handler_id, max_cases, is_available, handler:profiles!handler_capacity_handler_id_fkey(employee_name)')
-    .eq('is_available', true)
+  const handlers = await prisma.$queryRaw<any[]>`
+    SELECT hc.handler_id, hc.max_cases, hc.is_available, p.employee_name
+    FROM handler_capacity hc
+    LEFT JOIN profiles p ON hc.handler_id = p.id
+    WHERE hc.is_available = 1
+  `
 
   if (!handlers || handlers.length === 0) {
     return {
@@ -348,17 +351,18 @@ async function assignByBalance(
   const workloads: Array<{ handler_id: string; name: string; active: number; max: number; ratio: number }> = []
 
   for (const h of handlers) {
-    const { count } = await supabase
-      .from('accident_records')
-      .select('id', { count: 'exact', head: true })
-      .eq('handler_id', h.handler_id)
-      .in('status', ['reported', 'insurance_filed', 'repairing'])
+    const countResult = await prisma.$queryRaw<any[]>`
+      SELECT COUNT(*) as count
+      FROM accident_records
+      WHERE handler_id = ${h.handler_id}
+      AND status IN ('reported', 'insurance_filed', 'repairing')
+    `
 
-    const active = count || 0
+    const active = countResult[0]?.count || 0
     const max = h.max_cases || 20
     workloads.push({
       handler_id: h.handler_id,
-      name: (h.handler as any)?.employee_name || '',
+      name: h.employee_name || '',
       active,
       max,
       ratio: active / max,  // 낮을수록 여유
@@ -392,7 +396,6 @@ async function assignByBalance(
 // ── 배정 실행 (DB 업데이트 + 로그 기록) ──────────
 
 export async function executeAssignment(
-  supabase: SupabaseClient,
   accidentId: number,
   handlerId: string,
   matchInfo: {
@@ -403,56 +406,49 @@ export async function executeAssignment(
   }
 ): Promise<{ success: boolean; error?: string }> {
 
-  // accident_records에 handler_id 업데이트
-  const { error: updateErr } = await supabase
-    .from('accident_records')
-    .update({
-      handler_id: handlerId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', accidentId)
+  try {
+    // accident_records에 handler_id 업데이트
+    await prisma.$executeRaw`
+      UPDATE accident_records
+      SET handler_id = ${handlerId}, updated_at = NOW()
+      WHERE id = ${accidentId}
+    `
 
-  if (updateErr) {
-    return { success: false, error: updateErr.message }
+    // 배정 이력 로그
+    await prisma.$executeRaw`
+      INSERT INTO assignment_log (accident_id, handler_id, assignment_type, match_type, matched_rule, assigned_by)
+      VALUES (${accidentId}, ${handlerId}, ${matchInfo.is_auto ? 'auto' : 'manual'}, ${matchInfo.match_type}, ${matchInfo.matched_rule || null}, ${matchInfo.assigned_by || null})
+    `
+
+    return { success: true }
+  } catch (err: any) {
+    if (matchInfo.is_auto === false) {
+      // 로그 실패는 치명적이지 않으므로 성공 처리
+      console.error('배정 로그 저장 실패:', err)
+      return { success: true }
+    }
+    return { success: false, error: err.message }
   }
-
-  // 배정 이력 로그
-  const { error: logErr } = await supabase
-    .from('assignment_log')
-    .insert({
-      accident_id: accidentId,
-      handler_id: handlerId,
-      assignment_type: matchInfo.is_auto ? 'auto' : 'manual',
-      match_type: matchInfo.match_type,
-      matched_rule: matchInfo.matched_rule,
-      assigned_by: matchInfo.assigned_by || null,
-    })
-
-  if (logErr) {
-    console.error('배정 로그 저장 실패:', logErr)
-    // 로그 실패는 치명적이지 않으므로 성공 처리
-  }
-
-  return { success: true }
 }
 
 // ── 배정 추천 (자동 배정하지 않고 추천만) ─────────
 
 export async function suggestAssignment(
-  supabase: SupabaseClient,
   accident: AccidentForAssignment
 ): Promise<{
   recommended: AssignmentResult
   alternatives: AssignmentResult[]
 }> {
   // 메인 추천
-  const recommended = await assignHandler(supabase, accident)
+  const recommended = await assignHandler(accident)
 
   // 대안: 밸런스 기반 상위 3명
-  const { data: handlers } = await supabase
-    .from('handler_capacity')
-    .select('handler_id, max_cases, is_available, handler:profiles!handler_capacity_handler_id_fkey(employee_name)')
-    .eq('is_available', true)
+  const handlers = await prisma.$queryRaw<any[]>`
+    SELECT hc.handler_id, hc.max_cases, hc.is_available, p.employee_name
+    FROM handler_capacity hc
+    LEFT JOIN profiles p ON hc.handler_id = p.id
+    WHERE hc.is_available = 1
+  `
 
   const alternatives: AssignmentResult[] = []
 
@@ -460,16 +456,17 @@ export async function suggestAssignment(
     for (const h of handlers) {
       if (h.handler_id === recommended.handler_id) continue
 
-      const { count } = await supabase
-        .from('accident_records')
-        .select('id', { count: 'exact', head: true })
-        .eq('handler_id', h.handler_id)
-        .in('status', ['reported', 'insurance_filed', 'repairing'])
+      const countResult = await prisma.$queryRaw<any[]>`
+        SELECT COUNT(*) as count
+        FROM accident_records
+        WHERE handler_id = ${h.handler_id}
+        AND status IN ('reported', 'insurance_filed', 'repairing')
+      `
 
       alternatives.push({
         handler_id: h.handler_id,
-        handler_name: (h.handler as any)?.employee_name || '',
-        matched_rule: `활성 ${count || 0}/${h.max_cases || 20}건`,
+        handler_name: h.employee_name || '',
+        matched_rule: `활성 ${countResult[0]?.count || 0}/${h.max_cases || 20}건`,
         match_type: 'balance',
         confidence: 'low',
       })

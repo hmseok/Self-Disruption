@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const supabase = getSupabaseAdmin()
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await supabase
-    .from('profiles').select('*').eq('id', user.id).single()
-  return profile ? { ...user, ...profile } : null
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  // TODO: Phase 5 - Replace with Firebase Auth verification
+  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  return profile ? { id: userId, ...profile } : null
 }
 
 // GET: 내 프로필 정보 조회
@@ -26,15 +25,11 @@ export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-  const supabase = getSupabaseAdmin()
-
   // 법인카드 목록 조회
-  const { data: cards } = await supabase
-    .from('user_corporate_cards')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('is_default', { ascending: false })
-    .order('created_at', { ascending: false })
+  const cards = await prisma.$queryRaw<any[]>`
+    SELECT * FROM user_corporate_cards WHERE user_id = ${user.id}
+    ORDER BY is_default DESC, created_at DESC
+  `
 
   return NextResponse.json({
     profile: {
@@ -56,23 +51,20 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json()
   const { employee_name, phone } = body
 
-  const supabase = getSupabaseAdmin()
-  const updateData: Record<string, any> = {}
-  if (employee_name !== undefined) updateData.employee_name = employee_name
-  if (phone !== undefined) updateData.phone = phone
-
-  if (Object.keys(updateData).length === 0) {
+  if (employee_name === undefined && phone === undefined) {
     return NextResponse.json({ error: '변경할 내용이 없습니다.' }, { status: 400 })
   }
 
-  const { error } = await supabase
-    .from('profiles')
-    .update(updateData)
-    .eq('id', user.id)
-
-  if (error) {
+  try {
+    if (employee_name !== undefined && phone !== undefined) {
+      await prisma.$executeRaw`UPDATE profiles SET employee_name = ${employee_name}, phone = ${phone} WHERE id = ${user.id}`
+    } else if (employee_name !== undefined) {
+      await prisma.$executeRaw`UPDATE profiles SET employee_name = ${employee_name} WHERE id = ${user.id}`
+    } else {
+      await prisma.$executeRaw`UPDATE profiles SET phone = ${phone} WHERE id = ${user.id}`
+    }
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
     return NextResponse.json({ error: '수정 실패' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-// 👇 여기가 수정된 부분입니다!
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 
 type Props = {
   isOpen: boolean
@@ -23,14 +23,8 @@ export default function LoginModal({ isOpen, onClose }: Props) {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) throw error
-
-      if (data.session) {
+      const { user } = await signInWithEmailAndPassword(auth, email, password)
+      if (user) {
         router.replace('/admin')
       }
     } catch (error: any) {

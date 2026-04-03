@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, updatePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 // ── 타입 ──
 interface InspectionCostRow {
@@ -66,7 +66,6 @@ const VEHICLE_CLASS_GUIDE = [
 ]
 
 export default function InspectionTab() {
-  const supabase = createClientComponentClient()
   const [costs, setCosts] = useState<InspectionCostRow[]>([])
   const [schedules, setSchedules] = useState<InspectionScheduleRow[]>([])
   const [penalties, setPenalties] = useState<PenaltyRow[]>([])
@@ -87,18 +86,20 @@ export default function InspectionTab() {
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
-    setLoading(true)
-    const [costRes, schedRes, penRes, emitRes] = await Promise.all([
-      supabase.from('inspection_cost_table').select('*').eq('is_active', true).order('vehicle_class').order('fuel_type'),
-      supabase.from('inspection_schedule_table').select('*').eq('is_active', true).order('vehicle_usage').order('fuel_type').order('age_from'),
-      supabase.from('inspection_penalty_table').select('*').eq('is_active', true).order('penalty_type'),
-      supabase.from('emission_standard_table').select('*').eq('is_active', true).order('fuel_type').order('year_from'),
-    ])
-    setCosts(costRes.data || [])
-    setSchedules(schedRes.data || [])
-    setPenalties(penRes.data || [])
-    setEmissions(emitRes.data || [])
-    setLoading(false)
+    try {
+      setLoading(true)
+      const [costs, schedules, penalties, emissions] = await Promise.all([
+        fetchPricingStandardsData('inspection_cost_table'),
+        fetchPricingStandardsData('inspection_schedule_table'),
+        fetchPricingStandardsData('inspection_penalty_table'),
+        fetchPricingStandardsData('emission_standard_table'),
+      ])
+      setCosts(costs || [])
+      setSchedules(schedules || [])
+      setPenalties(penalties || [])
+      setEmissions(emissions || [])
+    } catch (error) { console.error('Error:', error) }
+    finally { setLoading(false) }
   }
 
   // 셀 편집
@@ -121,8 +122,10 @@ export default function InspectionTab() {
       }
     }
 
-    await supabase.from(table).update(updateData).eq('id', rowId)
-    await loadData()
+    try {
+      await updatePricingStandardsRow(table, String(rowId), updateData)
+      await loadData()
+    } catch (error) { console.error('Error:', error) }
     setEditingCell(null)
   }
 

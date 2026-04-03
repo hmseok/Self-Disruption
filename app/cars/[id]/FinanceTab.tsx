@@ -1,6 +1,18 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
+
 export default function FinanceTab({ carId }: { carId: string }) {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,14 +33,12 @@ export default function FinanceTab({ carId }: { carId: string }) {
   // 1. 금융 정보 불러오기
   const fetchFinance = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('financial_products')
-      .select('*')
-      .eq('car_id', carId)
-      .order('id', { ascending: false }) // ✅ id는 무조건 있으니까 해결!
-
-    if (error) console.error(error)
-    else setProducts(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/financial-products?car_id=${carId}`, { headers })
+      const json = await res.json()
+      setProducts(json.data || [])
+    } catch (e) { console.error('[FinanceTab]', e) }
     setLoading(false)
   }
 
@@ -37,23 +47,22 @@ export default function FinanceTab({ carId }: { carId: string }) {
   // 2. 저장하기
   const handleSave = async () => {
     if (!form.monthly_payment) return alert('월 납입금은 필수입니다.')
-
-    const { error } = await supabase.from('financial_products').insert([{
-      car_id: carId,
-      ...form
-    }])
-
-    if (error) alert('저장 실패: ' + error.message)
-    else {
-      alert('✅ 금융 계약이 등록되었습니다.')
-      fetchFinance()
-    }
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/financial-products', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ car_id: carId, ...form }),
+    })
+    const json = await res.json()
+    if (json.error) alert('저장 실패: ' + json.error)
+    else { alert('✅ 금융 계약이 등록되었습니다.'); fetchFinance() }
   }
 
   // 3. 삭제하기
   const handleDelete = async (id: number) => {
     if(!confirm('삭제하시겠습니까?')) return;
-    await supabase.from('financial_products').delete().eq('id', id)
+    const headers = await getAuthHeader()
+    await fetch(`/api/financial-products/${id}`, { method: 'DELETE', headers })
     fetchFinance()
   }
 

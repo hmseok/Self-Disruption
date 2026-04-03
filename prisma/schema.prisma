@@ -330,42 +330,6 @@ model FmiRentalTimeline {
 // ============================================================
 // 오픈뱅킹
 // ============================================================
-model OpenbankingAccount {
-  id           String    @id @default(uuid()) @db.Char(36)
-  user_seq_no  String?
-  fintech_use_num String? @unique
-  account_alias String?
-  bank_name    String?
-  account_num  String?
-  account_holder String?
-  is_active    Boolean   @default(true)
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-
-  transactions OpenbankingTransaction[]
-
-  @@map("openbanking_accounts")
-}
-
-model OpenbankingTransaction {
-  id              String    @id @default(uuid()) @db.Char(36)
-  account_id      String?   @db.Char(36)
-  fintech_use_num String?
-  tran_date       String?
-  tran_time       String?
-  tran_type       String?
-  tran_amt        Decimal?  @db.Decimal(15, 0)
-  balance_amt     Decimal?  @db.Decimal(15, 0)
-  print_content   String?
-  branch_name     String?
-  created_at      DateTime  @default(now())
-
-  account OpenbankingAccount? @relation(fields: [account_id], references: [id])
-
-  @@index([account_id])
-  @@index([tran_date])
-  @@map("openbanking_transactions")
-}
 
 // ============================================================
 // Codef 연동
@@ -428,4 +392,614 @@ model CommonCode {
 
   @@unique([category, code])
   @@map("common_codes")
+}
+
+// ============================================================
+// 거래/재무 관리
+// ============================================================
+model Transaction {
+  id               String    @id @default(uuid()) @db.Char(36)
+  company_id       String?   @db.Char(36)
+  transaction_date DateTime? @db.Date
+  type             String?   // income, expense
+  amount           Decimal?  @db.Decimal(15, 0)
+  client_name      String?
+  description      String?   @db.Text
+  payment_method   String?
+  status           String?   @default("completed")
+  category         String?
+  memo             String?   @db.Text
+  related_type     String?
+  related_id       String?   @db.Char(36)
+  ai_matched_type  String?
+  ai_matched_id    String?   @db.Char(36)
+  final_category   String?
+  imported_from    String?
+  codef_org_code   String?
+  raw_data         Json?
+  deleted_at       DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  @@index([company_id])
+  @@index([transaction_date])
+  @@index([status])
+  @@index([category])
+  @@map("transactions")
+}
+
+model ClassificationQueue {
+  id                String    @id @default(uuid()) @db.Char(36)
+  company_id        String?   @db.Char(36)
+  status            String    @default("pending") // pending, confirmed
+  source_data       Json?
+  ai_category       String?
+  ai_matched_type   String?
+  ai_matched_id     String?   @db.Char(36)
+  final_category    String?
+  final_matched_type String?
+  final_matched_id  String?   @db.Char(36)
+  queue_item_type   String?
+  queue_summary     String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  @@index([company_id])
+  @@index([status])
+  @@map("classification_queue")
+}
+
+model TransactionFlag {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  company_id           String?   @db.Char(36)
+  transaction_id       String?   @db.Char(36)
+  queue_id             String?   @db.Char(36)
+  flag_type            String?
+  flag_reason          String?   @db.Text
+  severity             String?
+  status               String    @default("pending") // pending, reviewing, approved, personal_confirmed, dismissed
+  transaction_date     DateTime? @db.Date
+  client_name          String?
+  amount               Decimal?  @db.Decimal(15, 0)
+  card_id              String?   @db.Char(36)
+  employee_id          String?   @db.Char(36)
+  employee_name        String?
+  reviewer_id          String?   @db.Char(36)
+  reviewer_note        String?   @db.Text
+  resolved_at          DateTime?
+  salary_adjustment_id String?   @db.Char(36)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@index([company_id])
+  @@index([status])
+  @@map("transaction_flags")
+}
+
+model SalaryAdjustment {
+  id                    String    @id @default(uuid()) @db.Char(36)
+  company_id            String?   @db.Char(36)
+  employee_id           String?   @db.Char(36)
+  year_month            String?   // YYYY-MM
+  adjustment_type       String?   // deduct, add
+  amount                Decimal?  @db.Decimal(12, 0)
+  reason                String?   @db.Text
+  status                String    @default("pending") // pending, approved, applied, cancelled
+  source_transaction_id String?   @db.Char(36)
+  source_flag_id        String?   @db.Char(36)
+  memo                  String?   @db.Text
+  approved_by           String?   @db.Char(36)
+  approved_at           DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  @@index([company_id])
+  @@index([employee_id])
+  @@index([year_month])
+  @@map("salary_adjustments")
+}
+
+model ExpenseReceipt {
+  id            String    @id @default(uuid()) @db.Char(36)
+  user_id       String?   @db.Char(36)
+  user_name     String?
+  expense_date  DateTime? @db.Date
+  card_number   String?
+  category      String?
+  merchant      String?
+  item_name     String?
+  customer_team String?
+  amount        Decimal?  @db.Decimal(12, 0)
+  receipt_url   String?
+  memo          String?   @db.Text
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  @@index([user_id])
+  @@index([expense_date])
+  @@map("expense_receipts")
+}
+
+// ============================================================
+// 계약/견적
+// ============================================================
+model Contract {
+  id              String    @id @default(uuid()) @db.Char(36)
+  quote_id        String?   @db.Char(36)
+  car_id          String?   @db.Char(36)
+  customer_id     String?   @db.Char(36)
+  customer_name   String?
+  start_date      DateTime? @db.Date
+  end_date        DateTime? @db.Date
+  term_months     Int?
+  deposit         Decimal?  @db.Decimal(12, 0)
+  monthly_rent    Decimal?  @db.Decimal(12, 0)
+  status          String    @default("pending") // pending, draft, active, ended, completed, expired, cancelled, terminated
+  signature_id    String?   @db.Char(36)
+  contract_pdf_url String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([car_id])
+  @@index([customer_id])
+  @@map("contracts")
+}
+
+model Quote {
+  id            String    @id @default(uuid()) @db.Char(36)
+  status        String    @default("draft") // draft, pending, active, archived
+  customer_name String?
+  rent_fee      Decimal?  @db.Decimal(12, 0)
+  shared_at     DateTime?
+  signed_at     DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  share_tokens QuoteShareToken[]
+
+  @@index([status])
+  @@map("quotes")
+}
+
+model QuoteShareToken {
+  id         String    @id @default(uuid()) @db.Char(36)
+  quote_id   String    @db.Char(36)
+  token      String    @unique
+  status     String    @default("active") // active, revoked
+  expires_at DateTime?
+  created_at DateTime  @default(now())
+
+  quote Quote @relation(fields: [quote_id], references: [id])
+
+  @@index([quote_id])
+  @@map("quote_share_tokens")
+}
+
+model CustomerSignature {
+  id             String    @id @default(uuid()) @db.Char(36)
+  quote_id       String?   @db.Char(36)
+  customer_name  String?
+  customer_phone String?
+  signed_at      DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  @@map("customer_signatures")
+}
+
+// ============================================================
+// 회사/사용자 관리
+// ============================================================
+model Company {
+  id         String    @id @default(uuid()) @db.Char(36)
+  name       String
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  @@map("companies")
+}
+
+model Car {
+  id         String    @id @default(uuid()) @db.Char(36)
+  brand      String?
+  model      String?
+  trim       String?
+  number     String?
+  year       Int?
+  image_url  String?
+  status     String    @default("active") // active, rented, accident
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  @@map("cars")
+}
+
+model MemberInvitation {
+  id               String    @id @default(uuid()) @db.Char(36)
+  email            String
+  company_id       String?   @db.Char(36)
+  status           String    @default("pending") // pending, accepted, cancelled, expired
+  token            String    @unique
+  expires_at       DateTime?
+  position_id      String?   @db.Char(36)
+  department_id    String?   @db.Char(36)
+  role             String?
+  page_permissions Json?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  @@index([token])
+  @@index([email])
+  @@map("member_invitations")
+}
+
+model AdminInviteCode {
+  id          String    @id @default(uuid()) @db.Char(36)
+  code        String    @unique
+  description String?
+  created_by  String?   @db.Char(36)
+  expires_at  DateTime?
+  used_at     DateTime?
+  used_by     String?   @db.Char(36)
+  created_at  DateTime  @default(now())
+
+  @@map("admin_invite_codes")
+}
+
+// ============================================================
+// 급여/인사
+// ============================================================
+model Payslip {
+  id                        String    @id @default(uuid()) @db.Char(36)
+  company_id                String?   @db.Char(36)
+  employee_id               String?   @db.Char(36)
+  pay_period                String?   // YYYY-MM
+  base_salary               Decimal?  @db.Decimal(12, 0)
+  total_allowances          Decimal?  @db.Decimal(12, 0)
+  allowance_details         Json?
+  gross_salary              Decimal?  @db.Decimal(12, 0)
+  national_pension          Decimal?  @db.Decimal(12, 0)
+  health_insurance          Decimal?  @db.Decimal(12, 0)
+  long_care_insurance       Decimal?  @db.Decimal(12, 0)
+  employment_insurance      Decimal?  @db.Decimal(12, 0)
+  income_tax                Decimal?  @db.Decimal(12, 0)
+  local_income_tax          Decimal?  @db.Decimal(12, 0)
+  tax_type                  String?
+  total_deductions          Decimal?  @db.Decimal(12, 0)
+  expense_claims            Json?
+  expense_deductions        Json?
+  net_salary                Decimal?  @db.Decimal(12, 0)
+  status                    String    @default("draft") // draft, confirmed, paid
+  paid_date                 DateTime? @db.Date
+  memo                      String?   @db.Text
+  meal_expense_total        Decimal?  @db.Decimal(12, 0)
+  meal_expense_allowance    Decimal?  @db.Decimal(12, 0)
+  meal_expense_excess       Decimal?  @db.Decimal(12, 0)
+  card_spending_total       Decimal?  @db.Decimal(12, 0)
+  overtime_hours            Decimal?  @db.Decimal(5, 2)
+  overtime_pay              Decimal?  @db.Decimal(12, 0)
+  custom_deductions_applied Json?
+  employment_type_snapshot  String?
+  salary_type_snapshot      String?
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @updatedAt
+
+  @@index([company_id])
+  @@index([employee_id])
+  @@index([pay_period])
+  @@map("payslips")
+}
+
+model EmployeeSalary {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  company_id           String?   @db.Char(36)
+  employee_id          String?   @db.Char(36)
+  base_salary          Decimal?  @db.Decimal(12, 0)
+  allowances           Json?
+  deduction_overrides  Json?
+  payment_day          Int?
+  tax_type             String?
+  bank_name            String?
+  account_number       String?
+  account_holder       String?
+  is_active            Boolean   @default(true)
+  employment_type      String?
+  salary_type          String?
+  annual_salary        Decimal?  @db.Decimal(15, 0)
+  hourly_rate          Decimal?  @db.Decimal(10, 2)
+  daily_rate           Decimal?  @db.Decimal(10, 2)
+  working_hours_per_week Int?
+  dependents_count     Int?
+  net_salary_mode      String?
+  target_net_salary    Decimal?  @db.Decimal(12, 0)
+  custom_deductions    Json?
+  expanded_allowances  Json?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@unique([company_id, employee_id])
+  @@index([company_id])
+  @@map("employee_salaries")
+}
+
+model Freelancer {
+  id         String    @id @default(uuid()) @db.Char(36)
+  name       String
+  status     String    @default("active") // active, inactive
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  @@map("freelancers")
+}
+
+model MealExpenseMonthly {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  employee_id          String?   @db.Char(36)
+  year_month           String?   // YYYY-MM
+  total_meal_spending  Decimal?  @db.Decimal(12, 0)
+  base_allowance       Decimal?  @db.Decimal(12, 0)
+  excess_amount        Decimal?  @db.Decimal(12, 0)
+  transaction_count    Int?
+  status               String    @default("pending") // pending, approved, applied
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@index([employee_id])
+  @@map("meal_expense_monthly")
+}
+
+model CorporateCard {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  card_number         String?
+  assigned_to         String?   @db.Char(36)
+  holder_name         String?
+  card_alias          String?
+  assigned_employee_id String?  @db.Char(36)
+  status              String?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@map("corporate_cards")
+}
+
+// ============================================================
+// 정산 공유
+// ============================================================
+model SettlementShare {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  token               String    @unique
+  recipient_name      String?
+  recipient_phone     String?
+  settlement_month    String?   // YYYY-MM
+  payment_date        DateTime? @db.Date
+  total_amount        Decimal?  @db.Decimal(12, 0)
+  items               Json?
+  breakdown           Json?
+  transaction_details Json?
+  bank_info           Json?
+  message             String?   @db.Text
+  status              String    @default("active")
+  view_count          Int       @default(0)
+  expires_at          DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([token])
+  @@map("settlement_shares")
+}
+
+// ============================================================
+// 오픈뱅킹 (실제 마이그레이션된 컬럼 기준)
+// ============================================================
+model OpenBankingAccount {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  user_seq_no          String?
+  fin_use_num          String?   @unique
+  bank_code            String?
+  bank_name            String?
+  account_num_masked   String?
+  account_holder_name  String?
+  access_token         String?   @db.Text
+  refresh_token        String?   @db.Text
+  token_expires_at     DateTime?
+  is_active            Boolean   @default(true)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  open_transactions OpenBankingTransaction[]
+
+  @@map("openbanking_accounts")
+}
+
+model OpenBankingTransaction {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  account_id           String?   @db.Char(36)
+  fin_use_num          String?
+  bank_code            String?
+  bank_name            String?
+  account_num_masked   String?
+  tran_date            String?
+  tran_time            String?
+  tran_type            String?
+  tran_type_name       String?
+  tran_amt             Decimal?  @db.Decimal(15, 0)
+  after_balance_amt    Decimal?  @db.Decimal(15, 0)
+  print_content        String?
+  branch_name          String?
+  unique_tran_no       String?   @unique
+  created_at           DateTime  @default(now())
+
+  account OpenBankingAccount? @relation(fields: [account_id], references: [id])
+
+  @@index([account_id])
+  @@index([tran_date])
+  @@map("openbanking_transactions")
+}
+
+// ============================================================
+// 카드 관리 (Phase 3 추가)
+// ============================================================
+model CardAssignmentHistory {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  card_id             String?   @db.Char(36)
+  employee_id         String?   @db.Char(36)
+  assigned_from       DateTime? @db.Date
+  assigned_to         DateTime? @db.Date
+  reason              String?
+  assigned_by         String?   @db.Char(36)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([card_id])
+  @@index([employee_id])
+  @@map("card_assignment_history")
+}
+
+model CardLimitSettings {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  type                String?   // card_company, dept, employee
+  key                 String?   // 카드사명, 부서명, 직원ID
+  monthly_limit       Decimal?  @db.Decimal(12, 0)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@unique([type, key])
+  @@map("card_limit_settings")
+}
+
+// ============================================================
+// 프리랜서 및 세무 (Phase 3 추가)
+// ============================================================
+model FreelancerPayment {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  freelancer_id       String?   @db.Char(36)
+  amount              Decimal?  @db.Decimal(12, 0)
+  payment_date        DateTime? @db.Date
+  invoice_no          String?
+  description         String?   @db.Text
+  status              String?   @default("pending") // pending, completed, cancelled
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([freelancer_id])
+  @@index([payment_date])
+  @@map("freelancer_payments")
+}
+
+model CustomerTaxInvoice {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  customer_id         String?   @db.Char(36)
+  invoice_no          String?   @unique
+  invoice_date        DateTime? @db.Date
+  amount              Decimal?  @db.Decimal(12, 0)
+  tax_amount          Decimal?  @db.Decimal(12, 0)
+  description         String?   @db.Text
+  status              String?   @default("issued")
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([customer_id])
+  @@index([invoice_date])
+  @@map("customer_tax_invoices")
+}
+
+model TaxFilingRecord {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  year                Int?
+  filing_date         DateTime? @db.Date
+  filing_type         String?   // individual, corporate
+  status              String?   @default("draft")
+  total_income        Decimal?  @db.Decimal(12, 0)
+  total_deduction     Decimal?  @db.Decimal(12, 0)
+  tax_amount          Decimal?  @db.Decimal(12, 0)
+  memo                String?   @db.Text
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([year])
+  @@index([filing_date])
+  @@map("tax_filing_records")
+}
+
+// ============================================================
+// 투자 관리 (Phase 3 추가)
+// ============================================================
+model InvestmentDeposit {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  investment_id       String?   @db.Char(36)
+  deposit_date        DateTime? @db.Date
+  amount              Decimal?  @db.Decimal(12, 0)
+  description         String?   @db.Text
+  status              String?   @default("pending")
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([investment_id])
+  @@index([deposit_date])
+  @@map("investment_deposits")
+}
+
+// ============================================================
+// 메시징 / 라이프사이클 (Supabase 탈출 후 추가)
+// ============================================================
+model MessageTemplate {
+  id                  String    @id @default(uuid()) @db.Char(36)
+  company_id          String?   @db.Char(36)
+  template_key        String
+  channel             String    // sms, kakao, email, push
+  subject             String?
+  body                String    @db.Text
+  html_template       String?   @db.LongText
+  kakao_template_code String?
+  kakao_button_json   Json?
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([template_key, channel])
+  @@index([company_id])
+  @@map("message_templates")
+}
+
+model MessageSendLog {
+  id               String    @id @default(uuid()) @db.Char(36)
+  company_id       String?   @db.Char(36)
+  template_key     String?
+  channel          String    // sms, kakao, email, push
+  recipient        String
+  recipient_name   String?
+  subject          String?
+  body             String    @db.Text
+  status           String    @default("pending") // pending, sent, failed, delivered
+  result_code      String?
+  result_message   String?
+  error_detail     String?   @db.Text
+  related_type     String?
+  related_id       String?   @db.Char(36)
+  sent_by          String?   @db.Char(36)
+  sent_at          DateTime?
+  created_at       DateTime  @default(now())
+
+  @@index([company_id])
+  @@index([related_type, related_id])
+  @@index([sent_at])
+  @@map("message_send_logs")
+}
+
+model QuoteLifecycleEvent {
+  id          String    @id @default(uuid()) @db.Char(36)
+  quote_id    String    @db.Char(36)
+  contract_id String?   @db.Char(36)
+  event_type  String    // created, shared, sent, viewed, signed, contract_created, revoked, pdf_stored
+  channel     String?   // sms, kakao, email, link
+  recipient   String?
+  metadata    Json?
+  actor_id    String?   @db.Char(36)
+  created_at  DateTime  @default(now())
+
+  @@index([quote_id])
+  @@index([event_type])
+  @@index([created_at])
+  @@map("quote_lifecycle_events")
 }

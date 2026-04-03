@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 
@@ -45,12 +45,12 @@ export default function DeveloperPage() {
   // 플랫폼 관리자 목록 로드
   const loadGodAdmins = async () => {
     setAdminsLoading(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, email, employee_name, role, is_active, created_at')
-      .in('role', ['admin', 'admin'])
-      .order('created_at', { ascending: true })
-    setGodAdmins(data || [])
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+      const res = await fetch('/api/profiles?role=admin', { headers: { 'Authorization': `Bearer ${token}` } })
+      const json = await res.json()
+      setGodAdmins(json.data || [])
+    } catch {}
     setAdminsLoading(false)
   }
 
@@ -58,8 +58,7 @@ export default function DeveloperPage() {
   const loadInvites = async () => {
     setInviteLoading(true)
     try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const res = await fetch('/api/admin-invite', { headers: { 'Authorization': `Bearer ${token}` } })
       const data = await res.json()
       if (Array.isArray(data)) setInvites(data)
@@ -211,8 +210,7 @@ export default function DeveloperPage() {
                   }
                   setInviteLoading(true)
                   try {
-                    const session = await supabase.auth.getSession()
-                    const token = session.data.session?.access_token
+                    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
                     const res = await fetch('/api/admin-invite', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -313,8 +311,7 @@ export default function DeveloperPage() {
                             onClick={async () => {
                               if (!confirm(`"${inv.code}" 코드를 즉시 만료 처리하시겠습니까?`)) return
                               try {
-                                const session = await supabase.auth.getSession()
-                                const token = session.data.session?.access_token
+                                const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
                                 const res = await fetch('/api/admin-invite', {
                                   method: 'PATCH',
                                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

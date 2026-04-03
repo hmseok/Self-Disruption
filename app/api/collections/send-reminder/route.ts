@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { sendWithTemplate } from '../../../utils/messaging'
 
 // ============================================
@@ -7,24 +7,24 @@ import { sendWithTemplate } from '../../../utils/messaging'
 // POST → 선택된 스케줄에 대해 SMS/이메일 발송
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  // TODO: Phase 5 - Replace with Firebase Auth verification
+  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  if (!profile || !['admin', 'master'].includes(profile.role)) return null
+  return { id: userId, ...profile }
 }
 
 export async function POST(request: NextRequest) {
@@ -43,22 +43,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'schedule_ids 배열 필수' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // 1. 스케줄 + 계약 정보 조회
-    const { data: schedules, error: fetchErr } = await sb
-      .from('expected_payment_schedules')
-      .select('*')
-      .in('id', schedule_ids)
+    const idList = schedule_ids.map((id: string) => `'${id}'`).join(',')
+    const schedules = await prisma.$queryRaw<any[]>`
+      SELECT * FROM expected_payment_schedules WHERE id IN (${idList})
+    `
 
-    if (fetchErr || !schedules || schedules.length === 0) {
+    if (!schedules || schedules.length === 0) {
       return NextResponse.json({ error: '스케줄을 찾을 수 없습니다.' }, { status: 404 })
     }
 
     // 2. 회사명 조회
     const companyId = schedules[0].company_id
-    const { data: company } = await sb.from('companies').select('name').eq('id', companyId).single()
-    const companyName = company?.name || '회사'
+    const companies = await prisma.$queryRaw<any[]>`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`
+    const companyName = companies[0]?.name || '회사'
 
     // 3. 각 스케줄에 대해 계약 정보 조회 + 발송
     const results: { scheduleId: string; success: boolean; error?: string }[] = []
@@ -67,11 +65,10 @@ export async function POST(request: NextRequest) {
       try {
         // 계약 정보 (이름, 전화번호, 이메일)
         const tableName = sched.contract_type === 'jiip' ? 'jiip_contracts' : 'general_investments'
-        const { data: contract } = await sb
-          .from(tableName)
-          .select('*')
-          .eq('id', sched.contract_id)
-          .single()
+        const contracts = await prisma.$queryRaw<any[]>`
+          SELECT * FROM ${tableName} WHERE id = ${sched.contract_id} LIMIT 1
+        `
+        const contract = contracts[0]
 
         if (!contract) {
           results.push({ scheduleId: sched.id, success: false, error: '계약 정보 없음' })

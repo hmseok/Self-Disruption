@@ -1,9 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
+
+// ────────────────────────────────────────────────────────────────
+// Auth Helper
+// ────────────────────────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 // ============================================
 // 메시지 센터 (메시지 템플릿 + 발송 이력)
@@ -139,12 +146,9 @@ export default function MessageTemplatesPage() {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: fetchError } = await supabase
-        .from('message_templates')
-        .select('*')
-        
-        .order('sort_order', { ascending: true })
-        .order('template_key', { ascending: true })
+      const res = await fetch('/api/message_templates', { headers: await getAuthHeader() })
+      const json = await res.json()
+      const { data, error: fetchError } = json
 
       if (fetchError) {
         if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
@@ -159,16 +163,14 @@ export default function MessageTemplatesPage() {
 
       // 각 템플릿의 발송 개수 조회
       const templatesWithCount = await Promise.all(
-        (data || []).map(async (template) => {
-          const { count } = await supabase
-            .from('message_send_logs')
-            .select('id', { count: 'exact', head: true })
-            
-            .eq('template_key', template.template_key)
+        (data || []).map(async (template: any) => {
+          const res = await fetch(`/api/message_send_logs?template_key=${template.template_key}`, { headers: await getAuthHeader() })
+          const json = await res.json()
+          const count = json?.data?.length || 0
 
           return {
             ...template,
-            sendCount: count || 0,
+            sendCount: count,
           }
         })
       )
@@ -187,27 +189,19 @@ export default function MessageTemplatesPage() {
     setLoading(true)
     setError(null)
     try {
-      let query = supabase
-        .from('message_send_logs')
-        .select('*')
-        
+      const params = new URLSearchParams()
+      if (selectedStatus !== 'all') params.append('status', selectedStatus)
+      if (selectedChannel !== 'all') params.append('channel', selectedChannel)
+      if (dateRange.from) params.append('from', dateRange.from)
+      if (dateRange.to) params.append('to', dateRange.to)
+      if (filterRecipient) params.append('recipient', filterRecipient)
+      if (filterTemplateKey) params.append('template_key', filterTemplateKey)
 
-      if (selectedStatus !== 'all') query = query.eq('status', selectedStatus)
-      if (selectedChannel !== 'all') query = query.eq('channel', selectedChannel)
-      if (dateRange.from) query = query.gte('sent_at', dateRange.from)
-      if (dateRange.to) query = query.lte('sent_at', dateRange.to)
-      if (filterRecipient) query = query.ilike('recipient', `%${filterRecipient}%`)
-      if (filterTemplateKey) query = query.ilike('template_key', `%${filterTemplateKey}%`)
-
-      const { data, error: fetchError } = await query.order('sent_at', { ascending: false }).limit(100)
+      const res = await fetch(`/api/message_send_logs?${params.toString()}`, { headers: await getAuthHeader() })
+      const json = await res.json()
+      const { data, error: fetchError } = json
 
       if (fetchError) {
-        if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
-          setLogs([])
-          setError('발송 이력 테이블이 아직 생성되지 않았습니다.')
-          setLoading(false)
-          return
-        }
         throw fetchError
       }
 
@@ -236,24 +230,24 @@ export default function MessageTemplatesPage() {
 
     try {
       if (editingTemplate && editingTemplate.id) {
-        const { error } = await supabase
-          .from('message_templates')
-          .update({
+        const res = await fetch(`/api/message_templates/${editingTemplate.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
             ...template,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', editingTemplate.id)
+        })
+        const json = await res.json()
+        const error = json?.error
         if (error) throw error
       } else {
-        const { error } = await supabase
-          .from('message_templates')
-          .insert([{
+        const res = await fetch('/api/message_templates', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
             ...template,
-            
             sort_order: templates.length,
             is_active: true,
             is_system: false,
-          }])
+          })
+        })
+        const json = await res.json()
+        const error = json?.error
         if (error) throw error
       }
 
@@ -270,7 +264,9 @@ export default function MessageTemplatesPage() {
   const deleteTemplate = async (id: string) => {
     if (!confirm('이 템플릿을 삭제하시겠습니까?')) return
     try {
-      const { error } = await supabase.from('message_templates').delete().eq('id', id)
+      const res = await fetch(`/api/message_templates/${id}`, { method: 'DELETE', headers: await getAuthHeader() })
+      const json = await res.json()
+      const error = json?.error
       if (error) throw error
       loadTemplates()
     } catch (err) {
@@ -281,10 +277,9 @@ export default function MessageTemplatesPage() {
   // 활성화 토글
   const toggleTemplate = async (id: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('message_templates')
-        .update({ is_active: !isActive })
-        .eq('id', id)
+      const res = await fetch(`/api/message_templates/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ is_active: !isActive }) })
+      const json = await res.json()
+      const error = json?.error
       if (error) throw error
       loadTemplates()
     } catch (err) {

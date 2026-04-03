@@ -1,9 +1,20 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DarkHeader from '../../components/DarkHeader'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const KOREAN_BANKS = [
   'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행',
@@ -49,25 +60,36 @@ export default function FreelancersPage() {
 
   const fetchFreelancers = async () => {
     setLoading(true)
-    let query = supabase.from('freelancers').select('*').order('name')
-    if (filter === 'active') query = query.eq('is_active', true)
-    if (filter === 'inactive') query = query.eq('is_active', false)
-    const { data } = await query
-    setFreelancers(data || [])
+    try {
+      const url = new URL('/api/freelancers', window.location.origin)
+      if (filter === 'active') url.searchParams.set('is_active', 'true')
+      else if (filter === 'inactive') url.searchParams.set('is_active', 'false')
+
+      const res = await fetch(url.toString(), { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch')
+      setFreelancers(json.data || [])
+    } catch (err) {
+      console.error('fetchFreelancers error:', err)
+      setFreelancers([])
+    }
     setLoading(false)
   }
 
   const fetchPayments = async () => {
     const [y, m] = paymentMonth.split('-').map(Number)
     const lastDay = new Date(y, m, 0).getDate()
-    const { data } = await supabase
-      .from('freelancer_payments')
-      .select('*, freelancers(name, service_type)')
-      
-      .gte('payment_date', `${paymentMonth}-01`)
-      .lte('payment_date', `${paymentMonth}-${lastDay}`)
-      .order('payment_date', { ascending: false })
-    setPayments(data || [])
+    try {
+      const res = await fetch(`/api/freelancer-payments?from=${paymentMonth}-01&to=${paymentMonth}-${lastDay}`, {
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch')
+      setPayments(json.data || [])
+    } catch (err) {
+      console.error('fetchPayments error:', err)
+      setPayments([])
+    }
   }
 
   useEffect(() => { if (companyId) fetchFreelancers() }, [filter])
@@ -76,16 +98,30 @@ export default function FreelancersPage() {
     if (!form.name) return alert('이름은 필수입니다.')
     const payload = { ...form }
 
-    if (editingId) {
-      const { error } = await supabase.from('freelancers').update(payload).eq('id', editingId)
-      if (error) return alert('수정 실패: ' + error.message)
-    } else {
-      const { error } = await supabase.from('freelancers').insert(payload)
-      if (error) return alert('등록 실패: ' + error.message)
+    try {
+      if (editingId) {
+        const res = await fetch(`/api/freelancers/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(payload)
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Update failed')
+      } else {
+        const res = await fetch('/api/freelancers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(payload)
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Create failed')
+      }
+      alert('저장되었습니다.')
+      setShowForm(false); setEditingId(null); setForm(emptyForm)
+      fetchFreelancers()
+    } catch (err: any) {
+      alert('저장 실패: ' + err.message)
     }
-    alert('저장되었습니다.')
-    setShowForm(false); setEditingId(null); setForm(emptyForm)
-    fetchFreelancers()
   }
 
   const handleEdit = (f: any) => {
@@ -94,8 +130,17 @@ export default function FreelancersPage() {
   }
 
   const handleToggleActive = async (f: any) => {
-    await supabase.from('freelancers').update({ is_active: !f.is_active }).eq('id', f.id)
-    fetchFreelancers()
+    try {
+      const res = await fetch(`/api/freelancers/${f.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ is_active: !f.is_active })
+      })
+      if (!res.ok) throw new Error('Update failed')
+      fetchFreelancers()
+    } catch (err) {
+      console.error('handleToggleActive error:', err)
+    }
   }
 
   const handlePaymentSave = async () => {
@@ -106,7 +151,6 @@ export default function FreelancersPage() {
     const netAmount = gross - taxAmount
 
     const payload = {
-      
       freelancer_id: payForm.freelancer_id,
       payment_date: payForm.payment_date,
       gross_amount: gross,
@@ -117,57 +161,81 @@ export default function FreelancersPage() {
       status: payForm.status,
     }
 
-    const { error } = await supabase.from('freelancer_payments').insert(payload)
-    if (error) return alert('등록 실패: ' + error.message)
-    alert('지급 등록 완료')
-    setShowPaymentForm(false); setPayForm(emptyPaymentForm)
-    fetchPayments()
+    try {
+      const res = await fetch('/api/freelancer-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Create failed')
+      alert('지급 등록 완료')
+      setShowPaymentForm(false); setPayForm(emptyPaymentForm)
+      fetchPayments()
+    } catch (err: any) {
+      alert('등록 실패: ' + err.message)
+    }
   }
 
   const handlePaymentConfirm = async (p: any) => {
     if (!confirm(`${p.freelancers?.name}에게 ${Number(p.net_amount).toLocaleString()}원 지급 확정하시겠습니까?`)) return
 
-    // 1. 지급 상태 업데이트
-    await supabase.from('freelancer_payments').update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] }).eq('id', p.id)
-
-    // 2. transactions에 자동 기록
-    await supabase.from('transactions').insert({
-      
-      transaction_date: p.payment_date,
-      type: 'expense',
-      category: '용역비(3.3%)',
-      client_name: p.freelancers?.name || '프리랜서',
-      amount: p.net_amount,
-      description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
-      payment_method: '이체',
-      status: 'completed',
-      related_type: 'freelancer',
-      related_id: p.freelancer_id,
-      classification_source: 'auto_sync',
-      confidence: 100,
-    })
-
-    // 3. 원천세도 별도 기록
-    if (p.tax_amount > 0) {
-      await supabase.from('transactions').insert({
-        
-        transaction_date: p.payment_date,
-        type: 'expense',
-        category: '세금/공과금',
-        client_name: `원천세(${p.freelancers?.name})`,
-        amount: p.tax_amount,
-        description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
-        payment_method: '이체',
-        status: 'completed',
-        related_type: 'freelancer',
-        related_id: p.freelancer_id,
-        classification_source: 'auto_sync',
-        confidence: 100,
+    try {
+      // 1. 지급 상태 업데이트
+      await fetch(`/api/freelancer-payments/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({ status: 'paid', paid_date: new Date().toISOString().split('T')[0] })
       })
-    }
 
-    alert('지급 확정 및 장부 반영 완료')
-    fetchPayments()
+      // 2. transactions에 자동 기록
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+        body: JSON.stringify({
+          transaction_date: p.payment_date,
+          type: 'expense',
+          category: '용역비(3.3%)',
+          client_name: p.freelancers?.name || '프리랜서',
+          amount: p.net_amount,
+          description: `프리랜서 용역비 - ${p.freelancers?.name} (${p.description || ''})`,
+          payment_method: '이체',
+          status: 'completed',
+          related_type: 'freelancer',
+          related_id: p.freelancer_id,
+          classification_source: 'auto_sync',
+          confidence: 100,
+        })
+      })
+
+      // 3. 원천세도 별도 기록
+      if (p.tax_amount > 0) {
+        await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify({
+            transaction_date: p.payment_date,
+            type: 'expense',
+            category: '세금/공과금',
+            client_name: `원천세(${p.freelancers?.name})`,
+            amount: p.tax_amount,
+            description: `프리랜서 원천징수세 - ${p.freelancers?.name}`,
+            payment_method: '이체',
+            status: 'completed',
+            related_type: 'freelancer',
+            related_id: p.freelancer_id,
+            classification_source: 'auto_sync',
+            confidence: 100,
+          })
+        })
+      }
+
+      alert('지급 확정 및 장부 반영 완료')
+      fetchPayments()
+    } catch (err) {
+      console.error('handlePaymentConfirm error:', err)
+      alert('처리 중 오류가 발생했습니다.')
+    }
   }
 
   const formatMoney = (n: number) => n ? Number(n).toLocaleString() : '0'

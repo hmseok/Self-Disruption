@@ -1,31 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ── 엑셀 기준 데이터 임포트 API ──
 // POST: 엑셀 파싱 데이터를 받아서
 //   1) transactions 테이블에 매칭되는 건 → 업데이트 (날짜시간, 거래처명, 적요)
 //   2) 매칭 안 되는 건 → classification_queue에 pending 삽입
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 // 전체 데이터 페이지네이션 조회
-async function fetchAll(sb: ReturnType<typeof getSupabaseAdmin>, table: string, select: string, _company_id?: string) {
+async function fetchAll(table: string, select: string, _company_id?: string) {
   const PAGE = 1000
   let all: any[] = []
   let offset = 0
   while (true) {
-    const { data, error } = await sb
-      .from(table)
-      .select(select)
-      .is('deleted_at', null)
-      .range(offset, offset + PAGE - 1)
-    if (error) throw error
+    const query = `SELECT ${select} FROM ${table} WHERE deleted_at IS NULL LIMIT ? OFFSET ?`
+    const data = await prisma.$queryRaw<any[]>`
+      SELECT ${select} FROM ${table} WHERE deleted_at IS NULL LIMIT ${PAGE} OFFSET ${offset}
+    `
     if (!data || data.length === 0) break
     all = all.concat(data)
     offset += data.length
@@ -41,14 +31,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'company_id와 excel_rows 필요' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // 1) 기존 transactions 조회
-    const transactions = await fetchAll(sb, 'transactions',
+    const transactions = await fetchAll('transactions',
       'id, transaction_date, client_name, amount, description, payment_method')
 
     // 2) 기존 classification_queue 전체 조회 (pending + confirmed — 중복 삽입 방지용)
-    const cqAll = await fetchAll(sb, 'classification_queue', 'id, source_data, status')
+    const cqAll = await fetchAll('classification_queue', 'id, source_data, status')
 
     // 3) transactions를 (date, abs_amount) → 배열로 그룹핑
     const txMap = new Map<string, any[]>()
@@ -124,12 +112,12 @@ export async function POST(request: NextRequest) {
         memo: excelRow.memo || '',
         source: 'excel_import',
       }
-      const { error } = await sb
-        .from('classification_queue')
-        .update({ source_data: newSourceData })
-        .eq('id', cqId)
-      if (!error) cqUpdatedCount++
-      else console.error('CQ update error:', error.message)
+      try {
+        await prisma.$executeRaw`UPDATE classification_queue SET source_data = ${JSON.stringify(newSourceData)} WHERE id = ${cqId}`
+        cqUpdatedCount++
+      } catch (error: any) {
+        console.error('CQ update error:', error.message)
+      }
     }
 
     // 5) 매칭된 건: transactions 업데이트 (엑셀 원본 데이터로)
@@ -138,29 +126,35 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < matched.length; i += 50) {
       const batch = matched.slice(i, i + 50)
       for (const { txId, excelRow } of batch) {
-        const updateData: any = {}
+        const updateParts: string[] = []
+        const params: any[] = []
+
         // 날짜+시간 업데이트 (엑셀에 시간 정보가 있으면)
         if (excelRow.datetime && excelRow.datetime.length > 10) {
-          updateData.transaction_date = excelRow.datetime
+          updateParts.push('transaction_date = ?')
+          params.push(excelRow.datetime)
         }
         // client_name 업데이트 (엑셀 기재내용 원본)
         if (excelRow.client) {
-          updateData.client_name = excelRow.client.trim()
+          updateParts.push('client_name = ?')
+          params.push(excelRow.client.trim())
         }
         // description 업데이트: 적요 + 취급점
         const descParts = [excelRow.summary, excelRow.branch].filter(Boolean).map((s: string) => s.trim()).filter(Boolean)
         const desc = descParts.join(' / ') || `${(excelRow.summary || '').trim()} ${(excelRow.client || '').trim()}`.trim()
         if (desc) {
-          updateData.description = desc
+          updateParts.push('description = ?')
+          params.push(desc)
         }
 
-        if (Object.keys(updateData).length > 0) {
-          const { error } = await sb
-            .from('transactions')
-            .update(updateData)
-            .eq('id', txId)
-          if (!error) updatedCount++
-          else updateErrors.push(`${txId}: ${error.message}`)
+        if (updateParts.length > 0) {
+          try {
+            const updateClause = updateParts.join(', ')
+            await prisma.$executeRaw`UPDATE transactions SET ${updateClause} WHERE id = ${txId}`
+            updatedCount++
+          } catch (error: any) {
+            updateErrors.push(`${txId}: ${error.message}`)
+          }
         }
       }
     }
@@ -179,12 +173,12 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString()
       for (let i = 0; i < unmatchedTxIds.length; i += 50) {
         const batch = unmatchedTxIds.slice(i, i + 50)
-        const { error } = await sb
-          .from('transactions')
-          .update({ deleted_at: now })
-          .in('id', batch)
-        if (!error) deletedTxCount += batch.length
-        else console.error('Delete tx error:', error.message)
+        try {
+          await prisma.$executeRaw`UPDATE transactions SET deleted_at = ${now} WHERE id IN (${batch.join(',')})`
+          deletedTxCount += batch.length
+        } catch (error: any) {
+          console.error('Delete tx error:', error.message)
+        }
       }
     }
 
@@ -192,10 +186,8 @@ export async function POST(request: NextRequest) {
     let insertedCount = 0
     for (let i = 0; i < trulyUnmatched.length; i += 50) {
       const batch = trulyUnmatched.slice(i, i + 50)
-      const inserts = batch.map((row: any) => ({
-        company_id,
-        status: 'pending',
-        source_data: {
+      for (const row of batch) {
+        const sourceData = {
           transaction_date: row.datetime || row.date,
           client_name: row.client || '',
           amount: Math.abs(Number(row.amount || 0)),
@@ -204,15 +196,14 @@ export async function POST(request: NextRequest) {
           payment_method: '통장',
           memo: row.memo || '',
           source: 'excel_import',
-        },
-        created_at: new Date().toISOString(),
-      }))
-
-      const { error } = await sb
-        .from('classification_queue')
-        .insert(inserts)
-      if (!error) insertedCount += inserts.length
-      else console.error('Insert error:', error.message)
+        }
+        try {
+          await prisma.$executeRaw`INSERT INTO classification_queue (company_id, status, source_data, created_at) VALUES (${company_id}, 'pending', ${JSON.stringify(sourceData)}, ${new Date().toISOString()})`
+          insertedCount++
+        } catch (error: any) {
+          console.error('Insert error:', error.message)
+        }
+      }
     }
 
     return NextResponse.json({

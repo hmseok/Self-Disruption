@@ -1,5 +1,5 @@
 'use client'
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
@@ -8,6 +8,21 @@ import { useDaumPostcodePopup } from 'react-daum-postcode'
 import SignatureCanvas from 'react-signature-canvas'
 import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
+
+// ─────────────────────────────────────────────
+// Auth helper (fetch-based API calls)
+// ─────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 const KOREAN_BANKS = [
   'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행',
@@ -125,15 +140,24 @@ export default function JiipDetailPage() {
 
   // ── 데이터 조회 ──
   const fetchCars = async () => {
-    let query = supabase.from('cars').select('id, number, brand, model, purchase_price')
-    const { data } = await query.order('number', { ascending: true })
-    setCars(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      const json = await res.json()
+      setCars(json.data || [])
+    } catch (err) {
+      console.error('fetchCars error:', err)
+    }
   }
 
   const fetchDetail = async () => {
-    const { data, error } = await supabase.from('jiip_contracts').select('*').eq('id', jiipId).single()
-    if (error) { alert('데이터 로드 실패'); router.push('/jiip'); return }
-    setItem({
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/jiip/${jiipId}`, { headers })
+      const json = await res.json()
+      const data = json.data
+      if (json.error) { alert('데이터 로드 실패'); router.push('/jiip'); return }
+      setItem({
       ...data,
       investor_address: data.investor_address || '',
       investor_address_detail: data.investor_address_detail || '',
@@ -146,32 +170,31 @@ export default function JiipDetailPage() {
       tax_type: data.tax_type || '세금계산서',
       signed_file_url: data.signed_file_url || '',
       status: data.status || 'active',
-    })
-    setSendingEmail(data.investor_email || '')
-    setSendingPhone(data.investor_phone || '')
+      })
+      setSendingEmail(data.investor_email || '')
+      setSendingPhone(data.investor_phone || '')
+    } catch (err) {
+      console.error('fetchDetail error:', err)
+    }
     setLoading(false)
   }
 
   const fetchRealDeposit = async () => {
-    // jiip + jiip_share 모두 조회
-    const { data: d1 } = await supabase
-      .from('transactions').select('amount, type')
-      .eq('related_type', 'jiip').eq('related_id', jiipId)
-    const { data: d2 } = await supabase
-      .from('transactions').select('amount, type')
-      .eq('related_type', 'jiip_share').eq('related_id', jiipId)
-    const all = [...(d1 || []), ...(d2 || [])]
-    const net = all.reduce((acc, cur) => {
-      const amt = Math.abs(cur.amount || 0)
-      return acc + (cur.type === 'income' ? amt : -amt)
-    }, 0)
-    setRealDepositTotal(net)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/jiip/deposit-total?jiip_id=${jiipId}`, { headers })
+      const json = await res.json()
+      const net = json.data ?? json.deposit_total ?? 0
+      setRealDepositTotal(net)
+    } catch (error) {
+      console.error('Failed to fetch real deposit:', error)
+    }
   }
 
   // ── API 호출 헬퍼 ──
   const getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { 'Authorization': `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+    return { 'Authorization': `Bearer ${token || ''}`, 'Content-Type': 'application/json' }
   }
 
   // ── 발송 관련 ──
@@ -271,28 +294,15 @@ export default function JiipDetailPage() {
   // ── 지입 거래 내역 로드 (transactions 기반 — jiip + jiip_share 모두) ──
   const loadJiipTransactions = async () => {
     if (!jiipId) return
-    // jiip (분류에서 직접 연결) + jiip_share (정산 지급) 모두 조회
-    // ★ deleted_at이 null인 항목만 (되돌리기로 soft-delete된 항목 제외)
-    const { data: d1 } = await supabase
-      .from('transactions')
-      .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
-      .eq('related_type', 'jiip')
-      .eq('related_id', String(jiipId))
-      .is('deleted_at', null)
-      .order('transaction_date', { ascending: true })
-
-    const { data: d2 } = await supabase
-      .from('transactions')
-      .select('id, transaction_date, amount, type, category, client_name, description, related_type, status')
-      .eq('related_type', 'jiip_share')
-      .eq('related_id', String(jiipId))
-      .is('deleted_at', null)
-      .order('transaction_date', { ascending: true })
-
-    // 합치고 날짜순 정렬
-    const all = [...(d1 || []), ...(d2 || [])]
-    all.sort((a, b) => (a.transaction_date || '').localeCompare(b.transaction_date || ''))
-    setJiipTxList(all)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/jiip/transactions?jiip_id=${String(jiipId)}`, { headers })
+      const json = await res.json()
+      const transactions = json.data ?? json.transactions ?? []
+      setJiipTxList(transactions)
+    } catch (error) {
+      console.error('Failed to load JIIP transactions:', error)
+    }
   }
 
   // ── 저장/삭제 ──
@@ -324,18 +334,37 @@ export default function JiipDetailPage() {
       status: item.status || 'active'
     }
 
-    const { error } = isNew
-      ? await supabase.from('jiip_contracts').insert(payload)
-      : await supabase.from('jiip_contracts').update(payload).eq('id', jiipId)
+    try {
+      const headers = await getAuthHeader()
+      const method = isNew ? 'POST' : 'PATCH'
+      const url = isNew ? '/api/jiip' : `/api/jiip/${jiipId}`
 
-    if (error) alert('저장 실패: ' + error.message)
-    else { alert('저장되었습니다!'); router.push('/jiip') }
+      const res = await fetch(url, {
+        method,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+
+      if (json.error) alert('저장 실패: ' + json.error)
+      else { alert('저장되었습니다!'); router.push('/jiip') }
+    } catch (err) {
+      alert('저장 실패: ' + err)
+    }
   }
 
   const handleDelete = async () => {
     if (!confirm('삭제하시겠습니까?')) return
-    await supabase.from('jiip_contracts').delete().eq('id', jiipId)
-    router.push('/jiip')
+    try {
+      const headers = await getAuthHeader()
+      await fetch(`/api/jiip/${jiipId}`, {
+        method: 'DELETE',
+        headers
+      })
+      router.push('/jiip')
+    } catch (err) {
+      alert('삭제 실패: ' + err)
+    }
   }
 
   // ── 서명 ──
@@ -357,11 +386,28 @@ export default function JiipDetailPage() {
 
       const pdfBlob = pdf.output('blob')
       const fileName = `contract_${jiipId}_admin_${Date.now()}.pdf`
-      const { error: uploadError } = await supabase.storage.from('contracts').upload(fileName, pdfBlob, { contentType: 'application/pdf' })
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage.from('contracts').getPublicUrl(fileName)
-      await supabase.from('jiip_contracts').update({ signed_file_url: publicUrl }).eq('id', jiipId)
+      // GCS upload
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', new File([pdfBlob], fileName, { type: 'application/pdf' }))
+      uploadFormData.append('folder', 'contracts')
+      const { Authorization } = await getAuthHeader()
+      const uploadRes = await fetch('/api/upload/pdf', {
+        method: 'POST',
+        headers: Authorization ? { Authorization } : {},
+        body: uploadFormData,
+      })
+      const uploadJson = await uploadRes.json()
+      const publicUrl = uploadJson.url || ''
+      try {
+        const headers = await getAuthHeader()
+        await fetch(`/api/jiip/${jiipId}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signed_file_url: publicUrl })
+        })
+      } catch (err) {
+        console.error('Failed to update jiip contract:', err)
+      }
 
       alert("서명 완료! PDF 저장됨.")
       setItem((prev: any) => ({ ...prev, signed_file_url: publicUrl }))

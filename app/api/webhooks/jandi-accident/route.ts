@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { assignHandler, executeAssignment, parseRegion, extractClientName, extractFaultType } from '../../lib/assignment-engine'
 
 // ============================================
@@ -29,15 +29,6 @@ import { assignHandler, executeAssignment, parseRegion, extractClientName, extra
 // *상대보험사:/
 // *접수자:정지은
 // ──────────────────────────────────
-
-// ── Supabase Admin (service role → RLS 우회)
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 // ── 과실/정산 유형 매핑
 const FAULT_TYPE_MAP: Record<string, string> = {
@@ -244,30 +235,30 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 7. DB 조회: 차량 찾기
-    const supabase = getSupabaseAdmin()
     const cleanCarNum = carNumber.replace(/\s/g, '')
 
-    const { data: car, error: carErr } = await supabase
-      .from('cars')
-      .select('id, number, brand, model, status')
-      .or(`number.ilike.%${cleanCarNum}%,number.ilike.%${cleanCarNum.replace(/(\d+)([가-힣])(\d+)/, '$1 $2 $3')}%`)
-      .limit(1)
-      .single()
+    const cars = await prisma.$queryRaw<any[]>`
+      SELECT id, number, brand, model, status
+      FROM cars
+      WHERE number LIKE ${`%${cleanCarNum}%`}
+      LIMIT 1
+    `
 
-    if (carErr || !car) {
+    const car = cars[0]
+
+    if (!car) {
       // 차량 못 찾아도 일단 접수 — company_id는 환경변수 또는 첫번째 회사
-      const { data: defaultCompany } = await supabase
-        .from('companies')
-        .select('id')
-        .limit(1)
-        .single()
+      const companies = await prisma.$queryRaw<any[]>`
+        SELECT id FROM companies LIMIT 1
+      `
 
+      const defaultCompany = companies[0]
       if (!defaultCompany) {
         return jandiResponse(`⚠️ 차량번호 "${carNumber}" 미등록 & 기본 회사 없음`, '#FF9800')
       }
 
       // 차량 미등록이지만 사고는 접수
-      return await insertAccidentRecord(supabase, {
+      return await insertAccidentRecord({
         companyId: defaultCompany.id,
         carId: null,
         fields,
@@ -279,23 +270,28 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 8. 현재 활성 계약 조회
-    const { data: activeContract } = await supabase
-      .from('contracts')
-      .select('id, customer_id')
-      .eq('car_id', car.id)
-      .eq('status', 'active')
-      .limit(1)
-      .single()
+    const contracts = await prisma.$queryRaw<any[]>`
+      SELECT id, customer_id
+      FROM contracts
+      WHERE car_id = ${car.id}
+      AND status = 'active'
+      LIMIT 1
+    `
+
+    const activeContract = contracts[0]
 
     // ── 9. 사고 등록
     // 회사 ID 결정
-    const { data: defaultCompany } = await supabase.from('companies').select('id').limit(1).single()
+    const companies = await prisma.$queryRaw<any[]>`
+      SELECT id FROM companies LIMIT 1
+    `
+    const defaultCompany = companies[0]
     const companyId = defaultCompany?.id
     if (!companyId) {
       return jandiResponse(`⚠️ 회사 정보를 찾을 수 없습니다.`, '#FF9800')
     }
 
-    return await insertAccidentRecord(supabase, {
+    return await insertAccidentRecord({
       companyId,
       carId: car.id,
       carInfo: car,
@@ -318,7 +314,6 @@ export async function POST(request: NextRequest) {
 // 사고 레코드 INSERT
 // ============================================
 async function insertAccidentRecord(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
   params: {
     companyId: string
     carId: number | null
@@ -406,63 +401,45 @@ async function insertAccidentRecord(
   const settlementTypeLabel = header.settlementType || ''
 
   // ── INSERT
-  const insertData: Record<string, any> = {
-    car_id: carId,
-    contract_id: contractId || null,
-    customer_id: customerId || null,
-    accident_date: accidentDt.date,
-    accident_time: accidentDt.time,
-    accident_location: fields['사고장소'] || '',
-    accident_type: accidentType,
-    fault_ratio: faultRatio,
-    description: fields['사고내용'] || '',
-    driver_name: driver.name || reporter.name || '',
-    driver_phone: driver.phone || reporter.phone || '',
-    driver_relation: driver.relation || reporter.relation || '',
-    counterpart_name: '',
-    counterpart_phone: '',
-    counterpart_vehicle: '',
-    counterpart_insurance: counterInsurance.company || '',
-    insurance_company: ownInsurance.company || '',
-    insurance_claim_no: ownInsurance.claimNo || claimNo || '',
-    customer_deductible: deductible,
-    vehicle_condition: vehicleCondition,
-    repair_shop_name: repair.repairLocation || '',
-    police_reported: false,
-    status: 'reported',
-    notes: noteParts,
-    source: 'jandi_accident',
-    jandi_raw: rawText,
-    jandi_topic: roomName,
-    // ── 배정 시스템용 파싱 컬럼
-    client_name: clientNameParsed || null,
-    fault_type: faultTypeLabel || null,
-    insurance_type: insuranceTypeLabel || null,
-    settlement_type: settlementTypeLabel || null,
-    region_sido: region.sido || null,
-    region_sigungu: region.sigungu || null,
-  }
+  const accidentId = require('crypto').randomUUID?.() || Math.random().toString(36).substring(7)
+  await prisma.$executeRaw`
+    INSERT INTO accident_records (
+      id, car_id, contract_id, customer_id, accident_date, accident_time,
+      accident_location, accident_type, fault_ratio, description,
+      driver_name, driver_phone, driver_relation,
+      counterpart_name, counterpart_phone, counterpart_vehicle,
+      counterpart_insurance, insurance_company, insurance_claim_no,
+      customer_deductible, vehicle_condition, repair_shop_name,
+      police_reported, status, notes, source, jandi_raw, jandi_topic,
+      client_name, fault_type, insurance_type, settlement_type,
+      region_sido, region_sigungu
+    ) VALUES (
+      ${accidentId}, ${carId}, ${contractId || null}, ${customerId || null},
+      ${accidentDt.date}, ${accidentDt.time}, ${fields['사고장소'] || ''}, ${accidentType}, ${faultRatio},
+      ${fields['사고내용'] || ''}, ${driver.name || reporter.name || ''}, ${driver.phone || reporter.phone || ''},
+      ${driver.relation || reporter.relation || ''}, '', '', '', ${counterInsurance.company || ''},
+      ${ownInsurance.company || ''}, ${ownInsurance.claimNo || claimNo || ''}, ${deductible},
+      ${vehicleCondition}, ${repair.repairLocation || ''}, 0, 'reported', ${noteParts},
+      'jandi_accident', ${rawText}, ${roomName}, ${clientNameParsed || null},
+      ${faultTypeLabel || null}, ${insuranceTypeLabel || null}, ${settlementTypeLabel || null},
+      ${region.sido || null}, ${region.sigungu || null}
+    )
+  `
 
-  // 수리 필요 시 상태 바로 변경
-  if (repair.needsRepair && repair.repairLocation) {
-    insertData.repair_start_date = accidentDt.date
-  }
+  // Get inserted accident ID (MySQL doesn't have RETURNING)
+  const accidents = await prisma.$queryRaw<any[]>`
+    SELECT id FROM accident_records WHERE jandi_raw = ${rawText} ORDER BY created_at DESC LIMIT 1
+  `
+  const accident = accidents[0]
 
-  const { data: accident, error: insertErr } = await supabase
-    .from('accident_records')
-    .insert(insertData)
-    .select('id, accident_date, status')
-    .single()
-
-  if (insertErr) {
-    console.error('사고 등록 실패:', JSON.stringify(insertErr))
-    return jandiResponse(`❌ 사고 등록 실패: ${insertErr.message}`, '#FF0000')
+  if (!accident) {
+    return jandiResponse(`❌ 사고 등록 실패: 레코드를 찾을 수 없습니다.`, '#FF0000')
   }
 
   // ── 자동 배정 시도 ─────────────────────────
   let assignmentLabel = ''
   try {
-    const assignResult = await assignHandler(supabase, {
+    const assignResult = await assignHandler({
       id: accident.id,
       accident_location: fields['사고장소'] || '',
       repair_shop_name: repair.repairLocation || '',
@@ -474,18 +451,18 @@ async function insertAccidentRecord(
     })
 
     if (assignResult.handler_id) {
-      await executeAssignment(supabase, accident.id, assignResult.handler_id, {
+      await executeAssignment(accident.id, assignResult.handler_id, {
         match_type: assignResult.match_type,
         matched_rule: assignResult.matched_rule,
         is_auto: true,
       })
 
       // assigned_at 업데이트
-      await supabase.from('accident_records').update({
-        assigned_at: new Date().toISOString(),
-        assignment_type: 'auto',
-        assignment_rule: assignResult.matched_rule,
-      }).eq('id', accident.id)
+      await prisma.$executeRaw`
+        UPDATE accident_records
+        SET assigned_at = NOW(), assignment_type = 'auto', assignment_rule = ${assignResult.matched_rule}
+        WHERE id = ${accident.id}
+      `
 
       assignmentLabel = `\n👷 담당자: ${assignResult.handler_name || '배정됨'} (${assignResult.matched_rule || '자동'})`
 
@@ -498,16 +475,12 @@ async function insertAccidentRecord(
 
   // ── 차량 상태 변경 (차량이 있는 경우)
   if (carId) {
-    await supabase.from('cars').update({ status: 'accident' }).eq('id', carId)
+    await prisma.$executeRaw`UPDATE cars SET status = 'accident' WHERE id = ${carId}`
 
-    await supabase.from('vehicle_status_log').insert({
-      car_id: carId,
-      old_status: carInfo?.status || 'active',
-      new_status: 'accident',
-      related_type: 'accident',
-      related_id: String(accident.id),
-      memo: `잔디 사고접수 #${accident.id} (${fields['접수번호'] || '-'})`,
-    })
+    await prisma.$executeRaw`
+      INSERT INTO vehicle_status_log (car_id, old_status, new_status, related_type, related_id, memo)
+      VALUES (${carId}, ${carInfo?.status || 'active'}, 'accident', 'accident', ${String(accident.id)}, ${`잔디 사고접수 #${accident.id} (${fields['접수번호'] || '-'})`})
+    `
   }
 
   // ── 성공 응답

@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { prisma } from '@/lib/prisma'
 
 // GET: OAuth 콜백 — code를 access_token으로 교환 후 계좌 목록 저장
 export async function GET(req: NextRequest) {
@@ -61,24 +54,31 @@ export async function GET(req: NextRequest) {
     const accountData = await accountRes.json()
     const accounts = accountData.res_list || []
 
-    // 3. Supabase에 토큰 + 계좌 저장
-    const supabase = getSupabase()
-    const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
+    // 3. MySQL에 토큰 + 계좌 저장 (openbanking_accounts)
+    const expiresAt = new Date(Date.now() + expires_in * 1000)
 
     for (const account of accounts) {
-      await supabase.from('openbanking_accounts').upsert({
-        user_seq_no,
-        fin_use_num: account.fintech_use_num,
-        bank_code: account.bank_code_std,
-        bank_name: account.bank_name,
-        account_num_masked: account.account_num_masked,
-        account_holder_name: account.account_holder_name,
-        access_token,
-        refresh_token,
-        token_expires_at: expiresAt,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'fin_use_num' })
+      await prisma.$executeRaw`
+        INSERT INTO openbanking_accounts
+          (id, user_seq_no, fin_use_num, bank_code, bank_name,
+           account_num_masked, account_holder_name,
+           access_token, refresh_token, token_expires_at, is_active,
+           created_at, updated_at)
+        VALUES
+          (UUID(), ${user_seq_no}, ${account.fintech_use_num},
+           ${account.bank_code_std}, ${account.bank_name},
+           ${account.account_num_masked}, ${account.account_holder_name},
+           ${access_token}, ${refresh_token}, ${expiresAt},
+           TRUE, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+          access_token = VALUES(access_token),
+          refresh_token = VALUES(refresh_token),
+          token_expires_at = VALUES(token_expires_at),
+          bank_name = VALUES(bank_name),
+          account_holder_name = VALUES(account_holder_name),
+          is_active = TRUE,
+          updated_at = NOW()
+      `
     }
 
     return NextResponse.redirect(

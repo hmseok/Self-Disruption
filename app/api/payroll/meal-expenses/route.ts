@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin()
     const token = req.headers.get('Authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const { data: { user } } = await supabase.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userId = getUserIdFromToken(token)
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // TODO: Phase 5 - Replace with Firebase Auth verification
 
     const { searchParams } = new URL(req.url)
     const companyId = searchParams.get('company_id')
@@ -26,11 +25,11 @@ export async function GET(req: NextRequest) {
     }
 
     // 1) 기존 집계 데이터 확인
-    const { data: existing } = await supabase
-      .from('meal_expense_monthly')
-      .select('*, employee:employee_id(id, employee_name, position:position_id(name), department:department_id(name))')
-      .eq('year_month', yearMonth)
-      .order('excess_amount', { ascending: false })
+    const existing = await prisma.$queryRaw<any[]>`
+      SELECT * FROM meal_expense_monthly
+      WHERE year_month = ${yearMonth}
+      ORDER BY excess_amount DESC
+    `
 
     if (existing && existing.length > 0) {
       return NextResponse.json({ data: existing, source: 'cached' })
@@ -42,18 +41,18 @@ export async function GET(req: NextRequest) {
     const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
 
     // 법인카드 목록 조회
-    const { data: cards } = await supabase
-      .from('corporate_cards')
-      .select('id, card_number, assigned_employee_id, holder_name, card_alias')
-      .eq('is_active', true)
+    const cards = await prisma.$queryRaw<any[]>`
+      SELECT id, card_number, assigned_employee_id, holder_name, card_alias FROM corporate_cards
+      WHERE is_active = 1
+    `
 
     // 식대 카테고리 거래 조회 (classification_queue에서)
-    const { data: mealTxns } = await supabase
-      .from('classification_queue')
-      .select('id, card_id, source_data, ai_category')
-      .gte('source_data->>transaction_date', startDate)
-      .lt('source_data->>transaction_date', nextMonth)
-      .in('ai_category', ['복리후생(식대)'])
+    const mealTxns = await prisma.$queryRaw<any[]>`
+      SELECT id, card_id, source_data, ai_category FROM classification_queue
+      WHERE ai_category = '복리후생(식대)'
+      AND JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.transaction_date')) >= ${startDate}
+      AND JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.transaction_date')) < ${nextMonth}
+    `
 
     // 직원별 집계
     const employeeMap: Record<string, { total: number; count: number; cardId: string | null; cardNumber: string | null }> = {}
@@ -64,22 +63,24 @@ export async function GET(req: NextRequest) {
       const empId = card?.assigned_employee_id
       if (!empId) continue
 
+      const sourceData = typeof txn.source_data === 'string' ? JSON.parse(txn.source_data) : txn.source_data
       if (!employeeMap[empId]) {
         employeeMap[empId] = { total: 0, count: 0, cardId: card?.id || null, cardNumber: card?.card_number || null }
       }
-      employeeMap[empId].total += Math.abs(Number(txn.source_data?.amount) || 0)
+      employeeMap[empId].total += Math.abs(Number(sourceData?.amount) || 0)
       employeeMap[empId].count += 1
     }
 
     // 직원 급여설정에서 식대 수당 조회
-    const { data: salarySettings } = await supabase
-      .from('employee_salaries')
-      .select('employee_id, allowances')
-      .eq('is_active', true)
+    const salarySettings = await prisma.$queryRaw<any[]>`
+      SELECT employee_id, allowances FROM employee_salaries
+      WHERE is_active = 1
+    `
 
     const settingsMap: Record<string, number> = {}
     for (const s of (salarySettings || [])) {
-      settingsMap[s.employee_id] = s.allowances?.['식대'] || 200000
+      const allowancesRaw = typeof s.allowances === 'string' ? JSON.parse(s.allowances) : s.allowances
+      settingsMap[s.employee_id] = allowancesRaw?.['식대'] || 200000
     }
 
     // 결과 조합
@@ -107,11 +108,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin()
     const token = req.headers.get('Authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const { data: { user } } = await supabase.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userId = getUserIdFromToken(token)
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // TODO: Phase 5 - Replace with Firebase Auth verification
 
     const { company_id, year_month } = await req.json()
     if (!company_id || !year_month) {
@@ -123,36 +124,38 @@ export async function POST(req: NextRequest) {
     const [y, m] = year_month.split('-').map(Number)
     const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
 
-    const { data: cards } = await supabase
-      .from('corporate_cards')
-      .select('id, card_number, assigned_employee_id, holder_name')
-      .eq('is_active', true)
+    const cards = await prisma.$queryRaw<any[]>`
+      SELECT id, card_number, assigned_employee_id, holder_name FROM corporate_cards
+      WHERE is_active = 1
+    `
 
-    const { data: mealTxns } = await supabase
-      .from('classification_queue')
-      .select('id, card_id, source_data, ai_category')
-      .gte('source_data->>transaction_date', startDate)
-      .lt('source_data->>transaction_date', nextMonth)
-      .in('ai_category', ['복리후생(식대)'])
+    const mealTxns = await prisma.$queryRaw<any[]>`
+      SELECT id, card_id, source_data, ai_category FROM classification_queue
+      WHERE ai_category = '복리후생(식대)'
+      AND JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.transaction_date')) >= ${startDate}
+      AND JSON_UNQUOTE(JSON_EXTRACT(source_data, '$.transaction_date')) < ${nextMonth}
+    `
 
     const employeeMap: Record<string, { total: number; count: number; cardId: string | null; cardNumber: string | null }> = {}
     for (const txn of (mealTxns || [])) {
       const card = cards?.find(c => c.id === txn.card_id)
       const empId = card?.assigned_employee_id
       if (!empId) continue
+      const sourceData = typeof txn.source_data === 'string' ? JSON.parse(txn.source_data) : txn.source_data
       if (!employeeMap[empId]) employeeMap[empId] = { total: 0, count: 0, cardId: card?.id || null, cardNumber: card?.card_number || null }
-      employeeMap[empId].total += Math.abs(Number(txn.source_data?.amount) || 0)
+      employeeMap[empId].total += Math.abs(Number(sourceData?.amount) || 0)
       employeeMap[empId].count += 1
     }
 
-    const { data: salarySettings } = await supabase
-      .from('employee_salaries')
-      .select('employee_id, allowances')
-      .eq('is_active', true)
+    const salarySettings = await prisma.$queryRaw<any[]>`
+      SELECT employee_id, allowances FROM employee_salaries
+      WHERE is_active = 1
+    `
 
     const settingsMap: Record<string, number> = {}
     for (const s of (salarySettings || [])) {
-      settingsMap[s.employee_id] = s.allowances?.['식대'] || 200000
+      const allowancesRaw = typeof s.allowances === 'string' ? JSON.parse(s.allowances) : s.allowances
+      settingsMap[s.employee_id] = allowancesRaw?.['식대'] || 200000
     }
 
     let created = 0
@@ -163,38 +166,41 @@ export async function POST(req: NextRequest) {
       const excess = Math.max(0, data.total - baseAllowance)
 
       // upsert meal_expense_monthly
-      const { error } = await supabase
-        .from('meal_expense_monthly')
-        .upsert({
-          company_id,
-          employee_id: empId,
-          year_month,
-          card_id: data.cardId,
-          card_number: data.cardNumber,
-          total_meal_spending: data.total,
-          base_allowance: baseAllowance,
-          excess_amount: excess,
-          transaction_count: data.count,
-          status: excess > 0 ? 'pending' : 'approved',
-        }, { onConflict: 'company_id,employee_id,year_month' })
-
-      if (!error) created++
+      try {
+        await prisma.$executeRaw`
+          INSERT INTO meal_expense_monthly (company_id, employee_id, year_month, card_id, card_number, total_meal_spending, base_allowance, excess_amount, transaction_count, status, created_at, updated_at)
+          VALUES (${company_id}, ${empId}, ${year_month}, ${data.cardId}, ${data.cardNumber}, ${data.total}, ${baseAllowance}, ${excess}, ${data.count}, ${excess > 0 ? 'pending' : 'approved'}, NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+          card_id = VALUES(card_id),
+          card_number = VALUES(card_number),
+          total_meal_spending = VALUES(total_meal_spending),
+          base_allowance = VALUES(base_allowance),
+          excess_amount = VALUES(excess_amount),
+          transaction_count = VALUES(transaction_count),
+          status = VALUES(status),
+          updated_at = NOW()
+        `
+        created++
+      } catch (e: any) {
+        console.error('meal_expense_monthly upsert 실패:', e)
+      }
 
       // 초과분이 있으면 salary_adjustment 생성
       if (excess > 0) {
-        const { error: adjError } = await supabase
-          .from('salary_adjustments')
-          .upsert({
-            company_id,
-            employee_id: empId,
-            year_month,
-            adjustment_type: 'deduct',
-            amount: excess,
-            reason: `식대 초과 공제 (사용: ${data.total.toLocaleString()}원, 수당: ${baseAllowance.toLocaleString()}원, 초과: ${excess.toLocaleString()}원)`,
-            status: 'pending',
-          }, { onConflict: 'source_transaction_id,adjustment_type', ignoreDuplicates: true })
-
-        if (!adjError) adjustmentsCreated++
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO salary_adjustments (company_id, employee_id, year_month, adjustment_type, amount, reason, status, created_at, updated_at)
+            VALUES (${company_id}, ${empId}, ${year_month}, 'deduct', ${excess}, ${'식대 초과 공제 (사용: ' + data.total.toLocaleString() + '원, 수당: ' + baseAllowance.toLocaleString() + '원, 초과: ' + excess.toLocaleString() + '원)'}, 'pending', NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+            amount = VALUES(amount),
+            reason = VALUES(reason),
+            status = VALUES(status),
+            updated_at = NOW()
+          `
+          adjustmentsCreated++
+        } catch (e: any) {
+          console.error('salary_adjustments upsert 실패:', e)
+        }
       }
     }
 

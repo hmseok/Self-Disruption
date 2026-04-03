@@ -1,8 +1,22 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================================================
 // E-CONTRACT STATUS BADGE
@@ -59,14 +73,10 @@ export default function EContractListMain() {
       if (!companyId) { setLoading(false); return }
 
       try {
-        const { data: allContracts, error: contractsError } = await supabase
-          .from('short_term_rental_contracts')
-          .select('*')
-          .order('id', { ascending: false })
-
-        if (contractsError) console.error('전자계약서 목록 로드 실패:', contractsError.message)
-
-        setContracts(allContracts || [])
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/e-contracts', { headers })
+        const json = await res.json()
+        setContracts(json.data ?? json ?? [])
       } catch (error) {
         console.error('Error fetching e-contracts:', error)
       } finally {

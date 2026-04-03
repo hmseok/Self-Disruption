@@ -1,11 +1,26 @@
 'use client'
+import { auth } from '@/lib/firebase'
 
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { DEFAULT_INSURANCE_COVERAGE, DEFAULT_QUOTE_NOTICES, DEFAULT_CALC_PARAMS } from '@/lib/contract-terms'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 타입 정의
@@ -618,7 +633,6 @@ function getDepRateFromCurve(curve: number[], age: number, classMultiplier: numb
   return Math.min(raw * classMultiplier, 90)
 }
 
-
 // ============================================
 // IRR (내부수익률) 계산 — Newton-Raphson법
 // cashFlows: [t0, t1, t2, ...tN] 배열 (월 단위 현금흐름)
@@ -973,11 +987,14 @@ export default function RentPricingBuilder() {
       setLoading(true)
 
       try {
+        const headers = await getAuthHeader()
+
         // 비즈니스 규칙
-        const { data: rulesData } = await supabase.from('business_rules').select('*')
-        if (rulesData) {
+        const rulesRes = await fetch('/api/business-rules', { headers })
+        const rulesJson = await rulesRes.json()
+        if (rulesJson.data) {
           const ruleMap: BusinessRules = {}
-          rulesData.forEach((r: any) => { ruleMap[r.key] = Number(r.value) })
+          rulesJson.data.forEach((r: any) => { ruleMap[r.key] = Number(r.value) })
           setRules(ruleMap)
 
           // 기본값 설정 — 최초 로드 시에만 (사용자가 수동 변경한 값 보존)
@@ -996,42 +1013,52 @@ export default function RentPricingBuilder() {
           }
         }
 
-        // 차량 목록 — admin '전체 보기' 시 전체 조회 (보험 페이지와 동일)
-        {
-          let carQuery = supabase.from('cars').select('*').order('created_at', { ascending: false })
-          const { data: carsData, error: carsError } = await carQuery
-          if (carsError) console.error('차량 목록 로드 실패:', carsError.message)
-          setCars(carsData || [])
-        }
+        // 차량 목록
+        const carsRes = await fetch('/api/cars', { headers })
+        const carsJson = await carsRes.json()
+        setCars(carsJson.data || [])
 
         // 기준 테이블 일괄 로드 (개별 에러 허용)
         try {
           const [depRes, depRatesRes, depAdjRes, insRes, maintRes, taxRes, finRes, regRes, inspCostRes, inspSchedRes, insBaseRes, insOwnRes] = await Promise.all([
-            supabase.from('depreciation_db').select('*').order('category'),
-            supabase.from('depreciation_rates').select('*').eq('is_active', true).order('origin').order('vehicle_class'),
-            supabase.from('depreciation_adjustments').select('*').order('adjustment_type').order('factor', { ascending: false }),
-            supabase.from('insurance_rate_table').select('*'),
-            supabase.from('maintenance_cost_table').select('*'),
-            supabase.from('vehicle_tax_table').select('*'),
-            supabase.from('finance_rate_table').select('*'),
-            supabase.from('registration_cost_table').select('*'),
-            supabase.from('inspection_cost_table').select('*').eq('is_active', true),
-            supabase.from('inspection_schedule_table').select('*').eq('is_active', true),
-            supabase.from('insurance_base_premium').select('*').eq('is_active', true),
-            supabase.from('insurance_own_vehicle_rate').select('*').eq('is_active', true),
+            fetch('/api/pricing-standards?table=depreciation_db', { headers }),
+            fetch('/api/pricing-standards?table=depreciation_rates', { headers }),
+            fetch('/api/pricing-standards?table=depreciation_adjustments', { headers }),
+            fetch('/api/pricing-standards?table=insurance_rate_table', { headers }),
+            fetch('/api/pricing-standards?table=maintenance_cost_table', { headers }),
+            fetch('/api/pricing-standards?table=vehicle_tax_table', { headers }),
+            fetch('/api/pricing-standards?table=finance_rate_table', { headers }),
+            fetch('/api/pricing-standards?table=registration_cost_table', { headers }),
+            fetch('/api/pricing-standards?table=inspection_cost_table', { headers }),
+            fetch('/api/pricing-standards?table=inspection_schedule_table', { headers }),
+            fetch('/api/pricing-standards?table=insurance_base_premium', { headers }),
+            fetch('/api/pricing-standards?table=insurance_own_vehicle_rate', { headers }),
           ])
-          setDepreciationDB(depRes.data || [])
-          setDepRates(depRatesRes.data || [])
-          setDepAdjustments(depAdjRes.data || [])
-          setInsuranceRates(insRes.data || [])
-          setMaintenanceCosts(maintRes.data || [])
-          setTaxRates(taxRes.data || [])
-          setFinanceRates(finRes.data || [])
-          setRegCosts(regRes.data || [])
-          setInspectionCosts(inspCostRes.data || [])
-          setInspectionSchedules(inspSchedRes.data || [])
-          setInsBasePremiums(insBaseRes.data || [])
-          setInsOwnRates(insOwnRes.data || [])
+          const depJson = await depRes.json()
+          const depRatesJson = await depRatesRes.json()
+          const depAdjJson = await depAdjRes.json()
+          const insJson = await insRes.json()
+          const maintJson = await maintRes.json()
+          const taxJson = await taxRes.json()
+          const finJson = await finRes.json()
+          const regJson = await regRes.json()
+          const inspCostJson = await inspCostRes.json()
+          const inspSchedJson = await inspSchedRes.json()
+          const insBaseJson = await insBaseRes.json()
+          const insOwnJson = await insOwnRes.json()
+
+          setDepreciationDB(depJson.data || [])
+          setDepRates(depRatesJson.data || [])
+          setDepAdjustments(depAdjJson.data || [])
+          setInsuranceRates(insJson.data || [])
+          setMaintenanceCosts(maintJson.data || [])
+          setTaxRates(taxJson.data || [])
+          setFinanceRates(finJson.data || [])
+          setRegCosts(regJson.data || [])
+          setInspectionCosts(inspCostJson.data || [])
+          setInspectionSchedules(inspSchedJson.data || [])
+          setInsBasePremiums(insBaseJson.data || [])
+          setInsOwnRates(insOwnJson.data || [])
         } catch (refErr) {
           console.warn('기준 테이블 로드 실패 (무시):', refErr)
         }
@@ -1049,15 +1076,18 @@ export default function RentPricingBuilder() {
   // 계약 조건 DB 설정 로드
   useEffect(() => {
     if (!effectiveCompanyId) return
-    supabase
-      .from('contract_terms')
-      .select('id, insurance_coverage, quote_notices, calc_params')
-      .eq('status', 'active')
-      .single()
-      .then(({ data, error }) => {
+    const fetchTerms = async () => {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/contract-terms?status=active', { headers })
+        const json = await res.json()
+        const data = json.data ?? json ?? null
         if (data) setTermsConfig(data)
-        if (error) console.warn('계약 조건 로드 실패 (DB 기본값 사용):', error)
-      })
+      } catch (error) {
+        console.warn('계약 조건 로드 실패 (DB 기본값 사용):', error)
+      }
+    }
+    fetchTerms()
   }, [effectiveCompanyId])
 
   // ============================================
@@ -1342,13 +1372,10 @@ export default function RentPricingBuilder() {
     }
 
     // 연동된 보험 조회
-    const { data: insData } = await supabase
-      .from('insurance_contracts')
-      .select('*')
-      .eq('car_id', carId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
+    const headers = await getAuthHeader()
+    const insRes = await fetch(`/api/insurance-contracts?car_id=${carId}`, { headers })
+    const insJson = await insRes.json()
+    const insData = insJson.data ?? insJson ?? null
     setLinkedInsurance(insData)
     if (insData?.premium) {
       setMonthlyInsuranceCost(Math.round(insData.premium / 12))
@@ -1356,13 +1383,9 @@ export default function RentPricingBuilder() {
     }
 
     // 연동된 금융상품 조회
-    const { data: finData } = await supabase
-      .from('financial_products')
-      .select('*')
-      .eq('car_id', carId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
+    const finRes = await fetch(`/api/financial-products?car_id=${carId}`, { headers })
+    const finJson = await finRes.json()
+    const finData = finJson.data ?? finJson ?? null
     setLinkedFinance(finData)
     if (finData) {
       if (finData.loan_amount) setLoanAmount(finData.loan_amount)
@@ -1370,21 +1393,18 @@ export default function RentPricingBuilder() {
     }
 
     // 시장 비교 데이터 조회
-    const { data: compData } = await supabase
-      .from('market_comparisons')
-      .select('*')
-      .eq('car_id', carId)
+    const compRes = await fetch(`/api/market-comparisons?car_id=${carId}`, { headers })
+    const compJson = await compRes.json()
+    const compData = compJson.data ?? compJson ?? []
     setMarketComps(compData || [])
 
     // 등록 페이지 구입비용 상세 (car_costs) 항목별 로드
-    const { data: costsData } = await supabase
-      .from('car_costs')
-      .select('category, item_name, amount')
-      .eq('car_id', carId)
-      .order('sort_order', { ascending: true })
-    const hasCarCosts = costsData && costsData.length > 0
+    const costsRes = await fetch(`/api/car-costs?car_id=${carId}`, { headers })
+    const costsJson = await costsRes.json()
+    const costsData = costsJson.data ?? costsJson ?? []
+    const hasCarCosts = Boolean(costsData && costsData.length > 0)
     hasCarCostsRef.current = hasCarCosts
-    if (hasCarCosts) {
+    if (hasCarCosts && costsData) {
       setCarCostItems(costsData.map((c: any) => ({ category: c.category, item_name: c.item_name, amount: Number(c.amount) || 0 })))
     } else {
       setCarCostItems([])
@@ -1406,7 +1426,7 @@ export default function RentPricingBuilder() {
     )
 
     // car_costs 실데이터가 있으면 → 자동계산 덮어쓰기 (마지막에 세팅해야 React 배치에서 이 값이 최종 반영됨)
-    if (hasCarCosts) {
+    if (hasCarCosts && costsData) {
       const costTotal = costsData.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
       if (costTotal > 0) {
         setTotalAcquisitionCost(costTotal)
@@ -1441,11 +1461,10 @@ export default function RentPricingBuilder() {
 
     try {
       setLookupStage('🤖 AI가 가격 정보를 검색하고 있습니다...')
-      const { data: { session: sess } } = await supabase.auth.getSession()
-      const tkn = sess?.access_token
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const res = await fetch('/api/lookup-new-car', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(tkn ? { 'Authorization': `Bearer ${tkn}` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({ brand: newCarBrand.trim(), model: newCarModel.trim() }),
       })
       const data = await res.json()
@@ -1467,10 +1486,10 @@ export default function RentPricingBuilder() {
   // 🆕 저장된 신차 가격 데이터 조회
   const fetchSavedPrices = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data } = await supabase
-      .from('new_car_prices')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/new-car-prices', { headers })
+    const json = await res.json()
+    const data = json.data ?? json ?? []
     // 상세모델명(model)이 다르면 별도 항목으로 유지
     setSavedCarPrices(data || [])
   }, [effectiveCompanyId])
@@ -1478,10 +1497,10 @@ export default function RentPricingBuilder() {
   // 🆕 저장된 산출 워크시트 조회
   const fetchSavedWorksheets = useCallback(async () => {
     if (!effectiveCompanyId) return
-    const { data } = await supabase
-      .from('pricing_worksheets')
-      .select('*, cars(id, number, brand, model, trim, year, fuel, is_used, is_commercial)')
-      .order('updated_at', { ascending: false })
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/pricing-worksheets', { headers })
+    const json = await res.json()
+    const data = json.data ?? json ?? []
     setSavedWorksheets(data || [])
   }, [effectiveCompanyId])
 
@@ -1496,13 +1515,20 @@ export default function RentPricingBuilder() {
   useEffect(() => {
     if (!effectiveCompanyId) return
     const fetchCustomers = async () => {
-      const [custRes, compRes] = await Promise.all([
-        supabase.from('customers').select('*').order('name'),
-        supabase.from('companies').select('*').eq('id', effectiveCompanyId).single(),
-      ])
-      if (custRes.data) setCustomers(custRes.data)
-      if (compRes.data) setQuoteCompany(compRes.data)
-      else if (company) setQuoteCompany(company)
+      try {
+        const headers = await getAuthHeader()
+        const [custRes, compRes] = await Promise.all([
+          fetch('/api/customers', { headers }),
+          fetch(`/api/companies/${effectiveCompanyId}`, { headers }),
+        ])
+        const custJson = await custRes.json()
+        const compJson = await compRes.json()
+        if (custJson.data) setCustomers(custJson.data)
+        if (compJson.data) setQuoteCompany(compJson.data)
+        else if (company) setQuoteCompany(company)
+      } catch (err) {
+        console.error('Error fetching customers/companies:', err)
+      }
     }
     fetchCustomers()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1519,50 +1545,56 @@ export default function RentPricingBuilder() {
 
     const loadQuoteForEdit = async () => {
       setEditLoading(true)
-      const { data: q } = await supabase.from('quotes').select('*').eq('id', quoteId).single()
-      if (!q) { setEditLoading(false); return }
-      setEditingQuoteId(quoteId)
-      const d = q.quote_detail || {}
-      // 고객 정보 복원
-      if (q.customer_id) {
-        setSelectedCustomerId(q.customer_id)
-        setCustomerMode('select')
-      } else if (d.manual_customer) {
-        setManualCustomer(d.manual_customer)
-        setCustomerMode('manual')
-      }
-      if (q.start_date) setStartDate(q.start_date)
-      if (d.note) setQuoteNote(d.note)
-      // 계약 조건 복원
-      if (d.term_months) setTermMonths(d.term_months)
-      if (d.contract_type) setContractType(d.contract_type)
-      if (d.deposit !== undefined) setDeposit(d.deposit)
-      if (d.prepayment !== undefined) setPrepayment(d.prepayment)
-      if (d.annualMileage) setAnnualMileage(d.annualMileage)
-      if (d.baselineKm) setBaselineKm(d.baselineKm)
-      if (d.deductible !== undefined) setDeductible(d.deductible)
-      if (d.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(d.own_damage_coverage_ratio)
-      if (d.margin !== undefined) setMargin(d.margin)
-      if (d.maint_package) setMaintPackage(d.maint_package)
-      if (d.driver_age_group) setDriverAgeGroup(d.driver_age_group)
-      if (d.dep_curve_preset) setDepCurvePreset(d.dep_curve_preset)
-      if (d.residual_rate !== undefined) setResidualRate(d.residual_rate)
-      if (d.excess_mileage_rate) setExcessMileageRate(d.excess_mileage_rate)
-      // 금융 복원
-      if (d.loan_amount !== undefined) setLoanAmount(d.loan_amount)
-      if (d.loan_rate !== undefined) setLoanRate(d.loan_rate)
-      if (d.investment_rate !== undefined) setInvestmentRate(d.investment_rate)
-      // 가격 복원
-      if (d.factory_price) setFactoryPrice(d.factory_price)
-      if (d.purchase_price) setPurchasePrice(d.purchase_price)
-      // 차량 복원: car_id가 있으면 등록차량 선택
-      let loadedInsData: any = null
-      let loadedFinData: any = null
-      if (q.car_id) {
-        // cars가 아직 로드되지 않았을 수 있으므로 직접 DB에서 조회
-        const { data: carData } = await supabase.from('cars').select('*').eq('id', q.car_id).single()
-        if (carData) {
-          setSelectedCar(carData)
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/quotes/${quoteId}`, { headers })
+        const json = await res.json()
+        const q = json.data
+        if (!q) { setEditLoading(false); return }
+        setEditingQuoteId(quoteId)
+        const d = q.quote_detail || {}
+        // 고객 정보 복원
+        if (q.customer_id) {
+          setSelectedCustomerId(q.customer_id)
+          setCustomerMode('select')
+        } else if (d.manual_customer) {
+          setManualCustomer(d.manual_customer)
+          setCustomerMode('manual')
+        }
+        if (q.start_date) setStartDate(q.start_date)
+        if (d.note) setQuoteNote(d.note)
+        // 계약 조건 복원
+        if (d.term_months) setTermMonths(d.term_months)
+        if (d.contract_type) setContractType(d.contract_type)
+        if (d.deposit !== undefined) setDeposit(d.deposit)
+        if (d.prepayment !== undefined) setPrepayment(d.prepayment)
+        if (d.annualMileage) setAnnualMileage(d.annualMileage)
+        if (d.baselineKm) setBaselineKm(d.baselineKm)
+        if (d.deductible !== undefined) setDeductible(d.deductible)
+        if (d.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(d.own_damage_coverage_ratio)
+        if (d.margin !== undefined) setMargin(d.margin)
+        if (d.maint_package) setMaintPackage(d.maint_package)
+        if (d.driver_age_group) setDriverAgeGroup(d.driver_age_group)
+        if (d.dep_curve_preset) setDepCurvePreset(d.dep_curve_preset)
+        if (d.residual_rate !== undefined) setResidualRate(d.residual_rate)
+        if (d.excess_mileage_rate) setExcessMileageRate(d.excess_mileage_rate)
+        // 금융 복원
+        if (d.loan_amount !== undefined) setLoanAmount(d.loan_amount)
+        if (d.loan_rate !== undefined) setLoanRate(d.loan_rate)
+        if (d.investment_rate !== undefined) setInvestmentRate(d.investment_rate)
+        // 가격 복원
+        if (d.factory_price) setFactoryPrice(d.factory_price)
+        if (d.purchase_price) setPurchasePrice(d.purchase_price)
+        // 차량 복원: car_id가 있으면 등록차량 선택
+        let loadedInsData: any = null
+        let loadedFinData: any = null
+        if (q.car_id) {
+          // cars를 직접 fetch로 조회
+          const carRes = await fetch(`/api/cars/${q.car_id}`, { headers })
+          const carJson = await carRes.json()
+          const carData = carJson.data
+          if (carData) {
+            setSelectedCar(carData)
           setLookupMode('registered')
           if (!d.factory_price) setFactoryPrice(carData.factory_price || Math.round(carData.purchase_price * 1.15))
           if (!d.purchase_price) setPurchasePrice(carData.purchase_price)
@@ -1578,14 +1610,13 @@ export default function RentPricingBuilder() {
           }
 
           // --- 취득원가 구성 항목 로드 (car_costs) ---
-          const { data: costsData } = await supabase
-            .from('car_costs')
-            .select('category, item_name, amount')
-            .eq('car_id', q.car_id)
-            .order('sort_order', { ascending: true })
-          const hasCarCosts = costsData && costsData.length > 0
+          const headers = await getAuthHeader()
+          const costsRes = await fetch(`/api/car-costs?car_id=${q.car_id}`, { headers })
+          const costsJson = await costsRes.json()
+          const costsData = costsJson.data ?? costsJson ?? []
+          const hasCarCosts = Boolean(costsData && costsData.length > 0)
           hasCarCostsRef.current = hasCarCosts
-          if (hasCarCosts) {
+          if (hasCarCosts && costsData) {
             setCarCostItems(costsData.map((c: any) => ({ category: c.category, item_name: c.item_name, amount: Number(c.amount) || 0 })))
             const costTotal = costsData.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
             if (costTotal > 0) setTotalAcquisitionCost(costTotal)
@@ -1596,26 +1627,18 @@ export default function RentPricingBuilder() {
           }
 
           // --- 연동 보험/금융 로드 ---
-          const { data: insData } = await supabase
-            .from('insurance_contracts')
-            .select('*')
-            .eq('car_id', q.car_id)
-            .order('id', { ascending: false })
-            .limit(1)
-            .single()
+          const insRes = await fetch(`/api/insurance-contracts?car_id=${q.car_id}`, { headers })
+          const insJson = await insRes.json()
+          const insData = insJson.data ?? insJson ?? null
           loadedInsData = insData
           setLinkedInsurance(insData)
           if (insData?.premium) {
             setMonthlyInsuranceCost(Math.round(insData.premium / 12))
             setInsAutoMode(false)
           }
-          const { data: finData } = await supabase
-            .from('financial_products')
-            .select('*')
-            .eq('car_id', q.car_id)
-            .order('id', { ascending: false })
-            .limit(1)
-            .single()
+          const finRes = await fetch(`/api/financial-products?car_id=${q.car_id}`, { headers })
+          const finJson = await finRes.json()
+          const finData = finJson.data ?? finJson ?? null
           loadedFinData = finData
           setLinkedFinance(finData)
           if (finData) {
@@ -1697,11 +1720,9 @@ export default function RentPricingBuilder() {
       // worksheet 연결 시 워크시트 데이터 완전 로드
       const wsId = searchParams.get('worksheet_id') || q.worksheet_id || d.worksheet_id
       if (wsId) {
-        const { data: ws } = await supabase
-          .from('pricing_worksheets')
-          .select('*, cars(number, brand, model, trim, year)')
-          .eq('id', wsId)
-          .single()
+        const wsRes = await fetch(`/api/pricing-worksheets?id=${wsId}`, { headers })
+        const wsJson = await wsRes.json()
+        const ws = wsJson.data ?? wsJson ?? null
         if (ws) {
           // 워크시트 ID 기억
           setCurrentWorksheetId(ws.id)
@@ -1756,6 +1777,10 @@ export default function RentPricingBuilder() {
         router.replace(`/quotes/pricing?worksheet_id=${wsId}&car_id=${q.car_id || ''}&quote_id=${quoteId}`)
       }
       setEditLoading(false)
+    } catch (error) {
+      console.error('Error loading quote:', error)
+      setEditLoading(false)
+    }
     }
     loadQuoteForEdit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1779,8 +1804,7 @@ export default function RentPricingBuilder() {
       formData.append('file', file)
 
       // 인증 토큰 가져오기
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
 
       const res = await fetch('/api/parse-quote', {
         method: 'POST',
@@ -1812,33 +1836,34 @@ export default function RentPricingBuilder() {
       }
       // brand + model(상세) + year + source(파일명)로 중복 체크
       // → 같은 모델이라도 다른 파일이면 별도 저장
-      const { data: existing, error: findErr } = await supabase
-        .from('new_car_prices')
-        .select('id')
-        .eq('brand', data.brand)
-        .eq('model', displayModel)
-        .eq('year', data.year)
-        .maybeSingle()
-
-      if (findErr) {
-        console.error('[가격표저장] 조회 에러:', findErr)
-        throw new Error(`DB 조회 실패: ${findErr.message}`)
+      const headers = await getAuthHeader()
+      const existRes = await fetch(`/api/new-car-prices?brand=${encodeURIComponent(data.brand)}&model=${encodeURIComponent(displayModel)}&year=${data.year}`, { headers })
+      if (!existRes.ok) {
+        console.error('[가격표저장] 조회 에러:', existRes.status)
+        throw new Error(`DB 조회 실패: ${existRes.statusText}`)
       }
+      const existJson = await existRes.json()
+      const existing = existJson.data ?? existJson ?? null
 
-      let saveError: any = null
+      let saveRes: Response
       if (existing) {
-        const { error } = await supabase.from('new_car_prices')
-          .update({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
-        saveError = error
+        saveRes = await fetch(`/api/new-car-prices/${existing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
+        })
       } else {
-        const { error } = await supabase.from('new_car_prices').insert([payload])
-        saveError = error
+        saveRes = await fetch('/api/new-car-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify(payload)
+        })
       }
 
-      if (saveError) {
-        console.error('[가격표저장] DB 에러:', saveError)
-        throw new Error(`저장 실패: ${saveError.message}`)
+      if (!saveRes.ok) {
+        const errJson = await saveRes.json()
+        console.error('[가격표저장] DB 에러:', errJson)
+        throw new Error(`저장 실패: ${errJson.error}`)
       }
 
       setParseStage('✅ 완료!')
@@ -1889,35 +1914,35 @@ export default function RentPricingBuilder() {
         price_data: newCarResult,
       }
       // 같은 브랜드+상세모델+연식이면 업데이트, 없으면 신규 등록
-      const { data: existing } = await supabase
-        .from('new_car_prices')
-        .select('id')
-        .eq('brand', newCarResult.brand)
-        .eq('model', displayModel)
-        .eq('year', newCarResult.year)
-        .maybeSingle()
-
-      let error: any = null
+      const headers = await getAuthHeader()
+      const existRes = await fetch(`/api/new-car-prices?brand=${encodeURIComponent(newCarResult.brand)}&model=${encodeURIComponent(displayModel)}&year=${newCarResult.year}`, { headers })
+      const existJson = await existRes.json()
+      const existing = existJson.data ?? existJson ?? null
+      let res: Response
       if (existing) {
-        const { error: e } = await supabase
-          .from('new_car_prices')
-          .update({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
-        error = e
+        res = await fetch(`/api/new-car-prices/${existing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
+        })
       } else {
-        const { error: e } = await supabase.from('new_car_prices').insert([payload])
-        error = e
+        res = await fetch('/api/new-car-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify(payload)
+        })
       }
-      if (error) {
-        console.error('[가격저장] DB 에러:', error)
-        throw error
+      if (!res.ok) {
+        const json = await res.json()
+        console.error('[가격저장] DB 에러:', json)
+        throw new Error(json.error)
       }
       await fetchSavedPrices()
       alert('가격 데이터가 저장되었습니다.')
     } catch (err: any) {
       console.error('[가격저장] 실패:', err)
       const msg = err?.message || err?.details || JSON.stringify(err)
-      alert(`저장 실패: ${msg}\n\n※ new_car_prices 테이블이 없으면 Supabase SQL Editor에서 supabase_new_car_prices.sql을 실행해주세요.`)
+      alert(`저장 실패: ${msg}\n\n※ new_car_prices 테이블이 없으면 DB 마이그레이션을 실행해주세요.`)
     } finally {
       setIsSavingPrice(false)
     }
@@ -1946,8 +1971,18 @@ export default function RentPricingBuilder() {
   // 🆕 저장된 가격 데이터 삭제
   const handleDeleteSavedPrice = useCallback(async (id: string) => {
     if (!confirm('이 가격 데이터를 삭제하시겠습니까?')) return
-    await supabase.from('new_car_prices').delete().eq('id', id)
-    await fetchSavedPrices()
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/new-car-prices/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      if (!res.ok) throw new Error('삭제 실패')
+      await fetchSavedPrices()
+    } catch (e) {
+      console.error('삭제 실패:', e)
+      alert('삭제에 실패했습니다.')
+    }
   }, [fetchSavedPrices])
 
   // 업로드 경과 시간 타이머
@@ -2118,7 +2153,7 @@ export default function RentPricingBuilder() {
     if (!selectedCar || !insAutoMode) return
     const cc = selectedCar.engine_cc || engineCC || 0
     const carAge = (() => {
-      if (carAgeMode === 'manual') return customCarAge
+      if (carAgeMode === 'used') return customCarAge > 0 ? customCarAge : 0
       const year = selectedCar.year || new Date().getFullYear()
       return new Date().getFullYear() - year
     })()
@@ -2564,20 +2599,39 @@ export default function RentPricingBuilder() {
     if (!newComp.competitor_name || !newComp.monthly_rent) return
     if (!selectedCar || !effectiveCompanyId) return
 
-    const { data, error } = await supabase.from('market_comparisons').insert([{
-      car_id: selectedCar.id,
-      ...newComp
-    }]).select().single()
-
-    if (!error && data) {
-      setMarketComps(prev => [...prev, data])
-      setNewComp({ competitor_name: '', vehicle_info: '', monthly_rent: 0, deposit: 0, term_months: 36, source: '' })
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/market-comparisons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          car_id: selectedCar.id,
+          ...newComp
+        })
+      })
+      const json = await res.json()
+      if (res.ok && json.data) {
+        setMarketComps(prev => [...prev, json.data])
+        setNewComp({ competitor_name: '', vehicle_info: '', monthly_rent: 0, deposit: 0, term_months: 36, source: '' })
+      }
+    } catch (e) {
+      console.error('시장비교 추가 실패:', e)
     }
   }
 
   const removeMarketComp = async (id: string) => {
-    await supabase.from('market_comparisons').delete().eq('id', id)
-    setMarketComps(prev => prev.filter(c => c.id !== id))
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/market-comparisons/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      if (res.ok) {
+        setMarketComps(prev => prev.filter(c => c.id !== id))
+      }
+    } catch (e) {
+      console.error('시장비교 삭제 실패:', e)
+    }
   }
 
   // 워크시트 저장 (등록차량 + 신차 모두 지원)
@@ -2645,33 +2699,44 @@ export default function RentPricingBuilder() {
     try {
       if (lookupMode === 'registered') {
         // 등록차량: car_id로 기존 워크시트 조회 후 insert/update
-        const { data: existing } = await supabase
-          .from('pricing_worksheets')
-          .select('id')
-          .eq('car_id', selectedCar.id)
-          .maybeSingle()
+        const headers = await getAuthHeader()
+        const existRes = await fetch(`/api/pricing-worksheets?car_id=${selectedCar.id}`, { headers })
+        const existJson = await existRes.json()
+        const existing = existJson.data ?? existJson ?? null
 
         if (existing) {
-          const { error: e } = await supabase
-            .from('pricing_worksheets')
-            .update({ ...baseData, car_id: selectedCar.id })
-            .eq('id', existing.id)
-          error = e
+          const updateRes = await fetch(`/api/pricing-worksheets/${existing.id}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...baseData, car_id: selectedCar.id })
+          })
+          if (!updateRes.ok) {
+            const errJson = await updateRes.json()
+            error = new Error(errJson.error || 'Update failed')
+          }
           savedWorksheetId = existing.id
         } else {
-          const { data, error: e } = await supabase
-            .from('pricing_worksheets')
-            .insert([{ ...baseData, car_id: selectedCar.id }])
-            .select('id')
-            .single()
-          error = e
-          savedWorksheetId = data?.id || null
+          const insertRes = await fetch('/api/pricing-worksheets', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...baseData, car_id: selectedCar.id })
+          })
+          if (insertRes.ok) {
+            const insertJson = await insertRes.json()
+            const data = insertJson.data ?? insertJson ?? {}
+            savedWorksheetId = data?.id || null
+          } else {
+            const errJson = await insertRes.json()
+            error = new Error(errJson.error || 'Insert failed')
+          }
         }
       } else {
         // 신차 분석: car_id 없이 insert + 차량정보 JSONB
-        const { data, error: e } = await supabase
-          .from('pricing_worksheets')
-          .insert([{
+        const headers = await getAuthHeader()
+        const insertRes = await fetch('/api/pricing-worksheets', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             ...baseData,
             car_id: null,
             newcar_info: {
@@ -2683,11 +2748,16 @@ export default function RentPricingBuilder() {
               exterior_color: newCarSelectedExterior?.name || '',
               interior_color: newCarSelectedInterior?.name || '',
             },
-          }])
-          .select('id')
-          .single()
-        error = e
-        savedWorksheetId = data?.id || null
+          })
+        })
+        if (insertRes.ok) {
+          const insertJson = await insertRes.json()
+          const data = insertJson.data ?? insertJson ?? {}
+          savedWorksheetId = data?.id || null
+        } else {
+          const errJson = await insertRes.json()
+          error = new Error(errJson.error || 'Insert failed')
+        }
       }
     } catch (err: any) {
       error = err
@@ -2853,19 +2923,41 @@ export default function RentPricingBuilder() {
       let insertData: any = null
       const errors: string[] = []
 
+      const headers = await getAuthHeader()
       for (let i = 0; i < payloadsToTry.length; i++) {
         const payload = payloadsToTry[i]
-        if (editingQuoteId) {
-          const { data: d, error: e } = await supabase.from('quotes').update(payload).eq('id', editingQuoteId).select()
-          error = e; insertData = d
-        } else {
-          const { data: d, error: e } = await supabase.from('quotes').insert([payload]).select()
-          error = e; insertData = d
+        try {
+          let res: Response
+          if (editingQuoteId) {
+            res = await fetch(`/api/quotes/${editingQuoteId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', ...headers },
+              body: JSON.stringify(payload)
+            })
+          } else {
+            res = await fetch('/api/quotes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...headers },
+              body: JSON.stringify(payload)
+            })
+          }
+          if (res.ok) {
+            const json = await res.json()
+            insertData = json.data
+            error = null
+            break
+          } else {
+            const json = await res.json()
+            error = json.error
+            const msg = error?.message || JSON.stringify(error)
+            errors.push(`시도${i + 1}(${Object.keys(payload).length}cols): ${msg}`)
+            console.warn(`Quote save attempt ${i + 1} failed:`, msg)
+          }
+        } catch (e: any) {
+          error = e
+          errors.push(`시도${i + 1}: ${e.message}`)
+          console.warn(`Quote save attempt ${i + 1} failed:`, e)
         }
-        if (!error) break
-        const msg = error?.message || error?.details || error?.hint || error?.code || JSON.stringify(error)
-        errors.push(`시도${i + 1}(${Object.keys(payload).length}cols): ${msg}`)
-        console.warn(`Quote save attempt ${i + 1} failed:`, msg)
       }
 
       setQuoteSaving(false)
@@ -2873,7 +2965,7 @@ export default function RentPricingBuilder() {
         console.error('Quote save failed:', errors)
         alert('저장 실패:\n' + errors.join('\n'))
       } else {
-        const savedId = editingQuoteId || insertData?.[0]?.id
+        const savedId = editingQuoteId || (Array.isArray(insertData) ? insertData?.[0]?.id : insertData?.id)
         alert(`견적서가 ${status === 'draft' ? '임시저장' : '확정'}되었습니다.`)
         if (savedId) {
           router.push(`/quotes/${savedId}`)
@@ -3463,7 +3555,6 @@ export default function RentPricingBuilder() {
               </div>
             </div>
 
-
             {/* 서명란 + 푸터 — 마지막 페이지 하단 고정 */}
             <div className="print:mt-auto">
               <div className="px-6 print:px-5">
@@ -3567,7 +3658,6 @@ export default function RentPricingBuilder() {
           </div>
         </div>
       </div>
-
 
       {/* ===== 가격표 드래그앤드롭 업로드 영역 ===== */}
       <div
@@ -4408,7 +4498,6 @@ export default function RentPricingBuilder() {
 
           {/* ===== 왼쪽: 입력/분석 영역 ===== */}
           <div className="lg:col-span-8 space-y-4">
-
 
             {/* 🆕 0. AI 자동분류 결과 */}
             {autoCategory && (

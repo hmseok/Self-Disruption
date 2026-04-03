@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
+
+// ============================================
+// Auth Helper
+// ============================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 // ============================================
 // 회사/가입 관리 — admin + 회사 + 사용자 통합
@@ -47,37 +54,30 @@ export default function AdminDashboard() {
     try {
       if (role === 'admin') {
         // 1) 회사 목록
-        const { data: companiesData } = await supabase
-          .from('companies')
-          .select('*')
-          .order('created_at', { ascending: false })
+        const res = await fetch('/api/companies', { headers: await getAuthHeader() })
+        if (!res.ok) throw new Error('회사 조회 실패')
+        const { data: companiesData } = await res.json()
 
         // 2) 전체 프로필 (회사 소속)
         const companiesWithUsers: CompanyWithUsers[] = []
         for (const comp of (companiesData || [])) {
-          const { data: users } = await supabase
-            .from('profiles')
-            .select('id, email, employee_name, role, is_active, created_at')
-            
-            .order('role', { ascending: true })
+          const res2 = await fetch(`/api/profiles?company_id=${comp.id}`, { headers: await getAuthHeader() })
+          if (!res2.ok) continue
+          const { data: users } = await res2.json()
           companiesWithUsers.push({ ...comp, users: users || [] })
         }
         setCompanies(companiesWithUsers)
 
         // 3) 미배정 사용자 (회사 없고 admin도 아닌)
-        const { data: orphanData } = await supabase
-          .from('profiles')
-          .select('id, email, employee_name, role, is_active, created_at')
-          .is('company_id', null)
-          .not('role', 'in', '("admin","admin")')
-          .order('created_at', { ascending: false })
+        const res3 = await fetch('/api/profiles?unassigned=true', { headers: await getAuthHeader() })
+        if (!res3.ok) throw new Error('미배정 사용자 조회 실패')
+        const { data: orphanData } = await res3.json()
         setUnassignedUsers(orphanData || [])
 
       } else if (company) {
-        const { data: users } = await supabase
-          .from('profiles')
-          .select('id, email, employee_name, role, is_active, created_at')
-          
+        const res = await fetch(`/api/profiles?company_id=${company.id}`, { headers: await getAuthHeader() })
+        if (!res.ok) throw new Error('사용자 조회 실패')
+        const { data: users } = await res.json()
         setCompanies([{ ...company, users: users || [] }])
       }
     } catch (err) {
@@ -87,17 +87,24 @@ export default function AdminDashboard() {
     }
   }
 
-  // approve/reject company RPC 삭제됨 (단독 ERP 전환)
-
+  // Toggle user active status via API route
   const toggleUserActive = async (userId: string, currentActive: boolean) => {
     const action = currentActive ? '비활성화' : '활성화'
     if (!confirm(`이 사용자를 ${action}하시겠습니까?`)) return
-    const { error } = await supabase.rpc('toggle_user_active', {
-      target_user_id: userId,
-      new_active: !currentActive,
-    })
-    if (error) { alert('변경 실패: ' + error.message); return }
-    fetchData()
+    try {
+      const res = await fetch(`/api/profiles/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getAuthHeader())
+        },
+        body: JSON.stringify({ is_active: !currentActive })
+      })
+      if (!res.ok) throw new Error('변경 실패')
+      fetchData()
+    } catch (err: any) {
+      alert('변경 실패: ' + err.message)
+    }
   }
 
   const [uploadingCompanyId, setUploadingCompanyId] = useState<string | null>(null)
@@ -106,22 +113,31 @@ export default function AdminDashboard() {
     if (!file) return
     setUploadingCompanyId(companyId)
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      const uid = authUser?.id || 'admin'
-      const ext = file.name.split('.').pop() || 'jpg'
-      const filePath = `${uid}/business_doc_${companyId}_${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('business-docs')
-        .upload(filePath, file, { upsert: true })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage
-        .from('business-docs')
-        .getPublicUrl(filePath)
-      const { error: updateError } = await supabase
-        .from('companies')
-        .update({ business_registration_url: urlData.publicUrl })
-        .eq('id', companyId)
-      if (updateError) throw updateError
+      // Upload to GCS via /api/upload-business-doc
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('company_id', companyId)
+
+      const res = await fetch('/api/upload-business-doc', {
+        method: 'POST',
+        headers: await getAuthHeader(),
+        body: formData
+      })
+
+      if (!res.ok) throw new Error('업로드 실패')
+      const { url } = await res.json()
+
+      // Update company with URL
+      const updateRes = await fetch(`/api/companies/${companyId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getAuthHeader())
+        },
+        body: JSON.stringify({ business_registration_url: url })
+      })
+
+      if (!updateRes.ok) throw new Error('URL 저장 실패')
       alert('✅ 사업자등록증이 등록되었습니다.')
       fetchData()
     } catch (err: any) {

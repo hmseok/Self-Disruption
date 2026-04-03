@@ -1,8 +1,19 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 export default function LoanDetailPage() {
   const router = useRouter()
@@ -86,19 +97,32 @@ export default function LoanDetailPage() {
   }, [loan.first_payment_date, loan.start_date, loan.months, loan.payment_date])
 
   const fetchCars = async () => {
-    const { data } = await supabase.from('cars').select('id, number, model').order('number', { ascending: true })
-    setCars(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', { headers })
+      const json = await res.json()
+      setCars(json.data || [])
+    } catch (e) { console.error('[fetchCars]', e) }
   }
 
   const fetchRealRepayment = async () => {
-    const { data } = await supabase.from('transactions').select('amount').eq('related_type', 'loan').eq('related_id', loanId).eq('type', 'expense')
-    if (data) setRealRepaidTotal(data.reduce((acc, cur) => acc + (cur.amount || 0), 0))
+    try {
+      const headers = await getAuthHeader()
+      const today = new Date().toISOString().split('T')[0]
+      const res = await fetch(`/api/transactions?from=2000-01-01&to=${today}`, { headers })
+      const json = await res.json()
+      const filtered = (json.data || []).filter((t: any) => t.related_type === 'loan' && t.related_id === loanId && t.type === 'expense')
+      setRealRepaidTotal(filtered.reduce((acc: number, cur: any) => acc + (cur.amount || 0), 0))
+    } catch (e) { console.error('[fetchRealRepayment]', e) }
   }
 
   const fetchLoanDetail = async () => {
-    const { data, error } = await supabase.from('loans').select('*').eq('id', loanId).single()
-    if (error) { alert('데이터 로드 실패'); router.push('/loans') }
-    else {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/loans/${loanId}`, { headers })
+      if (!res.ok) { alert('데이터 로드 실패'); router.push('/loans'); return }
+      const json = await res.json()
+      const data = json.data
       setLoan({
         ...data,
         vehicle_price: data.vehicle_price || 0, acquisition_tax: data.acquisition_tax || 0,
@@ -118,7 +142,7 @@ export default function LoanDetailPage() {
         displacement: data.displacement || '', fuel_type: data.fuel_type || ''
       })
       setLoading(false)
-    }
+    } catch (e) { alert('데이터 로드 실패'); router.push('/loans') }
   }
 
   const handleSave = async () => {
@@ -130,15 +154,19 @@ export default function LoanDetailPage() {
       first_payment_date: loan.first_payment_date || null,
       quote_date: loan.quote_date || null, valid_date: loan.valid_date || null,
     }
-    const query = isNew ? supabase.from('loans').insert(payload) : supabase.from('loans').update(payload).eq('id', loanId)
-    const { error } = await query
-    if (error) alert('저장 실패: ' + error.message)
+    const headers = await getAuthHeader()
+    const res = isNew
+      ? await fetch('/api/loans', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, company_id: effectiveCompanyId }) })
+      : await fetch(`/api/loans/${loanId}`, { method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    if (json.error) alert('저장 실패: ' + json.error)
     else { alert('저장되었습니다!'); router.push('/loans') }
   }
 
   const handleDelete = async () => {
     if (!confirm('정말 삭제하시겠습니까?')) return
-    await supabase.from('loans').delete().eq('id', loanId)
+    const headers = await getAuthHeader()
+    await fetch(`/api/loans/${loanId}`, { method: 'DELETE', headers })
     router.push('/loans')
   }
 
@@ -156,26 +184,36 @@ export default function LoanDetailPage() {
 
   const fmt = (n: number) => (n || 0).toLocaleString()
 
-  // 파일 업로드
+  // 파일 업로드 - GCS로 마이그레이션됨
   const uploadFiles = async (files: FileList | File[]) => {
     setUploading(true)
     const newAttachments = [...loan.attachments]
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const fileExt = file.name.split('.').pop()
-        const fileName = `loan_${loanId || 'new'}_${Date.now()}_${i}.${fileExt}`
-        const { error: uploadError } = await supabase.storage.from('contracts').upload(fileName, file)
-        if (uploadError) throw uploadError
-        const { data: { publicUrl } } = supabase.storage.from('contracts').getPublicUrl(fileName)
-        newAttachments.push({ name: file.name, url: publicUrl, type: fileExt?.toLowerCase() || 'file' })
+      for (const file of files) {
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', file)
+        uploadFormData.append('folder', 'loans')
+        const { Authorization } = await getAuthHeader()
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: Authorization ? { Authorization } : {},
+          body: uploadFormData,
+        })
+        const uploadJson = await uploadRes.json()
+        if (!uploadRes.ok) {
+          alert('파일 업로드 실패: ' + uploadJson.error)
+          return
+        }
+        const fileUrl = uploadJson.url || ''
+        newAttachments.push({ name: file.name, url: fileUrl, created_at: new Date().toISOString() })
       }
-      if (!isNew) {
-        await supabase.from('loans').update({ attachments: newAttachments }).eq('id', loanId)
-      }
-      setLoan((prev: any) => ({ ...prev, attachments: newAttachments }))
-    } catch (err: any) { alert('업로드 실패: ' + err.message) }
-    finally { setUploading(false) }
+      // Update loan attachments
+      setLoan({ ...loan, attachments: newAttachments })
+    } catch (err: any) {
+      alert('업로드 실패: ' + err.message)
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +230,14 @@ export default function LoanDetailPage() {
   const deleteAttachment = async (index: number) => {
     if (!confirm('삭제하시겠습니까?')) return
     const newAttachments = loan.attachments.filter((_: any, i: number) => i !== index)
-    if (!isNew) await supabase.from('loans').update({ attachments: newAttachments }).eq('id', loanId)
+    if (!isNew) {
+      const headers = await getAuthHeader()
+      await fetch(`/api/loans/${loanId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachments: JSON.stringify(newAttachments) }),
+      })
+    }
     setLoan((prev: any) => ({ ...prev, attachments: newAttachments }))
   }
 

@@ -1,12 +1,23 @@
 'use client'
+import { auth } from '@/lib/firebase'
 
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 타입 정의
@@ -313,111 +324,40 @@ export default function SettlementDashboard() {
     const past12Start = `${year - 1}-${String(month).padStart(2, '0')}-01`
 
     // 병렬 로드
+    const headers = await getAuthHeader()
     const [txRes, jiipRes, investRes, loanRes, allSettleRes, carTxRes, classifyRes, shareHistoryRes, investDepositsRes, investTxDepositsRes, allJiipRes, allInvestRes, contractsSettleTxRes, allPaidSharesRes] = await Promise.all([
       // 거래 내역 (당월)
-      (() => {
-        let q = supabase.from('transactions').select('*')
-        
-        return q.gte('transaction_date', startDate).lte('transaction_date', endDate)
-          .order('transaction_date', { ascending: false })
-      })(),
-      // 지입 계약 (contract_start_date 포함)
-      (() => {
-        let q = supabase.from('jiip_contracts').select('*, cars(number, model, owner_bank, owner_account, owner_account_holder)').eq('status', 'active')
-        
-        return q
-      })(),
-      // 투자자 (cars 조인 없이 — investors에 car_id FK 없을 수 있음)
-      (() => {
-        let q = supabase.from('general_investments').select('*').eq('status', 'active')
-        
-        return q
-      })(),
+      fetch(`/api/transactions?from=${startDate}&to=${endDate}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 지입 계약 (active status)
+      fetch('/api/jiip?status=active', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 투자자 (active status)
+      fetch('/api/investments?status=active', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
       // 대출
-      (() => {
-        let q = supabase.from('loans').select('*, cars(number)')
-        
-        return q
-      })(),
-      // 전체 정산 거래 (미수 누적 확인용 — 최근 12개월) — id 포함 (취소 시 직접 삭제용)
-      // ★ type='expense'만: 실제 지급(이자/배분금/상환) 건만 정산완료로 인식
-      // income(투자금 입금)은 정산완료가 아니므로 제외
-      (() => {
-        let q = supabase.from('transactions').select('id, related_type, related_id, transaction_date, amount, type')
-          .in('related_type', ['jiip_share', 'invest', 'loan'])
-          .eq('type', 'expense')
-        
-        return q.gte('transaction_date', past12Start)
-      })(),
-      // 차량별 거래 내역 (최근 12개월 — 지입 수익배분 계산용)
-      (() => {
-        let q = supabase.from('transactions').select('related_type, related_id, type, amount, transaction_date, category, client_name, description')
-          .eq('related_type', 'car')
-        
-        return q.gte('transaction_date', past12Start)
-      })(),
-      // 통장분류 내역 (당월 confirmed 건)
-      (() => {
-        let q = supabase.from('classification_queue').select('*')
-          .in('status', ['confirmed', 'auto_confirmed'])
-          .is('deleted_at', null)
-        
-        return q.order('created_at', { ascending: false }).limit(500)
-      })(),
-      // 정산 발송 이력 (당월 + 직전월 — 새로고침 시 정산월 자동 감지용)
+      fetch('/api/loans', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 전체 정산 거래 (지난 12개월)
+      fetch(`/api/transactions?related_type=jiip_share,invest,loan&type=expense&from=${past12Start}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 차량별 거래 내역 (지난 12개월)
+      fetch(`/api/transactions?related_type=car&from=${past12Start}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 통장분류 내역 (당월 confirmed)
+      fetch('/api/classification-queue?status=confirmed,auto_confirmed&limit=500', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 정산 발송 이력
       (() => {
         const [y, m] = filterDate.split('-').map(Number)
         const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
-        let q = supabase.from('settlement_shares')
-          .select('id, recipient_name, recipient_phone, settlement_month, total_amount, created_at, paid_at, items')
-        
-        return q.in('settlement_month', [filterDate, prevMonth]).order('created_at', { ascending: false })
+        return fetch(`/api/settlement/shares?months=${filterDate},${prevMonth}`, { headers }).then(r => r.json()).catch(() => ({ data: [] }))
       })(),
-      // 투자금 입금 내역 (투자금 변동 추적 — 테이블 없으면 빈 배열)
-      (async () => {
-        try {
-          let q = supabase.from('investment_deposits')
-            .select('id, investment_id, deposit_date, amount, memo')
-          
-          return await q.order('deposit_date', { ascending: true })
-        } catch { return { data: [], error: null } }
-      })(),
-      // 투자 관련 통장 거래 내역 (투자 원금 변동 추적 — transactions 기반, income+expense 모두)
-      (() => {
-        let q = supabase.from('transactions')
-          .select('id, transaction_date, amount, type, related_type, related_id, category, client_name, description')
-          .eq('related_type', 'invest')
-        
-        return q.order('transaction_date', { ascending: true })
-      })(),
-      // ── 계약 현황 탭: 전체 지입 계약 (모든 상태) ──
-      (() => {
-        let q = supabase.from('jiip_contracts').select('*, car:cars ( number, model )')
-        
-        return q.order('created_at', { ascending: false })
-      })(),
-      // ── 계약 현황 탭: 전체 투자 계약 (모든 상태) ──
-      (() => {
-        let q = supabase.from('general_investments').select('*')
-        
-        return q.order('created_at', { ascending: false })
-      })(),
-      // ── 계약 현황 탭: 정산 거래 (jiip_share + invest) ──
-      (() => {
-        let q = supabase.from('transactions')
-          .select('id, related_type, related_id, transaction_date, amount, type, category, client_name, memo')
-          .in('related_type', ['jiip_share', 'invest'])
-        
-        return q.order('transaction_date', { ascending: false })
-      })(),
-      // ── 계약 현황 탭: 전체 기간 지급완료 settlement_shares (누적 지급 계산용) ──
-      (() => {
-        let q = supabase.from('settlement_shares')
-          .select('id, recipient_name, settlement_month, total_amount, paid_at, items')
-          .not('paid_at', 'is', null)
-        
-        return q.order('paid_at', { ascending: false })
-      })(),
+      // 투자금 입금 내역
+      fetch('/api/investment-deposits', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 투자 관련 거래 내역
+      fetch('/api/transactions?related_type=invest', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 전체 지입 계약 (모든 상태)
+      fetch('/api/jiip', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 전체 투자 계약
+      fetch('/api/investments', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 정산 거래 (지입/투자)
+      fetch('/api/transactions?related_type=jiip_share,invest', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+      // 지급완료된 정산 내역
+      fetch('/api/settlement/shares?paid_only=true', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     ])
 
     const txs = txRes.data || []
@@ -449,11 +389,11 @@ export default function SettlementDashboard() {
     setAllPaidShares(allPaidSharesRes?.data || [])
 
     // 디버그: 투자/대출 데이터 확인
-    console.log('[Settlement] investData:', investData.map(i => ({
+    console.log('[Settlement] investData:', investData.map((i: any) => ({
       id: i.id, name: i.investor_name, amount: i.invest_amount, rate: i.interest_rate,
       startDate: i.contract_start_date, status: i.status,
     })))
-    console.log('[Settlement] loanData:', loanData.map(l => ({
+    console.log('[Settlement] loanData:', loanData.map((l: any) => ({
       id: l.id, name: l.finance_name, monthly: l.monthly_payment,
       startDate: l.start_date, status: l.status,
     })))
@@ -1130,8 +1070,12 @@ export default function SettlementDashboard() {
         return
       }
 
-      const { error } = await supabase.from('transactions').insert(newTxs)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/transactions', { method: 'POST', headers, body: JSON.stringify({ transactions: newTxs }) })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error || '거래 등록 실패')
+      }
 
       alert(`✅ ${newTxs.length}건 정산 완료!`)
       setSelectedIds(new Set())
@@ -1176,11 +1120,10 @@ export default function SettlementDashboard() {
           // 투자: investors의 은행정보
           const inv = investors.find(i => String(i.id) === String(item.relatedId))
           if (inv) {
-            const { data: invDetail } = await supabase
-              .from('general_investments')
-              .select('bank_name, account_number, account_holder')
-              .eq('id', item.relatedId)
-              .single()
+            const headers = await getAuthHeader()
+            const res = await fetch(`/api/general_investments?id=${item.relatedId}`, { headers })
+            const json = await res.json()
+            const invDetail = json.data ?? json ?? null
             if (invDetail) {
               bankMap[key] = {
                 bank: invDetail.bank_name || '',
@@ -1327,11 +1270,10 @@ export default function SettlementDashboard() {
             holder: carHolder || jcHolder || item.name,
           }
         } else if (item.type === 'invest') {
-          const { data: invDetail } = await supabase
-            .from('general_investments')
-            .select('bank_name, account_number, account_holder')
-            .eq('id', item.relatedId)
-            .single()
+          const headers = await getAuthHeader()
+          const res = await fetch(`/api/general_investments?id=${item.relatedId}`, { headers })
+          const json = await res.json()
+          const invDetail = json.data ?? json ?? null
           if (invDetail) {
             bankMap[key] = {
               bank: invDetail.bank_name || '',
@@ -1443,23 +1385,20 @@ export default function SettlementDashboard() {
         const relatedIdStr = String(item.relatedId)
 
         // 넓은 범위로 검색 (type 필터 없이)
-        const { data: matchTxs, error: findErr } = await supabase
-          .from('transactions')
-          .select('id, related_type, related_id, transaction_date')
-          
-          .in('related_type', ['jiip_share', 'invest', 'loan', relatedType])
-
-        if (findErr) throw findErr
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/transactions?filter=all', { headers })
+        const json = await res.json()
+        const matchTxs = json.data ?? json ?? []
 
         // 느슨한 비교 (related_id 문자열/숫자 혼합 대응)
-        const filtered = (matchTxs || []).filter(t =>
+        const filtered = (matchTxs || []).filter((t: any) =>
           t.related_type === relatedType &&
           (t.related_id === relatedIdStr || String(t.related_id) === relatedIdStr)
         )
 
         // 날짜 매칭 우선, 없으면 전체
-        const dateMatched = filtered.filter(t => t.transaction_date === item.dueDate)
-        txIds = (dateMatched.length > 0 ? dateMatched : filtered).map(t => t.id)
+        const dateMatched = filtered.filter((t: any) => t.transaction_date === item.dueDate)
+        txIds = (dateMatched.length > 0 ? dateMatched : filtered).map((t: any) => t.id)
       }
 
       if (txIds.length === 0) {
@@ -1468,37 +1407,47 @@ export default function SettlementDashboard() {
       }
 
       // 통장내역과 연결(매칭) 여부 확인
-      const { data: linkedClassify } = await supabase
-        .from('classification_queue')
-        .select('id, transaction_id')
-        .in('transaction_id', txIds)
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/classification-queue?transaction_ids=${txIds.join(',')}`, { headers })
+      const json = await res.json()
+      const linkedClassify = json.data ?? json ?? []
 
       if (linkedClassify && linkedClassify.length > 0) {
         // ★ 통장내역 연결된 경우: 거래 삭제 대신 연결(related_type/related_id)만 해제
         // 통장 거래 자체는 보존하고 정산 연결만 끊음
-        const { error: unlinkErr } = await supabase
-          .from('transactions')
-          .update({ related_type: null, related_id: null })
-          .in('id', txIds)
-
-        if (unlinkErr) throw unlinkErr
+        const unlinkHeaders = await getAuthHeader()
+        const updateRes = await fetch('/api/transactions/unlink', {
+          method: 'PATCH',
+          headers: { ...unlinkHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: txIds })
+        })
+        if (!updateRes.ok) {
+          const errJson = await updateRes.json()
+          throw new Error(errJson.error || 'Failed to unlink transactions')
+        }
 
         // classification_queue의 매칭 정보도 초기화
-        const linkedQueueIds = linkedClassify.map(lc => lc.id)
-        await supabase
-          .from('classification_queue')
-          .update({ final_matched_type: null, final_matched_id: null, final_matched_name: null })
-          .in('id', linkedQueueIds)
+        const linkedQueueIds = linkedClassify.map((lc: any) => lc.id)
+        const clearHeaders = await getAuthHeader()
+        await fetch('/api/classification-queue/clear-match', {
+          method: 'PATCH',
+          headers: { ...clearHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: linkedQueueIds })
+        })
 
         alert(`✅ ${item.name}님의 ${item.monthLabel?.slice(5)}월 정산이 취소되었습니다.\n(통장 거래 ${txIds.length}건의 정산 연결이 해제됨 — 통장 거래는 보존됩니다)`)
       } else {
         // 통장내역 미연결: 기존처럼 거래 삭제
-        const { error: delErr } = await supabase
-          .from('transactions')
-          .delete()
-          .in('id', txIds)
-
-        if (delErr) throw delErr
+        const headers = await getAuthHeader()
+        const deleteRes = await fetch('/api/transactions/bulk-delete', {
+          method: 'DELETE',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: txIds })
+        })
+        if (!deleteRes.ok) {
+          const errJson = await deleteRes.json()
+          throw new Error(errJson.error || 'Failed to delete transactions')
+        }
 
         alert(`✅ ${item.name}님의 ${item.monthLabel?.slice(5)}월 정산이 취소되었습니다. (${txIds.length}건 삭제)`)
       }
@@ -1645,11 +1594,11 @@ export default function SettlementDashboard() {
         queried.add(key)
 
         const tableName = g.type === 'jiip' ? 'jiip_contracts' : 'general_investments'
-        const { data: contract } = await supabase
-          .from(tableName)
-          .select('*')
-          .eq('id', g.relatedId)
-          .single()
+        const headers = await getAuthHeader()
+        const endpoint = tableName === 'jiip_contracts' ? `/api/jiip-contracts?id=${g.relatedId}` : `/api/general_investments?id=${g.relatedId}`
+        const res = await fetch(endpoint, { headers })
+        const json = await res.json()
+        const contract = json.data ?? json ?? null
 
         const phone = contract?.investor_phone || contract?.phone || ''
         const email = contract?.investor_email || contract?.email || ''
@@ -1694,7 +1643,7 @@ export default function SettlementDashboard() {
     setSmsModal(prev => ({ ...prev, open: false }))
 
     try {
-      const authToken = (await supabase.auth.getSession()).data.session?.access_token
+      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
 
       // 1. 수신자별 상세 링크 생성
@@ -1814,7 +1763,7 @@ export default function SettlementDashboard() {
   // 지급완료/취소 토글
   const handleTogglePaid = async (shareId: string, currentlyPaid: boolean) => {
     try {
-      const authToken = (await supabase.auth.getSession()).data.session?.access_token
+      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch('/api/settlement/share/paid', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -1882,7 +1831,7 @@ export default function SettlementDashboard() {
     if (shareIds.length === 0) return
     if (!confirm(`${shareIds.length}건을 일괄 지급완료 처리하시겠습니까?\n각 대상에게 입금 알림 SMS가 발송됩니다.`)) return
     try {
-      const authToken = (await supabase.auth.getSession()).data.session?.access_token
+      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch('/api/settlement/share/paid', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -3262,7 +3211,6 @@ type SettlementSettings = {
   paymentDate: string
   memo: string
 }
-
 
 // ============================================
 // 탭 5: 통장분류 내역

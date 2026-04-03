@@ -1,75 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const supabase = getSupabaseAdmin()
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await supabase
-    .from('profiles').select('role, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
+  const userId = getUserIdFromToken(token)
+  if (!userId) return null
+  const profiles = await prisma.$queryRaw<any[]>`SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1`
+  const profile = profiles[0]
+  return profile ? { id: userId, role: profile.role, employee_name: profile.employee_name } : null
 }
-
 
 // GET: 영수증/지출내역 목록 조회
 export async function GET(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-  const supabase = getSupabaseAdmin()
   const { searchParams } = request.nextUrl
 
-  // list_months=true → DB에 데이터가 존재하는 월 목록 반환
-  if (searchParams.get('list_months') === 'true') {
-    const { data: allDates, error } = await supabase
-      .from('expense_receipts')
-      .select('expense_date')
-      .eq('user_id', user.id)
-      .order('expense_date', { ascending: false })
-    if (error) return NextResponse.json({ months: [] })
-    const monthSet = new Set<string>()
-    allDates?.forEach(row => {
-      if (row.expense_date) monthSet.add(String(row.expense_date).slice(0, 7))
-    })
-    return NextResponse.json({ months: Array.from(monthSet).sort((a, b) => b.localeCompare(a)) })
-  }
+  try {
+    // list_months=true → DB에 데이터가 존재하는 월 목록 반환
+    if (searchParams.get('list_months') === 'true') {
+      const allDates = await prisma.$queryRaw<any[]>`
+        SELECT expense_date FROM expense_receipts
+        WHERE user_id = ${user.id}
+        ORDER BY expense_date DESC
+      `
+      const monthSet = new Set<string>()
+      allDates?.forEach(row => {
+        if (row.expense_date) monthSet.add(String(row.expense_date).slice(0, 7))
+      })
+      return NextResponse.json({ months: Array.from(monthSet).sort((a, b) => b.localeCompare(a)) })
+    }
 
-  const month = searchParams.get('month') // YYYY-MM
-  const year = searchParams.get('year')
+    const month = searchParams.get('month') // YYYY-MM
+    const year = searchParams.get('year')
 
-  let query = supabase
-    .from('expense_receipts')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('expense_date', { ascending: false })
+    let data: any[]
+    if (month) {
+      const start = `${month}-01`
+      const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+      const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM expense_receipts
+        WHERE user_id = ${user.id}
+        AND expense_date >= ${start}
+        AND expense_date <= ${end}
+        ORDER BY expense_date DESC
+      `
+    } else if (year) {
+      data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM expense_receipts
+        WHERE user_id = ${user.id}
+        AND expense_date >= ${year}-01-01
+        AND expense_date <= ${year}-12-31
+        ORDER BY expense_date DESC
+      `
+    } else {
+      data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM expense_receipts
+        WHERE user_id = ${user.id}
+        ORDER BY expense_date DESC
+      `
+    }
 
-  if (month) {
-    const start = `${month}-01`
-    const endDate = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
-    const end = `${month}-${String(endDate.getDate()).padStart(2, '0')}`
-    query = query.gte('expense_date', start).lte('expense_date', end)
-  } else if (year) {
-    query = query.gte('expense_date', `${year}-01-01`).lte('expense_date', `${year}-12-31`)
-  }
-
-  const { data, error } = await query
-  if (error) {
+    return NextResponse.json({ data })
+  } catch (error: any) {
     console.error('지출내역 조회 실패:', error)
     return NextResponse.json({ error: '조회 실패' }, { status: 500 })
   }
-
-  return NextResponse.json({ data })
 }
 
 // POST: 지출내역 추가 (수동 입력 or OCR 결과)
@@ -98,19 +105,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '항목이 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = getSupabaseAdmin()
-
     // ── 중복 체크: 같은 날짜 + 사용처 + 금액이 이미 있으면 스킵 ──
     const duplicateChecks = await Promise.all(
       items.map(async (item) => {
-        const { data: existing } = await supabase
-          .from('expense_receipts')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('expense_date', item.expense_date)
-          .eq('merchant', item.merchant)
-          .eq('amount', item.amount)
-          .limit(1)
+        const existing = await prisma.$queryRaw<any[]>`
+          SELECT id FROM expense_receipts
+          WHERE user_id = ${user.id}
+          AND expense_date = ${item.expense_date}
+          AND merchant = ${item.merchant}
+          AND amount = ${item.amount}
+          LIMIT 1
+        `
         return { item, isDuplicate: !!(existing && existing.length > 0) }
       })
     )
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
     const makeInsertData = (withMemo: boolean) => newItems.map(item => {
       const row: Record<string, any> = {
         user_id: user.id,
-        user_name: user.employee_name || user.email?.split('@')[0] || '',
+        user_name: user.employee_name || '',
         expense_date: item.expense_date,
         card_number: item.card_number || '',
         category: item.category,
@@ -144,20 +149,63 @@ export async function POST(request: NextRequest) {
       return row
     })
 
-    // memo 컬럼 포함하여 시도, 실패 시 memo 없이 재시도
-    let { data, error } = await supabase
-      .from('expense_receipts')
-      .insert(makeInsertData(true))
-      .select()
+    // 항목 삽입 - memo 컬럼이 있다고 가정
+    const insertData = makeInsertData(true)
+    const data: any[] = []
+    let error: any = null
 
-    if (error && (error.message?.includes('memo') || error.message?.includes('column'))) {
-      console.log('memo 컬럼 미존재, memo 없이 재시도')
-      const retry = await supabase
-        .from('expense_receipts')
-        .insert(makeInsertData(false))
-        .select()
-      data = retry.data
-      error = retry.error
+    try {
+      for (const row of insertData) {
+        await prisma.$executeRaw`
+          INSERT INTO expense_receipts (
+            user_id, user_name, expense_date, card_number, category, merchant,
+            item_name, customer_team, amount, receipt_url, memo, created_at, updated_at
+          ) VALUES (
+            ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+            ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
+            ${row.amount}, ${row.receipt_url}, ${row.memo || ''}, NOW(), NOW()
+          )
+        `
+        // Re-fetch inserted row
+        const result = await prisma.$queryRaw<any[]>`
+          SELECT * FROM expense_receipts
+          WHERE user_id = ${row.user_id}
+          AND expense_date = ${row.expense_date}
+          AND merchant = ${row.merchant}
+          AND amount = ${row.amount}
+          ORDER BY created_at DESC LIMIT 1
+        `
+        if (result[0]) data.push(result[0])
+      }
+    } catch (e: any) {
+      console.log('memo 컬럼 오류, memo 없이 재시도')
+      // Retry without memo
+      try {
+        const insertDataNoMemo = makeInsertData(false)
+        for (const row of insertDataNoMemo) {
+          await prisma.$executeRaw`
+            INSERT INTO expense_receipts (
+              user_id, user_name, expense_date, card_number, category, merchant,
+              item_name, customer_team, amount, receipt_url, created_at, updated_at
+            ) VALUES (
+              ${row.user_id}, ${row.user_name}, ${row.expense_date}, ${row.card_number},
+              ${row.category}, ${row.merchant}, ${row.item_name}, ${row.customer_team},
+              ${row.amount}, ${row.receipt_url}, NOW(), NOW()
+            )
+          `
+          const result = await prisma.$queryRaw<any[]>`
+            SELECT * FROM expense_receipts
+            WHERE user_id = ${row.user_id}
+            AND expense_date = ${row.expense_date}
+            AND merchant = ${row.merchant}
+            AND amount = ${row.amount}
+            ORDER BY created_at DESC LIMIT 1
+          `
+          if (result[0]) data.push(result[0])
+        }
+      } catch (retryError: any) {
+        error = retryError
+      }
     }
 
     if (error) {
@@ -195,7 +243,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ids와 updates 필요' }, { status: 400 })
     }
 
-    const supabase = getSupabaseAdmin()
+    const { Prisma } = await import('@prisma/client')
+    const idList = ids.map(id => id)
+
     const updateData: Record<string, any> = {}
     if (updates.category !== undefined) updateData.category = updates.category
     if (updates.item_name !== undefined) updateData.item_name = updates.item_name
@@ -206,24 +256,37 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
     }
 
-    let { error } = await supabase
-      .from('expense_receipts')
-      .update(updateData)
-      .in('id', ids)
-      .eq('user_id', user.id)
+    let error: any = null
+    try {
+      // Build dynamic UPDATE query
+      const setClause: string[] = []
+      if (updateData.category !== undefined) setClause.push(`category = ${JSON.stringify(updateData.category)}`)
+      if (updateData.item_name !== undefined) setClause.push(`item_name = ${JSON.stringify(updateData.item_name)}`)
+      if (updateData.customer_team !== undefined) setClause.push(`customer_team = ${JSON.stringify(updateData.customer_team)}`)
+      if (updateData.memo !== undefined) setClause.push(`memo = ${JSON.stringify(updateData.memo)}`)
 
-    // memo 컬럼 없으면 memo 제외하고 재시도
-    if (error && updateData.memo !== undefined && (error.message?.includes('memo') || error.message?.includes('column'))) {
-      delete updateData.memo
-      if (Object.keys(updateData).length === 0) {
-        return NextResponse.json({ success: true, updated: 0, note: 'memo 컬럼 미존재' })
+      const idPlaceholders = ids.map(id => `'${id}'`).join(',')
+      const query = `UPDATE expense_receipts SET ${setClause.join(', ')}, updated_at = NOW() WHERE id IN (${idPlaceholders}) AND user_id = '${user.id}'`
+
+      await prisma.$executeRawUnsafe(query)
+    } catch (e: any) {
+      // memo 컬럼 없으면 memo 제외하고 재시도
+      if (updateData.memo !== undefined && (e.message?.includes('memo') || e.message?.includes('column'))) {
+        delete updateData.memo
+        if (Object.keys(updateData).length === 0) {
+          return NextResponse.json({ success: true, updated: 0, note: 'memo 컬럼 미존재' })
+        }
+        const setClause2: string[] = []
+        if (updateData.category !== undefined) setClause2.push(`category = ${JSON.stringify(updateData.category)}`)
+        if (updateData.item_name !== undefined) setClause2.push(`item_name = ${JSON.stringify(updateData.item_name)}`)
+        if (updateData.customer_team !== undefined) setClause2.push(`customer_team = ${JSON.stringify(updateData.customer_team)}`)
+
+        const idPlaceholders = ids.map(id => `'${id}'`).join(',')
+        const query2 = `UPDATE expense_receipts SET ${setClause2.join(', ')}, updated_at = NOW() WHERE id IN (${idPlaceholders}) AND user_id = '${user.id}'`
+        await prisma.$executeRawUnsafe(query2)
+      } else {
+        error = e
       }
-      const retry = await supabase
-        .from('expense_receipts')
-        .update(updateData)
-        .in('id', ids)
-        .eq('user_id', user.id)
-      error = retry.error
     }
 
     if (error) throw error
@@ -242,15 +305,10 @@ export async function DELETE(request: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID 필요' }, { status: 400 })
 
-  const supabase = getSupabaseAdmin()
-  const { error } = await supabase
-    .from('expense_receipts')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id)
-
-  if (error) {
+  try {
+    await prisma.$executeRaw`DELETE FROM expense_receipts WHERE id = ${id} AND user_id = ${user.id}`
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
     return NextResponse.json({ error: '삭제 실패' }, { status: 500 })
   }
-  return NextResponse.json({ success: true })
 }

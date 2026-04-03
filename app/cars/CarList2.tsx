@@ -1,11 +1,10 @@
 'use client'
+import { auth } from '@/lib/firebase'
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function CarListPage() {
-  const supabase = createClientComponentClient()
   const router = useRouter()
   const [cars, setCars] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,7 +15,10 @@ export default function CarListPage() {
 
   useEffect(() => {
     const fetchCars = async () => {
-      const { data } = await supabase.from('cars').select('*').order('created_at', { ascending: false })
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+      const response = await fetch('/api/cars', { headers })
+      const { data } = await response.json()
       setCars(data || [])
       setLoading(false)
     }

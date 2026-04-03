@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../utils/supabase'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 type Props = {
   isOpen: boolean
@@ -24,26 +24,42 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
   const activateModules = async (companyId: string) => {
     setStatusMsg('모듈 활성화 중...')
 
-    // 전체 system_modules 가져오기
-    const { data: modules, error } = await supabase
-      .from('system_modules').select('id, path')
+    try {
+      const headers = await getAuthHeader()
 
-    if (error || !modules) {
-      console.error('모듈 로드 실패:', error)
-      return
-    }
+      // 전체 system_modules 가져오기
+      const res = await fetch('/api/system_modules', { headers })
 
-    // 모든 플랜에서 전체 모듈 활성화 (플랜별 제한은 추후 구독 관리에서)
-    const records = modules.map(m => ({
-      module_id: m.id,
-      is_active: true,
-    }))
+      if (!res.ok) {
+        console.error('모듈 로드 실패:', res.statusText)
+        return
+      }
 
-    const { error: insertError } = await supabase
-      .from('company_modules').insert(records)
+      const modules = await res.json()
 
-    if (insertError) {
-      console.error('모듈 활성화 실패:', insertError)
+      if (!modules || modules.length === 0) {
+        console.error('모듈 로드 실패: 데이터 없음')
+        return
+      }
+
+      // 모든 플랜에서 전체 모듈 활성화 (플랜별 제한은 추후 구독 관리에서)
+      const records = modules.map((m: any) => ({
+        module_id: m.id,
+        is_active: true,
+      }))
+
+      const insertRes = await fetch('/api/company_modules', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(records)
+      })
+
+      if (!insertRes.ok) {
+        const error = await insertRes.json()
+        console.error('모듈 활성화 실패:', error)
+      }
+    } catch (error) {
+      console.error('모듈 활성화 실패:', error)
     }
   }
 
@@ -53,19 +69,26 @@ export default function AddCompanyModal({ isOpen, onClose, onSuccess }: Props) {
     setStatusMsg('회사 등록 중...')
 
     try {
-      // 1. 회사 정보 insert (.select()로 생성된 ID 받아오기)
-      const { data: newCompany, error } = await supabase
-        .from('companies')
-        .insert({
+      const headers = await getAuthHeader()
+
+      // 1. 회사 정보 insert
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: formData.name,
           business_number: formData.business_number,
           plan: formData.plan,
           is_active: true
         })
-        .select('id')
-        .single()
+      })
 
-      if (error) throw error
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.message || 'Failed to create company')
+      }
+
+      const newCompany = await res.json()
 
       // 2. 모듈 자동 활성화
       if (newCompany?.id) {

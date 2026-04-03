@@ -1,10 +1,25 @@
 'use client'
+import { auth } from '@/lib/firebase'
 
-import { supabase } from '../../../utils/supabase'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 export const dynamic = "force-dynamic"
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ── 유틸 ──
 const f = (n: number) => Math.round(n || 0).toLocaleString()
@@ -23,13 +38,18 @@ function InvoiceTimeline({ quoteId }: { quoteId: string }) {
   const [events, setEvents] = useState<any[]>([])
   useEffect(() => {
     if (!quoteId) return
-    supabase
-      .from('quote_lifecycle_events')
-      .select('*')
-      .eq('quote_id', quoteId)
-      .order('created_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => setEvents(data || []))
+    ;(async () => {
+      try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+        const res = await fetch(`/api/quotes/${quoteId}/events`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const json = await res.json()
+        setEvents(json.data ?? json ?? [])
+      } catch (err) {
+        console.error('Error fetching timeline events:', err)
+      }
+    })()
   }, [quoteId])
   if (events.length === 0) return null
   const icons: Record<string, string> = { created: '📝', shared: '📤', viewed: '👁️', sent: '📱', signed: '✅', revoked: '🚫' }
@@ -86,28 +106,33 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     if (!quoteId) return
     ;(async () => {
-      const { data: q, error } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', quoteId)
-        .single()
-      if (error || !q) { setLoading(false); return }
-      setQuote(q)
+      try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+        const res = await fetch(`/api/quotes/${quoteId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const json = await res.json()
+        const q = json.data ?? json
+        if (!q) { setLoading(false); return }
+        setQuote(q)
 
-      // 회사 정보는 quote_detail에서 활용
+        // 회사 정보는 quote_detail에서 활용
 
-      // 공유 상태 확인
-      if (q.signed_at) {
-        setShareStatus('signed')
-      } else if (q.shared_at) {
-        setShareStatus('shared')
+        // 공유 상태 확인
+        if (q.signed_at) {
+          setShareStatus('signed')
+        } else if (q.shared_at) {
+          setShareStatus('shared')
+        }
+
+        // 연락처 자동 채우기
+        const phoneMatch = (q.memo || '').match(/연락처:\s*([0-9-]+)/)
+        if (phoneMatch) setSendPhone(phoneMatch[1])
+      } catch (err) {
+        console.error('Error loading quote:', err)
+      } finally {
+        setLoading(false)
       }
-
-      // 연락처 자동 채우기
-      const phoneMatch = (q.memo || '').match(/연락처:\s*([0-9-]+)/)
-      if (phoneMatch) setSendPhone(phoneMatch[1])
-
-      setLoading(false)
     })()
   }, [quoteId])
 
@@ -131,8 +156,7 @@ export default function InvoiceDetailPage() {
     setShareLoading(true)
     setShowShareModal(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch(`/api/quotes/${quoteId}/share`, {
         method: 'POST',
         headers: {
@@ -178,8 +202,7 @@ export default function InvoiceDetailPage() {
     setSending(true)
     setSendResult(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || ''
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const parsed = parseMemo(quote.memo || '')
       const rentWithVat = Math.round((quote.rent_fee || 0) * 1.1)
 
@@ -219,10 +242,10 @@ export default function InvoiceDetailPage() {
   // ── 링크 비활성화 ──
   const handleRevokeShare = useCallback(async () => {
     if (!confirm('공유 링크를 비활성화하시겠습니까?')) return
-    const { data: { session } } = await supabase.auth.getSession()
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
     await fetch(`/api/quotes/${quoteId}/share`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      headers: { Authorization: `Bearer ${token || ''}` },
     })
     setShareUrl('')
     setShareStatus('none')
@@ -234,8 +257,19 @@ export default function InvoiceDetailPage() {
   const handleArchive = useCallback(async () => {
     if (!confirm('이 청구서를 보관하시겠습니까?')) return
     setUpdating(true)
-    await supabase.from('quotes').update({ status: 'archived' }).eq('id', quoteId)
-    setQuote((p: any) => ({ ...p, status: 'archived' }))
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/quotes/${quoteId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setQuote((p: any) => ({ ...p, status: 'archived' }))
+    } catch (err) {
+      console.error('Error archiving:', err)
+    }
     setUpdating(false)
   }, [quoteId])
 

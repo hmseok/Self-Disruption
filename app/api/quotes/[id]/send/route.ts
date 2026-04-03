@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
   sendWithTemplate, buildEmailHTML, buildInfoTableHTML,
@@ -11,23 +11,26 @@ import { recordLifecycleEvent, maskRecipient } from '@/app/utils/lifecycle-event
 // POST → 견적서 링크를 고객에게 직접 발송
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 async function verifyUser(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role, employee_name').eq('id', user.id).single()
-  return profile ? { ...user, role: profile.role, employee_name: profile.employee_name } : null
+
+  // TODO: Phase 5 Firebase Auth - JWT decode to get userId
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+    const userId = decoded.sub || decoded.user_id
+    if (!userId) return null
+
+    const profile = await prisma.$queryRaw<any[]>`
+      SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1
+    `
+    return profile && profile.length > 0 ? { id: userId, role: profile[0].role, employee_name: profile[0].employee_name } : null
+  } catch {
+    return null
+  }
 }
 
 // 숫자 포맷
@@ -94,45 +97,51 @@ export async function POST(
       return NextResponse.json({ error: '이메일 주소가 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = getSupabaseAdmin()
-
     // 1. 견적 정보 조회
-    const { data: quote, error: qErr } = await supabase
-      .from('quotes')
-      .select('*, car:car_id(*)')
-      .eq('id', quoteId)
-      .single()
+    const quote = await prisma.$queryRaw<any[]>`
+      SELECT * FROM quotes WHERE id = ${quoteId} LIMIT 1
+    `
 
-    if (qErr || !quote) {
+    if (!quote || quote.length === 0) {
       return NextResponse.json({ error: '견적서를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    const detail = quote.quote_detail || {}
+    const detail = quote[0].quote_detail || {}
     const carInfo = detail.car_info || {}
-    const car = quote.car || {}
+
+    // 차량 정보
+    let car = {}
+    if (quote[0].car_id) {
+      const carData = await prisma.$queryRaw<any[]>`
+        SELECT * FROM cars WHERE id = ${quote[0].car_id} LIMIT 1
+      `
+      car = carData?.[0] || {}
+    }
 
     // 회사 정보
     let companyName = '당사'
-    if (quote.company_id) {
-      const { data: comp } = await supabase.from('companies').select('name').eq('id', quote.company_id).single()
-      if (comp) companyName = comp.name
+    if (quote[0].company_id) {
+      const comp = await prisma.$queryRaw<any[]>`
+        SELECT name FROM companies WHERE id = ${quote[0].company_id} LIMIT 1
+      `
+      if (comp && comp.length > 0) companyName = comp[0].name
     }
 
     // 변수 준비
     const vars: Record<string, string> = {
       companyName,
-      customerName: quote.customer_name || detail.manual_customer?.name || '고객',
-      brand: car.brand || carInfo.brand || '',
-      model: car.model || carInfo.model || '',
-      trim: car.trim || carInfo.trim || '',
-      year: String(car.year || carInfo.year || ''),
+      customerName: quote[0].customer_name || detail.manual_customer?.name || '고객',
+      brand: (car as any).brand || carInfo.brand || '',
+      model: (car as any).model || carInfo.model || '',
+      trim: (car as any).trim || carInfo.trim || '',
+      year: String((car as any).year || carInfo.year || ''),
       contractType: detail.contract_type === 'buyout' ? '인수형' : '반납형',
       termMonths: String(detail.term_months || 36),
       annualMileage: f((detail.annualMileage || detail.baselineKm || 2) * 10000),
-      rentFee: f(Math.round((quote.rent_fee || 0) / 1000) * 1000),
-      rentWithVAT: f(Math.round((quote.rent_fee || 0) * 1.1 / 1000) * 1000),
-      deposit: f(quote.deposit || 0),
-      depositRaw: String(quote.deposit || 0),
+      rentFee: f(Math.round((quote[0].rent_fee || 0) / 1000) * 1000),
+      rentWithVAT: f(Math.round((quote[0].rent_fee || 0) * 1.1 / 1000) * 1000),
+      deposit: f(quote[0].deposit || 0),
+      depositRaw: String(quote[0].deposit || 0),
       shareUrl,
     }
 
@@ -141,7 +150,7 @@ export async function POST(
 
     // 2. 템플릿 기반 발송 시도 → 실패 시 fallback
     const templateResult = await sendWithTemplate({
-      companyId: quote.company_id!,
+      companyId: quote[0].company_id!,
       templateKey: 'quote_share',
       channel,
       recipient,
@@ -153,10 +162,8 @@ export async function POST(
     })
 
     if (templateResult.success) {
-      // 템플릿 발송 성공
       result = templateResult
     } else {
-      // 템플릿 없거나 실패 → fallback 직접 발송
       console.log('[quote/send] 템플릿 발송 실패, fallback 사용:', templateResult.error)
 
       if (channel === 'email') {
@@ -189,7 +196,7 @@ export async function POST(
 
       // fallback 로그 저장
       await logMessageSend({
-        companyId: quote.company_id!,
+        companyId: quote[0].company_id!,
         templateKey: 'quote_share_fallback',
         channel,
         recipient,
@@ -207,14 +214,13 @@ export async function POST(
 
     // 3. quotes.shared_at 업데이트
     if (result?.success) {
-      await supabase
-        .from('quotes')
-        .update({ shared_at: new Date().toISOString() })
-        .eq('id', quoteId)
+      await prisma.$executeRaw`
+        UPDATE quotes SET shared_at = NOW() WHERE id = ${quoteId}
+      `
 
       // 라이프사이클 이벤트 기록
       recordLifecycleEvent({
-        companyId: quote.company_id!,
+        companyId: quote[0].company_id!,
         quoteId,
         eventType: 'sent',
         channel,
@@ -229,7 +235,6 @@ export async function POST(
       method: result?.method || channel,
       error: result?.error,
     })
-
   } catch (e: any) {
     console.error('[quotes/send] 에러:', e.message)
     return NextResponse.json({ error: '발송 중 오류가 발생했습니다.', detail: e.message }, { status: 500 })

@@ -1,30 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
 // ============================================
-// 정산 상세 공유 생성 API
+// 정산 상세 공유 생성 API (Prisma 버전)
 // POST → 공유 토큰 생성 및 링크 반환
 // ============================================
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+
+  // TODO: Phase 5 - Replace with Firebase Auth
+  // For now, extract userId from JWT payload (base64 decode)
+  let userId: string | null = null
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+      userId = payload.sub || payload.user_id
+    }
+  } catch {}
+
+  if (!userId) return null
+
+  const profiles = await prisma.$queryRaw<any[]>`
+    SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
+  `
+
+  if (profiles.length === 0 || !['admin', 'master'].includes(profiles[0].role)) return null
+  return { id: userId, role: profiles[0].role }
 }
 
 type SettlementItem = {
@@ -109,43 +115,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'items 배열 필수' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
     const token = generateToken()
+    const now = new Date().toISOString()
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
 
     // 공유 레코드 생성
-    const insertData: Record<string, any> = {
+    const insertData = {
       token,
       recipient_name: recipient_name.trim(),
       recipient_phone: recipient_phone?.replace(/[^0-9]/g, '') || null,
       settlement_month: settlement_month.trim(),
       payment_date: payment_date?.trim() || null,
       total_amount: total_amount || 0,
-      items: items,
-      breakdown: breakdown || null,
-      transaction_details: transaction_details || null,
-      bank_info: bank_info || null,
+      items: JSON.stringify(items),
+      breakdown: JSON.stringify(breakdown || null),
+      transaction_details: JSON.stringify(transaction_details || null),
+      bank_info: JSON.stringify(bank_info || null),
       message: message?.trim() || null,
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: now,
+      expires_at: expiresAt,
       view_count: 0,
     }
 
-    const { data, error } = await sb
-      .from('settlement_shares')
-      .insert(insertData)
-      .select()
-      .single()
-
-    if (error) {
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO settlement_shares
+        (token, recipient_name, recipient_phone, settlement_month, payment_date, total_amount,
+         items, breakdown, transaction_details, bank_info, message, created_at, expires_at, view_count)
+        VALUES (
+          ${insertData.token}, ${insertData.recipient_name}, ${insertData.recipient_phone},
+          ${insertData.settlement_month}, ${insertData.payment_date}, ${insertData.total_amount},
+          ${insertData.items}, ${insertData.breakdown}, ${insertData.transaction_details},
+          ${insertData.bank_info}, ${insertData.message}, ${insertData.created_at},
+          ${insertData.expires_at}, ${insertData.view_count}
+        )
+      `
+    } catch (error) {
       console.error('[settlement/share] 삽입 오류:', error)
       return NextResponse.json({ error: '공유 생성 실패' }, { status: 500 })
     }
+
+    const data = await prisma.$queryRaw<any[]>`
+      SELECT * FROM settlement_shares WHERE token = ${token} LIMIT 1
+    `
 
     return NextResponse.json({
       success: true,
       token,
       url: `/settlement/view/${token}`,
-      data
+      data: data.length > 0 ? data[0] : insertData
     })
   } catch (err: any) {
     console.error('[settlement/share] 오류:', err)

@@ -1,9 +1,20 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
-import { CommonCode } from '@/types/database' // 타입 경로 확인해주세요
+import { CommonCode } from '../../types/database' // 타입 경로 확인해주세요
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 export default function CarRegisterForm() {
   const router = useRouter()
@@ -33,13 +44,12 @@ export default function CarRegisterForm() {
   // 3. 페이지 열리자마자 코드값(연료, 색상 등) 불러오기
   useEffect(() => {
     const fetchCodes = async () => {
-      const { data } = await supabase
-        .from('common_codes')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-
-      if (data) setCommonCodes(data)
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/codes', { headers })
+        const json = await res.json()
+        if (json.data) setCommonCodes(json.data)
+      } catch (e) { console.error('[CarRegisterForm fetchCodes]', e) }
     }
     fetchCodes()
   }, [])
@@ -52,17 +62,21 @@ export default function CarRegisterForm() {
     if (!car.number || !car.model || !car.fuel) return alert('필수 정보를 입력해주세요.')
 
     setLoading(true)
-    const { error } = await supabase.from('cars').insert([{
-      ...car,
-      status: 'available'
-    }])
-
-    if (error) {
-      alert('에러 발생: ' + error.message)
-    } else {
-      alert('✅ 차량이 등록되었습니다!')
-      router.push('/cars') // 목록으로 이동
-    }
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/cars', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...car, status: 'available', company_id: effectiveCompanyId }),
+      })
+      const json = await res.json()
+      if (json.error) {
+        alert('에러 발생: ' + json.error)
+      } else {
+        alert('✅ 차량이 등록되었습니다!')
+        router.push('/cars')
+      }
+    } catch (e: any) { alert('에러 발생: ' + e.message) }
     setLoading(false)
   }
 

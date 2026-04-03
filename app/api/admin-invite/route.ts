@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 
 // ============================================
-// Super God Admin 초대 코드 API
+// Platform Admin 초대 코드 API (Prisma 버전)
 // GET    → 초대 코드 목록 조회
 // POST   → 초대 코드 발급 + Resend 이메일 발송
 // PATCH  → 초대 코드 즉시 만료 처리
 // DELETE → 초대 코드 삭제
 // ============================================
-
-// ★ 빌드 타임이 아닌 런타임에 클라이언트 생성 (Docker 빌드 호환)
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 // 요청자의 role 확인 (JWT에서)
 async function verifyPlatformAdmin(request: NextRequest) {
@@ -25,17 +16,26 @@ async function verifyPlatformAdmin(request: NextRequest) {
   if (!authHeader?.startsWith('Bearer ')) return null
 
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
 
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  // TODO: Phase 5 - Replace with Firebase Auth
+  // For now, extract userId from JWT payload (base64 decode)
+  let userId: string | null = null
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+      userId = payload.sub || payload.user_id
+    }
+  } catch {}
 
-  if (!profile || profile.role !== 'admin') return null
-  return user
+  if (!userId) return null
+
+  const profiles = await prisma.$queryRaw<any[]>`
+    SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
+  `
+
+  if (profiles.length === 0 || profiles[0].role !== 'admin') return null
+  return { id: userId }
 }
 
 // GET: 초대 코드 목록
@@ -43,16 +43,29 @@ export async function GET(request: NextRequest) {
   const user = await verifyPlatformAdmin(request)
   if (!user) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('admin_invite_codes')
-    .select(`
-      id, code, description, created_at, expires_at, used_at,
-      creator:created_by(employee_name),
-      consumer:used_by(employee_name)
-    `)
-    .order('created_at', { ascending: false })
+  const codes = await prisma.$queryRaw<any[]>`
+    SELECT
+      aic.id, aic.code, aic.description, aic.created_at, aic.expires_at, aic.used_at,
+      aic.created_by, aic.used_by,
+      pc.employee_name as creator_name,
+      pu.employee_name as consumer_name
+    FROM admin_invite_codes aic
+    LEFT JOIN profiles pc ON aic.created_by = pc.id
+    LEFT JOIN profiles pu ON aic.used_by = pu.id
+    ORDER BY aic.created_at DESC
+  `
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const data = codes.map(c => ({
+    id: c.id,
+    code: c.code,
+    description: c.description,
+    created_at: c.created_at,
+    expires_at: c.expires_at,
+    used_at: c.used_at,
+    creator: c.creator_name ? { employee_name: c.creator_name } : null,
+    consumer: c.consumer_name ? { employee_name: c.consumer_name } : null,
+  }))
+
   return NextResponse.json(data)
 }
 
@@ -77,18 +90,23 @@ export async function POST(request: NextRequest) {
   const expiresAt = new Date(Date.now() + validHours * 60 * 60 * 1000).toISOString()
 
   // DB에 저장
-  const { data, error } = await getSupabaseAdmin()
-    .from('admin_invite_codes')
-    .insert({
-      code,
-      description: description || (recipientEmail ? `${recipientEmail} 초대` : ''),
-      created_by: user.id,
-      expires_at: expiresAt,
-    })
-    .select()
-    .single()
+  await prisma.$executeRaw`
+    INSERT INTO admin_invite_codes
+    (code, description, created_by, expires_at, created_at)
+    VALUES (
+      ${code},
+      ${description || (recipientEmail ? `${recipientEmail} 초대` : '')},
+      ${user.id},
+      ${expiresAt},
+      NOW()
+    )
+  `
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Get the inserted ID
+  const inserted = await prisma.$queryRaw<any[]>`
+    SELECT id FROM admin_invite_codes WHERE code = ${code} LIMIT 1
+  `
+  const codeId = inserted.length > 0 ? inserted[0].id : null
 
   // 이메일 발송 (이메일이 있는 경우)
   let emailSent = false
@@ -145,7 +163,7 @@ export async function POST(request: NextRequest) {
     success: true,
     code,
     expires_at: expiresAt,
-    id: data.id,
+    id: codeId,
     emailSent,
     emailError: emailError || undefined,
   })
@@ -161,15 +179,16 @@ export async function PATCH(request: NextRequest) {
 
   if (!codeId) return NextResponse.json({ error: '코드 ID가 필요합니다.' }, { status: 400 })
 
-  // 이미 사용된 코드도 만료 처리 가능 (expires_at = NOW)
-  const { data, error } = await getSupabaseAdmin()
-    .from('admin_invite_codes')
-    .update({ expires_at: new Date().toISOString() })
-    .eq('id', codeId)
-    .select()
-    .single()
+  const now = new Date().toISOString()
+  await prisma.$executeRaw`
+    UPDATE admin_invite_codes SET expires_at = ${now} WHERE id = ${codeId}
+  `
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const updated = await prisma.$queryRaw<any[]>`
+    SELECT * FROM admin_invite_codes WHERE id = ${codeId} LIMIT 1
+  `
+
+  const data = updated.length > 0 ? updated[0] : null
   return NextResponse.json({ success: true, data })
 }
 
@@ -183,11 +202,9 @@ export async function DELETE(request: NextRequest) {
 
   if (!codeId) return NextResponse.json({ error: '코드 ID가 필요합니다.' }, { status: 400 })
 
-  const { error } = await getSupabaseAdmin()
-    .from('admin_invite_codes')
-    .delete()
-    .eq('id', codeId)
+  await prisma.$executeRaw`
+    DELETE FROM admin_invite_codes WHERE id = ${codeId}
+  `
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }

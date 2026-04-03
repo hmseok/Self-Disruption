@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, updatePricingStandardsRow, insertPricingStandardsRows, deletePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 interface FinanceRate {
   id: string
@@ -34,7 +34,6 @@ const MARKET_REFERENCE = [
 ]
 
 export default function FinanceTab() {
-  const supabase = createClientComponentClient()
   const [rows, setRows] = useState<FinanceRate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -48,8 +47,7 @@ export default function FinanceTab() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from('finance_rate_table').select('*').order('effective_date', { ascending: false })
-      if (error) throw error
+      const data = await fetchPricingStandardsData('finance_rate_table')
       setRows(data || [])
     } catch (error) { console.error('Error:', error) }
     finally { setLoading(false) }
@@ -58,24 +56,21 @@ export default function FinanceTab() {
   const handleAddRow = async () => {
     try {
       const newRow = { finance_type: '캐피탈대출', term_months_min: 12, term_months_max: 60, annual_rate: 0, description: '', effective_date: new Date().toISOString().split('T')[0], notes: '' }
-      const { data, error } = await supabase.from('finance_rate_table').insert([newRow]).select()
-      if (error) throw error
-      if (data) setRows([...rows, data[0]])
+      await insertPricingStandardsRows('finance_rate_table', [newRow])
+      await loadData()
     } catch (error) { console.error('Error:', error) }
   }
 
   const handleDeleteRow = async (id: string) => {
     try {
-      const { error } = await supabase.from('finance_rate_table').delete().eq('id', id)
-      if (error) throw error
+      await deletePricingStandardsRow('finance_rate_table', id)
       setRows(rows.filter(r => r.id !== id))
     } catch (error) { console.error('Error:', error) }
   }
 
   const handleUpdateField = async (id: string, field: keyof FinanceRate, value: any) => {
     try {
-      const { error } = await supabase.from('finance_rate_table').update({ [field]: value }).eq('id', id)
-      if (error) throw error
+      await updatePricingStandardsRow('finance_rate_table', id, { [field]: value })
       setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r))
     } catch (error) { console.error('Error:', error) }
   }

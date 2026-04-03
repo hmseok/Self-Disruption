@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { reverseCalculatePayroll } from '../../../utils/payroll-calc'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    return payload.sub || payload.user_id || null
+  } catch { return null }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin()
     const token = req.headers.get('Authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: { user } } = await supabase.auth.getUser(token)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userId = getUserIdFromToken(token)
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // TODO: Phase 5 - Replace with Firebase Auth verification
 
     const body = await req.json()
     const { target_net_salary, allowances, tax_type, dependents_count, custom_deductions, meal_excess_deduction } = body

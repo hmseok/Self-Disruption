@@ -1,11 +1,22 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DarkHeader from '../../components/DarkHeader'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 export default function CorporateCardsPage() {
   const { company, role } = useApp()
@@ -31,21 +42,28 @@ export default function CorporateCardsPage() {
 
   const fetchCards = async () => {
     setLoading(true)
-    const { data } = await supabase.from('corporate_cards')
-      .select('*, assigned_employee:profiles!corporate_cards_assigned_employee_id_fkey(employee_name)')
-      
-      .order('created_at', { ascending: false })
-    setCards(data || [])
+    try {
+      const res = await fetch('/api/corporate_cards', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch cards')
+      setCards(json.data || [])
+    } catch (err) {
+      console.error('fetchCards error:', err)
+      setCards([])
+    }
     setLoading(false)
   }
 
   const fetchEmployees = async () => {
-    const { data } = await supabase.from('profiles')
-      .select('id, employee_name')
-      
-      .eq('is_active', true)
-      .order('employee_name')
-    setEmployees(data || [])
+    try {
+      const res = await fetch('/api/profiles?is_active=true', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch employees')
+      setEmployees(json.data || [])
+    } catch (err) {
+      console.error('fetchEmployees error:', err)
+      setEmployees([])
+    }
   }
 
   const fetchCardUsage = async () => {
@@ -53,42 +71,57 @@ export default function CorporateCardsPage() {
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
 
-    const { data } = await supabase.from('transactions')
-      .select('card_id, amount')
-      
-      .eq('payment_method', '카드')
-      .gte('transaction_date', `${ym}-01`)
-      .lte('transaction_date', `${ym}-${lastDay}`)
+    try {
+      const res = await fetch(`/api/transactions?type=card&from=${ym}-01&to=${ym}-${lastDay}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch usage')
+      const data = json.data || []
 
-    const usage: Record<string, { count: number; total: number }> = {}
-    ;(data || []).forEach((t: any) => {
-      if (!t.card_id) return
-      if (!usage[t.card_id]) usage[t.card_id] = { count: 0, total: 0 }
-      usage[t.card_id].count++
-      usage[t.card_id].total += Number(t.amount || 0)
-    })
-    setCardUsage(usage)
+      const usage: Record<string, { count: number; total: number }> = {}
+      data.forEach((t: any) => {
+        if (!t.card_id) return
+        if (!usage[t.card_id]) usage[t.card_id] = { count: 0, total: 0 }
+        usage[t.card_id].count++
+        usage[t.card_id].total += Number(t.amount || 0)
+      })
+      setCardUsage(usage)
+    } catch (err) {
+      console.error('fetchCardUsage error:', err)
+    }
   }
 
   const handleSave = async () => {
     if (!form.card_company) return alert('카드사를 선택해주세요.')
     const payload = {
       ...form,
-      
       monthly_limit: form.monthly_limit ? Number(form.monthly_limit) : null,
       assigned_employee_id: form.assigned_employee_id || null,
     }
 
-    if (editingId) {
-      const { error } = await supabase.from('corporate_cards').update(payload).eq('id', editingId)
-      if (error) return alert('수정 실패: ' + error.message)
-    } else {
-      const { error } = await supabase.from('corporate_cards').insert(payload)
-      if (error) return alert('등록 실패: ' + error.message)
+    try {
+      if (editingId) {
+        const res = await fetch(`/api/corporate_cards/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(payload)
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed to update')
+      } else {
+        const res = await fetch('/api/corporate_cards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(payload)
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed to create')
+      }
+      alert('저장되었습니다.')
+      setShowForm(false); setEditingId(null); setForm(emptyForm)
+      fetchCards()
+    } catch (err: any) {
+      alert('저장 실패: ' + err.message)
     }
-    alert('저장되었습니다.')
-    setShowForm(false); setEditingId(null); setForm(emptyForm)
-    fetchCards()
   }
 
   const handleEdit = (c: any) => {
@@ -103,8 +136,16 @@ export default function CorporateCardsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 카드를 삭제하시겠습니까?')) return
-    await supabase.from('corporate_cards').delete().eq('id', id)
-    fetchCards()
+    try {
+      const res = await fetch(`/api/corporate_cards/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      fetchCards()
+    } catch (err) {
+      alert('삭제 실패')
+    }
   }
 
   const maskCardNumber = (n: string) => {

@@ -1,6 +1,17 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import DarkHeader from '../components/DarkHeader'
@@ -43,23 +54,29 @@ const router = useRouter()
   const fetchTransactions = async () => {
     if (!company && role !== 'admin') return
     setLoading(true)
-    const [year, month] = filterDate.split('-').map(Number)
-    const lastDay = new Date(year, month, 0).getDate()
-
-    let query = supabase
-      .from('transactions')
-      .select('*')
-
-    const { data: txs, error } = await query
-      .gte('transaction_date', `${filterDate}-01`)
-      .lte('transaction_date', `${filterDate}-${lastDay}`)
-      .order('transaction_date', { ascending: false })
-      .order('created_at', { ascending: false })
-
-    if (error) console.error(error)
-    else {
-        setList(txs || [])
-        calculateSummary(txs || [])
+    try {
+      const [year, month] = filterDate.split('-').map(Number)
+      const lastDay = new Date(year, month, 0).getDate()
+      const headers = await getAuthHeader()
+      const params = new URLSearchParams({
+        from: `${filterDate}-01`,
+        to: `${filterDate}-${String(lastDay).padStart(2, '0')}`,
+      })
+      const res = await fetch(`/api/transactions?${params}`, { headers })
+      if (!res.ok) {
+        const text = await res.text()
+        console.error(`[transactions] HTTP ${res.status}:`, text.slice(0, 300))
+        setLoading(false)
+        return
+      }
+      const json = await res.json()
+      if (json.error) console.error('[transactions] API error:', json.error)
+      else {
+        setList(json.data || [])
+        calculateSummary(json.data || [])
+      }
+    } catch (e: any) {
+      console.error('[transactions] exception:', e?.message || String(e))
     }
     setLoading(false)
   }
@@ -81,101 +98,59 @@ const router = useRouter()
   const handleSave = async () => {
       if (role === 'admin' && !company) return alert('⚠️ 회사를 먼저 선택해주세요.')
       if (!form.amount || !form.client_name) return alert('필수 항목을 입력해주세요.')
-      const { error } = await supabase.from('transactions').insert({
-          ...form, amount: Number(form.amount.replace(/,/g, ''))
-      })
-      if (error) alert('저장 실패: ' + error.message)
-      else {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, amount: Number(form.amount.replace(/,/g, '')), company_id: company?.id }),
+        })
+        const json = await res.json()
+        if (json.error) alert('저장 실패: ' + json.error)
+        else {
           alert('✅ 저장되었습니다.')
           fetchTransactions()
           setForm({ ...form, client_name: '', description: '', amount: '' })
-      }
+        }
+      } catch (e: any) { alert('저장 실패: ' + e.message) }
   }
 
   const handleConfirm = async (id: string) => {
       if(!confirm('지급/수금 완료 처리하시겠습니까?')) return
-      await supabase.from('transactions').update({ status: 'completed' }).eq('id', id)
+      const headers = await getAuthHeader()
+      await fetch(`/api/transactions/${id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      })
       fetchTransactions()
   }
 
   const handleDelete = async (id: string) => {
       if(confirm('삭제하시겠습니까?')) {
-          await supabase.from('transactions').delete().eq('id', id)
+          const headers = await getAuthHeader()
+          await fetch(`/api/transactions/${id}`, { method: 'DELETE', headers })
           fetchTransactions()
       }
   }
 
   const generateMonthlySchedule = async () => {
       if (role === 'admin' && !company) return alert('⚠️ 회사를 먼저 선택해주세요.')
-      if(!confirm(`${filterDate}월 정기 지출을 일괄 생성하시겠습니까?`)) return;
+      if(!confirm(`${filterDate}월 정기 지출을 일괄 생성하시겠습니까?`)) return
       setLoading(true)
       try {
-          const { data: investors } = await supabase.from('general_investments').select('*').eq('status', 'active')
-          const { data: jiips } = await supabase.from('jiip_contracts').select('*').eq('status', 'active')
-          const { data: loans } = await supabase.from('loans').select('*, cars(number)')
-
-          const [year, month] = filterDate.split('-').map(Number)
-          const lastDay = new Date(year, month, 0).getDate()
-          const { data: existingTxs } = await supabase.from('transactions').select('related_id, category')
-              .gte('transaction_date', `${filterDate}-01`).lte('transaction_date', `${filterDate}-${lastDay}`)
-
-          const existingSet = new Set(existingTxs?.map(t => `${t.related_id}-${t.category}`))
-          const newTxs = []
-          let skippedCount = 0;
-
-          // 1. 투자자 이자
-          if(investors) {
-              for (const inv of investors) {
-                  if (existingSet.has(`${inv.id}-투자이자`)) { skippedCount++; continue; }
-                  newTxs.push({
-                      transaction_date: `${filterDate}-${inv.payment_day?.toString().padStart(2,'0') || '10'}`,
-                      type: 'expense', status: 'pending', category: '투자이자',
-                      client_name: `${inv.investor_name} (이자)`, description: `${filterDate}월 정기 이자`,
-                      amount: Math.floor((inv.invest_amount * (inv.interest_rate / 100)) / 12),
-                      payment_method: '통장', related_type: 'invest', related_id: String(inv.id)
-                  })
-              }
-          }
-          // 2. 지입료
-          if(jiips) {
-              for (const jiip of jiips) {
-                  if (existingSet.has(`${jiip.id}-지입정산금`)) { skippedCount++; continue; }
-                  newTxs.push({
-                      transaction_date: `${filterDate}-${jiip.payout_day?.toString().padStart(2,'0') || '10'}`,
-                      type: 'expense', status: 'pending', category: '지입정산금',
-                      client_name: `${jiip.investor_name} (정산)`, description: `${filterDate}월 운송료 정산`,
-                      amount: 0, payment_method: '통장', related_type: 'jiip', related_id: String(jiip.id)
-                  })
-              }
-          }
-          // 3. 대출금
-          if(loans) {
-              const startDt = new Date(`${filterDate}-01`); const endDt = new Date(`${filterDate}-${lastDay}`)
-              for (const loan of loans) {
-                  const ls = loan.start_date ? new Date(loan.start_date) : null
-                  const le = loan.end_date ? new Date(loan.end_date) : null
-                  if ((ls && ls > endDt) || (le && le < startDt)) continue;
-                  if (existingSet.has(`${loan.id}-대출상환`)) { skippedCount++; continue; }
-                  newTxs.push({
-                      transaction_date: `${filterDate}-${loan.payment_date?.toString().padStart(2,'0') || '25'}`,
-                      type: 'expense', status: 'pending', category: loan.type === '리스' ? '리스료' : '대출원리금',
-                      client_name: `${loan.finance_name} (${loan.cars?.number})`, description: `${filterDate}월 ${loan.type} 납입`,
-                      amount: loan.monthly_payment || 0, payment_method: '통장', related_type: 'loan', related_id: String(loan.id)
-                  })
-              }
-          }
-
-          if(newTxs.length > 0) {
-              const { error } = await supabase.from('transactions').insert(newTxs)
-              if(error) throw error
-              alert(`✅ 신규 ${newTxs.length}건 생성 완료!`)
-              setActiveTab('schedule')
-              fetchTransactions()
-          } else {
-              alert(skippedCount > 0 ? '✅ 이미 모든 내역이 생성되어 있습니다.' : '생성할 대상이 없습니다.')
-              setLoading(false)
-          }
-      } catch (e: any) { alert('오류: ' + e.message); setLoading(false); }
+          const headers = await getAuthHeader()
+          const res = await fetch('/api/transactions/generate-schedule', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month: filterDate, company_id: company?.id }),
+          })
+          const json = await res.json()
+          if (json.error) throw new Error(json.error)
+          alert(`✅ ${json.message}`)
+          if (json.created > 0) setActiveTab('schedule')
+          fetchTransactions()
+      } catch (e: any) { alert('오류: ' + e.message); setLoading(false) }
   }
 
   const scrollToForm = () => {

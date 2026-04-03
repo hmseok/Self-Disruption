@@ -1,8 +1,9 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { getAuthHeader } from '@/app/utils/auth-client'
+
 export default function CompanyDashboard() {
   const params = useParams()
 const [loading, setLoading] = useState(true)
@@ -20,15 +21,19 @@ const [loading, setLoading] = useState(true)
     const fetchCompanyData = async () => {
       if (!params?.id) return
 
-      // 회사 이름 가져오기
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', params.id)
-        .single()
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/companies/${params.id}`, { headers })
 
-      if (data) setCompany(data)
-      setLoading(false)
+        if (res.ok) {
+          const data = await res.json()
+          if (data) setCompany(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch company:', error)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchCompanyData()
   }, [params.id])

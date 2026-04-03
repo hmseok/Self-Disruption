@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ── AI 재분류 API ──
 // POST: 이미 저장된 미분류 거래들을 Gemini로 재분류
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 const CATEGORY_LIST = [
   '렌트/운송수입', '지입 관리비/수수료', '투자원금 입금', '지입 초기비용/보증금',
@@ -34,21 +26,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gemini API 키가 설정되지 않았습니다.' }, { status: 500 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // 미분류 거래 조회
-    let query = sb
-      .from('transactions')
-      .select('*')
-
+    let txs: any[] = []
     if (transaction_ids && transaction_ids.length > 0) {
-      query = query.in('id', transaction_ids)
+      const ids = transaction_ids.map((id: string) => `'${id}'`).join(',')
+      txs = await prisma.$queryRaw<any[]>`
+        SELECT * FROM transactions WHERE id IN (${ids}) ORDER BY created_at DESC LIMIT 200
+      `
     } else {
-      query = query.or('category.is.null,category.eq.기타,category.eq.미분류,category.eq.')
+      txs = await prisma.$queryRaw<any[]>`
+        SELECT * FROM transactions WHERE category IS NULL OR category IN ('기타', '미분류', '') ORDER BY created_at DESC LIMIT 200
+      `
     }
 
-    const { data: txs, error } = await query.order('created_at', { ascending: false }).limit(200)
-    if (error) throw error
     if (!txs || txs.length === 0) {
       return NextResponse.json({ message: '재분류할 거래가 없습니다.', updated: 0 })
     }
@@ -154,12 +144,8 @@ ${txLines}
             }
 
             // DB 업데이트
-            const { error: upErr } = await sb
-              .from('transactions')
-              .update({ category: category })
-              .eq('id', tx.id)
-
-            if (!upErr) {
+            try {
+              await prisma.$executeRaw`UPDATE transactions SET category = ${category} WHERE id = ${tx.id}`
               totalUpdated++
               results.push({
                 id: tx.id,
@@ -167,6 +153,8 @@ ${txLines}
                 new_category: category,
                 confidence,
               })
+            } catch (upErr: any) {
+              console.error('Update error:', upErr.message)
             }
           }
         }

@@ -1,10 +1,21 @@
 'use client'
+import { auth } from '@/lib/firebase'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import ConfirmPaymentModal from './ConfirmPaymentModal'
 import DarkHeader from '../../components/DarkHeader'
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 수금 관리 페이지
@@ -52,30 +63,21 @@ export default function CollectionsPage() {
     if (!effectiveCompanyId && role !== 'admin') return
     setLoading(true)
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
-      if (!token) return
+      const headers = { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
 
       const [year, month] = filterMonth.split('-').map(Number)
       const lastDay = new Date(year, month, 0).getDate()
       const from = `${filterMonth}-01`
       const to = `${filterMonth}-${String(lastDay).padStart(2, '0')}`
 
-      let query = supabase
-        .from('expected_payment_schedules')
-        .select('*')
-        .gte('payment_date', from)
-        .lte('payment_date', to)
-        .order('payment_date', { ascending: true })
-
-      if (effectiveCompanyId) {
-        query = query
-      }
-
-      const { data, error } = await query
-      if (error) throw error
+      // Note: expected_payment_schedules table doesn't have an API route yet
+      // For now, we'll use a placeholder fetch that would need to be implemented
+      const res = await fetch(`/api/expected-payment-schedules?from=${from}&to=${to}`, { headers })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch schedules')
 
       // 고객명 조인
-      const enriched = await enrichWithCustomerInfo(data || [])
+      const enriched = await enrichWithCustomerInfo(json.data || [])
       setSchedules(enriched)
     } catch (err) {
       console.error('[collections] 조회 오류:', err)
@@ -93,13 +95,21 @@ export default function CollectionsPage() {
     let jiipMap: Record<string, any> = {}
     let investMap: Record<string, any> = {}
 
+    const headers = { 'Content-Type': 'application/json', ...(await getAuthHeader()) }
+
     if (jiipIds.length > 0) {
-      const { data } = await supabase.from('jiip_contracts').select('id, investor_name, phone, investor_email').in('id', jiipIds)
-      data?.forEach(c => { jiipMap[c.id] = c })
+      try {
+        const res = await fetch(`/api/jiip?ids=${jiipIds.join(',')}`, { headers })
+        const json = await res.json()
+        json.data?.forEach((c: any) => { jiipMap[c.id] = c })
+      } catch (e) { console.error('Failed to fetch jiip_contracts:', e) }
     }
     if (investIds.length > 0) {
-      const { data } = await supabase.from('general_investments').select('id, investor_name, investor_phone, investor_email').in('id', investIds)
-      data?.forEach(c => { investMap[c.id] = c })
+      try {
+        const res = await fetch(`/api/investments?ids=${investIds.join(',')}`, { headers })
+        const json = await res.json()
+        json.data?.forEach((c: any) => { investMap[c.id] = c })
+      } catch (e) { console.error('Failed to fetch general_investments:', e) }
     }
 
     return scheds.map(s => {
@@ -152,7 +162,7 @@ export default function CollectionsPage() {
     if (selectedIds.size === 0) return
     setSending(true)
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch('/api/collections/send-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -191,7 +201,7 @@ export default function CollectionsPage() {
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
   }
 
-  const getToken = async () => (await supabase.auth.getSession()).data.session?.access_token || ''
+  const getToken = async () => auth.currentUser ? await auth.currentUser.getIdToken() : ''
 
   // ── 월 이동 ──
   const changeMonth = (delta: number) => {

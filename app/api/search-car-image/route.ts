@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../../utils/auth-guard'
 
 export async function POST(request: NextRequest) {
@@ -51,44 +50,18 @@ export async function POST(request: NextRequest) {
 
     const data = await res.json()
     const base64Image = data.predictions?.[0]?.bytesBase64Encoded
-    if (!base64Image) throw new Error("이미지 생성 실패 (데이터 없음)")
+    if (!base64Image) throw new Error('이미지 생성 실패 (데이터 없음)')
 
-    const buffer = Buffer.from(base64Image, 'base64')
+    console.log(`✅ [생성 성공] 이미지 반환...`)
 
-    console.log(`✅ [생성 성공] Supabase 저장 시도...`)
+    // TODO: Phase 4 - Upload to Google Cloud Storage instead of returning base64
+    // For now, return base64 data URL directly
+    const imageUrl = `data:image/png;base64,${base64Image}`
 
-    // Supabase 업로드 (안전한 파일명 사용)
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    // 한글/공백 제거한 안전한 파일명
-    const safeFileName = `ai_generated/car_${Date.now()}_${Math.random().toString(36).substring(7)}.png`
-
-    const { error: uploadError } = await supabase.storage
-      .from('car_docs')
-      .upload(safeFileName, buffer, {
-        contentType: 'image/png',
-        upsert: true
-      })
-
-    if (uploadError) {
-      console.error("Supabase Upload Error:", uploadError)
-      throw new Error(`저장소 업로드 실패: ${uploadError.message}`)
-    }
-
-    // 4. 공개 주소 반환
-    const { data: publicUrlData } = supabase.storage
-      .from('car_docs')
-      .getPublicUrl(safeFileName)
-
-    console.log(`🚀 [최종 완료] ${publicUrlData.publicUrl}`)
-
-    return NextResponse.json({ imageUrl: publicUrlData.publicUrl })
+    return NextResponse.json({ imageUrl })
 
   } catch (error: any) {
-    console.error("Server Error:", error)
+    console.error('Server Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

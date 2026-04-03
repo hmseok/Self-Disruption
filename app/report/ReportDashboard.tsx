@@ -1,8 +1,19 @@
 'use client'
-import { supabase } from '../utils/supabase'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 타입 정의
@@ -121,11 +132,11 @@ export default function ReportDashboard() {
     const companyFilter = (q: any) => q
 
     const [txRes, carRes, jiipRes, investRes, loanRes] = await Promise.all([
-      companyFilter(supabase.from('transactions').select('*')).order('transaction_date', { ascending: false }),
-      companyFilter(supabase.from('cars').select('*')),
-      companyFilter(supabase.from('jiip_contracts').select('*')),
-      companyFilter(supabase.from('general_investments').select('*')),
-      companyFilter(supabase.from('loans').select('*')),
+      fetch('/api/transactions?order=transaction_date', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/cars', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/jiip-contracts', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/general-investments', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/loans', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
     ])
 
     setTransactions(txRes.data || [])

@@ -1,7 +1,19 @@
 'use client'
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../utils/supabase'
+import { auth } from '@/lib/firebase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ✅ 상태 타입 정의
 type UploadStatus = 'idle' | 'processing' | 'paused' | 'completed' | 'error';
@@ -179,12 +191,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // 🔐 인증 헤더
-  const getAuthHeaders = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` };
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-    return { 'Content-Type': 'application/json' };
+    return headers;
   }, []);
 
   // 🔑 안전한 고유 ID 생성
@@ -232,12 +245,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const loadDbFingerprints = useCallback(async (companyId: string) => {
     if (!companyId || dbFpLoadedRef.current) return;
     try {
-      const { data } = await supabase
-        .from('transactions')
-        .select('transaction_date, client_name, amount, type, approval_number, description, card_number')
-        
-        .order('transaction_date', { ascending: false })
-        .limit(5000);
+      const headers = await getAuthHeader();
+      const res = await fetch('/api/transactions?limit=5000', { headers });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch transactions: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+
       if (data && data.length > 0) {
         const fpMap = new Map<string, number>();
         for (const row of data) {
@@ -852,38 +868,29 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         // 카드번호 뒷4자리로 중복 체크
         const last4 = cardNumber.replace(/\D/g, '').slice(-4);
-        const { data: existing } = await supabase
-          .from('corporate_cards')
-          .select('id')
-          
-          .like('card_number', `%${last4}`);
+        const existingRes = await fetch(`/api/corporate-cards?last4=${last4}`, { headers: await getAuthHeader() })
+        const existingJson = await existingRes.json()
+        const existing = existingJson.data || []
 
-        if (existing && existing.length > 0) {
+        const cardData = {
+          card_number: cardNumber,
+          card_company: cardCompany,
+          card_type: cardType,
+          holder_name: holderName,
+          is_shared: isShared,
+          department,
+          expiry_date: expiryDate,
+          monthly_limit: monthlyLimit,
+          company_id: companyIdRef.current,
+        }
+
+        if (existing.length > 0) {
           // 업데이트
-          await supabase.from('corporate_cards').update({
-            card_company: cardCompany,
-            card_number: cardNumber,
-            holder_name: isShared ? '공용' : holderName,
-            card_alias: department || cardType,
-            card_type: cardType,
-            expiry_date: expiryDate,
-            monthly_limit: monthlyLimit > 0 ? monthlyLimit : undefined,
-            is_active: true,
-          }).eq('id', existing[0].id);
+          await fetch(`/api/corporate-cards/${existing[0].id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(cardData) });
           updated++;
         } else {
           // 신규 등록
-          await supabase.from('corporate_cards').insert({
-            card_company: cardCompany,
-            card_number: cardNumber,
-            holder_name: isShared ? '공용' : holderName,
-            card_alias: department || cardType,
-            card_type: cardType,
-            expiry_date: expiryDate,
-            monthly_limit: monthlyLimit > 0 ? monthlyLimit : null,
-            is_active: true,
-            status: 'active',
-          });
+          await fetch('/api/corporate-cards', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(cardData) });
           registered++;
         }
       } catch (e) {
@@ -1039,7 +1046,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    return {
+    const result: Transaction = {
       id: generateUniqueId(),
       transaction_date: txDate,
       type: txType,
@@ -1053,9 +1060,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       status: 'completed',
       card_number: item.card_number || '',
       approval_number: item.approval_number || '',
-      currency: currency,
-      original_amount: originalAmount,
+      currency: currency !== 'KRW' ? currency : undefined,
+      original_amount: originalAmount ?? undefined,
     };
+    return result;
   };
 
   // 📥 classification_queue에서 기존 데이터 로드 (새로고침/페이지 이동 후 복원)

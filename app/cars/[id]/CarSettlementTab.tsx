@@ -1,6 +1,17 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
-import { supabase } from '../../utils/supabase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 차량별 수익/정산 탭
@@ -78,50 +89,24 @@ export default function CarSettlementTab({ carId, companyId, car }: CarSettlemen
       const endDate = `${filterDate}-${lastDay}`
       const past12Start = `${year - 1}-${String(month).padStart(2, '0')}-01`
 
-      const [txRes, queueRes, jiipRes, investRes, loanRes, allSettleRes, carTxHistRes, investTxDepositsRes] = await Promise.all([
-        // 당월 거래내역
-        supabase.from('transactions')
-          .select('id, transaction_date, type, category, client_name, description, amount, payment_method, related_type, related_id')
-          .eq('related_type', 'car').eq('related_id', String(carId))
-          .gte('transaction_date', startDate).lte('transaction_date', endDate)
-          .order('transaction_date', { ascending: false }),
-        // classification_queue
-        supabase.from('classification_queue')
-          .select('id, source_data, final_category, final_matched_type, final_matched_id, status')
-          .eq('final_matched_type', 'car').eq('final_matched_id', String(carId))
-          .in('status', ['confirmed', 'auto_confirmed']),
-        // 지입 계약
-        supabase.from('jiip_contracts')
-          .select('id, investor_name, admin_fee, payout_day, share_ratio, contract_start_date, status')
-          .eq('car_id', carId).eq('status', 'active'),
-        // 투자 계약
-        supabase.from('general_investments')
-          .select('id, investor_name, invest_amount, interest_rate, payment_day, contract_start_date, status')
-          .eq('car_id', carId).eq('status', 'active'),
-        // 대출
-        supabase.from('loans')
-          .select('id, finance_name, type, monthly_payment, payment_date, start_date, end_date')
-          .eq('car_id', carId),
-        // 전체 정산 거래 (미수 확인용)
-        supabase.from('transactions')
-          .select('related_type, related_id, transaction_date, amount')
-          .in('related_type', ['jiip_share', 'invest', 'loan'])
-          .gte('transaction_date', past12Start),
-        // 차량 거래 히스토리 (월별 수입/비용 계산용 - category 포함)
-        supabase.from('transactions')
-          .select('type, amount, transaction_date, category')
-          .eq('related_type', 'car').eq('related_id', String(carId))
-          .gte('transaction_date', past12Start),
-        // 투자 관련 통장 거래 내역 (투자 원금 변동 추적 — income+expense 모두)
-        supabase.from('transactions')
-          .select('id, transaction_date, amount, type, related_type, related_id')
-          .eq('related_type', 'invest')
-          .order('transaction_date', { ascending: true }),
-      ])
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/cars/${carId}/settlement?month=${filterDate}`, { headers })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      const {
+        transactions: txRaw, classificationQueue: queueRaw, jiipContracts: jiipRaw,
+        investments: investRaw, loans: loanRaw, allSettlements: allSettleRaw,
+        carTxHistory: carTxHistRaw, investTxDeposits: investTxDepositsRaw,
+      } = json.data
+      const [txRes, queueRes, jiipRes, investRes, loanRes, allSettleRes, carTxHistRes, investTxDepositsRes] = [
+        { data: txRaw }, { data: queueRaw }, { data: jiipRaw },
+        { data: investRaw }, { data: loanRaw }, { data: allSettleRaw },
+        { data: carTxHistRaw }, { data: investTxDepositsRaw },
+      ]
 
       // 거래 내역 정리
       const txData = txRes.data || []
-      const txIds = new Set(txData.map(t => t.id))
+      const txIds = new Set(txData.map((t: any) => t.id))
       const queueTx: TransactionRow[] = (queueRes.data || [])
         .filter((q: any) => {
           if (txIds.has(q.id)) return false

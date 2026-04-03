@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
+import { prisma } from '@/lib/prisma'
 
 // POST: 기존 데이터 soft-delete + 새 데이터 삽입
 export async function POST(request: NextRequest) {
@@ -18,47 +10,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'transactions 배열 필요' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
     const now = new Date().toISOString()
 
     // 1) Soft-delete ALL existing classification_queue items
-    const { error: qDelErr } = await sb
-      .from('classification_queue')
-      .update({ deleted_at: now })
-      .is('deleted_at', null)
-    if (qDelErr) console.error('Queue soft-delete error:', qDelErr.message)
+    try {
+      await prisma.$executeRaw`
+        UPDATE classification_queue SET deleted_at = ${now} WHERE deleted_at IS NULL
+      `
+    } catch (qDelErr) {
+      console.error('Queue soft-delete error:', qDelErr)
+    }
 
     // 2) Soft-delete ALL existing transactions
-    const { error: txDelErr } = await sb
-      .from('transactions')
-      .update({ deleted_at: now })
-      .is('deleted_at', null)
-    if (txDelErr) console.error('Tx soft-delete error:', txDelErr.message)
+    try {
+      await prisma.$executeRaw`
+        UPDATE transactions SET deleted_at = ${now} WHERE deleted_at IS NULL
+      `
+    } catch (txDelErr) {
+      console.error('Tx soft-delete error:', txDelErr)
+    }
 
     // 3) Insert new classification_queue items in batches
     let inserted = 0
     const BATCH = 50
     for (let i = 0; i < transactions.length; i += BATCH) {
-      const batch = transactions.slice(i, i + BATCH).map((t: any) => ({
-        company_id,
-        source_data: {
+      const batch = transactions.slice(i, i + BATCH)
+      for (const t of batch) {
+        const sourceData = JSON.stringify({
           transaction_date: t.transaction_date,
           client_name: t.client_name,
           description: t.description,
           amount: t.amount,
           type: t.type,
           payment_method: t.payment_method || '통장',
-        },
-        source_type: 'bank_statement',
-        ai_category: '미분류',
-        ai_confidence: 0,
-        status: 'pending',
-      }))
-      const { error: insErr } = await sb.from('classification_queue').insert(batch)
-      if (insErr) {
-        console.error(`Insert batch error at ${i}:`, insErr.message)
-      } else {
-        inserted += batch.length
+        })
+
+        try {
+          await prisma.$executeRaw`
+            INSERT INTO classification_queue
+            (company_id, source_data, source_type, ai_category, ai_confidence, status, created_at)
+            VALUES (
+              ${company_id},
+              ${sourceData},
+              'bank_statement',
+              '미분류',
+              0,
+              'pending',
+              NOW()
+            )
+          `
+          inserted += 1
+        } catch (insErr) {
+          console.error(`Insert error:`, insErr)
+        }
       }
     }
 

@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ============================================
-// 정산 상세 조회 API (공개)
+// 정산 상세 조회 API (공개, Prisma 버전)
 // GET /api/settlement/share/[token]?phone=1234
 // 전화번호 뒷4자리 인증 → 인증 통과 시 상세 데이터 반환
 // ============================================
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(
   req: NextRequest,
@@ -20,18 +17,16 @@ export async function GET(
       return NextResponse.json({ error: '토큰이 필요합니다.' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     // 1. 토큰으로 정산 공유 조회
-    const { data: share, error: shareErr } = await supabase
-      .from('settlement_shares')
-      .select('*')
-      .eq('token', token)
-      .single()
+    const shares = await prisma.$queryRaw<any[]>`
+      SELECT * FROM settlement_shares WHERE token = ${token} LIMIT 1
+    `
 
-    if (shareErr || !share) {
+    if (shares.length === 0) {
       return NextResponse.json({ error: '유효하지 않은 링크입니다.' }, { status: 404 })
     }
+
+    const share = shares[0]
 
     // 2. 만료 여부 확인
     if (share.expires_at && new Date(share.expires_at) < new Date()) {
@@ -65,22 +60,22 @@ export async function GET(
     // 4. 첫 조회 시 viewed_at 설정
     const isFirstView = !share.viewed_at
     const newViewCount = (share.view_count || 0) + 1
+    const now = new Date().toISOString()
 
     // 5. 조회 정보 업데이트
-    await supabase
-      .from('settlement_shares')
-      .update({
-        view_count: newViewCount,
-        viewed_at: isFirstView ? new Date().toISOString() : share.viewed_at,
-      })
-      .eq('id', share.id)
+    await prisma.$executeRaw`
+      UPDATE settlement_shares SET
+        view_count = ${newViewCount},
+        viewed_at = ${isFirstView ? now : share.viewed_at}
+      WHERE id = ${share.id}
+    `
 
     // 6. 회사 정보 조회
-    const { data: company } = await supabase
-      .from('companies')
-      .select('id, name, business_number, address, phone, email, logo_url')
-      .eq('id', share.company_id)
-      .single()
+    const companies = await prisma.$queryRaw<any[]>`
+      SELECT id, name, business_number, address, phone, email, logo_url
+      FROM companies WHERE id = ${share.company_id} LIMIT 1
+    `
+    const company = companies.length > 0 ? companies[0] : null
 
     // 7. 과거 정산 이력 조회 (같은 전화번호 + 회사)
     // - 현재 정산서의 월은 제외
@@ -93,14 +88,15 @@ export async function GET(
         (share.settlement_month || '').split(',').map((m: string) => m.trim()).filter(Boolean)
       )
 
-      const { data: pastData } = await supabase
-        .from('settlement_shares')
-        .select('settlement_month, total_amount, items, created_at, paid_at')
-        .eq('recipient_phone', share.recipient_phone)
-        .eq('recipient_name', share.recipient_name)
-        .neq('id', share.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
+      const pastData = await prisma.$queryRaw<any[]>`
+        SELECT settlement_month, total_amount, items, created_at, paid_at
+        FROM settlement_shares
+        WHERE recipient_phone = ${share.recipient_phone}
+        AND recipient_name = ${share.recipient_name}
+        AND id != ${share.id}
+        ORDER BY created_at DESC
+        LIMIT 50
+      `
 
       // 월별 분리 + 중복 제거
       const seen = new Set<string>()
@@ -109,7 +105,10 @@ export async function GET(
       ;(pastData || []).forEach(ps => {
         // settlement_month가 여러 월인 경우 분리
         const months = (ps.settlement_month || '').split(',').map((m: string) => m.trim()).filter(Boolean)
-        const itemsArr = Array.isArray(ps.items) ? ps.items : []
+        let itemsArr: any[] = []
+        try {
+          itemsArr = typeof ps.items === 'string' ? JSON.parse(ps.items) : (Array.isArray(ps.items) ? ps.items : [])
+        } catch {}
 
         if (months.length <= 1) {
           // 단일 월
@@ -153,7 +152,11 @@ export async function GET(
     // 8. 계좌 정보 마스킹 처리
     let maskedBankInfo = null
     if (share.bank_info) {
-      const bi = share.bank_info as { bank_name?: string; account_holder?: string; account_number?: string }
+      let bi: any = share.bank_info
+      try {
+        bi = typeof share.bank_info === 'string' ? JSON.parse(share.bank_info) : share.bank_info
+      } catch {}
+
       const maskAccount = (acc: string) => {
         if (!acc || acc.length < 4) return acc
         return '****' + acc.slice(-4)
@@ -170,6 +173,20 @@ export async function GET(
       }
     }
 
+    // Parse items and breakdown
+    let items = share.items
+    let breakdown = share.breakdown
+    let transaction_details = share.transaction_details
+    try {
+      items = typeof share.items === 'string' ? JSON.parse(share.items) : share.items
+    } catch {}
+    try {
+      breakdown = typeof share.breakdown === 'string' ? JSON.parse(share.breakdown) : share.breakdown
+    } catch {}
+    try {
+      transaction_details = typeof share.transaction_details === 'string' ? JSON.parse(share.transaction_details) : share.transaction_details
+    } catch {}
+
     // 9. 반환 데이터 가공
     const publicData = {
       id: share.id,
@@ -179,9 +196,9 @@ export async function GET(
       payment_date: share.payment_date,
       paid_at: share.paid_at || null,
       total_amount: share.total_amount,
-      items: share.items,
-      breakdown: share.breakdown,
-      transaction_details: share.transaction_details || null,
+      items,
+      breakdown,
+      transaction_details: transaction_details || null,
       bank_info: maskedBankInfo,
       message: share.message,
       created_at: share.created_at,

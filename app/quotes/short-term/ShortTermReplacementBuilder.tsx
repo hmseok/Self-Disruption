@@ -1,5 +1,5 @@
 'use client'
-import { supabase } from '../../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
@@ -33,6 +33,18 @@ interface RateRow {
   calc_method: string
   sort_order: number
   is_active: boolean
+}
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
 }
 
 // ─── 롯데렌터카 공식 요금 (2025.02.10 기준, 내륙 · 전체 차종) ───
@@ -204,8 +216,11 @@ export default function ShortTermReplacementBuilder() {
   const loadLotteRates = async () => {
     if (!cid) return
     try {
-      const { data, error } = await supabase.from('lotte_reference_rates').select('*').eq('is_active', true).order('sort_order')
-      if (!error && data && data.length > 0) {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/short-term-rates?is_active=true', { headers })
+      const json = await res.json()
+      const data = json.data
+      if (data && data.length > 0) {
         setLotteRates(data)
         const latestDate = data[0]?.effective_date || data[0]?.updated_at
         if (latestDate) setLotteUpdateDate(new Date(latestDate).toLocaleDateString('ko-KR'))
@@ -218,8 +233,11 @@ export default function ShortTermReplacementBuilder() {
   const loadRates = async () => {
     if (!cid) return
     try {
-      const { data, error } = await supabase.from('short_term_rates').select('*').eq('is_active', true).order('sort_order')
-      if (!error && data && data.length > 0) {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/short-term-rates?is_active=true', { headers })
+      const json = await res.json()
+      const data = json.data
+      if (data && data.length > 0) {
         setRates(data)
         if (data[0]?.discount_percent) setGlobalDiscount(data[0].discount_percent)
         return
@@ -236,8 +254,6 @@ export default function ShortTermReplacementBuilder() {
     if (!cid) return
     setSaving(true)
     try {
-      // Note: company_id column has been removed from the table
-      // Each company now manages global rates
       const today = new Date().toISOString().split('T')[0]
       const payload = lotteRates.map((r, i) => ({
         lotte_category: r.lotte_category, vehicle_names: r.vehicle_names,
@@ -246,12 +262,18 @@ export default function ShortTermReplacementBuilder() {
         rate_7plus_days: r.rate_7plus_days, service_group: r.service_group,
         effective_date: today, sort_order: i + 1, is_active: true,
       }))
-      const { error } = await supabase.from('lotte_reference_rates').insert(payload)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/short-term-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '저장 실패')
       setLotteUpdateDate(new Date().toLocaleDateString('ko-KR'))
       alert('롯데 기준요율이 저장되었습니다!')
       setLotteEditMode(false)
-      loadLotteRates()
+      await loadLotteRates()
     } catch (e: any) { alert('저장 실패: ' + e.message) }
     setSaving(false)
   }
@@ -261,19 +283,23 @@ export default function ShortTermReplacementBuilder() {
     if (!cid) return
     setSaving(true)
     try {
-      // Note: company_id column has been removed from the table
-      // Each company now manages global rates
       const payload = rates.map((r, i) => ({
         service_group: r.service_group, vehicle_class: r.vehicle_class,
         displacement_range: r.displacement_range, daily_rate: r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, r.discount_percent) : r.daily_rate,
         lotte_base_rate: r.lotte_base_rate, discount_percent: r.discount_percent,
         calc_method: r.calc_method, sort_order: i + 1, is_active: true,
       }))
-      const { error } = await supabase.from('short_term_rates').insert(payload)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/short-term-rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(payload)
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '저장 실패')
       alert('요율표가 저장되었습니다!')
       setRateEditMode(false)
-      loadRates()
+      await loadRates()
     } catch (e: any) { alert('저장 실패: ' + e.message) }
     setSaving(false)
   }
@@ -282,8 +308,8 @@ export default function ShortTermReplacementBuilder() {
   const fetchLotteRatesAuto = async () => {
     setLotteUpdating(true)
     try {
-      const { data: { session: _s } } = await supabase.auth.getSession()
-      const _tk = _s?.access_token
+      // Firebase: token via auth.currentUser.getIdToken()
+      const _tk = auth.currentUser ? await auth.currentUser.getIdToken() : null
       const res = await fetch('/api/fetch-lotte-rates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(_tk ? { 'Authorization': `Bearer ${_tk}` } : {}) },
@@ -435,11 +461,17 @@ export default function ShortTermReplacementBuilder() {
         riskFactors: { accidentRate: simAccidentRate, repairDays: simAvgRepairDays, breakdownRate: simBreakdownRate, breakdownDays: simAvgBreakdownDays, totalRisk: risk },
         memo: contractMemo,
       }
-      const { error } = await supabase.from('short_term_quotes').insert({
-        quote_number: num, customer_name: customerName || customerCompany, customer_phone: customerPhone,
-        quote_detail: detail, discount_percent: globalDiscount, status: 'draft',
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/short-term-quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          quote_number: num, customer_name: customerName || customerCompany, customer_phone: customerPhone,
+          quote_detail: detail, discount_percent: globalDiscount, status: 'draft',
+        })
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '저장 실패')
       alert(`견적서 ${num} 이 생성되었습니다!`)
       setCustomerName(''); setCustomerCompany(''); setCustomerPhone(''); setContractMemo('')
       router.push('/quotes?tab=short_term')
@@ -661,7 +693,8 @@ export default function ShortTermReplacementBuilder() {
         },
       }
 
-      const { data, error } = await supabase.from('quotes').insert({
+      const authHeaders = await getAuthHeader();
+      const quotePayload = {
         customer_name: '',
         rent_fee: qcResult.totalWithVat,
         deposit: 0,
@@ -669,9 +702,14 @@ export default function ShortTermReplacementBuilder() {
         status: 'draft',
         rental_type: '청구서',
         quote_detail: invoiceDetail,
-      }).select().single()
-
-      if (error) throw error
+      };
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(quotePayload)
+      })
+      const { error } = await res.json()
+      if (error) throw new Error(error)
       alert('단기 탭에 임시저장 되었습니다.')
       router.push('/quotes?tab=short_term')
     } catch (err: any) {

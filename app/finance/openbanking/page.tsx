@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
 import DarkHeader from '../../components/DarkHeader'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 interface Account {
   id: string
@@ -44,13 +44,10 @@ export default function OpenbankingPage() {
 
   const fetchAccounts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('openbanking_accounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('bank_name')
-
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/openbanking', { headers })
+      const json = await res.json()
+      const data = json.data ?? json ?? []
       setAccounts(data || [])
     } catch (err) {
       console.error('Failed to fetch accounts:', err)

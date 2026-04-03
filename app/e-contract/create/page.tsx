@@ -2,8 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../utils/supabase';
 import { useApp } from '../../context/AppContext';
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 interface Customer {
   id: string;
@@ -130,26 +144,14 @@ export default function CreateContractPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const headers = await getAuthHeader();
         const [customersRes, carsRes] = await Promise.all([
-          supabase
-            .from('customers')
-            .select('*'),
-          supabase
-            .from('cars')
-            .select('*'),
+          fetch('/api/customers', { headers }).then(r => r.json()),
+          fetch('/api/cars', { headers }).then(r => r.json()),
         ]);
 
-        if (customersRes.error) {
-          console.error('customers error:', JSON.stringify(customersRes.error));
-          throw customersRes.error;
-        }
-        if (carsRes.error) {
-          console.error('cars error:', JSON.stringify(carsRes.error));
-          throw carsRes.error;
-        }
-
-        setCustomers(customersRes.data || []);
-        setCars(carsRes.data || []);
+        setCustomers(customersRes.data ?? customersRes ?? []);
+        setCars(carsRes.data ?? carsRes ?? []);
 
         // Initialize company info from context
         if (company) {
@@ -206,17 +208,16 @@ export default function CreateContractPage() {
     setSelectedCarId(car.id);
     setCarModel(`${car.brand} ${car.model}`);
     setCarNumber(car.number);
-    setCarFuelType(car.fuel_type);
+    setCarFuelType(car.fuel_type || '');
     setCarSearchOpen(false);
     setCarSearchText('');
 
     // Fetch insurance policy for this car
     try {
-      const { data } = await supabase
-        .from('insurance_policy_record')
-        .select('*')
-        .eq('car_id', car.id)
-        .single();
+      const headers = await getAuthHeader();
+      const res = await fetch(`/api/insurance-policies?car_id=${car.id}`, { headers });
+      const json = await res.json();
+      const data = json.data ?? json;
 
       if (data) {
         setInsOwnLimit(data.ins_own_limit?.toString() || '');
@@ -265,77 +266,82 @@ export default function CreateContractPage() {
     setSaving(true);
     try {
       const contractNumber = generateContractNumber();
+      const headers = await getAuthHeader();
 
-      const { data, error } = await supabase
-        .from('short_term_rental_contracts')
-        .insert({
-          contract_number: contractNumber,
-          status: asDraft ? 'draft' : 'pending_send',
+      const payload = {
+        contract_number: contractNumber,
+        status: asDraft ? 'draft' : 'pending_send',
 
-          // Renter info
-          renter_name: renterName,
-          renter_phone: renterPhone,
-          renter_email: renterEmail,
-          renter_birth: renterBirth,
-          renter_address: renterAddress,
-          renter_license_no: renterLicenseNo,
-          renter_license_type: renterLicenseType,
-          renter_license_date: renterLicenseDate,
-          renter_license_expiry: renterLicenseExpiry,
+        // Renter info
+        renter_name: renterName,
+        renter_phone: renterPhone,
+        renter_email: renterEmail,
+        renter_birth: renterBirth,
+        renter_address: renterAddress,
+        renter_license_no: renterLicenseNo,
+        renter_license_type: renterLicenseType,
+        renter_license_date: renterLicenseDate,
+        renter_license_expiry: renterLicenseExpiry,
 
-          // Driver 2 info
-          driver2_name: driver2Name,
-          driver2_phone: driver2Phone,
-          driver2_email: driver2Email,
-          driver2_birth: driver2Birth,
-          driver2_address: driver2Address,
-          driver2_license_no: driver2LicenseNo,
-          driver2_license_type: driver2LicenseType,
-          driver2_license_date: driver2LicenseDate,
-          driver2_license_expiry: driver2LicenseExpiry,
+        // Driver 2 info
+        driver2_name: driver2Name,
+        driver2_phone: driver2Phone,
+        driver2_email: driver2Email,
+        driver2_birth: driver2Birth,
+        driver2_address: driver2Address,
+        driver2_license_no: driver2LicenseNo,
+        driver2_license_type: driver2LicenseType,
+        driver2_license_date: driver2LicenseDate,
+        driver2_license_expiry: driver2LicenseExpiry,
 
-          // Car info
-          car_model: carModel,
-          car_number: carNumber,
-          car_fuel_type: carFuelType,
-          dispatch_at: dispatchAt,
-          return_at: returnAt,
-          dispatch_fuel: dispatchFuel,
-          dispatch_km: dispatchKm ? parseInt(dispatchKm) : null,
+        // Car info
+        car_model: carModel,
+        car_number: carNumber,
+        car_fuel_type: carFuelType,
+        dispatch_at: dispatchAt,
+        return_at: returnAt,
+        dispatch_fuel: dispatchFuel,
+        dispatch_km: dispatchKm ? parseInt(dispatchKm) : null,
 
-          // Pricing
-          rental_hours: rentalHours ? parseInt(rentalHours) : null,
-          total_amount: totalAmount ? parseInt(totalAmount.replace(/,/g, '')) : null,
+        // Pricing
+        rental_hours: rentalHours ? parseInt(rentalHours) : null,
+        total_amount: totalAmount ? parseInt(totalAmount.replace(/,/g, '')) : null,
 
-          // Insurance
-          ins_min_age: insMinAge ? parseInt(insMinAge) : 26,
-          ins_own_limit: insOwnLimit ? parseInt(insOwnLimit) : null,
-          ins_own_deductible: insOwnDeductible ? parseInt(insOwnDeductible) : null,
-          ins_person_limit: insPersonLimit ? parseInt(insPersonLimit) : null,
-          ins_person_deductible: insPersonDeductible ? parseInt(insPersonDeductible) : null,
-          ins_property_limit: insPropertyLimit ? parseInt(insPropertyLimit) : null,
-          ins_property_deductible: insPropertyDeductible ? parseInt(insPropertyDeductible) : null,
-          ins_injury_limit: insInjuryLimit ? parseInt(insInjuryLimit) : null,
-          ins_injury_deductible: insInjuryDeductible ? parseInt(insInjuryDeductible) : null,
-          ins_death_limit: insDeathLimit ? parseInt(insDeathLimit) : null,
-          ins_note: insNote,
+        // Insurance
+        ins_min_age: insMinAge ? parseInt(insMinAge) : 26,
+        ins_own_limit: insOwnLimit ? parseInt(insOwnLimit) : null,
+        ins_own_deductible: insOwnDeductible ? parseInt(insOwnDeductible) : null,
+        ins_person_limit: insPersonLimit ? parseInt(insPersonLimit) : null,
+        ins_person_deductible: insPersonDeductible ? parseInt(insPersonDeductible) : null,
+        ins_property_limit: insPropertyLimit ? parseInt(insPropertyLimit) : null,
+        ins_property_deductible: insPropertyDeductible ? parseInt(insPropertyDeductible) : null,
+        ins_injury_limit: insInjuryLimit ? parseInt(insInjuryLimit) : null,
+        ins_injury_deductible: insInjuryDeductible ? parseInt(insInjuryDeductible) : null,
+        ins_death_limit: insDeathLimit ? parseInt(insDeathLimit) : null,
+        ins_note: insNote,
 
-          // Company info
-          company_name: companyName,
-          company_ceo: companyCeo,
-          company_address: companyAddress,
-          company_phone: companyPhone,
-          staff_name: staffName,
-          staff_phone: staffPhone,
+        // Company info
+        company_name: companyName,
+        company_ceo: companyCeo,
+        company_address: companyAddress,
+        company_phone: companyPhone,
+        staff_name: staffName,
+        staff_phone: staffPhone,
 
-          // Special terms
-          special_terms: specialTerms,
-        })
-        .select('id')
-        .single();
+        // Special terms
+        special_terms: specialTerms,
+      };
 
-      if (error) throw error;
+      const res = await fetch('/api/e-contracts', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
 
+      if (json.error) throw new Error(json.error);
+
+      const data = json.data ?? json;
       router.push(`/e-contract/${data.id}`);
     } catch (error) {
       console.error('Error saving contract:', error);
@@ -348,12 +354,12 @@ export default function CreateContractPage() {
   // Filter customers for search
   const filteredCustomers = customers.filter((c) =>
     c.name.toLowerCase().includes(customerSearchText.toLowerCase()) ||
-    c.phone.includes(customerSearchText)
+    c.phone?.includes(customerSearchText)
   );
 
   const filteredDriver2Customers = customers.filter((c) =>
     c.name.toLowerCase().includes(driver2SearchText.toLowerCase()) ||
-    c.phone.includes(driver2SearchText)
+    c.phone?.includes(driver2SearchText)
   );
 
   // Filter cars for search

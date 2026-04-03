@@ -1,31 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ============================================
-// 정산 지급완료 처리 API
+// 정산 지급완료 처리 API (Prisma 버전)
 // PATCH → settlement_shares의 paid_at 업데이트
 //       + transactions 레코드 생성 (지급완료 시)
 //       + transactions 레코드 삭제 (취소 시)
 // ============================================
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
   const token = authHeader.replace('Bearer ', '')
-  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
-  if (error || !user) return null
-  const { data: profile } = await getSupabaseAdmin()
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (!profile || !['admin', 'admin', 'master'].includes(profile.role)) return null
-  return { ...user, role: profile.role }
+
+  // TODO: Phase 5 - Replace with Firebase Auth
+  // For now, extract userId from JWT payload (base64 decode)
+  let userId: string | null = null
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+      userId = payload.sub || payload.user_id
+    }
+  } catch {}
+
+  if (!userId) return null
+
+  const profiles = await prisma.$queryRaw<any[]>`
+    SELECT role FROM profiles WHERE id = ${userId} LIMIT 1
+  `
+
+  if (profiles.length === 0 || !['admin', 'master'].includes(profiles[0].role)) return null
+  return { id: userId, role: profiles[0].role }
 }
 
 export async function PATCH(request: NextRequest) {
@@ -42,28 +48,32 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'share_ids 필수' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
     const now = new Date().toISOString()
     const todayStr = now.slice(0, 10)
 
     if (action === 'mark_paid') {
       // ── 1. settlement_shares paid_at 업데이트 ──
-      const { data: updatedShares, error: updateErr } = await sb
-        .from('settlement_shares')
-        .update({ paid_at: now })
-        .in('id', share_ids)
-        .select('id, paid_at, items, total_amount, recipient_name, settlement_month, company_id')
-
-      if (updateErr) {
-        console.error('[settlement/share/paid] 업데이트 오류:', updateErr)
-        return NextResponse.json({ error: '업데이트 실패' }, { status: 500 })
+      for (const shareId of share_ids) {
+        await prisma.$executeRaw`
+          UPDATE settlement_shares SET paid_at = ${now} WHERE id = ${shareId}
+        `
       }
+
+      // Get updated shares
+      const updatedShares = await prisma.$queryRaw<any[]>`
+        SELECT id, paid_at, items, total_amount, recipient_name, settlement_month, company_id
+        FROM settlement_shares WHERE id IN (${share_ids.join(',')})
+      `
 
       // ── 2. 각 share의 items를 파싱하여 transactions 생성 ──
       const txInserts: any[] = []
 
       for (const share of (updatedShares || [])) {
-        const items = share.items as any[]
+        let items: any[] = []
+        try {
+          items = typeof share.items === 'string' ? JSON.parse(share.items) : (Array.isArray(share.items) ? share.items : [])
+        } catch {}
+
         if (!items || !Array.isArray(items)) continue
 
         for (const item of items) {
@@ -91,7 +101,6 @@ export async function PATCH(request: NextRequest) {
             payment_method: '이체',
             related_type: relatedType,
             related_id: relatedId,
-            // settlement_share_id를 description에 포함하여 취소 시 찾기 쉽게
             memo: `settlement_share:${share.id}`,
           })
         }
@@ -116,10 +125,20 @@ export async function PATCH(request: NextRequest) {
 
       // ── 3. transactions 일괄 삽입 ──
       if (txInserts.length > 0) {
-        const { error: txErr } = await sb.from('transactions').insert(txInserts)
-        if (txErr) {
-          console.error('[settlement/share/paid] 트랜잭션 생성 오류:', txErr)
-          // 트랜잭션 생성 실패해도 paid_at은 유지 (로그만 기록)
+        for (const tx of txInserts) {
+          try {
+            await prisma.$executeRaw`
+              INSERT INTO transactions
+              (transaction_date, type, status, category, client_name, description, amount, payment_method, related_type, related_id, memo, created_at)
+              VALUES (
+                ${tx.transaction_date}, ${tx.type}, ${tx.status}, ${tx.category},
+                ${tx.client_name}, ${tx.description}, ${tx.amount}, ${tx.payment_method},
+                ${tx.related_type}, ${tx.related_id}, ${tx.memo}, NOW()
+              )
+            `
+          } catch (txErr) {
+            console.error('[settlement/share/paid] 트랜잭션 생성 오류:', txErr)
+          }
         }
       }
 
@@ -133,24 +152,22 @@ export async function PATCH(request: NextRequest) {
       // ── unmark_paid: paid_at 초기화 + 관련 transactions 삭제 ──
 
       // 1. paid_at 초기화
-      const { data, error } = await sb
-        .from('settlement_shares')
-        .update({ paid_at: null })
-        .in('id', share_ids)
-        .select('id, paid_at')
-
-      if (error) {
-        console.error('[settlement/share/paid] 오류:', error)
-        return NextResponse.json({ error: '업데이트 실패' }, { status: 500 })
+      for (const shareId of share_ids) {
+        await prisma.$executeRaw`
+          UPDATE settlement_shares SET paid_at = NULL WHERE id = ${shareId}
+        `
       }
+
+      const data = await prisma.$queryRaw<any[]>`
+        SELECT id, paid_at FROM settlement_shares WHERE id IN (${share_ids.join(',')})
+      `
 
       // 2. 해당 share에서 생성된 transactions 삭제
       for (const shareId of share_ids) {
         const memoPattern = `settlement_share:${shareId}`
-        await sb
-          .from('transactions')
-          .delete()
-          .eq('memo', memoPattern)
+        await prisma.$executeRaw`
+          DELETE FROM transactions WHERE memo = ${memoPattern}
+        `
       }
 
       return NextResponse.json({ success: true, updated: data })

@@ -1,7 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { supabase } from '../utils/supabase'
+import { auth } from '../../lib/firebase'
+import { onAuthStateChanged, User } from 'firebase/auth'
 import type { Profile, UserPagePermission, Position, Department } from '../types/rbac'
 
 // ============================================
@@ -74,26 +75,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ★ 프로필 데이터 로드
-  const loadUserData = async (authUser: any) => {
+  const loadUserData = async (firebaseUser: User) => {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     setLoading(true)
     try {
-      setUser(authUser)
+      const token = await firebaseUser.getIdToken()
+      const headers = { Authorization: `Bearer ${token}` }
 
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          position:positions(*),
-          department:departments(*)
-        `)
-        .eq('id', authUser.id)
-        .maybeSingle()
+      setUser(firebaseUser)
 
-      if (profileError) {
-        console.error('프로필 로드 에러:', profileError.message)
-      }
+      // 프로필 로드
+      const profileRes = await fetch(`/api/profiles/me`, { headers })
+      const profileJson = await profileRes.json()
+      const profileData = profileJson.data
 
       if (profileData) {
         // ★ role 매핑: admin/master → admin (DB 마이그레이션 전 과도기)
@@ -109,12 +104,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDepartment(profileData.department || null)
 
         // ★ 페이지 권한 로드 (사용자 기준)
-        const { data: permsData } = await supabase
-          .from('user_page_permissions')
-          .select('*')
-          .eq('user_id', authUser.id)
-
-        setPermissions(permsData || [])
+        const permsRes = await fetch(`/api/user-page-permissions?user_id=${firebaseUser.uid}`, { headers })
+        const permsJson = await permsRes.json()
+        setPermissions(permsJson.data || [])
       } else {
         setRole('user')
       }
@@ -132,37 +124,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshAuth = async () => {
     isLoadedRef.current = false
     isFetchingRef.current = false
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      await loadUserData(session.user)
+    const user = auth.currentUser
+    if (user) {
+      await loadUserData(user)
     }
   }
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth:', event, isLoadedRef.current ? '(loaded, skip)' : '(processing)')
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('Firebase Auth:', firebaseUser ? 'signed in' : 'signed out', isLoadedRef.current ? '(loaded, skip)' : '(processing)')
 
-        if (event === 'SIGNED_OUT') {
-          isLoadedRef.current = false
-          isFetchingRef.current = false
-          clearState()
-          setLoading(false)
-          return
-        }
-
-        if (isLoadedRef.current) return
-
-        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
-          loadUserData(session.user)
-        } else if (event === 'INITIAL_SESSION' && !session) {
-          clearState()
-          setLoading(false)
-        }
+      if (!firebaseUser) {
+        isLoadedRef.current = false
+        isFetchingRef.current = false
+        clearState()
+        setLoading(false)
+        return
       }
-    )
 
-    return () => subscription.unsubscribe()
+      if (isLoadedRef.current) return
+
+      loadUserData(firebaseUser)
+    })
+
+    return () => unsubscribe()
   }, [])
 
   // ★ 하위 호환용 company 객체 (FMI 고정)

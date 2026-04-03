@@ -1,11 +1,18 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
 import DarkHeader from '../../components/DarkHeader'
+
+// ────────────────────────────────────────────────────────────────
+// Auth Helper
+// ────────────────────────────────────────────────────────────────
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 // ============================================
 // 조직/권한 통합 관리 페이지 (2-Tab 구조)
@@ -137,33 +144,33 @@ export default function OrgManagementPage() {
 
   const loadEmployees = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, companies(*), position:positions(*), department:departments(*)')
-      
-      .order('created_at', { ascending: false })
+    const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     setEmployees(data || [])
   }
 
   const loadPositions = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase.from('positions').select('*').order('level')
+    const res = await fetch('/api/positions', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     setPositions(data || [])
   }
 
   const loadDepartments = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase.from('departments').select('*').order('name')
+    const res = await fetch('/api/departments', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
     setDepartments(data || [])
   }
 
   const loadModules = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase
-      .from('company_modules')
-      .select('module:system_modules(path, name)')
-      
-      .eq('is_active', true)
+    const res = await fetch('/api/company_modules', { headers: await getAuthHeader() })
+    const json = await res.json()
+    const { data, error } = json
 
     if (data) {
       const modules: ActiveModule[] = data
@@ -180,9 +187,7 @@ export default function OrgManagementPage() {
   // ===== 전체 직원 권한 로드 =====
   const loadAllUserPermissions = async () => {
     if (!activeCompanyId) return
-    const { data } = await supabase
-      .from('user_page_permissions')
-      .select('*')
+    const res = await fetch('/api/user_page_permissions', { headers: await getAuthHeader() }); const { data, error } = await res.json()
       
 
     const permsMap: Record<string, UserPermMap> = {}
@@ -206,7 +211,7 @@ export default function OrgManagementPage() {
     setSavingPermsFor(userId)
 
     try {
-      await supabase.from('user_page_permissions').delete().eq('user_id', userId)
+      await fetch(`/api/user_page_permissions/\${JSON.stringify(userId)}`, { method: 'DELETE', headers: await getAuthHeader() })
 
       const userMap = allUserPerms[userId] || {}
       const toInsert = Object.entries(userMap)
@@ -223,7 +228,9 @@ export default function OrgManagementPage() {
         }))
 
       if (toInsert.length > 0) {
-        const { error } = await supabase.from('user_page_permissions').insert(toInsert)
+        const res = await fetch('/api/user_page_permissions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(toInsert) })
+        const json = await res.json()
+        const error = json?.error
         if (error) throw error
       }
       alert('권한이 저장되었습니다.')
@@ -270,11 +277,10 @@ export default function OrgManagementPage() {
   // ===== 초대 관리 =====
   // ★ 세션 토큰 안전하게 가져오기 (만료 시 자동 갱신)
   const getAccessToken = async (): Promise<string> => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.access_token) return session.access_token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
+    if (token) return token
     // 세션 없으면 갱신 시도
-    const { data: { session: refreshed } } = await supabase.auth.refreshSession()
-    return refreshed?.access_token || ''
+    return ''
   }
 
   const loadInvitations = async () => {
@@ -348,16 +354,14 @@ export default function OrgManagementPage() {
       department_id: editForm.department_id || null,
     }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', editingEmp.id)
-      .select()
+    const res = await fetch(`/api/profiles/${editingEmp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    const { data, error } = json
 
     if (error) {
       alert('저장 실패: ' + error.message)
       setSavingEdit(false)
-    } else if (!data || data.length === 0) {
+    } else if (!data || (Array.isArray(data) && data.length === 0)) {
       alert('저장 실패: 권한이 없거나 대상을 찾을 수 없습니다.')
       setSavingEdit(false)
     } else {
@@ -377,12 +381,12 @@ export default function OrgManagementPage() {
     if (!confirm(confirmMsg)) return
     setWithdrawing(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const token = typeof window !== 'undefined' ? localStorage.getItem('sb-auth-token') : null
       const res = await fetch('/api/employees/withdraw', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
+          'Authorization': `Bearer ${token || ''}`,
         },
         body: JSON.stringify({ employee_id: editingEmp.id, delete_auth: deleteAuth }),
       })
@@ -404,32 +408,38 @@ export default function OrgManagementPage() {
   // ===== 직급 관리 =====
   const addPosition = async () => {
     if (!newPositionName.trim() || !activeCompanyId) return
-    const { error } = await supabase.from('positions').insert({
-       name: newPositionName.trim(), level: newPositionLevel,
+    const res = await fetch('/api/positions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
+       name: newPositionName.trim(),
+       level: newPositionLevel,
     })
+    })
+    const json = await res.json()
+    const error = json?.error
     if (error) alert('직급 추가 실패: ' + error.message)
     else { setNewPositionName(''); setNewPositionLevel(4); loadPositions() }
   }
 
   const deletePosition = async (id: string) => {
     if (!confirm('이 직급을 삭제하시겠습니까?')) return
-    await supabase.from('positions').delete().eq('id', id)
+    await fetch(`/api/positions/\${JSON.stringify(id)}`, { method: 'DELETE', headers: await getAuthHeader() })
     loadPositions()
   }
 
   // ===== 부서 관리 =====
   const addDepartment = async () => {
     if (!newDeptName.trim() || !activeCompanyId) return
-    const { error } = await supabase.from('departments').insert({
-       name: newDeptName.trim(),
+    const res = await fetch('/api/departments', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
+       name: newDeptName.trim() })
     })
+    const json = await res.json()
+    const error = json?.error
     if (error) alert('부서 추가 실패: ' + error.message)
     else { setNewDeptName(''); loadDepartments() }
   }
 
   const deleteDepartment = async (id: string) => {
     if (!confirm('이 부서를 삭제하시겠습니까?')) return
-    await supabase.from('departments').delete().eq('id', id)
+    await fetch(`/api/departments/\${JSON.stringify(id)}`, { method: 'DELETE', headers: await getAuthHeader() })
     loadDepartments()
   }
 

@@ -1,10 +1,24 @@
 'use client'
 
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================
 // 유틸
@@ -145,13 +159,21 @@ export default function QuoteCreator() {
       return
     }
     const fetchData = async () => {
-      const [custRes, compRes] = await Promise.all([
-        supabase.from('customers').select('*').order('name'),
-        supabase.from('companies').select('*').eq('id', effectiveCompanyId).single(),
-      ])
-      if (custRes.data) setCustomers(custRes.data)
-      if (compRes.data) setCompany(compRes.data)
-      else if (appCompany) setCompany(appCompany) // DB fetch 실패 시 appCompany fallback
+      try {
+        const headers = await getAuthHeader()
+        const [custRes, compRes] = await Promise.all([
+          fetch('/api/customers', { headers }),
+          fetch(`/api/companies/${effectiveCompanyId}`, { headers }),
+        ])
+        const custJson = await custRes.json()
+        const compJson = await compRes.json()
+
+        if (custJson.data) setCustomers(custJson.data)
+        if (compJson.data) setCompany(compJson.data)
+        else if (appCompany) setCompany(appCompany) // DB fetch 실패 시 appCompany fallback
+      } catch (err) {
+        console.error('Error fetching data:', err)
+      }
     }
     fetchData()
   }, [effectiveCompanyId, appCompany])
@@ -293,30 +315,53 @@ export default function QuoteCreator() {
       }
 
       // 전체 시도
+      const headers = await getAuthHeader()
       let fullPayload = { ...payloadWithTerm, ...extendedCols }
-      let { data: insertData, error } = await supabase.from('quotes').insert([fullPayload]).select()
+      let res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullPayload),
+      })
+      let json = await res.json()
+      let insertData = json.data
+      let error = json.error
 
       // 에러 시 → term 없이 재시도
-      if (error && error.message.includes('term')) {
-        console.warn('Insert with term failed, retrying without term:', error.message)
-        fullPayload = { ...basePayload, ...extendedCols }
-        const result = await supabase.from('quotes').insert([fullPayload]).select()
-        error = result.error
-        insertData = result.data
+      if (error && error.includes?.('term')) {
+        console.warn('Insert with term failed, retrying without term:', error)
+        fullPayload = { ...basePayload, ...extendedCols } as any
+        res = await fetch('/api/quotes', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(fullPayload),
+        })
+        json = await res.json()
+        error = json.error
+        insertData = json.data
       }
 
       // 에러 시 → 확장컬럼 빼고 재시도
-      if (error && error.message.includes('column')) {
-        console.warn('Full insert failed, trying base only:', error.message)
-        const result = await supabase.from('quotes').insert([payloadWithTerm]).select()
-        error = result.error
-        insertData = result.data
+      if (error && error.includes?.('column')) {
+        console.warn('Full insert failed, trying base only:', error)
+        res = await fetch('/api/quotes', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadWithTerm),
+        })
+        json = await res.json()
+        error = json.error
+        insertData = json.data
 
         // term도 안되면 최소 컬럼
-        if (error && error.message.includes('term')) {
-          const result2 = await supabase.from('quotes').insert([basePayload]).select()
-          error = result2.error
-          insertData = result2.data
+        if (error && error.includes?.('term')) {
+          res = await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(basePayload),
+          })
+          json = await res.json()
+          error = json.error
+          insertData = json.data
         }
       }
 
@@ -324,9 +369,7 @@ export default function QuoteCreator() {
 
       if (error) {
         console.error('Quote save error:', error)
-        alert('저장 실패: ' + error.message +
-          '\n\nSupabase SQL Editor에서 다음 마이그레이션을 실행해주세요:\n' +
-          '파일: sql/014_quotes_enhancement.sql')
+        alert('저장 실패: ' + error)
       } else {
         sessionStorage.removeItem('quoteBuilderData')
         alert(`견적서가 ${status === 'draft' ? '임시저장' : '확정'}되었습니다.`)

@@ -39,13 +39,13 @@ export default function ContractPaper({ data, car, signatureUrl, mode = 'print' 
     // 갑/을 박스: 모바일에서는 세로로 배치, 인쇄용은 가로 배치
     partyBox: {
       display: 'flex',
-      flexDirection: isMobile ? 'column' : 'row' as const,
+      flexDirection: isMobile ? 'column' : 'row',
       justifyContent: 'space-between',
       gap: isMobile ? '30px' : '20px',
       marginBottom: '25px',
       borderBottom: '1px solid #e5e7eb',
       paddingBottom: '20px'
-    },
+    } as React.CSSProperties,
     partyCol: {
       flex: 1,
       width: isMobile ? '100%' : 'auto'

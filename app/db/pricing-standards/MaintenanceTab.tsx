@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, insertPricingStandardsRows, updatePricingStandardsRow, deletePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 interface MaintenanceRecord {
   id?: number
@@ -40,7 +40,6 @@ const MAINTENANCE_ITEMS = [
 ]
 
 export default function MaintenanceTab() {
-  const supabase = createClientComponentClient()
   const [rows, setRows] = useState<MaintenanceRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -57,8 +56,7 @@ export default function MaintenanceTab() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('maintenance_cost_table').select('*').order('vehicle_type')
-      if (error) throw error
+      const data = await fetchPricingStandardsData('maintenance_cost_table')
       setRows(data || [])
     } catch (err) { console.error('Error:', err) }
     finally { setLoading(false) }
@@ -67,17 +65,15 @@ export default function MaintenanceTab() {
   const addRow = async () => {
     try {
       const newRow = { vehicle_type: VEHICLE_TYPES[0], fuel_type: FUEL_TYPES[0], age_min: 0, age_max: 5, monthly_cost: 0, includes: '', notes: '' }
-      const { data, error } = await supabase.from('maintenance_cost_table').insert([newRow]).select()
-      if (error) throw error
-      if (data && data[0]) setRows([...rows, data[0]])
+      await insertPricingStandardsRows('maintenance_cost_table', [newRow])
+      await fetchData()
     } catch (err) { console.error('Error:', err) }
   }
 
   const updateField = async (id: number | undefined, field: string, value: any) => {
     if (!id) return
     try {
-      const { error } = await supabase.from('maintenance_cost_table').update({ [field]: value }).eq('id', id)
-      if (error) throw error
+      await updatePricingStandardsRow('maintenance_cost_table', String(id), { [field]: value })
       setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r))
     } catch (err) { console.error('Error:', err) }
   }
@@ -85,8 +81,7 @@ export default function MaintenanceTab() {
   const deleteRow = async (id: number | undefined) => {
     if (!id) return
     try {
-      const { error } = await supabase.from('maintenance_cost_table').delete().eq('id', id)
-      if (error) throw error
+      await deletePricingStandardsRow('maintenance_cost_table', String(id))
       setRows(rows.filter(r => r.id !== id))
     } catch (err) { console.error('Error:', err) }
   }

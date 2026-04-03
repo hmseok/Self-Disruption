@@ -1,9 +1,20 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import PnlTab from './PnlTab'
 import CarSettlementTab from './CarSettlementTab'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ── 보험 인라인 탭 ──────────────────────────
 function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: () => void }) {
@@ -12,12 +23,12 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
 
   useEffect(() => {
     const load = async () => {
-      const { data: ins } = await supabase
-        .from('insurance_contracts')
-        .select('*')
-        .eq('car_id', carId)
-        .order('end_date', { ascending: false })
-      setData(ins || [])
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/insurance?car_id=${carId}`, { headers })
+        const json = await res.json()
+        setData(json.data || [])
+      } catch (e) { console.error('[InsuranceInlineTab]', e) }
       setLoading(false)
     }
     load()
@@ -98,15 +109,12 @@ function InvestInlineTab({ carId }: { carId: string }) {
 
   useEffect(() => {
     const load = async () => {
-      // 이 차량에 연결된 투자 계약 조회
-      // investors에는 car_id가 없으므로, transactions에서 related_type='invest'이면서
-      // 같은 car에 연결된 것을 찾거나, 또는 invest 테이블에 car_ids 같은 필드가 있는지 확인
-      const { data } = await supabase
-        .from('general_investments')
-        .select('*')
-        .eq('car_id', carId)
-        .order('created_at', { ascending: false })
-      setInvestments(data || [])
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/investments?car_id=${carId}`, { headers })
+        const json = await res.json()
+        setInvestments(json.data || [])
+      } catch (e) { console.error('[InvestInlineTab]', e) }
       setLoading(false)
     }
     load()
@@ -193,9 +201,13 @@ export default function CarDetailPage() {
   useEffect(() => {
     if (!carId) return
     const fetchCar = async () => {
-      const { data, error } = await supabase.from('cars').select('*').eq('id', carId).single()
-      if (error) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars') }
-      else { setCar(data) }
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/cars/${carId}`, { headers })
+        if (!res.ok) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars'); return }
+        const json = await res.json()
+        setCar(json.data)
+      } catch (e) { alert('차량 정보를 불러오지 못했습니다.'); router.push('/cars') }
       setLoading(false)
     }
     fetchCar()
@@ -205,23 +217,26 @@ export default function CarDetailPage() {
   useEffect(() => {
     if (!carId) return
     const loadSummary = async () => {
-      const [insRes, loanRes, invRes] = await Promise.all([
-        supabase.from('insurance_contracts').select('*').eq('car_id', carId).order('end_date', { ascending: false }),
-        supabase.from('loans').select('id, total_amount').eq('car_id', carId),
-        supabase.from('general_investments').select('id, invest_amount').eq('car_id', carId),
-      ])
-      const ins = insRes.data || []
-      const activeIns = ins.find((i: any) => i.end_date && new Date(i.end_date) >= new Date())
-      const loanList = loanRes.data || []
-      const invList = invRes.data || []
-      setSummary({
-        insuranceCount: ins.length,
-        activeInsurance: activeIns || null,
-        loanCount: loanList.length,
-        totalLoanAmount: loanList.reduce((s: number, l: any) => s + (l.total_amount || 0), 0),
-        investCount: invList.length,
-        totalInvestAmount: invList.reduce((s: number, i: any) => s + (i.invest_amount || 0), 0),
-      })
+      try {
+        const headers = await getAuthHeader()
+        const [insRes, loanRes, invRes] = await Promise.all([
+          fetch(`/api/insurance?car_id=${carId}`, { headers }).then(r => r.json()),
+          fetch(`/api/loans?car_id=${carId}`, { headers }).then(r => r.json()),
+          fetch(`/api/investments?car_id=${carId}`, { headers }).then(r => r.json()),
+        ])
+        const ins = insRes.data || []
+        const activeIns = ins.find((i: any) => i.end_date && new Date(i.end_date) >= new Date())
+        const loanList = loanRes.data || []
+        const invList = invRes.data || []
+        setSummary({
+          insuranceCount: ins.length,
+          activeInsurance: activeIns || null,
+          loanCount: loanList.length,
+          totalLoanAmount: loanList.reduce((s: number, l: any) => s + (l.total_amount || 0), 0),
+          investCount: invList.length,
+          totalInvestAmount: invList.reduce((s: number, i: any) => s + (i.invest_amount || 0), 0),
+        })
+      } catch (e) { console.error('[CarDetail summary]', e) }
     }
     loadSummary()
   }, [carId])
@@ -234,8 +249,12 @@ export default function CarDetailPage() {
   // 🏦 대출 목록 불러오기
   const fetchLoans = async () => {
     setLoadingLoans(true)
-    const { data, error } = await supabase.from('loans').select('*').eq('car_id', carId).order('created_at', { ascending: false })
-    if (!error) setLoans(data || [])
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/loans?car_id=${carId}`, { headers })
+      const json = await res.json()
+      setLoans(json.data || [])
+    } catch (e) { console.error('[fetchLoans]', e) }
     setLoadingLoans(false)
   }
 
@@ -243,10 +262,14 @@ export default function CarDetailPage() {
   const handleAddLoan = async () => {
     if (!newLoan.finance_name || !newLoan.total_amount) return alert('금융사명과 원금은 필수입니다.')
 
-    const { error } = await supabase.from('loans').insert({
-      car_id: carId,
-      ...newLoan
+    const headers = await getAuthHeader()
+    const res = await fetch('/api/loans', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ car_id: carId, ...newLoan }),
     })
+    const json = await res.json()
+    const error = json.error ? { message: json.error } : null
 
     if (error) alert('추가 실패: ' + error.message)
     else {
@@ -259,8 +282,10 @@ export default function CarDetailPage() {
   // 🏦 대출 삭제하기
   const handleDeleteLoan = async (loanId: number) => {
     if (!confirm('이 금융 이력을 삭제하시겠습니까?')) return
-    const { error } = await supabase.from('loans').delete().eq('id', loanId)
-    if (error) alert('삭제 실패')
+    const headers = await getAuthHeader()
+    const res = await fetch(`/api/loans/${loanId}`, { method: 'DELETE', headers })
+    const json = await res.json()
+    if (json.error) alert('삭제 실패')
     else fetchLoans()
   }
 
@@ -270,32 +295,40 @@ export default function CarDetailPage() {
 
   const handleUpdate = async () => {
     setSaving(true)
-    const { error } = await supabase.from('cars').update({
-        number: car.number, brand: car.brand, model: car.model, trim: car.trim,
-        year: car.year, fuel: car.fuel, status: car.status, location: car.location,
-        mileage: car.mileage, purchase_price: car.purchase_price, acq_date: car.acq_date,
-        is_used: car.is_used, purchase_mileage: car.purchase_mileage,
-        // 초기비용
-        registration_tax: car.registration_tax || 0, bond_amount: car.bond_amount || 0,
-        delivery_fee: car.delivery_fee || 0, plate_fee: car.plate_fee || 0,
-        agency_fee: car.agency_fee || 0, other_initial_cost: car.other_initial_cost || 0,
-        initial_cost_memo: car.initial_cost_memo || '',
-        // 지입 관련
-        ownership_type: car.ownership_type, owner_name: car.owner_name, owner_phone: car.owner_phone,
-        owner_bank: car.owner_bank, owner_account: car.owner_account, owner_account_holder: car.owner_account_holder,
-        consignment_fee: car.consignment_fee, consignment_start: car.consignment_start || null,
-        consignment_end: car.consignment_end || null, insurance_by: car.insurance_by,
-        consignment_contract_url: car.consignment_contract_url, owner_memo: car.owner_memo
-      }).eq('id', carId)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/cars/${carId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: car.number, brand: car.brand, model: car.model, trim: car.trim,
+          year: car.year, fuel: car.fuel, status: car.status, location: car.location,
+          mileage: car.mileage, purchase_price: car.purchase_price, acq_date: car.acq_date,
+          is_used: car.is_used, purchase_mileage: car.purchase_mileage,
+          registration_tax: car.registration_tax || 0, bond_amount: car.bond_amount || 0,
+          delivery_fee: car.delivery_fee || 0, plate_fee: car.plate_fee || 0,
+          agency_fee: car.agency_fee || 0, other_initial_cost: car.other_initial_cost || 0,
+          initial_cost_memo: car.initial_cost_memo || '',
+          ownership_type: car.ownership_type, owner_name: car.owner_name, owner_phone: car.owner_phone,
+          owner_bank: car.owner_bank, owner_account: car.owner_account, owner_account_holder: car.owner_account_holder,
+          consignment_fee: car.consignment_fee, consignment_start: car.consignment_start || null,
+          consignment_end: car.consignment_end || null, insurance_by: car.insurance_by,
+          consignment_contract_url: car.consignment_contract_url, owner_memo: car.owner_memo,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) alert('저장 실패: ' + json.error)
+      else alert('✅ 저장되었습니다!')
+    } catch (e: any) { alert('저장 실패: ' + e.message) }
     setSaving(false)
-    if (error) alert('저장 실패: ' + error.message)
-    else alert('✅ 저장되었습니다!')
   }
 
   const handleDelete = async () => {
     if (!confirm('정말 삭제하시겠습니까?')) return
-    const { error } = await supabase.from('cars').delete().eq('id', carId)
-    if (error) alert('삭제 실패')
+    const headers = await getAuthHeader()
+    const res = await fetch(`/api/cars/${carId}`, { method: 'DELETE', headers })
+    const json = await res.json()
+    if (json.error) alert('삭제 실패')
     else { alert('삭제되었습니다.'); router.push('/cars') }
   }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { fetchPricingStandardsData, updatePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
 
 // ── 타입 정의 ──────────────────────────────────────────────────────────
 interface InsuranceRow {
@@ -122,7 +122,6 @@ const SUB_TABS: { id: SubTab; label: string; icon: string }[] = [
 ]
 
 export default function InsuranceTab() {
-  const supabase = createClientComponentClient()
   const [subTab, setSubTab] = useState<SubTab>('rates')
   const [loading, setLoading] = useState(true)
 
@@ -146,38 +145,44 @@ export default function InsuranceTab() {
   }, [])
 
   async function loadAll() {
-    setLoading(true)
-    const [rateRes, policyRes, baseRes, ownRes, groupRes] = await Promise.all([
-      supabase.from('insurance_rate_table').select('*').order('vehicle_type').order('value_min'),
-      supabase.from('insurance_policy_record').select('*').eq('is_active', true).order('created_at', { ascending: false }),
-      supabase.from('insurance_base_premium').select('*').eq('is_active', true),
-      supabase.from('insurance_own_vehicle_rate').select('*').eq('is_active', true).order('origin').order('fuel_type').order('value_min'),
-      supabase.from('insurance_vehicle_group').select('*').eq('is_active', true).order('sort_order'),
-    ])
-    setRateRows(rateRes.data || [])
-    setPolicies(policyRes.data || [])
-    setBasePremiums(baseRes.data || [])
-    setOwnRates(ownRes.data || [])
-    setGroups(groupRes.data || [])
-    setLoading(false)
+    try {
+      setLoading(true)
+      const [rateRows, policies, basePremiums, ownRates, groups] = await Promise.all([
+        fetchPricingStandardsData('insurance_rate_table'),
+        fetchPricingStandardsData('insurance_policy_record'),
+        fetchPricingStandardsData('insurance_base_premium'),
+        fetchPricingStandardsData('insurance_own_vehicle_rate'),
+        fetchPricingStandardsData('insurance_vehicle_group'),
+      ])
+      setRateRows(rateRows || [])
+      setPolicies(policies || [])
+      setBasePremiums(basePremiums || [])
+      setOwnRates(ownRates || [])
+      setGroups(groups || [])
+    } catch (error) { console.error('Error:', error) }
+    finally { setLoading(false) }
   }
 
   // ── 기준요율 수정 ──────────────────────────────────────────────────
   async function saveRateCell(rowId: number, field: string, value: string) {
     const numFields = ['value_min', 'value_max', 'annual_premium']
     const parsed = numFields.includes(field) ? Number(value.replace(/,/g, '')) : value
-    await supabase.from('insurance_rate_table').update({ [field]: parsed }).eq('id', rowId)
+    try {
+      await updatePricingStandardsRow('insurance_rate_table', String(rowId), { [field]: parsed })
+      loadAll()
+    } catch (error) { console.error('Error:', error) }
     setEditingCell(null)
-    loadAll()
   }
 
   // ── 자차요율 수정 ──────────────────────────────────────────────────
   async function saveOwnRate(id: number, field: string, value: string) {
     const numFields = ['own_vehicle_rate', 'value_min', 'value_max', 'sample_count']
     const parsed = numFields.includes(field) ? Number(value.replace(/,/g, '')) : value
-    await supabase.from('insurance_own_vehicle_rate').update({ [field]: parsed }).eq('id', id)
+    try {
+      await updatePricingStandardsRow('insurance_own_vehicle_rate', String(id), { [field]: parsed })
+      loadAll()
+    } catch (error) { console.error('Error:', error) }
     setEditingCell(null)
-    loadAll()
   }
 
   // ── 필터된 정책 ──────────────────────────────────────────────────

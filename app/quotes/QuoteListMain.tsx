@@ -1,11 +1,26 @@
 'use client'
-import { supabase } from '../utils/supabase'
+import { auth } from '@/lib/firebase'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -480,14 +495,26 @@ export default function QuoteListPage() {
   useEffect(() => {
     const loadStamp = async () => {
       if (!companyId) return
-      const { data } = await supabase
-        .from('company_settings')
-        .select('value')
-        .eq('key', 'pdf_defaults')
-        .maybeSingle()
-      if (data?.value?.company_stamp) {
-        setCompanyStamp(data.value.company_stamp)
-      } else {
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/quotes/company-settings?company_id=${companyId}`, { headers })
+        const json = await res.json()
+        const data = json.data ?? json
+        if (data?.value?.company_stamp) {
+          setCompanyStamp(data.value.company_stamp)
+        } else {
+          try {
+            const res = await fetch('/images/company_stamp.png')
+            if (res.ok) {
+              const blob = await res.blob()
+              const reader = new FileReader()
+              reader.onload = () => setCompanyStamp(reader.result as string)
+              reader.readAsDataURL(blob)
+            }
+          } catch {}
+        }
+      } catch (error) {
+        console.error('Failed to load company stamp:', error)
         try {
           const res = await fetch('/images/company_stamp.png')
           if (res.ok) {
@@ -507,48 +534,58 @@ export default function QuoteListPage() {
     if (!companyId) { setLoading(false); return }
 
     try {
+      const headers = await getAuthHeader()
+
       // Quotes
-      const { data: quotesData, error: quotesError } = await supabase
-        .from('quotes').select('*').order('id', { ascending: false })
-      if (quotesError) console.error('견적 목록 로드 실패:', quotesError.message)
+      const quotesRes = await fetch('/api/quotes', { headers })
+      const quotesJson = await quotesRes.json()
+      const quotesData = quotesJson.data || []
+      if (quotesJson.error) console.error('견적 목록 로드 실패:', quotesJson.error)
 
       // Cars
-      const carIds = (quotesData || []).map((q) => q.car_id).filter(Boolean)
-      const { data: carsData } = carIds.length > 0
-        ? await supabase.from('cars').select('*').in('id', carIds)
-        : { data: [] }
+      const carIds = quotesData.map((q: any) => q.car_id).filter(Boolean)
+      let carsData: any[] = []
+      if (carIds.length > 0) {
+        const carsRes = await fetch('/api/cars', { headers })
+        const carsJson = await carsRes.json()
+        carsData = carsJson.data || []
+      }
 
       // Contracts from quotes
-      const quoteIds = (quotesData || []).map((q) => q.id)
-      const { data: contractsFromQuotes } = quoteIds.length > 0
-        ? await supabase.from('contracts').select('id, quote_id, status').in('quote_id', quoteIds)
-        : { data: [] }
+      const quoteIds = quotesData.map((q: any) => q.id)
+      let contractsFromQuotes: any[] = []
+      if (quoteIds.length > 0) {
+        const contractsRes = await fetch('/api/contracts', { headers })
+        const contractsJson = await contractsRes.json()
+        contractsFromQuotes = (contractsJson.data || []).filter((c: any) => quoteIds.includes(c.quote_id))
+      }
 
       // Short-term quotes
-      const { data: stQuotesData } = await supabase
-        .from('short_term_quotes').select('*').order('created_at', { ascending: false })
-      setShortQuotes(stQuotesData || [])
+      const stRes = await fetch('/api/short-term-quotes', { headers })
+      const stJson = await stRes.json()
+      setShortQuotes(stJson.data || [])
 
       // Customers
-      const customerIds = [
-        ...(quotesData || []).map((q) => q.customer_id),
-      ].filter(Boolean)
+      const customerIds = quotesData.map((q: any) => q.customer_id).filter(Boolean)
       const uniqueCustomerIds = [...new Set(customerIds)]
-      const { data: customersData } = uniqueCustomerIds.length > 0
-        ? await supabase.from('customers').select('id, name, phone, email').in('id', uniqueCustomerIds)
-        : { data: [] }
+      let customersData: any[] = []
+      if (uniqueCustomerIds.length > 0) {
+        const custRes = await fetch('/api/customers', { headers })
+        const custJson = await custRes.json()
+        customersData = custJson.data || []
+      }
 
       const customersMap = new Map()
-      customersData?.forEach((c) => customersMap.set(c.id, c))
+      customersData?.forEach((c: any) => customersMap.set(c.id, c))
       setCustomers(customersMap)
 
       const allCars = carsData || []
 
       // Combine quotes
-      const combinedQuotes = (quotesData || []).map((quote) => ({
+      const combinedQuotes = quotesData.map((quote: any) => ({
         ...quote,
         car: allCars.find((c) => c.id === quote.car_id),
-        contract: (contractsFromQuotes || []).find((c) => c.quote_id === quote.id),
+        contract: contractsFromQuotes.find((c) => c.quote_id === quote.id),
         customer: customersMap.get(quote.customer_id),
       }))
 
@@ -683,8 +720,14 @@ export default function QuoteListPage() {
 
   const handleArchive = useCallback(async (quoteId: string) => {
     try {
-      const { error } = await supabase.from('quotes').update({ status: 'archived' }).eq('id', quoteId)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/quotes/${quoteId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'archived' }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
       setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: 'archived' } : q))
     } catch { alert('보관 중 오류가 발생했습니다.') }
   }, [])
@@ -692,51 +735,49 @@ export default function QuoteListPage() {
   const handleDelete = useCallback(async (quoteId: string) => {
     try {
       console.log('[DELETE] 견적 삭제 시작:', quoteId)
+      const headers = await getAuthHeader()
 
       // 1. 연결된 contracts 조회
-      const { data: linkedContracts } = await supabase
-        .from('contracts').select('id').eq('quote_id', quoteId)
+      const contractsRes = await fetch(`/api/contracts?quote_id=${quoteId}`, { headers })
+      const contractsJson = await contractsRes.json()
+      const linkedContracts = contractsJson.data || []
 
       // 2. 연결된 payment_schedules 삭제
-      if (linkedContracts && linkedContracts.length > 0) {
-        const contractIds = linkedContracts.map(c => c.id)
-        await supabase.from('payment_schedules').delete().in('contract_id', contractIds)
-      }
-
-      // 3. 연결된 contracts 삭제
-      await supabase.from('contracts').delete().eq('quote_id', quoteId)
-
-      // 4. quote_shares 삭제
-      await supabase.from('quote_shares').delete().eq('quote_id', quoteId)
-
-      // 5. customer_signatures 삭제
-      const { error: sigErr } = await supabase.from('customer_signatures').delete().eq('quote_id', quoteId)
-      if (sigErr) {
-        console.warn('[DELETE] 서명 직접 삭제 실패 (RLS 제한), RPC 시도:', sigErr.message)
-        const { error: rpcErr } = await supabase.rpc('delete_quote_cascade', { p_quote_id: quoteId })
-        if (rpcErr) {
-          console.error('[DELETE] RPC 우회도 실패:', rpcErr.message)
-          await supabase.from('quote_share_tokens').delete().eq('quote_id', quoteId)
-          const { error: sigErr2 } = await supabase.from('customer_signatures').delete().eq('quote_id', quoteId)
-          if (sigErr2) {
-            throw new Error(
-              `고객 서명 데이터 삭제 실패 (RLS 정책 없음)\n\n` +
-              `Supabase SQL Editor에서 아래 SQL을 실행해주세요:\n` +
-              `DELETE FROM customer_signatures WHERE quote_id = ${quoteId};\n\n` +
-              `또는 sql/065_signature_delete_policy.sql 마이그레이션을 실행하세요.`
-            )
-          }
-        } else {
-          console.log('[DELETE] RPC 우회 삭제 성공')
+      if (linkedContracts.length > 0) {
+        const contractIds = linkedContracts.map((c: any) => c.id)
+        for (const contractId of contractIds) {
+          await fetch(`/api/contracts/${contractId}`, { method: 'DELETE', headers })
         }
       }
 
-      // 6. quote_share_tokens 삭제
-      await supabase.from('quote_share_tokens').delete().eq('quote_id', quoteId)
+      // 3. quote_shares 삭제
+      const sharesRes = await fetch(`/api/quote-shares?quote_id=${quoteId}`, { headers })
+      const sharesJson = await sharesRes.json()
+      const shares = sharesJson.data || []
+      for (const share of shares) {
+        await fetch(`/api/quote-shares/${share.id}`, { method: 'DELETE', headers })
+      }
 
-      // 7. 견적서 삭제
-      const { error: qErr } = await supabase.from('quotes').delete().eq('id', quoteId)
-      if (qErr) throw new Error(`견적서 삭제 실패: ${qErr.message}`)
+      // 4. customer_signatures 삭제
+      const sigsRes = await fetch(`/api/customer-signatures?quote_id=${quoteId}`, { headers })
+      const sigsJson = await sigsRes.json()
+      const sigs = sigsJson.data || []
+      for (const sig of sigs) {
+        await fetch(`/api/customer-signatures/${sig.id}`, { method: 'DELETE', headers })
+      }
+
+      // 5. quote_share_tokens 삭제
+      const tokensRes = await fetch(`/api/quote-share-tokens?quote_id=${quoteId}`, { headers })
+      const tokensJson = await tokensRes.json()
+      const tokens = tokensJson.data || []
+      for (const token of tokens) {
+        await fetch(`/api/quote-share-tokens/${token.id}`, { method: 'DELETE', headers })
+      }
+
+      // 6. 견적서 삭제
+      const qRes = await fetch(`/api/quotes/${quoteId}`, { method: 'DELETE', headers })
+      const qJson = await qRes.json()
+      if (qJson.error) throw new Error(`견적서 삭제 실패: ${qJson.error}`)
 
       setQuotes(prev => prev.filter(q => q.id !== quoteId))
     } catch (err: any) {
@@ -748,16 +789,24 @@ export default function QuoteListPage() {
   // Short-term handlers
   const handleShortStatusChange = useCallback(async (id: string, status: string) => {
     try {
-      const { error } = await supabase.from('short_term_quotes').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/short-term-quotes/${id}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
       setShortQuotes(prev => prev.map(q => q.id === id ? { ...q, status } : q))
     } catch { alert('상태 변경 중 오류가 발생했습니다.') }
   }, [])
 
   const handleShortDelete = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase.from('short_term_quotes').delete().eq('id', id)
-      if (error) throw error
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/short-term-quotes/${id}`, { method: 'DELETE', headers })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
       setShortQuotes(prev => prev.filter(q => q.id !== id))
     } catch { alert('삭제 중 오류가 발생했습니다.') }
   }, [])
@@ -810,22 +859,31 @@ export default function QuoteListPage() {
 
       let data: any = null
       let error: any = null
+      const headers = await getAuthHeader()
 
       if (editingQuoteId) {
         // ── 수정 모드: 기존 청구서 업데이트 ──
         const updatePayload: Record<string, any> = { ...basePayload }
         delete updatePayload.status // 상태는 유지
-        const result = await supabase.from('quotes').update({
-          ...updatePayload,
-        }).eq('id', editingQuoteId).select().single()
-        data = result.data
-        error = result.error
+        const res = await fetch(`/api/quotes/${editingQuoteId}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload),
+        })
+        const json = await res.json()
+        data = json.data
+        error = json.error
 
-        if (error && error.message?.includes('column')) {
+        if (error && error.includes?.('column')) {
           delete updatePayload.quote_detail
-          const retry = await supabase.from('quotes').update(updatePayload).eq('id', editingQuoteId).select().single()
-          data = retry.data
-          error = retry.error
+          const res2 = await fetch(`/api/quotes/${editingQuoteId}`, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatePayload),
+          })
+          const json2 = await res2.json()
+          data = json2.data
+          error = json2.error
         }
 
         if (error) throw error
@@ -833,18 +891,31 @@ export default function QuoteListPage() {
         setQuotes(prev => prev.map(q => q.id === editingQuoteId ? { ...q, ...data } : q))
       } else {
         // ── 새 청구서 생성 ──
-        const result = await supabase.from('quotes').insert({
-          ...basePayload,
-          rental_type: '청구서',
-        }).select().single()
-        data = result.data
-        error = result.error
+        const res = await fetch('/api/quotes', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...basePayload,
+            rental_type: '청구서',
+          }),
+        })
+        const json = await res.json()
+        data = json.data
+        error = json.error
 
-        if (error && error.message?.includes('column')) {
+        if (error && error.includes?.('column')) {
           delete basePayload.quote_detail
-          const retry = await supabase.from('quotes').insert({ ...basePayload, rental_type: '청구서' }).select().single()
-          data = retry.data
-          error = retry.error
+          const res2 = await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...basePayload,
+              rental_type: '청구서',
+            }),
+          })
+          const json2 = await res2.json()
+          data = json2.data
+          error = json2.error
         }
 
         if (error) throw error
@@ -1420,11 +1491,11 @@ export default function QuoteListPage() {
                       const quoteId = (saved as any)?.id
                       if (!quoteId) return alert('저장 실패')
                       // 2) 토큰 생성
-                      const { data: { session } } = await supabase.auth.getSession()
-                      if (!session?.access_token) return alert('로그인이 필요합니다.')
+                      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+                      if (!token) return alert('로그인이 필요합니다.')
                       const shareRes = await fetch(`/api/quotes/${quoteId}/share`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                         body: JSON.stringify({ expiryDays: 7 }),
                       })
                       const shareData = await shareRes.json()
@@ -1433,7 +1504,7 @@ export default function QuoteListPage() {
                       const msg = `[에프엠아이 렌터카]\n${inv.tenant_name}님 청구서\n차종: ${carInfo}\n금액: ${amount}원\n\n확인 및 서명:\n${shareData.shareUrl}`
                       const smsRes = await fetch('/api/send-sms', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                         body: JSON.stringify({ phone, message: msg, title: '청구서 안내', recipientName: inv.tenant_name, relatedId: quoteId }),
                       })
                       const smsResult = await smsRes.json()

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type ExcelJS from 'exceljs'
 
 export async function POST(req: NextRequest) {
   try {

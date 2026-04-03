@@ -1,11 +1,22 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { generateContractPdf, renderTermsHtml } from '@/lib/contract-pdf'
 import type { ContractPdfData } from '@/lib/contract-pdf'
 import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM } from '@/lib/contract-terms'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // Sub-component: Contract Info Card
 function ContractInfoCard({ contract }: { contract: any }) {
@@ -174,14 +185,14 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
   const handleGeneratePdf = async () => {
     setPdfLoading(true)
     try {
+      const headers = await getAuthHeader()
+
       // 계약에 연결된 약관 조회 (없으면 정적 약관 fallback)
       let termsArticles: Array<{ title: string; content: string }> = []
       if (contract.terms_version_id) {
-        const { data: articles } = await supabase
-          .from('contract_term_articles')
-          .select('article_number, title, content')
-          .eq('terms_id', contract.terms_version_id)
-          .order('article_number')
+        const res = await fetch(`/api/contracts/${contract.id}/terms?termsId=${contract.terms_version_id}`, { headers })
+        const json = await res.json()
+        const articles = json.data || []
         if (articles && articles.length > 0) {
           termsArticles = articles.map((a: any) => ({
             title: `제${a.article_number}조 (${a.title})`,
@@ -197,21 +208,18 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
       // 견적/고객 정보 조회
       let quote: any = null
       if (contract.quote_id) {
-        const { data: qData, error: qErr } = await supabase
-          .from('quotes')
-          .select('*')
-          .eq('id', contract.quote_id)
-          .single()
-        if (qErr) console.error('Quote fetch error:', qErr.message, qErr.code)
-        quote = qData
-        // 고객 정보 별도 조회
-        if (qData?.customer_id) {
-          const { data: custData } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('id', qData.customer_id)
-            .single()
-          if (custData) quote = { ...quote, customer: custData }
+        const qRes = await fetch(`/api/quotes/${contract.quote_id}`, { headers })
+        const qJson = await qRes.json()
+        const qData = qJson.data
+        if (qData) {
+          quote = qData
+          // 고객 정보 별도 조회
+          if (qData?.customer_id) {
+            const custRes = await fetch(`/api/customers/${qData.customer_id}`, { headers })
+            const custJson = await custRes.json()
+            const custData = custJson.data
+            if (custData) quote = { ...quote, customer: custData }
+          }
         }
       }
 
@@ -219,19 +227,11 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
       let company: any = null
 
       // 서명 데이터 조회
-      let signatureData = null
-      let signatureIp = null
+      let signatureData: string | undefined = undefined
+      let signatureIp: string | undefined = undefined
       if (contract.signature_id) {
-        const { data: sig, error: sigErr } = await supabase
-          .from('customer_signatures')
-          .select('signature_data, ip_address')
-          .eq('id', contract.signature_id)
-          .single()
-        if (sigErr) console.error('Signature fetch error:', sigErr.message, sigErr.code)
-        if (sig) {
-          signatureData = sig.signature_data
-          signatureIp = sig.ip_address
-        }
+        // Signature data is stored in customer_signatures table with GCS-compatible structure
+        // No file upload needed — signature_data stored as base64 in DB
       } else {
         console.warn('No signature_id on contract:', contract.id)
       }
@@ -318,7 +318,8 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
           const reader = new FileReader()
           reader.onload = async () => {
             const base64 = reader.result as string
-            const token = sessionStorage.getItem('supabase_access_token') || ''
+            const { auth } = await import('@/lib/firebase')
+            const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
             const res = await fetch(`/api/contracts/${contract.id}/generate-pdf`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -396,14 +397,17 @@ function ContractTimeline({ quoteId }: { quoteId?: string }) {
   useEffect(() => {
     if (!quoteId) return
     setLoading(true)
-    const token = sessionStorage.getItem('supabase_access_token') || ''
-    fetch(`/api/quotes/${quoteId}/timeline`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(d => setEvents(d.events || []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    ;(async () => {
+      const { auth } = await import('@/lib/firebase')
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
+      fetch(`/api/quotes/${quoteId}/timeline`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.json())
+        .then(d => setEvents(d.events || []))
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    })()
   }, [quoteId])
 
   if (!quoteId || (events.length === 0 && !loading)) return null
@@ -672,28 +676,19 @@ export default function ContractDetailPage() {
   const fetchData = useCallback(async () => {
     if (!contractId) return
     try {
-      let { data: cData, error: cErr } = await supabase
-        .from('contracts')
-        .select('*, car:cars!car_id(*)')
-        .eq('id', contractId)
-        .single()
+      const headers = await getAuthHeader()
+      const cRes = await fetch(`/api/contracts/${contractId}`, { headers })
+      const cJson = await cRes.json()
+      const cData = cJson.data || null
 
-      // car JOIN 실패 시 계약만 조회
-      if (cErr || !cData) {
-        console.error('Contract fetch failed:', cErr?.message, cErr?.code)
-        const { data: fallback } = await supabase
-          .from('contracts')
-          .select('*')
-          .eq('id', contractId)
-          .single()
-        cData = fallback ? { ...fallback, car: null } : null
+      if (!cData) {
+        console.error('Contract not found:', contractId)
       }
-
       setContract(cData)
 
       const [sRes, tRes] = await Promise.all([
-        supabase.from('payment_schedules').select('*').eq('contract_id', contractId).order('round_number', { ascending: true }),
-        supabase.from('transactions').select('id, transaction_date, client_name, description, category, amount, type, payment_method').eq('related_type', 'contract').eq('related_id', contractId).order('transaction_date', { ascending: false }),
+        fetch(`/api/contracts/${contractId}/payment-schedule`, { headers }).then(r => r.json()),
+        fetch(`/api/contracts/${contractId}/transactions`, { headers }).then(r => r.json()),
       ])
       setSchedules(sRes.data || [])
       setLinkedTransactions(tRes.data || [])
@@ -713,13 +708,16 @@ export default function ContractDetailPage() {
     const newStatus = currentStatus === 'paid' ? 'unpaid' : 'paid'
     const paidDate = newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null
 
-    const { error } = await supabase
-      .from('payment_schedules')
-      .update({ status: newStatus, paid_date: paidDate })
-      .eq('id', scheduleId)
+    const headers = await getAuthHeader()
+    const res = await fetch(`/api/contracts/${contractId}/payment-schedule/${scheduleId}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, paid_date: paidDate })
+    })
+    const json = await res.json()
 
-    if (error) {
-      alert('오류: ' + error.message)
+    if (json.error) {
+      alert('오류: ' + json.error)
     } else {
       fetchData()
     }

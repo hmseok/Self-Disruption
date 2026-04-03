@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 
 // ============================================
 // 잔디(Jandi) Outgoing Webhook → 대차요청 접수
@@ -30,14 +30,6 @@ import { createClient } from '@supabase/supabase-js'
 // *청구내용(고객/스카이/대물): 대물
 // *추가내용:
 // *접수자: 정지은
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
 
 // ── 한국어 날짜 파싱
 function parseKoreanDatetime(str: string): { date: string; time: string | null } {
@@ -205,7 +197,6 @@ export async function POST(request: NextRequest) {
       return jandiResponse('⚠️ 차량번호를 찾을 수 없습니다.', '#FF9800')
     }
 
-    const supabase = getSupabaseAdmin()
     const cleanCarNum = carNumber.replace(/\s/g, '')
 
     // ── 과실 유형
@@ -248,15 +239,20 @@ export async function POST(request: NextRequest) {
     }
 
     // ── DB: 차량 조회
-    const { data: car } = await supabase
-      .from('cars')
-      .select('id, number, brand, model, status')
-      .or(`number.ilike.%${cleanCarNum}%`)
-      .limit(1)
-      .single()
+    const cars = await prisma.$queryRaw<any[]>`
+      SELECT id, number, brand, model, status
+      FROM cars
+      WHERE number LIKE ${`%${cleanCarNum}%`}
+      LIMIT 1
+    `
+
+    const car = cars[0]
 
     // 회사 ID 결정
-    const { data: defaultCompany } = await supabase.from('companies').select('id').limit(1).single()
+    const companies = await prisma.$queryRaw<any[]>`
+      SELECT id FROM companies LIMIT 1
+    `
+    const defaultCompany = companies[0]
     const companyId = defaultCompany?.id
     if (!companyId) {
       return jandiResponse('⚠️ 회사 정보를 찾을 수 없습니다.', '#FF9800')
@@ -266,76 +262,73 @@ export async function POST(request: NextRequest) {
     let contractId = null
     let customerId = null
     if (car) {
-      const { data: activeContract } = await supabase
-        .from('contracts')
-        .select('id, customer_id')
-        .eq('car_id', car.id)
-        .eq('status', 'active')
-        .limit(1)
-        .single()
+      const contracts = await prisma.$queryRaw<any[]>`
+        SELECT id, customer_id
+        FROM contracts
+        WHERE car_id = ${car.id}
+        AND status = 'active'
+        LIMIT 1
+      `
+      const activeContract = contracts[0]
       contractId = activeContract?.id || null
       customerId = activeContract?.customer_id || null
     }
 
     // ── 1) accident_records INSERT (사고 내역 보관)
-    const accidentInsert: Record<string, any> = {
-      car_id: car?.id || null,
-      contract_id: contractId,
-      customer_id: customerId,
-      accident_date: accidentDt.date,
-      accident_time: accidentDt.time,
-      accident_location: deliveryLocation || fields['사고장소'] || '',
-      accident_type: faultRatio === 100 && faultField.includes('단독') ? 'self_damage' : 'collision',
-      fault_ratio: faultRatio,
-      description: fields['사고내용'] || '',
-      driver_name: driver.name || reporter.name || customerName,
-      driver_phone: driver.phone || reporter.phone || '',
-      driver_relation: driver.relation || '',
-      counterpart_insurance: counterIns.company || '',
-      insurance_company: ownIns.company || '',
-      insurance_claim_no: ownIns.claimNo || '',
-      customer_deductible: deductible,
-      repair_shop_name: repairShop.name || '',
-      repair_start_date: repairShop.name ? accidentDt.date : null,
-      vehicle_condition: 'repairable',
-      status: 'reported',
-      source: 'jandi_replacement',
-      jandi_raw: rawText,
-      jandi_topic: roomName,
-      notes: [
-        `[잔디 대차요청] 작성자: ${writerName} / 토픽: ${roomName}`,
-        `접수시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
-        `거래처: ${capitalCompany}`,
-        `정산: ${header.settlementType || '-'} / 과실: ${faultField}`,
-        `대차요청일: ${requestDate} / 대차요청지: ${deliveryLocation}`,
-        `입고지: ${repairShop.name} ${repairShop.address} ${repairShop.phone}`,
-        `청구: ${billingType}`,
-        hasSpecialContract ? '임직원특약 해당' : '',
-        additionalNotes ? `추가: ${additionalNotes}` : '',
-        fields['파손부위'] ? `파손부위: ${fields['파손부위']}` : '',
-        fields['접수자'] ? `접수자: ${fields['접수자']}` : '',
-      ].filter(Boolean).join('\n'),
-    }
+    const accidentId = require('crypto').randomUUID?.() || Math.random().toString(36).substring(7)
+    const notesText = [
+      `[잔디 대차요청] 작성자: ${writerName} / 토픽: ${roomName}`,
+      `접수시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
+      `거래처: ${capitalCompany}`,
+      `정산: ${header.settlementType || '-'} / 과실: ${faultField}`,
+      `대차요청일: ${requestDate} / 대차요청지: ${deliveryLocation}`,
+      `입고지: ${repairShop.name} ${repairShop.address} ${repairShop.phone}`,
+      `청구: ${billingType}`,
+      hasSpecialContract ? '임직원특약 해당' : '',
+      additionalNotes ? `추가: ${additionalNotes}` : '',
+      fields['파손부위'] ? `파손부위: ${fields['파손부위']}` : '',
+      fields['접수자'] ? `접수자: ${fields['접수자']}` : '',
+    ].filter(Boolean).join('\n')
 
-    const { data: accident, error: accErr } = await supabase
-      .from('accident_records')
-      .insert(accidentInsert)
-      .select('id')
-      .single()
+    await prisma.$executeRaw`
+      INSERT INTO accident_records (
+        id, car_id, contract_id, customer_id, accident_date, accident_time,
+        accident_location, accident_type, fault_ratio, description,
+        driver_name, driver_phone, driver_relation,
+        counterpart_insurance, insurance_company, insurance_claim_no,
+        customer_deductible, repair_shop_name, repair_start_date, vehicle_condition,
+        status, source, jandi_raw, jandi_topic, notes
+      ) VALUES (
+        ${accidentId}, ${car?.id || null}, ${contractId}, ${customerId},
+        ${accidentDt.date}, ${accidentDt.time}, ${deliveryLocation || fields['사고장소'] || ''},
+        ${faultRatio === 100 && faultField.includes('단독') ? 'self_damage' : 'collision'},
+        ${faultRatio}, ${fields['사고내용'] || ''}, ${driver.name || reporter.name || customerName},
+        ${driver.phone || reporter.phone || ''}, ${driver.relation || ''}, ${counterIns.company || ''},
+        ${ownIns.company || ''}, ${ownIns.claimNo || ''}, ${deductible},
+        ${repairShop.name || ''}, ${repairShop.name ? accidentDt.date : null}, 'repairable',
+        'reported', 'jandi_replacement', ${rawText}, ${roomName}, ${notesText}
+      )
+    `
 
-    if (accErr) {
-      console.error('사고 등록 실패:', JSON.stringify(accErr))
-      return jandiResponse(`❌ 사고 등록 실패: ${accErr.message}`, '#FF0000')
+    // Get accident ID
+    const accidents = await prisma.$queryRaw<any[]>`
+      SELECT id FROM accident_records WHERE jandi_raw = ${rawText} ORDER BY created_at DESC LIMIT 1
+    `
+    const accident = accidents[0]
+
+    if (!accident) {
+      return jandiResponse(`❌ 사고 등록 실패: 레코드를 찾을 수 없습니다.`, '#FF0000')
     }
 
     // ── 2) 배정 가능 차량 추천
     // 유휴 차량 (status = available/idle) 조회
-    const { data: availableCars } = await supabase
-      .from('cars')
-      .select('id, number, brand, model, trim, year, status')
-      .in('status', ['available', 'idle', '대기'])
-      .order('brand', { ascending: true })
-      .limit(10)
+    const availableCars = await prisma.$queryRaw<any[]>`
+      SELECT id, number, brand, model, trim, year, status
+      FROM cars
+      WHERE status IN ('available', 'idle', '대기')
+      ORDER BY brand ASC
+      LIMIT 10
+    `
 
     // 차량 클래스 추정 (사고 차량 모델 기반)
     const modelLower = (carModel || car?.model || '').toLowerCase()
@@ -358,15 +351,11 @@ export async function POST(request: NextRequest) {
 
     // ── 3) 차량 상태 변경 (사고 차량)
     if (car) {
-      await supabase.from('cars').update({ status: 'accident' }).eq('id', car.id)
-      await supabase.from('vehicle_status_log').insert({
-        car_id: car.id,
-        old_status: car.status || 'active',
-        new_status: 'accident',
-        related_type: 'accident',
-        related_id: String(accident.id),
-        memo: `잔디 대차요청 #${accident.id}`,
-      })
+      await prisma.$executeRaw`UPDATE cars SET status = 'accident' WHERE id = ${car.id}`
+      await prisma.$executeRaw`
+        INSERT INTO vehicle_status_log (car_id, old_status, new_status, related_type, related_id, memo)
+        VALUES (${car.id}, ${car.status || 'active'}, 'accident', 'accident', ${String(accident.id)}, ${`잔디 대차요청 #${accident.id}`})
+      `
     }
 
     // ── 4) 잔디 응답

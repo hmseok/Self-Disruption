@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // ============================================
 // AI 통합 분류 API v3.0
@@ -188,14 +189,6 @@ ${txLines}
   return allResults
 }
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-
 // ── 세무사 기준 분류 규칙 (법인 전체 계정과목 기준 확장) ──
 const CATEGORY_RULES = [
   // ═══ 수입 (매출/영업외수익) ═══
@@ -362,20 +355,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'company_id가 필요합니다.' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // ── 1. 모든 매칭 데이터 병렬 로딩 (테이블 없어도 에러 안 남) ──
-    const safeQuery = async (query: any) => {
+    async function safeQuery<T>(fn: () => Promise<T>): Promise<T | null> {
       try {
-        const result = await query
-        if (result?.error) {
-          console.warn('[safeQuery] DB 에러 (무시):', result.error?.message || result.error)
-          return { data: [], error: result.error }
-        }
-        return result
+        return await fn()
       } catch (e: any) {
         console.warn('[safeQuery] 예외 (무시):', e?.message || e)
-        return { data: [], error: null }
+        return null
       }
     }
 
@@ -383,17 +369,17 @@ export async function POST(request: NextRequest) {
       jiipRes, investRes, loanRes, rulesRes, scheduleRes,
       salaryRes, freelancerRes, insuranceRes, carRes, cardRes, cardHistoryRes
     ] = await Promise.all([
-      safeQuery(sb.from('jiip_contracts').select('*')),
-      safeQuery(sb.from('general_investments').select('*')),
-      safeQuery(sb.from('loans').select('*')),
-      safeQuery(sb.from('finance_rules').select('*')),
-      safeQuery(sb.from('expected_payment_schedules').select('*')),
-      safeQuery(sb.from('employee_salaries').select('*')),
-      safeQuery(sb.from('freelancers').select('*')),
-      safeQuery(sb.from('insurance_contracts').select('*')),
-      safeQuery(sb.from('cars').select('*')),
-      safeQuery(sb.from('corporate_cards').select('*')),
-      safeQuery(sb.from('card_assignment_history').select('*')),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM general_investments`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM loans`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM finance_rules`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM expected_payment_schedules`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM employee_salaries`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM freelancers`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM insurance_contracts`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM cars`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM corporate_cards`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT * FROM card_assignment_history`),
     ])
 
     // ── 2. 통합 매칭 대상 생성 (JS에서 status 필터링 — 컬럼 없을 수 있음) ──
@@ -401,7 +387,7 @@ export async function POST(request: NextRequest) {
     const targets: MatchTarget[] = []
 
     // 지입 계약
-    for (const c of filterActive(jiipRes.data || [])) {
+    for (const c of filterActive(jiipRes || [])) {
       const acctDigits = (c.account_number || '').replace(/\D/g, '')
       targets.push({
         id: c.id, type: 'jiip',
@@ -415,7 +401,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 투자 계약
-    for (const c of filterActive(investRes.data || [])) {
+    for (const c of filterActive(investRes || [])) {
       const monthlyInterest = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
       // 계좌번호에서 숫자만 추출 (매칭용)
       const acctDigits = (c.account_number || '').replace(/\D/g, '')
@@ -431,7 +417,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 대출
-    for (const c of filterActive(loanRes.data || [])) {
+    for (const c of filterActive(loanRes || [])) {
       targets.push({
         id: c.id, type: 'loan',
         name: c.finance_name || '',
@@ -443,7 +429,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 직원 급여
-    for (const s of (salaryRes.data || []).filter((r: any) => r.is_active !== false)) {
+    for (const s of (salaryRes || []).filter((r: any) => r.is_active !== false)) {
       const profileData = s.profiles as any
       const empName = profileData?.name || s.name || ''
       targets.push({
@@ -458,7 +444,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 프리랜서
-    for (const f of filterActive(freelancerRes.data || [])) {
+    for (const f of filterActive(freelancerRes || [])) {
       targets.push({
         id: f.id, type: 'freelancer',
         name: f.name || '',
@@ -471,7 +457,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 보험
-    for (const ins of insuranceRes.data || []) {
+    for (const ins of insuranceRes || []) {
       const monthlyPremium = Math.round((Number(ins.total_premium) || 0) / 12)
       targets.push({
         id: ins.id, type: 'insurance',
@@ -485,19 +471,16 @@ export async function POST(request: NextRequest) {
     }
 
     const filterPending = (arr: any[]) => arr.filter(r => !r.status || r.status === 'pending')
-    const schedules: ScheduleInfo[] = filterPending(scheduleRes.data || []) as ScheduleInfo[]
-    const dbRules = (rulesRes.data || []) as any[]
+    const schedules: ScheduleInfo[] = filterPending(scheduleRes || []) as ScheduleInfo[]
+    const dbRules = (rulesRes || []) as any[]
     // 카드는 status 필터 없이 전체 로드 (status 컬럼이 없을 수 있음)
-    const cards = (cardRes.data || []) as any[]
-    const cars = (carRes.data || []) as any[]
+    const cards = (cardRes || []) as any[]
+    const cars = (carRes || []) as any[]
 
     // 디버그: 로드된 매칭 데이터 확인
     console.log(`[classify] 매칭 데이터 로드: 법인카드 ${cards.length}장, 차량 ${cars.length}대, 지입 ${targets.filter(t=>t.type==='jiip').length}건, 투자 ${targets.filter(t=>t.type==='invest').length}건, 대출 ${targets.filter(t=>t.type==='loan').length}건`)
     if (cards.length > 0) {
       console.log(`[classify] 카드 목록:`, cards.map((c: any) => `${c.card_company} ${(c.card_number||'').slice(-4)} (ID:${c.id})`))
-    }
-    if (cardRes.error) {
-      console.error('[classify] corporate_cards 쿼리 에러:', cardRes.error)
     }
 
     // ── 3. 각 거래 분석 ──
@@ -600,7 +583,7 @@ export async function POST(request: NextRequest) {
 
       // ── 3b-2. 카드 배정 이력 기반 사용자 매칭 ──
       if (tx.card_id) {
-        const cardHistory = (cardHistoryRes.data || []).filter((h: any) => h.card_id === tx.card_id)
+        const cardHistory = (cardHistoryRes || []).filter((h: any) => h.card_id === tx.card_id)
         const txDate = tx.transaction_date ? new Date(tx.transaction_date) : null
         if (txDate && cardHistory.length > 0) {
           // 거래 날짜가 어느 배정 기간에 속하는지 확인
@@ -936,11 +919,24 @@ export async function POST(request: NextRequest) {
     // queue에 저장하고 ID 반환
     const insertedQueueIds: string[] = []
     if (queueItems.length > 0) {
-      for (let i = 0; i < queueItems.length; i += 50) {
-        const batch = queueItems.slice(i, i + 50)
-        const { data: inserted, error } = await sb.from('classification_queue').insert(batch).select('id')
-        if (error) console.error('Classification queue insert error:', error.message)
-        if (inserted) insertedQueueIds.push(...inserted.map((r: any) => r.id))
+      const batchWithIds = queueItems.map((item: any) => ({ ...item, id: crypto.randomUUID() }))
+      for (const item of batchWithIds) {
+        try {
+          const altJson = JSON.stringify(item.alternatives)
+          await prisma.$executeRaw`
+            INSERT INTO classification_queue
+              (id, company_id, ai_category, ai_confidence, ai_matched_type, ai_matched_id,
+               ai_matched_name, alternatives, final_category, final_matched_type, final_matched_id, status)
+            VALUES
+              (${item.id}, ${item.company_id}, ${item.ai_category}, ${item.ai_confidence},
+               ${item.ai_matched_type || null}, ${item.ai_matched_id || null}, ${item.ai_matched_name || null},
+               ${altJson}, ${item.final_category || null}, ${item.final_matched_type || null},
+               ${item.final_matched_id || null}, ${item.status || 'pending'})
+          `
+          insertedQueueIds.push(item.id)
+        } catch (e: any) {
+          console.error('Classification queue insert error:', e.message)
+        }
       }
     }
 
@@ -971,66 +967,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // ── 1차: classification_queue에서 조회 ──
-    // Supabase 기본 제한이 1000행이므로, limit > 1000이면 페이지네이션으로 가져옴
-    const fetchAllFromQueue = async () => {
-      let baseQuery = sb
-        .from('classification_queue')
-        .select('*', { count: 'exact' })
-        .is('deleted_at', null)
+    let queueData: any[] | null = null
+    let queueCount = 0
+    let queueError: any = null
 
-      if (status === 'pending') {
-        baseQuery = baseQuery.in('status', ['pending', 'auto_confirmed'])
-      } else if (status === 'confirmed') {
-        baseQuery = baseQuery.eq('status', 'confirmed')
-      }
+    try {
+      const statusFilter = status === 'pending'
+        ? Prisma.raw(`AND status IN ('pending', 'auto_confirmed')`)
+        : status === 'confirmed'
+        ? Prisma.raw(`AND status = 'confirmed'`)
+        : Prisma.empty
 
-      if (limit <= 1000) {
-        const { data, error, count } = await baseQuery
-          .order('created_at', { ascending: false })
-          .limit(limit)
-        return { data, error, count }
-      }
+      const countRows = await prisma.$queryRaw<any[]>`
+        SELECT COUNT(*) as cnt FROM classification_queue
+        WHERE deleted_at IS NULL ${statusFilter}
+      `
+      queueCount = Number(countRows[0]?.cnt || 0)
 
-      // 페이지네이션: 1000건씩 가져오기
-      let allData: any[] = []
-      let totalCount = 0
-      let page = 0
-      const pageSize = 1000
-
-      while (allData.length < limit) {
-        const from = page * pageSize
-        const to = Math.min(from + pageSize - 1, limit - 1)
-
-        let pageQuery = sb
-          .from('classification_queue')
-          .select('*', { count: 'exact' })
-          .is('deleted_at', null)
-
-        if (status === 'pending') {
-          pageQuery = pageQuery.in('status', ['pending', 'auto_confirmed'])
-        } else if (status === 'confirmed') {
-          pageQuery = pageQuery.eq('status', 'confirmed')
-        }
-
-        const { data, error, count } = await pageQuery
-          .order('created_at', { ascending: false })
-          .range(from, to)
-
-        if (error) return { data: null, error, count: 0 }
-        totalCount = count || 0
-        if (!data || data.length === 0) break
-        allData = [...allData, ...data]
-        if (data.length < pageSize) break // 더 이상 데이터 없음
-        page++
-      }
-
-      return { data: allData, error: null, count: totalCount }
+      queueData = await prisma.$queryRaw<any[]>`
+        SELECT * FROM classification_queue
+        WHERE deleted_at IS NULL ${statusFilter}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `
+    } catch (e: any) {
+      console.error('[GET classify] queue 조회 오류:', e.message)
+      queueError = e
     }
-
-    const { data: queueData, error: queueError, count: queueCount } = await fetchAllFromQueue()
 
     console.log(`[GET classify] status=${status}, queueData=${queueData?.length || 0}건, queueCount=${queueCount}, error=${queueError?.message || 'none'}`)
     if (status === 'confirmed' && queueData) {
@@ -1041,10 +1005,10 @@ export async function GET(request: NextRequest) {
       // ★ invest/jiip 이름 조회 맵 (final_matched_id로 이름 해결)
       const nameMap: Record<string, string> = {}
       try {
-        const { data: invs } = await sb.from('general_investments').select('id, investor_name')
-        ;(invs || []).forEach((i: any) => { nameMap[`invest_${i.id}`] = i.investor_name })
-        const { data: jiips } = await sb.from('jiip_contracts').select('id, investor_name')
-        ;(jiips || []).forEach((j: any) => { nameMap[`jiip_${j.id}`] = j.investor_name })
+        const invs = await prisma.$queryRaw<any[]>`SELECT id, investor_name FROM general_investments`
+        invs.forEach((i: any) => { nameMap[`invest_${i.id}`] = i.investor_name })
+        const jiips = await prisma.$queryRaw<any[]>`SELECT id, investor_name FROM jiip_contracts`
+        jiips.forEach((j: any) => { nameMap[`jiip_${j.id}`] = j.investor_name })
       } catch (e) { console.error('[GET classify] nameMap 조회 오류:', e) }
 
       // 디버깅: 첫 번째 레코드의 alternatives 구조 확인
@@ -1155,16 +1119,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: [], total: 0, source: 'classification_queue' })
     }
 
-    let txQuery = sb
-      .from('transactions')
-      .select('*', { count: 'exact' })
-      .is('deleted_at', null)
-
-    const { data: txData, error: txError, count: txCount } = await txQuery
-      .order('created_at', { ascending: false })
-      .limit(5000)
-
-    if (txError) throw txError
+    const txData = await prisma.$queryRaw<any[]>`
+      SELECT * FROM transactions
+      WHERE deleted_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 5000
+    `
+    const txCount = txData.length
 
     const allItems = (txData || []).map((tx: any) => {
       const cat = tx.category || '미분류'
@@ -1221,62 +1182,57 @@ export async function PUT(request: NextRequest) {
     const { company_id } = await request.json()
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
 
-    const sb = getSupabaseAdmin()
-
     // 1. classification_queue에서 pending 항목 가져오기
     // 주의: transaction_date 등은 직접 컬럼이 아니라 alternatives->source_data 안에 있음
-    const { data: queueItems, error: qErr } = await sb
-      .from('classification_queue')
-      .select('*')
-      .is('deleted_at', null)
-      .in('status', ['pending', 'auto_confirmed'])
-      .order('created_at', { ascending: false })
-
-    if (qErr) throw qErr
+    const queueItems = await prisma.$queryRaw<any[]>`
+      SELECT * FROM classification_queue
+      WHERE deleted_at IS NULL AND status IN ('pending', 'auto_confirmed')
+      ORDER BY created_at DESC
+    `
     if (!queueItems || queueItems.length === 0) {
       return NextResponse.json({ message: '재매칭할 항목이 없습니다.', updated: 0, total: 0 })
     }
 
     // 2. 매칭 대상 데이터 로드
-    const safeQ = async (query: any) => {
-      try { const r = await query; return r?.error ? { data: [] } : r } catch { return { data: [] } }
+    const safeRaw = async (fn: () => Promise<any[]>): Promise<any[]> => {
+      try { return await fn() } catch { return [] }
     }
     const [jiipRes, investRes, loanRes, salaryRes, freelancerRes, insuranceRes, carRes] = await Promise.all([
-      safeQ(sb.from('jiip_contracts').select('*')),
-      safeQ(sb.from('general_investments').select('*')),
-      safeQ(sb.from('loans').select('*')),
-      safeQ(sb.from('employee_salaries').select('*')),
-      safeQ(sb.from('freelancers').select('*')),
-      safeQ(sb.from('insurance_contracts').select('*')),
-      safeQ(sb.from('cars').select('*')),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM general_investments`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM loans`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM employee_salaries`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM freelancers`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM insurance_contracts`),
+      safeRaw(() => prisma.$queryRaw<any[]>`SELECT * FROM cars`),
     ])
 
     const filterActive = (arr: any[]) => arr.filter(r => !r.status || r.status === 'active')
     const targets: MatchTarget[] = []
 
-    for (const c of filterActive(jiipRes.data || [])) {
+    for (const c of filterActive(jiipRes || [])) {
       const acctDigits = (c.account_number || '').replace(/\D/g, '')
       targets.push({ id: c.id, type: 'jiip', name: c.investor_name || '', monthlyAmount: Number(c.admin_fee) || 0, paymentDay: Number(c.payout_day) || 10, defaultCategory: '지입 관리비/수수료', txType: 'both', extra: { account_number: acctDigits, account_holder: c.account_holder || '' } })
     }
-    for (const c of filterActive(investRes.data || [])) {
+    for (const c of filterActive(investRes || [])) {
       const mi = Math.round((Number(c.invest_amount) || 0) * (Number(c.interest_rate) || 0) / 100 / 12)
       const acctDigits = (c.account_number || '').replace(/\D/g, '')
       targets.push({ id: c.id, type: 'invest', name: c.investor_name || '', monthlyAmount: mi, paymentDay: Number(c.payment_day) || 10, defaultCategory: '이자비용(대출/투자)', txType: 'both', extra: { account_number: acctDigits, account_holder: c.account_holder || '' } })
     }
-    for (const c of filterActive(loanRes.data || [])) {
+    for (const c of filterActive(loanRes || [])) {
       targets.push({ id: c.id, type: 'loan', name: c.finance_name || '', monthlyAmount: Number(c.monthly_payment) || 0, paymentDay: Number(c.payment_date) || 10, defaultCategory: '차량할부/리스료', txType: 'expense' })
     }
-    for (const s of (salaryRes.data || []).filter((r: any) => r.is_active !== false)) {
+    for (const s of (salaryRes || []).filter((r: any) => r.is_active !== false)) {
       const empName = (s.profiles as any)?.name || s.name || ''
       targets.push({ id: s.employee_id || s.id, type: 'salary', name: empName, monthlyAmount: Number(s.base_salary || s.salary) || 0, paymentDay: Number(s.pay_day || s.payment_day) || 25, defaultCategory: '급여(정규직)', txType: 'expense', extra: { employee_id: s.employee_id } })
     }
-    for (const f of filterActive(freelancerRes.data || [])) {
+    for (const f of filterActive(freelancerRes || [])) {
       targets.push({ id: f.id, type: 'freelancer', name: f.name || '', monthlyAmount: Number(f.default_fee) || 0, paymentDay: 0, defaultCategory: '용역비(3.3%)', txType: 'expense', extra: { service_type: f.service_type } })
     }
-    for (const ins of insuranceRes.data || []) {
+    for (const ins of insuranceRes || []) {
       targets.push({ id: ins.id, type: 'insurance', name: ins.company || ins.product_name || '', monthlyAmount: Math.round((Number(ins.total_premium) || 0) / 12), paymentDay: 0, defaultCategory: '차량보험료', txType: 'expense', extra: { car_id: ins.car_id } })
     }
-    const cars = (carRes.data || []) as any[]
+    const cars = (carRes || []) as any[]
 
     // 3. 각 큐 항목에 대해 재매칭
     // classification_queue의 거래 데이터는 alternatives.source_data 안에 저장됨
@@ -1397,12 +1353,20 @@ export async function PUT(request: NextRequest) {
         if (newCategory) {
           updateData.ai_category = newCategory
         }
-        const { error: upErr } = await sb
-          .from('classification_queue')
-          .update(updateData)
-          .eq('id', item.id)
-
-        if (!upErr) updated++
+        try {
+          const cat = updateData.ai_category || null
+          await prisma.$executeRaw`
+            UPDATE classification_queue
+            SET ai_matched_type = ${updateData.ai_matched_type},
+                ai_matched_id = ${updateData.ai_matched_id},
+                ai_matched_name = ${updateData.ai_matched_name}
+                ${cat ? Prisma.raw(`, ai_category = '${cat.replace(/'/g, "''")}'`) : Prisma.empty}
+            WHERE id = ${item.id}
+          `
+          updated++
+        } catch (e: any) {
+          console.error('[재매칭] 업데이트 오류:', e.message)
+        }
       }
     }
 
@@ -1421,17 +1385,16 @@ export async function PATCH(request: NextRequest) {
 
     // ★ 일괄분류 + 학습: bulk_classify 모드
     if (body.bulk_classify && Array.isArray(body.queue_ids) && body.final_category) {
-      const sb = getSupabaseAdmin()
       const { queue_ids, final_category, save_rules } = body
       const PENDING_CATS = ['미분류', '']
       const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
 
       // 일괄 카테고리 업데이트
-      const { error: bulkErr } = await sb
-        .from('classification_queue')
-        .update({ final_category, status: newStatus })
-        .in('id', queue_ids)
-      if (bulkErr) throw bulkErr
+      await prisma.$executeRaw`
+        UPDATE classification_queue
+        SET final_category = ${final_category}, status = ${newStatus}
+        WHERE id IN (${Prisma.join(queue_ids)})
+      `
 
       // 학습 규칙 저장 (save_rules가 true이고 keywords 배열이 있을 때)
       let rulesSaved = 0
@@ -1439,12 +1402,14 @@ export async function PATCH(request: NextRequest) {
         const uniqueKeywords = [...new Set(body.keywords.filter((k: string) => k && k.trim()))] as string[]
         for (const keyword of uniqueKeywords) {
           try {
-            await sb.from('finance_rules').upsert({
-              keyword: keyword.toLowerCase().trim(),
-              category: final_category,
-              related_type: body.final_matched_type || null,
-              related_id: body.final_matched_id || null,
-            }, { onConflict: 'keyword' })
+            const kw = keyword.toLowerCase().trim()
+            const relType = body.final_matched_type || null
+            const relId = body.final_matched_id || null
+            await prisma.$executeRaw`
+              INSERT INTO finance_rules (keyword, category, related_type, related_id)
+              VALUES (${kw}, ${final_category}, ${relType}, ${relId})
+              ON DUPLICATE KEY UPDATE category = ${final_category}, related_type = ${relType}, related_id = ${relId}
+            `
             rulesSaved++
           } catch (e) {
             console.error('Rule save error for keyword:', keyword, e)
@@ -1462,56 +1427,56 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'queue_id, final_category 필요' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
-
     // classification_queue 업데이트 — 카테고리에 따라 status 결정
     const PENDING_CATS = ['미분류', '']
     const newStatus = PENDING_CATS.includes(final_category) ? 'pending' : 'confirmed'
-    const updateData: Record<string, any> = {
-      final_category,
-      status: newStatus,
-    }
-    // ★ 되돌리기(pending) 시 → final_matched_* 초기화 (이전 매칭 정보 제거)
-    if (newStatus === 'pending') {
-      updateData.final_matched_type = null
-      updateData.final_matched_id = null
-      updateData.final_matched_name = null
-    }
-    // ★ final_matched_type/id가 있으면 classification_queue에도 저장
-    if (final_matched_type !== undefined) updateData.final_matched_type = final_matched_type || null
-    if (final_matched_id !== undefined) updateData.final_matched_id = final_matched_id || null
 
-    // ★ final_matched_name 조회 및 저장 (invest/jiip 연결 시)
+    // ★ final_matched_name 조회 (invest/jiip 연결 시)
+    let finalMatchedName: string | null = null
     if (final_matched_type && final_matched_id) {
       try {
         if (final_matched_type === 'invest') {
-          const { data: inv } = await sb.from('general_investments').select('investor_name').eq('id', final_matched_id).maybeSingle()
-          if (inv?.investor_name) updateData.final_matched_name = inv.investor_name
+          const rows = await prisma.$queryRaw<any[]>`SELECT investor_name FROM general_investments WHERE id = ${final_matched_id} LIMIT 1`
+          if (rows[0]?.investor_name) finalMatchedName = rows[0].investor_name
         } else if (final_matched_type === 'jiip') {
-          const { data: jiip } = await sb.from('jiip_contracts').select('investor_name').eq('id', final_matched_id).maybeSingle()
-          if (jiip?.investor_name) updateData.final_matched_name = jiip.investor_name
+          const rows = await prisma.$queryRaw<any[]>`SELECT investor_name FROM jiip_contracts WHERE id = ${final_matched_id} LIMIT 1`
+          if (rows[0]?.investor_name) finalMatchedName = rows[0].investor_name
         } else if (final_matched_type === 'freelancer') {
-          const { data: fl } = await sb.from('freelancers').select('name').eq('id', final_matched_id).maybeSingle()
-          if (fl?.name) updateData.final_matched_name = fl.name
+          const rows = await prisma.$queryRaw<any[]>`SELECT name FROM freelancers WHERE id = ${final_matched_id} LIMIT 1`
+          if (rows[0]?.name) finalMatchedName = rows[0].name
         } else if (final_matched_type === 'salary' || final_matched_type === 'employee') {
-          const { data: emp } = await sb.from('employees').select('name').eq('id', final_matched_id).maybeSingle()
-          if (emp?.name) updateData.final_matched_name = emp.name
+          const rows = await prisma.$queryRaw<any[]>`SELECT name FROM employees WHERE id = ${final_matched_id} LIMIT 1`
+          if (rows[0]?.name) finalMatchedName = rows[0].name
         }
       } catch (e) {
         console.error('[PATCH classify] final_matched_name 조회 오류:', e)
       }
     }
 
-    console.log(`[PATCH classify] queue_id=${queue_id}, final_category=${final_category}, newStatus=${newStatus}, related_type=${final_matched_type}, related_id=${final_matched_id}, matched_name=${updateData.final_matched_name || 'N/A'}`)
+    // Build update based on status
+    if (newStatus === 'pending') {
+      // 되돌리기: final_matched_* 초기화
+      await prisma.$executeRaw`
+        UPDATE classification_queue
+        SET final_category = ${final_category}, status = ${newStatus},
+            final_matched_type = NULL, final_matched_id = NULL, final_matched_name = NULL
+        WHERE id = ${queue_id}
+      `
+    } else {
+      const fmType = final_matched_type !== undefined ? (final_matched_type || null) : null
+      const fmId = final_matched_id !== undefined ? (final_matched_id || null) : null
+      await prisma.$executeRaw`
+        UPDATE classification_queue
+        SET final_category = ${final_category}, status = ${newStatus},
+            final_matched_type = ${fmType}, final_matched_id = ${fmId},
+            final_matched_name = ${finalMatchedName}
+        WHERE id = ${queue_id}
+      `
+    }
 
-    const { data: updated, error: updateErr } = await sb
-      .from('classification_queue')
-      .update(updateData)
-      .eq('id', queue_id)
-      .select()
-      .maybeSingle()
+    const updatedRows = await prisma.$queryRaw<any[]>`SELECT * FROM classification_queue WHERE id = ${queue_id} LIMIT 1`
+    const updated = updatedRows[0]
 
-    if (updateErr) throw updateErr
     if (!updated) {
       console.log(`[PATCH classify] queue_id=${queue_id} 레코드를 찾을 수 없음`)
       return NextResponse.json({ error: `queue_id ${queue_id} 레코드를 찾을 수 없습니다` }, { status: 404 })
@@ -1519,10 +1484,8 @@ export async function PATCH(request: NextRequest) {
 
     // 업데이트 후 confirmed 총 수 확인 (디버깅)
     try {
-      const { count: confirmedTotal } = await sb
-        .from('classification_queue')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'confirmed')
+      const countRows = await prisma.$queryRaw<any[]>`SELECT COUNT(*) as cnt FROM classification_queue WHERE status = 'confirmed'`
+      const confirmedTotal = Number(countRows[0]?.cnt || 0)
       console.log(`[PATCH classify] 업데이트 완료. updated.status=${updated.status}, DB confirmed 총 수=${confirmedTotal}`)
     } catch (e) {
       console.log(`[PATCH classify] 업데이트 완료. updated.status=${updated.status} (count 쿼리 실패)`)
@@ -1531,12 +1494,14 @@ export async function PATCH(request: NextRequest) {
     // 규칙 학습 (선택적)
     if (save_as_rule && rule_keyword) {
       try {
-        await sb.from('finance_rules').upsert({
-          keyword: rule_keyword.toLowerCase(),
-          category: final_category,
-          related_type: final_matched_type || null,
-          related_id: final_matched_id || null,
-        }, { onConflict: 'keyword' })
+        const kw = rule_keyword.toLowerCase()
+        const relType = final_matched_type || null
+        const relId = final_matched_id || null
+        await prisma.$executeRaw`
+          INSERT INTO finance_rules (keyword, category, related_type, related_id)
+          VALUES (${kw}, ${final_category}, ${relType}, ${relId})
+          ON DUPLICATE KEY UPDATE category = ${final_category}, related_type = ${relType}, related_id = ${relId}
+        `
       } catch (e) {
         console.error('Rule save error:', e)
       }
@@ -1544,13 +1509,10 @@ export async function PATCH(request: NextRequest) {
 
     // ★ 되돌리기(pending) 시 → transactions 테이블에서 매칭 거래 삭제 + 투자/지입 금액 재계산
     if (newStatus === 'pending' && updated) {
-      // 되돌리기 대상의 related_type/related_id 파악
-      // ★ final_matched_* 를 우선 참조 (확정 시 사용자가 지정한 값), 없으면 AI 값 사용
       const revertRelatedType = updated.final_matched_type || updated.ai_matched_type || final_matched_type || null
       const revertRelatedId = updated.final_matched_id || updated.ai_matched_id || final_matched_id || null
 
       try {
-        // alternatives에서 source_data 추출 (다양한 형식 대응)
         let sd: any = {}
         if (updated.source_data && typeof updated.source_data === 'object' && Object.keys(updated.source_data).length > 0) {
           sd = updated.source_data
@@ -1561,69 +1523,51 @@ export async function PATCH(request: NextRequest) {
         }
 
         const txDate = sd?.transaction_date || updated.transaction_date
-        const clientName = sd?.client_name || updated.client_name
+        const clientName = sd?.client_name || updated.client_name || ''
         const amount = Math.abs(Number(sd?.amount || updated.amount || 0))
         const companyId = updated.company_id
 
         if (txDate && companyId) {
-          // 날짜+거래처+금액으로 매칭되는 transactions 삭제
-          // related_type/related_id가 있으면 더 정확한 매칭으로 삭제
-          let deleteQuery = sb
-            .from('transactions')
-            .delete()
-            .eq('transaction_date', txDate)
-            .eq('client_name', clientName || '')
-            .eq('amount', amount)
-
           if (revertRelatedType && revertRelatedId) {
-            deleteQuery = deleteQuery
-              .eq('related_type', revertRelatedType)
-              .eq('related_id', revertRelatedId)
+            await prisma.$executeRaw`
+              DELETE FROM transactions
+              WHERE transaction_date = ${txDate} AND client_name = ${clientName}
+                AND amount = ${amount} AND related_type = ${revertRelatedType} AND related_id = ${revertRelatedId}
+            `
+          } else {
+            await prisma.$executeRaw`
+              DELETE FROM transactions
+              WHERE transaction_date = ${txDate} AND client_name = ${clientName} AND amount = ${amount}
+            `
           }
-
-          const { error: delErr } = await deleteQuery
-
-          if (delErr) console.error('[classify PATCH] 되돌리기 transactions 삭제 오류:', delErr)
-          else console.log(`[classify PATCH] 되돌리기: transactions에서 ${txDate}/${clientName}/${amount} (${revertRelatedType || 'no-type'}/${revertRelatedId || 'no-id'}) 삭제`)
+          console.log(`[classify PATCH] 되돌리기: transactions에서 ${txDate}/${clientName}/${amount} (${revertRelatedType || 'no-type'}/${revertRelatedId || 'no-id'}) 삭제`)
         }
       } catch (e) {
         console.error('[classify PATCH] 되돌리기 transactions 삭제 처리 오류:', e)
       }
 
-      // ★ 되돌리기 후 투자자 current_balance 재계산 (invest_amount 계약원금은 유지)
+      // ★ 되돌리기 후 투자자 current_balance 재계산
       if (revertRelatedType === 'invest' && revertRelatedId) {
         try {
-          const { data: allTxs } = await sb
-            .from('transactions')
-            .select('amount, type')
-            .eq('related_type', 'invest')
-            .eq('related_id', revertRelatedId)
-          const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
-            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          const allTxs = await prisma.$queryRaw<any[]>`SELECT amount, type FROM transactions WHERE related_type = 'invest' AND related_id = ${revertRelatedId}`
+          const netAmount = allTxs.reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(Number(cur.amount) || 0) : -Math.abs(Number(cur.amount) || 0))
           }, 0)
-          await sb.from('general_investments')
-            .update({ current_balance: netAmount })
-            .eq('id', revertRelatedId)
+          await prisma.$executeRaw`UPDATE general_investments SET current_balance = ${netAmount} WHERE id = ${revertRelatedId}`
           console.log(`[classify PATCH] 되돌리기: 투자자 ${revertRelatedId} current_balance 재계산: ${netAmount}`)
         } catch (e) {
           console.error('[classify PATCH] 되돌리기 투자자 잔액 재계산 오류:', e)
         }
       }
 
-      // ★ 되돌리기 후 지입 계약 current_balance 재계산 (invest_amount는 유지)
+      // ★ 되돌리기 후 지입 계약 current_balance 재계산
       if (revertRelatedType === 'jiip' && revertRelatedId) {
         try {
-          const { data: allTxs } = await sb
-            .from('transactions')
-            .select('amount, type')
-            .eq('related_type', 'jiip')
-            .eq('related_id', revertRelatedId)
-          const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
-            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+          const allTxs = await prisma.$queryRaw<any[]>`SELECT amount, type FROM transactions WHERE related_type = 'jiip' AND related_id = ${revertRelatedId}`
+          const netAmount = allTxs.reduce((acc: number, cur: any) => {
+            return acc + (cur.type === 'income' ? Math.abs(Number(cur.amount) || 0) : -Math.abs(Number(cur.amount) || 0))
           }, 0)
-          await sb.from('jiip_contracts')
-            .update({ current_balance: netAmount })
-            .eq('id', revertRelatedId)
+          await prisma.$executeRaw`UPDATE jiip_contracts SET current_balance = ${netAmount} WHERE id = ${revertRelatedId}`
           console.log(`[classify PATCH] 되돌리기: 지입 ${revertRelatedId} current_balance 재계산: ${netAmount}`)
         } catch (e) {
           console.error('[classify PATCH] 되돌리기 지입 잔액 재계산 오류:', e)
@@ -1634,7 +1578,6 @@ export async function PATCH(request: NextRequest) {
     // ★ 확정 시 → 매칭되는 transaction의 category/related_type/related_id 업데이트
     if (newStatus === 'confirmed' && updated) {
       try {
-        // source_data에서 거래 정보 추출
         let sd: any = {}
         if (updated.source_data && typeof updated.source_data === 'object' && Object.keys(updated.source_data).length > 0) {
           sd = updated.source_data
@@ -1645,68 +1588,50 @@ export async function PATCH(request: NextRequest) {
         }
 
         const txDate = sd?.transaction_date || updated.transaction_date
-        const clientName = sd?.client_name || updated.client_name
+        const clientName = sd?.client_name || updated.client_name || ''
         const amount = Math.abs(Number(sd?.amount || updated.amount || 0))
         const companyId = updated.company_id
 
         if (txDate && companyId) {
-          const txUpdateData: Record<string, any> = { category: final_category }
-          if (final_matched_type !== undefined) txUpdateData.related_type = final_matched_type || null
-          if (final_matched_id !== undefined) txUpdateData.related_id = final_matched_id || null
-
-          const { error: txUpdateErr, count: txUpdated } = await sb
-            .from('transactions')
-            .update(txUpdateData)
-            .eq('transaction_date', txDate)
-            .eq('client_name', clientName || '')
-            .eq('amount', amount)
-
-          if (txUpdateErr) console.error('[classify PATCH] 확정: transactions 업데이트 오류:', txUpdateErr)
-          else console.log(`[classify PATCH] 확정: transactions 업데이트 (${txDate}/${clientName}/${amount}) → category=${final_category}, related=${final_matched_type}/${final_matched_id}, count=${txUpdated}`)
+          const fmType = final_matched_type !== undefined ? (final_matched_type || null) : null
+          const fmId = final_matched_id !== undefined ? (final_matched_id || null) : null
+          await prisma.$executeRaw`
+            UPDATE transactions
+            SET category = ${final_category}, related_type = ${fmType}, related_id = ${fmId}
+            WHERE transaction_date = ${txDate} AND client_name = ${clientName} AND amount = ${amount}
+          `
+          console.log(`[classify PATCH] 확정: transactions 업데이트 (${txDate}/${clientName}/${amount}) → category=${final_category}, related=${fmType}/${fmId}`)
         }
       } catch (e) {
         console.error('[classify PATCH] 확정: transactions 업데이트 처리 오류:', e)
       }
     }
 
-    // ★ 투자 연결 거래 확정 시 → current_balance(통장잔액) 업데이트 (invest_amount 계약원금은 건드리지 않음)
+    // ★ 투자 연결 거래 확정 시 → current_balance 업데이트
     if (newStatus === 'confirmed' && final_matched_type === 'invest' && final_matched_id) {
       try {
-        const { data: allTxs } = await sb
-          .from('transactions')
-          .select('amount, type')
-          .eq('related_type', 'invest')
-          .eq('related_id', final_matched_id)
-        if (allTxs && allTxs.length > 0) {
+        const allTxs = await prisma.$queryRaw<any[]>`SELECT amount, type FROM transactions WHERE related_type = 'invest' AND related_id = ${final_matched_id}`
+        if (allTxs.length > 0) {
           const netAmount = allTxs.reduce((acc: number, cur: any) => {
-            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+            return acc + (cur.type === 'income' ? Math.abs(Number(cur.amount) || 0) : -Math.abs(Number(cur.amount) || 0))
           }, 0)
-          // current_balance 컬럼만 업데이트 (invest_amount 계약원금은 유지)
-          await sb.from('general_investments')
-            .update({ current_balance: netAmount })
-            .eq('id', final_matched_id)
-          console.log(`[classify PATCH] 투자자 ${final_matched_id} current_balance 업데이트: ${netAmount} (invest_amount 계약원금은 유지)`)
+          await prisma.$executeRaw`UPDATE general_investments SET current_balance = ${netAmount} WHERE id = ${final_matched_id}`
+          console.log(`[classify PATCH] 투자자 ${final_matched_id} current_balance 업데이트: ${netAmount}`)
         }
       } catch (e) {
         console.error('[classify PATCH] 투자자 잔액 업데이트 오류:', e)
       }
     }
 
-    // ★ 지입 연결 거래 확정 시 → current_balance 업데이트 (invest_amount는 유지)
+    // ★ 지입 연결 거래 확정 시 → current_balance 업데이트
     if (newStatus === 'confirmed' && final_matched_type === 'jiip' && final_matched_id) {
       try {
-        const { data: allTxs } = await sb
-          .from('transactions')
-          .select('amount, type')
-          .eq('related_type', 'jiip')
-          .eq('related_id', final_matched_id)
-        if (allTxs && allTxs.length > 0) {
+        const allTxs = await prisma.$queryRaw<any[]>`SELECT amount, type FROM transactions WHERE related_type = 'jiip' AND related_id = ${final_matched_id}`
+        if (allTxs.length > 0) {
           const netAmount = allTxs.reduce((acc: number, cur: any) => {
-            return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+            return acc + (cur.type === 'income' ? Math.abs(Number(cur.amount) || 0) : -Math.abs(Number(cur.amount) || 0))
           }, 0)
-          await sb.from('jiip_contracts')
-            .update({ current_balance: netAmount })
-            .eq('id', final_matched_id)
+          await prisma.$executeRaw`UPDATE jiip_contracts SET current_balance = ${netAmount} WHERE id = ${final_matched_id}`
           console.log(`[classify PATCH] 지입 ${final_matched_id} current_balance 업데이트: ${netAmount}`)
         }
       } catch (e) {
@@ -1731,7 +1656,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'company_id is required' }, { status: 400 })
     }
 
-    const sb = getSupabaseAdmin()
     let deleted = 0
 
     // 삭제된 transactions의 related 정보를 수집하여 금액 재계산에 사용
@@ -1743,105 +1667,70 @@ export async function DELETE(request: NextRequest) {
         const batch = ids.slice(i, i + 50)
 
         // classification_queue에서 삭제 전 related 정보 수집
-        const { data: queueItems } = await sb.from('classification_queue')
-          .select('id, ai_matched_type, ai_matched_id')
-          .in('id', batch)
-        if (queueItems) {
-          for (const q of queueItems) {
-            if (q.ai_matched_type && q.ai_matched_id && ['invest', 'jiip'].includes(q.ai_matched_type)) {
-              affectedRelated.set(`${q.ai_matched_type}:${q.ai_matched_id}`, { type: q.ai_matched_type, id: q.ai_matched_id })
-            }
+        const queueItems = await prisma.$queryRaw<any[]>`
+          SELECT id, ai_matched_type, ai_matched_id FROM classification_queue WHERE id IN (${Prisma.join(batch)})
+        `
+        for (const q of queueItems) {
+          if (q.ai_matched_type && q.ai_matched_id && ['invest', 'jiip'].includes(q.ai_matched_type)) {
+            affectedRelated.set(`${q.ai_matched_type}:${q.ai_matched_id}`, { type: q.ai_matched_type, id: q.ai_matched_id })
           }
         }
 
         // classification_queue에서 삭제
-        const { data: qd } = await sb.from('classification_queue')
-          .delete()
-          .in('id', batch)
-          .select('id')
-        deleted += (qd?.length || 0)
+        await prisma.$executeRaw`DELETE FROM classification_queue WHERE id IN (${Prisma.join(batch)})`
+        deleted += batch.length
 
         // transactions에서 삭제 전 related 정보 수집
-        const { data: txItems } = await sb.from('transactions')
-          .select('id, related_type, related_id')
-          .in('id', batch)
-        if (txItems) {
-          for (const t of txItems) {
-            if (t.related_type && t.related_id && ['invest', 'jiip'].includes(t.related_type)) {
-              affectedRelated.set(`${t.related_type}:${t.related_id}`, { type: t.related_type, id: t.related_id })
-            }
+        const txItems = await prisma.$queryRaw<any[]>`
+          SELECT id, related_type, related_id FROM transactions WHERE id IN (${Prisma.join(batch)})
+        `
+        for (const t of txItems) {
+          if (t.related_type && t.related_id && ['invest', 'jiip'].includes(t.related_type)) {
+            affectedRelated.set(`${t.related_type}:${t.related_id}`, { type: t.related_type, id: t.related_id })
           }
         }
 
         // transactions에서 삭제
-        const { data: td } = await sb.from('transactions')
-          .delete()
-          .in('id', batch)
-          .select('id')
-        deleted += (td?.length || 0)
+        await prisma.$executeRaw`DELETE FROM transactions WHERE id IN (${Prisma.join(batch)})`
+        deleted += txItems.length
       }
     } else {
       // 전체 삭제
       if (status === 'pending') {
-        // classification_queue pending 삭제
-        const { data: qd } = await sb.from('classification_queue')
-          .delete()
-          .in('status', ['pending', 'auto_confirmed'])
-          .select('id')
-        deleted += (qd?.length || 0)
-
-        // transactions 전체 삭제 (category 컬럼 없으면 모두 pending으로 간주)
-        const { data: td } = await sb.from('transactions')
-          .delete()
-          .select('id')
-        deleted += (td?.length || 0)
+        await prisma.$executeRaw`DELETE FROM classification_queue WHERE status IN ('pending', 'auto_confirmed')`
+        deleted += 1 // approximate
+        await prisma.$executeRaw`DELETE FROM transactions WHERE company_id = ${company_id}`
+        deleted += 1
       } else if (status === 'confirmed') {
-        // classification_queue confirmed 삭제
-        const { data: qd } = await sb.from('classification_queue')
-          .delete()
-          .eq('status', 'confirmed')
-          .select('id')
-        deleted += (qd?.length || 0)
-
-        // transactions에서도 confirmed 항목 삭제 (category가 있는 건)
+        await prisma.$executeRaw`DELETE FROM classification_queue WHERE status = 'confirmed'`
+        deleted += 1
         try {
-          const { data: td } = await sb.from('transactions')
-            .delete()
-            .select('id')
-          deleted += (td?.length || 0)
+          await prisma.$executeRaw`DELETE FROM transactions WHERE company_id = ${company_id}`
+          deleted += 1
         } catch (e) {
           console.error('transactions confirmed delete error:', e)
         }
       } else {
         // all: 양쪽 테이블 모두 삭제
-        const { data: qd } = await sb.from('classification_queue')
-          .delete()
-          .select('id')
-        deleted += (qd?.length || 0)
-
-        const { data: td } = await sb.from('transactions')
-          .delete()
-          .select('id')
-        deleted += (td?.length || 0)
+        await prisma.$executeRaw`DELETE FROM classification_queue WHERE company_id = ${company_id}`
+        deleted += 1
+        await prisma.$executeRaw`DELETE FROM transactions WHERE company_id = ${company_id}`
+        deleted += 1
       }
     }
 
     // ★ 삭제 후 영향받은 투자/지입 current_balance 재계산 (invest_amount 계약원금은 유지)
-    for (const [key, rel] of affectedRelated.entries()) {
+    for (const [, rel] of affectedRelated.entries()) {
       try {
-        const { data: allTxs } = await sb
-          .from('transactions')
-          .select('amount, type')
-          .eq('related_type', rel.type)
-          .eq('related_id', rel.id)
-        const netAmount = (allTxs || []).reduce((acc: number, cur: any) => {
-          return acc + (cur.type === 'income' ? Math.abs(cur.amount || 0) : -Math.abs(cur.amount || 0))
+        const allTxs = await prisma.$queryRaw<any[]>`SELECT amount, type FROM transactions WHERE related_type = ${rel.type} AND related_id = ${rel.id}`
+        const netAmount = allTxs.reduce((acc: number, cur: any) => {
+          return acc + (cur.type === 'income' ? Math.abs(Number(cur.amount) || 0) : -Math.abs(Number(cur.amount) || 0))
         }, 0)
-        const table = rel.type === 'invest' ? 'general_investments' : 'jiip_contracts'
-        const updatePayload: Record<string, any> = { current_balance: netAmount }
-        await sb.from(table)
-          .update(updatePayload)
-          .eq('id', rel.id)
+        if (rel.type === 'invest') {
+          await prisma.$executeRaw`UPDATE general_investments SET current_balance = ${netAmount} WHERE id = ${rel.id}`
+        } else {
+          await prisma.$executeRaw`UPDATE jiip_contracts SET current_balance = ${netAmount} WHERE id = ${rel.id}`
+        }
         console.log(`[classify DELETE] ${rel.type} ${rel.id} current_balance 재계산: ${netAmount}`)
       } catch (e) {
         console.error(`[classify DELETE] ${rel.type} ${rel.id} 잔액 재계산 오류:`, e)

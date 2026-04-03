@@ -1,8 +1,22 @@
 'use client'
-import { supabase } from '../../utils/supabase'
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+
+// ============================================================================
+// AUTH HELPER
+// ============================================================================
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { auth } = await import('@/lib/firebase')
+    const user = auth.currentUser
+    if (!user) return {}
+    const token = await user.getIdToken(false)
+    return { Authorization: `Bearer ${token}` }
+  } catch {
+    return {}
+  }
+}
 
 // ============================================================
 // SUB-COMPONENTS (외부 정의)
@@ -288,29 +302,42 @@ export default function QuoteCalculator() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: codeData } = await supabase.from('common_codes').select('*')
-      setCommonCodes(codeData || [])
+      try {
+        const headers = await getAuthHeader()
 
-      const { data: ruleData } = await supabase.from('business_rules').select('*')
-      if (ruleData) {
-        const ruleMap = ruleData.reduce((acc: any, cur) => ({ ...acc, [cur.key]: cur.value }), {})
-        setRules(ruleMap)
+        const codeRes = await fetch('/api/codes', { headers })
+        const codeJson = await codeRes.json()
+        setCommonCodes(codeJson.data || [])
+
+        const ruleRes = await fetch('/api/business-rules', { headers })
+        const ruleJson = await ruleRes.json()
+        if (ruleJson.data) {
+          const ruleMap = ruleJson.data.reduce((acc: any, cur: any) => ({ ...acc, [cur.key]: cur.value }), {})
+          setRules(ruleMap)
+        }
+
+        const carsRes = await fetch('/api/cars', { headers })
+        const carsJson = await carsRes.json()
+        setCars(carsJson.data || [])
+
+        const custsRes = await fetch('/api/customers', { headers })
+        const custsJson = await custsRes.json()
+        setCustomers(custsJson.data || [])
+
+        const [insRes, maintRes, taxRes] = await Promise.all([
+          fetch('/api/pricing-standards?table=insurance_rate_table', { headers }),
+          fetch('/api/pricing-standards?table=maintenance_cost_table', { headers }),
+          fetch('/api/pricing-standards?table=vehicle_tax_table', { headers }),
+        ])
+        const insJson = await insRes.json()
+        const maintJson = await maintRes.json()
+        const taxJson = await taxRes.json()
+        setInsuranceRates(insJson.data || [])
+        setMaintenanceCosts(maintJson.data || [])
+        setTaxRates(taxJson.data || [])
+      } catch (err) {
+        console.error('Error fetching data:', err)
       }
-
-      const { data: carData } = await supabase.from('cars').select('*').eq('status', 'available')
-      setCars(carData || [])
-
-      const { data: custData } = await supabase.from('customers').select('*').order('name')
-      setCustomers(custData || [])
-
-      const [insRes, maintRes, taxRes] = await Promise.all([
-        supabase.from('insurance_rate_table').select('*'),
-        supabase.from('maintenance_cost_table').select('*'),
-        supabase.from('vehicle_tax_table').select('*'),
-      ])
-      setInsuranceRates(insRes.data || [])
-      setMaintenanceCosts(maintRes.data || [])
-      setTaxRates(taxRes.data || [])
     }
     fetchData()
   }, [])
@@ -324,16 +351,16 @@ export default function QuoteCalculator() {
       const quoteId = searchParams.get('quote_id')
       if (!quoteId) return
 
-      const { data: quoteData, error } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', quoteId)
-        .single()
+      try {
+        const headers = await getAuthHeader()
+        const res = await fetch(`/api/quotes/${quoteId}`, { headers })
+        const json = await res.json()
+        const quoteData = json.data ?? json
 
-      if (error || !quoteData) {
-        console.error('Failed to load quote:', error)
-        return
-      }
+        if (!quoteData) {
+          console.error('Failed to load quote')
+          return
+        }
 
       // 편집 모드 활성화
       setIsEditing(true)
@@ -348,6 +375,9 @@ export default function QuoteCalculator() {
       // 차량 선택
       if (quoteData.car_id) {
         await handleCarSelect(quoteData.car_id)
+      }
+      } catch (err) {
+        console.error('Error loading quote:', err)
       }
     }
 
@@ -367,13 +397,16 @@ export default function QuoteCalculator() {
       if (carId && cars.length > 0) {
         await handleCarSelect(carId)
 
-        const { data: worksheetData } = await supabase
-          .from('pricing_worksheets')
-          .select('*')
-          .eq('car_id', carId)
-          .single()
-        if (worksheetData) {
-          setWorksheetData(worksheetData)
+        try {
+          const headers = await getAuthHeader()
+          const res = await fetch(`/api/pricing-worksheets?car_id=${carId}`, { headers })
+          const json = await res.json()
+          const worksheetData = json.data ?? json
+          if (worksheetData) {
+            setWorksheetData(worksheetData)
+          }
+        } catch (err) {
+          console.error('Error fetching worksheet data:', err)
         }
       }
 
@@ -408,28 +441,27 @@ export default function QuoteCalculator() {
     if (!carId) return
     setLoading(true)
 
-    const { data: carData } = await supabase.from('cars').select('*').eq('id', carId).single()
-    setSelectedCar(carData)
+    try {
+      const headers = await getAuthHeader()
 
-    const { data: finData } = await supabase
-      .from('financial_products')
-      .select('*')
-      .eq('car_id', carId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
-    setFinance(finData)
+      const carRes = await fetch(`/api/cars/${carId}`, { headers })
+      const carJson = await carRes.json()
+      const carData = carJson.data
+      setSelectedCar(carData)
 
-    const { data: insData } = await supabase
-      .from('insurance_contracts')
-      .select('*')
-      .eq('car_id', carId)
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
-    setInsurance(insData)
+      const finRes = await fetch(`/api/financial-products?car_id=${carId}`, { headers })
+      const finJson = await finRes.json()
+      const finData = finJson.data ? finJson.data[0] : null
+      setFinance(finData)
 
-    if (carData) {
+      // TODO Phase 4+: Create insurance_contracts API (out of scope for file uploads)
+      // const insRes = await fetch(`/api/insurance-contracts?car_id=${carId}`, { headers })
+      // const insJson = await insRes.json()
+      // const insData = insJson.data ? insJson.data[0] : null
+      // setInsurance(insData)
+      const insData = null
+
+      if (carData) {
       const IMPORT_B = ['벤츠', 'BMW', '아우디', '테슬라', '볼보', '포르쉐', '렉서스', '재규어', '폭스바겐', '미니', '링컨']
       const isImport = IMPORT_B.some((b) => (carData.brand || '').includes(b))
       const isEV = (carData.fuel_type || '').includes('전기')
@@ -496,10 +528,13 @@ export default function QuoteCalculator() {
         setCosts((prev) => ({ ...prev, monthly_tax: Math.round(tax / 12) }))
       }
 
-      setAutoInfo(`${maintType} · 차령 ${carAge}년`)
+        setAutoInfo(`${maintType} · 차령 ${carAge}년`)
+      }
+    } catch (err) {
+      console.error('Error selecting car:', err)
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }, [insuranceRates, maintenanceCosts, taxRates])
 
   // ============================================================
@@ -568,22 +603,34 @@ export default function QuoteCalculator() {
       expires_at: expiresAt,
     }
 
+    const headers = await getAuthHeader()
+
     if (isEditing && editingQuoteId) {
       // UPDATE
-      const { error } = await supabase.from('quotes').update(quoteData).eq('id', editingQuoteId)
+      const res = await fetch(`/api/quotes/${editingQuoteId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteData),
+      })
+      const json = await res.json()
 
-      if (error) {
-        alert('저장 실패: ' + error.message)
+      if (json.error) {
+        alert('저장 실패: ' + json.error)
       } else {
         alert(`✅ 견적서가 ${status === 'draft' ? '임시저장' : '확정'}되었습니다!`)
         router.push('/quotes')
       }
     } else {
       // INSERT
-      const { error } = await supabase.from('quotes').insert([quoteData])
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteData),
+      })
+      const json = await res.json()
 
-      if (error) {
-        alert('저장 실패: ' + error.message)
+      if (json.error) {
+        alert('저장 실패: ' + json.error)
       } else {
         alert(`✅ 견적서가 ${status === 'draft' ? '임시저장' : '생성'}되었습니다!`)
         router.push('/quotes')
@@ -623,7 +670,7 @@ export default function QuoteCalculator() {
           <CostBreakdown
             costs={costs}
             commonCodes={commonCodes}
-            onMaintenanceChange={(value) => setCosts({ ...costs, maintenance: value })}
+            onMaintenanceChange={(value: any) => setCosts({ ...costs, maintenance: value })}
             autoInfo={autoInfo}
           />
 
