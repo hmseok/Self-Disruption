@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { sendSMS, sendEmail, logMessageSend } from '../../../utils/messaging'
 
@@ -6,13 +7,6 @@ import { sendSMS, sendEmail, logMessageSend } from '../../../utils/messaging'
 // 정산 알림 발송 API
 // POST → 수신자별 통합 메시지 발송 (SMS/이메일)
 // ============================================
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')

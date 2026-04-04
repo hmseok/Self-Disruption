@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
-}
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const p = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return p.sub || p.user_id || null
-  } catch {
-    return null
-  }
-}
-
-async function verifyUser(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) return null
-    const userId = getUserIdFromToken(authHeader.replace('Bearer ', ''))
-    if (!userId) return null
-    const profiles = await prisma.$queryRaw<any[]>`SELECT id, role, company_id FROM profiles WHERE id = ${userId} LIMIT 1`
-    return profiles[0] ? { id: userId, ...profiles[0] } : null
-  } catch {
-    return null
-  }
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string; scheduleId: string } }) {

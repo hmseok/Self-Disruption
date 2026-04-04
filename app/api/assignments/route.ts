@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import {
   assignHandler,
@@ -8,24 +9,6 @@ import {
 } from '../lib/assignment-engine'
 
 // ── Auth helpers
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
-
-async function verifyUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
-  const userId = getUserIdFromToken(token)
-  if (!userId) return null
-  // TODO: Phase 5 - Replace with Firebase Auth verification
-  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
-  const profile = profiles[0]
-  return profile ? { id: userId, ...profile } : null
-}
 
 // ── Serialize helper
 function serialize<T>(data: T): T {

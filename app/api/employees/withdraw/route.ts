@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 // ============================================
@@ -7,13 +8,6 @@ import { prisma } from '@/lib/prisma'
 // - Firebase Auth 사용자 삭제 (선택)
 // - master/admin만 가능
 // ============================================
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
 
 export async function POST(request: NextRequest) {
   try {

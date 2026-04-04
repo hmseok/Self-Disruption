@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
-
-async function verifyUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
-  const userId = getUserIdFromToken(token)
-  if (!userId) return null
-  const profiles = await prisma.$queryRaw<any[]>`SELECT id, role, company_id FROM profiles WHERE id = ${userId} LIMIT 1`
-  return profiles[0] ? { id: userId, ...profiles[0] } : null
-}
 
 // POST /api/transactions/generate-schedule
 // Body: { month: 'YYYY-MM', company_id?: string }

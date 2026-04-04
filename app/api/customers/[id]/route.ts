@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
-}
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const p = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return p.sub || p.user_id || null
-  } catch {
-    return null
-  }
-}
-
-async function verifyUser(request: NextRequest) {
-  try {
-    const h = request.headers.get('authorization')
-    if (!h?.startsWith('Bearer ')) return null
-    const uid = getUserIdFromToken(h.replace('Bearer ', ''))
-    if (!uid) return null
-    const p = await prisma.$queryRaw<any[]>`SELECT id, role, company_id FROM profiles WHERE id = ${uid} LIMIT 1`
-    return p[0] ? { id: uid, ...p[0] } : null
-  } catch {
-    return null
-  }
 }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {

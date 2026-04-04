@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { sendWithTemplate } from '../../../utils/messaging'
 
@@ -6,13 +7,6 @@ import { sendWithTemplate } from '../../../utils/messaging'
 // 납부 안내 일괄 발송 API
 // POST → 선택된 스케줄에 대해 SMS/이메일 발송
 // ============================================
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')

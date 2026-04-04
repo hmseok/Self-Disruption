@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { sendSMS, logMessageSend } from '../../utils/messaging'
 
@@ -6,26 +7,6 @@ import { sendSMS, logMessageSend } from '../../utils/messaging'
 // 청구서 SMS 발송 API (Aligo)
 // POST /api/send-sms
 // ============================================
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
-
-async function verifyUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
-  const userId = getUserIdFromToken(token)
-  if (!userId) return null
-  // TODO: Phase 5 - Replace with Firebase Auth verification
-  const profiles = await prisma.$queryRaw<any[]>`SELECT * FROM profiles WHERE id = ${userId} LIMIT 1`
-  const profile = profiles[0]
-  if (!profile) return null
-  return { id: userId, ...profile }
-}
 
 export async function POST(request: NextRequest) {
   try {

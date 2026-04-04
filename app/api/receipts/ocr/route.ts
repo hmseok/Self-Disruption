@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
-
-async function verifyUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
-  const userId = getUserIdFromToken(token)
-  if (!userId) return null
-  const profiles = await prisma.$queryRaw<any[]>`SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1`
-  const profile = profiles[0]
-  return profile ? { id: userId, role: profile.role, employee_name: profile.employee_name } : null
-}
 
 // ═══════════════════════════════════════
 // Gemini Vision API로 영수증 분석

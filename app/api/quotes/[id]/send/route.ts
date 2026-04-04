@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
@@ -10,28 +11,6 @@ import { recordLifecycleEvent, maskRecipient } from '@/app/utils/lifecycle-event
 // 견적서 발송 API (SMS / 카카오 알림톡 / 이메일)
 // POST → 견적서 링크를 고객에게 직접 발송
 // ============================================
-
-async function verifyUser(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  const token = authHeader.replace('Bearer ', '')
-
-  // TODO: Phase 5 Firebase Auth - JWT decode to get userId
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-    const userId = decoded.sub || decoded.user_id
-    if (!userId) return null
-
-    const profile = await prisma.$queryRaw<any[]>`
-      SELECT role, employee_name FROM profiles WHERE id = ${userId} LIMIT 1
-    `
-    return profile && profile.length > 0 ? { id: userId, role: profile[0].role, employee_name: profile[0].employee_name } : null
-  } catch {
-    return null
-  }
-}
 
 // 숫자 포맷
 const f = (n: number) => Math.round(n || 0).toLocaleString()

@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 // ============================================
 // 수금 확인 API
 // POST → 입금 확인 처리 (transactions 생성 + schedule 매칭)
 // ============================================
-
-function getUserIdFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
-  } catch { return null }
-}
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')

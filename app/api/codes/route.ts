@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
@@ -6,20 +7,6 @@ function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
     typeof v === 'bigint' ? v.toString() : v
   ))
-}
-
-async function verifyUser(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) return null
-    const token = authHeader.replace('Bearer ', '')
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    const userId = payload.sub || payload.user_id
-    if (!userId) return null
-    const profiles = await prisma.$queryRaw<any[]>`SELECT id, role, company_id FROM profiles WHERE id = ${userId} LIMIT 1`
-    const profile = profiles[0]
-    return profile ? { id: userId, ...profile } : null
-  } catch { return null }
 }
 
 // GET /api/codes — 공통 코드 조회 (common_codes)
