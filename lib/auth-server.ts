@@ -1,4 +1,3 @@
-import * as jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
@@ -14,6 +13,7 @@ function serialize<T>(data: T): T {
  */
 export function getUserIdFromToken(token: string): string | null {
   try {
+    const jwt = require('jsonwebtoken')
     const decoded = jwt.verify(token, JWT_SECRET) as any
     return decoded.sub || decoded.userId || null
   } catch {
