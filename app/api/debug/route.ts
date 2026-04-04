@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyUser } from '@/lib/auth-server'
 
 export async function GET(request: NextRequest) {
-  const results: any = { timestamp: new Date().toISOString(), buildVersion: 'v4-require' }
+  const results: any = { timestamp: new Date().toISOString(), buildVersion: 'v5-native-crypto' }
 
   // 1. Authorization 헤더 확인
   const authHeader = request.headers.get('authorization')
