@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
 
-const jwt = require('jsonwebtoken')
 const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 function serialize<T>(data: T): T {
@@ -10,10 +9,11 @@ function serialize<T>(data: T): T {
 }
 
 /**
- * JWT 토큰에서 userId 추출
+ * JWT 토큰에서 userId 추출 (함수 내부에서 require — Turbopack 호환)
  */
 export function getUserIdFromToken(token: string): string | null {
   try {
+    const jwt = require('jsonwebtoken')
     const decoded = jwt.verify(token, JWT_SECRET) as any
     return decoded.sub || decoded.userId || null
   } catch {
