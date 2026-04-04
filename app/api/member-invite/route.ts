@@ -370,7 +370,16 @@ export async function GET(request: NextRequest) {
     }
     query += ` ORDER BY created_at DESC`
 
-    const data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    let data: any[] = []
+    try {
+      data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    } catch (e: any) {
+      // member_invitations 테이블 미존재 시 빈 배열 반환
+      if (e.message?.includes("doesn't exist")) {
+        return NextResponse.json({ data: [], total: 0 })
+      }
+      throw e
+    }
 
     // 수동 조인
     const positionIds = [...new Set((data || []).map((inv: any) => inv.position_id).filter(Boolean))]

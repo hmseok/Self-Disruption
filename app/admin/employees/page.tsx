@@ -112,10 +112,10 @@ export default function OrgManagementPage() {
   }, [company])
 
   useEffect(() => {
-    if (activeTab === 'organization' && activeCompanyId && ['admin', 'admin', 'master'].includes(role || '')) {
+    if (activeTab === 'organization' && ['admin', 'master'].includes(role || '')) {
       loadInvitations()
     }
-  }, [activeTab, activeCompanyId, role])
+  }, [activeTab, role])
 
   // 권한 탭 진입 시 전체 직원 권한 로드
   useEffect(() => {
@@ -281,7 +281,7 @@ export default function OrgManagementPage() {
   }
 
   const loadInvitations = async () => {
-    if (!['admin', 'admin', 'master'].includes(role || '')) return
+    if (!['admin', 'master'].includes(role || '')) return
     setLoadingInvitations(true)
     try {
       const token = await getAccessToken()
