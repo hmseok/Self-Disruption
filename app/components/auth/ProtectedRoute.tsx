@@ -2,8 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, ReactNode } from 'react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/auth-client';
 
 interface ProtectedRouteProps {
   allowedRoles: string[];
@@ -16,10 +15,10 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (currentUser) {
         try {
-          const token = await firebaseUser.getIdToken()
+          const token = await currentUser.getIdToken()
           const res = await fetch('/api/profiles/me', {
             headers: { Authorization: `Bearer ${token}` }
           })

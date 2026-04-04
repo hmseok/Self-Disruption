@@ -1,5 +1,5 @@
 'use client'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -412,7 +412,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               <div className="overflow-hidden flex-1 min-w-0">
                 <p className="text-xs font-medium truncate text-steel-300">{user?.email}</p>
                 <button
-                  onClick={() => import('firebase/auth').then(({signOut}) => signOut(auth)).then(() => router.push('/'))}
+                  onClick={() => auth.signOut().then(() => router.push('/'))}
                   className="text-[10px] text-steel-400 hover:text-red-400 transition-colors"
                 >
                   로그아웃

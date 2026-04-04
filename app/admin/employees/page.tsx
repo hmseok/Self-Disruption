@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
 import DarkHeader from '../../components/DarkHeader'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 
 // ────────────────────────────────────────────────────────────────
 // Auth Helper

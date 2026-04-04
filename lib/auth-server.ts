@@ -1,5 +1,7 @@
-import { adminAuth } from './firebase-admin'
+import * as jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
@@ -8,25 +10,12 @@ function serialize<T>(data: T): T {
 }
 
 /**
- * Firebase Admin 또는 JWT 디코딩으로 userId 추출
- * 1. Firebase Admin SDK 검증 (우선)
- * 2. JWT 수동 디코딩 (fallback — Firebase 토큰 호환)
+ * JWT 토큰에서 userId 추출
  */
-export async function getUserIdFromToken(token: string): Promise<string | null> {
-  // 1. Firebase Admin SDK 검증 (우선)
-  if (adminAuth) {
-    try {
-      const decoded = await adminAuth.verifyIdToken(token)
-      return decoded.uid
-    } catch {
-      // fallthrough to JWT decode
-    }
-  }
-
-  // 2. JWT 수동 디코딩 (fallback — 레거시 토큰 호환)
+export function getUserIdFromToken(token: string): string | null {
   try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.sub || payload.user_id || null
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+    return decoded.sub || decoded.userId || null
   } catch {
     return null
   }
@@ -41,7 +30,7 @@ export async function verifyUser(request: Request) {
     if (!authHeader?.startsWith('Bearer ')) return null
 
     const token = authHeader.replace('Bearer ', '')
-    const userId = await getUserIdFromToken(token)
+    const userId = getUserIdFromToken(token)
     if (!userId) return null
 
     const profiles = await prisma.$queryRaw<any[]>`

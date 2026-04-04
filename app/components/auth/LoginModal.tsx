@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { setAuth } from '@/lib/auth-client'
 
 type Props = {
   isOpen: boolean
@@ -23,10 +22,18 @@ export default function LoginModal({ isOpen, onClose }: Props) {
     setLoading(true)
 
     try {
-      const { user } = await signInWithEmailAndPassword(auth, email, password)
-      if (user) {
-        router.replace('/admin')
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert('로그인 실패: ' + (data.error || '이메일 또는 비밀번호를 확인해주세요.'))
+        return
       }
+      setAuth(data.token, data.user)
+      router.replace('/admin')
     } catch (error: any) {
       alert('로그인 실패: ' + error.message)
     } finally {

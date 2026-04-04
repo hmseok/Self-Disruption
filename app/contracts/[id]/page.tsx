@@ -8,7 +8,7 @@ import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM } from '@/li
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/firebase')
+    const { auth } = await import('@/lib/auth-client')
     const user = auth.currentUser
     if (!user) return {}
     const token = await user.getIdToken(false)
@@ -318,7 +318,7 @@ function ContractPdfSection({ contract, schedules }: { contract: any; schedules:
           const reader = new FileReader()
           reader.onload = async () => {
             const base64 = reader.result as string
-            const { auth } = await import('@/lib/firebase')
+            const { auth } = await import('@/lib/auth-client')
             const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
             const res = await fetch(`/api/contracts/${contract.id}/generate-pdf`, {
               method: 'POST',
@@ -398,7 +398,7 @@ function ContractTimeline({ quoteId }: { quoteId?: string }) {
     if (!quoteId) return
     setLoading(true)
     ;(async () => {
-      const { auth } = await import('@/lib/firebase')
+      const { auth } = await import('@/lib/auth-client')
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       fetch(`/api/quotes/${quoteId}/timeline`, {
         headers: { Authorization: `Bearer ${token}` },

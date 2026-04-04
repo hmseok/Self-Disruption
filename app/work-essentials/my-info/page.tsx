@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 import { useApp } from '../../context/AppContext'
 
 // ════════════════════════════════════════════

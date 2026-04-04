@@ -1,8 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { auth } from '../../lib/firebase'
-import { onAuthStateChanged, User } from 'firebase/auth'
+import { auth } from '../../lib/auth-client'
 import type { Profile, UserPagePermission, Position, Department } from '../types/rbac'
 
 // ============================================
@@ -75,15 +74,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ★ 프로필 데이터 로드
-  const loadUserData = async (firebaseUser: User) => {
+  const loadUserData = async (currentUser: any) => {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     setLoading(true)
     try {
-      const token = await firebaseUser.getIdToken()
+      const token = await currentUser.getIdToken()
       const headers = { Authorization: `Bearer ${token}` }
 
-      setUser(firebaseUser)
+      setUser(currentUser)
 
       // 프로필 로드
       const profileRes = await fetch(`/api/profiles/me`, { headers })
@@ -104,7 +103,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDepartment(profileData.department || null)
 
         // ★ 페이지 권한 로드 (사용자 기준)
-        const permsRes = await fetch(`/api/user-page-permissions?user_id=${firebaseUser.uid}`, { headers })
+        const permsRes = await fetch(`/api/user-page-permissions?user_id=${currentUser.uid}`, { headers })
         const permsJson = await permsRes.json()
         setPermissions(permsJson.data || [])
       } else {
@@ -124,17 +123,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshAuth = async () => {
     isLoadedRef.current = false
     isFetchingRef.current = false
-    const user = auth.currentUser
-    if (user) {
-      await loadUserData(user)
+    const currentUser = auth.currentUser
+    if (currentUser) {
+      await loadUserData(currentUser)
     }
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      console.log('Firebase Auth:', firebaseUser ? 'signed in' : 'signed out', isLoadedRef.current ? '(loaded, skip)' : '(processing)')
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      console.log('Auth:', currentUser ? 'signed in' : 'signed out', isLoadedRef.current ? '(loaded, skip)' : '(processing)')
 
-      if (!firebaseUser) {
+      if (!currentUser) {
         isLoadedRef.current = false
         isFetchingRef.current = false
         clearState()
@@ -144,7 +143,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (isLoadedRef.current) return
 
-      loadUserData(firebaseUser)
+      loadUserData(currentUser)
     })
 
     return () => unsubscribe()

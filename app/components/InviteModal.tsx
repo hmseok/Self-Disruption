@@ -1,5 +1,5 @@
 'use client'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 import { useState, useEffect, useMemo } from 'react'
 import { getAuthHeader } from '@/app/utils/auth-client'
 

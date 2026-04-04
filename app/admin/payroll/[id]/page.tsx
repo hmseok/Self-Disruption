@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 import { useApp } from '../../../context/AppContext'
 import { useRouter, useParams } from 'next/navigation'
 import { calculatePayroll } from '../../../utils/payroll-calc'

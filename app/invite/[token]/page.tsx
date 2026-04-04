@@ -1,8 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { setAuth } from '@/lib/auth-client'
 
 // ============================================
 // 초대 가입 페이지 (공개 - 인증 불필요)
@@ -105,10 +104,17 @@ export default function InviteAcceptPage() {
         return
       }
 
-      // 2. 바로 로그인 (서버에서 이메일 인증 완료 상태로 생성됨)
+      // 2. 바로 로그인 (서버에서 토큰 반환)
       let loginErr: any = null
       try {
-        await signInWithEmailAndPassword(auth, invite.email, password)
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: invite.email, password }),
+        })
+        const loginData = await loginRes.json()
+        if (!loginRes.ok) throw new Error(loginData.error || '자동 로그인 실패')
+        setAuth(loginData.token, loginData.user)
       } catch (err: any) {
         loginErr = err
         console.error('자동 로그인 실패:', err.message)

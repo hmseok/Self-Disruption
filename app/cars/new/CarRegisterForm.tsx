@@ -6,7 +6,7 @@ import { CommonCode } from '../../types/database' // 타입 경로 확인해주�
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/firebase')
+    const { auth } = await import('@/lib/auth-client')
     const user = auth.currentUser
     if (!user) return {}
     const token = await user.getIdToken(false)

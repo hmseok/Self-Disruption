@@ -1,5 +1,5 @@
 'use client'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo } from 'react'
@@ -9,7 +9,7 @@ import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/firebase')
+    const { auth } = await import('@/lib/auth-client')
     const user = auth.currentUser
     if (!user) return {}
     const token = await user.getIdToken(false)

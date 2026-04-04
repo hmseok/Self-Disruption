@@ -24,18 +24,19 @@ datasource db {
 // 공통: auth.users 대체 (Firebase UID 기반, Phase 5 이후)
 // ============================================================
 model Profile {
-  id          String    @id @default(uuid()) @db.Char(36)
-  email       String    @unique
-  name        String?
-  role        String    @default("member") // admin, manager, member
-  is_active   Boolean   @default(true)
-  is_approved Boolean   @default(false)
-  avatar_url  String?
-  phone       String?
-  department  String?
-  position    String?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  id            String    @id @default(uuid()) @db.Char(36)
+  email         String    @unique
+  name          String?
+  role          String    @default("member") // admin, manager, member
+  is_active     Boolean   @default(true)
+  is_approved   Boolean   @default(false)
+  avatar_url    String?
+  phone         String?
+  department    String?
+  position      String?
+  password_hash String?   @db.VarChar(255)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
 
   @@map("profiles")
 }

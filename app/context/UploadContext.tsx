@@ -1,11 +1,11 @@
 'use client'
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/firebase')
+    const { auth } = await import('@/lib/auth-client')
     const user = auth.currentUser
     if (!user) return {}
     const token = await user.getIdToken(false)

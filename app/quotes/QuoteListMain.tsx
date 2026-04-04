@@ -1,5 +1,5 @@
 'use client'
-import { auth } from '@/lib/firebase'
+import { auth } from '@/lib/auth-client'
 import { useApp } from '../context/AppContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
@@ -12,7 +12,7 @@ import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilde
 // ============================================================================
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
-    const { auth } = await import('@/lib/firebase')
+    const { auth } = await import('@/lib/auth-client')
     const user = auth.currentUser
     if (!user) return {}
     const token = await user.getIdToken(false)

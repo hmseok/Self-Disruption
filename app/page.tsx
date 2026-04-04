@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification } from 'firebase/auth'
+import { auth, setAuth } from '@/lib/auth-client'
 
 // ============================================
 // FMI ERP ERP - Enterprise Auth Page
@@ -317,8 +316,8 @@ function AuthPage() {
   useEffect(() => {
     let redirected = false
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!redirected && firebaseUser) {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!redirected && user) {
         redirected = true
         router.push('/dashboard')
       }
@@ -326,36 +325,19 @@ function AuthPage() {
     return () => { unsubscribe() }
   }, [])
 
-  // 인증 대기 화면: 폴링으로 인증 완료 감지 → verified 뷰로 전환
+  // 인증 대기 화면: 커스텀 JWT는 즉시 인증 완료 처리
   useEffect(() => {
     if (view !== 'verify') return
 
-    // onAuthStateChange: 다른 탭에서 인증 완료 시 감지
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
         setMessage(null)
         setView('verified')
       }
     })
 
-    // 4초마다 signInWithPassword 시도 → 인증 완료되면 성공
-    const interval = setInterval(async () => {
-      if (!formData.email || !formData.password) return
-      try {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password)
-        clearInterval(interval)
-        setMessage(null)
-        setView('verified')
-      } catch (err: any) {
-        // not verified yet, continue polling
-      }
-    }, 4000)
-
-    return () => {
-      unsubscribe()
-      clearInterval(interval)
-    }
-  }, [view, formData.email, formData.password])
+    return () => { unsubscribe() }
+  }, [view])
 
   // 재발송 쿨다운 타이머
   useEffect(() => {
@@ -435,7 +417,18 @@ function AuthPage() {
     setLoading(true)
     setMessage(null)
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password)
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage({ text: data.error || '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
+        setLoading(false)
+        return
+      }
+      setAuth(data.token, data.user)
       router.push('/dashboard')
     } catch (err: any) {
       setMessage({ text: '이메일 또는 비밀번호를 확인해주세요.', type: 'error' })
@@ -543,24 +536,25 @@ function AuthPage() {
     try {
       // 4. 클라이언트사이드 중복 체크가 완료되었으므로 추가 검증 스킵
 
-      // 5. Firebase 회원가입 실행
+      // 5. 커스텀 JWT 회원가입 실행
       let signUpData: any
       try {
-        const firebaseUser = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
-        await sendEmailVerification(firebaseUser.user)
-        signUpData = { user: firebaseUser.user }
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, password: formData.password, name: formData.name }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setMessage({ text: data.error || '회원가입에 실패했습니다.', type: 'error' })
+          setLoading(false)
+          return
+        }
+        setAuth(data.token, data.user)
+        signUpData = { user: data.user }
       } catch (error: any) {
         console.error('회원가입 에러:', error.message, error)
-        // 사용자 친화적 에러 메시지 변환
-        let friendlyMsg = error.message
-        if (error.code === 'auth/email-already-in-use') {
-          friendlyMsg = '이미 등록된 이메일입니다.'
-        } else if (error.code === 'auth/weak-password') {
-          friendlyMsg = '비밀번호가 유효하지 않습니다. (최소 8자)'
-        } else if (error.code === 'auth/invalid-email') {
-          friendlyMsg = '유효하지 않은 이메일입니다.'
-        }
-        setMessage({ text: friendlyMsg, type: 'error' })
+        setMessage({ text: '회원가입 중 오류가 발생했습니다.', type: 'error' })
         setLoading(false)
         return
       }
@@ -583,26 +577,28 @@ function AuthPage() {
     }
   }
 
-  // 이메일 재발송
+  // 이메일 재발송 (커스텀 JWT: 이메일 인증 불필요 — 메시지만 표시)
   const handleResendEmail = async () => {
     if (verifyCountdown > 0) return
     setVerifyCountdown(60)
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser)
-    }
-    setMessage({ text: '인증 메일이 재발송되었습니다.', type: 'success' })
+    setMessage({ text: '관리자 승인 후 입장 가능합니다.', type: 'success' })
   }
 
-  // 수동 인증 확인 → verified 뷰로 전환
+  // 수동 인증 확인 → verified 뷰로 전환 (커스텀 JWT: auth 상태 직접 확인)
   const handleVerifyAndLogin = async () => {
     setLoading(true)
     setMessage(null)
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password)
-      setLoading(false)
-      setView('verified')
+      const currentUser = auth.currentUser
+      if (currentUser) {
+        setLoading(false)
+        setView('verified')
+      } else {
+        setMessage({ text: '로그인 정보를 찾을 수 없습니다. 다시 로그인해주세요.', type: 'error' })
+        setLoading(false)
+      }
     } catch (err: any) {
-      setMessage({ text: '이메일 인증이 아직 완료되지 않았습니다. 메일함을 확인해주세요.', type: 'error' })
+      setMessage({ text: '인증 확인 중 오류가 발생했습니다.', type: 'error' })
       setLoading(false)
     }
   }
@@ -629,24 +625,29 @@ function AuthPage() {
     return mailServices[domain] || null
   }
 
-  // 인증 완료 → 로그인 후 입장
+  // 인증 완료 → 입장
   const handleVerifiedEnter = async () => {
     setLoading(true)
     setMessage(null)
     try {
-      // 이미 인증된 사용자 확인 후 이동
       const currentUser = auth.currentUser
       if (currentUser) {
         router.push('/dashboard')
         return
       }
-      // 인증이 없으면 다시 로그인 시도
-      try {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password)
-        router.push('/dashboard')
-      } catch (err: any) {
+      // 로그인 필요
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
         setMessage({ text: '로그인 중 오류가 발생했습니다. 로그인 페이지에서 다시 시도해주세요.', type: 'error' })
+        return
       }
+      setAuth(data.token, data.user)
+      router.push('/dashboard')
     } catch (err: any) {
       setMessage({ text: '로그인 처리 중 오류가 발생했습니다.', type: 'error' })
     } finally {
@@ -659,7 +660,18 @@ function AuthPage() {
     setLoading(true)
     setMessage(null)
     try {
-      await signInWithEmailAndPassword(auth, 'admin@self-disruption.com', 'password1234!!')
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@self-disruption.com', password: 'password1234!!' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
+        setLoading(false)
+        return
+      }
+      setAuth(data.token, data.user)
       router.push('/dashboard')
     } catch (err: any) {
       setMessage({ text: '개발자 계정 로그인 실패', type: 'error' })
