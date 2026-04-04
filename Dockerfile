@@ -18,6 +18,9 @@ ENV NEXT_PUBLIC_BASE_URL=https://hmseok.com
 ENV NEXT_PUBLIC_SUPABASE_URL=https://uiyiwgkpchnvuvpsjfxv.supabase.co
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpeWl3Z2twY2hudnV2cHNqZnh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2NjkwNDgsImV4cCI6MjA4NTI0NTA0OH0.GV9zeRh5eJrbJyNY-ma1N9KUQaMGxdcn0FR6u-9vOLg
 
+# Prisma 클라이언트 생성 (빌드 전 필수)
+RUN npx prisma generate
+
 # next build는 자동으로 production 모드
 RUN npm run build
 
@@ -69,6 +72,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Prisma 클라이언트 — standalone에 포함되지 않으므로 수동 복사
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # serverExternalPackages mysql2 — standalone에 자동 포함되지 않으므로 수동 복사
 COPY --from=builder /app/node_modules/mysql2 ./node_modules/mysql2
