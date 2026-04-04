@@ -75,6 +75,24 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# JWT 인증 모듈 — standalone 번들러가 누락할 수 있으므로 수동 복사
+COPY --from=builder /app/node_modules/jsonwebtoken ./node_modules/jsonwebtoken
+COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder /app/node_modules/jws ./node_modules/jws
+COPY --from=builder /app/node_modules/jwa ./node_modules/jwa
+COPY --from=builder /app/node_modules/safe-buffer ./node_modules/safe-buffer
+COPY --from=builder /app/node_modules/buffer-equal-constant-time ./node_modules/buffer-equal-constant-time
+COPY --from=builder /app/node_modules/ecdsa-sig-formatter ./node_modules/ecdsa-sig-formatter
+COPY --from=builder /app/node_modules/lodash.includes ./node_modules/lodash.includes
+COPY --from=builder /app/node_modules/lodash.isboolean ./node_modules/lodash.isboolean
+COPY --from=builder /app/node_modules/lodash.isinteger ./node_modules/lodash.isinteger
+COPY --from=builder /app/node_modules/lodash.isnumber ./node_modules/lodash.isnumber
+COPY --from=builder /app/node_modules/lodash.isplainobject ./node_modules/lodash.isplainobject
+COPY --from=builder /app/node_modules/lodash.isstring ./node_modules/lodash.isstring
+COPY --from=builder /app/node_modules/lodash.once ./node_modules/lodash.once
+COPY --from=builder /app/node_modules/ms ./node_modules/ms
+COPY --from=builder /app/node_modules/semver ./node_modules/semver
+
 # serverExternalPackages mysql2 — standalone에 자동 포함되지 않으므로 수동 복사
 COPY --from=builder /app/node_modules/mysql2 ./node_modules/mysql2
 COPY --from=builder /app/node_modules/long ./node_modules/long
