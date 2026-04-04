@@ -15,13 +15,11 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     try {
-      const data = await prisma.$queryRaw<any[]>`
-        SELECT * FROM system_modules ORDER BY sort_order ASC, name ASC
-      `
+      const data = await prisma.$queryRaw<any[]>`SELECT * FROM system_modules`
       return NextResponse.json({ data: serialize(data), error: null })
     } catch (e: any) {
-      // 테이블 미존재 시 빈 배열 반환
-      if (e.message?.includes("doesn't exist")) {
+      // 테이블 미존재 또는 컬럼 에러 시 빈 배열 반환
+      if (e.message?.includes("doesn't exist") || e.message?.includes('Unknown column')) {
         return NextResponse.json({ data: [], error: null })
       }
       throw e

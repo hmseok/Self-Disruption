@@ -8,12 +8,9 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// GET /api/company?id=xxx — 회사 정보 조회 (단독 ERP)
+// GET /api/company?id=xxx — 회사 정보 조회 (단독 ERP, 인증 불필요)
 export async function GET(req: NextRequest) {
   try {
-    const user = await verifyUser(req)
-    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-
     // companies 테이블 존재 여부에 따라 분기
     try {
       const data = await prisma.$queryRawUnsafe<any[]>('SELECT * FROM companies LIMIT 1')
