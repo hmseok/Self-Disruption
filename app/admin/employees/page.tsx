@@ -107,16 +107,8 @@ export default function OrgManagementPage() {
   const activeCompanyId = company?.id
 
   useEffect(() => {
-    if (company) {
-      loadAll()
-    } else {
-      setEmployees([])
-      setPositions([])
-      setDepartments([])
-      setActiveModules([])
-      setInvitations([])
-      setLoading(false)
-    }
+    // 단독 ERP: company 유무와 관계없이 로드
+    loadAll()
   }, [company])
 
   useEffect(() => {
@@ -127,10 +119,10 @@ export default function OrgManagementPage() {
 
   // 권한 탭 진입 시 전체 직원 권한 로드
   useEffect(() => {
-    if (activeTab === 'permissions' && activeCompanyId) {
+    if (activeTab === 'permissions') {
       loadAllUserPermissions()
     }
-  }, [activeTab, activeCompanyId])
+  }, [activeTab])
 
   const loadAll = async () => {
     setLoading(true)
@@ -144,7 +136,6 @@ export default function OrgManagementPage() {
   }
 
   const loadEmployees = async () => {
-    if (!activeCompanyId) return
     const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
     const json = await res.json()
     const { data, error } = json
@@ -152,7 +143,6 @@ export default function OrgManagementPage() {
   }
 
   const loadPositions = async () => {
-    if (!activeCompanyId) return
     const res = await fetch('/api/positions', { headers: await getAuthHeader() })
     const json = await res.json()
     const { data, error } = json
@@ -160,7 +150,6 @@ export default function OrgManagementPage() {
   }
 
   const loadDepartments = async () => {
-    if (!activeCompanyId) return
     const res = await fetch('/api/departments', { headers: await getAuthHeader() })
     const json = await res.json()
     const { data, error } = json
@@ -168,26 +157,36 @@ export default function OrgManagementPage() {
   }
 
   const loadModules = async () => {
-    if (!activeCompanyId) return
-    const res = await fetch('/api/company_modules', { headers: await getAuthHeader() })
-    const json = await res.json()
-    const { data, error } = json
+    // 단독 ERP: system_modules에서 직접 로드
+    try {
+      const res = await fetch('/api/system_modules', { headers: await getAuthHeader() })
+      const json = await res.json()
+      const data = Array.isArray(json) ? json : (json.data || [])
 
-    if (data) {
-      const modules: ActiveModule[] = data
-        .filter((m: any) => m.module?.path)
-        .map((m: any) => ({
-          path: m.module.path,
-          name: NAME_OVERRIDES[m.module.path] || m.module.name,
-          group: MODULE_GROUPS[m.module.path] || '기타',
-        }))
-      setActiveModules(modules)
-    }
+      if (data.length > 0) {
+        const modules: ActiveModule[] = data
+          .filter((m: any) => m.path)
+          .map((m: any) => ({
+            path: m.path,
+            name: NAME_OVERRIDES[m.path] || m.name,
+            group: MODULE_GROUPS[m.path] || '기타',
+          }))
+        setActiveModules(modules)
+        return
+      }
+    } catch {}
+
+    // Fallback: system_modules 테이블이 비어있으면 MODULE_GROUPS 기반으로 생성
+    const fallbackModules: ActiveModule[] = Object.entries(MODULE_GROUPS).map(([path, group]) => ({
+      path,
+      name: NAME_OVERRIDES[path] || path.replace(/^\//, '').replace(/\//g, ' > '),
+      group,
+    }))
+    setActiveModules(fallbackModules)
   }
 
   // ===== 전체 직원 권한 로드 =====
   const loadAllUserPermissions = async () => {
-    if (!activeCompanyId) return
     const res = await fetch('/api/user_page_permissions', { headers: await getAuthHeader() }); const { data, error } = await res.json()
       
 
@@ -208,7 +207,6 @@ export default function OrgManagementPage() {
 
   // ===== 특정 직원 권한 저장 =====
   const saveUserPerms = async (userId: string) => {
-    if (!activeCompanyId) return
     setSavingPermsFor(userId)
 
     try {
