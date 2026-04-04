@@ -196,7 +196,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
         const res = await fetch('/api/system_modules', { headers })
 
         if (res.ok) {
-          const data = await res.json()
+          const json = await res.json()
+          const data = Array.isArray(json) ? json : (json.data || [])
           const seen = new Set<string>()
           const allMenus = data
             .filter((item: any) => {
