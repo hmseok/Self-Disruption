@@ -1,52 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyUser } from '@/lib/auth-server'
+import { verifyUser, getUserIdFromToken } from '@/lib/auth-server'
+import crypto from 'crypto'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 export async function GET(request: NextRequest) {
-  const results: any = { timestamp: new Date().toISOString(), buildVersion: 'v5-native-crypto' }
+  const results: any = { buildVersion: 'v6-deep-debug' }
 
-  // 1. Authorization 헤더 확인
   const authHeader = request.headers.get('authorization')
-  results.authHeader = authHeader ? `Bearer ${authHeader.substring(7, 20)}...` : 'MISSING'
+  results.authHeader = authHeader ? 'present' : 'MISSING'
 
-  // 2. auth-server.ts의 verifyUser 직접 호출 테스트
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ ...results, error: 'no auth header' })
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  // Test 1: auth-server.ts verifyUser (the one that fails)
   try {
     const user = await verifyUser(request)
-    results.verifyUserResult = user ? { id: user.id, role: user.role } : 'NULL'
+    results.test1_verifyUser = user ? { id: user.id, role: user.role } : 'NULL'
   } catch (e: any) {
-    results.verifyUserError = e.message
+    results.test1_error = e.message
   }
 
-  // 3. 인라인 인증 (profiles/me와 동일한 로직)
-  if (authHeader?.startsWith('Bearer ')) {
-    try {
-      const jwt = require('jsonwebtoken')
-      const token = authHeader.replace('Bearer ', '')
-      const secret = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
-      const decoded = jwt.verify(token, secret) as any
-      const userId = decoded.sub || decoded.userId || null
-      results.inlineVerify = { userId, email: decoded.email, role: decoded.role }
-
-      if (userId) {
-        const profiles = await prisma.$queryRaw<any[]>`
-          SELECT id, email, role FROM profiles WHERE id = ${userId} LIMIT 1
-        `
-        results.profileLookup = profiles.length > 0 ? profiles[0] : 'NOT FOUND'
-      }
-    } catch (e: any) {
-      results.inlineVerifyError = e.message
-    }
-  }
-
-  // 4. 모듈 상태
-  results.jwtSecretSet = !!process.env.JWT_SECRET
-  results.jwtSecretLength = (process.env.JWT_SECRET || '').length
-
+  // Test 2: auth-server.ts getUserIdFromToken
   try {
-    const dbTest = await prisma.$queryRaw<any[]>`SELECT 1 as ok`
-    results.dbConnection = 'OK'
+    const uid = getUserIdFromToken(token)
+    results.test2_getUserId = uid || 'NULL'
   } catch (e: any) {
-    results.dbConnection = `FAIL: ${e.message}`
+    results.test2_error = e.message
+  }
+
+  // Test 3: inline base64 decode (no verification)
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    results.test3_base64 = { sub: payload.sub, email: payload.email }
+  } catch (e: any) {
+    results.test3_error = e.message
+  }
+
+  // Test 4: inline crypto verification (same logic as auth-server.ts)
+  try {
+    const parts = token.split('.')
+    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString())
+    results.test4_header = header
+
+    const signatureInput = parts[0] + '.' + parts[1]
+    const expectedSig = crypto.createHmac('sha256', JWT_SECRET).update(signatureInput).digest('base64url')
+    const actualSig = parts[2]
+    results.test4_sigMatch = expectedSig === actualSig
+    results.test4_expectedSig = expectedSig.substring(0, 20)
+    results.test4_actualSig = actualSig.substring(0, 20)
+  } catch (e: any) {
+    results.test4_error = e.message
+  }
+
+  // Test 5: is crypto module available?
+  try {
+    results.test5_crypto = typeof crypto.createHmac === 'function' ? 'OK' : 'NOT FUNCTION'
+  } catch (e: any) {
+    results.test5_error = e.message
+  }
+
+  // Test 6: require jsonwebtoken inline and verify
+  try {
+    const jwt = require('jsonwebtoken')
+    const decoded = jwt.verify(token, JWT_SECRET)
+    results.test6_requireJwt = { sub: decoded.sub, email: decoded.email }
+  } catch (e: any) {
+    results.test6_error = e.message
   }
 
   return NextResponse.json(results)
