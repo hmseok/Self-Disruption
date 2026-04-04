@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyUser } from '@/lib/auth-server'
+
+const jwt = require('jsonwebtoken')
+const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
@@ -8,10 +10,22 @@ function serialize<T>(data: T): T {
   ))
 }
 
+function verifyUserInline(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) return null
+    const token = authHeader.replace('Bearer ', '')
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+    return decoded.sub || decoded.userId || null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const user = await verifyUser(request)
-    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const userId = verifyUserInline(request)
+    if (!userId) return NextResponse.json({ error: '인증 필요', debug: 'verifyUserInline returned null' }, { status: 401 })
 
     const profiles = await prisma.$queryRaw<any[]>`
       SELECT p.*,
@@ -20,7 +34,7 @@ export async function GET(request: NextRequest) {
       FROM profiles p
       LEFT JOIN positions pos ON p.position_id = pos.id
       LEFT JOIN departments dep ON p.department_id = dep.id
-      WHERE p.id = ${user.id}
+      WHERE p.id = ${userId}
       LIMIT 1
     `
     const raw = profiles[0]
@@ -33,6 +47,6 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ data: serialize(profile), error: null })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ error: e.message, stack: e.stack?.substring(0, 300) }, { status: 500 })
   }
 }
