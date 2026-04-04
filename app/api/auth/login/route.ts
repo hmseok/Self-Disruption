@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as bcrypt from 'bcryptjs'
+import * as jwt from 'jsonwebtoken'
 import { prisma } from '@/lib/prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
@@ -32,10 +34,6 @@ export async function POST(request: NextRequest) {
     if (!profile.password_hash) {
       return NextResponse.json({ error: '비밀번호가 설정되지 않은 계정입니다. 관리자에게 문의하세요.' }, { status: 401 })
     }
-
-    // bcrypt, jwt를 런타임에 require (ESM 호환 이슈 방지)
-    const bcrypt = require('bcryptjs')
-    const jwt = require('jsonwebtoken')
 
     const hashStr = typeof profile.password_hash === 'string'
       ? profile.password_hash
