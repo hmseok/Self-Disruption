@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
     params.push(employeeId)
   }
 
-  const data = await prisma.$queryRaw<any[]>(
-    `SELECT * FROM transaction_flags ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?` as any,
+  const data = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT * FROM transaction_flags ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
     ...params,
     limit,
     offset

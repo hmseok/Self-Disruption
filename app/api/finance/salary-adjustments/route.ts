@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
     params.push(status)
   }
 
-  const data = await prisma.$queryRaw<any[]>(
-    `SELECT * FROM salary_adjustments ${whereClause} ORDER BY created_at DESC` as any,
+  const data = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT * FROM salary_adjustments ${whereClause} ORDER BY created_at DESC`,
     ...params
   )
 

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
 
     if (companyId) {
-      query += ' WHERE company_id = $1'
+      query += ' WHERE company_id = ?'
       params.push(companyId)
     }
 
@@ -43,13 +43,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const id = crypto.randomUUID()
 
-    // TODO: Adjust INSERT statement based on table schema
-    const result = await prisma.$queryRaw<any[]>`
+    await prisma.$executeRaw`
       INSERT INTO meal_expense_monthly (id, created_at, updated_at) VALUES (${id}, NOW(), NOW())
-      RETURNING *
     `
 
-    return NextResponse.json({ data: serialize(result[0]), error: null }, { status: 201 })
+    const created = await prisma.$queryRaw<any[]>`SELECT * FROM meal_expense_monthly WHERE id = ${id} LIMIT 1`
+    return NextResponse.json({ data: serialize(created[0]), error: null }, { status: 201 })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

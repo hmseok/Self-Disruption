@@ -8,23 +8,27 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// GET /api/profiles
+// GET /api/profiles — 프로필 목록 (단독 ERP: company_id 불필요)
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { searchParams } = request.nextUrl
-    const companyId = searchParams.get('company_id') || user.company_id
     const isActive = searchParams.get('is_active')
 
-    let query = 'SELECT id, employee_name FROM profiles WHERE company_id = $1'
-    const params: any[] = [companyId]
+    let query = 'SELECT id, employee_name, email, phone, role, is_active, position_id, department_id FROM profiles'
+    const params: any[] = []
+    const conditions: string[] = []
 
     if (isActive === 'true') {
-      query += ' AND is_active = true'
+      conditions.push('is_active = true')
     } else if (isActive === 'false') {
-      query += ' AND is_active = false'
+      conditions.push('is_active = false')
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
     }
 
     query += ' ORDER BY employee_name'
@@ -44,11 +48,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
-    const companyId = body.company_id || user.company_id
 
     const fields = ['email', 'employee_name', 'phone', 'position_id', 'department_id', 'role', 'is_active']
-    const cols = ['id', 'company_id', ...fields.filter(f => body[f] !== undefined)]
-    const vals = [id, companyId, ...fields.filter(f => body[f] !== undefined).map(f => body[f] || null)]
+    const cols = ['id', ...fields.filter(f => body[f] !== undefined)]
+    const vals = [id, ...fields.filter(f => body[f] !== undefined).map(f => body[f] ?? null)]
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO profiles (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`,

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id') || user.company_id
     const isActive = searchParams.get('is_active')
 
-    let query = 'SELECT * FROM freelancers WHERE company_id = $1'
+    let query = 'SELECT * FROM freelancers WHERE company_id = ?'
     const params: any[] = [companyId]
 
     if (isActive === 'true') {

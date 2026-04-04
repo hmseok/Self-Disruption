@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
 
     if (category) {
-      query += ' WHERE contract_category = $1'
+      query += ' WHERE contract_category = ?'
       params.push(category)
     }
 

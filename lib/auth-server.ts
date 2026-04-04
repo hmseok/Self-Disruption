@@ -84,8 +84,17 @@ export async function verifyUser(request: Request) {
       return null
     }
 
+    // 단독 ERP: company_id 조회 (다른 라우트 호환성)
+    let companyId: string | null = null
+    try {
+      const companies = await prisma.$queryRaw<any[]>`SELECT id FROM companies LIMIT 1`
+      if (companies[0]) companyId = companies[0].id
+    } catch {
+      // companies 테이블 미존재 시 null
+    }
+
     lastVerifyError = null
-    return { id: userId, ...serialize(profile) }
+    return { id: userId, company_id: companyId, ...serialize(profile) }
   } catch (e: any) {
     lastVerifyError = 'CATCH: ' + (e?.message || String(e))
     return null

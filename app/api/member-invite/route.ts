@@ -221,12 +221,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '관리자 초대는 플랫폼 관리자만 가능합니다.' }, { status: 403 })
     }
 
-    // 단독 ERP: DB에서 실제 회사 UUID 조회
-    const fmiCompanies = await prisma.$queryRaw<any[]>`SELECT id, name FROM companies LIMIT 1`
-    const company_id = fmiCompanies.length > 0 ? fmiCompanies[0].id : null
-    const companyName = fmiCompanies.length > 0 ? fmiCompanies[0].name : '주식회사 에프엠아이'
-    if (!company_id) {
-      return NextResponse.json({ error: '회사 정보를 찾을 수 없습니다.' }, { status: 500 })
+    // 단독 ERP: companies 테이블 조회 시도, 없으면 기본값
+    let company_id = 'fmi-single'
+    let companyName = '주식회사 에프엠아이'
+    try {
+      const fmiCompanies = await prisma.$queryRaw<any[]>`SELECT id, name FROM companies LIMIT 1`
+      if (fmiCompanies.length > 0) {
+        company_id = fmiCompanies[0].id
+        companyName = fmiCompanies[0].name || companyName
+      }
+    } catch {
+      // companies 테이블 미존재 시 기본값 사용
     }
 
     // 이미 가입된 이메일 확인
@@ -356,10 +361,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status')
 
     // 단독 ERP: company_id 없어도 전체 조회 가능
-    let query = `
-      SELECT id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id
-      FROM member_invitations
-    `
+    let query = `SELECT id, email, token, role, status, created_at, expires_at, accepted_at, invited_by, position_id, department_id FROM member_invitations`
     const params: any[] = []
 
     if (statusFilter) {
@@ -368,10 +370,7 @@ export async function GET(request: NextRequest) {
     }
     query += ` ORDER BY created_at DESC`
 
-    const data = await prisma.$queryRaw<any[]>(
-      query as any,
-      ...params
-    )
+    const data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
 
     // 수동 조인
     const positionIds = [...new Set((data || []).map((inv: any) => inv.position_id).filter(Boolean))]
