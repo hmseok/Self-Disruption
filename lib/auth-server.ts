@@ -74,7 +74,7 @@ export async function verifyUser(request: Request) {
 
     lastVerifyError = 'before prisma query, userId=' + userId
     const profiles = await prisma.$queryRaw<any[]>`
-      SELECT id, role, company_id FROM profiles WHERE id = ${userId} LIMIT 1
+      SELECT id, role FROM profiles WHERE id = ${userId} LIMIT 1
     `
     lastVerifyError = 'after prisma query, count=' + profiles.length
 
