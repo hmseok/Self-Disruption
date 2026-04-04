@@ -1,6 +1,6 @@
-import * as jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 
+const jwt = require('jsonwebtoken')
 const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 function serialize<T>(data: T): T {

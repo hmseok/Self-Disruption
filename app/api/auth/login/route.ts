@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as bcrypt from 'bcryptjs'
-import * as jwt from 'jsonwebtoken'
 import { prisma } from '@/lib/prisma'
 
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 const JWT_SECRET = process.env.JWT_SECRET || 'fmi_dev_secret_change_in_production'
 
 export async function POST(request: NextRequest) {
