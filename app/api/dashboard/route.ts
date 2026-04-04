@@ -8,6 +8,11 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// 테이블 미존재 등 쿼리 실패 시 빈 배열 반환
+async function safeQuery<T>(fn: () => Promise<T[]>): Promise<T[]> {
+  try { return await fn() } catch { return [] }
+}
+
 // GET /api/dashboard — All dashboard KPI stats
 export async function GET(request: NextRequest) {
   try {
@@ -32,24 +37,15 @@ export async function GET(request: NextRequest) {
       inspDueCount, inspOverCount, accActiveCount,
       accMonthData, schedData,
     ] = await Promise.all([
-      // system_modules
-      prisma.$queryRaw<any[]>`SELECT path FROM system_modules WHERE is_active = 1`,
-      // cars
-      prisma.$queryRaw<any[]>`SELECT id, status FROM cars`,
-      // customers count
-      prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM customers`,
-      // investments
-      prisma.$queryRaw<any[]>`SELECT invest_amount FROM general_investments`,
-      // jiip count
-      prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM jiip_contracts`,
-      // quotes revenue
-      prisma.$queryRaw<any[]>`SELECT rent_fee FROM quotes WHERE status = 'active'`,
-      // financial products
-      prisma.$queryRaw<any[]>`SELECT monthly_payment FROM financial_products`,
-      // insurance
-      prisma.$queryRaw<any[]>`SELECT total_premium FROM insurance_contracts`,
-      // today deliveries
-      prisma.$queryRawUnsafe<any[]>(
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT path FROM system_modules WHERE is_active = 1`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT id, status FROM cars`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM customers`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT invest_amount FROM general_investments`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM jiip_contracts`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT rent_fee FROM quotes WHERE status = 'active'`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT monthly_payment FROM financial_products`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT total_premium FROM insurance_contracts`),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT vo.id, vo.scheduled_date, vo.scheduled_time, vo.status, vo.operation_type,
                 c.number as car_number, c.brand as car_brand, c.model as car_model,
                 cu.name as customer_name
@@ -59,9 +55,8 @@ export async function GET(request: NextRequest) {
          WHERE vo.operation_type = 'delivery' AND vo.scheduled_date = ?
          ORDER BY vo.scheduled_time`,
         today
-      ),
-      // today returns
-      prisma.$queryRawUnsafe<any[]>(
+      )),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT vo.id, vo.scheduled_date, vo.scheduled_time, vo.status, vo.operation_type,
                 c.number as car_number, c.brand as car_brand, c.model as car_model,
                 cu.name as customer_name
@@ -71,25 +66,19 @@ export async function GET(request: NextRequest) {
          WHERE vo.operation_type = 'return' AND vo.scheduled_date = ?
          ORDER BY vo.scheduled_time`,
         today
-      ),
-      // maintenance waiting
-      prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM maintenance_records WHERE status IN ('requested', 'approved')`,
-      // maintenance in shop
-      prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM maintenance_records WHERE status = 'in_shop'`,
-      // inspections due soon
-      prisma.$queryRawUnsafe<any[]>(
+      )),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM maintenance_records WHERE status IN ('requested', 'approved')`),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM maintenance_records WHERE status = 'in_shop'`),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT COUNT(*) as count FROM inspection_records WHERE due_date <= ? AND due_date >= ? AND status IN ('scheduled', 'in_progress')`,
         weekLaterStr, today
-      ),
-      // inspections overdue
-      prisma.$queryRawUnsafe<any[]>(
+      )),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT COUNT(*) as count FROM inspection_records WHERE due_date < ? AND status IN ('scheduled', 'in_progress', 'overdue')`,
         today
-      ),
-      // active accidents
-      prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM accident_records WHERE status IN ('reported', 'insurance_filed', 'repairing')`,
-      // accidents this month
-      prisma.$queryRawUnsafe<any[]>(
+      )),
+      safeQuery(() => prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM accident_records WHERE status IN ('reported', 'insurance_filed', 'repairing')`),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT ar.id, ar.accident_date, ar.accident_type, ar.status,
                 c.number as car_number, c.brand as car_brand, c.model as car_model
          FROM accident_records ar
@@ -97,14 +86,13 @@ export async function GET(request: NextRequest) {
          WHERE ar.accident_date >= ?
          ORDER BY ar.accident_date DESC LIMIT 3`,
         monthStart
-      ),
-      // payment schedules
-      prisma.$queryRawUnsafe<any[]>(
+      )),
+      safeQuery(() => prisma.$queryRawUnsafe<any[]>(
         `SELECT status, expected_amount, actual_amount, payment_date
          FROM expected_payment_schedules
          WHERE payment_date >= ? AND payment_date <= ?`,
         monthStart, monthEnd
-      ),
+      )),
     ])
 
     const cars = carsData || []
