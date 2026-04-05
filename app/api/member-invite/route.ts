@@ -304,14 +304,16 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 신규 초대 생성 ──
+    const crypto = require('crypto')
     const expiresAt = toMySQLDatetime(new Date(Date.now() + 72 * 60 * 60 * 1000))
-    const invitationToken = require('crypto').randomBytes(16).toString('hex')
+    const invitationToken = crypto.randomBytes(16).toString('hex')
+    const invitationId = crypto.randomUUID()
 
-    const insertResult = await prisma.$executeRaw`
+    await prisma.$executeRaw`
       INSERT INTO member_invitations
-      (email, company_id, position_id, department_id, role, invited_by, expires_at, page_permissions, token, status, created_at)
+      (id, email, company_id, position_id, department_id, role, invited_by, expires_at, page_permissions, token, status, created_at)
       VALUES (
-        ${email}, ${company_id},
+        ${invitationId}, ${email}, ${company_id},
         ${position_id || null}, ${department_id || null},
         ${role}, ${admin.id}, ${expiresAt},
         ${JSON.stringify(page_permissions || [])},
@@ -319,17 +321,7 @@ export async function POST(request: NextRequest) {
       )
     `
 
-    const invitation = { id: '', token: invitationToken }
-    // Get the inserted ID
-    const invitations = await prisma.$queryRaw<any[]>`
-      SELECT id, token FROM member_invitations
-      WHERE token = ${invitationToken} LIMIT 1
-    `
-    if (invitations.length > 0) {
-      invitation.id = invitations[0].id
-    } else {
-      return NextResponse.json({ error: '초대 생성 실패' }, { status: 500 })
-    }
+    const invitation = { id: invitationId, token: invitationToken }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hmseok.com'
     const inviteUrl = `${siteUrl}/invite/${invitation.token}`
