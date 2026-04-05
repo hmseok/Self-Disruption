@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         UPDATE profiles SET
           role = ${invite.role || 'user'},
-          position_id = ${invite.position_id || null},
-          department_id = ${invite.department_id || null},
-          employee_name = ${name},
+          position = ${invite.position_id || null},
+          department = ${invite.department_id || null},
+          name = ${name},
           phone = ${phone || null},
           password_hash = ${passwordHash},
           is_active = 1,
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       userId = crypto.randomUUID()
       await prisma.$executeRaw`
         INSERT INTO profiles
-        (id, email, role, position_id, department_id, employee_name, phone, password_hash, is_active, is_approved, created_at)
+        (id, email, role, position, department, name, phone, password_hash, is_active, is_approved, created_at)
         VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
       `
     }
@@ -97,10 +97,11 @@ export async function POST(request: NextRequest) {
 
       if (permsToInsert.length > 0) {
         for (const perm of permsToInsert) {
+          const permId = crypto.randomUUID()
           await prisma.$executeRaw`
             INSERT INTO user_page_permissions
-            (user_id, page_path, can_view, can_create, can_edit, can_delete, data_scope, created_at)
-            VALUES (${perm.user_id}, ${perm.page_path}, ${perm.can_view}, ${perm.can_create}, ${perm.can_edit}, ${perm.can_delete}, ${perm.data_scope}, NOW())
+            (id, user_id, page_path, can_view, can_create, can_edit, can_delete, data_scope, created_at)
+            VALUES (${permId}, ${perm.user_id}, ${perm.page_path}, ${perm.can_view}, ${perm.can_create}, ${perm.can_edit}, ${perm.can_delete}, ${perm.data_scope}, NOW())
           `
         }
       }
