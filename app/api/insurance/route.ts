@@ -19,19 +19,38 @@ export async function GET(request: NextRequest) {
     const companyId = searchParams.get('company_id') || user.company_id
 
     let data: any[]
-    if (carId) {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT * FROM insurance_contracts
-        WHERE car_id = ${carId}
-        ORDER BY end_date DESC
-      `
-    } else {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT * FROM insurance_contracts
-        WHERE company_id = ${companyId}
-        ORDER BY end_date DESC
-        LIMIT 500
-      `
+    try {
+      if (carId) {
+        data = await prisma.$queryRaw<any[]>`
+          SELECT * FROM insurance_contracts
+          WHERE car_id = ${carId}
+          ORDER BY end_date DESC
+        `
+      } else {
+        // company_id 컬럼이 없을 수 있음 (단독 회사 ERP)
+        try {
+          data = await prisma.$queryRaw<any[]>`
+            SELECT * FROM insurance_contracts
+            WHERE company_id = ${companyId}
+            ORDER BY end_date DESC
+            LIMIT 500
+          `
+        } catch (colErr: any) {
+          if (colErr.message?.includes('company_id')) {
+            data = await prisma.$queryRaw<any[]>`
+              SELECT * FROM insurance_contracts
+              ORDER BY end_date DESC
+              LIMIT 500
+            `
+          } else throw colErr
+        }
+      }
+    } catch (tableErr: any) {
+      // insurance_contracts 테이블이 없으면 빈 배열 반환
+      if (tableErr.message?.includes("doesn't exist") || tableErr.message?.includes('1146')) {
+        console.warn('[insurance] 테이블 미존재, 빈 배열 반환')
+        data = []
+      } else throw tableErr
     }
 
     return NextResponse.json({ data: serialize(data), error: null })

@@ -45,17 +45,38 @@ export async function GET(request: NextRequest) {
         LIMIT 1
       `
     } else if (status) {
-      cars = await prisma.$queryRaw<any[]>`
-        SELECT * FROM cars
-        WHERE company_id = ${companyId} AND status = ${status}
-        ORDER BY created_at DESC
-      `
+      // company_id 컬럼이 있으면 필터, 없으면 전체 조회 (단독 회사 ERP)
+      try {
+        cars = await prisma.$queryRaw<any[]>`
+          SELECT * FROM cars
+          WHERE company_id = ${companyId} AND status = ${status}
+          ORDER BY created_at DESC
+        `
+      } catch (e: any) {
+        if (e.message?.includes('company_id')) {
+          cars = await prisma.$queryRaw<any[]>`
+            SELECT * FROM cars
+            WHERE status = ${status}
+            ORDER BY created_at DESC
+          `
+        } else throw e
+      }
     } else {
-      cars = await prisma.$queryRaw<any[]>`
-        SELECT * FROM cars
-        WHERE company_id = ${companyId}
-        ORDER BY created_at DESC
-      `
+      // company_id 컬럼이 있으면 필터, 없으면 전체 조회 (단독 회사 ERP)
+      try {
+        cars = await prisma.$queryRaw<any[]>`
+          SELECT * FROM cars
+          WHERE company_id = ${companyId}
+          ORDER BY created_at DESC
+        `
+      } catch (e: any) {
+        if (e.message?.includes('company_id')) {
+          cars = await prisma.$queryRaw<any[]>`
+            SELECT * FROM cars
+            ORDER BY created_at DESC
+          `
+        } else throw e
+      }
     }
 
     return NextResponse.json({ data: serialize(cars), error: null })
@@ -85,19 +106,38 @@ export async function POST(request: NextRequest) {
     const companyId = company_id || user.company_id
     const id = crypto.randomUUID()
 
-    await prisma.$executeRaw`
-      INSERT INTO cars (
-        id, number, brand, model, trim, year, fuel, status,
-        purchase_price, is_used, purchase_mileage, mileage,
-        is_commercial, ownership_type, company_id, created_at, updated_at
-      ) VALUES (
-        ${id}, ${number}, ${brand}, ${model}, ${trim || null}, ${year || null},
-        ${fuel || null}, ${status},
-        ${purchase_price || null}, ${is_used ? 1 : 0}, ${purchase_mileage || null},
-        ${mileage || null}, ${is_commercial ? 1 : 0}, ${ownership_type || 'company'},
-        ${companyId}, NOW(), NOW()
-      )
-    `
+    // company_id 컬럼이 있으면 포함, 없으면 제외
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO cars (
+          id, number, brand, model, \`trim\`, year, fuel, status,
+          purchase_price, is_used, purchase_mileage, mileage,
+          is_commercial, ownership_type, company_id, created_at, updated_at
+        ) VALUES (
+          ${id}, ${number}, ${brand}, ${model}, ${trim || null}, ${year || null},
+          ${fuel || null}, ${status},
+          ${purchase_price || null}, ${is_used ? 1 : 0}, ${purchase_mileage || null},
+          ${mileage || null}, ${is_commercial ? 1 : 0}, ${ownership_type || 'company'},
+          ${companyId}, NOW(), NOW()
+        )
+      `
+    } catch (e: any) {
+      if (e.message?.includes('company_id')) {
+        await prisma.$executeRaw`
+          INSERT INTO cars (
+            id, number, brand, model, \`trim\`, year, fuel, status,
+            purchase_price, is_used, purchase_mileage, mileage,
+            is_commercial, ownership_type, created_at, updated_at
+          ) VALUES (
+            ${id}, ${number}, ${brand}, ${model}, ${trim || null}, ${year || null},
+            ${fuel || null}, ${status},
+            ${purchase_price || null}, ${is_used ? 1 : 0}, ${purchase_mileage || null},
+            ${mileage || null}, ${is_commercial ? 1 : 0}, ${ownership_type || 'company'},
+            NOW(), NOW()
+          )
+        `
+      } else throw e
+    }
 
     const created = await prisma.$queryRaw<any[]>`SELECT * FROM cars WHERE id = ${id} LIMIT 1`
     return NextResponse.json({ data: serialize(created[0]), error: null }, { status: 201 })

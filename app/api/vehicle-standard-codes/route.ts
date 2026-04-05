@@ -12,8 +12,17 @@ export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const data = await prisma.$queryRaw<any[]>`SELECT * FROM vehicle_standard_codes ORDER BY model_name, price`
-    return NextResponse.json({ data: serialize(data), error: null })
+    try {
+      const data = await prisma.$queryRaw<any[]>`SELECT * FROM vehicle_standard_codes ORDER BY model_name, price`
+      return NextResponse.json({ data: serialize(data), error: null })
+    } catch (tableErr: any) {
+      // 테이블이 없으면 빈 배열 반환 (테이블 미생성 상태)
+      if (tableErr.message?.includes("doesn't exist") || tableErr.message?.includes('1146')) {
+        console.warn('[vehicle-standard-codes] 테이블 미존재, 빈 배열 반환')
+        return NextResponse.json({ data: [], error: null })
+      }
+      throw tableErr
+    }
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
