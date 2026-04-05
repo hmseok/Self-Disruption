@@ -74,7 +74,7 @@ export async function POST(
     // 4. 서명 저장
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     const ua = req.headers.get('user-agent') || 'unknown'
-    const signatureId = Date.now().toString()
+    const signatureId = crypto.randomUUID()
 
     await prisma.$executeRaw`
       INSERT INTO customer_signatures
@@ -116,7 +116,7 @@ export async function POST(
       // 테이블 없어도 진행
     }
 
-    const contractId = Date.now().toString()
+    const contractId = crypto.randomUUID()
     await prisma.$executeRaw`
       INSERT INTO contracts
       (id, quote_id, car_id, customer_id, customer_name, start_date, end_date, term_months, deposit, monthly_rent, status, signature_id, terms_version_id, special_terms, created_at)

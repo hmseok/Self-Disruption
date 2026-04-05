@@ -8,6 +8,10 @@ import { CONTRACT_TERMS, RETURN_TYPE_ADDENDUM, BUYOUT_TYPE_ADDENDUM, ESIGN_NOTIC
 
 const f = (n: number | undefined | null) => (n ?? 0).toLocaleString('ko-KR')
 const MAINT: Record<string, string> = { self: '자가정비', oil_only: '오일류만', basic: '기본정비', full: '완전정비' }
+const RENT_TYPE_LABEL: Record<string, string> = {
+  long_term: '장기렌트',
+  short_term: '단기렌트',
+}
 
 type PageState = 'loading' | 'valid' | 'signed' | 'expired' | 'error'
 
@@ -262,6 +266,8 @@ export default function PublicQuotePage() {
   const termMonths = quote.term_months || 36
   const annualMileage = quote.annual_mileage || 2
   const totalMileageLimit = annualMileage * 10000 * (termMonths / 12)
+  const isShortTerm = quote.quote_type === 'short_term' || termMonths <= 6
+  const quoteTypeLabel = isShortTerm ? '단기렌트' : (RENT_TYPE_LABEL[quote.quote_type] || '장기렌트')
 
   return (
     <div className="space-y-4">
@@ -273,7 +279,7 @@ export default function PublicQuotePage() {
         <h1 className="text-lg font-black text-gray-900">
           {quote.company?.name || '장기렌트'}
         </h1>
-        <p className="text-gray-400 text-xs mt-1">견적서 확인 및 계약 서명</p>
+        <p className="text-gray-400 text-xs mt-1">{quoteTypeLabel} 견적서 확인 및 계약 서명</p>
       </div>
 
       {/* 차량 정보 */}
@@ -319,7 +325,7 @@ export default function PublicQuotePage() {
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">계약유형</span>
-            <span className="font-black">{quote.contract_type === 'buyout' ? '인수형 장기렌트' : '반납형 장기렌트'}</span>
+            <span className="font-black">{isShortTerm ? '단기렌트' : (quote.contract_type === 'buyout' ? '인수형 장기렌트' : '반납형 장기렌트')}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">계약기간</span>
@@ -442,24 +448,58 @@ export default function PublicQuotePage() {
             onClick={() => setShowTerms(!showTerms)}
             className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition text-left"
           >
-            <span className="text-xs font-bold text-gray-700">자동차 장기대여 약관 보기</span>
+            <span className="text-xs font-bold text-gray-700">
+              {isShortTerm ? '자동차 단기대여 이용약관 보기' : '자동차 장기대여 약관 보기'}
+            </span>
             <svg className={`w-4 h-4 text-gray-400 transition-transform ${showTerms ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
           {showTerms && (
             <div className="max-h-[400px] overflow-y-auto px-4 py-3 space-y-3 border-t border-gray-200">
-              {/* DB 약관 우선, 없으면 정적 약관 fallback */}
-              {(quote.termsArticles || CONTRACT_TERMS).map((term: any, i: number) => (
-                <div key={i}>
-                  <p className="text-[11px] font-bold text-gray-800">{term.title}</p>
-                  <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">{term.content}</p>
-                </div>
-              ))}
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-[10px] font-bold text-gray-700">부속 약관</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">
-                  {quote.contract_type === 'buyout' ? BUYOUT_TYPE_ADDENDUM : RETURN_TYPE_ADDENDUM}
-                </p>
-              </div>
+              {isShortTerm ? (
+                <>
+                  {/* 단기렌트 간이약관 */}
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-800">제1조 (대여 조건)</p>
+                    <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">
+                      대여기간 중 차량의 관리책임은 임차인에게 있으며, 대여기간 종료 시 원래 상태로 반환하여야 합니다.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-800">제2조 (보험)</p>
+                    <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">
+                      대여 차량에는 대인/대물 보험이 가입되어 있습니다. 자차보험 면책금은 견적 조건에 따릅니다.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-800">제3조 (사고 시 책임)</p>
+                    <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">
+                      사고 발생 시 즉시 임대인에게 통보하여야 하며, 면책금 범위 내 수리비는 임차인 부담입니다.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-gray-800">제4조 (금지사항)</p>
+                    <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">
+                      음주운전, 무면허 운전, 차량 전대(타인 대여), 법규 위반 사용을 금지합니다.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* 장기렌트 약관 — DB 약관 우선, 없으면 정적 약관 fallback */}
+                  {(quote.termsArticles || CONTRACT_TERMS).map((term: any, i: number) => (
+                    <div key={i}>
+                      <p className="text-[11px] font-bold text-gray-800">{term.title}</p>
+                      <p className="text-[10px] text-gray-600 whitespace-pre-line leading-relaxed mt-0.5">{term.content}</p>
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-700">부속 약관</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      {quote.contract_type === 'buyout' ? BUYOUT_TYPE_ADDENDUM : RETURN_TYPE_ADDENDUM}
+                    </p>
+                  </div>
+                </>
+              )}
               <div className="pt-2 border-t border-gray-100">
                 <p className="text-[10px] text-blue-600">{ESIGN_NOTICE}</p>
               </div>
@@ -476,7 +516,7 @@ export default function PublicQuotePage() {
             className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <span className="text-xs text-gray-600 leading-relaxed">
-            상기 견적 내용 및 <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline font-bold">약관</button>을 확인하였으며, 계약 조건 및 개인정보 수집·이용에 동의합니다.
+            상기 견적 내용 및 <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline font-bold">{isShortTerm ? '이용약관' : '약관'}</button>을 확인하였으며, {isShortTerm ? '대여' : '계약'} 조건 및 개인정보 수집·이용에 동의합니다.
           </span>
         </label>
 

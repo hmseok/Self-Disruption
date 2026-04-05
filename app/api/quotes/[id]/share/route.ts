@@ -63,7 +63,7 @@ export async function POST(
       const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
       return NextResponse.json({
         token: existingToken[0].token,
-        shareUrl: `${origin}/sign/${existingToken[0].token}`,
+        shareUrl: `${origin}/public/quote/${existingToken[0].token}`,
         expiresAt: existingToken[0].expires_at,
         isExisting: true
       })
@@ -74,11 +74,13 @@ export async function POST(
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + expiryDays)
 
-    const tokenId = Date.now().toString()
+    const tokenId = crypto.randomUUID()
+    // company_id를 견적에서 가져옴
+    const companyId = quote[0].company_id || null
     await prisma.$executeRaw`
       INSERT INTO quote_share_tokens
-      (id, quote_id, token, status, expires_at, created_at)
-      VALUES (${tokenId}, ${quoteId}, ${token}, 'active', ${toMySQLDatetime(expiresAt)}, NOW())
+      (id, quote_id, company_id, token, status, expires_at, created_at)
+      VALUES (${tokenId}, ${quoteId}, ${companyId}, ${token}, 'active', ${toMySQLDatetime(expiresAt)}, NOW())
     `
 
     // 4. quotes.shared_at 업데이트
@@ -87,7 +89,7 @@ export async function POST(
     `
 
     const origin = process.env.NEXT_PUBLIC_BASE_URL || req.headers.get('origin') || ''
-    const shareUrl = `${origin}/sign/${token}`
+    const shareUrl = `${origin}/public/quote/${token}`
 
     return NextResponse.json({
       token,
