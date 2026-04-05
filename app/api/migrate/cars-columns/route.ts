@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   // admin만 실행 가능
-  const profile = await prisma.$queryRaw<any[]>`SELECT role FROM employees WHERE id = ${user.id} LIMIT 1`
+  const profile = await prisma.$queryRaw<any[]>`SELECT role FROM profiles WHERE id = ${user.id} LIMIT 1`
   if (!profile[0] || profile[0].role !== 'admin') {
     return NextResponse.json({ error: '관리자만 실행 가능' }, { status: 403 })
   }
