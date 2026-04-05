@@ -378,7 +378,7 @@ model CodeMaster {
   is_active  Boolean   @default(true)
   created_at DateTime  @default(now())
 
-  @@unique([category, code])
+  @@index([category, code])
   @@map("code_master")
 }
 
