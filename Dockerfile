@@ -40,6 +40,10 @@ ENV ALIGO_API_KEY=demmiqx99912gz507w2xr3sx06brni0p
 ENV ALIGO_USER_ID=fmi2bts
 ENV ALIGO_SENDER_PHONE=01098289500
 
+# Resend 이메일
+ENV RESEND_API_KEY=re_XhMpkoA4_NB5m2SR4XPcjj9ZLpP8FLKYJ
+ENV RESEND_FROM_EMAIL=noreply@hmseok.com
+
 # JWT Secret (커스텀 인증)
 ENV JWT_SECRET=fmi_prod_jwt_secret_change_this
 
@@ -92,6 +96,9 @@ COPY --from=builder /app/node_modules/lodash.isstring ./node_modules/lodash.isst
 COPY --from=builder /app/node_modules/lodash.once ./node_modules/lodash.once
 COPY --from=builder /app/node_modules/ms ./node_modules/ms
 COPY --from=builder /app/node_modules/semver ./node_modules/semver
+
+# Resend 이메일 모듈
+COPY --from=builder /app/node_modules/resend ./node_modules/resend
 
 # serverExternalPackages mysql2 — standalone에 자동 포함되지 않으므로 수동 복사
 COPY --from=builder /app/node_modules/mysql2 ./node_modules/mysql2
