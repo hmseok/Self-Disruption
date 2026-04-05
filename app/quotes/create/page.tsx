@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 
 // 동적 임포트 (코드 분할)
 const QuoteCreator = dynamic(() => import('./QuoteCreator'), { ssr: false })
-const QuoteCalculator = dynamic(() => import('../new/QuoteCalculator'), { ssr: false })
+const QuoteCalculator = dynamic(() => import('../pricing/RentPricingBuilder'), { ssr: false })
 
 type Mode = 'creator' | 'calculator'
 
