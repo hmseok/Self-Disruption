@@ -8,6 +8,10 @@ import { prisma } from '@/lib/prisma'
 //       + transactions 레코드 삭제 (취소 시)
 // ============================================
 
+function toMySQLDatetime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -48,7 +52,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'share_ids 필수' }, { status: 400 })
     }
 
-    const now = new Date().toISOString()
+    const now = toMySQLDatetime(new Date())
     const todayStr = now.slice(0, 10)
 
     if (action === 'mark_paid') {

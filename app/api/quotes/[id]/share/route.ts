@@ -12,6 +12,11 @@ import { prisma } from '@/lib/prisma'
  * - 반환: { token, shareUrl, expiresAt }
  */
 
+// MySQL DATETIME 형식 변환
+function toMySQLDatetime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 // nanoid 대안: crypto로 안전한 랜덤 토큰 생성
 function generateToken(length = 32): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -47,7 +52,7 @@ export async function POST(
     }
 
     // 2. 기존 활성 토큰 확인 (이미 있으면 재사용)
-    const expiresAtThreshold = new Date().toISOString()
+    const expiresAtThreshold = toMySQLDatetime(new Date())
     const existingToken = await prisma.$queryRaw<any[]>`
       SELECT * FROM quote_share_tokens
       WHERE quote_id = ${quoteId} AND status = 'active' AND expires_at > ${expiresAtThreshold}
@@ -73,7 +78,7 @@ export async function POST(
     await prisma.$executeRaw`
       INSERT INTO quote_share_tokens
       (id, quote_id, token, status, expires_at, created_at)
-      VALUES (${tokenId}, ${quoteId}, ${token}, 'active', ${expiresAt.toISOString()}, NOW())
+      VALUES (${tokenId}, ${quoteId}, ${token}, 'active', ${toMySQLDatetime(expiresAt)}, NOW())
     `
 
     // 4. quotes.shared_at 업데이트

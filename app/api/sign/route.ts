@@ -7,6 +7,11 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// MySQL DATETIME 형식 변환
+function toMySQLDatetime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 // GET: 토큰으로 견적서 정보 조회 (공개 접근)
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token')
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   // 접근 기록
   await prisma.$executeRaw`
-    UPDATE quote_share_tokens SET accessed_at = ${new Date().toISOString()}, access_count = ${(tokenData.access_count || 0) + 1} WHERE id = ${tokenData.id}
+    UPDATE quote_share_tokens SET accessed_at = ${toMySQLDatetime(new Date())}, access_count = ${(tokenData.access_count || 0) + 1} WHERE id = ${tokenData.id}
   `
 
   // viewed 이벤트 기록
@@ -105,7 +110,7 @@ export async function POST(request: NextRequest) {
     // 서명 저장
     const sigId = await prisma.$queryRaw<any[]>`
       INSERT INTO customer_signatures (quote_id, token_id, customer_name, customer_phone, signature_data, agreed_terms, signed_at, ip_address, user_agent)
-      VALUES (${tokenData.quote_id}, ${tokenData.id}, ${customer_name || ''}, ${customer_phone || ''}, ${signature_data}, 1, ${new Date().toISOString()}, ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''}, ${request.headers.get('user-agent') || ''})
+      VALUES (${tokenData.quote_id}, ${tokenData.id}, ${customer_name || ''}, ${customer_phone || ''}, ${signature_data}, 1, ${toMySQLDatetime(new Date())}, ${request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || ''}, ${request.headers.get('user-agent') || ''})
     `
 
     if (!sigId) {
@@ -117,7 +122,7 @@ export async function POST(request: NextRequest) {
     await prisma.$executeRaw`UPDATE quote_share_tokens SET status = 'signed' WHERE id = ${tokenData.id}`
 
     // 견적서 상태 업데이트
-    await prisma.$executeRaw`UPDATE quotes SET signed_at = ${new Date().toISOString()} WHERE id = ${tokenData.quote_id}`
+    await prisma.$executeRaw`UPDATE quotes SET signed_at = ${toMySQLDatetime(new Date())} WHERE id = ${tokenData.quote_id}`
 
     // signed 이벤트
     await prisma.$executeRaw`

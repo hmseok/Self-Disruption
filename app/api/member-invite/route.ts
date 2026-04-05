@@ -13,6 +13,11 @@ import {
 // DELETE → 초대 취소 (status='canceled')
 // ============================================
 
+// MySQL DATETIME 형식 변환 (ISO → 'YYYY-MM-DD HH:MM:SS')
+function toMySQLDatetime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 async function verifyAdmin(request: NextRequest) {
   const user = await verifyUser(request)
   if (!user || !['admin', 'master'].includes(user.role)) return null
@@ -245,7 +250,7 @@ export async function POST(request: NextRequest) {
     // 중복 pending 초대 확인
     const pendingInvites = await prisma.$queryRaw<any[]>`
       SELECT id, token, expires_at FROM member_invitations
-      WHERE email = ${email} AND status = 'pending' AND expires_at > ${new Date().toISOString()}
+      WHERE email = ${email} AND status = 'pending' AND expires_at > ${toMySQLDatetime(new Date())}
       LIMIT 1
     `
     const pendingInvite = pendingInvites.length > 0 ? pendingInvites[0] : null
@@ -299,7 +304,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 신규 초대 생성 ──
-    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+    const expiresAt = toMySQLDatetime(new Date(Date.now() + 72 * 60 * 60 * 1000))
     const invitationToken = require('crypto').randomBytes(16).toString('hex')
 
     const insertResult = await prisma.$executeRaw`
@@ -417,8 +422,8 @@ export async function GET(request: NextRequest) {
     }))
 
     // 만료 처리
-    const now = new Date().toISOString()
-    const expired = enrichedData.filter((inv: any) => inv.status === 'pending' && inv.expires_at < now)
+    const now = new Date()
+    const expired = enrichedData.filter((inv: any) => inv.status === 'pending' && new Date(inv.expires_at) < now)
     if (expired.length > 0) {
       await prisma.$executeRaw`
         UPDATE member_invitations SET status = 'expired' WHERE id IN (${expired.map((e: any) => e.id).join(',')})

@@ -7,6 +7,10 @@ import { prisma } from '@/lib/prisma'
 // 전화번호 뒷4자리 인증 → 인증 통과 시 상세 데이터 반환
 // ============================================
 
+function toMySQLDatetime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -60,7 +64,7 @@ export async function GET(
     // 4. 첫 조회 시 viewed_at 설정
     const isFirstView = !share.viewed_at
     const newViewCount = (share.view_count || 0) + 1
-    const now = new Date().toISOString()
+    const now = toMySQLDatetime(new Date())
 
     // 5. 조회 정보 업데이트
     await prisma.$executeRaw`

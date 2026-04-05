@@ -152,7 +152,7 @@ export async function DELETE(request: NextRequest) {
 
     if (softDelete) {
       // Soft delete - set deleted_at
-      const now = new Date().toISOString()
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
       const query = `UPDATE ${table} SET deleted_at = '${now}' WHERE id = '${id.replace(/'/g, "''")}'`
       await prisma.$executeRawUnsafe(query)
     } else {
