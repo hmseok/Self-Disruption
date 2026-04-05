@@ -37,8 +37,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/finance/upload': '카드/통장 관리',
   '/admin/payroll': '급여 관리',
   '/quotes': '견적 관리',
-  '/quotes/pricing': '견적 작성',
-  '/quotes/short-term': '단기 견적',
+  '/quotes/create': '견적 작성',
 }
 
 const MODULE_GROUPS: Record<string, string> = {
@@ -47,7 +46,7 @@ const MODULE_GROUPS: Record<string, string> = {
   // 차량 운영
   '/operations': '차량 운영', '/maintenance': '차량 운영', '/accidents': '차량 운영',
   // 대고객 영업
-  '/quotes': '대고객 영업', '/quotes/pricing': '대고객 영업', '/quotes/short-term': '대고객 영업',
+  '/quotes': '대고객 영업', '/quotes/create': '대고객 영업',
   '/customers': '대고객 영업', '/contracts': '대고객 영업', '/e-contract': '대고객 영업',
   // 경영 지원
   '/finance': '경영 지원', '/finance/collections': '경영 지원', '/finance/settlement': '경영 지원',

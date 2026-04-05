@@ -18,7 +18,7 @@ import DarkHeader from '../components/DarkHeader'
 export default function FinancePage() {
   const { company, role } = useApp()
 
-// ✅ [수정 2] supabase 클라이언트 생성 (이 줄이 없어서 에러가 난 겁니다!)
+// MySQL API 전환 완료
 const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'ledger' | 'schedule'>('ledger')

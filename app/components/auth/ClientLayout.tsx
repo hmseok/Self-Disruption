@@ -36,68 +36,87 @@ const Icons: any = {
 // 메뉴 설정
 // ============================================
 
-// 동적 메뉴 → 그룹 매핑
+// 동적 메뉴 → 그룹 매핑 (v2 — 3그룹 통합: 차량관리 + 영업/계약 + 재무/경영)
 const PATH_TO_GROUP: Record<string, string> = {
+  // ── 차량관리 (차량 + 차량운영 + 사고/보상 통합) ──
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle', '/fleet/vehicle-lookup': 'vehicle',
-  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops', '/rental': 'ops',
-  '/claims/accident-mgmt': 'claims', '/claims/billing-mgmt': 'claims',
-  '/claims/intake': 'claims', '/claims/investigation': 'claims', '/claims/assessment': 'claims', '/claims/billing': 'claims', '/claims/rental': 'claims',
-  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance', '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/jiip': 'finance',
-  '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
+  '/fleet/factory-mgmt': 'vehicle',
+  '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
+  // ── 영업/계약 (견적→계약→수금→정산 파이프라인 + 요금기준) ──
+  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
+  '/contracts': 'sales', '/customers': 'sales',
+  '/finance/collections': 'sales', '/finance/settlement': 'sales',
+  '/db/pricing-standards': 'sales',
+  // ── 재무/경영 (순수 재무·세무·인사) ──
+  '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
+  '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/db/lotte': 'finance',
   '/admin/code-master': 'admin',
-  '/fleet/factory-mgmt': 'ops',
 }
 
-// 메뉴명 오버라이드
+// 메뉴명 오버라이드 (v2 — 통합 구조 반영)
 const NAME_OVERRIDES: Record<string, string> = {
+  // 차량관리 그룹
   '/cars': '차량 관리',
   '/registration': '차량 등록증',
   '/insurance': '보험/가입',
   '/fleet/vehicle-lookup': '거래처 차량조회',
-  '/admin/code-master': '기초코드 관리',
-  '/fleet/factory-mgmt': '공장/협력업체 관리',
-  '/finance/upload': '카드/통장 관리',
-  '/finance/codef': '은행/카드 자동연동',
-  '/finance/settlement': '정산/계약 관리',
+  '/operations': '차량운영',
+  '/operations/intake': '접수/오더',
+  '/maintenance': '정비/유지보수',
+  '/fleet/factory-mgmt': '공장/협력업체',
+  '/claims/accident-mgmt': '사고관리',
+  '/claims/billing-mgmt': '보험청구관리',
+  // 영업/계약 그룹
+  '/quotes': '견적 관리',
+  '/contracts': '계약 관리',
+  '/customers': '고객 관리',
+  '/finance/collections': '수금/회수',
+  '/finance/settlement': '정산 관리',
+  '/db/pricing-standards': '요금 기준표',
+  // 재무/경영 그룹
+  '/finance': '재무 대시보드',
   '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
+  '/finance/upload': '카드/통장 관리',
+  '/finance/codef': '은행/카드 자동연동',
+  '/finance/cards': '카드 관리',
   '/admin/payroll': '급여 관리',
-  '/quotes': '견적 관리',
-  '/quotes/pricing': '견적 작성',
-  '/quotes/short-term': '단기 견적',
-  '/operations/intake': '접수/오더',
-  '/rental': '대차관리',
-  '/claims/accident-mgmt': '사고관리',
-  '/claims/billing-mgmt': '청구관리',
-  '/claims/intake': '사고 접수',
-  '/claims/investigation': '사고 조사',
-  '/claims/assessment': '손해 사정',
-  '/claims/billing': '보험 청구',
-  '/claims/rental': '대차 관리',
+  '/report': '보고서',
+  '/loans': '대출 관리',
+  '/db/lotte': '경쟁사 벤치마크',
+  '/admin/code-master': '기초코드 관리',
 }
 
-// 숨길 메뉴 경로 (FMI 단일회사 — 불필요한 플랫폼/구독 메뉴 제거)
+// 숨길 메뉴 경로 (v2 — 중복/미사용/리다이렉트/통합완료 메뉴 제거)
 const HIDDEN_PATHS = new Set([
-  '/finance/review', '/finance/freelancers', '/admin/freelancers',
-  '/jiip', '/invest', '/quotes/pricing', '/quotes/short-term',
-  '/accidents', '/rental', '/claims/intake', '/claims/investigation',
+  // 리다이렉트 전용 (실제 페이지 아님)
+  '/jiip',                   // → /invest?tab=jiip 리다이렉트
+  '/invest',                 // → /finance/settlement 리다이렉트
+  // 중복 메뉴 (다른 경로로 통합됨)
+  '/accidents',              // → /claims/accident-mgmt 중복
+  '/rental',                 // → /claims/rental 중복
+  '/e-contract',             // → 계약 관리에 흡수
+  '/quotes/pricing',         // → /quotes/create 통합
+  '/quotes/short-term',      // → /quotes/create 통합
+  // 사고/보상 하위 단계 (accident-mgmt, billing-mgmt만 노출)
+  '/claims/intake', '/claims/investigation',
   '/claims/assessment', '/claims/billing', '/claims/rental',
+  // 미사용/불필요
+  '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
   '/system-admin',           // 모듈 구독관리
   '/admin/developer',        // 개발자 도구
   '/admin/contracts',        // 회사/가입 관리 (플랫폼)
 ])
 
-// 비즈니스 그룹 (표시 순서)
+// 비즈니스 그룹 (v2 — 6그룹 → 3그룹 통합)
 const BUSINESS_GROUPS = [
-  { id: 'vehicle', label: '차량' },
-  { id: 'claims', label: '사고/보상' },
-  { id: 'ops', label: '차량운영' },
-  { id: 'sales', label: '영업' },
-  { id: 'finance', label: '재무' },
-  { id: 'data', label: '데이터 관리' },
+  { id: 'vehicle', label: '차량관리' },
+  { id: 'sales', label: '영업/계약' },
+  { id: 'finance', label: '재무/경영' },
 ]
 
 // 직장인필수 메뉴 (모든 로그인 사용자에게 표시)

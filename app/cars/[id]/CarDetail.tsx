@@ -800,7 +800,7 @@ export default function CarDetailPage() {
                         <div>
                           <label className="text-xs font-bold text-gray-500 block mb-1">계약서 파일 URL</label>
                           <div className="flex gap-2">
-                            <input className="flex-1 border rounded-lg p-2.5 text-sm" placeholder="Supabase Storage URL 또는 외부 링크"
+                            <input className="flex-1 border rounded-lg p-2.5 text-sm" placeholder="이미지 URL 입력"
                               value={car.consignment_contract_url || ''} onChange={e => handleChange('consignment_contract_url', e.target.value)} />
                             {car.consignment_contract_url && (
                               <a href={car.consignment_contract_url} target="_blank" rel="noopener noreferrer"

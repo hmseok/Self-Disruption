@@ -342,7 +342,7 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 200, overflow: 'hidden',
         }}>
           <Link
-            href="/quotes/pricing"
+            href="/quotes/create"
             onClick={() => setOpen(false)}
             style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
@@ -358,7 +358,7 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
             </div>
           </Link>
           <Link
-            href="/quotes/short-term"
+            href="/quotes/create"
             onClick={() => setOpen(false)}
             style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
@@ -415,7 +415,7 @@ export default function QuoteListPage() {
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // (계산기는 /quotes/short-term 페이지로 이동됨)
+  // (계산기는 /quotes/create 페이지로 통합됨)
 
   // ── 회사 도장 (companyId 선언 후 useEffect는 아래에) ──
   const [companyStamp, setCompanyStamp] = useState('')
@@ -715,7 +715,7 @@ export default function QuoteListPage() {
 
   // ── Handlers ──
   const handleEdit = useCallback((quoteId: string) => {
-    router.push(`/quotes/pricing?quote_id=${quoteId}`)
+    router.push(`/quotes/create?quote_id=${quoteId}`)
   }, [router])
 
   const handleArchive = useCallback(async (quoteId: string) => {
@@ -1045,7 +1045,7 @@ export default function QuoteListPage() {
         {/* 장기 탭: 새 견적(장기) 버튼 */}
         {mainTab === 'long_term' && (
           <Link
-            href="/quotes/pricing"
+            href="/quotes/create"
             className="q-new-btn"
             style={{
               padding: '7px 16px', background: '#2d5fa8', color: '#fff', border: 'none',
@@ -1060,7 +1060,7 @@ export default function QuoteListPage() {
         {/* 단기 탭: 새 견적 */}
         {mainTab === 'short_term' && (
           <Link
-            href="/quotes/short-term"
+            href="/quotes/create"
             className="q-new-btn"
             style={{
               padding: '7px 14px', background: '#2d5fa8', color: '#fff', border: 'none',

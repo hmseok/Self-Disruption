@@ -59,7 +59,7 @@ export default function CreateContractPage() {
   const router = useRouter();
   const { company, role, adminSelectedCompanyId } = useApp();
   const companyId = role === 'admin' ? adminSelectedCompanyId : company?.id;
-  // supabase is imported from utils
+  // MySQL API 전환 완료
 
   // State management
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -864,8 +864,8 @@ export default function CreateContractPage() {
           </div>
         </div>
 
-        <a href="/quotes/short-term" style={styles.link}>
-          단기계산기에서 계산하기 →
+        <a href="/quotes/create" style={styles.link}>
+          견적 작성하기 →
         </a>
       </div>
 

@@ -6,90 +6,82 @@ import { usePathname } from 'next/navigation'
 // 도트 마커 + 1행 브레드크럼 + 솔리드 라인
 // ═══════════════════════════════════════════════════════════════
 
-// 경로 → 비즈니스 그룹 매핑 (ClientLayout과 동기화)
+// 경로 → 비즈니스 그룹 매핑 (v2 — ClientLayout 3그룹과 동기화)
 const PATH_TO_GROUP: Record<string, string> = {
+  // ── 차량관리 (차량 + 운영 + 사고 통합) ──
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
-  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales', '/quotes/create': 'sales', '/customers': 'sales',
-  '/contracts': 'sales', '/e-contract': 'sales', '/e-contract/create': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance',
-  '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
-  '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/invest': 'invest', '/jiip': 'invest',
-  '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/fleet/vehicle-lookup': 'vehicle',
+  '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
+  '/fleet/factory-mgmt': 'vehicle',
+  '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
+  // ── 영업/계약 (견적→계약→수금→정산 파이프라인) ──
+  '/quotes': 'sales', '/quotes/create': 'sales',
+  '/contracts': 'sales', '/customers': 'sales',
+  '/finance/collections': 'sales', '/finance/settlement': 'sales',
+  '/db/pricing-standards': 'sales',
+  // ── 재무/경영 ──
+  '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
+  '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/db/lotte': 'finance',
+  // ── 기타 ──
   '/work-essentials/my-info': 'work',
   '/work-essentials/receipts': 'work',
 }
 
 // 그룹 ID → 섹션 라벨
 const GROUP_LABELS: Record<string, string> = {
-  vehicle: '차량',
-  ops: '차량운영',
-  sales: '영업',
-  finance: '재무',
-  invest: '투자',
-  data: '데이터 관리',
+  vehicle: '차량관리',
+  sales: '영업/계약',
+  finance: '재무/경영',
   work: '직장인필수',
-  platform: '플랫폼',
   settings: '설정',
 }
 
-// 경로 → 페이지 이름 (사이드바와 동기화)
+// 경로 → 페이지 이름 (사이드바 NAME_OVERRIDES와 동기화)
 const PAGE_NAMES: Record<string, string> = {
   '/dashboard': '대시보드',
-  // 차량
+  // 차량관리
   '/cars': '차량 관리',
-  '/insurance': '보험/가입',
   '/registration': '차량 등록증',
-  // 차량운영
-  '/operations': '운행일지',
-  '/maintenance': '정비 관리',
-  '/accidents': '사고 관리',
-  // 영업
+  '/insurance': '보험/가입',
+  '/fleet/vehicle-lookup': '거래처 차량조회',
+  '/operations': '차량운영',
+  '/operations/intake': '접수/오더',
+  '/maintenance': '정비/유지보수',
+  '/fleet/factory-mgmt': '공장/협력업체',
+  '/claims/accident-mgmt': '사고관리',
+  '/claims/billing-mgmt': '보험청구관리',
+  // 영업/계약
   '/quotes': '견적 관리',
-  '/quotes/pricing': '견적 작성',
-  '/quotes/short-term': '단기 견적',
-  '/customers': '고객 관리',
+  '/quotes/create': '견적 작성',
   '/contracts': '계약 관리',
-  '/e-contract': '전자계약서',
-  '/e-contract/create': '새 계약서 작성',
-  // 재무
-  '/finance': '장부/결산',
-  '/finance/collections': '수금 관리',
+  '/customers': '고객 관리',
+  '/finance/collections': '수금/회수',
   '/finance/settlement': '정산 관리',
-  '/finance/fleet': '차량별 수익',
-  '/operations/intake': '접수/오더 관리',
+  '/db/pricing-standards': '요금 기준표',
+  // 재무/경영
+  '/finance': '재무 대시보드',
+  '/finance/fleet': '차량 수익',
+  '/finance/tax': '세금 관리',
   '/finance/upload': '카드/통장 관리',
-  '/finance/review': '분류/확정',
-  '/finance/freelancers': '프리랜서 관리',
-  '/finance/cards': '법인카드',
+  '/finance/cards': '카드 관리',
+  '/finance/codef': '은행/카드 자동연동',
   '/admin/payroll': '급여 관리',
-  '/report': '경영보고서',
+  '/report': '보고서',
   '/loans': '대출 관리',
-  // 투자
-  '/invest': '투자 정산 관리',
-  '/jiip': '투자 정산 관리',
-  // 데이터 관리
-  '/db/pricing-standards': '견적 단가표',
-  '/db/lotte': '벤치마크',
+  '/db/lotte': '경쟁사 벤치마크',
   // 직장인필수
   '/work-essentials/my-info': '내 정보',
   '/work-essentials/receipts': '영수증제출',
-  // 플랫폼 (admin)
-  '/admin': '회사/가입 관리',
-  '/system-admin': '구독 관리',
-  '/admin/developer': '개발자 모드',
   // 설정
   '/admin/employees': '조직/권한 관리',
   '/admin/contract-terms': '계약 약관 관리',
   '/admin/message-templates': '메시지 센터',
 }
 
-// 설정/플랫폼 그룹 매핑
+// 설정 그룹 매핑
 const ADMIN_GROUP: Record<string, string> = {
-  '/admin': 'platform',
-  '/system-admin': 'platform',
-  '/admin/developer': 'platform',
   '/admin/employees': 'settings',
   '/admin/contract-terms': 'settings',
   '/admin/message-templates': 'settings',

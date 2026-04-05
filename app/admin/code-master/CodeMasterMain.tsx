@@ -169,7 +169,7 @@ export default function CodeMasterMain() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold text-white tracking-tight">기초코드 관리</h1>
-            <p className="text-[11px] text-slate-400 mt-0.5">Code Master Management — Supabase 정제 데이터</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Code Master Management — 코드 마스터 관리</p>
           </div>
           <div className="flex gap-3 text-[13px]">
             <div className="bg-white/10 rounded-lg px-4 py-2 text-white">

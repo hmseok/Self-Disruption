@@ -9,7 +9,7 @@ let _cache: CodeMap | null = null
 let _loading = false
 let _listeners: (() => void)[] = []
 
-// 기본 코드맵 (Supabase 조회 실패 시 fallback)
+// 기본 코드맵 (API 조회 실패 시 fallback)
 const FALLBACK: CodeMap = {
   OTPTSTAT: { '1': '접수', '2': '입고', '3': '수리중', '4': '출고' },
   OTPTACBN: { B: '보물', D: '단독', E: '기타', G: '가해', H: '긴출', J: '자차', K: '과실', M: '면책', O: '정비', P: '피해', Q: '검사', S: '긴출' },
@@ -38,7 +38,7 @@ async function loadCodes(): Promise<CodeMap> {
     const res = await fetch('/api/codes')
     const json = await res.json()
     if (json.success && json.codeMap) {
-      // Supabase 데이터를 fallback과 병합 (Supabase 우선)
+      // API 데이터를 fallback과 병합 (API 우선)
       _cache = { ...FALLBACK, ...json.codeMap }
     } else {
       _cache = FALLBACK

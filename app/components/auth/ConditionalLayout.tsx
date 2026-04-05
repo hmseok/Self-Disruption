@@ -13,10 +13,12 @@ import UploadWidget from '../UploadWidget'
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // 게스트 전용 경로 — ClientLayout 완전 우회
-  const isGuestRoute = pathname.startsWith('/sign')
-    || pathname.startsWith('/settlement/view')
-    || pathname.startsWith('/e-contract/')
+  // 게스트 전용 경로 — ClientLayout 완전 우회 (인증 불필요)
+  const isGuestRoute = pathname.startsWith('/public/quote')  // 견적 서명 (v2)
+    || pathname.startsWith('/sign')                           // 레거시 서명 (리다이렉트)
+    || pathname.startsWith('/settlement/view')                // 정산 내역 공유
+    || pathname.startsWith('/e-contract/')                    // 전자계약 서명
+    || pathname.startsWith('/invite/')                        // 초대 수락
 
   if (isGuestRoute) {
     return <>{children}</>

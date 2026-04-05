@@ -166,8 +166,7 @@ export default function GeneralInvestDetail() {
     // 입금과 출금을 모두 가져와서 순합계(입금 - 출금) 계산
     try {
       const headers = await getAuthHeader()
-      // TODO: Create /api/transactions endpoint
-      // const { data } = await supabase.from('transactions').select('amount, type').eq('related_type', 'invest').eq('related_id', id)
+      // TODO: Create /api/transactions endpoint (MySQL 전환 필요)
       const data: any = null
       if (data && Array.isArray(data)) {
         const net = data.reduce((acc: any, cur: any) => {

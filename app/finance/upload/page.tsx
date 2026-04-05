@@ -156,8 +156,7 @@ const formatDatetime = (dt: string | null | undefined) => {
   return { date, time }
 }
 
-// ═══ 클라이언트사이드 Supabase 직접 조회 헬퍼 ═══
-// VM 네트워크 제한으로 서버사이드 API 라우트가 Supabase에 접근 불가 시 fallback
+// ═══ 클라이언트사이드 파싱 헬퍼 ═══
 function parseQueueItem(q: any) {
   let altData: any = {}
   let sd: any = {}

@@ -306,7 +306,7 @@ export default function QuoteDetailPage() {
     setShareLoading(true)
     setShowShareModal(true)
     try {
-      // Supabase 세션에서 access_token 가져오기
+      // JWT access_token 가져오기
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : ''
       const res = await fetch(`/api/quotes/${quoteId}/share`, {
         method: 'POST',
@@ -493,8 +493,8 @@ export default function QuoteDetailPage() {
 
   const handleEditWorksheet = () => {
     // quote_id를 포함하여 수정 모드로 진입
-    if (worksheet) router.push(`/quotes/pricing?worksheet_id=${worksheet.id}&car_id=${worksheet.car_id || ''}&quote_id=${quoteId}`)
-    else router.push(`/quotes/pricing?quote_id=${quoteId}`)
+    if (worksheet) router.push(`/quotes/create?worksheet_id=${worksheet.id}&car_id=${worksheet.car_id || ''}&quote_id=${quoteId}`)
+    else router.push(`/quotes/create?quote_id=${quoteId}`)
   }
 
   if (loading) return (

@@ -1774,7 +1774,7 @@ export default function RentPricingBuilder() {
             setCustomCarAge(ws.custom_car_age || 0)
           }
         }
-        router.replace(`/quotes/pricing?worksheet_id=${wsId}&car_id=${q.car_id || ''}&quote_id=${quoteId}`)
+        router.replace(`/quotes/create?worksheet_id=${wsId}&car_id=${q.car_id || ''}&quote_id=${quoteId}`)
       }
       setEditLoading(false)
     } catch (error) {
@@ -3793,7 +3793,7 @@ export default function RentPricingBuilder() {
                               handleCarSelect(String(car.id))
                             }
                             // 워크시트 ID 기억하고 페이지 이동
-                            router.push(`/quotes/pricing?worksheet_id=${ws.id}&car_id=${car?.id || ''}`)
+                            router.push(`/quotes/create?worksheet_id=${ws.id}&car_id=${car?.id || ''}`)
                           }}
                           className="flex items-center gap-3 px-4 py-3 border border-gray-150 rounded-xl group cursor-pointer hover:border-steel-400 hover:shadow-sm transition-all bg-white"
                         >

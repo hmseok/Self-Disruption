@@ -613,7 +613,7 @@ export default function BenchmarkPage() {
               <h4 className="text-xs font-bold text-gray-900 mb-2">연동 페이지</h4>
               <div className="space-y-1.5">
                 {[
-                  { href: '/quotes/pricing', label: '렌트가 산출기' },
+                  { href: '/quotes/create', label: '렌트가 산출기' },
                   { href: '/db/pricing-standards', label: '산출 기준 관리 (7대 테이블)' },
                 ].map(l => (
                   <a key={l.href} href={l.href} className="block px-3 py-2 bg-gray-50 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100">{l.label} →</a>

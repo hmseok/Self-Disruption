@@ -146,7 +146,7 @@ export default function QuoteCreator() {
     const raw = sessionStorage.getItem('quoteBuilderData')
     if (!raw) {
       alert('견적 데이터가 없습니다. 렌트가 산출 빌더에서 분석을 먼저 진행해주세요.')
-      router.push('/quotes/pricing')
+      router.push('/quotes/create')
       return
     }
     setData(JSON.parse(raw))
@@ -396,7 +396,7 @@ export default function QuoteCreator() {
     return (
       <div className="max-w-[800px] mx-auto py-8 px-4 min-h-screen bg-gray-50/50">
         <div className="flex items-center gap-2 mb-6">
-          <Link href="/quotes/pricing" className="text-gray-400 hover:text-gray-600 text-sm">&larr; 산출 빌더</Link>
+          <Link href="/quotes/create" className="text-gray-400 hover:text-gray-600 text-sm">&larr; 산출 빌더</Link>
           <span className="text-gray-300">/</span>
           <span className="text-steel-600 font-bold text-sm">견적서 작성</span>
         </div>
@@ -570,7 +570,7 @@ export default function QuoteCreator() {
 
         {/* 버튼 */}
         <div className="flex gap-3">
-          <Link href="/quotes/pricing"
+          <Link href="/quotes/create"
             className="flex-1 py-3 text-center border border-gray-300 rounded-xl font-bold text-gray-500 hover:bg-gray-50">
             &larr; 산출 빌더로
           </Link>

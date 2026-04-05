@@ -27,29 +27,34 @@ type PagePerm = {
   data_scope: string
 }
 
-// ── 그룹 정의 (사이드바와 동일 구조) ──
+// ── 그룹 정의 (v2 — 사이드바 3그룹과 동기화) ──
 const PAGE_GROUPS = [
-  { id: 'vehicle', label: '차량 관리' },
-  { id: 'ops', label: '차량 운영' },
-  { id: 'sales', label: '영업' },
-  { id: 'finance', label: '재무' },
-  { id: 'invest', label: '투자' },
-  { id: 'data', label: '데이터 관리' },
-  { id: 'work', label: '업무 필수' },
+  { id: 'vehicle', label: '차량관리' },
+  { id: 'sales', label: '영업/계약' },
+  { id: 'finance', label: '재무/경영' },
+  { id: 'work', label: '직장인필수' },
   { id: 'settings', label: '설정' },
 ]
 
 const PATH_TO_GROUP: Record<string, string> = {
+  // 차량관리
   '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle',
-  '/operations': 'ops', '/operations/intake': 'ops', '/maintenance': 'ops', '/accidents': 'ops',
-  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
-  '/contracts': 'sales', '/customers': 'sales', '/e-contract': 'sales',
-  '/finance': 'finance', '/finance/collections': 'finance', '/finance/settlement': 'finance', '/finance/fleet': 'finance',
-  '/finance/upload': 'finance', '/finance/review': 'finance', '/finance/freelancers': 'finance',
-  '/finance/cards': 'finance', '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/invest': 'invest', '/jiip': 'invest',
-  '/db/pricing-standards': 'data', '/db/lotte': 'data',
+  '/fleet/vehicle-lookup': 'vehicle',
+  '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
+  '/fleet/factory-mgmt': 'vehicle',
+  '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
+  // 영업/계약
+  '/quotes': 'sales', '/contracts': 'sales', '/customers': 'sales',
+  '/finance/collections': 'sales', '/finance/settlement': 'sales',
+  '/db/pricing-standards': 'sales',
+  // 재무/경영
+  '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
+  '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  '/db/lotte': 'finance',
+  // 직장인필수
   '/work-essentials/my-info': 'work', '/work-essentials/receipts': 'work',
+  // 설정
   '/admin/employees': 'settings', '/admin/contract-terms': 'settings', '/admin/message-templates': 'settings',
 }
 
