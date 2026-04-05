@@ -627,6 +627,11 @@ model MemberInvitation {
   department_id    String?   @db.Char(36)
   role             String?
   page_permissions Json?
+  accepted_at      DateTime?
+  accepted_by      String?   @db.Char(36)
+  invited_by       String?   @db.Char(36)
+  send_channel     String?   // email, kakao, sms, both
+  recipient_phone  String?
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
 
@@ -1003,4 +1008,24 @@ model QuoteLifecycleEvent {
   @@index([event_type])
   @@index([created_at])
   @@map("quote_lifecycle_events")
+}
+
+// ============================================================
+// 페이지 권한 (RBAC)
+// ============================================================
+model UserPagePermission {
+  id          String    @id @default(uuid()) @db.Char(36)
+  user_id     String    @db.Char(36)
+  page_path   String    @db.VarChar(255)
+  can_view    Boolean   @default(false)
+  can_create  Boolean   @default(false)
+  can_edit    Boolean   @default(false)
+  can_delete  Boolean   @default(false)
+  data_scope  String    @default("all") // all, department, own
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now()) @updatedAt
+
+  @@unique([user_id, page_path])
+  @@index([user_id])
+  @@map("user_page_permissions")
 }
