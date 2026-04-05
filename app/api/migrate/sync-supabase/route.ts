@@ -4,13 +4,13 @@ import { prisma } from '@/lib/prisma'
 
 // Supabase 설정
 const SUPABASE_URL = 'https://uiyiwgkpchnvuvpsjfxv.supabase.co'
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || ''
+let SUPABASE_KEY = ''
 
 async function supabaseFetch(table: string, select = '*') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
     headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
     },
   })
@@ -28,8 +28,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '관리자만 실행 가능' }, { status: 403 })
   }
 
-  if (!SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'SUPABASE_ANON_KEY 환경변수 필요' }, { status: 500 })
+  // body에서 supabase_key 받기 (1회성 마이그레이션용)
+  let body: any = {}
+  try { body = await request.json() } catch {}
+  SUPABASE_KEY = body.supabase_key || process.env.SUPABASE_ANON_KEY || ''
+  if (!SUPABASE_KEY) {
+    return NextResponse.json({ error: 'supabase_key를 body에 포함하거나 SUPABASE_ANON_KEY 환경변수 설정 필요' }, { status: 400 })
   }
 
   const results: string[] = []
