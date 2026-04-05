@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { auth } from '../../lib/auth-client'
+import { auth, getStoredUser } from '../../lib/auth-client'
 import type { Profile, UserPagePermission, Position, Department } from '../types/rbac'
 
 // ============================================
@@ -103,11 +103,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDepartment(profileData.department || null)
 
         // ★ 페이지 권한 로드 (사용자 기준)
-        const permsRes = await fetch(`/api/user-page-permissions?user_id=${currentUser.uid}`, { headers })
-        const permsJson = await permsRes.json()
-        setPermissions(permsJson.data || [])
+        try {
+          const permsRes = await fetch(`/api/user-page-permissions?user_id=${currentUser.uid}`, { headers })
+          const permsJson = await permsRes.json()
+          setPermissions(permsJson.data || [])
+        } catch { /* 권한 로드 실패 시 빈 배열 유지 */ }
       } else {
-        setRole('user')
+        // ★ profileData가 null이면 JWT/localStorage에서 role 복구
+        const storedUser = getStoredUser()
+        const fallbackRole = storedUser?.role || 'user'
+        console.warn('AppContext: 프로필 조회 실패, localStorage fallback role:', fallbackRole)
+        setRole(fallbackRole === 'admin' || fallbackRole === 'master' ? 'admin' : fallbackRole)
       }
 
       isLoadedRef.current = true
