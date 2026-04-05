@@ -265,20 +265,24 @@ export async function POST(request: NextRequest) {
 
     const roleLabel = role === 'admin' ? '관리자' : '직원'
 
-    // 직급/부서명 조회
+    // 직급/부서명 조회 (테이블 미존재 시 무시)
     let positionName = ''
     let departmentName = ''
     if (position_id) {
-      const positions = await prisma.$queryRaw<any[]>`
-        SELECT name FROM positions WHERE id = ${position_id} LIMIT 1
-      `
-      positionName = positions.length > 0 ? positions[0].name : ''
+      try {
+        const positions = await prisma.$queryRaw<any[]>`
+          SELECT name FROM positions WHERE id = ${position_id} LIMIT 1
+        `
+        positionName = positions.length > 0 ? positions[0].name : ''
+      } catch { /* positions 테이블 미존재 */ }
     }
     if (department_id) {
-      const departments = await prisma.$queryRaw<any[]>`
-        SELECT name FROM departments WHERE id = ${department_id} LIMIT 1
-      `
-      departmentName = departments.length > 0 ? departments[0].name : ''
+      try {
+        const departments = await prisma.$queryRaw<any[]>`
+          SELECT name FROM departments WHERE id = ${department_id} LIMIT 1
+        `
+        departmentName = departments.length > 0 ? departments[0].name : ''
+      } catch { /* departments 테이블 미존재 */ }
     }
 
     // ── 재발송 경로 ──
@@ -388,22 +392,28 @@ export async function GET(request: NextRequest) {
     let inviterMap: Record<string, string> = {}
 
     if (positionIds.length > 0) {
-      const positions = await prisma.$queryRaw<any[]>`
-        SELECT id, name FROM positions WHERE id IN (${positionIds.join(',')})
-      `
-      if (positions) positionMap = Object.fromEntries(positions.map((p: any) => [p.id, { id: p.id, name: p.name }]))
+      try {
+        const positions = await prisma.$queryRaw<any[]>`
+          SELECT id, name FROM positions WHERE id IN (${positionIds.join(',')})
+        `
+        if (positions) positionMap = Object.fromEntries(positions.map((p: any) => [p.id, { id: p.id, name: p.name }]))
+      } catch { /* positions 테이블 미존재 시 무시 */ }
     }
     if (departmentIds.length > 0) {
-      const departments = await prisma.$queryRaw<any[]>`
-        SELECT id, name FROM departments WHERE id IN (${departmentIds.join(',')})
-      `
-      if (departments) departmentMap = Object.fromEntries(departments.map((d: any) => [d.id, { id: d.id, name: d.name }]))
+      try {
+        const departments = await prisma.$queryRaw<any[]>`
+          SELECT id, name FROM departments WHERE id IN (${departmentIds.join(',')})
+        `
+        if (departments) departmentMap = Object.fromEntries(departments.map((d: any) => [d.id, { id: d.id, name: d.name }]))
+      } catch { /* departments 테이블 미존재 시 무시 */ }
     }
     if (inviterIds.length > 0) {
-      const inviters = await prisma.$queryRaw<any[]>`
-        SELECT id, employee_name FROM profiles WHERE id IN (${inviterIds.join(',')})
-      `
-      if (inviters) inviterMap = Object.fromEntries(inviters.map((p: any) => [p.id, p.employee_name || '']))
+      try {
+        const inviters = await prisma.$queryRaw<any[]>`
+          SELECT id, name FROM profiles WHERE id IN (${inviterIds.join(',')})
+        `
+        if (inviters) inviterMap = Object.fromEntries(inviters.map((p: any) => [p.id, p.employee_name || p.name || '']))
+      } catch { /* profiles 컬럼 에러 시 무시 */ }
     }
 
     const enrichedData = (data || []).map((inv: any) => ({

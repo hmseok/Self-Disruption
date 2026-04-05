@@ -83,8 +83,8 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         try {
           const res = await fetch('/api/departments', { headers })
           if (res.ok) {
-            const data = await res.json()
-            setDepartments(data || [])
+            const json = await res.json()
+            setDepartments(json.data || json || [])
           }
         } catch (error) {
           console.error('Failed to load departments:', error)
@@ -94,23 +94,29 @@ export default function InviteModal({ companyName, companyId, isOpen, onClose, o
         try {
           const res = await fetch('/api/positions', { headers })
           if (res.ok) {
-            const data = await res.json()
-            setPositions(data || [])
+            const json = await res.json()
+            setPositions(json.data || json || [])
           }
         } catch (error) {
           console.error('Failed to load positions:', error)
         }
 
-        // 활성 모듈 로드
+        // 활성 모듈 로드 (system_modules 사용)
         try {
-          const res = await fetch('/api/company_modules', { headers })
+          const res = await fetch('/api/system_modules', { headers })
           if (res.ok) {
-            const data = await res.json()
-            if (data) {
+            const json = await res.json()
+            const data = Array.isArray(json) ? json : (json.data || [])
+            if (data.length > 0) {
               const seen = new Set<string>()
               const modules = data
-                .filter((m: any) => m.module?.path && !seen.has(m.module.path) && seen.add(m.module.path))
-                .map((m: any) => ({ path: m.module.path, name: m.module.name }))
+                .filter((m: any) => {
+                  const path = m.module?.path || m.path
+                  if (!path || seen.has(path)) return false
+                  seen.add(path)
+                  return true
+                })
+                .map((m: any) => ({ path: m.module?.path || m.path, name: m.module?.name || m.name }))
               setActiveModules(modules)
             }
           }

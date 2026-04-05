@@ -27,7 +27,16 @@ export async function GET(request: NextRequest) {
 
     query += ' ORDER BY created_at DESC'
 
-    const data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    let data: any[] = []
+    try {
+      data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    } catch (dbErr: any) {
+      // positions 테이블 미존재 시 빈 배열 반환
+      if (dbErr.message?.includes("doesn't exist")) {
+        return NextResponse.json({ data: [], error: null })
+      }
+      throw dbErr
+    }
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
