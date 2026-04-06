@@ -16,8 +16,12 @@ const PAGE_SIZE = 1000
 type ColDef = { name: string; pgType: string; nullable: boolean }
 type TableSchema = { cols: ColDef[]; required: string[] }
 
+// Tables to skip (Supabase views that cannot be inserted into)
+const SKIP_TABLES = new Set(['fmi_dashboard_summary'])
+
 // PG → MySQL type mapping
-function pgToMysql(pgType: string): string {
+// forPk: if true, return a key-compatible type (VARCHAR instead of TEXT)
+function pgToMysql(pgType: string, forPk = false): string {
   const t = pgType.toLowerCase().trim()
   if (t === 'uuid') return 'CHAR(36)'
   if (t === 'bigint') return 'BIGINT'
@@ -26,7 +30,7 @@ function pgToMysql(pgType: string): string {
   if (t === 'numeric' || t.startsWith('numeric')) return 'DECIMAL(20,6)'
   if (t === 'real' || t === 'double precision') return 'DOUBLE'
   if (t === 'boolean' || t === 'bool') return 'TINYINT(1)'
-  if (t === 'text') return 'TEXT'
+  if (t === 'text') return forPk ? 'VARCHAR(255)' : 'TEXT'
   if (t.startsWith('character varying') || t.startsWith('varchar')) {
     const m = t.match(/\((\d+)\)/)
     return m ? `VARCHAR(${m[1]})` : 'VARCHAR(255)'
@@ -39,7 +43,7 @@ function pgToMysql(pgType: string): string {
   if (t === 'jsonb' || t === 'json') return 'JSON'
   if (t.endsWith('[]') || t === 'array') return 'JSON'
   if (t === 'bytea') return 'BLOB'
-  return 'TEXT'
+  return forPk ? 'VARCHAR(255)' : 'TEXT'
 }
 
 // Fetch OpenAPI schema and extract table definitions
@@ -74,9 +78,9 @@ function buildCreateTable(table: string, schema: TableSchema): string {
   const colDefs: string[] = []
   let pkCol: string | null = null
   for (const c of schema.cols) {
-    const mysqlType = pgToMysql(c.pgType)
-    // id PK must be NOT NULL even if OpenAPI says nullable
     const isPk = c.name === 'id' && !pkCol
+    const mysqlType = pgToMysql(c.pgType, isPk)
+    // id PK must be NOT NULL even if OpenAPI says nullable
     const nullStr = isPk ? 'NOT NULL' : (c.nullable ? 'NULL' : 'NOT NULL')
     colDefs.push(`  \`${c.name}\` ${mysqlType} ${nullStr}`)
     if (isPk) pkCol = c.name
@@ -85,6 +89,15 @@ function buildCreateTable(table: string, schema: TableSchema): string {
     colDefs.push(`  PRIMARY KEY (\`${pkCol}\`)`)
   }
   return `CREATE TABLE IF NOT EXISTS \`${table}\` (\n${colDefs.join(',\n')}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+}
+
+// Fetch existing MySQL columns for a table
+async function getMysqlColumns(table: string): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<Array<{ COLUMN_NAME: string }>>`
+    SELECT COLUMN_NAME FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${table}
+  `
+  return new Set(rows.map(r => (r as any).COLUMN_NAME || (r as any).column_name))
 }
 
 // Normalize a row value for MySQL insertion
@@ -163,6 +176,12 @@ export async function POST(request: NextRequest) {
     for (const tbl of tables) {
       const r: any = { table: tbl }
       try {
+        if (SKIP_TABLES.has(tbl)) {
+          r.skipped_reason = 'view (not insertable)'
+          results[tbl] = r
+          continue
+        }
+
         const schema = allSchemas[tbl]
         if (!schema) {
           r.error = 'schema not found in Supabase OpenAPI'
@@ -182,6 +201,26 @@ export async function POST(request: NextRequest) {
         if (mode === 'create_only') {
           results[tbl] = r
           continue
+        }
+
+        // 1.5 Sync columns: ALTER TABLE ADD COLUMN for Supabase cols missing in MySQL
+        if (!dryRun) {
+          const mysqlCols = await getMysqlColumns(tbl)
+          const missing: string[] = []
+          for (const c of schema.cols) {
+            if (!mysqlCols.has(c.name)) {
+              const mysqlType = pgToMysql(c.pgType, false)
+              try {
+                await prisma.$executeRawUnsafe(
+                  `ALTER TABLE \`${tbl}\` ADD COLUMN \`${c.name}\` ${mysqlType} NULL`
+                )
+                missing.push(c.name)
+              } catch (e: any) {
+                // ignore if column race-added
+              }
+            }
+          }
+          if (missing.length > 0) r.added_columns = missing
         }
 
         // 2. Fetch rows
