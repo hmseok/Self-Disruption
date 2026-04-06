@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
             }
 
             await gcsFile.save(buffer, { contentType, metadata: { contentType } })
-            await gcsFile.makePublic()
+            // 균일 액세스 버킷이므로 makePublic() 미사용 — 버킷 IAM(allUsers/objectViewer)으로 공개
             uploaded++
             urlMap.push({
               old: oldUrl,
