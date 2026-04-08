@@ -16,13 +16,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const investmentId = searchParams.get('investment_id')
 
-    let query = `SELECT * FROM investment_deposits`
+    // CLAUDE.md: $queryRaw는 태그 함수 → 태그 템플릿 또는 $queryRawUnsafe 사용
+    let data: any[]
     if (investmentId) {
-      query += ` WHERE investment_id = '${investmentId}'`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM investment_deposits
+        WHERE investment_id = ${investmentId}
+        ORDER BY deposit_date DESC
+        LIMIT 500
+      `
+    } else {
+      data = await prisma.$queryRaw<any[]>`
+        SELECT * FROM investment_deposits
+        ORDER BY deposit_date DESC
+        LIMIT 500
+      `
     }
-    query += ` ORDER BY deposit_date DESC LIMIT 500`
-
-    const data = await prisma.$queryRaw<any[]>(query as any)
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -37,7 +46,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { investment_id, deposit_date, amount, description, status } = body
 
-    await prisma.$queryRaw`
+    await prisma.$executeRaw`
       INSERT INTO investment_deposits (id, investment_id, deposit_date, amount, description, status, created_at, updated_at)
       VALUES (UUID(), ${investment_id}, ${deposit_date}, ${amount}, ${description}, ${status || 'pending'}, NOW(), NOW())
     `

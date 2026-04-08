@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const carId = searchParams.get('car_id')
     const status = searchParams.get('status')
-    const companyId = searchParams.get('company_id') || user.company_id
 
+    // 단독 회사 ERP — company_id 필터 제거 (해당 컬럼 미존재)
     let data: any[]
     if (carId && status) {
       data = await prisma.$queryRaw<any[]>`
@@ -35,13 +35,12 @@ export async function GET(request: NextRequest) {
     } else if (status) {
       data = await prisma.$queryRaw<any[]>`
         SELECT * FROM general_investments
-        WHERE company_id = ${companyId} AND status = ${status}
+        WHERE status = ${status}
         ORDER BY created_at DESC
       `
     } else {
       data = await prisma.$queryRaw<any[]>`
         SELECT * FROM general_investments
-        WHERE company_id = ${companyId}
         ORDER BY created_at DESC
         LIMIT 500
       `
@@ -64,21 +63,19 @@ export async function POST(request: NextRequest) {
     const {
       car_id, investor_name, invest_amount = 0, interest_rate = 0,
       payment_day, contract_start_date, contract_end_date, status = 'active',
-      company_id,
       // JiipTab legacy fields
       monthly_payout, invest_date,
     } = body
 
-    const companyId = company_id || user.company_id
     const id = crypto.randomUUID()
 
     await prisma.$executeRaw`
       INSERT INTO general_investments (
-        id, car_id, company_id, investor_name, invest_amount, interest_rate,
+        id, car_id, investor_name, invest_amount, interest_rate,
         payment_day, contract_start_date, contract_end_date, status,
         created_at, updated_at
       ) VALUES (
-        ${id}, ${car_id || null}, ${companyId}, ${investor_name || null},
+        ${id}, ${car_id || null}, ${investor_name || null},
         ${Number(invest_amount)}, ${Number(interest_rate)},
         ${payment_day || null}, ${contract_start_date || invest_date || null},
         ${contract_end_date || null}, ${status},
