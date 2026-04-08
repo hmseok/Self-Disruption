@@ -8,8 +8,17 @@ import { useRouter } from 'next/navigation'
 // 계약 정보 중심 (지급 상태는 지급관리 탭에서 관리)
 // ═══════════════════════════════════════════════════════════════
 
-const f = (n: number) => n ? n.toLocaleString() : '0'
-const fm = (num: number) => {
+// Prisma Raw SQL이 Decimal 컬럼을 문자열로 리턴하므로 Number() 강제 변환
+const N = (v: any): number => {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const f = (n: any) => {
+  const num = N(n)
+  return num ? num.toLocaleString() : '0'
+}
+const fm = (n: any) => {
+  const num = N(n)
   if (num >= 100000000) return (num / 100000000).toFixed(1) + '억'
   if (num >= 10000) return (num / 10000).toFixed(0) + '만'
   return num.toLocaleString()
@@ -156,11 +165,11 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
   const investActive = investList.filter((c: any) => c.status === 'active')
   const totalContracts = jiipList.length + investList.length
   const activeCount = jiipActive.length + investActive.length
-  const monthlyJiip = jiipActive.reduce((s: number, c: any) => s + (c.admin_fee || 0), 0)
-  const monthlyInvest = investActive.reduce((s: number, c: any) => s + Math.round((c.invest_amount || 0) * (c.interest_rate || 0) / 100 / 12), 0)
+  const monthlyJiip = jiipActive.reduce((s: number, c: any) => s + N(c.admin_fee), 0)
+  const monthlyInvest = investActive.reduce((s: number, c: any) => s + Math.round(N(c.invest_amount) * N(c.interest_rate) / 100 / 12), 0)
   const monthlyTotal = monthlyJiip + monthlyInvest
-  const totalInvestAmount = jiipList.reduce((s: number, c: any) => s + (c.invest_amount || 0), 0)
-    + investList.reduce((s: number, c: any) => s + (c.invest_amount || 0), 0)
+  const totalInvestAmount = jiipList.reduce((s: number, c: any) => s + N(c.invest_amount), 0)
+    + investList.reduce((s: number, c: any) => s + N(c.invest_amount), 0)
 
   const currentList = activeSubTab === 'jiip' ? jiipList : investList
   const ninetyDays = new Date(today.getTime() + 90 * 86400000)
@@ -203,7 +212,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
         item.status === 'expired' ? '만기' : item.status === 'terminated' ? '해지' : '종료'
       if (!groups[k]) groups[k] = { items: [], totalAmount: 0 }
       groups[k].items.push(item)
-      groups[k].totalAmount += (item.invest_amount || 0)
+      groups[k].totalAmount += N(item.invest_amount)
     }
     const order = activeSubTab === 'jiip' ? ['운영 중', '만기', '해지', '종료'] : ['운용중', '만기', '해지', '종료']
     return order.filter(k => groups[k]).map(k => [k, groups[k]] as [string, typeof groups[string]])
@@ -211,11 +220,11 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
 
   const summaryStats = useMemo(() => {
     if (activeSubTab === 'jiip') {
-      const totalPaid = jiipList.reduce((s: number, c: any) => s + (settlementMap[`jiip_share:${c.id}`]?.totalExpense || 0), 0)
-      return { income: jiipList.reduce((s: number, c: any) => s + (c.invest_amount || 0), 0), expense: monthlyJiip, totalPaid, totalCount: jiipActive.length, avgRate: jiipList.length > 0 ? (jiipList.reduce((s: number, c: any) => s + (c.share_ratio || 0), 0) / jiipList.length).toFixed(1) : '0' }
+      const totalPaid = jiipList.reduce((s: number, c: any) => s + N(settlementMap[`jiip_share:${c.id}`]?.totalExpense), 0)
+      return { income: jiipList.reduce((s: number, c: any) => s + N(c.invest_amount), 0), expense: monthlyJiip, totalPaid, totalCount: jiipActive.length, avgRate: jiipList.length > 0 ? (jiipList.reduce((s: number, c: any) => s + N(c.share_ratio), 0) / jiipList.length).toFixed(1) : '0' }
     } else {
-      const totalPaid = investList.reduce((s: number, c: any) => s + (settlementMap[`invest:${c.id}`]?.totalExpense || 0), 0)
-      return { income: investList.reduce((s: number, c: any) => s + (c.invest_amount || 0), 0), expense: monthlyInvest, totalPaid, totalCount: investActive.length, avgRate: investList.length > 0 ? (investList.reduce((s: number, c: any) => s + (c.interest_rate || 0), 0) / investList.length).toFixed(1) : '0' }
+      const totalPaid = investList.reduce((s: number, c: any) => s + N(settlementMap[`invest:${c.id}`]?.totalExpense), 0)
+      return { income: investList.reduce((s: number, c: any) => s + N(c.invest_amount), 0), expense: monthlyInvest, totalPaid, totalCount: investActive.length, avgRate: investList.length > 0 ? (investList.reduce((s: number, c: any) => s + N(c.interest_rate), 0) / investList.length).toFixed(1) : '0' }
     }
   }, [jiipList, investList, jiipActive, investActive, settlementMap, activeSubTab, monthlyJiip, monthlyInvest])
 
@@ -379,8 +388,8 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>·</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>월 {fm(
                     activeSubTab === 'jiip'
-                      ? group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? (c.admin_fee || 0) : 0), 0)
-                      : group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? Math.round((c.invest_amount || 0) * (c.interest_rate || 0) / 100 / 12) : 0), 0)
+                      ? group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? N(c.admin_fee) : 0), 0)
+                      : group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? Math.round(N(c.invest_amount) * N(c.interest_rate) / 100 / 12) : 0), 0)
                   )} 지급</span>
                 </div>
 
@@ -398,7 +407,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                   }
 
                   if (activeSubTab === 'jiip') {
-                    const exp = months * (item.admin_fee || 0)
+                    const exp = months * N(item.admin_fee)
                     const rate = exp > 0 ? Math.min(100, Math.round((totalPaid / exp) * 100)) : 0
                     return (
                       <div key={item.id} style={rowBase}
@@ -444,7 +453,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                     )
                   } else {
                     // 투자
-                    const gross = Math.round((item.invest_amount || 0) * (item.interest_rate || 0) / 100 / 12)
+                    const gross = Math.round(N(item.invest_amount) * N(item.interest_rate) / 100 / 12)
                     const net = calcAfterTax(gross, item.tax_type || '이자소득(27.5%)')
                     const exp = months * gross
                     const rate = exp > 0 ? Math.min(100, Math.round((totalPaid / exp) * 100)) : 0
@@ -463,7 +472,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                         {/* 투자원금 */}
                         <div style={{ width: 130, flexShrink: 0, textAlign: 'right' }}>
                           <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>{f(item.invest_amount)}</div>
-                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#2d5fa8', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>연 {Number(item.interest_rate).toFixed(1)}%</span>
+                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#2d5fa8', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>연 {N(item.interest_rate).toFixed(1)}%</span>
                         </div>
                         {/* 월 이자(세후) */}
                         <div style={{ width: 120, flexShrink: 0, textAlign: 'right' }}>

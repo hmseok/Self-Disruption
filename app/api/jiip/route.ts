@@ -20,21 +20,52 @@ export async function GET(request: NextRequest) {
     const single = searchParams.get('single') === 'true'
 
     // 단독 회사 ERP — company_id 필터 제거 (해당 컬럼 미존재)
+    // 차량 정보 JOIN (car_number, model)
     let data: any[]
     if (carId && single) {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} LIMIT 1`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT j.*, c.car_number AS car_number, c.model AS car_model
+        FROM jiip_contracts j
+        LEFT JOIN cars c ON c.id = j.car_id
+        WHERE j.car_id = ${carId}
+        LIMIT 1
+      `
     } else if (carId) {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} ORDER BY created_at DESC`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT j.*, c.car_number AS car_number, c.model AS car_model
+        FROM jiip_contracts j
+        LEFT JOIN cars c ON c.id = j.car_id
+        WHERE j.car_id = ${carId}
+        ORDER BY j.created_at DESC
+      `
     } else if (status) {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE status = ${status} ORDER BY created_at DESC`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT j.*, c.car_number AS car_number, c.model AS car_model
+        FROM jiip_contracts j
+        LEFT JOIN cars c ON c.id = j.car_id
+        WHERE j.status = ${status}
+        ORDER BY j.created_at DESC
+      `
     } else {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts ORDER BY created_at DESC LIMIT 500`
+      data = await prisma.$queryRaw<any[]>`
+        SELECT j.*, c.car_number AS car_number, c.model AS car_model
+        FROM jiip_contracts j
+        LEFT JOIN cars c ON c.id = j.car_id
+        ORDER BY j.created_at DESC
+        LIMIT 500
+      `
     }
 
+    // 프론트 호환: item.car.number / item.car.model
+    const withCar = data.map((r: any) => ({
+      ...r,
+      car: r.car_number ? { number: r.car_number, model: r.car_model } : null,
+    }))
+
     if (single) {
-      return NextResponse.json({ data: serialize(data[0] || null), error: null })
+      return NextResponse.json({ data: serialize(withCar[0] || null), error: null })
     }
-    return NextResponse.json({ data: serialize(data), error: null })
+    return NextResponse.json({ data: serialize(withCar), error: null })
   } catch (e: any) {
     console.error('[GET /api/jiip]', e)
     return NextResponse.json({ error: e.message }, { status: 500 })

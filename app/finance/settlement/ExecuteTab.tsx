@@ -7,7 +7,15 @@ import React, { useState, useMemo } from 'react'
 // 다른 탭과 동일한 서브탭 + 필터 + 테이블 레이아웃
 // ═══════════════════════════════════════════════════════════════
 
-const nf = (num: number) => num ? num.toLocaleString() : '0'
+// Prisma Decimal → string 대응
+const N = (v: any): number => {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const nf = (v: any) => {
+  const num = N(v)
+  return num ? num.toLocaleString() : '0'
+}
 
 type SettlementItem = {
   id: string; type: 'jiip' | 'invest' | 'loan'; name: string; amount: number

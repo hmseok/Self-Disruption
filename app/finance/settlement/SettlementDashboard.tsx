@@ -170,10 +170,20 @@ function categorizeAmount(category: string, groups: Record<string, string[]>): s
 }
 
 // ============================================
-// 숫자 포맷
+// 숫자 포맷 (Prisma Raw SQL이 Decimal을 문자열로 리턴 → Number 강제 변환)
 // ============================================
-const nf = (num: number) => num ? num.toLocaleString() : '0'
-const nfSign = (num: number) => num > 0 ? `+${nf(num)}` : nf(num)
+const N = (v: any): number => {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const nf = (v: any) => {
+  const num = N(v)
+  return num ? num.toLocaleString() : '0'
+}
+const nfSign = (v: any) => {
+  const num = N(v)
+  return num > 0 ? `+${nf(num)}` : nf(num)
+}
 
 // ============================================
 // 메인 컴포넌트
@@ -360,15 +370,34 @@ export default function SettlementDashboard() {
       fetch('/api/settlement/shares?paid_only=true', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     ])
 
-    const txs = txRes.data || []
-    const jiipData = jiipRes.data || []
-    const investData = investRes.data || []
-    const loanData = loanRes.data || []
-    const allSettleTxs = allSettleRes.data || []
-    const carTxs = carTxRes.data || []
+    // Prisma Raw SQL은 Decimal/BigInt을 문자열로 리턴 → 모든 숫자 필드 Number 강제 변환
+    const txs = (txRes.data || []).map((t: any) => ({ ...t, amount: N(t.amount) }))
+    const jiipData = (jiipRes.data || []).map((c: any) => ({
+      ...c,
+      invest_amount: N(c.invest_amount),
+      admin_fee: N(c.admin_fee),
+      share_ratio: N(c.share_ratio),
+      payout_day: N(c.payout_day),
+      monthly_management_fee: N(c.monthly_management_fee),
+      profit_share_ratio: N(c.profit_share_ratio),
+    }))
+    const investData = (investRes.data || []).map((c: any) => ({
+      ...c,
+      invest_amount: N(c.invest_amount),
+      interest_rate: N(c.interest_rate),
+      payment_day: N(c.payment_day),
+    }))
+    const loanData = (loanRes.data || []).map((l: any) => ({
+      ...l,
+      monthly_payment: N(l.monthly_payment),
+      loan_amount: N(l.loan_amount),
+      interest_rate: N(l.interest_rate),
+    }))
+    const allSettleTxs = (allSettleRes.data || []).map((t: any) => ({ ...t, amount: N(t.amount) }))
+    const carTxs = (carTxRes.data || []).map((t: any) => ({ ...t, amount: N(t.amount) }))
     const classifyData = (classifyRes.data || []) as ClassifiedItem[]
-    setShareHistory(shareHistoryRes.data || [])
-    const investDeposits: InvestDeposit[] = investDepositsRes?.data || []
+    setShareHistory((shareHistoryRes.data || []).map((s: any) => ({ ...s, total_amount: N(s.total_amount) })))
+    const investDeposits: InvestDeposit[] = (investDepositsRes?.data || []).map((d: any) => ({ ...d, amount: N(d.amount) }))
     // 통장 거래 기반 투자금 거래 내역 (income=입금, expense=이자지급 등)
     const investTxDeposits: { id: string; transaction_date: string; amount: number; type: string; related_id: string; client_name?: string; description?: string; category?: string }[] =
       (investTxDepositsRes?.data || []).map((t: any) => ({
@@ -382,11 +411,24 @@ export default function SettlementDashboard() {
         category: t.category || '',
       }))
 
-    // 계약 현황 탭 데이터 설정
-    setAllJiipContracts(allJiipRes?.data || [])
-    setAllInvestContracts(allInvestRes?.data || [])
-    setContractsSettleTxs(contractsSettleTxRes?.data || [])
-    setAllPaidShares(allPaidSharesRes?.data || [])
+    // 계약 현황 탭 데이터 설정 (동일 Decimal 변환)
+    setAllJiipContracts((allJiipRes?.data || []).map((c: any) => ({
+      ...c,
+      invest_amount: N(c.invest_amount),
+      admin_fee: N(c.admin_fee),
+      share_ratio: N(c.share_ratio),
+      payout_day: N(c.payout_day),
+      monthly_management_fee: N(c.monthly_management_fee),
+      profit_share_ratio: N(c.profit_share_ratio),
+    })))
+    setAllInvestContracts((allInvestRes?.data || []).map((c: any) => ({
+      ...c,
+      invest_amount: N(c.invest_amount),
+      interest_rate: N(c.interest_rate),
+      payment_day: N(c.payment_day),
+    })))
+    setContractsSettleTxs((contractsSettleTxRes?.data || []).map((t: any) => ({ ...t, amount: N(t.amount) })))
+    setAllPaidShares((allPaidSharesRes?.data || []).map((s: any) => ({ ...s, total_amount: N(s.total_amount) })))
 
     // 디버그: 투자/대출 데이터 확인
     console.log('[Settlement] investData:', investData.map((i: any) => ({
