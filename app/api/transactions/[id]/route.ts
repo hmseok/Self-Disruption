@@ -3,12 +3,12 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 // PATCH /api/transactions/[id]
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   try {
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { status, category, amount, client_name, description, related_type, related_id } = body
 
@@ -35,12 +35,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 // DELETE /api/transactions/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await verifyUser(request)
   if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
   try {
-    const { id } = params
+    const { id } = await params
     await prisma.$executeRaw`DELETE FROM transactions WHERE id = ${id}`
     return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {
