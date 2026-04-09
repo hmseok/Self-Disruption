@@ -19,7 +19,6 @@ export async function PATCH(
     const { id } = await params
 
     const body = await request.json()
-    const id = id
 
     await prisma.$executeRaw`
       UPDATE contract_terms SET
@@ -54,7 +53,6 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const id = id
 
     await prisma.$executeRaw`
       DELETE FROM contract_terms WHERE id = ${id}

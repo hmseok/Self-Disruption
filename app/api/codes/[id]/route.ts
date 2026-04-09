@@ -17,7 +17,6 @@ export async function PATCH(
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const id = id
     const body = await request.json()
 
     const updated = await prisma.$queryRaw<any[]>`
@@ -49,7 +48,6 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const id = id
 
     await prisma.$executeRaw`
       DELETE FROM common_codes WHERE id = ${id}

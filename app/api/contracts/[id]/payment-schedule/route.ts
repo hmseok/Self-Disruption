@@ -12,7 +12,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const { id } = params
     const data = await prisma.$queryRaw<any[]>`SELECT * FROM payment_schedules WHERE contract_id = ${id} ORDER BY round_number ASC`
 
     return NextResponse.json({ data: serialize(data), error: null })

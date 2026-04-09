@@ -16,7 +16,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
 
     const body = await request.json()
-    const { id } = params
 
     await prisma.$executeRaw`
       UPDATE corporate_cards
@@ -47,7 +46,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const { id } = params
 
     await prisma.$executeRaw`DELETE FROM corporate_cards WHERE id = ${id}`
     return NextResponse.json({ data: null, error: null })

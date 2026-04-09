@@ -19,7 +19,6 @@ export async function PATCH(
     const { id } = await params
 
     const body = await request.json()
-    const id = id
 
     // TODO: Adjust UPDATE statement based on table schema
     await prisma.$executeRaw`
@@ -45,7 +44,6 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await params
 
-    const id = id
 
     await prisma.$executeRaw`
       DELETE FROM departments WHERE id = ${id}
