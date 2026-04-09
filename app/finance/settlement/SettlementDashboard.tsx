@@ -1163,7 +1163,7 @@ export default function SettlementDashboard() {
           const inv = investors.find(i => String(i.id) === String(item.relatedId))
           if (inv) {
             const headers = await getAuthHeader()
-            const res = await fetch(`/api/general_investments?id=${item.relatedId}`, { headers })
+            const res = await fetch(`/api/investments/${item.relatedId}`, { headers })
             const json = await res.json()
             const invDetail = json.data ?? json ?? null
             if (invDetail) {
@@ -1313,7 +1313,7 @@ export default function SettlementDashboard() {
           }
         } else if (item.type === 'invest') {
           const headers = await getAuthHeader()
-          const res = await fetch(`/api/general_investments?id=${item.relatedId}`, { headers })
+          const res = await fetch(`/api/investments/${item.relatedId}`, { headers })
           const json = await res.json()
           const invDetail = json.data ?? json ?? null
           if (invDetail) {
@@ -1637,7 +1637,7 @@ export default function SettlementDashboard() {
 
         const tableName = g.type === 'jiip' ? 'jiip_contracts' : 'general_investments'
         const headers = await getAuthHeader()
-        const endpoint = tableName === 'jiip_contracts' ? `/api/jiip-contracts?id=${g.relatedId}` : `/api/general_investments?id=${g.relatedId}`
+        const endpoint = tableName === 'jiip_contracts' ? `/api/jiip/${g.relatedId}` : `/api/investments/${g.relatedId}`
         const res = await fetch(endpoint, { headers })
         const json = await res.json()
         const contract = json.data ?? json ?? null

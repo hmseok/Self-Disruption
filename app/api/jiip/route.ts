@@ -18,10 +18,22 @@ export async function GET(request: NextRequest) {
     const carId = searchParams.get('car_id')
     const status = searchParams.get('status')
     const single = searchParams.get('single') === 'true'
+    const idsParam = searchParams.get('ids')
 
     // 단독 회사 ERP — company_id 필터 제거 (해당 컬럼 미존재)
     let data: any[]
-    if (carId && single) {
+    if (idsParam) {
+      const ids = idsParam.split(',').map(s => s.trim()).filter(Boolean)
+      if (ids.length === 0) {
+        data = []
+      } else {
+        const placeholders = ids.map(() => '?').join(',')
+        data = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM jiip_contracts WHERE id IN (${placeholders}) ORDER BY created_at DESC`,
+          ...ids
+        )
+      }
+    } else if (carId && single) {
       data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} LIMIT 1`
     } else if (carId) {
       data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} ORDER BY created_at DESC`

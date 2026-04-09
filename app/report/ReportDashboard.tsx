@@ -134,8 +134,8 @@ export default function ReportDashboard() {
     const [txRes, carRes, jiipRes, investRes, loanRes] = await Promise.all([
       fetch('/api/transactions?order=transaction_date', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
       fetch('/api/cars', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
-      fetch('/api/jiip-contracts', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
-      fetch('/api/general-investments', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/jiip', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
+      fetch('/api/investments', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
       fetch('/api/loans', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } }).then(r => r.json()).then(r => r.data || []),
     ])
 

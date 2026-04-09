@@ -218,7 +218,7 @@ export default function TaxManagementPage() {
         const jiipIds = [...new Set(jiipTxs.map((t: any) => t.related_id))]
         let jiipMap = new Map()
         try {
-          const res = await fetch(`/api/jiip-contracts?ids=${jiipIds.join(',')}`, { headers })
+          const res = await fetch(`/api/jiip?ids=${jiipIds.join(',')}`, { headers })
           const json = await res.json()
           const jiipContracts = json.data ?? json ?? []
           jiipMap = new Map((jiipContracts).map((j: any) => [j.id, j]))
