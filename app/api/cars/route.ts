@@ -45,38 +45,17 @@ export async function GET(request: NextRequest) {
         LIMIT 1
       `
     } else if (status) {
-      // company_id 컬럼이 있으면 필터, 없으면 전체 조회 (단독 회사 ERP)
-      try {
-        cars = await prisma.$queryRaw<any[]>`
-          SELECT * FROM cars
-          WHERE company_id = ${companyId} AND status = ${status}
-          ORDER BY created_at DESC
-        `
-      } catch (e: any) {
-        if (e.message?.includes('company_id')) {
-          cars = await prisma.$queryRaw<any[]>`
-            SELECT * FROM cars
-            WHERE status = ${status}
-            ORDER BY created_at DESC
-          `
-        } else throw e
-      }
+      // 단독 회사 ERP — company_id 필터 제거 (값 mismatch로 0건 반환되던 이슈)
+      cars = await prisma.$queryRaw<any[]>`
+        SELECT * FROM cars
+        WHERE status = ${status}
+        ORDER BY created_at DESC
+      `
     } else {
-      // company_id 컬럼이 있으면 필터, 없으면 전체 조회 (단독 회사 ERP)
-      try {
-        cars = await prisma.$queryRaw<any[]>`
-          SELECT * FROM cars
-          WHERE company_id = ${companyId}
-          ORDER BY created_at DESC
-        `
-      } catch (e: any) {
-        if (e.message?.includes('company_id')) {
-          cars = await prisma.$queryRaw<any[]>`
-            SELECT * FROM cars
-            ORDER BY created_at DESC
-          `
-        } else throw e
-      }
+      cars = await prisma.$queryRaw<any[]>`
+        SELECT * FROM cars
+        ORDER BY created_at DESC
+      `
     }
 
     return NextResponse.json({ data: serialize(cars), error: null })

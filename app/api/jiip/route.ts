@@ -20,47 +20,39 @@ export async function GET(request: NextRequest) {
     const single = searchParams.get('single') === 'true'
 
     // 단독 회사 ERP — company_id 필터 제거 (해당 컬럼 미존재)
-    // 차량 정보 JOIN (car_number, model)
     let data: any[]
     if (carId && single) {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT j.*, c.car_number AS car_number, c.model AS car_model
-        FROM jiip_contracts j
-        LEFT JOIN cars c ON c.id = j.car_id
-        WHERE j.car_id = ${carId}
-        LIMIT 1
-      `
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} LIMIT 1`
     } else if (carId) {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT j.*, c.car_number AS car_number, c.model AS car_model
-        FROM jiip_contracts j
-        LEFT JOIN cars c ON c.id = j.car_id
-        WHERE j.car_id = ${carId}
-        ORDER BY j.created_at DESC
-      `
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE car_id = ${carId} ORDER BY created_at DESC`
     } else if (status) {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT j.*, c.car_number AS car_number, c.model AS car_model
-        FROM jiip_contracts j
-        LEFT JOIN cars c ON c.id = j.car_id
-        WHERE j.status = ${status}
-        ORDER BY j.created_at DESC
-      `
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE status = ${status} ORDER BY created_at DESC`
     } else {
-      data = await prisma.$queryRaw<any[]>`
-        SELECT j.*, c.car_number AS car_number, c.model AS car_model
-        FROM jiip_contracts j
-        LEFT JOIN cars c ON c.id = j.car_id
-        ORDER BY j.created_at DESC
-        LIMIT 500
-      `
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts ORDER BY created_at DESC LIMIT 500`
     }
 
-    // 프론트 호환: item.car.number / item.car.model
-    const withCar = data.map((r: any) => ({
-      ...r,
-      car: r.car_number ? { number: r.car_number, model: r.car_model } : null,
-    }))
+    // 차량 정보 보강 — cars.number(차량번호), cars.model 조회
+    const carIds = Array.from(new Set(data.map((r: any) => r.car_id).filter(Boolean))) as string[]
+    const carMap: Record<string, any> = {}
+    if (carIds.length > 0) {
+      try {
+        const placeholders = carIds.map(() => '?').join(',')
+        const cars = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, \`number\`, model FROM cars WHERE id IN (${placeholders})`,
+          ...carIds
+        )
+        for (const c of cars) {
+          carMap[c.id] = c
+        }
+      } catch (err) {
+        console.warn('[jiip] cars 조회 실패 (차량 정보 없이 진행):', err)
+      }
+    }
+
+    const withCar = data.map((r: any) => {
+      const c = carMap[r.car_id]
+      return { ...r, car: c ? { number: c.number, model: c.model } : null }
+    })
 
     if (single) {
       return NextResponse.json({ data: serialize(withCar[0] || null), error: null })
