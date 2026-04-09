@@ -9,11 +9,11 @@ function serialize<T>(data: T): T {
 }
 
 // GET /api/cars/[id]
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     const cars = await prisma.$queryRaw<any[]>`SELECT * FROM cars WHERE id = ${id} LIMIT 1`
     if (!cars[0]) return NextResponse.json({ error: '차량을 찾을 수 없습니다' }, { status: 404 })
     return NextResponse.json({ data: serialize(cars[0]), error: null })
@@ -24,11 +24,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PATCH /api/cars/[id]
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     const fields = [
@@ -68,11 +68,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 // DELETE /api/cars/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     await prisma.$executeRaw`DELETE FROM cars WHERE id = ${id}`
     return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {

@@ -10,13 +10,14 @@ function serialize<T>(data: T): T {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    const id = params.id
+    const id = id
     const body = await request.json()
 
     const updated = await prisma.$queryRaw<any[]>`
@@ -41,13 +42,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    const id = params.id
+    const id = id
 
     await prisma.$executeRaw`
       DELETE FROM common_codes WHERE id = ${id}

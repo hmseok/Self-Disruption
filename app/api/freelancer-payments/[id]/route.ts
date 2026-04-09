@@ -8,10 +8,11 @@ function serialize<T>(data: T): T {
   ))
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
     const body = await request.json()
     const { status } = body
@@ -20,22 +21,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       UPDATE freelancer_payments SET
         status = ${status},
         updated_at = NOW()
-      WHERE id = ${params.id}
+      WHERE id = ${id}
     `
 
-    return NextResponse.json({ data: { id: params.id }, error: null })
+    return NextResponse.json({ data: { id: id }, error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    await prisma.$queryRaw`DELETE FROM freelancer_payments WHERE id = ${params.id}`
-    return NextResponse.json({ data: { id: params.id }, error: null })
+    await prisma.$queryRaw`DELETE FROM freelancer_payments WHERE id = ${id}`
+    return NextResponse.json({ data: { id: id }, error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

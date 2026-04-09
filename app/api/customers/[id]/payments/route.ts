@@ -6,12 +6,12 @@ function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    const { id } = params
     const data = await prisma.$queryRaw<any[]>`SELECT * FROM customer_payments WHERE customer_id = ${id} ORDER BY created_at DESC`
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
@@ -19,12 +19,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    const { id } = params
     const body = await request.json()
     const paymentId = crypto.randomUUID()
 

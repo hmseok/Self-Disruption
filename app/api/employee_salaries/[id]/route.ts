@@ -11,14 +11,15 @@ function serialize<T>(data: T): T {
 // PATCH /api/employee_salaries/[id]
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
     const body = await request.json()
-    const id = params.id
+    const id = id
 
     // TODO: Adjust UPDATE statement based on table schema
     await prisma.$executeRaw`
@@ -37,13 +38,14 @@ export async function PATCH(
 // DELETE /api/employee_salaries/[id]
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
-    const id = params.id
+    const id = id
 
     await prisma.$executeRaw`
       DELETE FROM employee_salaries WHERE id = ${id}

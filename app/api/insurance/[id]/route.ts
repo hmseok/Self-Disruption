@@ -9,11 +9,11 @@ function serialize<T>(data: T): T {
 }
 
 // GET /api/insurance/[id]
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     const data = await prisma.$queryRaw<any[]>`SELECT * FROM insurance_contracts WHERE id = ${id} LIMIT 1`
     if (!data[0]) return NextResponse.json({ error: '계약을 찾을 수 없습니다' }, { status: 404 })
     return NextResponse.json({ data: serialize(data[0]), error: null })
@@ -24,11 +24,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PATCH /api/insurance/[id]
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
 
     const fields = ['car_id', 'company', 'start_date', 'end_date', 'total_premium', 'age_limit', 'driver_range']
@@ -56,11 +56,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 // DELETE /api/insurance/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     await prisma.$executeRaw`DELETE FROM insurance_contracts WHERE id = ${id}`
     return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {

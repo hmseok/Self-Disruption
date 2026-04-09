@@ -6,12 +6,12 @@ function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string; scheduleId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; scheduleId: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const { scheduleId } = params
+    const { scheduleId } = await params
     const body = await request.json()
 
     const fields = Object.keys(body).filter(k => k !== 'id' && k !== 'contract_id')

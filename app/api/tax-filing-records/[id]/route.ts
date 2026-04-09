@@ -8,13 +8,14 @@ function serialize<T>(data: T): T {
   ))
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
+    const { id } = await params
     const data = await prisma.$queryRaw<any[]>`
-      SELECT * FROM tax_filing_records WHERE id = ${params.id} LIMIT 1
+      SELECT * FROM tax_filing_records WHERE id = ${id} LIMIT 1
     `
     return NextResponse.json({ data: serialize(data[0] || null), error: null })
   } catch (e: any) {
@@ -22,11 +23,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
+    const { id } = await params
     const body = await request.json()
     const { status, total_income, total_deduction, tax_amount, memo } = body
 
@@ -38,22 +40,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         tax_amount = COALESCE(${tax_amount}, tax_amount),
         memo = COALESCE(${memo}, memo),
         updated_at = NOW()
-      WHERE id = ${params.id}
+      WHERE id = ${id}
     `
 
-    return NextResponse.json({ data: { id: params.id }, error: null })
+    return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    await prisma.$queryRaw`DELETE FROM tax_filing_records WHERE id = ${params.id}`
-    return NextResponse.json({ data: { id: params.id }, error: null })
+    const { id } = await params
+    await prisma.$queryRaw`DELETE FROM tax_filing_records WHERE id = ${id}`
+    return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

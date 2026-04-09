@@ -10,10 +10,11 @@ function serialize<T>(data: T): T {
 
 // GET /api/cars/[id]/settlement?month=YYYY-MM
 // Returns all data needed for CarSettlementTab in one request
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+    const { id } = await params
 
     const { id: carId } = params
     const { searchParams } = request.nextUrl

@@ -3,11 +3,11 @@ import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
 // DELETE /api/financial-products/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
-    const { id } = params
+    const { id } = await params
     await prisma.$executeRaw`DELETE FROM financial_products WHERE id = ${id}`
     return NextResponse.json({ data: { id }, error: null })
   } catch (e: any) {

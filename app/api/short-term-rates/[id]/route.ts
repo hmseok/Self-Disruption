@@ -6,12 +6,13 @@ function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) => typeof v === 'bigint' ? v.toString() : v))
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const data = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${params.id} LIMIT 1`
+    const { id } = await params
+    const data = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${id} LIMIT 1`
 
     return NextResponse.json({ data: data[0] || null, error: null })
   } catch (e: any) {
@@ -19,11 +20,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
+    const { id } = await params
     const body = await request.json()
     const updates: string[] = []
     const values: any[] = []
@@ -33,10 +35,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       values.push(value)
     }
 
-    values.push(params.id)
+    values.push(id)
 
     if (updates.length === 0) {
-      const data = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${params.id} LIMIT 1`
+      const data = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${id} LIMIT 1`
       return NextResponse.json({ data: serialize(data[0]), error: null })
     }
 
@@ -45,19 +47,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       ...values
     )
 
-    const updated = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${params.id} LIMIT 1`
+    const updated = await prisma.$queryRaw<any[]>`SELECT * FROM short_term_rates WHERE id = ${id} LIMIT 1`
     return NextResponse.json({ data: serialize(updated[0]), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    await prisma.$executeRaw`DELETE FROM short_term_rates WHERE id = ${params.id}`
+    const { id } = await params
+    await prisma.$executeRaw`DELETE FROM short_term_rates WHERE id = ${id}`
 
     return NextResponse.json({ data: null, error: null })
   } catch (e: any) {
