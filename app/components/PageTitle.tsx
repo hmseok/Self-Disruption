@@ -2,8 +2,8 @@
 import { usePathname } from 'next/navigation'
 
 // ═══════════════════════════════════════════════════════════════
-// P3-C 페이지 타이틀 컴포넌트
-// 도트 마커 + 1행 브레드크럼 + 솔리드 라인
+// Dark Glass Morphism — 페이지 타이틀 컴포넌트
+// 글로우 도트 + 1행 브레드크럼 + 그라데이션 라인
 // ═══════════════════════════════════════════════════════════════
 
 // 경로 → 비즈니스 그룹 매핑 (v2 — ClientLayout 3그룹과 동기화)
@@ -87,9 +87,6 @@ const ADMIN_GROUP: Record<string, string> = {
   '/admin/message-templates': 'settings',
 }
 
-/**
- * 동적 메뉴 이름으로 오버라이드 가능 (ClientLayout에서 전달)
- */
 interface PageTitleProps {
   dynamicMenuName?: string
 }
@@ -97,10 +94,8 @@ interface PageTitleProps {
 export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
   const pathname = usePathname()
 
-  // 매칭: 정확 매칭 → 가장 긴 prefix 매칭
   const findBestMatch = (map: Record<string, string>): string | null => {
     if (map[pathname]) return map[pathname]
-    // 동적 경로 (예: /cars/abc123) → 부모 경로에서 찾기
     const segments = pathname.split('/')
     for (let i = segments.length - 1; i >= 2; i--) {
       const parent = segments.slice(0, i).join('/')
@@ -113,39 +108,41 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
   const groupId = findBestMatch(PATH_TO_GROUP) || findBestMatch(ADMIN_GROUP)
   const sectionLabel = groupId ? GROUP_LABELS[groupId] : null
 
-  // 대시보드이거나 매칭 안 되면 표시 안 함
   if (!pageName || pathname === '/dashboard') return null
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {/* P3-C: 도트 마커 + 1행 브레드크럼 */}
+      {/* 도트 마커 + 1행 브레드크럼 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         padding: '12px 20px',
       }}>
-        {/* 블루 도트 */}
+        {/* 글로우 블루 도트 */}
         <div style={{
           width: 8,
           height: 8,
           borderRadius: '50%',
-          background: '#2d5fa8',
+          background: '#3b82f6',
           flexShrink: 0,
-          boxShadow: '0 0 0 3px rgba(45,95,168,0.15)',
+          boxShadow: '0 0 8px rgba(59,130,246,0.5), 0 0 0 3px rgba(59,130,246,0.15)',
         }} />
-        {/* 섹션 라벨 (브레드크럼) */}
+        {/* 섹션 라벨 */}
         {sectionLabel && (
           <>
-            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sectionLabel}</span>
-            <span style={{ color: '#cbd5e1', fontSize: 11 }}>&rsaquo;</span>
+            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{sectionLabel}</span>
+            <span style={{ color: '#334155', fontSize: 11 }}>&rsaquo;</span>
           </>
         )}
         {/* 페이지 이름 */}
-        <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{pageName}</span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>{pageName}</span>
       </div>
-      {/* 1.5px 솔리드 라인 */}
-      <div style={{ height: 1.5, background: '#2d5fa8' }} />
+      {/* 그라데이션 라인 */}
+      <div style={{
+        height: 1,
+        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, transparent)',
+      }} />
     </div>
   )
 }

@@ -36,18 +36,18 @@ type SortOption = 'latest' | 'customer' | 'expiry' | 'rent'
 // ============================================================================
 function QuoteStatusBadge({ quote }: { quote: any }) {
   if (quote.status === 'archived') {
-    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#f3f4f6', color: '#9ca3af' }}>보관</span>
+    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(148,163,184,0.3)', color: '#cbd5e1' }}>보관</span>
   }
   if (quote.contract) {
-    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#e5e7eb', color: '#6b7280' }}>계약전환</span>
+    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(148,163,184,0.2)', color: '#94a3b8' }}>계약전환</span>
   }
   if (quote.signed_at) {
-    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>서명완료</span>
+    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(52,211,153,0.2)', color: '#34d399' }}>서명완료</span>
   }
   if (quote.shared_at) {
-    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#2563eb' }}>발송됨</span>
+    return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa' }}>발송됨</span>
   }
-  return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#d97706' }}>작성중</span>
+  return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>작성중</span>
 }
 
 // ============================================================================
@@ -55,11 +55,11 @@ function QuoteStatusBadge({ quote }: { quote: any }) {
 // ============================================================================
 function ShortTermStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
-    draft: { label: '작성중', bg: '#fef3c7', color: '#d97706' },
-    sent: { label: '발송됨', bg: '#dbeafe', color: '#2563eb' },
-    accepted: { label: '수락됨', bg: '#dcfce7', color: '#16a34a' },
-    contracted: { label: '계약완료', bg: '#e5e7eb', color: '#6b7280' },
-    cancelled: { label: '취소', bg: '#f3f4f6', color: '#9ca3af' },
+    draft: { label: '작성중', bg: 'rgba(251,191,36,0.2)', color: '#fbbf24' },
+    sent: { label: '발송됨', bg: 'rgba(96,165,250,0.2)', color: '#60a5fa' },
+    accepted: { label: '수락됨', bg: 'rgba(52,211,153,0.2)', color: '#34d399' },
+    contracted: { label: '계약완료', bg: 'rgba(148,163,184,0.2)', color: '#94a3b8' },
+    cancelled: { label: '취소', bg: 'rgba(148,163,184,0.3)', color: '#cbd5e1' },
   }
   const s = map[status] || map.draft
   return <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: s.bg, color: s.color }}>{s.label}</span>
@@ -86,15 +86,15 @@ function ShortTermDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#131926] rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-5 border-b border-gray-100 flex justify-between items-start">
+        <div className="p-5 border-b border-white/[0.06] flex justify-between items-start">
           <div>
-            <p className="text-xs text-gray-400 font-bold mb-1">{quote.quote_number}</p>
-            <h3 className="text-lg font-black text-gray-900">{quote.customer_name}</h3>
-            {quote.customer_phone && <p className="text-sm text-gray-500 mt-0.5">{quote.customer_phone}</p>}
+            <p className="text-xs text-slate-500 font-bold mb-1">{quote.quote_number}</p>
+            <h3 className="text-lg font-black text-slate-100">{quote.customer_name}</h3>
+            {quote.customer_phone && <p className="text-sm text-slate-400 mt-0.5">{quote.customer_phone}</p>}
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 text-lg">✕</button>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg text-slate-500 text-lg">✕</button>
         </div>
 
         {/* Status */}
@@ -107,17 +107,17 @@ function ShortTermDetailModal({
 
         {/* Amount Summary */}
         <div className="p-5">
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200/50">
+          <div className="bg-gradient-to-br from-amber-950/30 to-orange-950/30 rounded-xl p-4 border border-amber-700/30">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600 font-bold">합계 (VAT포함)</span>
-              <span className="text-xl font-black text-amber-700">{f(detail.totalWithVat || detail.total || 0)}원</span>
+              <span className="text-sm text-slate-300 font-bold">합계 (VAT포함)</span>
+              <span className="text-xl font-black text-amber-400">{f(detail.totalWithVat || detail.total || 0)}원</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between text-xs text-slate-400">
               <span>공급가액: {f(detail.supplyPrice || 0)}원</span>
               <span>부가세: {f(detail.vat || 0)}원</span>
             </div>
             {detail.globalDiscount && (
-              <div className="mt-2 text-xs text-amber-600 font-bold">적용 할인율: {detail.globalDiscount}%</div>
+              <div className="mt-2 text-xs text-amber-400 font-bold">적용 할인율: {detail.globalDiscount}%</div>
             )}
           </div>
         </div>
@@ -125,19 +125,19 @@ function ShortTermDetailModal({
         {/* Items */}
         {items.length > 0 && (
           <div className="px-5 pb-4">
-            <h4 className="text-xs font-bold text-gray-500 mb-2">견적 항목</h4>
+            <h4 className="text-xs font-bold text-slate-400 mb-2">견적 항목</h4>
             <div className="space-y-1.5">
               {items.map((item: any, i: number) => (
-                <div key={i} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg text-sm">
+                <div key={i} className="flex justify-between items-center p-2.5 bg-white/5 rounded-lg text-sm">
                   <div>
-                    <span className="font-bold text-gray-700">{item.vehicleClass || item.group}</span>
-                    <span className="text-xs text-gray-400 ml-2">일단가 {f(item.dailyRate)}원</span>
+                    <span className="font-bold text-slate-200">{item.vehicleClass || item.group}</span>
+                    <span className="text-xs text-slate-500 ml-2">일단가 {f(item.dailyRate)}원</span>
                   </div>
                   <div className="text-right">
                     {item.byDays && Object.entries(item.byDays).map(([days, amt]: [string, any]) => (
                       <div key={days} className="text-xs">
-                        <span className="text-gray-500">{days}일:</span>{' '}
-                        <span className="font-bold text-gray-800">{f(amt)}원</span>
+                        <span className="text-slate-400">{days}일:</span>{' '}
+                        <span className="font-bold text-slate-200">{f(amt)}원</span>
                       </div>
                     ))}
                   </div>
@@ -150,12 +150,12 @@ function ShortTermDetailModal({
         {/* Risk Factors */}
         {risk.totalRisk && (
           <div className="px-5 pb-4">
-            <h4 className="text-xs font-bold text-gray-500 mb-2">리스크 팩터</h4>
+            <h4 className="text-xs font-bold text-slate-400 mb-2">리스크 팩터</h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2 bg-gray-50 rounded-lg"><span className="text-gray-400">사고율</span><br /><span className="font-bold">{risk.accidentRate}%</span></div>
-              <div className="p-2 bg-gray-50 rounded-lg"><span className="text-gray-400">수리일수</span><br /><span className="font-bold">{risk.repairDays}일</span></div>
-              <div className="p-2 bg-gray-50 rounded-lg"><span className="text-gray-400">고장율</span><br /><span className="font-bold">{risk.breakdownRate}%</span></div>
-              <div className="p-2 bg-gray-50 rounded-lg"><span className="text-gray-400">고장수리</span><br /><span className="font-bold">{risk.breakdownDays}일</span></div>
+              <div className="p-2 bg-white/5 rounded-lg"><span className="text-slate-500">사고율</span><br /><span className="font-bold text-slate-200">{risk.accidentRate}%</span></div>
+              <div className="p-2 bg-white/5 rounded-lg"><span className="text-slate-500">수리일수</span><br /><span className="font-bold text-slate-200">{risk.repairDays}일</span></div>
+              <div className="p-2 bg-white/5 rounded-lg"><span className="text-slate-500">고장율</span><br /><span className="font-bold text-slate-200">{risk.breakdownRate}%</span></div>
+              <div className="p-2 bg-white/5 rounded-lg"><span className="text-slate-500">고장수리</span><br /><span className="font-bold text-slate-200">{risk.breakdownDays}일</span></div>
             </div>
           </div>
         )}
@@ -163,13 +163,13 @@ function ShortTermDetailModal({
         {/* Memo */}
         {detail.memo && (
           <div className="px-5 pb-4">
-            <h4 className="text-xs font-bold text-gray-500 mb-1">메모</h4>
-            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{detail.memo}</p>
+            <h4 className="text-xs font-bold text-slate-400 mb-1">메모</h4>
+            <p className="text-sm text-slate-300 bg-white/5 p-3 rounded-lg whitespace-pre-wrap">{detail.memo}</p>
           </div>
         )}
 
         {/* Actions */}
-        <div className="p-5 border-t border-gray-100 flex flex-wrap gap-2">
+        <div className="p-5 border-t border-white/[0.06] flex flex-wrap gap-2">
           {quote.status === 'draft' && (
             <button onClick={() => { onStatusChange(quote.id, 'sent'); onClose() }}
               className="flex-1 py-2.5 px-3 text-sm font-bold rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors">발송 처리</button>
@@ -184,11 +184,11 @@ function ShortTermDetailModal({
           )}
           {quote.status !== 'cancelled' && quote.status !== 'contracted' && (
             <button onClick={() => { onStatusChange(quote.id, 'cancelled'); onClose() }}
-              className="py-2.5 px-4 text-sm font-bold rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">취소</button>
+              className="py-2.5 px-4 text-sm font-bold rounded-xl bg-white/10 text-slate-400 hover:bg-white/20 transition-colors">취소</button>
           )}
           <button onClick={() => {
             if (confirm('이 견적서를 삭제하시겠습니까?')) { onDelete(quote.id); onClose() }
-          }} className="py-2.5 px-4 text-sm font-bold rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">삭제</button>
+          }} className="py-2.5 px-4 text-sm font-bold rounded-xl bg-red-950/30 text-red-400 hover:bg-red-950/50 transition-colors">삭제</button>
         </div>
       </div>
     </div>
@@ -232,12 +232,12 @@ function RowActions({
           }
           setOpen(!open)
         }}
-        style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280', fontSize: 16 }}
+        style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 16 }}
       >
         ⋯
       </button>
       {open && (
-        <div style={{ position: 'fixed', top: pos.top, right: pos.right, background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 130 }}>
+        <div style={{ position: 'fixed', top: pos.top, right: pos.right, background: '#1f2937', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 130 }}>
           {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) && (
             <button
               onClick={async (e) => {
@@ -271,21 +271,21 @@ function RowActions({
                   alert(`PDF 다운로드 실패: ${err.message}`)
                 }
               }}
-              style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#2563eb', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#eff6ff')}
+              style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#60a5fa', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.1)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >📄 PDF 다운로드</button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(quote.id); setOpen(false) }}
-            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#cbd5e1', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >수정</button>
           <button
             onClick={(e) => { e.stopPropagation(); onArchive(quote.id); setOpen(false) }}
-            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#374151', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#cbd5e1', border: 'none', background: 'none', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >보관</button>
           <button
@@ -297,8 +297,8 @@ function RowActions({
               if (confirm(msg)) onDelete(quote.id)
               setOpen(false)
             }}
-            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+            style={{ display: 'block', width: '100%', padding: '8px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#f87171', border: 'none', background: 'none', cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.1)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >삭제</button>
         </div>
@@ -338,23 +338,23 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
       {open && (
         <div style={{
           position: 'absolute', right: 0, top: '100%', marginTop: 8,
-          background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 200, overflow: 'hidden',
+          background: '#1f2937', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 200, overflow: 'hidden',
         }}>
           <Link
             href="/quotes/create"
             onClick={() => setOpen(false)}
             style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
-              textDecoration: 'none', borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s',
+              textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', transition: 'background 0.15s',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             <span style={{ fontSize: 14 }}>📋</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>장기렌트 견적</div>
-              <div style={{ fontSize: 11, color: '#9ca3af' }}>렌탈료 산출 · 견적서 작성</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>장기렌트 견적</div>
+              <div style={{ fontSize: 11, color: '#cbd5e1' }}>렌탈료 산출 · 견적서 작성</div>
             </div>
           </Link>
           <Link
@@ -364,13 +364,13 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
               display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
               textDecoration: 'none', transition: 'background 0.15s',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             <span style={{ fontSize: 14 }}>⏱️</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>단기렌트 견적</div>
-              <div style={{ fontSize: 11, color: '#9ca3af' }}>빠른 계산기 · 청구서 작성</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>단기렌트 견적</div>
+              <div style={{ fontSize: 11, color: '#cbd5e1' }}>빠른 계산기 · 청구서 작성</div>
             </div>
           </Link>
         </div>
@@ -1003,7 +1003,7 @@ export default function QuoteListPage() {
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -1017,7 +1017,7 @@ export default function QuoteListPage() {
 
       {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e5e7eb', flex: 1, overflow: 'auto' }}>
+        <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid rgba(255,255,255,0.06)', flex: 1, overflow: 'auto' }}>
           {([
             { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
             { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
@@ -1029,8 +1029,8 @@ export default function QuoteListPage() {
               style={{
                 padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
                 fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
-                color: mainTab === t.key ? '#1e3a5f' : '#9ca3af',
-                borderBottom: mainTab === t.key ? '2px solid #1e3a5f' : '2px solid transparent',
+                color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
+                borderBottom: mainTab === t.key ? '2px solid #60a5fa' : '2px solid transparent',
                 marginBottom: -2,
               }}
             >
@@ -1038,8 +1038,8 @@ export default function QuoteListPage() {
               {t.count !== null && (
                 <span style={{
                   marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 8,
-                  background: mainTab === t.key ? '#eef2ff' : '#f3f4f6',
-                  color: mainTab === t.key ? '#1e3a5f' : '#9ca3af',
+                  background: mainTab === t.key ? 'rgba(96,165,250,0.15)' : 'rgba(148,163,184,0.2)',
+                  color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
                 }}>{t.count}</span>
               )}
             </button>
@@ -1129,13 +1129,13 @@ export default function QuoteListPage() {
           {/* 정렬 + 검색 */}
           <div className="q-sort-search" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span className="q-sort-label" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>정렬:</span>
+              <span className="q-sort-label" style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortOption)}
                 style={{
-                  padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8,
-                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: '#fff',
+                  padding: '6px 10px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8,
+                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: '#1f2937', color: '#e2e8f0',
                 }}
               >
                 <option value="latest">최신순</option>
@@ -1150,8 +1150,8 @@ export default function QuoteListPage() {
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{
-                flex: 1, padding: '7px 14px', border: '1px solid #e5e7eb', borderRadius: 8,
-                fontSize: 13, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                flex: 1, padding: '7px 14px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8,
+                fontSize: 13, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', background: '#1f2937', color: '#e2e8f0',
               }}
             />
           </div>
@@ -1184,15 +1184,15 @@ export default function QuoteListPage() {
           setInvoiceOpen(true)
         }
         const getBadge = (q: any) => q.signed_at
-          ? { label: '서명완료', bg: '#dcfce7', color: '#16a34a' }
+          ? { label: '서명완료', bg: 'rgba(52,211,153,0.2)', color: '#34d399' }
           : q.shared_at
-          ? { label: '발송됨', bg: '#dbeafe', color: '#2563eb' }
-          : { label: '임시저장', bg: '#fef3c7', color: '#d97706' }
+          ? { label: '발송됨', bg: 'rgba(96,165,250,0.2)', color: '#60a5fa' }
+          : { label: '임시저장', bg: 'rgba(251,191,36,0.2)', color: '#fbbf24' }
 
         return (
-        <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+        <div style={{ background: '#131926', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
           {filteredInvoiceQuotes.length === 0 ? (
-            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
               {invoiceQuotes.length === 0 ? '단기렌트 청구서가 없습니다.' : '해당 조건의 청구서가 없습니다.'}
             </div>
@@ -1201,13 +1201,13 @@ export default function QuoteListPage() {
             <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>임차인</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대여기간</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>임차인</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대여기간</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1216,20 +1216,20 @@ export default function QuoteListPage() {
                     const badge = getBadge(q)
                     return (
                       <tr key={q.id} onClick={() => openInvoice(q)}
-                        style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                        style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'background 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
                           <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{q.customer_name || '(미입력)'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{parsed.car || '-'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280' }}>{parsed.period || '-'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#e2e8f0' }}>{q.customer_name || '(미입력)'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.car || '-'}</td>
+                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.period || '-'}</td>
                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                          <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(q.rent_fee || 0)}원</span>
+                          <span style={{ fontWeight: 900, color: '#60a5fa' }}>{f(q.rent_fee || 0)}원</span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(q.created_at)}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(q.created_at)}</td>
                       </tr>
                     )
                   })}
@@ -1243,14 +1243,14 @@ export default function QuoteListPage() {
                 const badge = getBadge(q)
                 return (
                   <div key={q.id} onClick={() => openInvoice(q)}
-                    style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                         <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, flexShrink: 0 }}>{badge.label}</span>
-                        <span style={{ fontWeight: 700, color: '#111827', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
-                        <span style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
+                        <span style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
+                        <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
                       </div>
-                      <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
+                      <span style={{ fontWeight: 900, color: '#60a5fa', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
                     </div>
                   </div>
                 )
@@ -1268,12 +1268,12 @@ export default function QuoteListPage() {
 
       {/* ═══ TAB: 장기 견적 목록 ═══ */}
       {mainTab === 'long_term' && (
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+      <div style={{ background: '#131926', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
         {loading ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
+          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
         ) : (
           displayedQuotes.length === 0 ? (
-            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
+            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
               {quotes.length === 0 ? '발행된 견적서가 없습니다.' : '해당 조건의 견적서가 없습니다.'}
             </div>
@@ -1282,16 +1282,16 @@ export default function QuoteListPage() {
             <div className="hidden md:block" style={{ overflowX: 'auto' }}>
               <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적기간</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>발송일</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', width: 50 }}></th>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적기간</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>발송일</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', width: 50 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1301,62 +1301,62 @@ export default function QuoteListPage() {
                       onClick={() => router.push(`/quotes/${quote.id}`)}
                       style={{
                         cursor: 'pointer', transition: 'background 0.15s',
-                        borderBottom: idx < displayedQuotes.length - 1 ? '1px solid #f3f4f6' : 'none',
+                        borderBottom: idx < displayedQuotes.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <QuoteStatusBadge quote={quote} />
                           {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#d97706' }}>청구</span>
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{quote.customer_name}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#e2e8f0' }}>{quote.customer_name}</td>
                       <td style={{ padding: '12px 16px' }}>
                         {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fde68a', flexShrink: 0 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(251,191,36,0.4)', flexShrink: 0 }}>
                               <span style={{ fontSize: 16 }}>✍️</span>
                             </div>
                             <div>
-                              <div style={{ fontWeight: 700, color: '#111827', fontSize: 12 }}>{parseInvoiceMemo(quote.memo).car}</div>
-                              <div style={{ fontSize: 11, color: '#d97706' }}>청구서</div>
+                              <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 12 }}>{parseInvoiceMemo(quote.memo).car}</div>
+                              <div style={{ fontSize: 11, color: '#fbbf24' }}>청구서</div>
                             </div>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f3f4f6', overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(148,163,184,0.2)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
                               {quote.car?.image_url ? (
                                 <img src={quote.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               ) : (
-                                <span style={{ fontSize: 9, color: '#d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
+                                <span style={{ fontSize: 9, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
                               )}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 700, color: '#111827', fontSize: 12 }}>{quote.car?.number || '-'}</div>
-                              <div style={{ fontSize: 11, color: '#6b7280' }}>{quote.car?.brand} {quote.car?.model}</div>
+                              <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 12 }}>{quote.car?.number || '-'}</div>
+                              <div style={{ fontSize: 11, color: '#94a3b8' }}>{quote.car?.brand} {quote.car?.model}</div>
                             </div>
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>
+                      <td style={{ padding: '12px 16px', color: '#cbd5e1', fontSize: 13 }}>
                         {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]'))
                           ? parseInvoiceMemo(quote.memo).period
                           : `${formatDate(quote.start_date)} ~ ${formatDate(quote.end_date)}`
                         }
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280', fontSize: 13 }}>{f(quote.deposit)}원</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#94a3b8', fontSize: 13 }}>{f(quote.deposit)}원</td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
-                        <div style={{ fontSize: 10, color: '#9ca3af' }}>{(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? '/총액 (VAT포함)' : '/월 (VAT포함)'}</div>
+                        <span style={{ fontWeight: 900, color: '#60a5fa' }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
+                        <div style={{ fontSize: 10, color: '#94a3b8' }}>{(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? '/총액 (VAT포함)' : '/월 (VAT포함)'}</div>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
                         {quote.shared_at ? formatDate(quote.shared_at) : '-'}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(quote.created_at)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(quote.created_at)}</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                         <RowActions quote={quote} onEdit={handleEdit} onArchive={handleArchive} onDelete={handleDelete} />
                       </td>
@@ -1372,23 +1372,23 @@ export default function QuoteListPage() {
                 const parsed = isInv ? parseInvoiceMemo(quote.memo) : null
                 return (
                   <div key={quote.id} onClick={() => router.push(`/quotes/${quote.id}`)}
-                    style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <QuoteStatusBadge quote={quote} />
-                        {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#d97706' }}>청구</span>}
-                        <span style={{ fontWeight: 700, color: '#111827', fontSize: 13 }}>{quote.customer_name || '(미입력)'}</span>
+                        {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>}
+                        <span style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 13 }}>{quote.customer_name || '(미입력)'}</span>
                       </div>
-                      <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 14, flexShrink: 0 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
+                      <span style={{ fontWeight: 900, color: '#60a5fa', fontSize: 14, flexShrink: 0 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 2 }}>
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>
                         {isInv
                           ? `${parsed?.car || '-'} · ${parsed?.period || '-'}`
                           : `${quote.car?.brand || ''} ${quote.car?.model || ''} ${quote.car?.number ? `(${quote.car.number})` : ''}`
                         }
                       </span>
-                      <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
                         {isInv ? '' : `${formatDate(quote.start_date)}~${formatDate(quote.end_date)}`}
                         {' '}{formatDate(quote.created_at)}
                       </span>
@@ -1404,8 +1404,8 @@ export default function QuoteListPage() {
 
       {/* ═══ 청구서 작성 모달 ═══ */}
       {invoiceOpen && (() => {
-        const iS = { width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none' }
-        const lS = { fontSize: 10, fontWeight: 700 as const, color: '#6b7280', display: 'block', marginBottom: 2 }
+        const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none', background: '#1f2937', color: '#e2e8f0' }
+        const lS = { fontSize: 10, fontWeight: 700 as const, color: '#94a3b8', display: 'block', marginBottom: 2 }
         return (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div
@@ -1413,20 +1413,20 @@ export default function QuoteListPage() {
             onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
           />
           <div style={{
-            position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
+            position: 'relative', background: '#131926', borderRadius: 16, padding: '24px 28px',
             width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             animation: 'fadeInUp 0.2s ease-out',
           }}>
             <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#1e3a5f' }}>📄 {editingQuoteId ? '청구서 수정' : '청구서 작성'}</div>
-              <button onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 }}>✕</button>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#60a5fa' }}>📄 {editingQuoteId ? '청구서 수정' : '청구서 작성'}</div>
+              <button onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>✕</button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>임차인 정보</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4 }}>임차인 정보</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div><label style={lS}>임차인 *</label><input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} /></div>
                   <div><label style={lS}>연락처</label><input value={inv.tenant_phone} onChange={e => setField('tenant_phone', fmtPhone(e.target.value))} placeholder="010-0000-0000" style={iS} inputMode="tel" /></div>
@@ -1434,8 +1434,8 @@ export default function QuoteListPage() {
                   <div>
                     <label style={lS}>주소</label>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: '#fafafa' }} onClick={openAddressSearch} />
-                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: '#f9fafb', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: 'rgba(255,255,255,0.05)' }} onClick={openAddressSearch} />
+                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(255,255,255,0.05)', fontSize: 11, fontWeight: 700, color: '#cbd5e1', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
                     </div>
                   </div>
                   <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
@@ -1443,7 +1443,7 @@ export default function QuoteListPage() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>대차 정보</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4 }}>대차 정보</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div><label style={lS}>차종</label><input value={inv.rental_car} onChange={e => setField('rental_car', e.target.value)} placeholder="차종" style={iS} /></div>
                   <div><label style={lS}>차량번호</label><input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} /></div>
@@ -1455,31 +1455,31 @@ export default function QuoteListPage() {
                       <label style={lS}>배차 유류</label>
                       <div style={{ position: 'relative' }}>
                         <input type="number" min={0} max={100} value={inv.fuel_out} onChange={e => setField('fuel_out', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
-                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#9ca3af', pointerEvents: 'none' }}>%</span>
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
                       </div>
                     </div>
                     <div>
                       <label style={lS}>반납 유류</label>
                       <div style={{ position: 'relative' }}>
                         <input type="number" min={0} max={100} value={inv.fuel_in} onChange={e => setField('fuel_in', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
-                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#9ca3af', pointerEvents: 'none' }}>%</span>
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>기타 / 저장</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4 }}>기타 / 저장</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div><label style={lS}>메모</label><textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항" rows={3} style={{ ...iS, resize: 'vertical' }} /></div>
-                  <div><label style={lS}>금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#2d5fa8', textAlign: 'right' }} /></div>
+                  <div><label style={lS}>금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#60a5fa', textAlign: 'right' }} /></div>
                 </div>
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginTop: 20 }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16, marginTop: 20 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', lineHeight: '32px' }}>발송:</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', lineHeight: '32px' }}>발송:</span>
                 <button
                   onClick={async () => {
                     if (!inv.tenant_name.trim()) return alert('임차인 이름을 입력해주세요.')
@@ -1531,15 +1531,15 @@ export default function QuoteListPage() {
                     const body = `안녕하세요, ${inv.tenant_name}님.\n\n에프엠아이 렌터카 청구서입니다.\n\n■ 차종: ${carInfo}\n■ 금액: ${amount}원\n${inv.rental_start ? `■ 대여일시: ${inv.rental_start.replace('T', ' ')}` : ''}\n${inv.return_datetime ? `■ 반납예정: ${inv.return_datetime.replace('T', ' ')}` : ''}\n\n감사합니다.\n주식회사에프엠아이`
                     window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
                   }}
-                  style={{ padding: '6px 14px', border: '1px solid #93c5fd', borderRadius: 8, background: '#eff6ff', fontSize: 12, fontWeight: 700, color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ padding: '6px 14px', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 8, background: 'rgba(96,165,250,0.1)', fontSize: 12, fontWeight: 700, color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                 >📧 이메일</button>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'transparent', color: '#94a3b8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
                 <button
                   onClick={() => { handleInvoiceSave(false, invManualAmount); setInvoiceOpen(false) }}
                   disabled={qSaving}
-                  style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
+                  style={{ padding: '10px 20px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
                 >{qSaving ? '저장 중...' : '저장'}</button>
                 <button
                   onClick={() => { handleInvoiceSave(true, invManualAmount); setInvoiceOpen(false) }}

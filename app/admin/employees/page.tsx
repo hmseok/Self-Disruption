@@ -66,9 +66,9 @@ type UserPermMap = {
 }
 
 const ROLE_LABELS: Record<string, { label: string; bg: string }> = {
-  admin: { label: 'GOD ADMIN', bg: 'bg-sky-100 text-sky-700' },
-  master:    { label: '관리자', bg: 'bg-steel-100 text-steel-700' },
-  user:      { label: '직원', bg: 'bg-slate-100 text-slate-600' },
+  admin: { label: 'GOD ADMIN', bg: 'bg-sky-400/20 text-sky-400' },
+  master:    { label: '관리자', bg: 'bg-blue-400/20 text-blue-400' },
+  user:      { label: '직원', bg: 'bg-white/10 text-slate-400' },
 }
 
 export default function OrgManagementPage() {
@@ -447,8 +447,8 @@ export default function OrgManagementPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #e2e8f0', borderTopColor: '#2d5fa8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(19,25,38,0.8)' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.06)', borderTopColor: '#60a5fa', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     )
@@ -471,15 +471,15 @@ export default function OrgManagementPage() {
   const EmployeeCard = ({ emp }: { emp: any }) => {
     const r = ROLE_LABELS[emp.role] || ROLE_LABELS.user
     const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
-      admin: { bg: '#e0f2fe', color: '#0369a1' },
-      master: { bg: '#e8eef7', color: '#2d5fa8' },
-      user: { bg: '#f1f5f9', color: '#64748b' },
+      admin: { bg: '#e0f2fe', color: '#38bdf8' },
+      master: { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' },
+      user: { bg: 'rgba(255,255,255,0.05)', color: '#94a3b8' },
     }
     const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
-    const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'admin' ? '#2d5fa8' : '#94a3b8'
+    const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'admin' ? '#60a5fa' : '#94a3b8'
     return (
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}
         onClick={() => openEditModal(emp)}
         onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -489,7 +489,7 @@ export default function OrgManagementPage() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.employee_name || '(이름 미설정)'}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.employee_name || '(이름 미설정)'}</span>
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: rc.bg, color: rc.color }}>{r.label}</span>
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: emp.is_active !== false ? '#dcfce7' : '#fee2e2', color: emp.is_active !== false ? '#16a34a' : '#dc2626' }}>
               {emp.is_active !== false ? '활성' : '비활성'}
@@ -497,15 +497,15 @@ export default function OrgManagementPage() {
           </div>
           <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' as const }}>
-            {emp.position?.name && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>{emp.position.name}</span>}
-            {emp.department?.name && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>{emp.department.name}</span>}
+            {emp.position?.name && <span style={{ fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 4 }}>{emp.position.name}</span>}
+            {emp.department?.name && <span style={{ fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 4 }}>{emp.department.name}</span>}
             {emp.phone && <span style={{ fontSize: 11, color: '#94a3b8' }}>{emp.phone}</span>}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(emp.created_at)}</div>
         </div>
-        <div style={{ color: '#d1d5db', flexShrink: 0, fontSize: 14 }}>›</div>
+        <div style={{ color: '#475569', flexShrink: 0, fontSize: 14 }}>›</div>
       </div>
     )
   }
@@ -520,9 +520,9 @@ export default function OrgManagementPage() {
         title="조직/권한 통합 관리"
         subtitle="직원 관리 및 페이지 권한 설정"
         stats={activeCompanyId ? [
-          { label: '전체 직원', value: employees.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
-          { label: '대기중 초대', value: pendingInvitationCount, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
-          { label: '권한설정 대상', value: assignableEmployees.length, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
+          { label: '전체 직원', value: employees.length, color: '#60a5fa', bgColor: '#eff6ff', borderColor: 'rgba(96,165,250,0.3)', labelColor: '#93c5fd' },
+          { label: '대기중 초대', value: pendingInvitationCount, color: '#fbbf24', bgColor: '#fffbeb', borderColor: 'rgba(251,191,36,0.3)', labelColor: '#fcd34d' },
+          { label: '권한설정 대상', value: assignableEmployees.length, color: '#059669', bgColor: '#ecfdf5', borderColor: 'rgba(74,222,128,0.3)', labelColor: '#6ee7b7' },
         ] : []}
         actions={activeCompanyId ? [
           { label: '직원 초대', icon: '➕', onClick: () => setShowInviteModal(true), variant: 'primary' }
@@ -533,21 +533,21 @@ export default function OrgManagementPage() {
         <>
           {/* ═══ 통계 카드 ═══ */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <div style={{ flex: 1, background: '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #e5e7eb', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', margin: 0 }}>전체 직원</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#111827', margin: '4px 0 0' }}>{employees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#9ca3af', marginLeft: 2 }}>명</span></p>
+            <div style={{ flex: 1, background: 'rgba(19,25,38,0.8)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', margin: 0 }}>전체 직원</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#e2e8f0', margin: '4px 0 0' }}>{employees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginLeft: 2 }}>명</span></p>
             </div>
-            <div style={{ flex: 1, background: '#fffbeb', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#d97706', margin: 0 }}>대기중 초대</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#b45309', margin: '4px 0 0' }}>{pendingInvitationCount}<span style={{ fontSize: 14, fontWeight: 500, color: '#d97706', marginLeft: 2 }}>건</span></p>
+            <div style={{ flex: 1, background: 'rgba(250,204,21,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', margin: 0 }}>대기중 초대</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#f59e0b', margin: '4px 0 0' }}>{pendingInvitationCount}<span style={{ fontSize: 14, fontWeight: 500, color: '#fbbf24', marginLeft: 2 }}>건</span></p>
             </div>
-            <div style={{ flex: 1, background: '#f0fdf4', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', margin: 0 }}>직급/부서</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#15803d', margin: '4px 0 0' }}>{positions.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#16a34a', marginLeft: 2 }}>직급</span> · {departments.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#16a34a', marginLeft: 2 }}>부서</span></p>
+            <div style={{ flex: 1, background: 'rgba(34,197,94,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', margin: 0 }}>직급/부서</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#22c55e', margin: '4px 0 0' }}>{positions.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#4ade80', marginLeft: 2 }}>직급</span> · {departments.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#4ade80', marginLeft: 2 }}>부서</span></p>
             </div>
-            <div style={{ flex: 1, background: '#eff6ff', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', cursor: 'pointer' }} onClick={() => setActiveTab('permissions')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', margin: 0 }}>권한 설정 대상</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#1d4ed8', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>명</span></p>
+            <div style={{ flex: 1, background: 'rgba(59,130,246,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', cursor: 'pointer' }} onClick={() => setActiveTab('permissions')}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', margin: 0 }}>권한 설정 대상</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#3b82f6', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#60a5fa', marginLeft: 2 }}>명</span></p>
             </div>
           </div>
 
@@ -574,16 +574,16 @@ export default function OrgManagementPage() {
           {activeTab === 'organization' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* 직원 목록 */}
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>직원 목록</h2>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>직원 목록</h2>
                     <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>총 {employees.length}명 · 클릭하여 수정</p>
                   </div>
                 </div>
 
                 {/* 테이블 헤더 */}
-                <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: 'rgba(15,23,42,0.5)', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                   <div style={{ width: 40, marginRight: 12 }}></div>
                   <div style={{ flex: 1 }}>이름 / 이메일 / 소속</div>
                   <div style={{ width: 96, textAlign: 'right', marginRight: 24 }}>가입일</div>
@@ -602,33 +602,33 @@ export default function OrgManagementPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 {/* 직급 관리 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
                     <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>직급 추가</h2>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>직급명</label>
                         <input value={newPositionName} onChange={e => setNewPositionName(e.target.value)}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 과장" />
+                          style={{ width: '100%', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 과장" />
                       </div>
                       <div style={{ width: 80 }}>
                         <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>레벨</label>
                         <input type="number" min={1} max={10} value={newPositionLevel}
                           onChange={e => setNewPositionLevel(Number(e.target.value))}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
+                          style={{ width: '100%', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                       </div>
-                      <button onClick={addPosition} style={{ padding: '8px 16px', background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
+                      <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', margin: 0 }}>직급 목록 ({positions.length})</h3>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0 }}>직급 목록 ({positions.length})</h3>
                     </div>
                     <div>
                       {positions.map(pos => (
                         <div key={pos.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #f8fafc' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ background: '#e8eef7', color: '#2d5fa8', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, width: 48, textAlign: 'center', display: 'inline-block' }}>Lv.{pos.level}</span>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{pos.name}</span>
+                            <span style={{ background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, width: 48, textAlign: 'center', display: 'inline-block' }}>Lv.{pos.level}</span>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: '#cbd5e1' }}>{pos.name}</span>
                           </div>
                           <button onClick={() => deletePosition(pos.id)} style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
                         </div>
@@ -640,25 +640,25 @@ export default function OrgManagementPage() {
 
                 {/* 부서 관리 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 20 }}>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
                     <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>부서 추가</h2>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 4 }}>부서명</label>
                         <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
-                          style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 영업팀" />
+                          style={{ width: '100%', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 영업팀" />
                       </div>
-                      <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
+                      <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#64748b', margin: 0 }}>부서 목록 ({departments.length})</h3>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0 }}>부서 목록 ({departments.length})</h3>
                     </div>
                     <div>
                       {departments.map(dept => (
                         <div key={dept.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #f8fafc' }}>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{dept.name}</span>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: '#cbd5e1' }}>{dept.name}</span>
                           <button onClick={() => deleteDepartment(dept.id)} style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>삭제</button>
                         </div>
                       ))}
@@ -669,15 +669,15 @@ export default function OrgManagementPage() {
               </div>
 
               {/* 초대 관리 */}
-              <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>초대 관리</h2>
+              <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>초대 관리</h2>
                   <p className="text-xs text-slate-400 mt-0.5">총 {invitations.length}개 · 대기중: {pendingInvitationCount}개</p>
                 </div>
 
                 {loadingInvitations ? (
                   <div style={{ padding: 40, textAlign: 'center' }}>
-                    <div style={{ display: 'inline-block', width: 24, height: 24, border: '2px solid #e2e8f0', borderTopColor: '#2d5fa8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <div style={{ display: 'inline-block', width: 24, height: 24, border: '2px solid rgba(255,255,255,0.1)', borderTopColor: '#60a5fa', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>초대 정보를 불러오는 중...</p>
                     <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
                   </div>
@@ -686,7 +686,7 @@ export default function OrgManagementPage() {
                 ) : (
                   <>
                     {/* 테이블 헤더 */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: 'rgba(15,23,42,0.5)', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                       <div style={{ flex: 1 }}>이메일</div>
                       <div style={{ width: 96 }}>부서</div>
                       <div style={{ width: 80 }}>직급</div>
@@ -700,27 +700,27 @@ export default function OrgManagementPage() {
                     <div>
                       {invitations.map((inv: any) => {
                         const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }> = {
-                          pending: { label: '대기중', bg: '#fef9c3', color: '#a16207' },
-                          accepted: { label: '수락', bg: '#dcfce7', color: '#15803d' },
-                          expired: { label: '만료', bg: '#fee2e2', color: '#b91c1c' },
-                          canceled: { label: '취소', bg: '#f3f4f6', color: '#6b7280' },
+                          pending: { label: '대기중', bg: 'rgba(251,191,36,0.2)', color: '#a16207' },
+                          accepted: { label: '수락', bg: 'rgba(34,197,94,0.2)', color: '#22c55e' },
+                          expired: { label: '만료', bg: 'rgba(239,68,68,0.2)', color: '#b91c1c' },
+                          canceled: { label: '취소', bg: 'rgba(255,255,255,0.05)', color: '#94a3b8' },
                         }
-                        const statusInfo = STATUS_STYLE[inv.status] || { label: inv.status, bg: '#f3f4f6', color: '#6b7280' }
+                        const statusInfo = STATUS_STYLE[inv.status] || { label: inv.status, bg: 'rgba(255,255,255,0.05)', color: '#94a3b8' }
                         return (
-                          <div key={inv.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #f1f5f9', gap: 8, transition: 'background 0.2s' }}
+                          <div key={inv.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: 8, transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{inv.email}</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{inv.email}</span>
                             </div>
                             <div style={{ width: 96 }}>
-                              <span style={{ fontSize: 12, color: '#64748b' }}>{inv.department?.name || '-'}</span>
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>{inv.department?.name || '-'}</span>
                             </div>
                             <div style={{ width: 80 }}>
-                              <span style={{ fontSize: 12, color: '#64748b' }}>{inv.position?.name || '-'}</span>
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>{inv.position?.name || '-'}</span>
                             </div>
                             <div style={{ width: 64 }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', color: '#475569' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: '#cbd5e1' }}>
                                 {ROLE_LABELS[inv.role]?.label || inv.role}
                               </span>
                             </div>
@@ -730,15 +730,15 @@ export default function OrgManagementPage() {
                               </span>
                             </div>
                             <div style={{ width: 112 }}>
-                              <span style={{ fontSize: 12, color: '#64748b' }}>{formatDate(inv.created_at)}</span>
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(inv.created_at)}</span>
                             </div>
                             <div style={{ width: 112 }}>
-                              <span style={{ fontSize: 12, color: '#64748b' }}>{formatDate(inv.expires_at)}</span>
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>{formatDate(inv.expires_at)}</span>
                             </div>
                             <div style={{ width: 64 }}>
                               {inv.status === 'pending' && (
                                 <button onClick={() => cancelInvitation(inv.id)} disabled={cancelingId === inv.id}
-                                  style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+                                  style={{ fontSize: 11, fontWeight: 700, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
                                   onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                   {cancelingId === inv.id ? '취소 중...' : '취소'}
@@ -761,21 +761,21 @@ export default function OrgManagementPage() {
             {activeTab === 'permissions' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {assignableEmployees.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '32px 48px', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: '32px 48px', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: 14 }}>권한을 설정할 일반 직원이 없습니다.</p>
                     <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>관리자(master)와 GOD ADMIN은 항상 전체 접근 권한을 가집니다.</p>
                   </div>
                 ) : activeModules.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 32, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 32, textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: 14 }}>활성화된 모듈이 없습니다.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'row', gap: 0, height: 'calc(100vh - 200px)' }}>
 
                     {/* ── 좌측: 직원 목록 (고정) ── */}
-                    <div style={{ width: 288, flexShrink: 0, background: '#fff', borderRadius: '16px 0 0 16px', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ padding: 16, borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>직원 목록</h3>
+                    <div style={{ width: 288, flexShrink: 0, background: 'rgba(19,25,38,0.8)', borderRadius: '16px 0 0 16px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>직원 목록</h3>
                         <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{assignableEmployees.length}명 · 클릭하여 권한 설정</p>
                       </div>
                       <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -790,14 +790,14 @@ export default function OrgManagementPage() {
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
                                 borderBottom: '1px solid #f8fafc',
-                                borderLeft: isSelected ? '3px solid #2d5fa8' : '3px solid transparent',
+                                borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                                 background: isSelected ? '#eef3fb' : 'transparent',
                               }}
                             >
                               <div style={{
                                 width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 color: '#fff', fontWeight: 900, fontSize: 12, flexShrink: 0,
-                                background: isSelected ? '#2d5fa8' : '#94a3b8'
+                                background: isSelected ? '#3b82f6' : '#94a3b8'
                               }}>
                                 {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                               </div>
@@ -809,16 +809,16 @@ export default function OrgManagementPage() {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                                   {emp.department?.name && (
-                                    <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.department.name}</span>
+                                    <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.department.name}</span>
                                   )}
                                   {emp.position?.name && (
-                                    <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.position.name}</span>
+                                    <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{emp.position.name}</span>
                                   )}
                                 </div>
                               </div>
                               <span style={{
                                 fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, flexShrink: 0,
-                                background: enabledCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                background: enabledCount > 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
                                 color: enabledCount > 0 ? '#15803d' : '#94a3b8'
                               }}>
                                 {enabledCount}/{activeModules.length}
@@ -830,11 +830,11 @@ export default function OrgManagementPage() {
                     </div>
 
                     {/* ── 우측: 권한 설정 패널 (스크롤) ── */}
-                    <div style={{ flex: 1, background: '#fff', borderRadius: '0 16px 16px 0', border: '1px solid #e2e8f0', borderLeft: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ flex: 1, background: 'rgba(19,25,38,0.8)', borderRadius: '0 16px 16px 0', border: '1px solid rgba(255,255,255,0.06)', borderLeft: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                       {!selectedPermUserId ? (
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
                           <div style={{ textAlign: 'center' }}>
-                            <div style={{ width: 64, height: 64, borderRadius: 16, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                            <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                               <svg style={{ width: 32, height: 32, color: '#cbd5e1' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
                               </svg>
@@ -852,18 +852,18 @@ export default function OrgManagementPage() {
                         return (
                           <>
                             {/* 선택된 직원 헤더 */}
-                            <div style={{ padding: 16, borderBottom: '1px solid #f1f5f9', flexShrink: 0, background: '#fafbfc' }}>
+                            <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0, background: '#fafbfc' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, background: '#2d5fa8', flexShrink: 0 }}>
+                                  <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, background: '#3b82f6', flexShrink: 0 }}>
                                     {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                                   </div>
                                   <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>{emp.employee_name || '(이름 미설정)'}</span>
+                                      <span style={{ fontWeight: 700, fontSize: 16, color: '#e2e8f0' }}>{emp.employee_name || '(이름 미설정)'}</span>
                                       <span style={{
                                         fontSize: 12, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                                        background: enabledCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                        background: enabledCount > 0 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
                                         color: enabledCount > 0 ? '#15803d' : '#94a3b8'
                                       }}>
                                         {enabledCount}/{activeModules.length} 페이지
@@ -874,7 +874,7 @@ export default function OrgManagementPage() {
                                 </div>
                                 <button onClick={() => saveUserPerms(emp.id)}
                                   disabled={savingPermsFor === emp.id}
-                                  style={{ padding: '8px 20px', background: savingPermsFor === emp.id ? '#cbd5e1' : '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPermsFor === emp.id ? 'not-allowed' : 'pointer' }}>
+                                  style={{ padding: '8px 20px', background: savingPermsFor === emp.id ? '#64748b' : '#3b82f6', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPermsFor === emp.id ? 'not-allowed' : 'pointer' }}>
                                   {savingPermsFor === emp.id ? '저장 중...' : '저장'}
                                 </button>
                               </div>
@@ -884,8 +884,8 @@ export default function OrgManagementPage() {
                             <div style={{ flex: 1, overflowY: 'auto' }}>
                               {moduleGroups.map(group => (
                                 <div key={group}>
-                                  <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group}</span>
+                                  <div style={{ padding: '10px 16px', background: 'rgba(15,23,42,0.5)', borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, zIndex: 10 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{group}</span>
                                   </div>
                                   <div>
                                     {activeModules.filter(m => m.group === group).map(mod => {
@@ -897,12 +897,12 @@ export default function OrgManagementPage() {
                                             <button onClick={() => matrixTogglePage(emp.id, mod.path)}
                                               style={{
                                                 padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0,
-                                                background: isOn ? '#dcfce7' : '#f1f5f9',
+                                                background: isOn ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)',
                                                 color: isOn ? '#15803d' : '#94a3b8'
                                               }}>
                                               {isOn ? 'ON' : 'OFF'}
                                             </button>
-                                            <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', flex: 1 }}>{mod.name}</span>
+                                            <span style={{ fontWeight: 700, fontSize: 14, color: '#cbd5e1', flex: 1 }}>{mod.name}</span>
                                           </div>
 
                                           {/* CRUD + 범위 (ON일 때 아래로) */}
@@ -913,14 +913,14 @@ export default function OrgManagementPage() {
                                                   <input type="checkbox" checked={perm?.[f] || false}
                                                     onChange={() => matrixTogglePerm(emp.id, mod.path, f)}
                                                     style={{ width: 14, height: 14, borderRadius: 4 }} />
-                                                  <span style={{ fontWeight: 700, color: '#475569' }}>
+                                                  <span style={{ fontWeight: 700, color: '#cbd5e1' }}>
                                                     {f === 'can_view' ? '조회' : f === 'can_create' ? '생성' : f === 'can_edit' ? '수정' : '삭제'}
                                                   </span>
                                                 </label>
                                               ))}
                                               <select value={perm?.data_scope || 'all'}
                                                 onChange={e => matrixChangeScope(emp.id, mod.path, e.target.value)}
-                                                style={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8, padding: '2px 6px', background: '#fff', fontWeight: 700, marginLeft: 'auto' }}>
+                                                style={{ fontSize: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 6px', background: 'rgba(19,25,38,0.8)', fontWeight: 700, marginLeft: 'auto' }}>
                                                 {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                               </select>
                                             </div>
@@ -940,8 +940,8 @@ export default function OrgManagementPage() {
                 )}
 
                 {/* 안내 */}
-                <div style={{ padding: '12px 16px', background: '#eef3fb', borderRadius: 12, border: '1px solid #d4e0f0' }}>
-                  <p style={{ fontSize: 12, color: '#2d5fa8' }}>
+                <div style={{ padding: '12px 16px', background: 'rgba(59,130,246,0.1)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.3)' }}>
+                  <p style={{ fontSize: 12, color: '#60a5fa' }}>
                     <strong>권한 안내:</strong> GOD ADMIN과 관리자(master)는 이 설정과 무관하게 항상 전체 접근 권한을 가집니다.
                     일반 직원만 이 페이지에서 개별 권한을 설정할 수 있습니다.
                   </p>
@@ -968,10 +968,10 @@ export default function OrgManagementPage() {
         <div onClick={closeEditModal}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 512, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, width: '100%', maxWidth: 512, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: 'rgba(15,23,42,0.5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 }}>직원 정보 수정</h3>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>직원 정보 수정</h3>
                 <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{editingEmp.email}</p>
               </div>
               <button onClick={closeEditModal} style={{ fontSize: 24, fontWeight: 300, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
@@ -980,29 +980,29 @@ export default function OrgManagementPage() {
             <div style={{ padding: 24, maxHeight: '60vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>이름</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>이름</label>
                   <input value={editForm.employee_name} onChange={e => setEditForm({ ...editForm, employee_name: e.target.value })}
-                    style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, fontWeight: 700, outline: 'none', boxSizing: 'border-box' as const }} placeholder="직원 이름" />
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, fontWeight: 700, outline: 'none', boxSizing: 'border-box' as const }} placeholder="직원 이름" />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>연락처</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>연락처</label>
                   <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} placeholder="010-0000-0000" />
+                    style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const }} placeholder="010-0000-0000" />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>역할</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>역할</label>
                     <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
                       <option value="user">직원</option>
                       <option value="master">관리자</option>
                       {role === 'admin' && <option value="admin">GOD ADMIN</option>}
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>상태</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>상태</label>
                     <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
-                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
                       <option value="active">활성</option>
                       <option value="inactive">비활성</option>
                     </select>
@@ -1010,30 +1010,30 @@ export default function OrgManagementPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>직급</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>직급</label>
                     <select value={editForm.position_id} onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
                       <option value="">미지정</option>
                       {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>부서</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>부서</label>
                     <select value={editForm.department_id} onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, background: '#fff', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
                       <option value="">미지정</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
                 </div>
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12 }}>
+                <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 12, padding: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: '#94a3b8' }}>이메일</span>
-                    <span style={{ color: '#475569', fontWeight: 500 }}>{editingEmp.email}</span>
+                    <span style={{ color: '#cbd5e1', fontWeight: 500 }}>{editingEmp.email}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                     <span style={{ color: '#94a3b8' }}>가입일</span>
-                    <span style={{ color: '#475569', fontWeight: 500 }}>{formatDate(editingEmp.created_at)}</span>
+                    <span style={{ color: '#cbd5e1', fontWeight: 500 }}>{formatDate(editingEmp.created_at)}</span>
                   </div>
                 </div>
               </div>
@@ -1041,15 +1041,15 @@ export default function OrgManagementPage() {
 
             {/* 직원 탈퇴 */}
             {editingEmp.id !== user?.id && editingEmp.role !== 'admin' && (
-              <div style={{ padding: '12px 24px', borderTop: '1px solid #fecaca', background: '#fef2f2' }}>
+              <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', margin: 0 }}>직원 탈퇴</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#f87171', margin: 0 }}>직원 탈퇴</p>
                     <p style={{ fontSize: 12, color: '#f87171', marginTop: 2 }}>회사에서 직원을 제거합니다.</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => withdrawEmployee(false)} disabled={withdrawing}
-                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#dc2626', border: '1px solid #fecaca', background: '#fff', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
+                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#f87171', border: '1px solid #fecaca', background: 'rgba(19,25,38,0.8)', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '비활성화'}
                     </button>
                     <button onClick={() => withdrawEmployee(true)} disabled={withdrawing}
@@ -1061,13 +1061,13 @@ export default function OrgManagementPage() {
               </div>
             )}
 
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: 12 }}>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: 'rgba(15,23,42,0.5)', display: 'flex', gap: 12 }}>
               <button onClick={closeEditModal}
-                style={{ flex: 1, padding: '10px 0', border: '1px solid #e5e7eb', background: '#fff', color: '#4b5563', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(19,25,38,0.8)', color: '#4b5563', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
               <button onClick={saveEdit} disabled={savingEdit}
-                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#cbd5e1' : '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#64748b' : '#3b82f6', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
                 {savingEdit ? '저장 중...' : '저장'}
               </button>
             </div>

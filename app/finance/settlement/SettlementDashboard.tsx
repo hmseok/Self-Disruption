@@ -1939,7 +1939,7 @@ export default function SettlementDashboard() {
   // 탭별 그룹 카운트 뱃지
   // ============================================
   const pendingBadge = settlementSummary.pendingCount > 0
-    ? <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{settlementSummary.pendingCount}</span>
+    ? <span className="ml-1.5 bg-red-500/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{settlementSummary.pendingCount}</span>
     : null
 
   // ============================================
@@ -1948,9 +1948,9 @@ export default function SettlementDashboard() {
   if (!company) {
     return (
       <div className="page-bg">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-[#131926] rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
@@ -1961,17 +1961,17 @@ export default function SettlementDashboard() {
       <div className="page-bg">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#e2e8f0', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg style={{ width: 28, height: 28, color: '#60a5fa' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
               매출 회계 정산
             </h1>
-            <p className="text-gray-500 text-sm mt-1">매출 분석, 정산 현황, 손익계산서를 한눈에 관리합니다.</p>
+            <p className="text-slate-400 text-sm mt-1">매출 분석, 정산 현황, 손익계산서를 한눈에 관리합니다.</p>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
+        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
           <p className="text-4xl mb-3">🏢</p>
-          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p className="text-xs text-slate-400 mt-1">회사 선택 후 매출 정산을 이용할 수 있습니다</p>
+          <p className="font-semibold text-sm text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="text-xs text-slate-500 mt-1">회사 선택 후 매출 정산을 이용할 수 있습니다</p>
         </div>
       </div>
     )
@@ -1983,28 +1983,28 @@ export default function SettlementDashboard() {
 
       {/* ═══ 컴팩트 요약바 ═══ */}
       <div style={{
-        background: '#2d5fa8', padding: '10px 20px',
+        background: '#1e3a5f', padding: '10px 20px',
         display: 'flex', alignItems: 'center', gap: 14,
         borderRadius: '12px 12px 0 0', flexWrap: 'wrap',
       }}>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          총 매출 <b style={{ color: '#fff', fontSize: 14, fontWeight: 900 }}>{nf(summary.income)}원</b>
+          총 매출 <b style={{ color: '#60a5fa', fontSize: 14, fontWeight: 900 }}>{nf(summary.income)}원</b>
         </span>
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          총 지출 <b style={{ color: '#fca5a5', fontSize: 14, fontWeight: 900 }}>{nf(summary.expense)}원</b>
+          총 지출 <b style={{ color: '#f87171', fontSize: 14, fontWeight: 900 }}>{nf(summary.expense)}원</b>
         </span>
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          영업이익 <b style={{ color: summary.profit >= 0 ? '#6ee7b7' : '#fca5a5', fontSize: 14, fontWeight: 900 }}>{nfSign(summary.profit)}원</b>
+          영업이익 <b style={{ color: summary.profit >= 0 ? '#34d399' : '#f87171', fontSize: 14, fontWeight: 900 }}>{nfSign(summary.profit)}원</b>
         </span>
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          미정산 <b style={{ color: '#fde68a', fontSize: 14, fontWeight: 900 }}>{settlementSummary.pendingCount}건</b>
+          미정산 <b style={{ color: '#fbbf24', fontSize: 14, fontWeight: 900 }}>{settlementSummary.pendingCount}건</b>
         </span>
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          미정산 금액 <b style={{ color: '#fde68a', fontSize: 14, fontWeight: 900 }}>{nf(settlementSummary.pendingAmount)}원</b>
+          미정산 금액 <b style={{ color: '#fbbf24', fontSize: 14, fontWeight: 900 }}>{nf(settlementSummary.pendingAmount)}원</b>
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
@@ -2012,8 +2012,8 @@ export default function SettlementDashboard() {
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
             style={{
-              background: 'rgba(255,255,255,0.12)', color: '#e0ecf8',
-              border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px',
+              background: 'rgba(255,255,255,0.05)', color: '#cbd5e1',
+              border: '1px solid rgba(255,255,255,0.1)', padding: '6px 12px',
               borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
               outline: 'none',
             }}
@@ -2021,8 +2021,8 @@ export default function SettlementDashboard() {
           <button
             onClick={() => router.push('/finance')}
             style={{
-              background: 'rgba(255,255,255,0.12)', color: '#e0ecf8',
-              border: '1px solid rgba(255,255,255,0.2)', padding: '6px 12px',
+              background: 'rgba(255,255,255,0.05)', color: '#cbd5e1',
+              border: '1px solid rgba(255,255,255,0.1)', padding: '6px 12px',
               borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -2031,7 +2031,7 @@ export default function SettlementDashboard() {
           <button
             onClick={() => router.push('/finance/upload')}
             style={{
-              background: '#fff', color: '#2d5fa8', border: 'none',
+              background: '#60a5fa', color: '#fff', border: 'none',
               padding: '6px 12px', borderRadius: 7, fontSize: 11,
               fontWeight: 800, cursor: 'pointer',
             }}
@@ -2043,8 +2043,8 @@ export default function SettlementDashboard() {
 
       {/* ═══ 탭 네비게이션 ═══ */}
       <div style={{
-        display: 'flex', gap: 0, background: '#fff',
-        borderBottom: '2px solid #e2e8f0', padding: '0 24px',
+        display: 'flex', gap: 0, background: '#131926',
+        borderBottom: '2px solid rgba(255,255,255,0.1)', padding: '0 24px',
       }}>
         {[
           { key: 'contracts' as const, label: '📋 계약 현황' },
@@ -2058,9 +2058,9 @@ export default function SettlementDashboard() {
             onClick={() => setActiveTab(tab.key)}
             style={{
               padding: '12px 20px', fontSize: 13, fontWeight: 700,
-              color: activeTab === tab.key ? '#0f172a' : '#94a3b8',
+              color: activeTab === tab.key ? '#60a5fa' : '#94a3b8',
               cursor: 'pointer', background: 'none',
-              borderBottom: activeTab === tab.key ? '3px solid #2d5fa8' : '3px solid transparent',
+              borderBottom: activeTab === tab.key ? '3px solid #60a5fa' : '3px solid transparent',
               marginBottom: -2,
               display: 'flex', alignItems: 'center', gap: 6,
               transition: 'all 0.15s',
@@ -2071,8 +2071,8 @@ export default function SettlementDashboard() {
             {(tab.key === 'settlement' || tab.key === 'execute') && settlementSummary.pendingCount > 0 && (
               <span style={{
                 padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-                background: activeTab === tab.key ? 'rgba(239,68,68,0.1)' : '#fee2e2',
-                color: '#dc2626',
+                background: activeTab === tab.key ? 'rgba(248, 113, 113, 0.2)' : 'rgba(248, 113, 113, 0.1)',
+                color: '#f87171',
               }}>
                 {settlementSummary.pendingCount}
               </span>
@@ -2082,9 +2082,9 @@ export default function SettlementDashboard() {
       </div>
 
       {/* ═══ 탭 콘텐츠 ═══ */}
-      <div style={{ background: '#fff', borderRadius: '0 0 16px 16px', border: '1px solid #e5e7eb', borderTop: 'none' }}>
+      <div style={{ background: '#131926', borderRadius: '0 0 16px 16px', border: '1px solid rgba(255,255,255,0.1)', borderTop: 'none' }}>
         {loading ? (
-          <div style={{ padding: 80, textAlign: 'center', color: '#9ca3af', fontWeight: 700 }}>데이터를 불러오는 중...</div>
+          <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>데이터를 불러오는 중...</div>
         ) : (
           <>
             {activeTab === 'contracts' && <ContractsTab jiipList={allJiipContracts} investList={allInvestContracts} settleTxs={contractsSettleTxs} shareHistory={allPaidShares} loading={loading} />}
@@ -2129,42 +2129,42 @@ export default function SettlementDashboard() {
           padding: 16,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 16, width: '100%', maxWidth: 680,
+            background: '#131926', borderRadius: 16, width: '100%', maxWidth: 680,
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)',
           }}>
             {/* 모달 헤더 */}
             <div style={{
-              padding: '16px 24px', borderBottom: '1px solid #e5e7eb',
+              padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#111827' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#e2e8f0' }}>
                   {notifyChannel === 'sms' ? '📱 SMS' : '📧 이메일'} 발송 확인
                 </h3>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
                   발송 전 수신자 정보와 메시지 내용을 확인하세요.
                 </p>
               </div>
               <button
                 onClick={() => setSmsModal(prev => ({ ...prev, open: false }))}
-                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af', padding: 4 }}
+                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#64748b', padding: 4 }}
               >
                 ✕
               </button>
             </div>
 
             {smsModal.loading ? (
-              <div style={{ padding: 60, textAlign: 'center', color: '#6b7280' }}>
+              <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
                 <div style={{ fontSize: 28, marginBottom: 12 }}>⏳</div>
                 <p style={{ fontWeight: 700 }}>연락처 조회 중...</p>
               </div>
             ) : (
               <>
                 {/* 추가 메시지 & 안내 */}
-                <div style={{ padding: '14px 24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#374151', display: 'block', marginBottom: 6 }}>
-                    추가 메시지 <span style={{ fontWeight: 500, color: '#9ca3af' }}>(선택사항 — 모든 수신자에게 공통 표시)</span>
+                <div style={{ padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
+                  <label style={{ fontSize: 12, fontWeight: 800, color: '#cbd5e1', display: 'block', marginBottom: 6 }}>
+                    추가 메시지 <span style={{ fontWeight: 500, color: '#94a3b8' }}>(선택사항 — 모든 수신자에게 공통 표시)</span>
                   </label>
                   <textarea
                     value={smsModal.customNote}
@@ -2172,13 +2172,13 @@ export default function SettlementDashboard() {
                     placeholder="계좌 안내, 문의처, 공지사항 등을 자유롭게 입력하세요..."
                     rows={2}
                     style={{
-                      width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0',
+                      width: '100%', padding: '8px 12px', border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: 8, fontSize: 13, lineHeight: 1.5, resize: 'vertical',
-                      fontFamily: 'inherit', outline: 'none', color: '#0f172a', background: '#fff',
+                      fontFamily: 'inherit', outline: 'none', color: '#e2e8f0', background: 'rgba(255,255,255,0.05)',
                     }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>
                       발송 시 상세 정산 내역 링크가 자동 포함됩니다.
                     </span>
                     {smsModal.customNote && (
@@ -2195,7 +2195,7 @@ export default function SettlementDashboard() {
                         }}
                         style={{
                           padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                          cursor: 'pointer', background: '#2d5fa8', color: '#fff', border: 'none',
+                          cursor: 'pointer', background: '#60a5fa', color: '#fff', border: 'none',
                         }}
                       >
                         메시지 미리보기 갱신
@@ -2206,17 +2206,17 @@ export default function SettlementDashboard() {
 
                 {/* 수신자 목록 */}
                 <div style={{ flex: 1, overflow: 'auto' }}>
-                  <div style={{ padding: '8px 24px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#374151' }}>
+                  <div style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#cbd5e1' }}>
                       수신자 {smsModal.recipients.length}명
                     </span>
-                    <span style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>
+                    <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
                       총 항목 {smsModal.recipients.reduce((s, r) => s + r.items.length, 0)}건
                     </span>
-                    <span style={{ width: 1, height: 14, background: '#e2e8f0' }} />
+                    <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
                     {smsModal.recipients.filter(r => notifyChannel === 'sms' ? !r.phone : !r.email).length > 0 && (
-                      <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
+                      <span style={{ fontSize: 11, color: '#f87171', fontWeight: 700 }}>
                         연락처 미등록 {smsModal.recipients.filter(r => notifyChannel === 'sms' ? !r.phone : !r.email).length}명
                       </span>
                     )}
@@ -2230,8 +2230,8 @@ export default function SettlementDashboard() {
                       <div
                         key={r.key}
                         style={{
-                          padding: '16px 24px', borderBottom: '1px solid #f1f5f9',
-                          background: hasContact ? '#fff' : '#fef2f2',
+                          padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                          background: hasContact ? '#131926' : 'rgba(248, 113, 113, 0.1)',
                           opacity: hasContact ? 1 : 0.8,
                         }}
                       >
@@ -2240,14 +2240,14 @@ export default function SettlementDashboard() {
                           {typeSet.map(t => (
                             <span key={t} style={{
                               padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                              background: t === 'jiip' ? '#f3e8ff' : '#dbeafe',
-                              color: t === 'jiip' ? '#7c3aed' : '#2563eb',
+                              background: t === 'jiip' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                              color: t === 'jiip' ? '#c4b5fd' : '#93c5fd',
                             }}>
                               {t === 'jiip' ? '지입' : '투자'}
                             </span>
                           ))}
-                          <span style={{ fontWeight: 800, color: '#111827', fontSize: 14 }}>{r.name}</span>
-                          <span style={{ fontSize: 13, fontWeight: 900, color: '#dc2626' }}>합계 {nf(r.totalAmount)}원</span>
+                          <span style={{ fontWeight: 800, color: '#e2e8f0', fontSize: 14 }}>{r.name}</span>
+                          <span style={{ fontSize: 13, fontWeight: 900, color: '#f87171' }}>합계 {nf(r.totalAmount)}원</span>
                           <span style={{ flex: 1 }} />
 
                           {/* 연락처 수정 가능 */}
@@ -2267,39 +2267,39 @@ export default function SettlementDashboard() {
                                 }))
                               }}
                               style={{
-                                padding: '5px 10px', border: '1px solid #e2e8f0', borderRadius: 6,
-                                fontSize: 13, fontWeight: 700, color: '#374151', width: 160,
-                                outline: 'none', background: '#f8fafc',
+                                padding: '5px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6,
+                                fontSize: 13, fontWeight: 700, color: '#e2e8f0', width: 160,
+                                outline: 'none', background: 'rgba(255,255,255,0.05)',
                               }}
                             />
                           ) : (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
                               ⚠️ {notifyChannel === 'sms' ? '번호' : '이메일'} 미등록
                             </span>
                           )}
                         </div>
 
                         {/* 월별 내역 요약 (간결한 표) */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
                           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                             <tbody>
                               {r.items.map((it, iIdx) => (
-                                <tr key={iIdx} style={{ borderBottom: iIdx < r.items.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                                  <td style={{ padding: '6px 12px', fontWeight: 700, color: '#6b7280', whiteSpace: 'nowrap', width: 70 }}>
+                                <tr key={iIdx} style={{ borderBottom: iIdx < r.items.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                                  <td style={{ padding: '6px 12px', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap', width: 70 }}>
                                     {it.monthLabel.slice(2, 4)}년{it.monthLabel.slice(5)}월
                                   </td>
-                                  <td style={{ padding: '6px 12px', color: '#374151' }}>
+                                  <td style={{ padding: '6px 12px', color: '#cbd5e1' }}>
                                     {it.type === 'jiip' ? '수익배분' : '투자이자'}
                                   </td>
-                                  <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 900, color: '#dc2626', whiteSpace: 'nowrap' }}>
+                                  <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 900, color: '#f87171', whiteSpace: 'nowrap' }}>
                                     {nf(it.amount)}원
                                   </td>
                                 </tr>
                               ))}
                               {r.items.length > 1 && (
-                                <tr style={{ background: '#f1f5f9' }}>
-                                  <td colSpan={2} style={{ padding: '6px 12px', fontWeight: 800, color: '#111827', fontSize: 12 }}>합계</td>
-                                  <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 900, color: '#111827', fontSize: 13 }}>{nf(r.totalAmount)}원</td>
+                                <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                  <td colSpan={2} style={{ padding: '6px 12px', fontWeight: 800, color: '#e2e8f0', fontSize: 12 }}>합계</td>
+                                  <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 900, color: '#e2e8f0', fontSize: 13 }}>{nf(r.totalAmount)}원</td>
                                 </tr>
                               )}
                             </tbody>
@@ -2320,14 +2320,14 @@ export default function SettlementDashboard() {
                           }}
                           rows={Math.min(r.message.split('\n').length + 1, 12)}
                           style={{
-                            width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0',
+                            width: '100%', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)',
                             borderRadius: 8, fontSize: 12, lineHeight: 1.6, resize: 'vertical',
-                            fontFamily: 'inherit', outline: 'none', color: '#374151',
-                            background: '#fff',
+                            fontFamily: 'inherit', outline: 'none', color: '#cbd5e1',
+                            background: 'rgba(255,255,255,0.03)',
                           }}
                         />
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                          <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                          <span style={{ fontSize: 10, color: '#64748b' }}>
                             {Buffer ? `${new TextEncoder().encode(r.message).length}바이트` : ''} · {r.message.length > 90 ? 'LMS' : 'SMS'}
                           </span>
                           <button
@@ -2342,8 +2342,8 @@ export default function SettlementDashboard() {
                             }}
                             style={{
                               padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                              cursor: 'pointer', background: '#f1f5f9', color: '#6b7280',
-                              border: '1px solid #e2e8f0',
+                              cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                              border: '1px solid rgba(255,255,255,0.1)',
                             }}
                           >
                             초기화
@@ -2356,16 +2356,16 @@ export default function SettlementDashboard() {
 
                 {/* 모달 푸터 */}
                 <div style={{
-                  padding: '14px 24px', borderTop: '1px solid #e5e7eb',
+                  padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.1)',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: '#f8fafc', borderRadius: '0 0 16px 16px',
+                  background: 'rgba(255,255,255,0.02)', borderRadius: '0 0 16px 16px',
                 }}>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>
-                    발송 가능 <b style={{ color: '#16a34a' }}>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                    발송 가능 <b style={{ color: '#34d399' }}>
                       {smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length}명
                     </b>
                     {smsModal.recipients.filter(r => notifyChannel === 'sms' ? !r.phone : !r.email).length > 0 && (
-                      <span style={{ marginLeft: 8, color: '#dc2626' }}>
+                      <span style={{ marginLeft: 8, color: '#f87171' }}>
                         불가 {smsModal.recipients.filter(r => notifyChannel === 'sms' ? !r.phone : !r.email).length}명
                       </span>
                     )}
@@ -2375,7 +2375,7 @@ export default function SettlementDashboard() {
                       onClick={() => setSmsModal(prev => ({ ...prev, open: false }))}
                       style={{
                         padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                        cursor: 'pointer', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0',
+                        cursor: 'pointer', background: 'rgba(255,255,255,0.05)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.1)',
                       }}
                     >
                       취소
@@ -2386,8 +2386,8 @@ export default function SettlementDashboard() {
                       style={{
                         padding: '8px 24px', borderRadius: 8, fontSize: 13, fontWeight: 800,
                         cursor: 'pointer', border: 'none',
-                        background: smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length > 0 ? '#2d5fa8' : '#e5e7eb',
-                        color: smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length > 0 ? '#fff' : '#9ca3af',
+                        background: smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length > 0 ? '#60a5fa' : 'rgba(255,255,255,0.1)',
+                        color: smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length > 0 ? '#fff' : '#64748b',
                       }}
                     >
                       {smsModal.recipients.filter(r => notifyChannel === 'sms' ? r.phone : r.email).length}명에게 발송
@@ -2403,7 +2403,7 @@ export default function SettlementDashboard() {
       {/* 토스트 */}
       {toast && (
         <div className={`fixed bottom-6 right-6 px-5 py-3 rounded-xl shadow-lg text-sm font-bold text-white z-50 transition-all ${
-          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
         }`}>
           {toast.msg}
         </div>
@@ -2420,15 +2420,15 @@ function KPICard({ label, value, suffix, color, icon }: {
   label: string; value: string; suffix: string; color: string; icon: string
 }) {
   const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 border-blue-100 text-blue-700',
-    red: 'bg-red-50 border-red-100 text-red-700',
-    green: 'bg-green-50 border-green-100 text-green-700',
-    yellow: 'bg-yellow-50 border-yellow-100 text-yellow-700',
-    orange: 'bg-orange-50 border-orange-100 text-orange-700',
+    blue: 'bg-blue-500/5 border-blue-500/30 text-blue-400',
+    red: 'bg-red-500/5 border-red-500/30 text-red-400',
+    green: 'bg-emerald-500/5 border-emerald-500/30 text-emerald-400',
+    yellow: 'bg-amber-500/5 border-amber-500/30 text-amber-400',
+    orange: 'bg-orange-500/5 border-orange-500/30 text-orange-400',
   }
 
   return (
-    <div className={`p-3 md:p-4 rounded-2xl border shadow-sm ${colorMap[color] || 'bg-white border-gray-100'}`}>
+    <div className={`p-3 md:p-4 rounded-2xl border shadow-sm ${colorMap[color] || 'bg-[#131926] border-white/5'}`}>
       <div className="flex justify-between items-start mb-1">
         <p className="text-xs font-bold opacity-70">{label}</p>
         <span className="text-lg">{icon}</span>
@@ -2465,16 +2465,16 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
   return (
     <div className="space-y-6">
       {/* 매출 소스별 분석 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="font-bold text-gray-800">📊 매출 소스별 분석</h3>
-          <p className="text-xs text-gray-400 mt-1">수입원별로 매출을 분류합니다</p>
+      <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-white/5 bg-white/[0.03]/50">
+          <h3 className="font-bold text-slate-100">📊 매출 소스별 분석</h3>
+          <p className="text-xs text-slate-500 mt-1">수입원별로 매출을 분류합니다</p>
         </div>
 
         {revenueBySource.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 text-sm">해당 월의 매출 데이터가 없습니다.</div>
+          <div className="p-12 text-center text-slate-500 text-sm">해당 월의 매출 데이터가 없습니다.</div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-white/5">
             {revenueBySource.map(([group, data]) => {
               const pct = totalIncome > 0 ? ((data.total / totalIncome) * 100).toFixed(1) : '0'
               const isExpanded = expandedGroup === group
@@ -2487,19 +2487,19 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-gray-700">{group}</span>
-                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-bold">{data.count}건</span>
+                        <span className="text-sm font-bold text-slate-200">{group}</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded-full text-slate-400 font-bold">{data.count}건</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-steel-600">{nf(data.total)}원</span>
-                        <span className="text-xs font-bold text-gray-400">{pct}%</span>
+                        <span className="text-sm font-black text-blue-400">{nf(data.total)}원</span>
+                        <span className="text-xs font-bold text-slate-500">{pct}%</span>
                         <span className={`text-xs transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
                       </div>
                     </div>
                     {/* 비율 바 */}
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-steel-400 to-steel-600 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -2507,9 +2507,9 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
 
                   {/* 상세 항목 */}
                   {isExpanded && (
-                    <div className="bg-gray-50/50 border-t border-gray-100">
+                    <div className="bg-white/[0.03]/50 border-t border-white/5">
                       <table className="w-full text-sm">
-                        <thead className="text-xs text-gray-400">
+                        <thead className="text-xs text-slate-500">
                           <tr>
                             <th className="p-3 text-left">날짜</th>
                             <th className="p-3 text-left">거래처</th>
@@ -2517,13 +2517,13 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
                             <th className="p-3 text-right">금액</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-white/5">
                           {data.items.map(item => (
-                            <tr key={item.id} className="hover:bg-white transition-colors">
-                              <td className="p-3 text-gray-600">{item.transaction_date.slice(5)}</td>
-                              <td className="p-3 font-bold text-gray-800">{item.client_name}</td>
-                              <td className="p-3 text-gray-500 text-xs">{item.description}</td>
-                              <td className="p-3 text-right font-bold text-steel-600">+{nf(item.amount)}</td>
+                            <tr key={item.id} className="hover:bg-[#131926] transition-colors">
+                              <td className="p-3 text-slate-300">{item.transaction_date.slice(5)}</td>
+                              <td className="p-3 font-bold text-slate-100">{item.client_name}</td>
+                              <td className="p-3 text-slate-400 text-xs">{item.description}</td>
+                              <td className="p-3 text-right font-bold text-blue-400">+{nf(item.amount)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2538,10 +2538,10 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
       </div>
 
       {/* 일별 매출 추이 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <h3 className="font-bold text-gray-800 mb-4">📅 일별 매출 추이</h3>
+      <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm p-5">
+        <h3 className="font-bold text-slate-100 mb-4">📅 일별 매출 추이</h3>
         {Object.keys(dailyRevenue.byDate).length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-8">매출 데이터가 없습니다.</p>
+          <p className="text-slate-500 text-sm text-center py-8">매출 데이터가 없습니다.</p>
         ) : (
           <div className="flex items-end gap-1 h-32 overflow-x-auto pb-2">
             {Array.from({ length: 31 }, (_, i) => {
@@ -2552,16 +2552,16 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
                 <div key={day} className="flex flex-col items-center flex-shrink-0 group" style={{ minWidth: '24px' }}>
                   <div className="relative w-full flex justify-center">
                     {val > 0 && (
-                      <div className="absolute -top-6 bg-gray-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity z-10">
+                      <div className="absolute -top-6 bg-slate-900 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity z-10">
                         {nf(val)}
                       </div>
                     )}
                     <div
-                      className={`w-4 rounded-t transition-all ${val > 0 ? 'bg-gradient-to-t from-steel-500 to-steel-300' : 'bg-gray-100'}`}
+                      className={`w-4 rounded-t transition-all ${val > 0 ? 'bg-gradient-to-t from-blue-400 to-blue-300' : 'bg-white/5'}`}
                       style={{ height: `${Math.max(pct, val > 0 ? 8 : 2)}%` }}
                     />
                   </div>
-                  <span className="text-[9px] text-gray-400 mt-1">{i + 1}</span>
+                  <span className="text-[9px] text-slate-500 mt-1">{i + 1}</span>
                 </div>
               )
             })}
@@ -2649,15 +2649,15 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
   const overdueAmount = overdueItems.reduce((s, i) => s + i.amount, 0)
 
   const typeLabels: Record<string, { label: string; color: string; icon: string }> = {
-    jiip: { label: '수익배분', color: 'bg-purple-100 text-purple-700', icon: '🤝' },
-    invest: { label: '투자이자', color: 'bg-blue-100 text-blue-700', icon: '💰' },
-    loan: { label: '대출상환', color: 'bg-orange-100 text-orange-700', icon: '🏦' },
+    jiip: { label: '수익배분', color: 'bg-violet-900/40 text-violet-400', icon: '🤝' },
+    invest: { label: '투자이자', color: 'bg-blue-900/40 text-blue-400', icon: '💰' },
+    loan: { label: '대출상환', color: 'bg-orange-900/40 text-orange-400', icon: '🏦' },
   }
 
   const statusLabels: Record<string, { label: string; color: string }> = {
-    pending: { label: '미정산', color: 'bg-red-100 text-red-600' },
-    approved: { label: '승인됨', color: 'bg-yellow-100 text-yellow-700' },
-    paid: { label: '정산완료', color: 'bg-green-100 text-green-700' },
+    pending: { label: '미정산', color: 'bg-red-900/40 text-red-400' },
+    approved: { label: '승인됨', color: 'bg-amber-900/40 text-amber-400' },
+    paid: { label: '정산완료', color: 'bg-emerald-900/40 text-emerald-400' },
   }
 
   // 정산 항목 렌더링 (상세 포함)
@@ -2667,31 +2667,31 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
     const isExpanded = expandedItem === item.id
 
     return (
-      <div key={item.id} className={`border-b border-gray-50 last:border-0 ${item.isOverdue ? 'bg-red-50/30' : ''}`}>
+      <div key={item.id} className={`border-b border-white/[0.03] last:border-0 ${item.isOverdue ? 'bg-red-500/5/30' : ''}`}>
         <button
           onClick={() => setExpandedItem(isExpanded ? null : item.id)}
-          className="w-full px-5 py-3 flex items-center gap-2 hover:bg-gray-50 transition-colors text-left"
+          className="w-full px-5 py-3 flex items-center gap-2 hover:bg-white/[0.03] transition-colors text-left"
         >
           <span className={`px-2 py-0.5 rounded text-xs font-bold ${tl.color}`}>
             {tl.icon} {tl.label}
           </span>
           {item.isOverdue && (
-            <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">이월</span>
+            <span className="text-[10px] bg-red-500/50 text-white px-1.5 py-0.5 rounded font-bold">이월</span>
           )}
           {item.monthLabel && (
-            <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold">
+            <span className="text-[10px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded font-bold">
               {item.monthLabel.slice(5)}월
             </span>
           )}
-          <span className="font-bold text-gray-800 text-sm">{item.name}</span>
+          <span className="font-bold text-slate-100 text-sm">{item.name}</span>
           {item.carNumber && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{item.carNumber}</span>
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{item.carNumber}</span>
           )}
           <span className="flex-1"></span>
-          <span className="text-xs text-gray-400 hidden md:inline max-w-[200px] truncate">{item.detail}</span>
-          <span className="text-sm font-bold text-gray-800">{nf(item.amount)}원</span>
+          <span className="text-xs text-slate-500 hidden md:inline max-w-[200px] truncate">{item.detail}</span>
+          <span className="text-sm font-bold text-slate-100">{nf(item.amount)}원</span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sl.color}`}>{sl.label}</span>
-          <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
+          <span className="text-slate-500 text-xs">{isExpanded ? '▲' : '▼'}</span>
         </button>
 
         {/* 상세 breakdown (지입 수익배분 상세 — invest/loan은 별도 패널 사용) */}
@@ -2707,51 +2707,51 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
           return (
             <div className="mx-5 mb-3 space-y-2">
               {/* 정산 계산 요약 */}
-              <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-1.5 border border-gray-100">
-                <p className="text-xs font-bold text-gray-500 mb-2">📊 {item.monthLabel?.slice(5)}월분 수익배분 상세</p>
+              <div className="bg-white/[0.03] rounded-xl p-4 text-sm space-y-1.5 border border-white/5">
+                <p className="text-xs font-bold text-slate-400 mb-2">📊 {item.monthLabel?.slice(5)}월분 수익배분 상세</p>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">차량 수입</span>
-                  <span className="font-bold text-blue-600">{nf(item.breakdown.revenue)}원</span>
+                  <span className="text-slate-300">차량 수입</span>
+                  <span className="font-bold text-blue-400">{nf(item.breakdown.revenue)}원</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">차량 비용 (유지비 등)</span>
-                  <span className="font-bold text-red-500">-{nf(item.breakdown.expense)}원</span>
+                  <span className="text-slate-300">차량 비용 (유지비 등)</span>
+                  <span className="font-bold text-red-400">-{nf(item.breakdown.expense)}원</span>
                 </div>
-                <div className="border-t border-dashed border-gray-200 my-1"></div>
+                <div className="border-t border-dashed border-white/[0.06] my-1"></div>
                 <div className="flex justify-between">
-                  <span className="text-gray-700 font-bold">순수익</span>
-                  <span className={`font-bold ${item.breakdown.netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  <span className="text-slate-200 font-bold">순수익</span>
+                  <span className={`font-bold ${item.breakdown.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {nfSign(item.breakdown.netProfit)}원
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">지입비 (회사 수입)</span>
+                  <span className="text-slate-300">지입비 (회사 수입)</span>
                   <span className="font-bold text-orange-600">-{nf(item.breakdown.adminFee)}원</span>
                 </div>
-                <div className="border-t border-dashed border-gray-200 my-1"></div>
+                <div className="border-t border-dashed border-white/[0.06] my-1"></div>
                 <div className="flex justify-between">
-                  <span className="text-gray-700 font-bold">당월 배분대상</span>
-                  <span className={`font-bold ${item.breakdown.distributable >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
+                  <span className="text-slate-200 font-bold">당월 배분대상</span>
+                  <span className={`font-bold ${item.breakdown.distributable >= 0 ? 'text-slate-100' : 'text-red-400'}`}>
                     {nfSign(item.breakdown.distributable)}원
                   </span>
                 </div>
                 {item.breakdown.carryOver !== 0 && (
-                  <div className="flex justify-between bg-red-50 rounded-lg px-2 py-1 -mx-1">
-                    <span className="text-red-600 font-bold text-xs">전월 이월 적자</span>
-                    <span className="font-bold text-red-600">{nfSign(item.breakdown.carryOver)}원</span>
+                  <div className="flex justify-between bg-red-500/5 rounded-lg px-2 py-1 -mx-1">
+                    <span className="text-red-400 font-bold text-xs">전월 이월 적자</span>
+                    <span className="font-bold text-red-400">{nfSign(item.breakdown.carryOver)}원</span>
                   </div>
                 )}
                 {item.breakdown.carryOver !== 0 && (
                   <div className="flex justify-between">
-                    <span className="text-gray-700 font-bold">실제 배분대상 (당월+이월)</span>
-                    <span className={`font-bold ${item.breakdown.effectiveDistributable >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
+                    <span className="text-slate-200 font-bold">실제 배분대상 (당월+이월)</span>
+                    <span className={`font-bold ${item.breakdown.effectiveDistributable >= 0 ? 'text-slate-100' : 'text-red-400'}`}>
                       {nfSign(item.breakdown.effectiveDistributable)}원
                     </span>
                   </div>
                 )}
                 {item.breakdown.effectiveDistributable <= 0 && (
-                  <div className="bg-red-50 rounded-lg px-2 py-1.5 -mx-1 text-center">
-                    <span className="text-red-600 font-bold text-xs">적자 → 다음 달 이월 ({nf(item.breakdown.effectiveDistributable)}원)</span>
+                  <div className="bg-red-500/5 rounded-lg px-2 py-1.5 -mx-1 text-center">
+                    <span className="text-red-400 font-bold text-xs">적자 → 다음 달 이월 ({nf(item.breakdown.effectiveDistributable)}원)</span>
                   </div>
                 )}
                 {item.breakdown.effectiveDistributable > 0 && (
@@ -2761,26 +2761,26 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
                   </div>
                 )}
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">회사 수익 (지입비 + {Math.round((100 - item.breakdown.shareRatio) * 10) / 10}%)</span>
-                  <span className="text-gray-500">{nf(item.breakdown.companyProfit)}원</span>
+                  <span className="text-slate-500">회사 수익 (지입비 + {Math.round((100 - item.breakdown.shareRatio) * 10) / 10}%)</span>
+                  <span className="text-slate-400">{nf(item.breakdown.companyProfit)}원</span>
                 </div>
               </div>
 
               {/* 통장 거래 내역 (수입/비용 원본) */}
               {txsForMonth.length > 0 && (
-                <div className="bg-white rounded-xl p-4 text-sm border border-gray-200">
-                  <p className="text-xs font-bold text-gray-500 mb-3">📋 {item.monthLabel?.slice(5)}월 통장 분류 내역 ({item.carNumber})</p>
+                <div className="bg-[#131926] rounded-xl p-4 text-sm border border-white/[0.06]">
+                  <p className="text-xs font-bold text-slate-400 mb-3">📋 {item.monthLabel?.slice(5)}월 통장 분류 내역 ({item.carNumber})</p>
 
                   {incomeTxs.length > 0 && (
                     <div className="mb-3">
                       <p className="text-[10px] font-bold text-blue-500 mb-1.5">수입 ({incomeTxs.length}건)</p>
                       <div className="space-y-1">
                         {incomeTxs.map((tx, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-xs bg-blue-50/50 rounded-lg px-2.5 py-1.5">
-                            <span className="text-gray-400 w-14 shrink-0">{tx.transaction_date.slice(5)}</span>
-                            <span className="text-gray-500 w-20 shrink-0 truncate">{tx.category || '미분류'}</span>
-                            <span className="text-gray-600 flex-1 truncate">{tx.client_name || tx.description || '-'}</span>
-                            <span className="font-bold text-blue-600 shrink-0">+{nf(Math.abs(tx.amount))}원</span>
+                          <div key={idx} className="flex items-center gap-2 text-xs bg-blue-500/5/50 rounded-lg px-2.5 py-1.5">
+                            <span className="text-slate-500 w-14 shrink-0">{tx.transaction_date.slice(5)}</span>
+                            <span className="text-slate-400 w-20 shrink-0 truncate">{tx.category || '미분류'}</span>
+                            <span className="text-slate-300 flex-1 truncate">{tx.client_name || tx.description || '-'}</span>
+                            <span className="font-bold text-blue-400 shrink-0">+{nf(Math.abs(tx.amount))}원</span>
                           </div>
                         ))}
                       </div>
@@ -2789,14 +2789,14 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
 
                   {expenseTxs.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-bold text-red-500 mb-1.5">비용 ({expenseTxs.length}건)</p>
+                      <p className="text-[10px] font-bold text-red-400 mb-1.5">비용 ({expenseTxs.length}건)</p>
                       <div className="space-y-1">
                         {expenseTxs.map((tx, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-xs bg-red-50/50 rounded-lg px-2.5 py-1.5">
-                            <span className="text-gray-400 w-14 shrink-0">{tx.transaction_date.slice(5)}</span>
-                            <span className="text-gray-500 w-20 shrink-0 truncate">{tx.category || '미분류'}</span>
-                            <span className="text-gray-600 flex-1 truncate">{tx.client_name || tx.description || '-'}</span>
-                            <span className="font-bold text-red-500 shrink-0">-{nf(Math.abs(tx.amount))}원</span>
+                          <div key={idx} className="flex items-center gap-2 text-xs bg-red-500/5/50 rounded-lg px-2.5 py-1.5">
+                            <span className="text-slate-500 w-14 shrink-0">{tx.transaction_date.slice(5)}</span>
+                            <span className="text-slate-400 w-20 shrink-0 truncate">{tx.category || '미분류'}</span>
+                            <span className="text-slate-300 flex-1 truncate">{tx.client_name || tx.description || '-'}</span>
+                            <span className="font-bold text-red-400 shrink-0">-{nf(Math.abs(tx.amount))}원</span>
                           </div>
                         ))}
                       </div>
@@ -2804,7 +2804,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
                   )}
 
                   {txsForMonth.length === 0 && (
-                    <p className="text-xs text-gray-400 text-center py-2">해당 월 통장 거래 내역 없음</p>
+                    <p className="text-xs text-slate-500 text-center py-2">해당 월 통장 거래 내역 없음</p>
                   )}
                 </div>
               )}
@@ -2833,44 +2833,44 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
           return (
             <div className="mx-5 mb-3 space-y-2">
               {/* 이자 계산 상세 */}
-              <div className="bg-blue-50 rounded-xl p-4 text-sm border border-blue-100 space-y-1.5">
-                <p className="text-xs font-bold text-blue-600 mb-2">💰 {baseMonth.slice(5)}월분 투자이자 계산</p>
+              <div className="bg-blue-500/5 rounded-xl p-4 text-sm border border-blue-100 space-y-1.5">
+                <p className="text-xs font-bold text-blue-400 mb-2">💰 {baseMonth.slice(5)}월분 투자이자 계산</p>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">투자 원금 (해당월 기준)</span>
+                  <span className="text-slate-300">투자 원금 (해당월 기준)</span>
                   <span className="font-bold text-blue-700">{nf(bd?.revenue || 0)}원</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">연이자율</span>
-                  <span className="font-bold text-gray-700">{bd?.shareRatio || 0}%</span>
+                  <span className="text-slate-300">연이자율</span>
+                  <span className="font-bold text-slate-200">{bd?.shareRatio || 0}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">월이자 (원금 × {bd?.shareRatio}% ÷ 12)</span>
-                  <span className="font-bold text-gray-800">{nf(bd?.netProfit || 0)}원</span>
+                  <span className="text-slate-300">월이자 (원금 × {bd?.shareRatio}% ÷ 12)</span>
+                  <span className="font-bold text-slate-100">{nf(bd?.netProfit || 0)}원</span>
                 </div>
                 {bd && (bd.taxRate || 0) > 0 && (
                   <>
                     <div className="border-t border-dashed border-blue-200 my-1"></div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">{bd.taxType || '세금'}</span>
-                      <span className="text-red-500 font-bold">-{nf(bd.taxAmount || 0)}원</span>
+                      <span className="text-slate-400">{bd.taxType || '세금'}</span>
+                      <span className="text-red-400 font-bold">-{nf(bd.taxAmount || 0)}원</span>
                     </div>
                     {bd.taxType === '세금계산서' && (bd.supplyAmount || 0) > 0 && (
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">공급가액</span>
-                        <span className="text-gray-600">{nf(bd.supplyAmount || 0)}원</span>
+                        <span className="text-slate-400">공급가액</span>
+                        <span className="text-slate-300">{nf(bd.supplyAmount || 0)}원</span>
                       </div>
                     )}
-                    <div className="flex justify-between bg-blue-100/70 rounded-lg px-2 py-1.5 -mx-1">
-                      <span className="text-blue-800 font-bold">실지급액</span>
-                      <span className="font-black text-blue-800">{nf(bd.netPayout || item.amount)}원</span>
+                    <div className="flex justify-between bg-blue-900/40/70 rounded-lg px-2 py-1.5 -mx-1">
+                      <span className="text-blue-300 font-bold">실지급액</span>
+                      <span className="font-black text-blue-300">{nf(bd.netPayout || item.amount)}원</span>
                     </div>
                   </>
                 )}
               </div>
 
               {/* 투자금 거래 내역 (통장 거래 기반 원금 변동 히스토리) */}
-              <div className="bg-white rounded-xl p-4 text-sm border border-gray-200">
-                <p className="text-xs font-bold text-gray-500 mb-3">📋 투자금 거래 내역 ({allInvestTxs.length}건)</p>
+              <div className="bg-[#131926] rounded-xl p-4 text-sm border border-white/[0.06]">
+                <p className="text-xs font-bold text-slate-400 mb-3">📋 투자금 거래 내역 ({allInvestTxs.length}건)</p>
                 {allInvestTxs.length > 0 ? (
                   <div className="space-y-1">
                     {allInvestTxs.map((tx: InvestTx, idx: number) => {
@@ -2881,27 +2881,27 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
                       const isIncome = tx.type === 'income'
                       const isBeforeMonth = endOfBaseMonth && tx.transaction_date <= endOfBaseMonth
                       return (
-                        <div key={tx.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${isBeforeMonth ? (isIncome ? 'bg-green-50/50' : 'bg-red-50/50') : 'bg-gray-50'}`}>
-                          <span className="text-gray-400 w-16 shrink-0">{tx.transaction_date.slice(2)}</span>
-                          <span className={`font-bold shrink-0 ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                        <div key={tx.id} className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${isBeforeMonth ? (isIncome ? 'bg-emerald-500/5/50' : 'bg-red-500/5/50') : 'bg-white/[0.03]'}`}>
+                          <span className="text-slate-500 w-16 shrink-0">{tx.transaction_date.slice(2)}</span>
+                          <span className={`font-bold shrink-0 ${isIncome ? 'text-emerald-400' : 'text-red-400'}`}>
                             {isIncome ? '+' : '-'}{nf(tx.amount)}원
                           </span>
                           {(tx.client_name || tx.description) && (
-                            <span className="text-gray-400 text-[10px] truncate max-w-[80px]">{tx.client_name || tx.description}</span>
+                            <span className="text-slate-500 text-[10px] truncate max-w-[80px]">{tx.client_name || tx.description}</span>
                           )}
                           <span className="flex-1"></span>
-                          <span className="text-gray-400 text-[10px]">잔액</span>
-                          <span className={`font-bold shrink-0 ${isBeforeMonth ? 'text-blue-600' : 'text-gray-400'}`}>{nf(runningBalance)}원</span>
+                          <span className="text-slate-500 text-[10px]">잔액</span>
+                          <span className={`font-bold shrink-0 ${isBeforeMonth ? 'text-blue-400' : 'text-slate-500'}`}>{nf(runningBalance)}원</span>
                         </div>
                       )
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 text-center py-2">통장분류에서 투자 연결된 거래가 없습니다</p>
+                  <p className="text-xs text-slate-500 text-center py-2">통장분류에서 투자 연결된 거래가 없습니다</p>
                 )}
                 {cumulativeBalance > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between">
-                    <span className="text-xs text-gray-500 font-bold">{baseMonth.slice(5)}월 기준 투자 원금 (입금 누적)</span>
+                  <div className="mt-2 pt-2 border-t border-white/5 flex justify-between">
+                    <span className="text-xs text-slate-400 font-bold">{baseMonth.slice(5)}월 기준 투자 원금 (입금 누적)</span>
                     <span className="text-sm font-black text-blue-700">{nf(cumulativeBalance)}원</span>
                   </div>
                 )}
@@ -2914,7 +2914,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
         {isExpanded && item.type === 'loan' && (
           <div className="mx-5 mb-3 bg-orange-50 rounded-xl p-4 text-sm border border-orange-100">
             <p className="text-xs font-bold text-orange-600 mb-1">🏦 대출 상환</p>
-            <p className="text-gray-700">{item.detail}</p>
+            <p className="text-slate-200">{item.detail}</p>
           </div>
         )}
       </div>
@@ -2924,31 +2924,31 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
   return (
     <div>
       {/* 요약 + 필터 바 */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', gap: 12, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
-          전체 <b style={{ color: '#111827', fontWeight: 900 }}>{summary.totalItems}건</b>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
+          전체 <b style={{ color: '#e2e8f0', fontWeight: 900 }}>{summary.totalItems}건</b>
         </span>
         {overdueItems.length > 0 && (
           <>
-            <span style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-            <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 700 }}>
+            <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
+            <span style={{ fontSize: 12, color: '#f87171', fontWeight: 700 }}>
               이월 미수 <b>{overdueItems.length}건</b> ({nf(overdueAmount)}원)
             </span>
           </>
         )}
-        <span style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
+        <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ fontSize: 12, color: '#f87171', fontWeight: 600 }}>
           미정산 <b style={{ fontWeight: 900 }}>{summary.pendingCount}건</b>
-          <span style={{ marginLeft: 4, color: '#ef4444' }}>{nf(summary.pendingAmount)}원</span>
+          <span style={{ marginLeft: 4, color: '#f87171' }}>{nf(summary.pendingAmount)}원</span>
         </span>
-        <span style={{ width: 1, height: 14, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
+        <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ fontSize: 12, color: '#34d399', fontWeight: 600 }}>
           완료 <b style={{ fontWeight: 900 }}>{summary.paidCount}건</b>
         </span>
       </div>
 
       {/* 뷰 모드 + 타입 필터 */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 8, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
         {[
           { key: 'byDate', label: '📅 납부일순' },
           { key: 'list', label: '📋 전체 목록' },
@@ -2960,15 +2960,15 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
             style={{
               padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
               cursor: 'pointer', whiteSpace: 'nowrap',
-              background: viewMode === v.key ? 'rgba(45,95,168,0.08)' : '#f8fafc',
-              color: viewMode === v.key ? '#2d5fa8' : '#64748b',
-              border: viewMode === v.key ? '1px solid rgba(45,95,168,0.3)' : '1px solid #e2e8f0',
+              background: viewMode === v.key ? 'rgba(96, 165, 250, 0.1)' : 'rgba(255,255,255,0.05)',
+              color: viewMode === v.key ? '#60a5fa' : '#94a3b8',
+              border: viewMode === v.key ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(255,255,255,0.1)',
             }}
           >
             {v.label}
           </button>
         ))}
-        <span style={{ width: 1, height: 18, background: '#e2e8f0', margin: '0 4px' }} />
+        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
         {[
           { key: 'all' as const, label: '전체', count: items.length },
           { key: 'jiip' as const, label: '지입', count: items.filter(i => i.type === 'jiip').length },
@@ -2981,9 +2981,9 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
             style={{
               padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
               cursor: 'pointer', whiteSpace: 'nowrap',
-              background: typeFilter === f.key ? 'rgba(45,95,168,0.08)' : '#f8fafc',
-              color: typeFilter === f.key ? '#2d5fa8' : '#64748b',
-              border: typeFilter === f.key ? '1px solid rgba(45,95,168,0.3)' : '1px solid #e2e8f0',
+              background: typeFilter === f.key ? 'rgba(96, 165, 250, 0.1)' : 'rgba(255,255,255,0.05)',
+              color: typeFilter === f.key ? '#60a5fa' : '#94a3b8',
+              border: typeFilter === f.key ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(255,255,255,0.1)',
             }}
           >
             {f.label} <span style={{ fontWeight: 900, marginLeft: 3 }}>{f.count}</span>
@@ -2995,7 +2995,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
       {viewMode === 'byDate' && (
         <div className="space-y-3">
           {dateGroups.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+            <div className="bg-[#131926] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
               해당 조건의 정산 항목이 없습니다.
             </div>
           ) : (
@@ -3005,35 +3005,35 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
               const allPaid = group.pendingCount === 0
 
               return (
-                <div key={group.day} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
+                <div key={group.day} className={`bg-[#131926] rounded-2xl border shadow-sm overflow-hidden ${
                   isToday ? 'border-blue-300 ring-2 ring-blue-100' :
                   isPast && group.pendingCount > 0 ? 'border-red-200' :
-                  allPaid ? 'border-green-200' : 'border-gray-200'
+                  allPaid ? 'border-green-200' : 'border-white/[0.06]'
                 }`}>
                   {/* 날짜 헤더 */}
                   <div className={`px-5 py-3 flex items-center gap-3 ${
-                    isToday ? 'bg-blue-50' :
-                    isPast && group.pendingCount > 0 ? 'bg-red-50' :
-                    allPaid ? 'bg-green-50' : 'bg-gray-50'
+                    isToday ? 'bg-blue-500/5' :
+                    isPast && group.pendingCount > 0 ? 'bg-red-500/5' :
+                    allPaid ? 'bg-emerald-500/5' : 'bg-white/[0.03]'
                   }`}>
                     <span className="text-lg">
                       {isToday ? '📌' : isPast && group.pendingCount > 0 ? '🚨' : allPaid ? '✅' : '📅'}
                     </span>
-                    <span className="font-black text-gray-800 text-lg">{group.day}일</span>
-                    {isToday && <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">오늘</span>}
-                    {isPast && group.pendingCount > 0 && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">연체</span>}
+                    <span className="font-black text-slate-100 text-lg">{group.day}일</span>
+                    {isToday && <span className="text-xs bg-blue-500/50 text-white px-2 py-0.5 rounded-full font-bold">오늘</span>}
+                    {isPast && group.pendingCount > 0 && <span className="text-xs bg-red-500/50 text-white px-2 py-0.5 rounded-full font-bold">연체</span>}
                     <span className="flex-1"></span>
                     {group.pendingCount > 0 && (
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-xs bg-amber-900/40 text-amber-400 px-2 py-0.5 rounded-full font-bold">
                         미지급 {group.pendingCount}건
                       </span>
                     )}
                     {group.paidCount > 0 && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
                         완료 {group.paidCount}건
                       </span>
                     )}
-                    <span className="text-sm font-black text-gray-800">{nf(group.total)}원</span>
+                    <span className="text-sm font-black text-slate-100">{nf(group.total)}원</span>
                   </div>
                   {/* 항목들 */}
                   <div>
@@ -3048,9 +3048,9 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
 
       {/* 리스트 뷰 */}
       {viewMode === 'list' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
           {filtered.length === 0 ? (
-            <div className="p-12 text-center text-gray-400 text-sm">해당 조건의 정산 항목이 없습니다.</div>
+            <div className="p-12 text-center text-slate-500 text-sm">해당 조건의 정산 항목이 없습니다.</div>
           ) : (
             <div>
               {filtered.map(item => renderItem(item))}
@@ -3063,39 +3063,39 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
       {viewMode === 'byCar' && (
         <div className="space-y-3">
           {carGroups.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+            <div className="bg-[#131926] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
               해당 조건의 정산 항목이 없습니다.
             </div>
           ) : (
             carGroups.map(group => {
               const isExpanded = expandedCars.has(group.carNumber)
               return (
-                <div key={group.carNumber} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div key={group.carNumber} className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
                   {/* 차량 헤더 */}
                   <button
                     onClick={() => toggleCarExpand(group.carNumber)}
-                    className="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                    className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left"
                   >
                     <span className="text-lg">🚛</span>
-                    <span className="font-bold text-gray-800 flex-1">{group.carNumber}</span>
+                    <span className="font-bold text-slate-100 flex-1">{group.carNumber}</span>
                     <div className="flex items-center gap-2">
                       {group.pendingCount > 0 && (
-                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-xs bg-red-900/40 text-red-400 px-2 py-0.5 rounded-full font-bold">
                           미정산 {group.pendingCount}건
                         </span>
                       )}
                       {group.paidCount > 0 && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
                           완료 {group.paidCount}건
                         </span>
                       )}
-                      <span className="text-sm font-black text-gray-800">{nf(group.total)}원</span>
-                      <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-sm font-black text-slate-100">{nf(group.total)}원</span>
+                      <span className="text-slate-500 text-sm">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </button>
                   {/* 펼쳐진 항목 */}
                   {isExpanded && (
-                    <div className="border-t border-gray-100">
+                    <div className="border-t border-white/5">
                       {group.items.map(item => renderItem(item))}
                     </div>
                   )}
@@ -3129,24 +3129,24 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-6 md:p-8 shadow-xl">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <p className="text-gray-400 text-sm font-bold mb-1">{filterDate} 손익계산서 요약</p>
+            <p className="text-slate-500 text-sm font-bold mb-1">{filterDate} 손익계산서 요약</p>
             <h2 className="text-3xl md:text-4xl font-black">
-              {operatingProfit >= 0 ? '+' : ''}{nf(operatingProfit)}<span className="text-lg ml-1 text-gray-400">원</span>
+              {operatingProfit >= 0 ? '+' : ''}{nf(operatingProfit)}<span className="text-lg ml-1 text-slate-500">원</span>
             </h2>
           </div>
-          <div className={`text-right px-4 py-2 rounded-xl ${operatingProfit >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-            <p className="text-xs text-gray-400">이익률</p>
+          <div className={`text-right px-4 py-2 rounded-xl ${operatingProfit >= 0 ? 'bg-emerald-500/50/20' : 'bg-red-500/50/20'}`}>
+            <p className="text-xs text-slate-500">이익률</p>
             <p className={`text-2xl font-black ${operatingProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>{profitRate}%</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white/10 rounded-xl p-4">
-            <p className="text-xs text-gray-400 font-bold">총 매출 (수입)</p>
+          <div className="bg-[#131926]/10 rounded-xl p-4">
+            <p className="text-xs text-slate-500 font-bold">총 매출 (수입)</p>
             <p className="text-xl font-black text-blue-300 mt-1">{nf(totalIncome)}</p>
           </div>
-          <div className="bg-white/10 rounded-xl p-4">
-            <p className="text-xs text-gray-400 font-bold">총 비용 (지출)</p>
+          <div className="bg-[#131926]/10 rounded-xl p-4">
+            <p className="text-xs text-slate-500 font-bold">총 비용 (지출)</p>
             <p className="text-xl font-black text-red-300 mt-1">{nf(totalExpense)}</p>
           </div>
         </div>
@@ -3154,26 +3154,26 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 수입 항목 */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-blue-50/50">
-            <h3 className="font-bold text-blue-800 flex items-center gap-2">
+        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-white/5 bg-blue-500/5/50">
+            <h3 className="font-bold text-blue-300 flex items-center gap-2">
               🔵 수입 항목
-              <span className="text-xs bg-blue-100 px-2 py-0.5 rounded-full">{nf(totalIncome)}원</span>
+              <span className="text-xs bg-blue-900/40 px-2 py-0.5 rounded-full">{nf(totalIncome)}원</span>
             </h3>
           </div>
           <div className="divide-y divide-gray-50">
             {revenueBySource.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 text-sm">수입 내역이 없습니다.</div>
+              <div className="p-8 text-center text-slate-500 text-sm">수입 내역이 없습니다.</div>
             ) : (
               revenueBySource.map(([group, data]) => (
                 <div key={group} className="p-4 flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-gray-700 text-sm">{group}</p>
-                    <p className="text-xs text-gray-400">{data.count}건</p>
+                    <p className="font-bold text-slate-200 text-sm">{group}</p>
+                    <p className="text-xs text-slate-500">{data.count}건</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-blue-600">{nf(data.total)}</p>
-                    <p className="text-xs text-gray-400">{totalIncome > 0 ? ((data.total / totalIncome) * 100).toFixed(1) : 0}%</p>
+                    <p className="font-black text-blue-400">{nf(data.total)}</p>
+                    <p className="text-xs text-slate-500">{totalIncome > 0 ? ((data.total / totalIncome) * 100).toFixed(1) : 0}%</p>
                   </div>
                 </div>
               ))
@@ -3182,26 +3182,26 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
         </div>
 
         {/* 지출 항목 */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-red-50/50">
+        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-white/5 bg-red-500/5/50">
             <h3 className="font-bold text-red-800 flex items-center gap-2">
               🔴 지출 항목
-              <span className="text-xs bg-red-100 px-2 py-0.5 rounded-full">{nf(totalExpense)}원</span>
+              <span className="text-xs bg-red-900/40 px-2 py-0.5 rounded-full">{nf(totalExpense)}원</span>
             </h3>
           </div>
           <div className="divide-y divide-gray-50">
             {expenseByGroup.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 text-sm">지출 내역이 없습니다.</div>
+              <div className="p-8 text-center text-slate-500 text-sm">지출 내역이 없습니다.</div>
             ) : (
               expenseByGroup.map(([group, data]) => (
                 <div key={group} className="p-4 flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-gray-700 text-sm">{group}</p>
-                    <p className="text-xs text-gray-400">{data.count}건</p>
+                    <p className="font-bold text-slate-200 text-sm">{group}</p>
+                    <p className="text-xs text-slate-500">{data.count}건</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-black text-red-600">{nf(data.total)}</p>
-                    <p className="text-xs text-gray-400">{totalExpense > 0 ? ((data.total / totalExpense) * 100).toFixed(1) : 0}%</p>
+                    <p className="font-black text-red-400">{nf(data.total)}</p>
+                    <p className="text-xs text-slate-500">{totalExpense > 0 ? ((data.total / totalExpense) * 100).toFixed(1) : 0}%</p>
                   </div>
                 </div>
               ))
@@ -3212,8 +3212,8 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 
       {/* 비용 구조 시각화 */}
       {expenseByGroup.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-          <h3 className="font-bold text-gray-800 mb-4">📊 비용 구조</h3>
+        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm p-5">
+          <h3 className="font-bold text-slate-100 mb-4">📊 비용 구조</h3>
           <div className="space-y-3">
             {expenseByGroup.map(([group, data]) => {
               const pct = totalExpense > 0 ? ((data.total / totalExpense) * 100) : 0
@@ -3228,10 +3228,10 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
               return (
                 <div key={group}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="font-bold text-gray-700">{group}</span>
-                    <span className="font-bold text-gray-500">{nf(data.total)}원 ({pct.toFixed(1)}%)</span>
+                    <span className="font-bold text-slate-200">{group}</span>
+                    <span className="font-bold text-slate-400">{nf(data.total)}원 ({pct.toFixed(1)}%)</span>
                   </div>
-                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-3 bg-white/5 rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-gradient-to-r ${colors[group] || 'from-gray-400 to-gray-600'} rounded-full transition-all duration-700`}
                       style={{ width: `${pct}%` }}
@@ -3281,13 +3281,13 @@ function ClassifyTab({ items, jiips, investors, loans, filterDate }: {
 
   // 타입 라벨
   const typeLabels: Record<string, { label: string; color: string; bg: string }> = {
-    jiip: { label: '지입', color: '#7c3aed', bg: '#f3e8ff' },
-    invest: { label: '투자', color: '#2563eb', bg: '#dbeafe' },
-    loan: { label: '대출', color: '#ea580c', bg: '#ffedd5' },
-    car: { label: '차량', color: '#0d9488', bg: '#ccfbf1' },
-    salary: { label: '급여', color: '#059669', bg: '#d1fae5' },
-    freelancer: { label: '용역', color: '#6366f1', bg: '#e0e7ff' },
-    insurance: { label: '보험', color: '#dc2626', bg: '#fee2e2' },
+    jiip: { label: '지입', color: '#c4b5fd', bg: 'rgba(139, 92, 246, 0.15)' },
+    invest: { label: '투자', color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.15)' },
+    loan: { label: '대출', color: '#fb923c', bg: 'rgba(249, 115, 22, 0.15)' },
+    car: { label: '차량', color: '#2dd4bf', bg: 'rgba(45, 212, 191, 0.15)' },
+    salary: { label: '급여', color: '#34d399', bg: 'rgba(52, 211, 153, 0.15)' },
+    freelancer: { label: '용역', color: '#818cf8', bg: 'rgba(129, 140, 248, 0.15)' },
+    insurance: { label: '보험', color: '#f87171', bg: 'rgba(248, 113, 113, 0.15)' },
   }
 
   // 필터 적용
@@ -3343,22 +3343,22 @@ function ClassifyTab({ items, jiips, investors, loans, filterDate }: {
   return (
     <div>
       {/* 요약 바 */}
-      <div style={{ padding: '12px 20px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: '#64748b' }}>
-          분류 완료 <b style={{ color: '#111827', fontSize: 14, fontWeight: 900 }}>{stats.total}건</b>
+      <div style={{ padding: '12px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: '#94a3b8' }}>
+          분류 완료 <b style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 900 }}>{stats.total}건</b>
         </span>
-        <span style={{ width: 1, height: 16, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 12, color: '#64748b' }}>
-          수입 <b style={{ color: '#2563eb', fontSize: 14, fontWeight: 900 }}>{nf(stats.totalIncome)}원</b>
+        <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ fontSize: 12, color: '#94a3b8' }}>
+          수입 <b style={{ color: '#60a5fa', fontSize: 14, fontWeight: 900 }}>{nf(stats.totalIncome)}원</b>
         </span>
-        <span style={{ width: 1, height: 16, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 12, color: '#64748b' }}>
-          지출 <b style={{ color: '#dc2626', fontSize: 14, fontWeight: 900 }}>{nf(stats.totalExpense)}원</b>
+        <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ fontSize: 12, color: '#94a3b8' }}>
+          지출 <b style={{ color: '#f87171', fontSize: 14, fontWeight: 900 }}>{nf(stats.totalExpense)}원</b>
         </span>
       </div>
 
       {/* 필터 바 */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 8, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
         {[
           { key: 'all' as const, label: '전체' },
           { key: 'jiip' as const, label: '지입' },
@@ -3374,9 +3374,9 @@ function ClassifyTab({ items, jiips, investors, loans, filterDate }: {
             style={{
               padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
               cursor: 'pointer', whiteSpace: 'nowrap',
-              background: targetFilter === f.key ? 'rgba(45,95,168,0.08)' : '#f8fafc',
-              color: targetFilter === f.key ? '#2d5fa8' : '#64748b',
-              border: targetFilter === f.key ? '1px solid rgba(45,95,168,0.3)' : '1px solid #e2e8f0',
+              background: targetFilter === f.key ? 'rgba(96, 165, 250, 0.1)' : 'rgba(255,255,255,0.05)',
+              color: targetFilter === f.key ? '#60a5fa' : '#94a3b8',
+              border: targetFilter === f.key ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(255,255,255,0.1)',
             }}
           >
             {f.label}
@@ -3442,26 +3442,26 @@ function ClassifyTab({ items, jiips, investors, loans, filterDate }: {
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#f9fafb'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                   >
-                    <td style={{ padding: '12px 16px', fontSize: 12, fontWeight: 700, color: '#6b7280', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 12, fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap' }}>
                       {sd.transaction_date?.slice(5) || '-'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{
                         padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                        background: sd.type === 'income' ? '#dbeafe' : '#fee2e2',
-                        color: sd.type === 'income' ? '#2563eb' : '#dc2626',
+                        background: sd.type === 'income' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(248, 113, 113, 0.2)',
+                        color: sd.type === 'income' ? '#60a5fa' : '#f87171',
                       }}>
                         {sd.type === 'income' ? '입금' : '출금'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: 800, color: '#111827', fontSize: 13 }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 800, color: '#e2e8f0', fontSize: 13 }}>
                       {sd.client_name || '-'}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {sd.description || '-'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd5e1' }}>
                         {item.final_category || item.ai_category || '-'}
                       </span>
                     </td>

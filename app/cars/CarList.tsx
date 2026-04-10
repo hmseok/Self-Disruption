@@ -101,7 +101,7 @@ export default function CarListPage() {
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -116,22 +116,22 @@ export default function CarListPage() {
         {cars.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {[
-              { label: '전체', value: stats.total, key: 'all', badge: 'glass-border-blue', icon: '🚗', color: 'text-steel-700' },
-              { label: '대기중', value: stats.available, key: 'available', badge: 'glass-border-green', icon: '✅', color: 'text-emerald-600' },
-              { label: '대여중', value: stats.rented, key: 'rented', badge: 'glass-border-blue', icon: '🔑', color: 'text-blue-600' },
-              { label: '정비/사고', value: stats.maintenance, key: 'maintenance', badge: 'glass-border-amber', icon: '🔧', color: 'text-amber-600' },
-              { label: '가동률', value: `${utilizationRate}%`, key: '_util', badge: 'glass-border-purple', icon: '📊', color: utilizationRate >= 70 ? 'text-emerald-600' : 'text-amber-600' },
+              { label: '전체', value: stats.total, key: 'all', badge: 'glass-border-blue', icon: '🚗', color: 'text-blue-400' },
+              { label: '대기중', value: stats.available, key: 'available', badge: 'glass-border-green', icon: '✅', color: 'text-emerald-400' },
+              { label: '대여중', value: stats.rented, key: 'rented', badge: 'glass-border-cyan', icon: '🔑', color: 'text-cyan-400' },
+              { label: '정비/사고', value: stats.maintenance, key: 'maintenance', badge: 'glass-border-amber', icon: '🔧', color: 'text-amber-400' },
+              { label: '가동률', value: `${utilizationRate}%`, key: '_util', badge: 'glass-border-purple', icon: '📊', color: utilizationRate >= 70 ? 'text-emerald-400' : 'text-amber-400' },
             ].map(s => (
               <button
                 key={s.key}
                 onClick={() => s.key !== '_util' && setFilter(s.key)}
-                className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center transition-all hover:scale-[1.02] ${filter === s.key ? 'ring-2 ring-steel-400/40 shadow-md' : ''}`}
+                className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center transition-all hover:scale-[1.02] ${filter === s.key ? 'ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10' : ''}`}
               >
                 <div className="text-base mb-1">{s.icon}</div>
                 <div className={`text-xl md:text-2xl font-black ${s.color}`}>
                   {loading ? '-' : s.value}
                 </div>
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</div>
+                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
               </button>
             ))}
           </div>
@@ -142,17 +142,18 @@ export default function CarListPage() {
           <div className="glass-3 glass-border-red rounded-xl p-4 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-base">🔧</span>
-              <h3 className="font-bold text-red-700 text-sm">정비/사고 차량 ({maintenanceCars.length}대)</h3>
+              <h3 className="font-bold text-red-400 text-sm">정비/사고 차량 ({maintenanceCars.length}대)</h3>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {maintenanceCars.slice(0, 8).map(car => (
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 border border-red-200/60 rounded-lg px-3 py-2 flex-shrink-0 hover:shadow-md transition-all text-left"
+                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-white/5 transition-all text-left"
+                  style={{ border: '1px solid rgba(239,68,68,0.15)' }}
                 >
-                  <div className="font-bold text-gray-800 text-sm">{car.number}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{car.brand} {car.model}</div>
+                  <div className="font-bold text-slate-200 text-sm">{car.number}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{car.brand} {car.model}</div>
                 </button>
               ))}
               {maintenanceCars.length > 8 && (
@@ -169,19 +170,20 @@ export default function CarListPage() {
           <div className="glass-3 glass-border-blue rounded-xl p-4 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-base">🆕</span>
-              <h3 className="font-bold text-steel-700 text-sm">최근 7일 신규 등록 ({recentCars.length}대)</h3>
+              <h3 className="font-bold text-blue-400 text-sm">최근 7일 신규 등록 ({recentCars.length}대)</h3>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {recentCars.slice(0, 8).map(car => (
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 border border-steel-200/60 rounded-lg px-3 py-2 flex-shrink-0 hover:shadow-md transition-all text-left"
+                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-white/5 transition-all text-left"
+                  style={{ border: '1px solid rgba(59,130,246,0.12)' }}
                 >
-                  <div className="font-bold text-gray-800 text-sm">{car.number}</div>
+                  <div className="font-bold text-slate-200 text-sm">{car.number}</div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-500">{car.brand}</span>
-                    <span className="text-[10px] text-steel-500 font-bold">{car.created_at.split('T')[0]}</span>
+                    <span className="text-xs text-slate-500">{car.brand}</span>
+                    <span className="text-[10px] text-blue-400 font-bold">{car.created_at.split('T')[0]}</span>
                   </div>
                 </button>
               ))}
@@ -203,8 +205,8 @@ export default function CarListPage() {
               />
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-gray-400 hidden sm:inline">
-                검색결과 <strong className="text-gray-600">{filteredCars.length}</strong>대
+              <span className="text-xs text-slate-500 hidden sm:inline">
+                검색결과 <strong className="text-slate-300">{filteredCars.length}</strong>대
               </span>
               <button
                 onClick={() => {
@@ -242,14 +244,14 @@ export default function CarListPage() {
 
           {/* 테이블 콘텐츠 */}
           {loading ? (
-            <div className="p-20 text-center text-gray-400 flex flex-col items-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-3"></div>
+            <div className="p-20 text-center text-slate-500 flex flex-col items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
               <span className="text-sm">차량 데이터를 불러오는 중...</span>
             </div>
           ) : filteredCars.length === 0 ? (
             <div className="p-12 md:p-20 text-center">
               <span className="text-3xl block mb-3">🚗</span>
-              <p className="text-gray-400 text-sm">
+              <p className="text-slate-500 text-sm">
                 {searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
               </p>
             </div>
@@ -276,16 +278,16 @@ export default function CarListPage() {
                         onClick={() => router.push(`/cars/${car.id}`)}
                         className="cursor-pointer group"
                       >
-                        <td className="font-black text-gray-900 text-base group-hover:text-steel-600 transition-colors">
+                        <td className="font-black text-slate-100 text-base group-hover:text-blue-400 transition-colors">
                           {car.number}
                         </td>
                         <td>
-                          <div className="font-bold text-gray-800 text-sm">{car.brand}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{car.model}</div>
+                          <div className="font-bold text-slate-200 text-sm">{car.brand}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{car.model}</div>
                         </td>
                         <td>
-                          <span className="font-medium text-gray-600 text-sm">{car.year}년</span>
-                          <span className="text-xs text-gray-400 block">{car.fuel}</span>
+                          <span className="font-medium text-slate-300 text-sm">{car.year}년</span>
+                          <span className="text-xs text-slate-500 block">{car.fuel}</span>
                         </td>
                         <td className="text-center">
                           <div className="flex flex-wrap justify-center gap-1">
@@ -302,7 +304,7 @@ export default function CarListPage() {
                             )}
                           </div>
                           {car.is_used && (car.purchase_mileage || 0) > 0 && (
-                            <span className="text-[10px] text-gray-400 block mt-1">
+                            <span className="text-[10px] text-slate-500 block mt-1">
                               구입시 {((car.purchase_mileage || 0) / 10000).toFixed(1)}만km
                             </span>
                           )}
@@ -312,10 +314,10 @@ export default function CarListPage() {
                             {statusLabel(car.status)}
                           </span>
                         </td>
-                        <td className="text-right font-bold text-gray-700 text-sm">
+                        <td className="text-right font-bold text-slate-300 text-sm">
                           {formatMoney(car.purchase_price)}원
                         </td>
-                        <td className="text-center text-xs text-gray-400">
+                        <td className="text-center text-xs text-slate-500">
                           {car.created_at.split('T')[0]}
                         </td>
                       </tr>
@@ -325,12 +327,12 @@ export default function CarListPage() {
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-gray-100/80">
+              <div className="md:hidden divide-y divide-white/5">
                 {filteredCars.map((car) => (
                   <button
                     key={car.id}
                     onClick={() => router.push(`/cars/${car.id}`)}
-                    className="w-full text-left px-4 py-3.5 hover:bg-steel-50/30 transition-colors"
+                    className="w-full text-left px-4 py-3.5 hover:bg-white/5 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5">
@@ -344,16 +346,16 @@ export default function CarListPage() {
                           {car.is_commercial === false ? '비영업' : '영업'}
                         </span>
                       </div>
-                      <span className="text-[11px] text-gray-400">{car.created_at.split('T')[0]}</span>
+                      <span className="text-[11px] text-slate-500">{car.created_at.split('T')[0]}</span>
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
-                        <div className="font-black text-gray-900 text-base mb-0.5">{car.number}</div>
-                        <div className="text-sm text-gray-600 font-bold">{car.brand} {car.model}</div>
-                        <div className="text-xs text-gray-400">{car.year}년 · {car.fuel}</div>
+                        <div className="font-black text-slate-100 text-base mb-0.5">{car.number}</div>
+                        <div className="text-sm text-slate-300 font-bold">{car.brand} {car.model}</div>
+                        <div className="text-xs text-slate-500">{car.year}년 · {car.fuel}</div>
                       </div>
                       <div className="text-right">
-                        <span className="font-black text-steel-600 text-sm">{formatMoney(car.purchase_price)}원</span>
+                        <span className="font-black text-blue-400 text-sm">{formatMoney(car.purchase_price)}원</span>
                       </div>
                     </div>
                   </button>

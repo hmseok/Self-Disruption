@@ -164,8 +164,8 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#131926]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
       </div>
     )
   }
@@ -173,8 +173,8 @@ export default function AdminDashboard() {
   // ===== 역할 배지 렌더러 =====
   const roleBadge = (r: string) => {
     if (r === 'admin') return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white uppercase tracking-wider">GOD ADMIN</span>
-    if (r === 'master') return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-steel-100 text-steel-700">관리자</span>
-    return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-500">직원</span>
+    if (r === 'master') return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/10 text-blue-400">관리자</span>
+    return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/5 text-slate-400">직원</span>
   }
 
   // ===== 활성 토글 버튼 =====
@@ -185,21 +185,21 @@ export default function AdminDashboard() {
           onClick={() => toggleUserActive(u.id, u.is_active)}
           className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
             u.is_active
-              ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-              : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+              ? 'bg-emerald-400/20 text-emerald-400 hover:bg-emerald-400/30 border border-emerald-400/50'
+              : 'bg-red-400/20 text-red-400 hover:bg-red-400/30 border border-red-400/50'
           }`}
           title={u.is_active ? '클릭하면 서비스 이용을 정지합니다' : '클릭하면 서비스 이용을 허용합니다'}
         >
-          <span className={`w-2 h-2 rounded-full ${u.is_active ? 'bg-green-500' : 'bg-red-400'}`}></span>
+          <span className={`w-2 h-2 rounded-full ${u.is_active ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
           {u.is_active ? '허용' : '정지'}
         </button>
       )
     }
     return (
       <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded ${
-        u.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+        u.is_active ? 'bg-emerald-400/20 text-emerald-400' : 'bg-red-400/20 text-red-400'
       }`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-green-500' : 'bg-red-400'}`}></span>
+        <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
         {u.is_active ? '허용' : '정지'}
       </span>
     )
@@ -207,30 +207,30 @@ export default function AdminDashboard() {
 
   // ===== 회사 카드 렌더러 =====
   const renderCompanyCard = (comp: CompanyWithUsers) => (
-    <div key={comp.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-      !comp.is_active ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200'
+    <div key={comp.id} className={`bg-[#131926]/80 rounded-2xl border shadow-sm overflow-hidden ${
+      !comp.is_active ? 'border-yellow-400/50 ring-1 ring-yellow-400/20' : 'border-white/[0.06]'
     }`}>
       {/* 회사 헤더 */}
       <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 ${
-            !comp.is_active ? 'bg-yellow-500' : 'bg-steel-600'
+            !comp.is_active ? 'bg-yellow-500' : 'bg-blue-500'
           }`}>
             {comp.name[0]}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-slate-900 text-sm md:text-base">{comp.name}</span>
+              <span className="font-bold text-slate-100 text-sm md:text-base">{comp.name}</span>
               {!comp.is_active && (
-                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 animate-pulse">
+                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-yellow-400/20 text-yellow-400 animate-pulse">
                   승인 대기
                 </span>
               )}
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                comp.plan === 'max' ? 'bg-amber-100 text-amber-700' :
-                comp.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
-                comp.plan === 'basic' ? 'bg-green-100 text-green-700' :
-                'bg-slate-100 text-slate-500'
+                comp.plan === 'max' ? 'bg-amber-400/20 text-amber-400' :
+                comp.plan === 'pro' ? 'bg-blue-400/20 text-blue-400' :
+                comp.plan === 'basic' ? 'bg-emerald-400/20 text-emerald-400' :
+                'bg-white/5 text-slate-400'
               }`}>
                 {comp.plan === 'max' ? 'MAX' : comp.plan.toUpperCase()}
               </span>
@@ -244,7 +244,7 @@ export default function AdminDashboard() {
                   href={comp.business_registration_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-steel-50 text-steel-600 hover:bg-steel-100 transition-colors"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-400/20 text-blue-400 hover:bg-blue-400/30 transition-colors"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
@@ -255,8 +255,8 @@ export default function AdminDashboard() {
               {role === 'admin' && (
                 <label className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${
                   comp.business_registration_url
-                    ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                    ? 'bg-white/5 text-slate-400 hover:bg-white/10'
+                    : 'bg-emerald-400/20 text-emerald-400 hover:bg-emerald-400/30'
                 } ${uploadingCompanyId === comp.id ? 'opacity-50 pointer-events-none' : ''}`}>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
@@ -287,7 +287,7 @@ export default function AdminDashboard() {
                 setAdminSelectedCompanyId(comp.id)
                 router.push('/admin/employees')
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-steel-50 text-steel-700 rounded-lg text-sm font-bold hover:bg-steel-100 border border-steel-200 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-400/20 text-blue-400 rounded-lg text-sm font-bold hover:bg-blue-400/30 border border-blue-400/50 transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/>
@@ -300,12 +300,12 @@ export default function AdminDashboard() {
 
       {/* 소속 유저 목록 */}
       {comp.users.length > 0 && (
-        <div className="border-t border-slate-100">
+        <div className="border-t border-white/[0.06]">
           {/* Desktop Table */}
           <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50/50">
+                <tr className="bg-white/5">
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이름</th>
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이메일</th>
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">역할</th>
@@ -315,9 +315,9 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {comp.users.map(u => (
-                  <tr key={u.id} className="border-t border-slate-50 hover:bg-slate-50/30">
-                    <td className="px-5 py-3 text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</td>
-                    <td className="px-5 py-3 text-sm text-slate-500">{u.email}</td>
+                  <tr key={u.id} className="border-t border-white/5 hover:bg-white/5">
+                    <td className="px-5 py-3 text-sm font-bold text-slate-200">{u.employee_name || '(미설정)'}</td>
+                    <td className="px-5 py-3 text-sm text-slate-400">{u.email}</td>
                     <td className="px-5 py-3">{roleBadge(u.role)}</td>
                     <td className="px-5 py-3 text-xs text-slate-400">{formatDate(u.created_at)}</td>
                     <td className="px-5 py-3">{activeToggle(u)}</td>
@@ -339,30 +339,30 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
           <div className="glass-3 glass-border-blue rounded-xl p-3 md:p-4 text-center">
             <div className="text-base mb-1">🏢</div>
-            <div className="text-xl md:text-2xl font-black text-steel-700">{clientCompanies.length}</div>
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">가입 회사</div>
+            <div className="text-xl md:text-2xl font-black text-blue-400">{clientCompanies.length}</div>
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">가입 회사</div>
           </div>
           {pendingCount > 0 && (
             <div className="glass-3 glass-border-amber rounded-xl p-3 md:p-4 text-center">
               <div className="text-base mb-1">⏳</div>
-              <div className="text-xl md:text-2xl font-black text-amber-600">{pendingCount}</div>
-              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">승인 대기</div>
+              <div className="text-xl md:text-2xl font-black text-amber-400">{pendingCount}</div>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">승인 대기</div>
             </div>
           )}
           <div className="glass-3 glass-border-blue rounded-xl p-3 md:p-4 text-center">
             <div className="text-base mb-1">👥</div>
-            <div className="text-xl md:text-2xl font-black text-steel-600">{totalUsers}</div>
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">전체 사용자</div>
+            <div className="text-xl md:text-2xl font-black text-blue-400">{totalUsers}</div>
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">전체 사용자</div>
           </div>
         </div>
 
         {/* ===== 미배정 사용자 ===== */}
         {role === 'admin' && unassignedUsers.length > 0 && (
           <div className="mb-6">
-            <h2 className="section-title text-red-500 mb-3">
+            <h2 className="section-title text-red-400 mb-3">
               미배정 사용자 ({unassignedUsers.length})
             </h2>
-            <div className="si-card overflow-hidden" style={{ borderColor: 'rgba(254,202,202,0.6)' }}>
+            <div className="si-card overflow-hidden" style={{ borderColor: 'rgba(248, 113, 113, 0.2)' }}>
               <div className="overflow-x-auto">
                 <table className="si-table">
                   <thead>
@@ -376,9 +376,9 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {unassignedUsers.map(u => (
-                      <tr key={u.id} className="border-t border-red-50 hover:bg-red-50/30">
-                        <td className="px-5 py-3 text-sm font-bold text-slate-800">{u.employee_name || '(미설정)'}</td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{u.email}</td>
+                      <tr key={u.id} className="border-t border-red-400/20 hover:bg-red-400/10">
+                        <td className="px-5 py-3 text-sm font-bold text-slate-200">{u.employee_name || '(미설정)'}</td>
+                        <td className="px-5 py-3 text-sm text-slate-400">{u.email}</td>
                         <td className="px-5 py-3">{roleBadge(u.role)}</td>
                         <td className="px-5 py-3 text-xs text-slate-400">{formatDate(u.created_at)}</td>
                         <td className="px-5 py-3">{activeToggle(u)}</td>
@@ -395,7 +395,7 @@ export default function AdminDashboard() {
 
         {/* 필터 탭 */}
         <div className="flex items-center gap-2 mb-4 md:mb-6 overflow-x-auto">
-          <h2 className="text-base md:text-lg font-black text-slate-800 mr-2 flex-shrink-0">가입 회사</h2>
+          <h2 className="text-base md:text-lg font-black text-slate-200 mr-2 flex-shrink-0">가입 회사</h2>
           {[
             { key: 'all', label: '전체', count: clientCompanies.length },
             { key: 'pending', label: '승인 대기', count: pendingCount },
@@ -406,8 +406,8 @@ export default function AdminDashboard() {
               onClick={() => setActiveFilter(tab.key as any)}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeFilter === tab.key
-                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-steel-900 text-white'
-                  : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-blue-600 text-white'
+                  : 'bg-white/10 text-slate-400 border border-white/[0.06] hover:bg-white/20'
               }`}
             >
               {tab.label} ({tab.count})
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
           {filteredCompanies.map(comp => renderCompanyCard(comp))}
 
           {filteredCompanies.length === 0 && (
-            <div className="bg-white rounded-2xl p-12 border border-slate-200 text-center">
+            <div className="bg-[#131926]/80 rounded-2xl p-12 border border-white/[0.06] text-center">
               <p className="text-slate-400 font-bold">해당 조건의 회사가 없습니다</p>
             </div>
           )}
