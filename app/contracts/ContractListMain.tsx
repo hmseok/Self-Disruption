@@ -15,30 +15,38 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 
-// ============================================================================
-// CONTRACT STATUS BADGE
-// ============================================================================
+// ── 상태 뱃지 ──
 function ContractStatusBadge({ contract }: { contract: any }) {
   const paidCount = contract.paidCount || 0
   const totalCount = contract.totalCount || 0
   if (contract.status === 'completed') {
-    return <span className="px-2 py-1 rounded-md text-xs font-black bg-green-600 text-white">완납</span>
+    return <span className="si-badge si-badge-green">완납</span>
   }
   if (['ended', 'expired'].includes(contract.status)) {
-    return <span className="px-2 py-1 rounded-md text-xs font-bold bg-gray-200 text-gray-600">종료</span>
+    return <span className="si-badge si-badge-gray">종료</span>
   }
   if (['cancelled', 'terminated'].includes(contract.status)) {
-    return <span className="px-2 py-1 rounded-md text-xs font-bold bg-red-100 text-red-600">해지</span>
+    return <span className="si-badge si-badge-red">해지</span>
   }
   if (paidCount > 0) {
-    return <span className="px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-700">수납 {paidCount}/{totalCount}</span>
+    return <span className="si-badge si-badge-blue">수납 {paidCount}/{totalCount}</span>
   }
-  return <span className="px-2 py-1 rounded-md text-xs font-bold bg-steel-600 text-white">진행중</span>
+  return <span className="si-badge si-badge-steel">진행중</span>
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+// ── 진행률 바 ──
+function ProgressBar({ paid, total }: { paid: number; total: number }) {
+  const pct = total > 0 ? (paid / total) * 100 : 0
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] text-gray-500 font-bold">{paid}/{total}</span>
+    </div>
+  )
+}
+
 type ContractStatusFilter = 'all' | 'active' | 'expiring' | 'ended' | 'cancelled'
 type SortOption = 'latest' | 'customer' | 'expiry' | 'rent'
 
@@ -60,15 +68,11 @@ export default function ContractListMain() {
   useEffect(() => {
     const fetchData = async () => {
       if (!companyId) { setLoading(false); return }
-
       try {
         const headers = await getAuthHeader()
         const res = await fetch('/api/contracts', { headers })
         const json = await res.json()
-        if (json.error) {
-          console.error('계약 목록 로드 실패:', json.error)
-          return
-        }
+        if (json.error) { console.error('계약 목록 로드 실패:', json.error); return }
         const allContracts = json.data || []
 
         const contractIds = allContracts.map((c: any) => c.id)
@@ -156,71 +160,60 @@ export default function ContractListMain() {
         case 'customer': return (a.customer?.name || a.customer_name || '').localeCompare(b.customer?.name || b.customer_name || '')
         case 'expiry': return (a.end_date || '').localeCompare(b.end_date || '')
         case 'rent': return (b.monthly_rent || 0) - (a.monthly_rent || 0)
-        default: return 0 // latest — already sorted by id desc from DB
+        default: return 0
       }
     })
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+      <div className="page-bg">
+        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+          <div className="si-card p-12 md:p-20 text-center">
+            <span className="text-4xl block mb-3">🏢</span>
+            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* ── 칩 필터 + 정렬 + 검색 (C 스타일) ── */}
-      {!loading && (
-        <div style={{ marginBottom: 16 }}>
-          {/* 칩 필터 */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        {/* ── KPI 스탯 카드 ── */}
+        {!loading && contracts.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {([
-              { id: 'all' as ContractStatusFilter, label: '전체', count: contractStats.total },
-              { id: 'active' as ContractStatusFilter, label: '진행중', count: contractStats.active },
-              { id: 'expiring' as ContractStatusFilter, label: '만료임박', count: contractStats.expiringSoon },
-              { id: 'ended' as ContractStatusFilter, label: '종료', count: contractStats.ended },
-              { id: 'cancelled' as ContractStatusFilter, label: '해지', count: contractStats.cancelled },
-            ]).map(chip => (
+              { label: '전체', value: contractStats.total, key: 'all' as ContractStatusFilter, badge: 'glass-border-blue', icon: '📋', color: 'text-steel-700' },
+              { label: '진행중', value: contractStats.active, key: 'active' as ContractStatusFilter, badge: 'glass-border-green', icon: '✅', color: 'text-emerald-600' },
+              { label: '만료임박', value: contractStats.expiringSoon, key: 'expiring' as ContractStatusFilter, badge: 'glass-border-amber', icon: '⏳', color: 'text-amber-600' },
+              { label: '종료', value: contractStats.ended, key: 'ended' as ContractStatusFilter, badge: 'glass-border-blue', icon: '📁', color: 'text-gray-500' },
+              { label: '해지', value: contractStats.cancelled, key: 'cancelled' as ContractStatusFilter, badge: 'glass-border-red', icon: '🚫', color: 'text-red-500' },
+            ]).map(s => (
               <button
-                key={chip.id}
-                onClick={() => setContractStatusFilter(chip.id)}
-                style={{
-                  padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
-                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                  background: contractStatusFilter === chip.id ? '#2d5fa8' : '#f3f4f6',
-                  color: contractStatusFilter === chip.id ? '#fff' : '#6b7280',
-                }}
+                key={s.key}
+                onClick={() => setContractStatusFilter(s.key)}
+                className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center transition-all hover:scale-[1.02] ${contractStatusFilter === s.key ? 'ring-2 ring-steel-400/40 shadow-md' : ''}`}
               >
-                {contractStatusFilter === chip.id && '● '}{chip.label}
-                <span style={{
-                  marginLeft: 6, fontSize: 11, fontWeight: 700,
-                  background: contractStatusFilter === chip.id ? 'rgba(255,255,255,0.25)' : '#e5e7eb',
-                  color: contractStatusFilter === chip.id ? '#fff' : '#6b7280',
-                  padding: '1px 7px', borderRadius: 10,
-                }}>{chip.count}</span>
+                <div className="text-base mb-1">{s.icon}</div>
+                <div className={`text-xl md:text-2xl font-black ${s.color}`}>{s.value}</div>
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</div>
               </button>
             ))}
           </div>
+        )}
 
-          {/* 정렬 + 검색 */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>정렬:</span>
+        {/* ── 메인 테이블 카드 ── */}
+        <div className="si-card">
+          {/* 검색 + 정렬 바 */}
+          <div className="si-search-bar">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-400">정렬</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortOption)}
-                style={{
-                  padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8,
-                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: '#fff',
-                }}
+                className="si-input text-xs !w-auto !py-1.5 !px-2.5"
               >
                 <option value="latest">최신순</option>
                 <option value="customer">고객명순</option>
@@ -228,123 +221,145 @@ export default function ContractListMain() {
                 <option value="rent">렌트료순</option>
               </select>
             </div>
-            <input
-              type="text"
-              placeholder="🔍 고객명, 차량번호, 브랜드 검색..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{
-                flex: 1, padding: '7px 14px', border: '1px solid #e5e7eb', borderRadius: 8,
-                fontSize: 13, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}
-            />
+            <div className="flex-1 max-w-sm">
+              <input
+                type="text"
+                placeholder="고객명, 차량번호, 브랜드 검색..."
+                className="si-input text-sm"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              <strong className="text-gray-600">{filteredContracts.length}</strong>건
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* ── 표준 테이블 (A 스타일) ── */}
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-        {loading ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>로딩 중...</div>
-        ) : filteredContracts.length === 0 ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-            {contracts.length === 0 ? '계약 내역이 없습니다.' : '해당 조건의 계약이 없습니다.'}
-          </div>
-        ) : (<>
-          {/* 데스크톱 */}
-          <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-            <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
-              <thead>
-                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>계약기간</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>수납</th>
-                  <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>계약일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredContracts.map((c, idx) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => router.push(`/contracts/${c.id}`)}
-                    style={{ cursor: 'pointer', borderBottom: idx < filteredContracts.length - 1 ? '1px solid #f3f4f6' : 'none', transition: 'background 0.15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <td style={{ padding: '12px 16px', paddingLeft: 24 }}><ContractStatusBadge contract={c} /></td>
-                    <td style={{ padding: '12px 16px', fontWeight: 700, color: '#111827' }}>{c.customer?.name || c.customer_name}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f3f4f6', overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
-                          {c.car?.image_url ? (
-                            <img src={c.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ fontSize: 9, color: '#d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
-                          )}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: '#111827', fontSize: 12 }}>{c.car?.number || '-'}</div>
-                          <div style={{ fontSize: 11, color: '#6b7280' }}>{c.car?.brand} {c.car?.model}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: 13 }}>
-                      {formatDate(c.start_date)} ~ {formatDate(c.end_date)}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#6b7280', fontSize: 13 }}>{f(c.deposit)}원</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <span style={{ fontWeight: 900, color: '#2d5fa8' }}>{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>/월 (VAT포함)</div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        <div style={{ width: 60, height: 6, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', background: '#22c55e', borderRadius: 999, transition: 'all 0.3s', width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
-                        </div>
-                        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>{c.paidCount}/{c.totalCount}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 12 }}>{formatDate(c.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {/* 모바일 카드형 */}
-          <div className="md:hidden" style={{ padding: '8px 12px' }}>
-            {filteredContracts.map((c) => (
-              <div key={c.id} onClick={() => router.push(`/contracts/${c.id}`)}
-                style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <ContractStatusBadge contract={c} />
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(c.created_at)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: '#111827', fontSize: 14, marginBottom: 2 }}>{c.customer?.name || c.customer_name}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>{c.car?.brand} {c.car?.model} {c.car?.number ? `(${c.car.number})` : ''}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(c.start_date)} ~ {formatDate(c.end_date)}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                    <span style={{ fontWeight: 900, color: '#2d5fa8', fontSize: 15 }}>{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>/월 VAT포함</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
-                      <div style={{ width: 40, height: 5, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', background: '#22c55e', borderRadius: 999, width: `${c.totalCount > 0 ? (c.paidCount / c.totalCount) * 100 : 0}%` }} />
-                      </div>
-                      <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 700 }}>{c.paidCount}/{c.totalCount}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {/* 탭 필터 */}
+          <div className="si-tabs">
+            {([
+              { key: 'all' as ContractStatusFilter, label: '전체' },
+              { key: 'active' as ContractStatusFilter, label: '진행중' },
+              { key: 'expiring' as ContractStatusFilter, label: '만료임박' },
+              { key: 'ended' as ContractStatusFilter, label: '종료' },
+              { key: 'cancelled' as ContractStatusFilter, label: '해지' },
+            ]).map(t => (
+              <button
+                key={t.key}
+                onClick={() => setContractStatusFilter(t.key)}
+                className={`si-tab ${contractStatusFilter === t.key ? 'si-tab-active' : ''}`}
+              >
+                {t.label}
+              </button>
             ))}
           </div>
-        </>)}
+
+          {/* 테이블 콘텐츠 */}
+          {loading ? (
+            <div className="p-20 text-center text-gray-400 flex flex-col items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-3"></div>
+              <span className="text-sm">계약 데이터를 불러오는 중...</span>
+            </div>
+          ) : filteredContracts.length === 0 ? (
+            <div className="p-12 md:p-20 text-center">
+              <span className="text-3xl block mb-3">📋</span>
+              <p className="text-gray-400 text-sm">
+                {contracts.length === 0 ? '계약 내역이 없습니다.' : '해당 조건의 계약이 없습니다.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="si-table" style={{ minWidth: 800 }}>
+                  <thead>
+                    <tr>
+                      <th>상태</th>
+                      <th>고객명</th>
+                      <th>차량</th>
+                      <th>계약기간</th>
+                      <th className="text-right">보증금</th>
+                      <th className="text-right">월 렌트료</th>
+                      <th className="text-center">수납</th>
+                      <th className="text-center">계약일</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContracts.map(c => (
+                      <tr
+                        key={c.id}
+                        onClick={() => router.push(`/contracts/${c.id}`)}
+                        className="cursor-pointer group"
+                      >
+                        <td><ContractStatusBadge contract={c} /></td>
+                        <td className="font-bold text-gray-900 group-hover:text-steel-600 transition-colors">
+                          {c.customer?.name || c.customer_name}
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0 flex items-center justify-center">
+                              {c.car?.image_url ? (
+                                <img src={c.car.image_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-[8px] text-gray-300">No Img</span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-bold text-gray-800 text-xs">{c.car?.number || '-'}</div>
+                              <div className="text-[11px] text-gray-400">{c.car?.brand} {c.car?.model}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="text-gray-500 text-xs">
+                          {formatDate(c.start_date)} ~ {formatDate(c.end_date)}
+                        </td>
+                        <td className="text-right text-gray-500 text-sm">{f(c.deposit)}원</td>
+                        <td className="text-right">
+                          <span className="font-black text-steel-600">{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
+                          <div className="text-[10px] text-gray-400">/월 (VAT포함)</div>
+                        </td>
+                        <td className="text-center">
+                          <ProgressBar paid={c.paidCount} total={c.totalCount} />
+                        </td>
+                        <td className="text-center text-xs text-gray-400">{formatDate(c.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-gray-100/80">
+                {filteredContracts.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => router.push(`/contracts/${c.id}`)}
+                    className="w-full text-left px-4 py-3.5 hover:bg-steel-50/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <ContractStatusBadge contract={c} />
+                      <span className="text-[11px] text-gray-400">{formatDate(c.created_at)}</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-gray-900 text-sm mb-0.5">{c.customer?.name || c.customer_name}</div>
+                        <div className="text-xs text-gray-500">{c.car?.brand} {c.car?.model} {c.car?.number ? `(${c.car.number})` : ''}</div>
+                        <div className="text-[11px] text-gray-400">{formatDate(c.start_date)} ~ {formatDate(c.end_date)}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <span className="font-black text-steel-600 text-sm">{f(Math.round((c.monthly_rent || 0) * 1.1))}원</span>
+                        <div className="text-[10px] text-gray-400">/월 VAT포함</div>
+                        <div className="mt-1 flex justify-end">
+                          <ProgressBar paid={c.paidCount} total={c.totalCount} />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

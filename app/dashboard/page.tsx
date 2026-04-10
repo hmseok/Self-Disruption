@@ -136,7 +136,7 @@ export default function DashboardPage() {
   // ============================================
   if (appLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="page-bg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-steel-600 mx-auto mb-4"></div>
           <p className="text-gray-500 font-medium">로딩 중...</p>
@@ -165,7 +165,8 @@ export default function DashboardPage() {
   const showFinance = hasModule('/finance') || hasModule('/quotes')
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
       {/* 상단 인사 영역 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
@@ -442,6 +443,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

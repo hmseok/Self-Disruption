@@ -332,49 +332,46 @@ export default function AdminDashboard() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
-        {/* 헤더 */}
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-            🏢 {role === 'admin' ? '회사/가입 관리' : '회사 관리'}
-          </h1>
-        </div>
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
         {/* KPI */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-          <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">가입 회사</div>
-            <div className="text-2xl md:text-3xl font-black text-slate-900">{clientCompanies.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <div className="glass-3 glass-border-blue rounded-xl p-3 md:p-4 text-center">
+            <div className="text-base mb-1">🏢</div>
+            <div className="text-xl md:text-2xl font-black text-steel-700">{clientCompanies.length}</div>
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">가입 회사</div>
           </div>
           {pendingCount > 0 && (
-            <div className="bg-yellow-50 p-4 md:p-5 rounded-2xl border border-yellow-200 shadow-sm">
-              <div className="text-[10px] md:text-xs font-bold text-yellow-600 uppercase mb-1">승인 대기</div>
-              <div className="text-2xl md:text-3xl font-black text-yellow-700">{pendingCount}</div>
+            <div className="glass-3 glass-border-amber rounded-xl p-3 md:p-4 text-center">
+              <div className="text-base mb-1">⏳</div>
+              <div className="text-xl md:text-2xl font-black text-amber-600">{pendingCount}</div>
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">승인 대기</div>
             </div>
           )}
-          <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-1">전체 사용자</div>
-            <div className="text-2xl md:text-3xl font-black text-steel-600">{totalUsers}</div>
+          <div className="glass-3 glass-border-blue rounded-xl p-3 md:p-4 text-center">
+            <div className="text-base mb-1">👥</div>
+            <div className="text-xl md:text-2xl font-black text-steel-600">{totalUsers}</div>
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">전체 사용자</div>
           </div>
         </div>
 
         {/* ===== 미배정 사용자 ===== */}
         {role === 'admin' && unassignedUsers.length > 0 && (
-          <div className="mb-6 md:mb-8">
-            <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider mb-3">
+          <div className="mb-6">
+            <h2 className="section-title text-red-500 mb-3">
               미배정 사용자 ({unassignedUsers.length})
             </h2>
-            <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-              <div style={{ overflowX: 'auto' }}>
-                <table className="w-full text-left">
+            <div className="si-card overflow-hidden" style={{ borderColor: 'rgba(254,202,202,0.6)' }}>
+              <div className="overflow-x-auto">
+                <table className="si-table">
                   <thead>
-                    <tr className="bg-red-50/50">
-                      <th className="px-5 py-2 text-[10px] font-bold text-red-400 uppercase">이름</th>
-                      <th className="px-5 py-2 text-[10px] font-bold text-red-400 uppercase">이메일</th>
-                      <th className="px-5 py-2 text-[10px] font-bold text-red-400 uppercase">역할</th>
-                      <th className="px-5 py-2 text-[10px] font-bold text-red-400 uppercase">가입일</th>
-                      <th className="px-5 py-2 text-[10px] font-bold text-red-400 uppercase">상태</th>
+                    <tr>
+                      <th>이름</th>
+                      <th>이메일</th>
+                      <th>역할</th>
+                      <th>가입일</th>
+                      <th>상태</th>
                     </tr>
                   </thead>
                   <tbody>

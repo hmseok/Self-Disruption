@@ -737,81 +737,47 @@ export default function CustomerPage() {
   // ─────────────────────────────────────────────
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+      <div className="page-bg">
+        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+          <div className="si-card p-12 md:p-20 text-center">
+            <span className="text-4xl block mb-3">🏢</span>
+            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen animate-fade-in">
-      {/* DarkHeader with Stats and Action */}
-      <DarkHeader
-        icon="👥"
-        title="고객 관리"
-        subtitle="고객 정보 등록 및 계약 이력 관리"
-        stats={[
-          {
-            label: '전체',
-            value: stats.total,
-            color: '#334155',
-            bgColor: '#fff',
-            borderColor: '#e2e8f0',
-            labelColor: '#94a3b8',
-          },
-          {
-            label: '개인',
-            value: stats.personal,
-            color: '#2563eb',
-            bgColor: '#eff6ff',
-            borderColor: '#bfdbfe',
-            labelColor: '#93c5fd',
-          },
-          {
-            label: '법인',
-            value: stats.corporate,
-            color: '#059669',
-            bgColor: '#ecfdf5',
-            borderColor: '#bbf7d0',
-            labelColor: '#6ee7b7',
-          },
-          {
-            label: '외국인',
-            value: stats.foreign,
-            color: '#7c3aed',
-            bgColor: '#f5f3ff',
-            borderColor: '#ddd6fe',
-            labelColor: '#c4b5fd',
-          },
-          {
-            label: 'VIP',
-            value: stats.vip,
-            color: '#d97706',
-            bgColor: '#fffbeb',
-            borderColor: '#fde68a',
-            labelColor: '#fcd34d',
-          },
-        ]}
-        actions={[
-          {
-            label: '+ 신규 고객',
-            onClick: () => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) },
-            variant: 'primary',
-          },
-        ]}
-      />
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
+
+      {/* ── KPI 스탯 카드 ── */}
+      {!loading && customers.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          {[
+            { label: '전체', value: stats.total, badge: 'glass-border-blue', icon: '👥', color: 'text-steel-700' },
+            { label: '개인', value: stats.personal, badge: 'glass-border-blue', icon: '👤', color: 'text-blue-600' },
+            { label: '법인', value: stats.corporate, badge: 'glass-border-green', icon: '🏢', color: 'text-emerald-600' },
+            { label: '외국인', value: stats.foreign, badge: 'glass-border-purple', icon: '🌐', color: 'text-violet-600' },
+            { label: 'VIP', value: stats.vip, badge: 'glass-border-amber', icon: '⭐', color: 'text-amber-600' },
+          ].map(s => (
+            <div key={s.label} className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center`}>
+              <div className="text-base mb-1">{s.icon}</div>
+              <div className={`text-xl md:text-2xl font-black ${s.color}`}>{s.value}</div>
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 검색 + 필터 */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-6">
+      <div className="si-card p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-3">
           {/* 검색 */}
-          <div className="flex-1 relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">🔍</span>
+          <div className="flex-1">
             <input
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:border-steel-400 outline-none"
+              className="si-input text-sm"
               placeholder="이름, 연락처, 이메일, 사업자번호로 검색..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -821,16 +787,14 @@ export default function CustomerPage() {
           <div className="flex gap-1.5">
             {CUSTOMER_TYPES.map(t => (
               <button key={t} onClick={() => setTypeFilter(t)}
-                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-colors ${
-                  typeFilter === t ? 'bg-steel-900 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}>
+                className={`si-tab ${typeFilter === t ? 'si-tab-active !border-b-0 !bg-steel-50' : ''} !px-4 !py-2.5 !rounded-lg !border-0`}>
                 {t}
               </button>
             ))}
           </div>
           {/* 등급 필터 */}
           <select
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 focus:border-steel-400 outline-none"
+            className="si-input !w-auto text-xs"
             value={gradeFilter}
             onChange={e => setGradeFilter(e.target.value)}>
             <option value="">등급 전체</option>
@@ -838,13 +802,19 @@ export default function CustomerPage() {
           </select>
           {/* 정렬 */}
           <select
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 focus:border-steel-400 outline-none"
+            className="si-input !w-auto text-xs"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as any)}>
             <option value="latest">최신순</option>
             <option value="name">이름순</option>
             <option value="grade">등급순</option>
           </select>
+          <button
+            onClick={() => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) }}
+            className="si-btn si-btn-primary text-xs whitespace-nowrap"
+          >
+            + 신규 고객
+          </button>
         </div>
       </div>
 
@@ -852,7 +822,7 @@ export default function CustomerPage() {
       <div className="flex gap-6">
         {/* 고객 목록 */}
         <div className={`${selectedCustomer ? 'w-[420px] flex-shrink-0' : 'w-full'} transition-all`}>
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="si-card overflow-hidden">
             <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
               <span className="text-xs font-bold text-gray-400">
                 {filteredCustomers.length}명 {typeFilter !== '전체' ? `(${typeFilter})` : ''}
@@ -1384,6 +1354,7 @@ export default function CustomerPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

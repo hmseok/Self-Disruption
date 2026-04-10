@@ -164,78 +164,70 @@ const router = useRouter()
 
   if (!company && !loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-              자금 장부 (입출금)
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">회사의 모든 자금 흐름을 기록하고 예측합니다.</p>
+      <div className="page-bg">
+        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+          <div className="si-card p-12 md:p-20 text-center">
+            <span className="text-4xl block mb-3">🏢</span>
+            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="text-xs text-gray-400 mt-1">회사 선택 후 자금 장부를 이용할 수 있습니다</p>
           </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
-          <p className="text-4xl mb-3">🏢</p>
-          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p className="text-xs text-slate-400 mt-1">회사 선택 후 자금 장부를 이용할 수 있습니다</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* DarkHeader with month picker in children */}
-      <DarkHeader
-        icon="📊"
-        title="장부/결산"
-        subtitle="회사의 모든 자금 흐름을 기록하고 예측합니다."
-        stats={[
-          { label: '총 수입', value: `${nf(summary.income)}원`, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
-          { label: '총 지출', value: `${nf(summary.expense)}원`, color: '#dc2626', bgColor: '#fef2f2', borderColor: '#fecaca', labelColor: '#fca5a5' },
-          { label: '손익', value: `${summary.profit > 0 ? '+' : ''}${nf(summary.profit)}원`, color: summary.profit >= 0 ? '#059669' : '#dc2626', bgColor: summary.profit >= 0 ? '#ecfdf5' : '#fef2f2', borderColor: summary.profit >= 0 ? '#bbf7d0' : '#fecaca', labelColor: summary.profit >= 0 ? '#6ee7b7' : '#fca5a5' },
-        ]}
-        actions={[
-          { label: '엑셀 등록', icon: '📂', onClick: () => router.push('/finance/upload'), variant: 'secondary' },
-          { label: '직접 입력', icon: '✏️', onClick: scrollToForm, variant: 'primary' }
-        ]}
-      >
-        {/* Month picker in DarkHeader children */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', gap: 8 }}>
-          <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-            style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600 }} />
+      {/* ── KPI 스탯 카드 ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="glass-3 glass-border-blue rounded-xl p-4 text-center">
+          <div className="text-base mb-1">💵</div>
+          <div className="text-xl font-black text-blue-600">{nf(summary.income)}원</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">총 수입</div>
         </div>
-      </DarkHeader>
+        <div className="glass-3 glass-border-red rounded-xl p-4 text-center">
+          <div className="text-base mb-1">💸</div>
+          <div className="text-xl font-black text-red-600">{nf(summary.expense)}원</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">총 지출</div>
+        </div>
+        <div className={`glass-3 ${summary.profit >= 0 ? 'glass-border-green' : 'glass-border-red'} rounded-xl p-4 text-center`}>
+          <div className="text-base mb-1">📈</div>
+          <div className={`text-xl font-black ${summary.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{summary.profit > 0 ? '+' : ''}{nf(summary.profit)}원</div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">손익</div>
+        </div>
+      </div>
 
-      {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button onClick={() => setActiveTab('ledger')} style={{
-          padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
-          background: activeTab === 'ledger' ? '#3b82f6' : '#fff', color: activeTab === 'ledger' ? '#fff' : '#6b7280',
-          border: activeTab === 'ledger' ? 'none' : '1px solid #e5e7eb', cursor: 'pointer'
-        }}>
-          📊 확정된 장부
-        </button>
-        <button onClick={() => setActiveTab('schedule')} style={{
-          padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
-          background: activeTab === 'schedule' ? '#3b82f6' : '#fff', color: activeTab === 'schedule' ? '#fff' : '#6b7280',
-          border: activeTab === 'schedule' ? 'none' : '1px solid #e5e7eb', cursor: 'pointer'
-        }}>
-          🗓️ 예정 스케줄
-        </button>
-        {activeTab === 'schedule' && (
-          <button onClick={generateMonthlySchedule} style={{
-            marginLeft: 'auto', padding: '10px 20px', borderRadius: 10, fontWeight: 700, fontSize: 14,
-            background: '#f59e11', color: '#000', border: 'none', cursor: 'pointer'
-          }}>
-            ⚡ 정기 지출 생성
+      {/* 액션 + 월 선택 */}
+      <div className="si-card mb-6">
+        <div className="si-search-bar">
+          <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
+            className="si-input !w-auto text-sm" />
+          <div className="ml-auto flex gap-2">
+            <button onClick={() => router.push('/finance/upload')} className="si-btn si-btn-secondary text-xs">📂 엑셀 등록</button>
+            <button onClick={scrollToForm} className="si-btn si-btn-primary text-xs">✏️ 직접 입력</button>
+          </div>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="si-tabs">
+          <button onClick={() => setActiveTab('ledger')} className={`si-tab ${activeTab === 'ledger' ? 'si-tab-active' : ''}`}>
+            📊 확정된 장부
           </button>
-        )}
+          <button onClick={() => setActiveTab('schedule')} className={`si-tab ${activeTab === 'schedule' ? 'si-tab-active' : ''}`}>
+            🗓️ 예정 스케줄
+          </button>
+          {activeTab === 'schedule' && (
+            <button onClick={generateMonthlySchedule} className="si-btn si-btn-primary text-xs ml-auto my-1.5 mr-3">
+              ⚡ 정기 지출 생성
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 4. 입력 폼 (Ref) */}
-      <div ref={formRef} className="bg-white p-4 md:p-6 rounded-3xl shadow-lg border border-gray-100 mb-8 scroll-mt-32 ring-1 ring-black/5">
+      <div ref={formRef} className="si-card p-4 md:p-6 mb-8 scroll-mt-32">
           <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   {activeTab === 'schedule' ? '🗓️ 예정 내역 등록' : '✏️ 입출금 내역 등록'}
@@ -282,37 +274,41 @@ const router = useRouter()
       </div>
 
       {/* 5. 리스트 뷰 */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden min-h-[400px]">
-          <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <div className="si-card min-h-[400px]">
+          <div className="px-5 py-3 border-b border-gray-100/80 flex justify-between items-center">
               <h3 className="font-bold text-gray-600 text-sm">
                   {activeTab === 'ledger' ? '📚 거래 내역 장부' : '🗓️ 자금 집행 스케줄'}
               </h3>
-              <span className="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full font-bold text-gray-500">총 {filteredList.length}건</span>
+              <span className="si-badge si-badge-gray">총 {filteredList.length}건</span>
           </div>
 
           {/* Empty State */}
           {loading ? (
-              <div className="p-10 text-center text-gray-400">데이터를 불러오는 중입니다...</div>
+              <div className="p-20 text-center text-gray-400 flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-3"></div>
+                <span className="text-sm">데이터를 불러오는 중...</span>
+              </div>
           ) : filteredList.length === 0 ? (
-              <div className="p-20 text-center text-gray-400 bg-gray-50/30">
-                  {activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}
+              <div className="p-20 text-center">
+                <span className="text-3xl block mb-3">{activeTab === 'ledger' ? '📚' : '🗓️'}</span>
+                <p className="text-gray-400 text-sm">{activeTab === 'ledger' ? '등록된 내역이 없습니다.' : '예정된 스케줄이 없습니다.'}</p>
               </div>
           ) : (
               <>
                   {/* Desktop Table View */}
-                  <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-                      <table className="w-full text-left min-w-[600px]">
-                          <thead className="bg-gray-50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
+                  <div className="hidden md:block overflow-x-auto">
+                      <table className="si-table" style={{ minWidth: 600 }}>
+                          <thead>
                               <tr>
-                                  <th className="p-3 md:p-4 pl-4 md:pl-6 font-bold">거래일</th>
-                                  <th className="p-3 md:p-4 font-bold">구분</th>
-                                  <th className="p-3 md:p-4 font-bold">계정과목</th>
-                                  <th className="p-3 md:p-4 font-bold">거래처/내용</th>
-                                  <th className="p-3 md:p-4 font-bold text-right">금액</th>
-                                  <th className="p-3 md:p-4 pr-4 md:pr-6 font-bold text-center">관리</th>
+                                  <th>거래일</th>
+                                  <th>구분</th>
+                                  <th>계정과목</th>
+                                  <th>거래처/내용</th>
+                                  <th className="text-right">금액</th>
+                                  <th className="text-center">관리</th>
                               </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-50 text-sm">
+                          <tbody>
                               {filteredList.map((item) => (
                                   <tr key={item.id} className="hover:bg-steel-50/30 transition-colors group">
                                       <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-gray-600">{item.transaction_date.slice(5)}</td>
@@ -380,6 +376,7 @@ const router = useRouter()
               </>
           )}
       </div>
+    </div>
     </div>
   )
 }

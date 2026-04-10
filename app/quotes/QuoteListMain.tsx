@@ -999,17 +999,20 @@ export default function QuoteListPage() {
   // ============================================================================
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+      <div className="page-bg">
+        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+          <div className="si-card p-12 md:p-20 text-center">
+            <span className="text-4xl block mb-3">🏢</span>
+            <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
       <style>{`@media (max-width: 767px) { .q-main-tabs { gap: 0 !important; } .q-main-tabs button { padding: 8px 10px !important; font-size: 12px !important; } .q-chip-wrap { gap: 4px !important; margin-bottom: 6px !important; } .q-chip-wrap button { padding: 4px 10px !important; font-size: 11px !important; } .q-sort-search { gap: 6px !important; } .q-sort-search input { font-size: 12px !important; padding: 6px 10px !important; } .q-new-btn { padding: 6px 10px !important; font-size: 11px !important; } .q-sort-label { display: none !important; } }`}</style>
 
       {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
@@ -1549,6 +1552,7 @@ export default function QuoteListPage() {
         </div>
         )
       })()}
+    </div>
     </div>
   )
 }

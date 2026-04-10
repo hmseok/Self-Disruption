@@ -218,7 +218,7 @@ export default function CollectionsPage() {
 
   if (!effectiveCompanyId && !loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+      <div className="page-bg">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 수금 관리</h1>
@@ -235,8 +235,8 @@ export default function CollectionsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-      <div className="space-y-6">
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 space-y-6">
         {/* DarkHeader */}
         <DarkHeader
           icon="💰"

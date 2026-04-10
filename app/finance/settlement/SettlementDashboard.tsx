@@ -1947,7 +1947,7 @@ export default function SettlementDashboard() {
   // ============================================
   if (!company) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+      <div className="page-bg">
         <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
           <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
@@ -1958,7 +1958,7 @@ export default function SettlementDashboard() {
 
   if (!effectiveCompanyId && !loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+      <div className="page-bg">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
             <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1978,7 +1978,8 @@ export default function SettlementDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
       {/* ═══ 컴팩트 요약바 ═══ */}
       <div style={{
@@ -2407,6 +2408,7 @@ export default function SettlementDashboard() {
           {toast.msg}
         </div>
       )}
+    </div>
     </div>
   )
 }

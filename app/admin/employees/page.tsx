@@ -511,7 +511,8 @@ export default function OrgManagementPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
       {/* ═══ DarkHeader ═══ */}
       <DarkHeader
@@ -1073,6 +1074,7 @@ export default function OrgManagementPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }
