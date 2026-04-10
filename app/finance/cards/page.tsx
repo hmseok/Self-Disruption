@@ -1357,12 +1357,12 @@ export default function CorporateCardsPage() {
                         }} />
                         <div style={{
                           position: 'absolute' as const, top: 0, left: 0, right: 0, height: '50%',
-                          background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%)',
+                          background: 'linear-gradient(180deg, rgba(0,0,0,0.06) 0%, transparent 100%)',
                         }} />
                         {/* 원형 장식 */}
                         <div style={{
                           position: 'absolute' as const, bottom: -30, right: -20, width: 120, height: 120,
-                          borderRadius: '50%', background: `rgba(255,255,255,0.06)`,
+                          borderRadius: '50%', background: `rgba(0,0,0,0.06)`,
                         }} />
 
                         {/* 상단: 브랜드 + 종류 */}
@@ -1413,7 +1413,7 @@ export default function CorporateCardsPage() {
                             <div style={{ fontSize: 7, opacity: 0.5, letterSpacing: 1, textTransform: 'uppercase' as const }}>CARD HOLDER</div>
                             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.5 }}>{c.holder_name || '공용'}</div>
                             {assignedCar && (
-                              <div style={{ fontSize: 9, marginTop: 2, background: 'rgba(255,255,255,0.15)', padding: '1px 6px', borderRadius: 6, display: 'inline-block', fontWeight: 700 }}>
+                              <div style={{ fontSize: 9, marginTop: 2, background: 'rgba(0,0,0,0.10)', padding: '1px 6px', borderRadius: 6, display: 'inline-block', fontWeight: 700 }}>
                                 🚙 {assignedCar.number}
                               </div>
                             )}
@@ -1574,7 +1574,7 @@ export default function CorporateCardsPage() {
                   </button>
                 </div>
                 {form.previous_card_numbers.length === 0 ? (
-                  <p style={{ fontSize: 11, color: '#cbd5e1', textAlign: 'center', padding: 4 }}>등록된 이전 번호 없음</p>
+                  <p style={{ fontSize: 11, color: '#334155', textAlign: 'center', padding: 4 }}>등록된 이전 번호 없음</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {form.previous_card_numbers.map((num: string, idx: number) => (
@@ -1658,7 +1658,7 @@ export default function CorporateCardsPage() {
                   {historyLoading ? (
                     <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 8 }}>로딩 중...</p>
                   ) : assignmentHistory.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'center', padding: 8 }}>이력이 없습니다</p>
+                    <p style={{ fontSize: 12, color: '#334155', textAlign: 'center', padding: 8 }}>이력이 없습니다</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                       {assignmentHistory.map((h, idx) => (
@@ -2252,7 +2252,7 @@ export default function CorporateCardsPage() {
                             {c.monthly_limit ? (
                               <span style={{ fontSize: 12, fontWeight: 900, color: limitRate >= 80 ? '#ef4444' : limitRate >= 50 ? '#f59e0b' : '#10b981' }}>{limitRate}%</span>
                             ) : (
-                              <span style={{ fontSize: 10, color: '#cbd5e1' }}>-</span>
+                              <span style={{ fontSize: 10, color: '#334155' }}>-</span>
                             )}
                           </div>
                         </div>

@@ -759,7 +759,7 @@ function AuthPage() {
         </div>
 
         {/* 하단 Copyright */}
-        <div className="relative z-10 pt-6 border-t border-white/10">
+        <div className="relative z-10 pt-6 border-t border-black/10">
           <p className="text-[11px] text-slate-500">&copy; 2025 FMI ERP Inc. All rights reserved.</p>
         </div>
       </div>
@@ -1074,7 +1074,7 @@ function AuthPage() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="text-slate-300 hover:text-slate-500 transition-colors p-0.5"
+                        className="text-slate-600 hover:text-slate-500 transition-colors p-0.5"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                           {showPassword
@@ -1222,7 +1222,7 @@ function AuthPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
                               </svg>
                               <span className="text-xs text-steel-400 group-hover:text-steel-600 font-medium">사업자등록증 업로드</span>
-                              <span className="text-[10px] text-slate-300">JPG, PNG, PDF (10MB 이하)</span>
+                              <span className="text-[10px] text-slate-600">JPG, PNG, PDF (10MB 이하)</span>
                             </div>
                             <input
                               ref={fileInputRef}

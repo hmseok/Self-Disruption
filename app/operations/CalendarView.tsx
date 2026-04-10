@@ -119,33 +119,33 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
   // ============================================
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
         {/* Calendar Header */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-3 border-b border-black/[0.06] bg-gray-50">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('prev')} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50">←</button>
+            <button onClick={() => navigate('prev')} className="px-3 py-1.5 bg-white border border-black/[0.06] rounded-lg text-sm font-bold hover:bg-gray-50">←</button>
             <button onClick={() => navigate('today')} className="px-3 py-1.5 bg-steel-600 text-white rounded-lg text-sm font-bold hover:bg-steel-700">오늘</button>
-            <button onClick={() => navigate('next')} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50">→</button>
-            <h2 className="text-lg font-black text-gray-900 ml-2">
+            <button onClick={() => navigate('next')} className="px-3 py-1.5 bg-white border border-black/[0.06] rounded-lg text-sm font-bold hover:bg-gray-50">→</button>
+            <h2 className="text-lg font-black text-slate-800 ml-2">
               {year}년 {month + 1}월
             </h2>
           </div>
           <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
             <button onClick={() => setViewType('month')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold ${viewType === 'month' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+              className={`px-3 py-1.5 rounded-md text-xs font-bold ${viewType === 'month' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}>
               월간
             </button>
             <button onClick={() => setViewType('week')}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold ${viewType === 'week' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+              className={`px-3 py-1.5 rounded-md text-xs font-bold ${viewType === 'week' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}>
               주간
             </button>
           </div>
         </div>
 
         {/* Day Headers */}
-        <div className="grid grid-cols-7 border-b border-gray-200">
+        <div className="grid grid-cols-7 border-b border-black/[0.06]">
           {['일', '월', '화', '수', '목', '금', '토'].map((day, i) => (
-            <div key={day} className={`p-2 text-center text-xs font-bold ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-500'}`}>
+            <div key={day} className={`p-2 text-center text-xs font-bold ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-slate-500'}`}>
               {day}
             </div>
           ))}
@@ -167,7 +167,7 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
                 key={day.date}
                 onClick={() => setSelectedDate(isSelected ? null : day.date)}
                 className={`
-                  border-b border-r border-gray-100 cursor-pointer transition-colors
+                  border-b border-r border-black/5 cursor-pointer transition-colors
                   ${viewType === 'week' ? 'min-h-[120px]' : 'min-h-[80px] md:min-h-[90px]'}
                   ${!day.inMonth ? 'bg-gray-50/50' : ''}
                   ${day.isToday ? 'bg-blue-50/50' : ''}
@@ -177,7 +177,7 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
                 <div className="p-1.5">
                   <span className={`text-xs font-bold inline-block w-6 h-6 leading-6 text-center rounded-full
                     ${day.isToday ? 'bg-steel-600 text-white' : ''}
-                    ${!day.inMonth ? 'text-gray-300' : dayOfWeek === 0 ? 'text-red-400' : dayOfWeek === 6 ? 'text-blue-400' : 'text-gray-700'}
+                    ${!day.inMonth ? 'text-slate-600' : dayOfWeek === 0 ? 'text-red-400' : dayOfWeek === 6 ? 'text-blue-400' : 'text-slate-600'}
                   `}>
                     {dayNum}
                   </span>
@@ -212,18 +212,18 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
 
       {/* Selected Date Detail Panel */}
       {selectedDate && selectedDetails && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h3 className="font-bold text-gray-900">
+        <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-black/5 bg-gray-50 flex justify-between items-center">
+            <h3 className="font-bold text-slate-800">
               {new Date(selectedDate).getMonth() + 1}월 {new Date(selectedDate).getDate()}일 배차 현황
             </h3>
-            <button onClick={() => setSelectedDate(null)} className="text-gray-400 hover:text-gray-600 text-lg font-bold">×</button>
+            <button onClick={() => setSelectedDate(null)} className="text-slate-500 hover:text-slate-400 text-lg font-bold">×</button>
           </div>
 
           {selectedDetails.operations.length === 0 && selectedDetails.schedules.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-sm">이 날짜에 등록된 배차가 없습니다.</div>
+            <div className="p-8 text-center text-slate-500 text-sm">이 날짜에 등록된 배차가 없습니다.</div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-200">
               {/* Operations */}
               {selectedDetails.operations.map((op: any) => {
                 const car = getCar(op.car_id)
@@ -235,23 +235,23 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                           {op.operation_type === 'delivery' ? '출고' : '반납'}
                         </span>
-                        <span className="text-sm font-bold text-gray-800">{op.scheduled_time}</span>
+                        <span className="text-sm font-bold text-slate-700">{op.scheduled_time}</span>
                       </div>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         op.status === 'completed' ? 'bg-green-100 text-green-700' :
                         op.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-600'
+                        'bg-gray-100 text-slate-400'
                       }`}>
                         {op.status === 'scheduled' ? '예정' : op.status === 'completed' ? '완료' : op.status === 'cancelled' ? '취소' : '진행중'}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-slate-400">
                       <span className="font-bold">{car?.number || '-'}</span>
-                      <span className="text-gray-400 mx-1">·</span>
+                      <span className="text-slate-500 mx-1">·</span>
                       {car?.brand} {car?.model}
-                      {cust && <><span className="text-gray-400 mx-1">·</span>{cust.name}</>}
+                      {cust && <><span className="text-slate-500 mx-1">·</span>{cust.name}</>}
                     </div>
-                    {op.location && <div className="text-xs text-gray-400 mt-0.5">{op.location}</div>}
+                    {op.location && <div className="text-xs text-slate-500 mt-0.5">{op.location}</div>}
                   </div>
                 )
               })}
@@ -266,11 +266,11 @@ export default function CalendarView({ operations, schedules, cars, getCar, getC
                     <div key={sched.id} className="p-4">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sched.color || '#6b7280' }}></span>
-                        <span className="text-sm font-bold text-gray-800">{sched.title || sched.schedule_type}</span>
+                        <span className="text-sm font-bold text-slate-700">{sched.title || sched.schedule_type}</span>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500">
                         {car?.number || '-'} · {car?.brand} {car?.model}
-                        <span className="text-gray-400 ml-2">{sched.start_date} ~ {sched.end_date}</span>
+                        <span className="text-slate-500 ml-2">{sched.start_date} ~ {sched.end_date}</span>
                       </div>
                     </div>
                   )

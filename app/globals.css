@@ -3,36 +3,36 @@
 /* ── Tailwind v4: 소스 경로 명시 (production CSS 누락 방지) ── */
 @source "../app/**/*.{tsx,ts,jsx,js}";
 
-/* 우측 패널 얇은 스크롤바 (다크 테마) */
+/* 우측 패널 얇은 스크롤바 */
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 9999px; }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
-.scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 9999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.20); }
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.12) transparent; }
 
 :root {
-  --background: #0f1729;
-  --foreground: #e2e8f0;
+  --background: #f0f4f8;
+  --foreground: #1e293b;
 
-  /* Dark Glass Morphism — Core palette (밝은 네이비) */
-  --navy-deep:    #0b1120;
-  --navy-base:    #0f1729;
-  --navy-surface: #162036;
-  --navy-card:    #1e2a45;
-  --navy-hover:   #263552;
-  --navy-border:  rgba(255,255,255,0.08);
+  /* Light Glass Morphism — Core palette */
+  --surface-1:    #f0f4f8;   /* 페이지 배경 */
+  --surface-2:    #e8eef4;   /* 서브 배경 */
+  --surface-card: rgba(255,255,255,0.75);
+  --surface-hover: rgba(255,255,255,0.90);
+  --border-light: rgba(0,0,0,0.06);
+  --border-color: rgba(0,0,0,0.08);
 
-  /* Accent gradients */
+  /* Accent */
   --accent-blue:    #3b82f6;
   --accent-purple:  #8b5cf6;
   --accent-cyan:    #06b6d4;
-  --accent-glow:    rgba(59,130,246,0.15);
+  --accent-glow:    rgba(59,130,246,0.08);
 
-  /* Text hierarchy */
-  --text-primary:   #f1f5f9;
-  --text-secondary: #94a3b8;
+  /* Text hierarchy (light theme) */
+  --text-primary:   #1e293b;
+  --text-secondary: #475569;
   --text-muted:     #64748b;
-  --text-dim:       #475569;
+  --text-dim:       #94a3b8;
 }
 
 @theme inline {
@@ -41,25 +41,25 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* ── Steel palette (kept for backward compat, adjusted for dark) ── */
-  --color-steel-50:  #1a2035;
-  --color-steel-100: #1f2b42;
-  --color-steel-200: #2a3a56;
-  --color-steel-300: #3b5178;
-  --color-steel-400: #4f6d9a;
-  --color-steel-500: #6490c4;
-  --color-steel-600: #7baee0;
-  --color-steel-700: #93c5fd;
-  --color-steel-800: #bfdbfe;
-  --color-steel-900: #dbeafe;
-  --color-steel-950: #eff6ff;
+  /* ── Steel palette (original light theme values) ── */
+  --color-steel-50:  #f0f5ff;
+  --color-steel-100: #e0eafc;
+  --color-steel-200: #c3d5f7;
+  --color-steel-300: #93b5ed;
+  --color-steel-400: #6490c4;
+  --color-steel-500: #4272a8;
+  --color-steel-600: #2d5fa8;
+  --color-steel-700: #274f8a;
+  --color-steel-800: #1e3a5f;
+  --color-steel-900: #1a2d4d;
+  --color-steel-950: #0f1a30;
 }
 
 html {
   overflow-x: hidden;
   max-width: 100vw;
   height: 100%;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -93,7 +93,7 @@ body.app-shell {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Dark Glass Morphism — Animations
+   Light Glass Morphism — Animations
    ══════════════════════════════════════════════════════════════ */
 
 @keyframes fadeInUp {
@@ -130,17 +130,17 @@ body.app-shell {
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 @keyframes ring-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+  0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.3); }
   70% { box-shadow: 0 0 0 20px rgba(59,130,246,0); }
   100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
 }
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(59,130,246,0.1), 0 0 30px rgba(139,92,246,0.05); }
-  50% { box-shadow: 0 0 25px rgba(59,130,246,0.2), 0 0 50px rgba(139,92,246,0.1); }
+  0%, 100% { box-shadow: 0 0 12px rgba(59,130,246,0.06), 0 0 24px rgba(139,92,246,0.03); }
+  50% { box-shadow: 0 0 20px rgba(59,130,246,0.12), 0 0 40px rgba(139,92,246,0.06); }
 }
 @keyframes border-glow {
-  0%, 100% { border-color: rgba(59,130,246,0.3); }
-  50% { border-color: rgba(139,92,246,0.4); }
+  0%, 100% { border-color: rgba(59,130,246,0.2); }
+  50% { border-color: rgba(139,92,246,0.3); }
 }
 
 .animate-fade-in-up { animation: fadeInUp 0.6s ease-out both; }
@@ -159,101 +159,101 @@ body.app-shell {
 .delay-400 { animation-delay: 0.4s; }
 .delay-500 { animation-delay: 0.5s; }
 
-/* Premium gradient text (dark theme) */
+/* Premium gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #06b6d4 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Shimmer loading (dark theme) */
+/* Shimmer loading */
 .shimmer-bg {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.04) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Dark Glass Morphism Design System — Utility Classes
+   Light Glass Morphism Design System — Utility Classes
    ══════════════════════════════════════════════════════════════ */
 
-/* ── Glass Depth Levels (밝은 네이비 — 레이어 구분 강화) ── */
-/* L5: 네비게이션 바 (가장 위) */
+/* ── Glass Depth Levels (Light Glass — 반투명 화이트) ── */
+/* L5: 네비게이션 바 (가장 위, 가장 불투명) */
 .glass-5 {
-  background: rgba(22,32,54,0.95);
+  background: rgba(255,255,255,0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(0,0,0,0.06);
 }
-/* L4: 테이블 카드, 모달 (밝은 표면) */
+/* L4: 테이블 카드, 모달 */
 .glass-4 {
-  background: rgba(30,42,69,0.92);
+  background: rgba(255,255,255,0.80);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
 }
-/* L3: 스탯 카드, 일반 카드 (가장 눈에 띄는 레벨) */
+/* L3: 스탯 카드, 일반 카드 */
 .glass-3 {
-  background: rgba(38,53,82,0.90);
+  background: rgba(255,255,255,0.70);
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
 }
 /* L2: 사이드바, 서브 패널 */
 .glass-2 {
-  background: rgba(22,32,54,0.85);
+  background: rgba(255,255,255,0.50);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(0,0,0,0.05);
 }
 /* L1: 인풋, 검색바 (오목) */
 .glass-1 {
-  background: rgba(15,23,41,0.80);
+  background: rgba(255,255,255,0.50);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
 /* Legacy .glass */
 .glass {
-  background: rgba(30,42,69,0.90);
+  background: rgba(255,255,255,0.70);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(0,0,0,0.06);
 }
 
-/* ── 색상 틴트 보더 (L3 카드용 — 글로우 강화) ── */
+/* ── 색상 틴트 보더 (L3 카드용) ── */
 .glass-border-blue {
-  border: 1px solid rgba(59,130,246,0.35);
-  box-shadow: 0 0 20px rgba(59,130,246,0.08), inset 0 1px 0 rgba(59,130,246,0.12);
+  border: 1px solid rgba(59,130,246,0.25);
+  box-shadow: 0 2px 12px rgba(59,130,246,0.06);
 }
 .glass-border-green {
-  border: 1px solid rgba(34,197,94,0.35);
-  box-shadow: 0 0 20px rgba(34,197,94,0.08), inset 0 1px 0 rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.25);
+  box-shadow: 0 2px 12px rgba(34,197,94,0.06);
 }
 .glass-border-red {
-  border: 1px solid rgba(239,68,68,0.35);
-  box-shadow: 0 0 20px rgba(239,68,68,0.08), inset 0 1px 0 rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.25);
+  box-shadow: 0 2px 12px rgba(239,68,68,0.06);
 }
 .glass-border-amber {
-  border: 1px solid rgba(245,158,11,0.35);
-  box-shadow: 0 0 20px rgba(245,158,11,0.08), inset 0 1px 0 rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.25);
+  box-shadow: 0 2px 12px rgba(245,158,11,0.06);
 }
 .glass-border-purple {
-  border: 1px solid rgba(139,92,246,0.35);
-  box-shadow: 0 0 20px rgba(139,92,246,0.08), inset 0 1px 0 rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.25);
+  box-shadow: 0 2px 12px rgba(139,92,246,0.06);
 }
 .glass-border-cyan {
-  border: 1px solid rgba(6,182,212,0.35);
-  box-shadow: 0 0 20px rgba(6,182,212,0.08), inset 0 1px 0 rgba(6,182,212,0.12);
+  border: 1px solid rgba(6,182,212,0.25);
+  box-shadow: 0 2px 12px rgba(6,182,212,0.06);
 }
 
-/* ── 공통 페이지 배경 (Dark Navy Gradient) ── */
+/* ── 공통 페이지 배경 (Light Soft Gradient) ── */
 .page-bg {
-  background: linear-gradient(180deg, #0b1120 0%, #0f1729 40%, #162036 80%, #0f1729 100%);
+  background: linear-gradient(180deg, #e8eef4 0%, #f0f4f8 40%, #f5f7fa 100%);
   min-height: 100vh;
 }
 
@@ -266,7 +266,7 @@ body.app-shell {
   color: #64748b;
 }
 
-/* ── Dark Glass 테이블 ── */
+/* ── Light Glass 테이블 ── */
 .si-table {
   width: 100%;
   text-align: left;
@@ -279,38 +279,38 @@ body.app-shell {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #94a3b8;
-  background: rgba(15,23,41,0.70);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  color: #64748b;
+  background: rgba(241,245,249,0.90);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 .si-table tbody td {
   padding: 12px 16px;
   font-size: 13px;
-  color: #cbd5e1;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: #334155;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
 .si-table tbody tr {
   transition: background 0.15s;
 }
 .si-table tbody tr:hover {
-  background: rgba(59,130,246,0.06);
+  background: rgba(59,130,246,0.04);
 }
 .si-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* ── Dark Glass 카드 (밝은 네이비 표면) ── */
+/* ── Light Glass 카드 ── */
 .si-card {
-  background: rgba(30,42,69,0.92);
+  background: rgba(255,255,255,0.80);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(0,0,0,0.06);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.2), 0 0 1px rgba(255,255,255,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.05), 0 0 1px rgba(0,0,0,0.08);
   overflow: hidden;
 }
 
-/* ── Dark Glass 뱃지 ── */
+/* ── Light Glass 뱃지 ── */
 .si-badge {
   display: inline-flex;
   align-items: center;
@@ -320,38 +320,39 @@ body.app-shell {
   font-weight: 700;
   line-height: 1.4;
 }
-.si-badge-green  { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.15); }
-.si-badge-blue   { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.15); }
-.si-badge-red    { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
-.si-badge-amber  { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.15); }
-.si-badge-purple { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.15); }
-.si-badge-gray   { background: rgba(100,116,139,0.12); color: #94a3b8; border: 1px solid rgba(100,116,139,0.15); }
-.si-badge-steel  { background: rgba(59,130,246,0.10); color: #7baee0; border: 1px solid rgba(59,130,246,0.12); }
-.si-badge-teal   { background: rgba(20,184,166,0.12); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.15); }
-.si-badge-cyan   { background: rgba(6,182,212,0.12); color: #22d3ee; border: 1px solid rgba(6,182,212,0.15); }
+.si-badge-green  { background: rgba(34,197,94,0.10); color: #16a34a; border: 1px solid rgba(34,197,94,0.15); }
+.si-badge-blue   { background: rgba(59,130,246,0.10); color: #2563eb; border: 1px solid rgba(59,130,246,0.15); }
+.si-badge-red    { background: rgba(239,68,68,0.10);  color: #dc2626; border: 1px solid rgba(239,68,68,0.15); }
+.si-badge-amber  { background: rgba(245,158,11,0.10); color: #d97706; border: 1px solid rgba(245,158,11,0.15); }
+.si-badge-purple { background: rgba(139,92,246,0.10); color: #7c3aed; border: 1px solid rgba(139,92,246,0.15); }
+.si-badge-gray   { background: rgba(100,116,139,0.10); color: #64748b; border: 1px solid rgba(100,116,139,0.15); }
+.si-badge-steel  { background: rgba(59,130,246,0.08); color: #2d5fa8; border: 1px solid rgba(59,130,246,0.12); }
+.si-badge-teal   { background: rgba(20,184,166,0.10); color: #0d9488; border: 1px solid rgba(20,184,166,0.15); }
+.si-badge-cyan   { background: rgba(6,182,212,0.10); color: #0891b2; border: 1px solid rgba(6,182,212,0.15); }
 
-/* ── Dark Glass 인풋 ── */
+/* ── Light Glass 인풋 ── */
 .si-input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(15,23,41,0.80);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(0,0,0,0.08);
   border-radius: 10px;
   font-size: 13px;
-  color: #f1f5f9;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+  color: #1e293b;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .si-input:focus {
   outline: none;
   border-color: rgba(59,130,246,0.5);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12), inset 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08), inset 0 1px 2px rgba(0,0,0,0.04);
+  background: #fff;
 }
 .si-input::placeholder {
-  color: #475569;
+  color: #94a3b8;
 }
 
-/* ── Dark Glass 버튼 ── */
+/* ── Light Glass 버튼 ── */
 .si-btn {
   display: inline-flex;
   align-items: center;
@@ -367,42 +368,42 @@ body.app-shell {
 .si-btn-primary {
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(59,130,246,0.25);
+  box-shadow: 0 2px 12px rgba(59,130,246,0.20);
 }
 .si-btn-primary:hover {
   background: linear-gradient(135deg, #2563eb, #4f46e5);
-  box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.30);
 }
 .si-btn-secondary {
-  background: rgba(255,255,255,0.06);
-  color: #cbd5e1;
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.60);
+  color: #475569;
+  border: 1px solid rgba(0,0,0,0.08);
 }
 .si-btn-secondary:hover {
-  background: rgba(255,255,255,0.10);
-  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.90);
+  border-color: rgba(0,0,0,0.12);
 }
 .si-btn-danger {
-  background: rgba(239,68,68,0.12);
-  color: #f87171;
-  border: 1px solid rgba(239,68,68,0.20);
+  background: rgba(239,68,68,0.08);
+  color: #dc2626;
+  border: 1px solid rgba(239,68,68,0.15);
 }
 .si-btn-danger:hover {
-  background: rgba(239,68,68,0.18);
+  background: rgba(239,68,68,0.12);
 }
 
-/* ── Dark Glass 탭 필터 바 ── */
+/* ── Light Glass 탭 필터 바 ── */
 .si-tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
   overflow-x: auto;
 }
 .si-tab {
   padding: 10px 20px;
   font-size: 12px;
   font-weight: 700;
-  color: #475569;
+  color: #94a3b8;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: all 0.15s;
@@ -412,20 +413,20 @@ body.app-shell {
   border-left: none;
   border-right: none;
 }
-.si-tab:hover { color: #94a3b8; }
+.si-tab:hover { color: #64748b; }
 .si-tab-active {
-  color: #60a5fa;
+  color: #2563eb;
   border-bottom-color: #3b82f6;
 }
 
-/* ── Dark Glass 검색 바 ── */
+/* ── Light Glass 검색 바 ── */
 .si-search-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(15,23,41,0.60);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(241,245,249,0.80);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
 
 /* ===== Mobile Responsive ===== */
@@ -464,11 +465,11 @@ button:not(:disabled),
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 }
 
-/* 사이드바 오버레이 (다크) */
+/* 사이드바 오버레이 */
 .sidebar-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 15;
   opacity: 0;
   pointer-events: none;

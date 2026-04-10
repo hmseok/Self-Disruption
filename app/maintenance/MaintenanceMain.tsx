@@ -89,7 +89,7 @@ type InspectionRecord = {
 }
 
 const MAINT_STATUS: Record<string, { label: string; color: string }> = {
-  requested: { label: '접수', color: 'bg-gray-100 text-gray-700' },
+  requested: { label: '접수', color: 'bg-gray-100 text-slate-600' },
   approved: { label: '승인', color: 'bg-blue-100 text-blue-700' },
   in_shop: { label: '정비중', color: 'bg-amber-100 text-amber-700' },
   completed: { label: '완료', color: 'bg-green-100 text-green-700' },
@@ -108,12 +108,12 @@ const MAINT_TYPE: Record<string, string> = {
 }
 
 const INSP_STATUS: Record<string, { label: string; color: string }> = {
-  scheduled: { label: '예정', color: 'bg-gray-100 text-gray-700' },
+  scheduled: { label: '예정', color: 'bg-gray-100 text-slate-600' },
   in_progress: { label: '진행중', color: 'bg-blue-100 text-blue-700' },
   passed: { label: '합격', color: 'bg-green-100 text-green-700' },
   failed: { label: '불합격', color: 'bg-red-100 text-red-700' },
   overdue: { label: '만기초과', color: 'bg-red-500 text-white' },
-  cancelled: { label: '취소', color: 'bg-gray-400 text-white' },
+  cancelled: { label: '취소', color: 'bg-slate-500 text-white' },
 }
 
 const INSP_TYPE: Record<string, string> = {
@@ -504,15 +504,15 @@ export default function MaintenanceMainPage() {
   const getDDayColor = (daysLeft: number) => {
     if (daysLeft < 0) return 'text-red-600 font-bold'
     if (daysLeft <= 7) return 'text-amber-600 font-bold'
-    return 'text-gray-500'
+    return 'text-slate-500'
   }
 
   if (!company) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-white rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
           <p className="text-xs mt-1">슈퍼어드민은 회사를 선택한 후 데이터를 조회/등록할 수 있습니다.</p>
         </div>
       </div>
@@ -520,12 +520,12 @@ export default function MaintenanceMainPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50/50 animate-fade-in">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50 animate-fade-in">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🔧 정비/검사 관리</h1>
-          <p className="text-gray-500 mt-1 md:mt-2 text-sm">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🔧 정비/검사 관리</h1>
+          <p className="text-slate-500 mt-1 md:mt-2 text-sm">
             정비 기록: <span className="font-bold text-steel-600">{maintenanceRecords.length}</span>건 /
             검사 기록: <span className="font-bold text-steel-600">{inspectionRecords.length}</span>건
           </p>
@@ -533,7 +533,7 @@ export default function MaintenanceMainPage() {
 
         <Link
           href="/cars"
-          className="px-4 md:px-6 py-2.5 md:py-3 border border-gray-300 rounded-xl font-bold text-gray-700 hover:bg-gray-50 text-center text-sm"
+          className="px-4 md:px-6 py-2.5 md:py-3 border border-black/10 rounded-xl font-bold text-slate-600 hover:bg-gray-50 text-center text-sm"
         >
           목록으로
         </Link>
@@ -542,30 +542,30 @@ export default function MaintenanceMainPage() {
       {/* KPI Cards */}
       {(maintenanceRecords.length > 0 || inspectionRecords.length > 0) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-            <p className="text-xs text-gray-400 font-bold">정비 대기</p>
-            <p className="text-xl font-black text-gray-900 mt-1">
+          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+            <p className="text-xs text-slate-500 font-bold">정비 대기</p>
+            <p className="text-xl font-black text-slate-800 mt-1">
               {stats.maintPending}
-              <span className="text-sm text-gray-400 ml-0.5">건</span>
+              <span className="text-sm text-slate-500 ml-0.5">건</span>
             </p>
           </div>
-          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-            <p className="text-xs text-gray-400 font-bold">정비 진행</p>
-            <p className="text-xl font-black text-gray-900 mt-1">
+          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+            <p className="text-xs text-slate-500 font-bold">정비 진행</p>
+            <p className="text-xl font-black text-slate-800 mt-1">
               {stats.maintInProgress}
-              <span className="text-sm text-gray-400 ml-0.5">건</span>
+              <span className="text-sm text-slate-500 ml-0.5">건</span>
             </p>
           </div>
-          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-            <p className="text-xs text-gray-400 font-bold">검사 예정</p>
-            <p className="text-xl font-black text-gray-900 mt-1">
+          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+            <p className="text-xs text-slate-500 font-bold">검사 예정</p>
+            <p className="text-xl font-black text-slate-800 mt-1">
               {stats.inspUpcoming}
-              <span className="text-sm text-gray-400 ml-0.5">건</span>
+              <span className="text-sm text-slate-500 ml-0.5">건</span>
             </p>
           </div>
-          <div className={`${stats.inspOverdue > 0 ? 'bg-red-50' : 'bg-white'} p-3 rounded-xl border ${stats.inspOverdue > 0 ? 'border-red-200' : 'border-gray-200'} shadow-sm`}>
-            <p className={`text-xs font-bold ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-gray-400'}`}>만기 초과</p>
-            <p className={`text-xl font-black mt-1 ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+          <div className={`${stats.inspOverdue > 0 ? 'bg-red-500/10' : 'bg-white'} p-3 rounded-xl border ${stats.inspOverdue > 0 ? 'border-red-500/20' : 'border-black/[0.06]'} shadow-sm`}>
+            <p className={`text-xs font-bold ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-slate-500'}`}>만기 초과</p>
+            <p className={`text-xl font-black mt-1 ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-slate-800'}`}>
               {stats.inspOverdue}
               <span className="text-sm ml-0.5">건</span>
             </p>
@@ -574,7 +574,7 @@ export default function MaintenanceMainPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-4 overflow-x-auto gap-2">
+      <div className="flex border-b border-black/[0.06] mb-4 overflow-x-auto gap-2">
         {[
           { key: 'maintenance', label: '정비 이력' },
           { key: 'inspection', label: '법정 검사' },
@@ -585,7 +585,7 @@ export default function MaintenanceMainPage() {
             className={`px-3 md:px-6 py-2.5 md:py-3 font-bold text-xs md:text-sm border-b-2 transition-colors whitespace-nowrap ${
               mainTab === t.key
                 ? 'border-steel-600 text-steel-600'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+                : 'border-transparent text-slate-500 hover:text-slate-400'
             }`}
           >
             {t.label}
@@ -601,7 +601,7 @@ export default function MaintenanceMainPage() {
             <input
               type="text"
               placeholder="🔍 차량번호, 정비소, 메모로 검색..."
-              className="px-3 md:px-4 py-2.5 md:py-3 border border-gray-300 rounded-xl flex-1 focus:outline-none focus:border-steel-500 shadow-sm text-sm"
+              className="px-3 md:px-4 py-2.5 md:py-3 border border-black/10 rounded-xl flex-1 focus:outline-none focus:border-steel-500 shadow-sm text-sm bg-gray-50 text-slate-800"
               value={maintSearchQuery}
               onChange={e => setMaintSearchQuery(e.target.value)}
             />
@@ -618,7 +618,7 @@ export default function MaintenanceMainPage() {
             <select
               value={maintStatusFilter}
               onChange={e => setMaintStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none"
+              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
             >
               <option value="all">상태: 전체</option>
               {Object.entries(MAINT_STATUS).map(([key, val]) => (
@@ -630,7 +630,7 @@ export default function MaintenanceMainPage() {
             <select
               value={maintTypeFilter}
               onChange={e => setMaintTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none"
+              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
             >
               <option value="all">유형: 전체</option>
               {Object.entries(MAINT_TYPE).map(([key, val]) => (
@@ -642,7 +642,7 @@ export default function MaintenanceMainPage() {
             <select
               value={maintVehicleFilter}
               onChange={e => setMaintVehicleFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none"
+              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
             >
               <option value="all">차량: 전체</option>
               {cars.map(car => (
@@ -654,14 +654,14 @@ export default function MaintenanceMainPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             {loading ? (
-              <div className="p-20 text-center text-gray-400 flex flex-col items-center">
+              <div className="p-20 text-center text-slate-500 flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
                 정비 데이터를 불러오는 중...
               </div>
             ) : filteredMaintenanceRecords.length === 0 ? (
-              <div className="p-12 md:p-20 text-center text-gray-400 text-sm">
+              <div className="p-12 md:p-20 text-center text-slate-500 text-sm">
                 {maintSearchQuery || maintStatusFilter !== 'all' || maintTypeFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 정비 기록이 없습니다.'}
               </div>
             ) : (
@@ -669,7 +669,7 @@ export default function MaintenanceMainPage() {
                 {/* Desktop Table */}
                 <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
+                    <thead className="bg-gray-100 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
                       <tr>
                         <th className="p-4">요청일</th>
                         <th className="p-4">차량</th>
@@ -680,13 +680,13 @@ export default function MaintenanceMainPage() {
                         <th className="p-4 text-center">액션</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-200">
                       {filteredMaintenanceRecords.map(maint => (
-                        <tr key={maint.id} className="hover:bg-steel-50 transition-colors group">
-                          <td className="p-4 font-bold text-gray-900 text-sm">{maint.requested_date}</td>
+                        <tr key={maint.id} className="hover:bg-gray-50 transition-colors group">
+                          <td className="p-4 font-bold text-slate-800 text-sm">{maint.requested_date}</td>
                           <td className="p-4 text-sm">
-                            <div className="font-bold text-gray-800">{getCar(maint.car_id)?.number}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="font-bold text-slate-700">{getCar(maint.car_id)?.number}</div>
+                            <div className="text-xs text-slate-400">
                               {getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}
                             </div>
                           </td>
@@ -696,10 +696,10 @@ export default function MaintenanceMainPage() {
                             </span>
                           </td>
                           <td className="p-4 text-sm">
-                            <div className="font-bold text-gray-800">{maint.shop_name}</div>
-                            <div className="text-xs text-gray-500">{maint.shop_phone}</div>
+                            <div className="font-bold text-slate-700">{maint.shop_name}</div>
+                            <div className="text-xs text-slate-400">{maint.shop_phone}</div>
                           </td>
-                          <td className="p-4 text-sm font-bold text-gray-900">
+                          <td className="p-4 text-sm font-bold text-slate-800">
                             {maint.estimated_cost?.toLocaleString()}원
                           </td>
                           <td className="p-4 text-sm">
@@ -750,7 +750,7 @@ export default function MaintenanceMainPage() {
                 {/* Mobile Card View */}
                 <div className="md:hidden" style={{ padding: '8px 12px' }}>
                   {filteredMaintenanceRecords.map(maint => (
-                    <div key={maint.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                    <div key={maint.id} style={{ padding: '14px 16px', borderBottom: 'rgba(0,0,0,0.04)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${MAINT_STATUS[maint.status]?.color}`}>
@@ -760,16 +760,16 @@ export default function MaintenanceMainPage() {
                             {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
                           </span>
                         </div>
-                        <span style={{ fontSize: 11, color: '#9ca3af' }}>{maint.requested_date}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)' }}>{maint.requested_date}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{getCar(maint.car_id)?.number || '-'}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>{getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}</div>
-                          <div style={{ fontSize: 12, color: '#6b7280' }}>{maint.shop_name} {maint.shop_phone ? `· ${maint.shop_phone}` : ''}</div>
+                          <div style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 15, marginBottom: 2 }}>{getCar(maint.car_id)?.number || '-'}</div>
+                          <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}</div>
+                          <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{maint.shop_name} {maint.shop_phone ? `· ${maint.shop_phone}` : ''}</div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                          <span style={{ fontWeight: 900, color: '#111827', fontSize: 14 }}>{maint.estimated_cost?.toLocaleString()}원</span>
+                          <span style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 14 }}>{maint.estimated_cost?.toLocaleString()}원</span>
                           <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             <button onClick={() => openEditMaintenanceModal(maint)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
                             {maint.status === 'requested' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">승인</button>}
@@ -805,7 +805,7 @@ export default function MaintenanceMainPage() {
             <select
               value={inspStatusFilter}
               onChange={e => setInspStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500"
+              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
             >
               <option value="all">상태: 전체</option>
               {Object.entries(INSP_STATUS).map(([key, val]) => (
@@ -817,14 +817,14 @@ export default function MaintenanceMainPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             {loading ? (
-              <div className="p-20 text-center text-gray-400 flex flex-col items-center">
+              <div className="p-20 text-center text-slate-500 flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
                 검사 데이터를 불러오는 중...
               </div>
             ) : filteredInspectionRecords.length === 0 ? (
-              <div className="p-12 md:p-20 text-center text-gray-400 text-sm">
+              <div className="p-12 md:p-20 text-center text-slate-500 text-sm">
                 {inspStatusFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 검사 기록이 없습니다.'}
               </div>
             ) : (
@@ -832,7 +832,7 @@ export default function MaintenanceMainPage() {
                 {/* Desktop Table */}
                 <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
+                    <thead className="bg-gray-100 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
                       <tr>
                         <th className="p-4">만기일</th>
                         <th className="p-4">차량</th>
@@ -843,15 +843,15 @@ export default function MaintenanceMainPage() {
                         <th className="p-4 text-center">액션</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-200">
                       {filteredInspectionRecords.map(insp => {
                         const daysLeft = getDDay(insp.due_date)
                         return (
-                          <tr key={insp.id} className="hover:bg-steel-50 transition-colors group">
-                            <td className="p-4 font-bold text-gray-900 text-sm">{insp.due_date}</td>
+                          <tr key={insp.id} className="hover:bg-gray-50 transition-colors group">
+                            <td className="p-4 font-bold text-slate-800 text-sm">{insp.due_date}</td>
                             <td className="p-4 text-sm">
-                              <div className="font-bold text-gray-800">{getCar(insp.car_id)?.number}</div>
-                              <div className="text-xs text-gray-500">
+                              <div className="font-bold text-slate-700">{getCar(insp.car_id)?.number}</div>
+                              <div className="text-xs text-slate-400">
                                 {getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}
                               </div>
                             </td>
@@ -869,8 +869,8 @@ export default function MaintenanceMainPage() {
                               {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
                             </td>
                             <td className="p-4 text-sm">
-                              <div className="font-bold text-gray-800">{insp.center_name}</div>
-                              <div className="text-xs text-gray-500">{insp.center_address}</div>
+                              <div className="font-bold text-slate-700">{insp.center_name}</div>
+                              <div className="text-xs text-slate-400">{insp.center_address}</div>
                             </td>
                             <td className="p-4 text-center">
                               <div className="flex gap-2 justify-center flex-wrap">
@@ -918,7 +918,7 @@ export default function MaintenanceMainPage() {
                   {filteredInspectionRecords.map(insp => {
                     const daysLeft = getDDay(insp.due_date)
                     return (
-                      <div key={insp.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                      <div key={insp.id} style={{ padding: '14px 16px', borderBottom: 'rgba(0,0,0,0.04)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${INSP_STATUS[insp.status]?.color}`}>
@@ -929,7 +929,7 @@ export default function MaintenanceMainPage() {
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 11, color: '#9ca3af' }}>{insp.due_date}</span>
+                            <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)' }}>{insp.due_date}</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getDDayColor(daysLeft)}`} style={{ backgroundColor: daysLeft < 0 ? '#fee2e2' : '#fef3c7', color: daysLeft < 0 ? '#991b1b' : '#92400e' }}>
                               {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
                             </span>
@@ -937,10 +937,10 @@ export default function MaintenanceMainPage() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 900, color: '#111827', fontSize: 15, marginBottom: 2 }}>{getCar(insp.car_id)?.number || '-'}</div>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>{getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}</div>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>{insp.center_name}</div>
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>{insp.center_address}</div>
+                            <div style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 15, marginBottom: 2 }}>{getCar(insp.car_id)?.number || '-'}</div>
+                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}</div>
+                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{insp.center_name}</div>
+                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{insp.center_address}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
                             <button onClick={() => openEditInspectionModal(insp)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
@@ -967,13 +967,13 @@ export default function MaintenanceMainPage() {
       {showMaintenanceModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+            <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800">
                 {editingMaintenance ? '정비 기록 수정' : '새 정비 기록 생성'}
               </h2>
               <button
                 onClick={() => setShowMaintenanceModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className="text-slate-500 hover:text-slate-400 text-2xl"
               >
                 ×
               </button>
@@ -982,11 +982,11 @@ export default function MaintenanceMainPage() {
             <div className="p-4 md:p-6 space-y-4">
               {/* Car */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">차량 선택</label>
+                <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
                 <select
                   value={maintenanceFormData.car_id}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 >
                   <option value="">차량 선택</option>
                   {cars.map(c => (
@@ -999,11 +999,11 @@ export default function MaintenanceMainPage() {
 
               {/* Maintenance Type */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">정비 유형</label>
+                <label className="block font-bold text-slate-600 mb-2">정비 유형</label>
                 <select
                   value={maintenanceFormData.maintenance_type}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, maintenance_type: e.target.value as any })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 >
                   {Object.entries(MAINT_TYPE).map(([key, val]) => (
                     <option key={key} value={key}>
@@ -1016,68 +1016,68 @@ export default function MaintenanceMainPage() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">요청일</label>
+                  <label className="block font-bold text-slate-600 mb-2">요청일</label>
                   <input
                     type="date"
                     value={maintenanceFormData.requested_date}
                     onChange={e => setMaintenanceFormData({ ...maintenanceFormData, requested_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">예정일</label>
+                  <label className="block font-bold text-slate-600 mb-2">예정일</label>
                   <input
                     type="date"
                     value={maintenanceFormData.scheduled_date}
                     onChange={e => setMaintenanceFormData({ ...maintenanceFormData, scheduled_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
               </div>
 
               {/* Shop Info */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">정비소 정보</label>
+                <label className="block font-bold text-slate-600 mb-2">정비소 정보</label>
                 <input
                   type="text"
                   placeholder="정비소 이름"
                   value={maintenanceFormData.shop_name}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
                 />
                 <input
                   type="tel"
                   placeholder="전화번호"
                   value={maintenanceFormData.shop_phone}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_phone: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
                 />
                 <input
                   type="text"
                   placeholder="주소"
                   value={maintenanceFormData.shop_address}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_address: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 />
               </div>
 
               {/* Mileage */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">주행거리 (km)</label>
+                <label className="block font-bold text-slate-600 mb-2">주행거리 (km)</label>
                 <input
                   type="number"
                   value={maintenanceFormData.mileage}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, mileage: parseInt(e.target.value) || 0 })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 />
               </div>
 
               {/* Maintenance Items */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">정비 항목</label>
+                <label className="block font-bold text-slate-600 mb-2">정비 항목</label>
                 <div className="space-y-3">
                   {maintenanceFormData.maintenance_items.map((item, idx) => (
-                    <div key={idx} className="border border-gray-300 rounded-lg p-3 space-y-2">
+                    <div key={idx} className="border border-black/10 rounded-lg p-3 space-y-2 bg-gray-50">
                       <input
                         type="text"
                         placeholder="항목명"
@@ -1087,7 +1087,7 @@ export default function MaintenanceMainPage() {
                           newItems[idx].item = e.target.value
                           setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                         }}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm"
+                        className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm bg-gray-50 text-slate-800"
                       />
                       <div className="grid grid-cols-5 gap-2">
                         <input
@@ -1099,7 +1099,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].quantity = parseInt(e.target.value) || 1
                             setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                           }}
-                          className="border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs"
+                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
                         />
                         <input
                           type="number"
@@ -1110,7 +1110,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].unit_price = parseInt(e.target.value) || 0
                             setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                           }}
-                          className="border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs"
+                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
                         />
                         <input
                           type="number"
@@ -1121,7 +1121,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].parts_cost = parseInt(e.target.value) || 0
                             setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                           }}
-                          className="border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs"
+                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
                         />
                         <input
                           type="number"
@@ -1132,7 +1132,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].labor_cost = parseInt(e.target.value) || 0
                             setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                           }}
-                          className="border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs"
+                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
                         />
                         <button
                           onClick={() => {
@@ -1161,28 +1161,28 @@ export default function MaintenanceMainPage() {
               {/* Costs */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">예상 비용</label>
+                  <label className="block font-bold text-slate-600 mb-2">예상 비용</label>
                   <input
                     type="number"
                     value={maintenanceFormData.estimated_cost}
                     onChange={e => setMaintenanceFormData({ ...maintenanceFormData, estimated_cost: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">실제 비용</label>
+                  <label className="block font-bold text-slate-600 mb-2">실제 비용</label>
                   <input
                     type="number"
                     value={maintenanceFormData.actual_cost || ''}
                     onChange={e => setMaintenanceFormData({ ...maintenanceFormData, actual_cost: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
               </div>
 
               {/* Cost Responsibility */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">비용 부담</label>
+                <label className="block font-bold text-slate-600 mb-2">비용 부담</label>
                 <div className="space-y-2">
                   {(['company', 'customer', 'insurance', 'warranty', 'shared'] as const).map(option => (
                     <label key={option} className="flex items-center gap-2 cursor-pointer">
@@ -1194,7 +1194,7 @@ export default function MaintenanceMainPage() {
                         onChange={() => setMaintenanceFormData({ ...maintenanceFormData, cost_responsibility: option })}
                         className="w-4 h-4 cursor-pointer"
                       />
-                      <span className="text-gray-700">
+                      <span className="text-slate-600">
                         {option === 'company' ? '회사' : option === 'customer' ? '고객' : option === 'insurance' ? '보험' : option === 'warranty' ? '보증' : '공동'}
                       </span>
                     </label>
@@ -1205,23 +1205,23 @@ export default function MaintenanceMainPage() {
               {/* Customer Share Amount */}
               {maintenanceFormData.cost_responsibility === 'shared' && (
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">고객 부담금</label>
+                  <label className="block font-bold text-slate-600 mb-2">고객 부담금</label>
                   <input
                     type="number"
                     value={maintenanceFormData.customer_share_amount || ''}
                     onChange={e => setMaintenanceFormData({ ...maintenanceFormData, customer_share_amount: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
               )}
 
               {/* Replacement Car */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">대차 차량 (선택)</label>
+                <label className="block font-bold text-slate-600 mb-2">대차 차량 (선택)</label>
                 <select
                   value={maintenanceFormData.replacement_car_id}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 >
                   <option value="">대차 차량 없음</option>
                   {cars.map(c => (
@@ -1236,21 +1236,21 @@ export default function MaintenanceMainPage() {
               {maintenanceFormData.replacement_car_id && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-bold text-gray-700 mb-2">대차 시작일</label>
+                    <label className="block font-bold text-slate-600 mb-2">대차 시작일</label>
                     <input
                       type="date"
                       value={maintenanceFormData.replacement_start_date}
                       onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_start_date: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-gray-700 mb-2">대차 종료일</label>
+                    <label className="block font-bold text-slate-600 mb-2">대차 종료일</label>
                     <input
                       type="date"
                       value={maintenanceFormData.replacement_end_date}
                       onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_end_date: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                     />
                   </div>
                 </div>
@@ -1258,28 +1258,28 @@ export default function MaintenanceMainPage() {
 
               {/* Notes */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">메모</label>
+                <label className="block font-bold text-slate-600 mb-2">메모</label>
                 <textarea
                   value={maintenanceFormData.notes}
                   onChange={e => setMaintenanceFormData({ ...maintenanceFormData, notes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
                   rows={3}
                 />
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 md:p-6 flex gap-3 justify-end">
+            <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
               <button
                 onClick={() => setShowMaintenanceModal(false)}
-                className="px-6 py-2.5 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
               >
                 취소
               </button>
               <button
                 onClick={handleSaveMaintenance}
                 disabled={savingMaintenance}
-                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-gray-400"
+                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
               >
                 {savingMaintenance ? '저장중...' : '저장'}
               </button>
@@ -1292,13 +1292,13 @@ export default function MaintenanceMainPage() {
       {showInspectionModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+            <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800">
                 {editingInspection ? '검사 기록 수정' : '새 검사 기록 생성'}
               </h2>
               <button
                 onClick={() => setShowInspectionModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className="text-slate-500 hover:text-slate-400 text-2xl"
               >
                 ×
               </button>
@@ -1307,11 +1307,11 @@ export default function MaintenanceMainPage() {
             <div className="p-4 md:p-6 space-y-4">
               {/* Car */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">차량 선택</label>
+                <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
                 <select
                   value={inspectionFormData.car_id}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 >
                   <option value="">차량 선택</option>
                   {cars.map(c => (
@@ -1324,11 +1324,11 @@ export default function MaintenanceMainPage() {
 
               {/* Inspection Type */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">검사 유형</label>
+                <label className="block font-bold text-slate-600 mb-2">검사 유형</label>
                 <select
                   value={inspectionFormData.inspection_type}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_type: e.target.value as any })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 >
                   {Object.entries(INSP_TYPE).map(([key, val]) => (
                     <option key={key} value={key}>
@@ -1341,78 +1341,78 @@ export default function MaintenanceMainPage() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">만기일</label>
+                  <label className="block font-bold text-slate-600 mb-2">만기일</label>
                   <input
                     type="date"
                     value={inspectionFormData.due_date}
                     onChange={e => setInspectionFormData({ ...inspectionFormData, due_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">예정일</label>
+                  <label className="block font-bold text-slate-600 mb-2">예정일</label>
                   <input
                     type="date"
                     value={inspectionFormData.scheduled_date}
                     onChange={e => setInspectionFormData({ ...inspectionFormData, scheduled_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
               </div>
 
               {/* Center Info */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">검사소</label>
+                <label className="block font-bold text-slate-600 mb-2">검사소</label>
                 <input
                   type="text"
                   placeholder="검사소명"
                   value={inspectionFormData.center_name}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, center_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
                 />
                 <input
                   type="text"
                   placeholder="주소"
                   value={inspectionFormData.center_address}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, center_address: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 />
               </div>
 
               {/* Costs */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">검사비</label>
+                  <label className="block font-bold text-slate-600 mb-2">검사비</label>
                   <input
                     type="number"
                     value={inspectionFormData.inspection_cost}
                     onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_cost: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">대행비</label>
+                  <label className="block font-bold text-slate-600 mb-2">대행비</label>
                   <input
                     type="number"
                     value={inspectionFormData.agency_fee || ''}
                     onChange={e => setInspectionFormData({ ...inspectionFormData, agency_fee: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">과태료</label>
+                  <label className="block font-bold text-slate-600 mb-2">과태료</label>
                   <input
                     type="number"
                     value={inspectionFormData.fine || ''}
                     onChange={e => setInspectionFormData({ ...inspectionFormData, fine: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
               </div>
 
               {/* Result */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">검사 결과</label>
+                <label className="block font-bold text-slate-600 mb-2">검사 결과</label>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1423,7 +1423,7 @@ export default function MaintenanceMainPage() {
                       onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'passed' })}
                       className="w-4 h-4 cursor-pointer"
                     />
-                    <span className="text-gray-700">합격</span>
+                    <span className="text-slate-600">합격</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1434,7 +1434,7 @@ export default function MaintenanceMainPage() {
                       onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'failed' })}
                       className="w-4 h-4 cursor-pointer"
                     />
-                    <span className="text-gray-700">불합격</span>
+                    <span className="text-slate-600">불합격</span>
                   </label>
                 </div>
               </div>
@@ -1442,10 +1442,10 @@ export default function MaintenanceMainPage() {
               {/* Fail Items */}
               {inspectionFormData.result === 'failed' && (
                 <div>
-                  <label className="block font-bold text-gray-700 mb-2">불합격 항목</label>
+                  <label className="block font-bold text-slate-600 mb-2">불합격 항목</label>
                   <div className="space-y-3">
                     {inspectionFormData.fail_items.map((item, idx) => (
-                      <div key={idx} className="border border-gray-300 rounded-lg p-3 space-y-2">
+                      <div key={idx} className="border border-black/10 rounded-lg p-3 space-y-2 bg-gray-50">
                         <input
                           type="text"
                           placeholder="항목"
@@ -1455,7 +1455,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].item = e.target.value
                             setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
                           }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm"
+                          className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm bg-gray-50 text-slate-800"
                         />
                         <textarea
                           placeholder="설명"
@@ -1465,7 +1465,7 @@ export default function MaintenanceMainPage() {
                             newItems[idx].description = e.target.value
                             setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
                           }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm resize-none"
+                          className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm resize-none bg-gray-50 text-slate-800"
                           rows={2}
                         />
                         <button
@@ -1494,39 +1494,39 @@ export default function MaintenanceMainPage() {
 
               {/* Next Due Date */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">다음 만기일</label>
+                <label className="block font-bold text-slate-600 mb-2">다음 만기일</label>
                 <input
                   type="date"
                   value={inspectionFormData.next_due_date}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, next_due_date: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block font-bold text-gray-700 mb-2">메모</label>
+                <label className="block font-bold text-slate-600 mb-2">메모</label>
                 <textarea
                   value={inspectionFormData.notes}
                   onChange={e => setInspectionFormData({ ...inspectionFormData, notes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none"
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
                   rows={3}
                 />
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 md:p-6 flex gap-3 justify-end">
+            <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
               <button
                 onClick={() => setShowInspectionModal(false)}
-                className="px-6 py-2.5 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
               >
                 취소
               </button>
               <button
                 onClick={handleSaveInspection}
                 disabled={savingInspection}
-                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-gray-400"
+                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
               >
                 {savingInspection ? '저장중...' : '저장'}
               </button>

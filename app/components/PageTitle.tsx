@@ -119,29 +119,29 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
         gap: 10,
         padding: '12px 20px',
       }}>
-        {/* 글로우 블루 도트 */}
+        {/* 블루 도트 */}
         <div style={{
           width: 8,
           height: 8,
           borderRadius: '50%',
           background: '#3b82f6',
           flexShrink: 0,
-          boxShadow: '0 0 8px rgba(59,130,246,0.5), 0 0 0 3px rgba(59,130,246,0.15)',
+          boxShadow: '0 0 6px rgba(59,130,246,0.3)',
         }} />
         {/* 섹션 라벨 */}
         {sectionLabel && (
           <>
-            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{sectionLabel}</span>
+            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sectionLabel}</span>
             <span style={{ color: '#334155', fontSize: 11 }}>&rsaquo;</span>
           </>
         )}
         {/* 페이지 이름 */}
-        <span style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>{pageName}</span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{pageName}</span>
       </div>
       {/* 그라데이션 라인 */}
       <div style={{
         height: 1,
-        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, transparent)',
+        background: 'linear-gradient(90deg, rgba(59,130,246,0.4), rgba(139,92,246,0.2), transparent)',
       }} />
     </div>
   )

@@ -172,10 +172,10 @@ export default function CodeMasterMain() {
             <p className="text-[11px] text-slate-400 mt-0.5">Code Master Management — 코드 마스터 관리</p>
           </div>
           <div className="flex gap-3 text-[13px]">
-            <div className="bg-white/10 rounded-lg px-4 py-2 text-white">
+            <div className="bg-gray-100 rounded-lg px-4 py-2 text-white">
               <span className="text-slate-400">그룹</span> <b>{groups.length}</b>
             </div>
-            <div className="bg-white/10 rounded-lg px-4 py-2 text-white">
+            <div className="bg-gray-100 rounded-lg px-4 py-2 text-white">
               <span className="text-slate-400">전체 코드</span> <b>{groups.reduce((s, g) => s + g.count, 0)}</b>
             </div>
           </div>

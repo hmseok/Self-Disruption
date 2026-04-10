@@ -164,7 +164,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1e2a45]">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
       </div>
     )
@@ -173,8 +173,8 @@ export default function AdminDashboard() {
   // ===== 역할 배지 렌더러 =====
   const roleBadge = (r: string) => {
     if (r === 'admin') return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white uppercase tracking-wider">GOD ADMIN</span>
-    if (r === 'master') return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/10 text-blue-400">관리자</span>
-    return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/5 text-slate-400">직원</span>
+    if (r === 'master') return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-gray-100 text-blue-400">관리자</span>
+    return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-gray-50 text-slate-400">직원</span>
   }
 
   // ===== 활성 토글 버튼 =====
@@ -207,8 +207,8 @@ export default function AdminDashboard() {
 
   // ===== 회사 카드 렌더러 =====
   const renderCompanyCard = (comp: CompanyWithUsers) => (
-    <div key={comp.id} className={`bg-[#1e2a45]/80 rounded-2xl border shadow-sm overflow-hidden ${
-      !comp.is_active ? 'border-yellow-400/50 ring-1 ring-yellow-400/20' : 'border-white/[0.06]'
+    <div key={comp.id} className={`bg-white/80 rounded-2xl border shadow-sm overflow-hidden ${
+      !comp.is_active ? 'border-yellow-400/50 ring-1 ring-yellow-400/20' : 'border-black/[0.06]'
     }`}>
       {/* 회사 헤더 */}
       <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-slate-100 text-sm md:text-base">{comp.name}</span>
+              <span className="font-bold text-slate-800 text-sm md:text-base">{comp.name}</span>
               {!comp.is_active && (
                 <span className="text-[10px] font-black px-2 py-0.5 rounded bg-yellow-400/20 text-yellow-400 animate-pulse">
                   승인 대기
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
                 comp.plan === 'max' ? 'bg-amber-400/20 text-amber-400' :
                 comp.plan === 'pro' ? 'bg-blue-400/20 text-blue-400' :
                 comp.plan === 'basic' ? 'bg-emerald-400/20 text-emerald-400' :
-                'bg-white/5 text-slate-400'
+                'bg-gray-50 text-slate-400'
               }`}>
                 {comp.plan === 'max' ? 'MAX' : comp.plan.toUpperCase()}
               </span>
@@ -255,7 +255,7 @@ export default function AdminDashboard() {
               {role === 'admin' && (
                 <label className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${
                   comp.business_registration_url
-                    ? 'bg-white/5 text-slate-400 hover:bg-white/10'
+                    ? 'bg-gray-50 text-slate-400 hover:bg-gray-100'
                     : 'bg-emerald-400/20 text-emerald-400 hover:bg-emerald-400/30'
                 } ${uploadingCompanyId === comp.id ? 'opacity-50 pointer-events-none' : ''}`}>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -300,12 +300,12 @@ export default function AdminDashboard() {
 
       {/* 소속 유저 목록 */}
       {comp.users.length > 0 && (
-        <div className="border-t border-white/[0.06]">
+        <div className="border-t border-black/[0.06]">
           {/* Desktop Table */}
           <div style={{ overflowX: 'auto' }}>
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white/5">
+                <tr className="bg-gray-50">
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이름</th>
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">이메일</th>
                   <th className="px-5 py-2 text-[10px] font-bold text-slate-400 uppercase">역할</th>
@@ -315,8 +315,8 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {comp.users.map(u => (
-                  <tr key={u.id} className="border-t border-white/5 hover:bg-white/5">
-                    <td className="px-5 py-3 text-sm font-bold text-slate-200">{u.employee_name || '(미설정)'}</td>
+                  <tr key={u.id} className="border-t border-black/5 hover:bg-gray-50">
+                    <td className="px-5 py-3 text-sm font-bold text-slate-700">{u.employee_name || '(미설정)'}</td>
                     <td className="px-5 py-3 text-sm text-slate-400">{u.email}</td>
                     <td className="px-5 py-3">{roleBadge(u.role)}</td>
                     <td className="px-5 py-3 text-xs text-slate-400">{formatDate(u.created_at)}</td>
@@ -377,7 +377,7 @@ export default function AdminDashboard() {
                   <tbody>
                     {unassignedUsers.map(u => (
                       <tr key={u.id} className="border-t border-red-400/20 hover:bg-red-400/10">
-                        <td className="px-5 py-3 text-sm font-bold text-slate-200">{u.employee_name || '(미설정)'}</td>
+                        <td className="px-5 py-3 text-sm font-bold text-slate-700">{u.employee_name || '(미설정)'}</td>
                         <td className="px-5 py-3 text-sm text-slate-400">{u.email}</td>
                         <td className="px-5 py-3">{roleBadge(u.role)}</td>
                         <td className="px-5 py-3 text-xs text-slate-400">{formatDate(u.created_at)}</td>
@@ -395,7 +395,7 @@ export default function AdminDashboard() {
 
         {/* 필터 탭 */}
         <div className="flex items-center gap-2 mb-4 md:mb-6 overflow-x-auto">
-          <h2 className="text-base md:text-lg font-black text-slate-200 mr-2 flex-shrink-0">가입 회사</h2>
+          <h2 className="text-base md:text-lg font-black text-slate-700 mr-2 flex-shrink-0">가입 회사</h2>
           {[
             { key: 'all', label: '전체', count: clientCompanies.length },
             { key: 'pending', label: '승인 대기', count: pendingCount },
@@ -407,7 +407,7 @@ export default function AdminDashboard() {
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeFilter === tab.key
                   ? tab.key === 'pending' ? 'bg-yellow-500 text-white' : 'bg-blue-600 text-white'
-                  : 'bg-white/10 text-slate-400 border border-white/[0.06] hover:bg-white/20'
+                  : 'bg-gray-100 text-slate-400 border border-black/[0.06] hover:bg-white/20'
               }`}
             >
               {tab.label} ({tab.count})
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
           {filteredCompanies.map(comp => renderCompanyCard(comp))}
 
           {filteredCompanies.length === 0 && (
-            <div className="bg-[#1e2a45]/80 rounded-2xl p-12 border border-white/[0.06] text-center">
+            <div className="bg-white/80 rounded-2xl p-12 border border-black/[0.06] text-center">
               <p className="text-slate-400 font-bold">해당 조건의 회사가 없습니다</p>
             </div>
           )}

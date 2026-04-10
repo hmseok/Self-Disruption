@@ -746,7 +746,7 @@ export default function ShortTermReplacementBuilder() {
               style={{
                 padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                background: subTab === t.key ? '#2d5fa8' : '#f3f4f6',
+                background: subTab === t.key ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)',
                 color: subTab === t.key ? '#fff' : '#6b7280',
               }}>
               {subTab === t.key && '● '}{t.icon} {t.label}
@@ -762,32 +762,32 @@ export default function ShortTermReplacementBuilder() {
         <div className="space-y-4">
 
           {/* ─── 빠른 견적 계산기 ─── */}
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
             {/* 할인율 */}
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>롯데 기준 할인율</span>
                 <input type="range" min={10} max={100} step={5} value={globalDiscount}
                   onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                  style={{ flex: 1, accentColor: '#2d5fa8' }} />
+                  style={{ flex: 1, accentColor: 'rgba(59,130,246,0.9)' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <input type="number" min={1} max={100} value={globalDiscount}
                     onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                    style={{ width: 52, textAlign: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: '#2d5fa8' }} />
+                    style={{ width: 52, textAlign: 'center', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: 'rgba(59,130,246,0.9)' }} />
                   <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 700 }}>%</span>
                 </div>
               </div>
             </div>
             {/* 카테고리 + 차종 드롭다운 */}
-            <div ref={qcSearchRef} style={{ padding: '10px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div ref={qcSearchRef} style={{ padding: '10px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <select value={qcCategory} onChange={e => { setQcCategory(e.target.value); setQcVehicle(''); setQcSearch('') }}
-                style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+                style={{ padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                 <option value="">카테고리</option>
                 {qcCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               {qcCategory ? (
                 <select value={qcVehicle} onChange={e => setQcVehicle(e.target.value)}
-                  style={{ flex: 1, minWidth: 200, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+                  style={{ flex: 1, minWidth: 200, padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                   <option value="">차종 선택</option>
                   {qcVehicles.map((v, i) => <option key={i} value={v.vehicle_names}>{v.vehicle_names} ({v.service_group})</option>)}
                 </select>
@@ -796,9 +796,9 @@ export default function ShortTermReplacementBuilder() {
                   <input type="text" value={qcSearch} placeholder="차종명으로 검색 (예: 쏘나타, G80, 카니발)"
                     onChange={e => { setQcSearch(e.target.value); setQcSearchOpen(true) }}
                     onFocus={() => { if (qcSearch.trim()) setQcSearchOpen(true) }}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, outline: 'none' }} />
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, outline: 'none' }} />
                   {qcSearchOpen && qcSearch.trim() && (
-                    <div style={{ position: 'absolute', zIndex: 50, left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 256, overflowY: 'auto' }}>
+                    <div style={{ position: 'absolute', zIndex: 50, left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 256, overflowY: 'auto' }}>
                       {qcSearchResults.length === 0 ? (
                         <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: '#9ca3af' }}>검색 결과가 없습니다</div>
                       ) : qcSearchResults.map((r, i) => (
@@ -806,7 +806,7 @@ export default function ShortTermReplacementBuilder() {
                           onClick={() => { setQcCategory(r.lotte_category); setQcVehicle(r.vehicle_names); setQcSearch(''); setQcSearchOpen(false) }}
                           style={{ width: '100%', textAlign: 'left', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderBottom: '1px solid #f9fafb', background: 'transparent', cursor: 'pointer', fontSize: 13 }}>
                           <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{r.lotte_category}</span>
-                          <span style={{ background: '#f3f4f6', color: '#6b7280', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{r.service_group}</span>
+                          <span style={{ background: 'rgba(0,0,0,0.04)', color: '#6b7280', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{r.service_group}</span>
                           <span style={{ color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.vehicle_names}</span>
                           <span style={{ marginLeft: 'auto', fontSize: 12, color: '#9ca3af' }}>{f(calcRate(r.rate_1_3days, globalDiscount))}원/일</span>
                         </button>
@@ -822,24 +822,24 @@ export default function ShortTermReplacementBuilder() {
             </div>
             {/* 선택 완료 표시 */}
             {qcSelectedRate && (
-              <div style={{ padding: '10px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8, background: '#eff6ff' }}>
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8, background: '#eff6ff' }}>
                 <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.lotte_category}</span>
-                <span style={{ background: '#e0e7ff', color: '#2d5fa8', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.service_group}</span>
+                <span style={{ background: '#e0e7ff', color: 'rgba(59,130,246,0.9)', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.service_group}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', flex: 1 }}>{qcSelectedRate.vehicle_names}</span>
-                <span style={{ fontSize: 13, color: '#2d5fa8', fontWeight: 800 }}>{f(calcRate(qcSelectedRate.rate_1_3days, globalDiscount))}원/일</span>
+                <span style={{ fontSize: 13, color: 'rgba(59,130,246,0.9)', fontWeight: 800 }}>{f(calcRate(qcSelectedRate.rate_1_3days, globalDiscount))}원/일</span>
               </div>
             )}
             {/* Stepper + 결과 카드 (2열, 모바일 1열) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }} className="qc-calc-grid">
-              <style>{`@media (max-width: 768px) { .qc-calc-grid { grid-template-columns: 1fr !important; } .qc-calc-left { border-right: none !important; border-bottom: 1px solid #f3f4f6 !important; } }`}</style>
+              <style>{`@media (max-width: 768px) { .qc-calc-grid { grid-template-columns: 1fr !important; } .qc-calc-left { border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.04) !important; } }`}</style>
               {/* 왼쪽: Stepper 설정 */}
-              <div style={{ padding: '12px 20px', borderRight: '1px solid #f3f4f6' }} className="qc-calc-left">
+              <div style={{ padding: '12px 20px', borderRight: '1px solid rgba(0,0,0,0.04)' }} className="qc-calc-left">
                 {/* 기간 모드 전환 */}
                 <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
                   <button onClick={() => { if (qcDateMode !== 'days') { setQcDateMode('days'); setQcDays(0); setQcHours(0); setQcDeliveryFee(0); setQcFaultEnabled(false); setQcFaultPercent(100); setQcServiceSupport(0) } }}
-                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'days' ? '#2d5fa8' : '#f3f4f6', color: qcDateMode === 'days' ? '#fff' : '#9ca3af' }}>일/시간 입력</button>
+                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'days' ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'days' ? '#fff' : '#9ca3af' }}>일/시간 입력</button>
                   <button onClick={() => { if (qcDateMode !== 'range') { setQcDateMode('range'); const today = new Date(); setQcStartDate(today.toISOString().split('T')[0]); setQcStartTime('09:00'); setQcEndDate(today.toISOString().split('T')[0]); setQcEndTime('09:00'); setQcDeliveryFee(0); setQcFaultEnabled(false); setQcFaultPercent(100); setQcServiceSupport(0) } }}
-                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'range' ? '#2d5fa8' : '#f3f4f6', color: qcDateMode === 'range' ? '#fff' : '#9ca3af' }}>날짜/시간 선택</button>
+                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'range' ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'range' ? '#fff' : '#9ca3af' }}>날짜/시간 선택</button>
                 </div>
                 {qcDateMode === 'days' ? (
                   <div>
@@ -901,15 +901,15 @@ export default function ShortTermReplacementBuilder() {
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', display: 'block', marginBottom: 4 }}>대여 시작</label>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="date" value={qcStartDate} onChange={e => setQcStartDate(e.target.value)} style={{ flex: 3, minWidth: 0, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
-                        <input type="time" value={qcStartTime} onChange={e => setQcStartTime(e.target.value)} style={{ flex: 2, minWidth: 0, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
+                        <input type="date" value={qcStartDate} onChange={e => setQcStartDate(e.target.value)} style={{ flex: 3, minWidth: 0, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
+                        <input type="time" value={qcStartTime} onChange={e => setQcStartTime(e.target.value)} style={{ flex: 2, minWidth: 0, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
                       </div>
                     </div>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', display: 'block', marginBottom: 4 }}>반납 예정</label>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input type="date" value={qcEndDate} onChange={e => setQcEndDate(e.target.value)} style={{ flex: 3, minWidth: 0, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
-                        <input type="time" value={qcEndTime} onChange={e => setQcEndTime(e.target.value)} style={{ flex: 2, minWidth: 0, padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
+                        <input type="date" value={qcEndDate} onChange={e => setQcEndDate(e.target.value)} style={{ flex: 3, minWidth: 0, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
+                        <input type="time" value={qcEndTime} onChange={e => setQcEndTime(e.target.value)} style={{ flex: 2, minWidth: 0, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, fontWeight: 600, outline: 'none' }} />
                       </div>
                     </div>
                     {qcTotalHours > 0 && (
@@ -966,7 +966,7 @@ export default function ShortTermReplacementBuilder() {
                     <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
                       {f(qcResult.totalWithVat)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
                     </div>
-                    {(() => { const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24); return d > 0 ? <div style={{ fontSize: 13, color: '#60a5fa', marginTop: 2 }}>하루 {f(Math.round(qcResult.totalWithVat / d))}원</div> : null })()}
+                    {(() => { const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24); return d > 0 ? <div style={{ fontSize: 13, color: '#2563eb', marginTop: 2 }}>하루 {f(Math.round(qcResult.totalWithVat / d))}원</div> : null })()}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11, color: '#94a3b8' }}>렌트 {f(qcResult.totalDisc)}</span>
                       {qcResult.faultActive && <span style={{ fontSize: 11, color: '#fb923c' }}>과실 {qcResult.faultPercent}%</span>}
@@ -1021,7 +1021,7 @@ export default function ShortTermReplacementBuilder() {
                       disabled={qcSaving}
                       style={{
                         flex: 1, padding: '10px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
-                        background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff',
+                        background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff',
                         fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
                         opacity: qcSaving ? 0.5 : 1, transition: 'opacity 0.15s',
                       }}
@@ -1036,28 +1036,28 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 할인율 + 정비군 매핑 ─── */}
 
           {/* 정비군별 요율 매핑 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
-                <h3 className="font-black text-gray-800 text-sm">정비군별 요율 매핑</h3>
-                <span className="text-xs text-gray-400 font-medium">롯데 기준가 × {globalDiscount}% = 턴키 단가</span>
+                <h3 className="font-black text-slate-700 text-sm">정비군별 요율 매핑</h3>
+                <span className="text-xs text-slate-500 font-medium">롯데 기준가 × {globalDiscount}% = 턴키 단가</span>
               </div>
               <div className="flex gap-1.5">
                 {rateEditMode ? (
                   <>
-                    <button onClick={() => { setRateEditMode(false); loadRates() }} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">취소</button>
+                    <button onClick={() => { setRateEditMode(false); loadRates() }} className="py-1 px-3 text-sm rounded-lg border border-black/[0.06] font-bold text-slate-500 hover:bg-gray-50 transition-colors">취소</button>
                     <button onClick={saveRates} disabled={saving} className="py-1 px-3 text-sm rounded-lg bg-steel-600 text-white font-bold hover:bg-steel-700 disabled:opacity-50 transition-colors">{saving ? '저장 중...' : '저장'}</button>
                   </>
                 ) : (
-                  <button onClick={() => setRateEditMode(true)} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">편집</button>
+                  <button onClick={() => setRateEditMode(true)} className="py-1 px-3 text-sm rounded-lg border border-black/[0.06] font-bold text-slate-500 hover:bg-gray-50 transition-colors">편집</button>
                 )}
               </div>
             </div>
             {/* 데스크톱: 테이블 */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="text-gray-400 whitespace-nowrap">
+                <thead><tr className="text-slate-500 whitespace-nowrap">
                   <th className="py-2 px-3 pl-4 text-left text-sm font-bold">정비군</th>
                   <th className="py-2 px-3 text-left text-sm font-bold">차종 분류</th>
                   <th className="py-2 px-3 text-left text-sm font-bold">배기량</th>
@@ -1076,27 +1076,27 @@ export default function ShortTermReplacementBuilder() {
                           <td colSpan={7} className="px-4 py-1.5 text-sm font-bold text-amber-600">RV · SUV · 승합</td>
                         </tr>
                       )}
-                      <tr className="border-t border-gray-100 hover:bg-steel-50/30 whitespace-nowrap">
+                      <tr className="border-t border-white/5 hover:bg-steel-50/30 whitespace-nowrap">
                         <td className="py-2 px-3 pl-4"><span className="bg-steel-100 text-steel-700 text-sm font-bold px-2 py-0.5 rounded">{r.service_group}</span></td>
                         <td className="py-2 px-3">
                           {rateEditMode ? (
-                            <input className="border border-gray-200 px-2 py-1 rounded text-sm w-full" value={r.vehicle_class}
+                            <input className="border border-black/[0.06] px-2 py-1 rounded text-sm w-full" value={r.vehicle_class}
                               onChange={e => { const n = [...rates]; n[i] = { ...n[i], vehicle_class: e.target.value }; setRates(n) }} />
                           ) : (
-                            <span className="text-sm font-bold text-gray-800">{r.vehicle_class}</span>
+                            <span className="text-sm font-bold text-slate-700">{r.vehicle_class}</span>
                           )}
                         </td>
                         <td className="py-1.5 px-3">
                           {rateEditMode ? (
-                            <input className="border border-gray-200 px-2 py-1 rounded text-sm w-28" value={r.displacement_range}
+                            <input className="border border-black/[0.06] px-2 py-1 rounded text-sm w-28" value={r.displacement_range}
                               onChange={e => { const n = [...rates]; n[i] = { ...n[i], displacement_range: e.target.value }; setRates(n) }} />
                           ) : (
-                            <span className="text-sm text-gray-500 font-bold">{r.displacement_range}</span>
+                            <span className="text-sm text-slate-500 font-bold">{r.displacement_range}</span>
                           )}
                         </td>
                         <td className="py-2 pr-3 text-right">
                           {rateEditMode ? (
-                            <input className="w-24 border border-gray-200 px-2 py-1 rounded text-sm font-bold text-right" value={f(r.lotte_base_rate)}
+                            <input className="w-24 border border-black/[0.06] px-2 py-1 rounded text-sm font-bold text-right" value={f(r.lotte_base_rate)}
                               onChange={e => {
                                 const base = Number(e.target.value.replace(/,/g, ''))
                                 const n = [...rates]; n[i] = { ...n[i], lotte_base_rate: base, daily_rate: r.calc_method === 'auto' ? calcRate(base, r.discount_percent) : r.daily_rate }; setRates(n)
@@ -1107,7 +1107,7 @@ export default function ShortTermReplacementBuilder() {
                         </td>
                         <td className="py-2 px-3 text-center">
                           {rateEditMode ? (
-                            <input type="number" className="w-14 border border-gray-200 px-1.5 py-1 rounded text-sm font-bold text-center" value={r.discount_percent}
+                            <input type="number" className="w-14 border border-black/[0.06] px-1.5 py-1 rounded text-sm font-bold text-center" value={r.discount_percent}
                               onChange={e => { const pct = Number(e.target.value); const n = [...rates]; n[i] = { ...n[i], discount_percent: pct, daily_rate: r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, pct) : r.daily_rate }; setRates(n) }} />
                           ) : (
                             <span className="text-sm font-bold text-steel-600">{r.discount_percent}%</span>
@@ -1115,7 +1115,7 @@ export default function ShortTermReplacementBuilder() {
                         </td>
                         <td className="py-2 px-3 text-center">
                           {rateEditMode ? (
-                            <select className="border border-gray-200 px-1.5 py-1 rounded text-sm font-bold" value={r.calc_method}
+                            <select className="border border-black/[0.06] px-1.5 py-1 rounded text-sm font-bold" value={r.calc_method}
                               onChange={e => { const n = [...rates]; n[i] = { ...n[i], calc_method: e.target.value }; setRates(n) }}>
                               <option value="auto">자동</option><option value="manual">수동</option>
                             </select>
@@ -1127,7 +1127,7 @@ export default function ShortTermReplacementBuilder() {
                         </td>
                         <td className="py-2 pr-4 text-right">
                           {rateEditMode && r.calc_method === 'manual' ? (
-                            <input className="w-28 border border-gray-200 px-2 py-1 rounded text-sm font-bold text-right" value={f(r.daily_rate)}
+                            <input className="w-28 border border-black/[0.06] px-2 py-1 rounded text-sm font-bold text-right" value={f(r.daily_rate)}
                               onChange={e => { const n = [...rates]; n[i] = { ...n[i], daily_rate: Number(e.target.value.replace(/,/g, '')) }; setRates(n) }} />
                           ) : (
                             <span className="text-base font-black text-steel-700">{f(computed)}원</span>
@@ -1145,7 +1145,7 @@ export default function ShortTermReplacementBuilder() {
               {rates.map((r, i) => {
                 const computed = r.calc_method === 'auto' ? calcRate(r.lotte_base_rate, r.discount_percent) : r.daily_rate
                 return (
-                  <div key={r.id || `rate-m-${i}`} style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+                  <div key={r.id || `rate-m-${i}`} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <span className="bg-steel-100 text-steel-700 text-[11px] font-bold px-2 py-0.5 rounded">{r.service_group}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{r.vehicle_class}</span>
@@ -1157,7 +1157,7 @@ export default function ShortTermReplacementBuilder() {
                         <span>할인 <span style={{ fontWeight: 700 }}>{r.discount_percent}%</span></span>
                         <span className={r.calc_method === 'auto' ? 'text-green-600' : 'text-orange-600'}>{r.calc_method === 'auto' ? '자동' : '수동'}</span>
                       </div>
-                      <span style={{ fontSize: 14, fontWeight: 900, color: '#2d5fa8' }}>{f(computed)}원</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: 'rgba(59,130,246,0.9)' }}>{f(computed)}원</span>
                     </div>
                   </div>
                 )
@@ -1168,25 +1168,25 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 롯데 참고 자료 (하단, 접이식) ─── */}
 
           {/* 정비군 분류 기준표 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <button onClick={() => setLotteOpen(!lotteOpen)} className="w-full bg-gray-50/50 border-b border-gray-100 px-5 py-3 flex items-center justify-between hover:bg-gray-100/50 transition-colors">
-              <span className="font-bold text-gray-800 text-sm flex items-center gap-2">롯데렌터카 공식 요금표 <span className="text-xs text-gray-400 font-medium">{lotteUpdateDate} 기준 · 내륙</span></span>
-              <span className={`text-gray-400 text-xs transition-transform ${lotteOpen ? 'rotate-180' : ''}`}>▼</span>
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+            <button onClick={() => setLotteOpen(!lotteOpen)} className="w-full bg-gray-50/50 border-b border-white/5 px-5 py-3 flex items-center justify-between hover:bg-gray-100/50 transition-colors">
+              <span className="font-bold text-slate-700 text-sm flex items-center gap-2">롯데렌터카 공식 요금표 <span className="text-xs text-slate-500 font-medium">{lotteUpdateDate} 기준 · 내륙</span></span>
+              <span className={`text-slate-500 text-xs transition-transform ${lotteOpen ? 'rotate-180' : ''}`}>▼</span>
             </button>
           {lotteOpen && (<>
 
         {/* 롯데 기준 요금 */}
         <div>
-          <div className="bg-gray-50/30 border-b border-gray-100 px-5 py-2.5 flex items-center justify-between">
-            <span className="font-bold text-gray-800 text-sm flex items-center gap-2">
+          <div className="bg-gray-50/30 border-b border-white/5 px-5 py-2.5 flex items-center justify-between">
+            <span className="font-bold text-slate-700 text-sm flex items-center gap-2">
               롯데렌터카 공식 단기렌트 요금
-              <span className="text-xs text-gray-400 font-medium">{lotteUpdateDate} 기준 · 내륙</span>
+              <span className="text-xs text-slate-500 font-medium">{lotteUpdateDate} 기준 · 내륙</span>
               <span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span>
             </span>
             <div className="flex items-center gap-2">
               {lotteEditMode ? (
                 <>
-                  <button onClick={() => { setLotteEditMode(false); loadLotteRates() }} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">취소</button>
+                  <button onClick={() => { setLotteEditMode(false); loadLotteRates() }} className="py-1 px-3 text-sm rounded-lg border border-black/[0.06] font-bold text-slate-500 hover:bg-gray-50 transition-colors">취소</button>
                   <button onClick={saveLotteRates} disabled={saving} className="py-1 px-3 text-sm rounded-lg bg-steel-600 text-white font-bold hover:bg-steel-700 disabled:opacity-50 transition-colors">{saving ? '저장 중...' : '저장'}</button>
                 </>
               ) : (
@@ -1195,22 +1195,22 @@ export default function ShortTermReplacementBuilder() {
                     className="py-1 px-3 text-sm rounded-lg bg-steel-600 text-white font-bold hover:bg-steel-700 disabled:opacity-50 transition-colors">
                     {lotteUpdating ? '가져오는 중...' : '자동 업데이트'}
                   </button>
-                  <button onClick={() => setLotteEditMode(true)} className="py-1 px-3 text-sm rounded-lg border border-gray-200 font-bold text-gray-500 hover:bg-gray-50 transition-colors">수동 편집</button>
+                  <button onClick={() => setLotteEditMode(true)} className="py-1 px-3 text-sm rounded-lg border border-black/[0.06] font-bold text-slate-500 hover:bg-gray-50 transition-colors">수동 편집</button>
                 </div>
               )}
             </div>
           </div>
 
           {/* 카테고리 필터 */}
-          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-1.5 overflow-x-auto">
+          <div className="px-4 py-2.5 border-b border-white/5 flex items-center gap-1.5 overflow-x-auto">
             {lotteCategories.map(cat => {
               const cnt = cat === '전체' ? lotteRates.length : lotteRates.filter(r => r.lotte_category === cat).length
               return (
                 <button key={cat} onClick={() => setLotteCatFilter(cat)}
                   className={`py-1 px-3 text-sm rounded-lg border font-bold transition-colors whitespace-nowrap ${
-                    lotteCatFilter === cat ? 'bg-red-500 text-white border-red-500' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    lotteCatFilter === cat ? 'bg-red-500 text-white border-red-500' : 'border-black/[0.06] text-slate-500 hover:bg-gray-50'
                   }`}>
-                  {cat} <span className={`ml-0.5 ${lotteCatFilter === cat ? 'text-red-200' : 'text-gray-300'}`}>{cnt}</span>
+                  {cat} <span className={`ml-0.5 ${lotteCatFilter === cat ? 'text-red-200' : 'text-slate-400'}`}>{cnt}</span>
                 </button>
               )
             })}
@@ -1219,7 +1219,7 @@ export default function ShortTermReplacementBuilder() {
           {/* 테이블 (반응형 스크롤) */}
           <div className="hidden md:block" style={{ overflowX: 'auto' }}>
             <table className="w-full">
-              <thead><tr className="text-gray-400 whitespace-nowrap">
+              <thead><tr className="text-slate-500 whitespace-nowrap">
                 <th className="py-2 px-3 pl-4 text-left text-sm font-bold">카테고리</th>
                 <th className="py-2 px-3 text-left text-sm font-bold">차종</th>
                 <th className="py-2 pr-3 text-right text-sm font-bold text-orange-400">6시간</th>
@@ -1237,10 +1237,10 @@ export default function ShortTermReplacementBuilder() {
                 {filteredLotteRates.map((lr, i) => {
                   const realIdx = lotteRates.findIndex(r => r.id === lr.id || (r.lotte_category === lr.lotte_category && r.vehicle_names === lr.vehicle_names))
                   return (
-                    <tr key={lr.id || i} className="border-t border-gray-100 hover:bg-gray-50/50">
+                    <tr key={lr.id || i} className="border-t border-white/5 hover:bg-gray-50/50">
                       <td className="py-2 px-3 pl-4 whitespace-nowrap">
                         {lotteEditMode ? (
-                          <select className="border border-gray-200 px-2 py-1 rounded text-sm font-bold w-full" value={lr.lotte_category}
+                          <select className="border border-black/[0.06] px-2 py-1 rounded text-sm font-bold w-full" value={lr.lotte_category}
                             onChange={e => { const n = [...lotteRates]; n[realIdx] = { ...n[realIdx], lotte_category: e.target.value }; setLotteRates(n) }}>
                             {['경차','소형','중형','준대형','대형','승합','SUV·RV(소형)','SUV·RV(중형)','수입차','전기차'].map(c => <option key={c}>{c}</option>)}
                           </select>
@@ -1250,20 +1250,20 @@ export default function ShortTermReplacementBuilder() {
                       </td>
                       <td className="py-2 px-3 overflow-hidden text-ellipsis">
                         {lotteEditMode ? (
-                          <input className="border border-gray-200 px-2 py-1 rounded text-sm w-full" value={lr.vehicle_names}
+                          <input className="border border-black/[0.06] px-2 py-1 rounded text-sm w-full" value={lr.vehicle_names}
                             onChange={e => { const n = [...lotteRates]; n[realIdx] = { ...n[realIdx], vehicle_names: e.target.value }; setLotteRates(n) }} />
                         ) : (
-                          <span className="text-sm text-gray-600">{lr.vehicle_names}</span>
+                          <span className="text-sm text-slate-400">{lr.vehicle_names}</span>
                         )}
                       </td>
                       {(['rate_6hrs', 'rate_10hrs', 'rate_12hrs', 'rate_1_3days', 'rate_4days', 'rate_5_6days', 'rate_7plus_days'] as const).map((field, fi) => (
                         <td key={field} className="py-2 pr-3 text-right whitespace-nowrap">
                           {lotteEditMode ? (
-                            <input className="w-20 border border-gray-200 px-2 py-1 rounded text-sm font-bold text-right"
+                            <input className="w-20 border border-black/[0.06] px-2 py-1 rounded text-sm font-bold text-right"
                               value={f((lr as any)[field])}
                               onChange={e => { const n = [...lotteRates]; (n[realIdx] as any)[field] = Number(e.target.value.replace(/,/g, '')); setLotteRates(n) }} />
                           ) : (
-                            <span className={`text-sm font-bold ${fi <= 2 ? 'text-orange-500' : fi === 3 ? 'text-red-600' : 'text-gray-600'}`}>{f((lr as any)[field])}</span>
+                            <span className={`text-sm font-bold ${fi <= 2 ? 'text-orange-500' : fi === 3 ? 'text-red-600' : 'text-slate-400'}`}>{f((lr as any)[field])}</span>
                           )}
                         </td>
                       ))}
@@ -1272,7 +1272,7 @@ export default function ShortTermReplacementBuilder() {
                       </td>
                       <td className="py-2 px-3 pr-4 text-center whitespace-nowrap">
                         {lotteEditMode ? (
-                          <select className="border border-gray-200 px-2 py-1 rounded text-sm font-bold" value={lr.service_group}
+                          <select className="border border-black/[0.06] px-2 py-1 rounded text-sm font-bold" value={lr.service_group}
                             onChange={e => { const n = [...lotteRates]; n[realIdx] = { ...n[realIdx], service_group: e.target.value }; setLotteRates(n) }}>
                             {ALL_GROUPS.map(g => <option key={g}>{g}</option>)}
                           </select>
@@ -1283,7 +1283,7 @@ export default function ShortTermReplacementBuilder() {
                       {lotteEditMode && (
                         <td className="py-1.5 px-2 pr-4 text-center">
                           <button onClick={() => { const n = [...lotteRates]; n.splice(realIdx, 1); setLotteRates(n) }}
-                            className="text-gray-300 hover:text-red-500 text-sm">&times;</button>
+                            className="text-slate-400 hover:text-red-500 text-sm">&times;</button>
                         </td>
                       )}
                     </tr>
@@ -1295,7 +1295,7 @@ export default function ShortTermReplacementBuilder() {
           {/* 모바일: 카드형 */}
           <div className="md:hidden">
             {filteredLotteRates.map((lr, i) => (
-              <div key={lr.id || i} style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6' }}>
+              <div key={lr.id || i} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <span className="bg-red-50 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded">{lr.lotte_category}</span>
                   <span className="bg-steel-100 text-steel-700 text-[10px] font-bold px-1.5 py-0.5 rounded">{lr.service_group}</span>
@@ -1306,13 +1306,13 @@ export default function ShortTermReplacementBuilder() {
                     <span>1~3일 <span style={{ color: '#dc2626', fontWeight: 700 }}>{f(lr.rate_1_3days)}</span></span>
                     <span>7일+ <span style={{ fontWeight: 700, color: '#374151' }}>{f(lr.rate_7plus_days)}</span></span>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2d5fa8' }}>{f(calcRate(lr.rate_1_3days, globalDiscount))}원<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>/일</span></span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(59,130,246,0.9)' }}>{f(calcRate(lr.rate_1_3days, globalDiscount))}원<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>/일</span></span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
+          <div className="px-4 py-2 bg-gray-50/50 border-t border-white/5 text-xs text-slate-500 flex items-center justify-between">
             <span>출처: <a href="https://www.lotterentacar.net/hp/kor/reservation/shortInfo/pay.do" target="_blank" rel="noopener" className="text-steel-600 hover:underline">롯데렌터카 공식</a> · 내륙 · 비회원가</span>
             <div className="flex items-center gap-2">
               {lotteEditMode && (
@@ -1383,12 +1383,12 @@ export default function ShortTermReplacementBuilder() {
         <div className="space-y-4">
 
           {/* ① 시장 표준 요율 설정 + 계약 조건 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+            <div className="px-6 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
-                <h3 className="font-black text-gray-800 text-sm whitespace-nowrap">시장 표준 요율 설정</h3>
-                <span className="text-[11px] text-gray-400 hidden sm:inline">전문가 수집 데이터 기반</span>
+                <h3 className="font-black text-slate-700 text-sm whitespace-nowrap">시장 표준 요율 설정</h3>
+                <span className="text-[11px] text-slate-500 hidden sm:inline">전문가 수집 데이터 기반</span>
               </div>
             </div>
             <div className="p-4 space-y-4">
@@ -1396,58 +1396,58 @@ export default function ShortTermReplacementBuilder() {
               {/* 시장 데이터 입력 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">사고 발생률</label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">사고 발생률</label>
                   <input type="number" step={0.1} min={0} value={simAccidentRate}
                     onChange={e => setSimAccidentRate(Number(e.target.value))}
-                    className="w-full border border-gray-200 px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">건/100대·년</span>
+                    className="w-full border border-black/[0.06] px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">건/100대·년</span>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">사고 수리일수</label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">사고 수리일수</label>
                   <input type="number" step={0.5} min={1} value={simAvgRepairDays}
                     onChange={e => setSimAvgRepairDays(Number(e.target.value))}
-                    className="w-full border border-gray-200 px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">평균일</span>
+                    className="w-full border border-black/[0.06] px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">평균일</span>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">고장 발생률</label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">고장 발생률</label>
                   <input type="number" step={0.1} min={0} value={simBreakdownRate}
                     onChange={e => setSimBreakdownRate(Number(e.target.value))}
-                    className="w-full border border-gray-200 px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">건/100대·년</span>
+                    className="w-full border border-black/[0.06] px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">건/100대·년</span>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">고장 수리일수</label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">고장 수리일수</label>
                   <input type="number" step={0.5} min={1} value={simAvgBreakdownDays}
                     onChange={e => setSimAvgBreakdownDays(Number(e.target.value))}
-                    className="w-full border border-gray-200 px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">평균일</span>
+                    className="w-full border border-black/[0.06] px-2 py-1.5 rounded-lg font-bold text-xs text-center focus:border-steel-500 outline-none" />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">평균일</span>
                 </div>
               </div>
 
               {/* 기본 데이터 출처 */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-400 px-1">
-                <span className="font-bold text-gray-500">기준 데이터</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 px-1">
+                <span className="font-bold text-slate-500">기준 데이터</span>
                 <span>사고발생률·수리일수: 보험개발원 자동차보험 통계 (2024)</span>
-                <span className="text-gray-300">|</span>
+                <span className="text-slate-400">|</span>
                 <span>고장발생률·수리일수: 한국교통안전공단 자동차검사 통계 (2024)</span>
-                <span className="text-gray-300">|</span>
+                <span className="text-slate-400">|</span>
                 <span>확인일: 2025.01.15</span>
               </div>
 
               {/* 적용 공식 + 산출 결과 */}
               <div className="bg-gray-50 rounded-xl px-4 py-2.5 space-y-1">
-                <div className="text-[11px] text-gray-400">공식: 일단가 × ((사고발생율÷100 × 사고수리일수) + (고장발생율÷100 × 고장수리일수)) × 대차일수</div>
-                <div className="text-[11px] text-gray-500">리스크 계수: <span className="font-bold text-steel-600">{accidentRisk.toFixed(4)}</span><span className="text-gray-300"> (사고)</span> + <span className="font-bold text-steel-600">{breakdownRisk.toFixed(4)}</span><span className="text-gray-300"> (고장)</span> = <span className="font-black text-steel-700">{totalRisk.toFixed(4)}</span></div>
+                <div className="text-[11px] text-slate-500">공식: 일단가 × ((사고발생율÷100 × 사고수리일수) + (고장발생율÷100 × 고장수리일수)) × 대차일수</div>
+                <div className="text-[11px] text-slate-500">리스크 계수: <span className="font-bold text-steel-600">{accidentRisk.toFixed(4)}</span><span className="text-slate-400"> (사고)</span> + <span className="font-bold text-steel-600">{breakdownRisk.toFixed(4)}</span><span className="text-slate-400"> (고장)</span> = <span className="font-black text-steel-700">{totalRisk.toFixed(4)}</span></div>
               </div>
 
               {/* 구분선 */}
-              <div className="border-t border-gray-200" />
+              <div className="border-t border-black/[0.06]" />
 
               {/* 대차일수 + 할인율 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">대차일수 <span className="text-gray-400 font-normal">(복수선택)</span></label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5">대차일수 <span className="text-slate-500 font-normal">(복수선택)</span></label>
                   <div className="flex gap-1">
                     {DAY_PRESETS.map(d => {
                       const isSelected = customDays.includes(d)
@@ -1460,33 +1460,33 @@ export default function ShortTermReplacementBuilder() {
                           }
                         }}
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                            isSelected ? 'bg-steel-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            isSelected ? 'bg-steel-600 text-white shadow-sm' : 'bg-gray-100 text-slate-500 hover:bg-gray-100'
                           }`}>{d}일</button>
                       )
                     })}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1.5">롯데 기준 할인율</label>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5">롯데 기준 할인율</label>
                   <div className="flex items-center gap-2">
                     <input type="range" min={10} max={100} step={5} value={globalDiscount}
                       onChange={e => applyGlobalDiscount(Number(e.target.value))}
                       className="flex-1 h-1.5 accent-steel-600 rounded-full" />
                     <span className="text-sm font-black text-steel-600 w-12 text-right">{globalDiscount}%</span>
                   </div>
-                  <span className="text-[10px] text-gray-400 mt-0.5 block">시장 30~50%</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">시장 30~50%</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* ② 요율표 자동 산출 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+            <div className="px-6 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
-                <h3 className="font-black text-gray-800 text-sm whitespace-nowrap">견적 요율표</h3>
-                <span className="text-[10px] font-medium text-gray-400">(1대당 · 롯데 {globalDiscount}%)</span>
+                <h3 className="font-black text-slate-700 text-sm whitespace-nowrap">견적 요율표</h3>
+                <span className="text-[10px] font-medium text-slate-500">(1대당 · 롯데 {globalDiscount}%)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={exportExcel}
@@ -1535,15 +1535,15 @@ export default function ShortTermReplacementBuilder() {
                             <td colSpan={colCount} className="px-3 py-1.5 text-sm font-bold text-amber-700">RV · SUV · 승합</td>
                           </tr>
                         )}
-                        <tr className={`border-t border-gray-100 hover:bg-steel-50/40 ${isEven ? 'bg-white' : 'bg-gray-50/30'}`}>
-                          <td className="py-2 px-1 text-center border-r border-gray-100">
+                        <tr className={`border-t border-white/5 hover:bg-steel-50/40 ${isEven ? 'bg-white' : 'bg-gray-50/30'}`}>
+                          <td className="py-2 px-1 text-center border-r border-white/5">
                             <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">{r.service_group}</span>
                           </td>
-                          <td className="py-2 px-2 font-bold text-gray-800 truncate border-r border-gray-100" title={r.vehicle_class}>{r.vehicle_class}</td>
-                          <td className="py-2 px-2 text-center text-gray-500 font-bold truncate border-r border-gray-100">{r.displacement_range}</td>
-                          <td className="py-2 px-2 text-right font-bold text-steel-700 whitespace-nowrap tabular-nums border-r border-gray-100">{f(r.dailyRate)}</td>
+                          <td className="py-2 px-2 font-bold text-slate-700 truncate border-r border-white/5" title={r.vehicle_class}>{r.vehicle_class}</td>
+                          <td className="py-2 px-2 text-center text-slate-500 font-bold truncate border-r border-white/5">{r.displacement_range}</td>
+                          <td className="py-2 px-2 text-right font-bold text-steel-700 whitespace-nowrap tabular-nums border-r border-white/5">{f(r.dailyRate)}</td>
                           {selectedDaysList.map((d, idx) => (
-                            <td key={d} className={`py-2 px-2 text-right font-black text-steel-600 whitespace-nowrap tabular-nums ${idx < selectedDaysList.length - 1 ? 'border-r border-gray-100' : ''}`}>{f(r.byDays[d].monthly)}</td>
+                            <td key={d} className={`py-2 px-2 text-right font-black text-steel-600 whitespace-nowrap tabular-nums ${idx < selectedDaysList.length - 1 ? 'border-r border-white/5' : ''}`}>{f(r.byDays[d].monthly)}</td>
                           ))}
                         </tr>
                       </React.Fragment>
@@ -1553,42 +1553,42 @@ export default function ShortTermReplacementBuilder() {
                 <tfoot></tfoot>
               </table>
             </div>
-            <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-100 text-[10px] text-gray-400 flex justify-between">
+            <div className="px-4 py-2 bg-gray-50/50 border-t border-white/5 text-[10px] text-slate-500 flex justify-between">
               <span>※ 롯데렌터카 대비 {globalDiscount}% · 부가세 별도 · 1대당 월 기준</span>
               <span>{new Date().toLocaleDateString('ko-KR')} 기준</span>
             </div>
           </div>
 
           {/* ③ 고객 정보 + 견적 저장 */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+            <div className="px-6 py-4 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
-                <h3 className="font-black text-gray-800 text-sm">고객 정보 및 저장</h3>
+                <h3 className="font-black text-slate-700 text-sm">고객 정보 및 저장</h3>
               </div>
             </div>
             <div className="p-6 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">업체명</label>
-                  <input className="w-full border border-gray-200 px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">업체명</label>
+                  <input className="w-full border border-black/[0.06] px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
                     placeholder="업체명" value={customerCompany}
                     onChange={e => setCustomerCompany(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">담당자</label>
-                  <input className="w-full border border-gray-200 px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">담당자</label>
+                  <input className="w-full border border-black/[0.06] px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
                     placeholder="담당자명" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 mb-1">연락처</label>
-                  <input className="w-full border border-gray-200 px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">연락처</label>
+                  <input className="w-full border border-black/[0.06] px-2.5 py-1.5 rounded-lg font-bold text-xs focus:border-steel-500 outline-none"
                     placeholder="010-0000-0000" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-gray-500 mb-1">메모</label>
-                <input className="w-full border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs focus:border-steel-500 outline-none"
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">메모</label>
+                <input className="w-full border border-black/[0.06] px-2.5 py-1.5 rounded-lg text-xs focus:border-steel-500 outline-none"
                   placeholder="특약사항, 서비스 조건 등" value={contractMemo} onChange={e => setContractMemo(e.target.value)} />
               </div>
               {/* 버튼 */}

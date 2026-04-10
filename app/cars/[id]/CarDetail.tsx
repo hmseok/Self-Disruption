@@ -363,7 +363,7 @@ export default function CarDetailPage() {
         {/* 좌측: 요약 정보 카드 */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6 lg:self-start">
            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-10 -mt-10 blur-2xl"></div>
               <div className="flex justify-between items-start mb-8">
                 <div>
                    <p className="text-gray-400 text-xs font-bold mb-1">Vehicle No.</p>
@@ -373,11 +373,11 @@ export default function CarDetailPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                 <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                 <div className="bg-gray-100 p-4 rounded-2xl backdrop-blur-sm">
                     <p className="text-gray-400 text-xs font-bold">모델명</p>
                     <p className="text-lg font-bold truncate">{car.brand} {car.model}</p>
                  </div>
-                 <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                 <div className="bg-gray-100 p-4 rounded-2xl backdrop-blur-sm">
                     <p className="text-gray-400 text-xs font-bold">주행거리</p>
                     <p className="text-lg font-bold">{car.mileage?.toLocaleString()} km</p>
                  </div>

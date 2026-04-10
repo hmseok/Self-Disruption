@@ -185,7 +185,7 @@ export default function RegistrationTab() {
   }, {} as Record<string, RegistrationCost[]>)
 
   if (loading) {
-    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
+    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-slate-400">로딩 중...</p></div>
   }
 
   const sim = calculateTotal()
@@ -193,58 +193,58 @@ export default function RegistrationTab() {
   return (
     <div className="space-y-4">
       {/* 영업용 전용 안내 배너 */}
-      <div className="bg-gradient-to-r from-steel-600 to-steel-800 rounded-2xl p-4 text-white">
+      <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/20 rounded-2xl p-4 text-white border border-blue-700/30">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">🚗</span>
-          <h3 className="text-sm font-bold">렌터카 영업용 등록비 관리</h3>
+          <h3 className="text-sm font-bold text-slate-800">렌터카 영업용 등록비 관리</h3>
           <span className="ml-auto px-2 py-0.5 bg-white/20 rounded text-[10px] font-semibold">영업용 전용</span>
         </div>
-        <p className="text-xs text-white/80 leading-relaxed">
+        <p className="text-xs text-white/70 leading-relaxed">
           이 데이터는 렌트가 산출(RentPricingBuilder)에 직접 연동됩니다.
           취득세·공채매입·부대비용 수정 시 견적 산출에 즉시 반영됩니다.
         </p>
       </div>
 
       {/* 영업용 vs 비영업용 비교 가이드 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06]">
         <button
           onClick={() => setShowComparison(!showComparison)}
           className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition rounded-2xl"
         >
           <div className="flex items-center gap-2">
             <span className="text-sm">📊</span>
-            <span className="text-xs font-bold text-gray-800">영업용(렌터카) vs 비영업용(일반) 비교 가이드</span>
+            <span className="text-xs font-bold text-slate-800">영업용(렌터카) vs 비영업용(일반) 비교 가이드</span>
           </div>
-          <span className="text-gray-400 text-xs">{showComparison ? '접기 ▲' : '펼치기 ▼'}</span>
+          <span className="text-slate-400 text-xs">{showComparison ? '접기 ▲' : '펼치기 ▼'}</span>
         </button>
         {showComparison && (
           <div className="px-4 pb-4">
             <div className="overflow-x-auto">
               <table className="text-xs">
                 <thead>
-                  <tr className="border-b-2 border-steel-200 bg-steel-50">
-                    <th className="text-left py-2 px-3 font-bold text-steel-800">항목</th>
-                    <th className="text-center py-2 px-3 font-bold text-steel-700">영업용 (렌터카)</th>
-                    <th className="text-center py-2 px-3 font-bold text-gray-500">비영업용 (일반)</th>
-                    <th className="text-center py-2 px-3 font-bold text-green-700">차이</th>
-                    <th className="text-left py-2 px-3 font-bold text-gray-500">비고</th>
+                  <tr className="border-b-2 border-blue-700/30 bg-gray-100">
+                    <th className="text-left py-2 px-3 font-bold text-blue-300">항목</th>
+                    <th className="text-center py-2 px-3 font-bold text-blue-300">영업용 (렌터카)</th>
+                    <th className="text-center py-2 px-3 font-bold text-slate-400">비영업용 (일반)</th>
+                    <th className="text-center py-2 px-3 font-bold text-green-400">차이</th>
+                    <th className="text-left py-2 px-3 font-bold text-slate-400">비고</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-200">
                   {BUSINESS_VS_GENERAL.map((row, i) => (
                     <tr key={i} className="hover:bg-gray-50">
-                      <td className="py-2 px-3 font-semibold text-gray-800">{row.item}</td>
-                      <td className="py-2 px-3 text-center text-steel-700 font-bold">{row.biz}</td>
-                      <td className="py-2 px-3 text-center text-gray-400 line-through">{row.general}</td>
-                      <td className="py-2 px-3 text-center text-green-600 font-bold">{row.diff}</td>
-                      <td className="py-2 px-3 text-gray-500">{row.note}</td>
+                      <td className="py-2 px-3 font-semibold text-slate-700">{row.item}</td>
+                      <td className="py-2 px-3 text-center text-blue-400 font-bold">{row.biz}</td>
+                      <td className="py-2 px-3 text-center text-slate-500 line-through">{row.general}</td>
+                      <td className="py-2 px-3 text-center text-green-400 font-bold">{row.diff}</td>
+                      <td className="py-2 px-3 text-slate-400">{row.note}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs text-amber-800">
+            <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
+              <p className="text-xs text-amber-300">
                 <strong>핵심 요약:</strong> 렌터카(자동차대여업)는 영업용으로 등록하므로 취득세 4% (일반 7%), 공채 대폭 감면, 자동차세 1/4~1/10 수준입니다.
                 서울·부산·대구 외 지역은 공채매입 자체가 면제되어 등록비가 크게 절감됩니다.
               </p>
@@ -255,22 +255,22 @@ export default function RegistrationTab() {
 
       {/* 항목별 상세 기준 (영업용) */}
       {showGuide && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm">⚖️</span>
-              <h3 className="text-xs font-bold text-gray-700">등록비 항목별 기준 (영업용)</h3>
+              <h3 className="text-xs font-bold text-slate-700">등록비 항목별 기준 (영업용)</h3>
             </div>
-            <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+            <button onClick={() => setShowGuide(false)} className="text-xs text-slate-400 hover:text-slate-600">닫기</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {REGISTRATION_GUIDE.map((item) => (
-              <div key={item.type} className={`rounded-lg p-3 border ${COST_TYPE_COLORS[item.type] || 'bg-gray-50 border-gray-200'}`}>
-                <p className="text-xs font-bold text-gray-800 mb-0.5">{item.type}</p>
-                <p className="text-[10px] text-gray-500 mb-1.5">{item.legalBasis}</p>
-                <p className="text-xs text-gray-600 mb-1">{item.desc}</p>
-                <p className="text-xs font-semibold text-gray-700">{item.rate}</p>
-                <p className="text-[10px] text-gray-400 mt-1">{item.example}</p>
+              <div key={item.type} className={`rounded-lg p-3 border ${COST_TYPE_COLORS[item.type] ? COST_TYPE_COLORS[item.type].replace('bg-', 'bg-').replace('border-', 'border-').replace('50', '900/20').replace('200', '700/30') : 'bg-gray-100 border-black/10'}`}>
+                <p className="text-xs font-bold text-slate-800 mb-0.5">{item.type}</p>
+                <p className="text-[10px] text-slate-400 mb-1.5">{item.legalBasis}</p>
+                <p className="text-xs text-slate-600 mb-1">{item.desc}</p>
+                <p className="text-xs font-semibold text-slate-700">{item.rate}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{item.example}</p>
               </div>
             ))}
           </div>
@@ -278,11 +278,11 @@ export default function RegistrationTab() {
       )}
 
       {/* 편집 가능한 기준표 */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-black/[0.06]">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06]">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">영업용 등록비용 기준표 (편집 가능)</h3>
-            <p className="text-xs text-gray-400 mt-0.5">이 데이터가 렌트가 산출에 직접 반영됩니다 — 수정 시 즉시 적용</p>
+            <h3 className="text-sm font-bold text-slate-800">영업용 등록비용 기준표 (편집 가능)</h3>
+            <p className="text-xs text-slate-400 mt-0.5">이 데이터가 렌트가 산출에 직접 반영됩니다 — 수정 시 즉시 적용</p>
           </div>
           <div className="flex gap-2">
             {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드</button>}
@@ -297,50 +297,50 @@ export default function RegistrationTab() {
         <div className="p-5 space-y-4">
           {Object.entries(groupedByCostType).map(([costType, typeRows]) => (
             typeRows.length > 0 && (
-              <div key={costType} className={`rounded-xl p-4 border ${COST_TYPE_COLORS[costType] || 'bg-gray-50 border-gray-200'}`}>
+              <div key={costType} className={`rounded-xl p-4 border ${COST_TYPE_COLORS[costType] ? COST_TYPE_COLORS[costType].replace('bg-', 'bg-').replace('border-', 'border-').replace('50', '900/20').replace('200', '700/30') : 'bg-gray-100 border-black/10'}`}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="text-xs font-bold text-gray-700">{costType}</div>
-                  <span className="text-[10px] text-gray-400">({typeRows.length}건)</span>
+                  <div className="text-xs font-bold text-slate-800">{costType}</div>
+                  <span className="text-[10px] text-slate-400">({typeRows.length}건)</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="text-xs">
                     <thead>
-                      <tr className="border-b border-gray-200/50">
-                        <th className="text-left py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">차종 카테고리</th>
-                        <th className="text-left py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">지역</th>
-                        <th className="text-center py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">요율(%)</th>
-                        <th className="text-center py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">고정액</th>
-                        <th className="text-left py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">설명</th>
-                        <th className="text-left py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">비고</th>
-                        <th className="text-center py-1.5 px-2 text-gray-600 font-medium whitespace-nowrap">삭제</th>
+                      <tr className="border-b border-black/10">
+                        <th className="text-left py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">차종 카테고리</th>
+                        <th className="text-left py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">지역</th>
+                        <th className="text-center py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">요율(%)</th>
+                        <th className="text-center py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">고정액</th>
+                        <th className="text-left py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">설명</th>
+                        <th className="text-left py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">비고</th>
+                        <th className="text-center py-1.5 px-2 text-slate-400 font-medium whitespace-nowrap">삭제</th>
                       </tr>
                     </thead>
                     <tbody>
                       {typeRows.map((row) => (
-                        <tr key={row.id} className="border-b border-gray-200/30 hover:bg-white/50">
+                        <tr key={row.id} className="border-b border-black/5 hover:bg-gray-50">
                           <td className="py-1.5 px-2 whitespace-nowrap">
                             <select value={row.vehicle_category} onChange={(e) => handleUpdateField(row.id, 'vehicle_category', e.target.value)}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-steel-400 focus:outline-none">{VEHICLE_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select>
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded focus:border-white/40 focus:outline-none bg-gray-100 text-white">{VEHICLE_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select>
                           </td>
                           <td className="py-1.5 px-2 whitespace-nowrap">
                             <select value={row.region} onChange={(e) => handleUpdateField(row.id, 'region', e.target.value)}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-steel-400 focus:outline-none">{REGIONS.map(r => (<option key={r} value={r}>{r}</option>))}</select>
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded focus:border-white/40 focus:outline-none bg-gray-100 text-white">{REGIONS.map(r => (<option key={r} value={r}>{r}</option>))}</select>
                           </td>
                           <td className="py-1.5 px-2">
                             <input type="number" step="0.01" value={row.rate} onChange={(e) => handleUpdateField(row.id, 'rate', parseFloat(e.target.value))}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center font-semibold focus:border-steel-400 focus:outline-none" />
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded text-center font-semibold focus:border-white/40 focus:outline-none bg-gray-100 text-white" />
                           </td>
                           <td className="py-1.5 px-2">
                             <input type="number" value={row.fixed_amount} onChange={(e) => handleUpdateField(row.id, 'fixed_amount', parseInt(e.target.value))}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded text-center focus:border-steel-400 focus:outline-none" />
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded text-center focus:border-white/40 focus:outline-none bg-gray-100 text-white" />
                           </td>
                           <td className="py-1.5 px-2">
                             <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-steel-400 focus:outline-none" />
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded focus:border-white/40 focus:outline-none bg-gray-100 text-white" />
                           </td>
                           <td className="py-1.5 px-2">
                             <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
-                              className="w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:border-steel-400 focus:outline-none" />
+                              className="w-full px-1.5 py-1 text-xs border border-white/20 rounded focus:border-white/40 focus:outline-none bg-gray-100 text-white" />
                           </td>
                           <td className="py-1.5 px-2 text-center">
                             <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
@@ -356,10 +356,10 @@ export default function RegistrationTab() {
         </div>
 
         {/* 영업용 시뮬레이션 */}
-        <div className="p-5 border-t border-gray-100 bg-steel-50">
+        <div className="p-5 border-t border-black/[0.06] bg-gray-50">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">🧮</span>
-            <span className="text-xs font-bold text-steel-900">영업용 등록비 시뮬레이션</span>
+            <span className="text-xs font-bold text-slate-800">영업용 등록비 시뮬레이션</span>
           </div>
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <div className="flex items-center gap-1.5">

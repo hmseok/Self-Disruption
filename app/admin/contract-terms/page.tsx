@@ -77,7 +77,7 @@ const CATEGORIES: Record<string, string> = {
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   draft:    { label: '작성중', color: 'bg-yellow-100 text-yellow-800' },
   active:   { label: '적용중', color: 'bg-green-100 text-green-800' },
-  archived: { label: '보관',   color: 'bg-gray-100 text-gray-600' },
+  archived: { label: '보관',   color: 'bg-gray-100 text-slate-400' },
 }
 
 const CONTRACT_TYPES: Record<string, string> = {
@@ -706,8 +706,8 @@ export default function ContractTermsPage() {
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📜 계약 약관 관리</h1>
-          <p className="text-gray-500 text-sm mt-1">표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">📜 계약 약관 관리</h1>
+          <p className="text-slate-500 text-sm mt-1">표준약관을 버전별로 관리하고, 계약서 PDF에 자동 반영합니다.</p>
         </div>
       </div>
 
@@ -720,7 +720,7 @@ export default function ContractTermsPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
               selectedCategory === key
                 ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-100 text-slate-600 hover:bg-gray-100'
             }`}
           >
             <span>{emoji}</span>
@@ -730,7 +730,7 @@ export default function ContractTermsPage() {
       </div>
 
       {/* 탭 (언더라인 스타일) */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #e5e7eb', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid rgba(0,0,0,0.06)', marginBottom: 24 }}>
         {(selectedCategory === 'short_term_rental' ? [
           ['versions', '약관 버전'],
           ['articles', '조항 편집'],
@@ -753,8 +753,8 @@ export default function ContractTermsPage() {
             style={{
               padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
               fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
-              color: tab === key ? '#1e3a5f' : '#9ca3af',
-              borderBottom: tab === key ? '2px solid #1e3a5f' : '2px solid transparent',
+              color: tab === key ? '#60a5fa' : '#64748b',
+              borderBottom: tab === key ? '2px solid #60a5fa' : '2px solid transparent',
               marginBottom: -2,
             }}
           >
@@ -778,10 +778,10 @@ export default function ContractTermsPage() {
 
           {showNewForm && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-3">
-              <h3 className="font-bold text-gray-800">새 약관 버전 생성</h3>
+              <h3 className="font-bold text-slate-700">새 약관 버전 생성</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-600">버전명 *</label>
+                  <label className="text-xs font-medium text-slate-400">버전명 *</label>
                   <input
                     type="text"
                     placeholder="예: v2.0, 2026-03 개정"
@@ -791,7 +791,7 @@ export default function ContractTermsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600">시행일</label>
+                  <label className="text-xs font-medium text-slate-400">시행일</label>
                   <input
                     type="date"
                     className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
@@ -801,7 +801,7 @@ export default function ContractTermsPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">약관 제목</label>
+                <label className="text-xs font-medium text-slate-400">약관 제목</label>
                 <input
                   type="text"
                   className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
@@ -810,7 +810,7 @@ export default function ContractTermsPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">개정 사유</label>
+                <label className="text-xs font-medium text-slate-400">개정 사유</label>
                 <input
                   type="text"
                   placeholder="예: 전기차 배터리 조항 추가"
@@ -820,7 +820,7 @@ export default function ContractTermsPage() {
                 />
               </div>
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setShowNewForm(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">취소</button>
+                <button onClick={() => setShowNewForm(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-600">취소</button>
                 <button onClick={handleCreateVersion} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">생성</button>
               </div>
             </div>
@@ -835,11 +835,11 @@ export default function ContractTermsPage() {
 
           {/* 버전 목록 */}
           {loading ? (
-            <div className="text-center py-12 text-gray-400">로딩 중...</div>
+            <div className="text-center py-12 text-slate-500">로딩 중...</div>
           ) : termsSets.length === 0 && !fetchError ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500 mb-2">등록된 약관이 없습니다.</p>
-              <p className="text-sm text-gray-400">
+              <p className="text-slate-500 mb-2">등록된 약관이 없습니다.</p>
+              <p className="text-sm text-slate-500">
                 {!companyId
                   ? '회사를 먼저 선택해주세요.'
                   : '약관 버전을 새로 생성하거나, SQL 마이그레이션(030, 031)을 실행해주세요.'}
@@ -851,7 +851,7 @@ export default function ContractTermsPage() {
                 <div
                   key={ts.id}
                   className={`bg-white border rounded-xl p-4 transition hover:shadow-md cursor-pointer ${
-                    selectedTerms?.id === ts.id ? 'ring-2 ring-blue-500 border-blue-300' : 'border-gray-200'
+                    selectedTerms?.id === ts.id ? 'ring-2 ring-blue-500 border-blue-300' : 'border-black/[0.06]'
                   }`}
                   onClick={() => { setSelectedTerms(ts); setTab('articles') }}
                 >
@@ -860,8 +860,8 @@ export default function ContractTermsPage() {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[ts.status]?.color}`}>
                         {STATUS_LABELS[ts.status]?.label}
                       </span>
-                      <h3 className="font-bold text-gray-900">{ts.title}</h3>
-                      <span className="text-sm text-gray-500 font-mono">{ts.version}</span>
+                      <h3 className="font-bold text-white">{ts.title}</h3>
+                      <span className="text-sm text-slate-500 font-mono">{ts.version}</span>
                     </div>
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                       {ts.status === 'draft' && (
@@ -870,7 +870,7 @@ export default function ContractTermsPage() {
                         </button>
                       )}
                       {ts.status === 'active' && (
-                        <button onClick={() => handleArchive(ts)} className="text-xs bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 font-medium">
+                        <button onClick={() => handleArchive(ts)} className="text-xs bg-gray-50 text-slate-400 px-3 py-1.5 rounded-lg hover:bg-gray-100 font-medium">
                           보관
                         </button>
                       )}
@@ -879,7 +879,7 @@ export default function ContractTermsPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                  <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
                     {ts.description && <span>{ts.description}</span>}
                     {ts.effective_from && <span>시행: {ts.effective_from}</span>}
                     <span>생성: {new Date(ts.created_at).toLocaleDateString('ko-KR')}</span>
@@ -896,50 +896,50 @@ export default function ContractTermsPage() {
         <div>
           {!selectedTerms ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+              <p className="text-slate-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {/* 선택된 약관 정보 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+              <div className="bg-white border border-black/[0.06] rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
                     {STATUS_LABELS[selectedTerms.status]?.label}
                   </span>
-                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-slate-500 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
                 </div>
-                <span className="text-sm text-gray-400">{articles.length}개 조항</span>
+                <span className="text-sm text-slate-500">{articles.length}개 조항</span>
               </div>
 
               {/* 검색 + 카테고리 필터 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row gap-2">
+              <div className="bg-white border border-black/[0.06] rounded-xl p-3 flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   <input
                     type="text"
                     value={articleSearch}
                     onChange={e => setArticleSearch(e.target.value)}
                     placeholder="조항 제목 또는 내용 검색..."
-                    className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-steel-500 focus:bg-white transition-colors"
+                    className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-black/[0.06] rounded-lg text-sm outline-none focus:border-steel-500 focus:bg-gray-100 transition-colors"
                   />
                   {articleSearch && (
                     <button
                       onClick={() => setArticleSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400 text-sm"
                     >✕</button>
                   )}
                 </div>
                 <select
                   value={articleCategoryFilter}
                   onChange={e => setArticleCategoryFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-steel-500 cursor-pointer"
+                  className="px-3 py-2 bg-gray-50 border border-black/[0.06] rounded-lg text-sm font-bold outline-none focus:border-steel-500 cursor-pointer"
                 >
                   <option value="all">전체 카테고리</option>
                   {Object.entries(CATEGORIES).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
                   ))}
                 </select>
-                <span className="text-xs text-gray-400 self-center whitespace-nowrap">
+                <span className="text-xs text-slate-500 self-center whitespace-nowrap">
                   {(() => {
                     const q = articleSearch.toLowerCase()
                     const filtered = articles.filter(a => {
@@ -965,7 +965,7 @@ export default function ContractTermsPage() {
                     <div className={`bg-white border rounded-xl p-4 transition ${
                       editingArticle?.id === article.id
                         ? 'border-blue-400 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-black/[0.06] hover:border-black/10'
                     }`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -973,16 +973,16 @@ export default function ContractTermsPage() {
                             <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                               제{article.article_number}조
                             </span>
-                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                            <span className="text-xs text-slate-500 bg-gray-100 px-2 py-0.5 rounded">
                               {CATEGORIES[article.category] || article.category}
                             </span>
                             {!article.is_required && (
                               <span className="text-xs text-orange-500 bg-orange-50 px-2 py-0.5 rounded">선택</span>
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800">{article.title}</h4>
+                          <h4 className="font-bold text-slate-700">{article.title}</h4>
                           {editingArticle?.id !== article.id && (
-                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{article.content}</p>
+                            <p className="text-sm text-slate-400 mt-1 whitespace-pre-wrap">{article.content}</p>
                           )}
                         </div>
                         {selectedTerms.status !== 'archived' && (
@@ -990,7 +990,7 @@ export default function ContractTermsPage() {
                             {editingArticle?.id === article.id ? (
                               <button
                                 onClick={() => { setEditingArticle(null); setArticleForm({ title: '', content: '', category: 'general', is_required: true }) }}
-                                className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                                className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded"
                               >
                                 접기
                               </button>
@@ -1019,7 +1019,7 @@ export default function ContractTermsPage() {
                         <div ref={articleFormRef} className="mt-3 pt-3 border-t border-blue-200 space-y-3">
                           <div className="grid grid-cols-3 gap-3">
                             <div className="col-span-2">
-                              <label className="text-xs font-medium text-gray-600">조항 제목 *</label>
+                              <label className="text-xs font-medium text-slate-400">조항 제목 *</label>
                               <input
                                 type="text"
                                 className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
@@ -1028,7 +1028,7 @@ export default function ContractTermsPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-600">분류</label>
+                              <label className="text-xs font-medium text-slate-400">분류</label>
                               <select
                                 className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                                 value={articleForm.category}
@@ -1041,7 +1041,7 @@ export default function ContractTermsPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600">조항 내용 *</label>
+                            <label className="text-xs font-medium text-slate-400">조항 내용 *</label>
                             <textarea
                               rows={8}
                               className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
@@ -1062,7 +1062,7 @@ export default function ContractTermsPage() {
                             <div className="flex-1" />
                             <button
                               onClick={() => { setEditingArticle(null); setArticleForm({ title: '', content: '', category: 'general', is_required: true }) }}
-                              className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                              className="text-sm text-slate-500 hover:text-slate-600 px-4 py-2"
                             >
                               취소
                             </button>
@@ -1082,11 +1082,11 @@ export default function ContractTermsPage() {
 
               {/* 새 조항 추가 폼 (하단) */}
               {selectedTerms.status !== 'archived' && !editingArticle && (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
-                  <h3 className="font-bold text-gray-800">새 조항 추가</h3>
+                <div className="bg-gray-50 border border-black/[0.06] rounded-xl p-5 space-y-3">
+                  <h3 className="font-bold text-slate-700">새 조항 추가</h3>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
-                      <label className="text-xs font-medium text-gray-600">조항 제목 *</label>
+                      <label className="text-xs font-medium text-slate-400">조항 제목 *</label>
                       <input
                         type="text"
                         placeholder="예: 계약의 내용"
@@ -1096,7 +1096,7 @@ export default function ContractTermsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600">분류</label>
+                      <label className="text-xs font-medium text-slate-400">분류</label>
                       <select
                         className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                         value={articleForm.category}
@@ -1109,7 +1109,7 @@ export default function ContractTermsPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">조항 내용 *</label>
+                    <label className="text-xs font-medium text-slate-400">조항 내용 *</label>
                     <textarea
                       rows={6}
                       placeholder="① 항목1&#10;② 항목2&#10;③ 항목3"
@@ -1117,7 +1117,7 @@ export default function ContractTermsPage() {
                       value={articleForm.content}
                       onChange={e => setArticleForm(f => ({ ...f, content: e.target.value }))}
                     />
-                    <p className="text-xs text-gray-400 mt-1">줄바꿈으로 항목을 구분합니다. ①②③ 등 원문자를 사용하면 가독성이 좋습니다.</p>
+                    <p className="text-xs text-slate-500 mt-1">줄바꿈으로 항목을 구분합니다. ①②③ 등 원문자를 사용하면 가독성이 좋습니다.</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 text-sm">
@@ -1150,12 +1150,12 @@ export default function ContractTermsPage() {
           {/* 특약 목록 */}
           {specialTerms.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">등록된 특약 템플릿이 없습니다.</p>
+              <p className="text-slate-500">등록된 특약 템플릿이 없습니다.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {specialTerms.map(item => (
-                <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                <div key={item.id} className="bg-white border border-black/[0.06] rounded-xl p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -1166,8 +1166,8 @@ export default function ContractTermsPage() {
                           <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">기본 적용</span>
                         )}
                       </div>
-                      <h4 className="font-bold text-gray-800">{item.label}</h4>
-                      <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.content}</p>
+                      <h4 className="font-bold text-slate-700">{item.label}</h4>
+                      <p className="text-sm text-slate-400 mt-1 whitespace-pre-wrap">{item.content}</p>
                     </div>
                     <div className="flex gap-1 ml-3 flex-shrink-0">
                       <button
@@ -1201,13 +1201,13 @@ export default function ContractTermsPage() {
           )}
 
           {/* 특약 추가/수정 폼 */}
-          <div ref={specialFormRef} className={`border rounded-xl p-5 space-y-3 ${editingSpecial ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-            <h3 className="font-bold text-gray-800">
+          <div ref={specialFormRef} className={`border rounded-xl p-5 space-y-3 ${editingSpecial ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' : 'bg-gray-50 border-black/[0.06]'}`}>
+            <h3 className="font-bold text-slate-700">
               {editingSpecial ? '✏️ 특약 수정' : '새 특약 템플릿 추가'}
             </h3>
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-600">템플릿명 *</label>
+                <label className="text-xs font-medium text-slate-400">템플릿명 *</label>
                 <input
                   type="text"
                   placeholder="예: 전기차 배터리 보증 특약"
@@ -1217,7 +1217,7 @@ export default function ContractTermsPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">계약 유형</label>
+                <label className="text-xs font-medium text-slate-400">계약 유형</label>
                 <select
                   className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                   value={specialForm.contract_type}
@@ -1230,7 +1230,7 @@ export default function ContractTermsPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">특약 내용 *</label>
+              <label className="text-xs font-medium text-slate-400">특약 내용 *</label>
               <textarea
                 rows={4}
                 className="w-full border rounded-lg px-3 py-2 text-sm mt-1 font-mono"
@@ -1252,7 +1252,7 @@ export default function ContractTermsPage() {
               {editingSpecial && (
                 <button
                   onClick={() => { setEditingSpecial(null); setSpecialForm({ label: '', content: '', contract_type: 'all', is_default: false }) }}
-                  className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                  className="text-sm text-slate-500 hover:text-slate-600 px-4 py-2"
                 >
                   취소
                 </button>
@@ -1273,19 +1273,19 @@ export default function ContractTermsPage() {
         <div>
           {!selectedTerms ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+              <p className="text-slate-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {/* 선택된 약관 정보 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+              <div className="bg-white border border-black/[0.06] rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
                     {STATUS_LABELS[selectedTerms.status]?.label}
                   </span>
-                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-slate-500 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
                 </div>
-                <span className="text-sm text-gray-400">{insuranceCoverage.length}개 항목</span>
+                <span className="text-sm text-slate-500">{insuranceCoverage.length}개 항목</span>
               </div>
 
               {/* 보장내역 목록 */}
@@ -1294,14 +1294,14 @@ export default function ContractTermsPage() {
                   <div key={index} className={`bg-white border rounded-xl p-4 transition ${
                     editingCoverageIndex === index
                       ? 'border-blue-400 ring-2 ring-blue-200'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-black/[0.06] hover:border-black/10'
                   }`}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         {editingCoverageIndex !== index && (
                           <>
-                            <h4 className="font-bold text-gray-800">{item.label}</h4>
-                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description}</p>
+                            <h4 className="font-bold text-slate-700">{item.label}</h4>
+                            <p className="text-sm text-slate-400 mt-1 whitespace-pre-wrap">{item.description}</p>
                           </>
                         )}
                       </div>
@@ -1310,7 +1310,7 @@ export default function ContractTermsPage() {
                           {editingCoverageIndex === index ? (
                             <button
                               onClick={() => { setEditingCoverageIndex(null); setCoverageForm({ label: '', description: '' }) }}
-                              className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                              className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded"
                             >
                               접기
                             </button>
@@ -1335,14 +1335,14 @@ export default function ContractTermsPage() {
                               <button
                                 onClick={() => moveCoverageUp(index)}
                                 disabled={index === 0}
-                                className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
                               >
                                 ↑
                               </button>
                               <button
                                 onClick={() => moveCoverageDown(index)}
                                 disabled={index === insuranceCoverage.length - 1}
-                                className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
                               >
                                 ↓
                               </button>
@@ -1356,7 +1356,7 @@ export default function ContractTermsPage() {
                     {editingCoverageIndex === index && (
                       <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
                         <div>
-                          <label className="text-xs font-medium text-gray-600">보장 항목명 *</label>
+                          <label className="text-xs font-medium text-slate-400">보장 항목명 *</label>
                           <input
                             type="text"
                             placeholder="예: 차량손해보험"
@@ -1366,9 +1366,9 @@ export default function ContractTermsPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600">
+                          <label className="text-xs font-medium text-slate-400">
                             설명 *
-                            <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
+                            <span className="text-slate-500 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
                           </label>
                           <textarea
                             rows={4}
@@ -1381,7 +1381,7 @@ export default function ContractTermsPage() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => { setEditingCoverageIndex(null); setCoverageForm({ label: '', description: '' }) }}
-                            className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                            className="text-sm text-slate-500 hover:text-slate-600 px-4 py-2"
                           >
                             취소
                           </button>
@@ -1400,10 +1400,10 @@ export default function ContractTermsPage() {
 
               {/* 새 항목 추가 폼 */}
               {selectedTerms.status !== 'archived' && editingCoverageIndex === null && (
-                <div ref={insuranceFormRef} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
-                  <h3 className="font-bold text-gray-800">새 보장내역 추가</h3>
+                <div ref={insuranceFormRef} className="bg-gray-50 border border-black/[0.06] rounded-xl p-5 space-y-3">
+                  <h3 className="font-bold text-slate-700">새 보장내역 추가</h3>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">보장 항목명 *</label>
+                    <label className="text-xs font-medium text-slate-400">보장 항목명 *</label>
                     <input
                       type="text"
                       placeholder="예: 차량손해보험"
@@ -1413,9 +1413,9 @@ export default function ContractTermsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium text-slate-400">
                       설명 *
-                      <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
+                      <span className="text-slate-500 text-xs ml-2">{'{'} deductible {'}'}를 사용하면 면책금이 자동 대체됩니다</span>
                     </label>
                     <textarea
                       rows={4}
@@ -1457,19 +1457,19 @@ export default function ContractTermsPage() {
         <div>
           {!selectedTerms ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
+              <p className="text-slate-500">"약관 버전" 탭에서 편집할 약관을 선택해주세요.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {/* 선택된 약관 정보 */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+              <div className="bg-white border border-black/[0.06] rounded-xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
                     {STATUS_LABELS[selectedTerms.status]?.label}
                   </span>
-                  <h3 className="font-bold">{selectedTerms.title} <span className="text-gray-400 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
+                  <h3 className="font-bold">{selectedTerms.title} <span className="text-slate-500 font-mono text-sm ml-1">{selectedTerms.version}</span></h3>
                 </div>
-                <span className="text-sm text-gray-400">{quoteNotices.length}개 항목</span>
+                <span className="text-sm text-slate-500">{quoteNotices.length}개 항목</span>
               </div>
 
               {/* 유의사항 목록 */}
@@ -1481,7 +1481,7 @@ export default function ContractTermsPage() {
                     <div key={index} className={`bg-white border rounded-xl p-4 transition ${
                       editingNoticeIndex === index
                         ? 'border-blue-400 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-black/[0.06] hover:border-black/10'
                     }`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -1494,7 +1494,7 @@ export default function ContractTermsPage() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{itemText}</p>
+                              <p className="text-sm text-slate-600 whitespace-pre-wrap">{itemText}</p>
                             </>
                           )}
                         </div>
@@ -1503,7 +1503,7 @@ export default function ContractTermsPage() {
                             {editingNoticeIndex === index ? (
                               <button
                                 onClick={() => { setEditingNoticeIndex(null); setNoticeForm(''); setNoticeCondition('') }}
-                                className="text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
+                                className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded"
                               >
                                 접기
                               </button>
@@ -1529,14 +1529,14 @@ export default function ContractTermsPage() {
                                 <button
                                   onClick={() => moveNoticeUp(index)}
                                   disabled={index === 0}
-                                  className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                  className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
                                 >
                                   ↑
                                 </button>
                                 <button
                                   onClick={() => moveNoticeDown(index)}
                                   disabled={index === quoteNotices.length - 1}
-                                  className="text-xs text-gray-400 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
+                                  className="text-xs text-slate-500 hover:bg-gray-100 px-2 py-1 rounded disabled:opacity-50"
                                 >
                                   ↓
                                 </button>
@@ -1550,9 +1550,9 @@ export default function ContractTermsPage() {
                       {editingNoticeIndex === index && (
                         <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
                           <div>
-                            <label className="text-xs font-medium text-gray-600">
+                            <label className="text-xs font-medium text-slate-400">
                               유의사항 *
-                              <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
+                              <span className="text-slate-500 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
                             </label>
                             <textarea
                               rows={4}
@@ -1563,7 +1563,7 @@ export default function ContractTermsPage() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600">조건 (선택)</label>
+                            <label className="text-xs font-medium text-slate-400">조건 (선택)</label>
                             <select
                               className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                               value={noticeCondition}
@@ -1576,7 +1576,7 @@ export default function ContractTermsPage() {
                           <div className="flex gap-2 justify-end">
                             <button
                               onClick={() => { setEditingNoticeIndex(null); setNoticeForm(''); setNoticeCondition('') }}
-                              className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                              className="text-sm text-slate-500 hover:text-slate-600 px-4 py-2"
                             >
                               취소
                             </button>
@@ -1596,12 +1596,12 @@ export default function ContractTermsPage() {
 
               {/* 새 항목 추가 폼 */}
               {selectedTerms.status !== 'archived' && editingNoticeIndex === null && (
-                <div ref={noticeFormRef} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-3">
-                  <h3 className="font-bold text-gray-800">새 유의사항 추가</h3>
+                <div ref={noticeFormRef} className="bg-gray-50 border border-black/[0.06] rounded-xl p-5 space-y-3">
+                  <h3 className="font-bold text-slate-700">새 유의사항 추가</h3>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">
+                    <label className="text-xs font-medium text-slate-400">
                       유의사항 *
-                      <span className="text-gray-400 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
+                      <span className="text-slate-500 text-xs ml-2">{'{'} deductible {'}'}, {'{'} excessRate {'}'}, {'{'} earlyTerminationRate {'}'} 사용 가능</span>
                     </label>
                     <textarea
                       rows={4}
@@ -1612,7 +1612,7 @@ export default function ContractTermsPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-600">조건 (선택)</label>
+                    <label className="text-xs font-medium text-slate-400">조건 (선택)</label>
                     <select
                       className="w-full border rounded-lg px-3 py-2 text-sm mt-1"
                       value={noticeCondition}
@@ -1659,13 +1659,13 @@ export default function ContractTermsPage() {
           ) : (
             <div>
               {/* 선택된 약관 헤더 + 저장 버튼 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, padding: '12px 16px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, padding: '12px 16px', background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_LABELS[selectedTerms.status]?.color}`}>
                     {STATUS_LABELS[selectedTerms.status]?.label}
                   </span>
                   <span style={{ fontWeight: 700 }}>{selectedTerms.title}</span>
-                  <span style={{ color: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}>{selectedTerms.version}</span>
+                  <span style={{ color: '#64748b', fontSize: 13, fontFamily: 'monospace' }}>{selectedTerms.version}</span>
                 </div>
                 {selectedTerms.status !== 'archived' && (
                   <button
@@ -1685,8 +1685,8 @@ export default function ContractTermsPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
                   {/* ── 카드 1: 기본 설정 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>기본 설정</h4>
                     </div>
                     <div style={{ padding: 16 }}>
@@ -1698,8 +1698,8 @@ export default function ContractTermsPage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <input type="number" step="0.01" value={calcParams.early_termination_rate || 0}
                                   onChange={e => updateParamValue('early_termination_rate', parseFloat(e.target.value) || 0)}
-                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
-                                <span style={{ color: '#9ca3af', fontSize: 12 }}>%</span>
+                                  style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                <span style={{ color: '#64748b', fontSize: 12 }}>%</span>
                               </div>
                             </td>
                           </tr>
@@ -1708,7 +1708,7 @@ export default function ContractTermsPage() {
                             <td style={{ padding: '8px 0' }}>
                               <textarea rows={2} value={calcParams.insurance_note || ''}
                                 onChange={e => updateParamValue('insurance_note', e.target.value)}
-                                style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px', fontSize: 13, resize: 'vertical' }} />
+                                style={{ width: '100%', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 13, resize: 'vertical' }} />
                             </td>
                           </tr>
                         </tbody>
@@ -1717,8 +1717,8 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 2: 비영업용 계수 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>비영업용 계수</h4>
                     </div>
                     <div style={{ padding: 16 }}>
@@ -1729,7 +1729,7 @@ export default function ContractTermsPage() {
                             <td style={{ padding: '8px 0' }}>
                               <input type="number" step="0.01" value={calcParams.non_commercial_base_factor || 1}
                                 onChange={e => updateParamValue('non_commercial_base_factor', parseFloat(e.target.value) || 1)}
-                                style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
                             </td>
                           </tr>
                           <tr>
@@ -1737,7 +1737,7 @@ export default function ContractTermsPage() {
                             <td style={{ padding: '8px 0' }}>
                               <input type="number" step="0.01" value={calcParams.non_commercial_own_factor || 1}
                                 onChange={e => updateParamValue('non_commercial_own_factor', parseFloat(e.target.value) || 1)}
-                                style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
                             </td>
                           </tr>
                         </tbody>
@@ -1746,14 +1746,14 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 3: 보험 기본분담금 (연) + 자차 요율 (%) ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>차급별 보험 기본분담금 / 자차 요율</h4>
                     </div>
                     <div style={{ padding: 16, overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', textAlign: 'center' }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                          <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
                             <th style={{ padding: '8px 12px', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>차급</th>
                             {['경형', '소형', '중형', '대형', '수입'].map(cls => (
                               <th key={cls} style={{ padding: '8px 12px', color: '#374151', fontWeight: 600 }}>{cls}</th>
@@ -1761,7 +1761,7 @@ export default function ContractTermsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                             <td style={{ padding: '8px 12px', color: '#64748b', textAlign: 'left', fontWeight: 500 }}>기본분담금 (연)</td>
                             {['경형', '소형', '중형', '대형', '수입'].map(cls => (
                               <td key={cls} style={{ padding: '8px 4px' }}>
@@ -1770,7 +1770,7 @@ export default function ContractTermsPage() {
                                     if (!calcParams.ins_base_annual) updateParamValue('ins_base_annual', {})
                                     updateParamValue(`ins_base_annual.${cls}`, parseInt(e.target.value) || 0)
                                   }}
-                                  style={{ width: 90, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
+                                  style={{ width: 90, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
                               </td>
                             ))}
                           </tr>
@@ -1783,7 +1783,7 @@ export default function ContractTermsPage() {
                                     if (!calcParams.ins_own_damage_rate) updateParamValue('ins_own_damage_rate', {})
                                     updateParamValue(`ins_own_damage_rate.${cls}`, parseFloat(e.target.value) || 0)
                                   }}
-                                  style={{ width: 90, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
+                                  style={{ width: 90, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'right' }} />
                               </td>
                             ))}
                           </tr>
@@ -1793,15 +1793,15 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 4: 보험 담보별 비중 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>보험 담보별 비중</h4>
                     </div>
                     <div style={{ padding: 16 }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                         <tbody>
                           {['대물', '대인', '자차', '인명', '도난', '기타'].map((coverage, i) => (
-                            <tr key={coverage} style={{ borderBottom: i < 5 ? '1px solid #f3f4f6' : 'none' }}>
+                            <tr key={coverage} style={{ borderBottom: i < 5 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
                               <td style={{ padding: '6px 0', color: '#64748b', width: 80 }}>{coverage}</td>
                               <td style={{ padding: '6px 0' }}>
                                 <input type="number" step="0.01" value={calcParams.ins_breakdown_ratios?.[coverage] || 0}
@@ -1809,7 +1809,7 @@ export default function ContractTermsPage() {
                                     if (!calcParams.ins_breakdown_ratios) updateParamValue('ins_breakdown_ratios', {})
                                     updateParamValue(`ins_breakdown_ratios.${coverage}`, parseFloat(e.target.value) || 0)
                                   }}
-                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                  style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
                               </td>
                             </tr>
                           ))}
@@ -1819,20 +1819,20 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 5: 면책금 할인율 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>면책금 할인율</h4>
                     </div>
                     <div style={{ padding: 16 }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                         <tbody>
                           {Object.entries(calcParams.deductible_discount || {}).map(([key, value], i, arr) => (
-                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
                               <td style={{ padding: '6px 0', color: '#64748b', width: 120 }}>{Number(key).toLocaleString()}원</td>
                               <td style={{ padding: '6px 0' }}>
                                 <input type="number" step="0.01" value={value as number}
                                   onChange={e => updateParamValue(`deductible_discount.${key}`, parseFloat(e.target.value) || 0)}
-                                  style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                  style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
                               </td>
                               <td style={{ padding: '6px 0', width: 40, textAlign: 'center' }}>
                                 <button onClick={() => {
@@ -1848,22 +1848,22 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 6: 초과주행 요금 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>초과주행 요금</h4>
                     </div>
                     <div style={{ padding: 16 }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                         <tbody>
                           {Object.entries(calcParams.excess_mileage_rates || {}).map(([key, value], i, arr) => (
-                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                            <tr key={key} style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
                               <td style={{ padding: '6px 0', color: '#64748b', width: 120 }}>{key}</td>
                               <td style={{ padding: '6px 0' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                   <input type="number" step="1" value={value as number}
                                     onChange={e => updateParamValue(`excess_mileage_rates.${key}`, parseInt(e.target.value) || 0)}
-                                    style={{ width: 80, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
-                                  <span style={{ color: '#9ca3af', fontSize: 11 }}>원/km</span>
+                                    style={{ width: 80, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'right' }} />
+                                  <span style={{ color: '#64748b', fontSize: 11 }}>원/km</span>
                                 </div>
                               </td>
                               <td style={{ padding: '6px 0', width: 40, textAlign: 'center' }}>
@@ -1880,14 +1880,14 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 7: 운전자 연령 요율 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>운전자 연령 요율</h4>
                     </div>
                     <div style={{ padding: 16, overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                          <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
                             <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>구분</th>
                             <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>최소 연령</th>
                             <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>계수</th>
@@ -1895,7 +1895,7 @@ export default function ContractTermsPage() {
                         </thead>
                         <tbody>
                           {Array.isArray(calcParams.driver_age_factors) && calcParams.driver_age_factors.map((factor: any, idx: number) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                               <td style={{ padding: '6px 8px', color: '#374151', fontWeight: 500 }}>{factor.label || `구간 ${idx + 1}`}</td>
                               <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                 <input type="number" value={factor.min_age || 0}
@@ -1903,7 +1903,7 @@ export default function ContractTermsPage() {
                                     const updated = [...(calcParams.driver_age_factors || [])]; updated[idx] = { ...updated[idx], min_age: parseInt(e.target.value) || 0 }
                                     updateParamValue('driver_age_factors', updated)
                                   }}
-                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                               <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                 <input type="number" step="0.01" value={factor.factor || 1}
@@ -1911,7 +1911,7 @@ export default function ContractTermsPage() {
                                     const updated = [...(calcParams.driver_age_factors || [])]; updated[idx] = { ...updated[idx], factor: parseFloat(e.target.value) || 1 }
                                     updateParamValue('driver_age_factors', updated)
                                   }}
-                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                             </tr>
                           ))}
@@ -1921,28 +1921,28 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 8: 차령별 계수 ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>차령별 계수</h4>
                     </div>
                     <div style={{ padding: 16, overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                          <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
                             <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>최대 차령 (년)</th>
                             <th style={{ padding: '6px 8px', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>계수</th>
                           </tr>
                         </thead>
                         <tbody>
                           {Array.isArray(calcParams.car_age_factors) && calcParams.car_age_factors.map((factor: any, idx: number) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                               <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                 <input type="number" value={factor.max_age || 0}
                                   onChange={e => {
                                     const updated = [...(calcParams.car_age_factors || [])]; updated[idx] = { ...updated[idx], max_age: parseInt(e.target.value) || 0 }
                                     updateParamValue('car_age_factors', updated)
                                   }}
-                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                               <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                                 <input type="number" step="0.01" value={factor.factor || 1}
@@ -1950,7 +1950,7 @@ export default function ContractTermsPage() {
                                     const updated = [...(calcParams.car_age_factors || [])]; updated[idx] = { ...updated[idx], factor: parseFloat(e.target.value) || 1 }
                                     updateParamValue('car_age_factors', updated)
                                   }}
-                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                             </tr>
                           ))}
@@ -1960,14 +1960,14 @@ export default function ContractTermsPage() {
                   </div>
 
                   {/* ── 카드 9: 중도해지 기간별 수수료 (풀 와이드) ── */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
-                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden', gridColumn: 'span 2' }}>
+                    <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <h4 style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', margin: 0 }}>중도해지 기간별 수수료</h4>
                     </div>
                     <div style={{ padding: 16, overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', textAlign: 'center' }}>
                         <thead>
-                          <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                          <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
                             <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>시작 월</th>
                             <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>종료 월</th>
                             <th style={{ padding: '6px 12px', color: '#64748b', fontWeight: 600 }}>수수료율 (%)</th>
@@ -1976,14 +1976,14 @@ export default function ContractTermsPage() {
                         </thead>
                         <tbody>
                           {Array.isArray(calcParams.early_termination_rates_by_period) && calcParams.early_termination_rates_by_period.map((period: any, idx: number) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                               <td style={{ padding: '6px 12px' }}>
                                 <input type="number" value={period.months_from || 0}
                                   onChange={e => {
                                     const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], months_from: parseInt(e.target.value) || 0 }
                                     updateParamValue('early_termination_rates_by_period', updated)
                                   }}
-                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                               <td style={{ padding: '6px 12px' }}>
                                 <input type="number" value={period.months_to || 0}
@@ -1991,7 +1991,7 @@ export default function ContractTermsPage() {
                                     const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], months_to: parseInt(e.target.value) || 0 }
                                     updateParamValue('early_termination_rates_by_period', updated)
                                   }}
-                                  style={{ width: 60, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 60, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
                               <td style={{ padding: '6px 12px' }}>
                                 <input type="number" step="0.01" value={period.rate || 0}
@@ -1999,9 +1999,9 @@ export default function ContractTermsPage() {
                                     const updated = [...(calcParams.early_termination_rates_by_period || [])]; updated[idx] = { ...updated[idx], rate: parseFloat(e.target.value) || 0 }
                                     updateParamValue('early_termination_rates_by_period', updated)
                                   }}
-                                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
+                                  style={{ width: 70, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center' }} />
                               </td>
-                              <td style={{ padding: '6px 12px', color: '#9ca3af', fontSize: 12 }}>
+                              <td style={{ padding: '6px 12px', color: '#64748b', fontSize: 12 }}>
                                 {period.months_from}~{period.months_to}개월
                               </td>
                             </tr>
@@ -2023,22 +2023,22 @@ export default function ContractTermsPage() {
         <div>
           {!selectedTerms ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <p className="text-gray-500">"약관 버전" 탭에서 약관을 선택하면 이력이 표시됩니다.</p>
+              <p className="text-slate-500">"약관 버전" 탭에서 약관을 선택하면 이력이 표시됩니다.</p>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="mb-4 flex items-center gap-2">
-                <span className="font-bold text-gray-700">{selectedTerms.title}</span>
-                <span className="text-sm text-gray-400 font-mono">{selectedTerms.version}</span>
-                <span className="text-sm text-gray-400">— 최근 50건</span>
+                <span className="font-bold text-slate-600">{selectedTerms.title}</span>
+                <span className="text-sm text-slate-500 font-mono">{selectedTerms.version}</span>
+                <span className="text-sm text-slate-500">— 최근 50건</span>
               </div>
               {history.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">변경 이력이 없습니다.</div>
+                <div className="text-center py-8 text-slate-500 text-sm">변경 이력이 없습니다.</div>
               ) : (
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-white border border-black/[0.06] rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 border-b text-gray-500 text-xs">
+                      <tr className="bg-gray-50 border-b text-slate-500 text-xs">
                         <th className="text-left px-4 py-3">일시</th>
                         <th className="text-left px-4 py-3">구분</th>
                         <th className="text-left px-4 py-3">내용</th>
@@ -2071,7 +2071,7 @@ export default function ContractTermsPage() {
 
                         return (
                           <tr key={h.id} className="border-b last:border-0 hover:bg-gray-50">
-                            <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                               {new Date(h.changed_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </td>
                             <td className="px-4 py-3">
@@ -2084,8 +2084,8 @@ export default function ContractTermsPage() {
                                 {actionLabels[h.action] || h.action}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-gray-700">{detail}</td>
-                            <td className="px-4 py-3 text-gray-400 text-xs">{h.reason || '-'}</td>
+                            <td className="px-4 py-3 text-slate-600">{detail}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">{h.reason || '-'}</td>
                           </tr>
                         )
                       })}
@@ -2104,8 +2104,8 @@ export default function ContractTermsPage() {
           {/* 헤더 */}
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">📄 PDF 계약서 템플릿 관리</h3>
-              <p className="text-sm text-gray-500 mt-1">계약서 PDF에 자동으로 들어가는 기본값을 설정하고 미리보기로 확인하세요.</p>
+              <h3 className="text-lg font-bold text-white">📄 PDF 계약서 템플릿 관리</h3>
+              <p className="text-sm text-slate-500 mt-1">계약서 PDF에 자동으로 들어가는 기본값을 설정하고 미리보기로 확인하세요.</p>
             </div>
             <div className="flex gap-2">
               <button
@@ -2126,13 +2126,13 @@ export default function ContractTermsPage() {
           </div>
 
           {/* ── PDF 항목 체크리스트 (템플릿 항목 vs 계약입력 항목) ── */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <h4 className="text-sm font-bold text-gray-900 mb-4">PDF 계약서 항목 구성표</h4>
+          <div className="bg-white rounded-xl border border-black/[0.06] p-5 mb-6">
+            <h4 className="text-sm font-bold text-white mb-4">PDF 계약서 항목 구성표</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 템플릿 기본값 (미리 설정) */}
               <div>
                 <div className="text-xs font-bold text-blue-700 bg-blue-50 rounded-t-lg px-3 py-2">템플릿 기본값 (아래에서 설정)</div>
-                <table className="w-full text-xs border border-gray-200 border-t-0">
+                <table className="w-full text-xs border border-black/[0.06] border-t-0">
                   <tbody>
                     {[
                       { name: '회사명', val: pdfDefaults.company_name },
@@ -2144,8 +2144,8 @@ export default function ContractTermsPage() {
                       { name: '면책 안내문', val: pdfDefaults.cdw_notice ? '설정됨' : '' },
                       { name: '약관 조항 (5항)', val: pdfDefaults.terms_clause_1 ? '설정됨' : '' },
                     ].map((r, i) => (
-                      <tr key={i} className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 text-gray-600 w-40 bg-gray-50">{r.name}</td>
+                      <tr key={i} className="border-b border-black/5">
+                        <td className="px-3 py-1.5 text-slate-400 w-40 bg-gray-50">{r.name}</td>
                         <td className="px-3 py-1.5">
                           {r.val ? (
                             <span className="text-green-600 font-bold">&#10003; {r.val.length > 20 ? r.val.slice(0, 20) + '...' : r.val}</span>
@@ -2161,7 +2161,7 @@ export default function ContractTermsPage() {
               {/* 계약 시 입력 항목 */}
               <div>
                 <div className="text-xs font-bold text-amber-700 bg-amber-50 rounded-t-lg px-3 py-2">계약 시 입력 항목 (견적/계약에서 입력)</div>
-                <table className="w-full text-xs border border-gray-200 border-t-0">
+                <table className="w-full text-xs border border-black/[0.06] border-t-0">
                   <tbody>
                     {[
                       { name: '임차인명', src: '견적서' },
@@ -2175,9 +2175,9 @@ export default function ContractTermsPage() {
                       { name: '담당자 / 담당자 연락처', src: '로그인 정보' },
                       { name: '메모 / 기타 계약사항', src: '견적서 (선택)' },
                     ].map((r, i) => (
-                      <tr key={i} className="border-b border-gray-100">
-                        <td className="px-3 py-1.5 text-gray-600 w-40 bg-gray-50">{r.name}</td>
-                        <td className="px-3 py-1.5 text-gray-500">{r.src}</td>
+                      <tr key={i} className="border-b border-black/5">
+                        <td className="px-3 py-1.5 text-slate-400 w-40 bg-gray-50">{r.name}</td>
+                        <td className="px-3 py-1.5 text-slate-500">{r.src}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2191,9 +2191,9 @@ export default function ContractTermsPage() {
             <div className="space-y-5">
 
               {/* ─── 회사 정보 ─── */}
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <h4 className="text-sm font-bold text-gray-900">🏢 회사 (임대인) 정보</h4>
+              <div className="bg-white rounded-xl border border-black/[0.06]">
+                <div className="px-5 py-3 border-b border-black/5">
+                  <h4 className="text-sm font-bold text-white">🏢 회사 (임대인) 정보</h4>
                 </div>
                 <table className="w-full text-sm">
                   <tbody>
@@ -2203,29 +2203,29 @@ export default function ContractTermsPage() {
                       { key: 'company_address', label: '주소' },
                       { key: 'representative', label: '대표자' },
                     ].map(f => (
-                      <tr key={f.key} className="border-b border-gray-50">
-                        <td className="px-5 py-2.5 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
+                      <tr key={f.key} className="border-b border-black/5">
+                        <td className="px-5 py-2.5 w-28 text-xs font-bold text-slate-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
                         <td className="px-3 py-1.5">
                           <input
                             value={(pdfDefaults as any)[f.key] || ''}
                             onChange={e => setPdfDefaults(p => ({ ...p, [f.key]: e.target.value }))}
-                            className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            className="w-full px-3 py-1.5 border border-black/[0.06] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                           />
                         </td>
                       </tr>
                     ))}
                     {/* 회사 도장 행 */}
-                    <tr className="border-b border-gray-50">
-                      <td className="px-5 py-2.5 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-4">회사 도장</td>
+                    <tr className="border-b border-black/5">
+                      <td className="px-5 py-2.5 w-28 text-xs font-bold text-slate-500 bg-gray-50 whitespace-nowrap align-top pt-4">회사 도장</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-gray-300 rounded flex items-center justify-center overflow-hidden bg-gray-50"
+                            className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-black/10 rounded flex items-center justify-center overflow-hidden bg-gray-50"
                           >
                             {pdfDefaults.company_stamp ? (
                               <img src={pdfDefaults.company_stamp} alt="도장" className="max-w-full max-h-full object-contain" />
                             ) : (
-                              <span className="text-xl text-gray-300">印</span>
+                              <span className="text-xl text-slate-500">印</span>
                             )}
                           </div>
                           <div className="flex flex-col gap-1.5">
@@ -2251,7 +2251,7 @@ export default function ContractTermsPage() {
                                 삭제
                               </button>
                             )}
-                            <span className="text-[10px] text-gray-400">PNG 투명배경 권장 · 서명란에 삽입</span>
+                            <span className="text-[10px] text-slate-500">PNG 투명배경 권장 · 서명란에 삽입</span>
                           </div>
                         </div>
                       </td>
@@ -2261,9 +2261,9 @@ export default function ContractTermsPage() {
               </div>
 
               {/* ─── 보험 정보 ─── */}
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <h4 className="text-sm font-bold text-gray-900">🛡️ 보험가입 및 면책 제도</h4>
+              <div className="bg-white rounded-xl border border-black/[0.06]">
+                <div className="px-5 py-3 border-b border-black/5">
+                  <h4 className="text-sm font-bold text-white">🛡️ 보험가입 및 면책 제도</h4>
                 </div>
                 <table className="w-full text-sm">
                   <tbody>
@@ -2279,25 +2279,25 @@ export default function ContractTermsPage() {
                       { key: 'ins_death_limit', label: '자손 한도(사망)' },
                       { key: 'ins_injury_ded', label: '자손 면책금' },
                     ].map(f => (
-                      <tr key={f.key} className="border-b border-gray-50">
-                        <td className="px-5 py-2 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
+                      <tr key={f.key} className="border-b border-black/5">
+                        <td className="px-5 py-2 w-28 text-xs font-bold text-slate-500 bg-gray-50 whitespace-nowrap">{f.label}</td>
                         <td className="px-3 py-1.5">
                           <input
                             value={(pdfDefaults as any)[f.key] || ''}
                             onChange={e => setPdfDefaults(p => ({ ...p, [f.key]: e.target.value }))}
-                            className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            className="w-full px-3 py-1.5 border border-black/[0.06] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                           />
                         </td>
                       </tr>
                     ))}
                     <tr>
-                      <td className="px-5 py-2 w-28 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-3">면책 안내문</td>
+                      <td className="px-5 py-2 w-28 text-xs font-bold text-slate-500 bg-gray-50 whitespace-nowrap align-top pt-3">면책 안내문</td>
                       <td className="px-3 py-1.5">
                         <textarea
                           value={pdfDefaults.cdw_notice}
                           onChange={e => setPdfDefaults(p => ({ ...p, cdw_notice: e.target.value }))}
                           rows={2}
-                          className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
+                          className="w-full px-3 py-1.5 border border-black/[0.06] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
                         />
                       </td>
                     </tr>
@@ -2306,23 +2306,23 @@ export default function ContractTermsPage() {
               </div>
 
               {/* ─── 약관 조항 ─── */}
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <h4 className="text-sm font-bold text-gray-900">📜 약관 고지사항 (PDF 2페이지)</h4>
+              <div className="bg-white rounded-xl border border-black/[0.06]">
+                <div className="px-5 py-3 border-b border-black/5">
+                  <h4 className="text-sm font-bold text-white">📜 약관 고지사항 (PDF 2페이지)</h4>
                 </div>
                 <table className="w-full text-sm">
                   <tbody>
                     {[1, 2, 3, 4, 5].map(n => {
                       const key = `terms_clause_${n}` as keyof typeof pdfDefaults
                       return (
-                        <tr key={n} className="border-b border-gray-50">
-                          <td className="px-5 py-2 w-16 text-xs font-bold text-gray-500 bg-gray-50 whitespace-nowrap align-top pt-3">제{n}항</td>
+                        <tr key={n} className="border-b border-black/5">
+                          <td className="px-5 py-2 w-16 text-xs font-bold text-slate-500 bg-gray-50 whitespace-nowrap align-top pt-3">제{n}항</td>
                           <td className="px-3 py-1.5">
                             <textarea
                               value={pdfDefaults[key] || ''}
                               onChange={e => setPdfDefaults(p => ({ ...p, [key]: e.target.value }))}
                               rows={2}
-                              className="w-full px-3 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
+                              className="w-full px-3 py-1.5 border border-black/[0.06] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-vertical"
                             />
                           </td>
                         </tr>
@@ -2335,13 +2335,13 @@ export default function ContractTermsPage() {
 
             {/* 우측: PDF 미리보기 */}
             <div>
-              <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-4">
-                <h4 className="text-sm font-bold text-gray-900 mb-3">👁 PDF 미리보기</h4>
+              <div className="bg-white rounded-xl border border-black/[0.06] p-5 sticky top-4">
+                <h4 className="text-sm font-bold text-white mb-3">👁 PDF 미리보기</h4>
                 {pdfPreviewUrl ? (
                   <div className="space-y-3">
                     <iframe
                       src={pdfPreviewUrl}
-                      className="w-full border border-gray-200 rounded-lg"
+                      className="w-full border border-black/[0.06] rounded-lg"
                       style={{ height: 600 }}
                       title="PDF 미리보기"
                     />
@@ -2349,7 +2349,7 @@ export default function ContractTermsPage() {
                       <a
                         href={pdfPreviewUrl}
                         download="계약서_미리보기.pdf"
-                        className="flex-1 text-center py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200"
+                        className="flex-1 text-center py-2 bg-gray-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-gray-100"
                       >
                         📥 다운로드
                       </a>
@@ -2363,9 +2363,9 @@ export default function ContractTermsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-gray-400">
+                  <div className="text-center py-16 text-slate-500">
                     <div className="text-4xl mb-3">📄</div>
-                    <p className="font-bold text-gray-600 mb-2">PDF 미리보기가 없습니다</p>
+                    <p className="font-bold text-slate-400 mb-2">PDF 미리보기가 없습니다</p>
                     <p className="text-xs mb-3">상단의 &quot;👁 미리보기&quot; 버튼을 클릭하세요</p>
                     <button
                       onClick={generatePdfPreview}

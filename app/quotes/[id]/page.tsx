@@ -77,21 +77,21 @@ const CostBar = ({ label, value, total, color }: { label: string; value: number;
   const pct = total > 0 ? Math.abs(value) / total * 100 : 0
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className="w-24 text-gray-500 text-xs">{label}</span>
+      <span className="w-24 text-slate-500 text-xs">{label}</span>
       <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
       <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
-      <span className="w-10 text-right text-gray-400 text-[11px]">{pct.toFixed(0)}%</span>
+      <span className="w-10 text-right text-slate-500 text-[11px]">{pct.toFixed(0)}%</span>
     </div>
   )
 }
 
 // 테이블 행 컴포넌트
 const TRow = ({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) => (
-  <tr className="border-b border-gray-100 last:border-0">
-    <td className="bg-gray-50 px-4 py-2.5 font-bold text-gray-500 w-32 text-sm">{label}</td>
-    <td className={`px-4 py-2.5 text-sm ${bold ? 'font-black text-gray-900' : 'text-gray-700'}`}>{value}</td>
+  <tr className="border-b border-black/5 last:border-0">
+    <td className="bg-gray-50 px-4 py-2.5 font-bold text-slate-500 w-32 text-sm">{label}</td>
+    <td className={`px-4 py-2.5 text-sm ${bold ? 'font-black text-slate-800' : 'text-slate-600'}`}>{value}</td>
   </tr>
 )
 
@@ -99,7 +99,7 @@ const TRow = ({ label, value, bold = false }: { label: string; value: string; bo
 // 타임라인 컴포넌트
 // ============================================
 const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-  created:          { icon: '📄', label: '견적 생성',   color: '#6b7280', bg: '#f3f4f6' },
+  created:          { icon: '📄', label: '견적 생성',   color: '#6b7280', bg: 'rgba(0,0,0,0.04)' },
   shared:           { icon: '🔗', label: '링크 공유',   color: '#2563eb', bg: '#eff6ff' },
   sent:             { icon: '📤', label: '견적 발송',   color: '#7c3aed', bg: '#f5f3ff' },
   viewed:           { icon: '👁️', label: '고객 열람',   color: '#0891b2', bg: '#ecfeff' },
@@ -153,8 +153,8 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
 
   return (
     <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px 24px' }}>
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>📋 활동 타임라인</h3>
           <span style={{ fontSize: 12, color: '#9ca3af' }}>{events.length}건</span>
         </div>
@@ -166,7 +166,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
           ) : (
             <div style={{ position: 'relative' }}>
               {/* 세로 선 */}
-              <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 2, background: '#e5e7eb' }} />
+              <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 2, background: 'rgba(0,0,0,0.06)' }} />
               {displayed.map((ev: any, i: number) => {
                 const cfg = EVENT_CONFIG[ev.event_type] || EVENT_CONFIG.created
                 return (
@@ -501,7 +501,7 @@ export default function QuoteDetailPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-steel-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-500 font-bold">견적서 불러오는 중...</p>
+        <p className="text-slate-500 font-bold">견적서 불러오는 중...</p>
       </div>
     </div>
   )
@@ -594,19 +594,19 @@ export default function QuoteDetailPage() {
       {/* ===== 상단 네비게이션 + 액션 바 (인쇄 시 숨김) ===== */}
       <div className="max-w-[900px] mx-auto py-4 px-4 md:py-6 no-print">
         <div className="flex items-center gap-2 mb-4 no-print">
-          <Link href="/quotes" className="text-gray-400 hover:text-gray-600 text-sm">견적 관리</Link>
-          <span className="text-gray-300">/</span>
+          <Link href="/quotes" className="text-slate-500 hover:text-slate-400 text-sm">견적 관리</Link>
+          <span className="text-slate-400">/</span>
           <span className="text-steel-600 font-bold text-sm">견적 상세</span>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem' }} className="no-print">
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl font-black text-gray-900">{isInvoiceQuote ? '청구서' : '견적서'} #{String(quote.id).slice(0, 8)}</h1>
+            <h1 className="text-2xl font-black text-slate-800">{isInvoiceQuote ? '청구서' : '견적서'} #{String(quote.id).slice(0, 8)}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                 quote.status === 'active' ? 'bg-green-100 text-green-700' :
                 quote.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-200 text-gray-500'
+                'bg-gray-100 text-slate-500'
               }`}>
                 {quote.status === 'active' ? '확정' : quote.status === 'draft' ? '임시저장' : '보관'}
               </span>
@@ -615,7 +615,7 @@ export default function QuoteDetailPage() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white">인쇄</button>
+            <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-black/10 rounded-xl font-bold text-slate-400 hover:bg-white">인쇄</button>
             {!isInvoiceQuote && (
               <button onClick={handleEditWorksheet}
                 className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
@@ -631,7 +631,7 @@ export default function QuoteDetailPage() {
               {shareStatus === 'signed' ? '서명완료' : shareStatus === 'shared' ? '발송됨' : isInvoiceQuote ? '청구서 발송' : '견적 발송'}
             </button>
             <button onClick={handleArchiveQuote} disabled={updating || quote.status === 'archived'}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white disabled:opacity-50">
+              className="px-4 py-2 text-sm border border-black/10 rounded-xl font-bold text-slate-400 hover:bg-white disabled:opacity-50">
               {updating ? '처리 중...' : '보관'}
             </button>
             {!isInvoiceQuote && canCreateContract && (
@@ -732,7 +732,7 @@ export default function QuoteDetailPage() {
             {(['quote', 'analysis'] as const).map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)}
                 className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  viewMode === mode ? 'bg-gray-900 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                  viewMode === mode ? 'bg-gray-50 text-white shadow-lg' : 'bg-white text-slate-500 border border-black/[0.06] hover:bg-gray-50'
                 }`}>
                 {mode === 'quote' ? '고객용 견적서' : '내부 원가분석'}
               </button>
@@ -766,7 +766,7 @@ export default function QuoteDetailPage() {
           <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
 
             {/* 헤더 */}
-            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2d5fa8)' }} className="text-white px-6 py-4 rounded-t-2xl">
+            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, rgba(59,130,246,0.9))' }} className="text-white px-6 py-4 rounded-t-2xl">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">단기렌트 청구서</h1>
@@ -784,13 +784,13 @@ export default function QuoteDetailPage() {
               {/* 상태 + 기본정보 */}
               <div className="flex items-center gap-3">
                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${invStatusBadge.bg} ${invStatusBadge.color}`}>{invStatusBadge.label}</span>
-                <span className="text-gray-400 text-xs">#{String(quote.id).slice(0, 8)}</span>
+                <span className="text-slate-500 text-xs">#{String(quote.id).slice(0, 8)}</span>
               </div>
 
               {/* 임차인 + 대차 정보 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임차인 정보</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임차인 정보</p>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <table className="w-full text-sm">
                       <tbody>
@@ -801,7 +801,7 @@ export default function QuoteDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">대차 정보</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">대차 정보</p>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <table className="w-full text-sm">
                       <tbody>
@@ -815,21 +815,21 @@ export default function QuoteDetailPage() {
 
               {/* 요금 안내 */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">요금 안내</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">요금 안내</p>
                 <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)' }} className="rounded-xl p-5 text-white">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-gray-400 text-sm">공급가</span>
-                    <span className="text-gray-300 font-bold">{f(rentTotal)}원</span>
+                    <span className="text-slate-500 text-sm">공급가</span>
+                    <span className="text-slate-400 font-bold">{f(rentTotal)}원</span>
                   </div>
                   <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-700">
-                    <span className="text-gray-400 text-sm">VAT (10%)</span>
-                    <span className="text-gray-300 font-bold">{f(rentVat)}원</span>
+                    <span className="text-slate-500 text-sm">VAT (10%)</span>
+                    <span className="text-slate-400 font-bold">{f(rentVat)}원</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-white font-black text-lg">총 청구금액</span>
                     <div className="text-right">
                       <span className="text-3xl font-black text-white">{f(rentWithVat)}</span>
-                      <span className="text-gray-400 ml-1">원</span>
+                      <span className="text-slate-500 ml-1">원</span>
                     </div>
                   </div>
                 </div>
@@ -841,19 +841,19 @@ export default function QuoteDetailPage() {
                 const userMemo = parts.filter((p: string) => !p.startsWith('[청구서]') && !p.startsWith('기간:') && !p.startsWith('연락처:')).join(' | ')
                 return userMemo ? (
                   <div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">메모</p>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">{userMemo}</div>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">메모</p>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-slate-600">{userMemo}</div>
                   </div>
                 ) : null
               })()}
 
               {/* 임대인 정보 */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
                 <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
                   <p className="font-black text-sm">{company?.name || '주식회사에프엠아이'}</p>
-                  {company?.business_number && <p className="text-gray-500">사업자번호: {company.business_number}</p>}
-                  {company?.phone && <p className="text-gray-500">TEL: {company.phone}</p>}
+                  {company?.business_number && <p className="text-slate-500">사업자번호: {company.business_number}</p>}
+                  {company?.phone && <p className="text-slate-500">TEL: {company.phone}</p>}
                 </div>
               </div>
 
@@ -873,18 +873,18 @@ export default function QuoteDetailPage() {
           <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
 
             {/* 헤더 */}
-            <div className="bg-gray-900 text-white px-6 py-4 print:px-5 print:py-3 rounded-t-2xl print:rounded-none">
+            <div className="bg-gray-50 text-white px-6 py-4 print:px-5 print:py-3 rounded-t-2xl print:rounded-none">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">장기렌트 견적서</h1>
-                  <p className="text-gray-400 text-xs mt-0.5">LONG-TERM RENTAL QUOTATION</p>
+                  <p className="text-slate-500 text-xs mt-0.5">LONG-TERM RENTAL QUOTATION</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-gray-400 text-xs">견적일</p>
+                  <p className="text-slate-500 text-xs">견적일</p>
                   <p className="font-bold">{fDate(quote.created_at)}</p>
                   {quote.expires_at && (
                     <>
-                      <p className="text-gray-400 text-xs mt-1">유효기간</p>
+                      <p className="text-slate-500 text-xs mt-1">유효기간</p>
                       <p className="text-sm text-yellow-400 font-bold">{fDate(quote.expires_at)}까지</p>
                     </>
                   )}
@@ -897,53 +897,53 @@ export default function QuoteDetailPage() {
               {/* ── 1. 임대인 / 임차인 ── */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
                   <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
                     <p className="font-black text-base">{company?.name || '당사'}</p>
-                    {company?.business_number && <p className="text-gray-500">사업자번호: {company.business_number}</p>}
-                    {company?.address && <p className="text-gray-500">{company.address}</p>}
-                    {company?.phone && <p className="text-gray-500">TEL: {company.phone}</p>}
-                    {company?.email && <p className="text-gray-500">{company.email}</p>}
+                    {company?.business_number && <p className="text-slate-500">사업자번호: {company.business_number}</p>}
+                    {company?.address && <p className="text-slate-500">{company.address}</p>}
+                    {company?.phone && <p className="text-slate-500">TEL: {company.phone}</p>}
+                    {company?.email && <p className="text-slate-500">{company.email}</p>}
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">임차인 (고객)</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임차인 (고객)</p>
                   <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
                     <p className="font-black text-base">{customerName}</p>
-                    {customerBizNum && <p className="text-gray-500">사업자번호: {customerBizNum}</p>}
-                    {customerPhone && <p className="text-gray-500">연락처: {customerPhone}</p>}
-                    {customerEmail && <p className="text-gray-500">{customerEmail}</p>}
-                    {customerAddress && <p className="text-gray-500">{customerAddress}</p>}
+                    {customerBizNum && <p className="text-slate-500">사업자번호: {customerBizNum}</p>}
+                    {customerPhone && <p className="text-slate-500">연락처: {customerPhone}</p>}
+                    {customerEmail && <p className="text-slate-500">{customerEmail}</p>}
+                    {customerAddress && <p className="text-slate-500">{customerAddress}</p>}
                   </div>
                 </div>
               </div>
 
               {/* ── 2. 차량 정보 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">차량 정보</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">차량 정보</p>
+                <div className="border border-black/[0.06] rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-24">차종</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500 w-24">차종</td>
                         <td className="px-3 py-1.5 font-black">{displayBrand} {displayModel}</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-24">트림</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500 w-24">트림</td>
                         <td className="px-3 py-1.5 font-bold">{displayTrim || '-'}</td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">연식</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">연식</td>
                         <td className="px-3 py-1.5">{displayYear}년</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">연료</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">연료</td>
                         <td className="px-3 py-1.5">{displayFuel || '-'}</td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">차량가격</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">차량가격</td>
                         <td className="px-3 py-1.5 font-bold">{f(factoryPrice)}원</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">차량번호</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">차량번호</td>
                         <td className="px-3 py-1.5">{displayNumber || '(출고 전)'}</td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">구분</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">구분</td>
                         <td className="px-3 py-1.5">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             carInfo.is_used ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
@@ -951,14 +951,14 @@ export default function QuoteDetailPage() {
                             {carInfo.is_used ? '중고차' : '신차'}
                           </span>
                         </td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">배기량</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">배기량</td>
                         <td className="px-3 py-1.5">{carInfo.engine_cc ? `${f(carInfo.engine_cc)}cc` : '-'}</td>
                       </tr>
                       {(carInfo.mileage > 0 || carInfo.purchase_mileage > 0) && (
                         <tr>
-                          <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">현재 주행거리</td>
+                          <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">현재 주행거리</td>
                           <td className="px-3 py-1.5">{f(carInfo.mileage || 0)}km</td>
-                          <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">
+                          <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">
                             {carInfo.is_used ? '구입시 주행거리' : ''}
                           </td>
                           <td className="px-3 py-1.5">
@@ -973,34 +973,34 @@ export default function QuoteDetailPage() {
 
               {/* ── 3. 계약 조건 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">계약 조건</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">계약 조건</p>
+                <div className="border border-black/[0.06] rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-24">계약유형</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500 w-24">계약유형</td>
                         <td className="px-3 py-1.5 font-black">
                           {contractType === 'buyout' ? '인수형 장기렌트' : '반납형 장기렌트'}
                         </td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-24">계약기간</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500 w-24">계약기간</td>
                         <td className="px-3 py-1.5 font-bold">{termMonths}개월</td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">시작일</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">시작일</td>
                         <td className="px-3 py-1.5">{fDate(quote.start_date)}</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">종료일</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">종료일</td>
                         <td className="px-3 py-1.5">{fDate(quote.end_date)}</td>
                       </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">약정주행</td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">약정주행</td>
                         <td className="px-3 py-1.5">연간 {f(annualMileage * 10000)}km (총 {f(totalMileageLimit)}km)</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">정비상품</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">정비상품</td>
                         <td className="px-3 py-1.5 font-bold">{MAINT_PACKAGE_LABELS[maintPackage] || maintPackage}</td>
                       </tr>
                       <tr>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">보험연령</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">보험연령</td>
                         <td className="px-3 py-1.5">만 {driverAgeGroup}</td>
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">자차 면책금</td>
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">자차 면책금</td>
                         <td className="px-3 py-1.5 font-bold">
                           {deductible === 0 ? '완전자차 (면책 0원)' : `${f(deductible)}원`}
                         </td>
@@ -1012,26 +1012,26 @@ export default function QuoteDetailPage() {
 
               {/* ── 4. 월 렌탈료 안내 ── */}
               <div className="border-2 border-gray-900 rounded-lg overflow-hidden">
-                <div className="bg-gray-900 text-white px-3 py-1.5">
+                <div className="bg-gray-50 text-white px-3 py-1.5">
                   <p className="font-black text-xs">월 렌탈료 안내</p>
                 </div>
-                <div className="border border-gray-200 rounded-b-lg overflow-hidden">
+                <div className="border border-black/[0.06] rounded-b-lg overflow-hidden">
                   <table className="w-full text-xs"><tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500 w-28">보증금</td>
-                      <td className="px-3 py-1.5 font-bold text-gray-800">
-                        {depositAmt === 0 ? '없음' : <>{f(depositAmt)}원{factoryPrice > 0 && <span className="text-[10px] text-gray-400 ml-1">(차량가의 {(depositAmt / factoryPrice * 100).toFixed(0)}%)</span>}</>}
+                    <tr className="border-b border-black/5">
+                      <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500 w-28">보증금</td>
+                      <td className="px-3 py-1.5 font-bold text-slate-700">
+                        {depositAmt === 0 ? '없음' : <>{f(depositAmt)}원{factoryPrice > 0 && <span className="text-[10px] text-slate-500 ml-1">(차량가의 {(depositAmt / factoryPrice * 100).toFixed(0)}%)</span>}</>}
                       </td>
                     </tr>
                     {prepaymentAmt > 0 && (
-                      <tr className="border-b border-gray-100">
-                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-gray-500">선납금</td>
-                        <td className="px-3 py-1.5 font-bold text-gray-800">{f(prepaymentAmt)}원 <span className="text-[10px] text-gray-400">(계약 시 1회)</span></td>
+                      <tr className="border-b border-black/5">
+                        <td className="bg-gray-50 px-3 py-1.5 font-bold text-slate-500">선납금</td>
+                        <td className="px-3 py-1.5 font-bold text-slate-700">{f(prepaymentAmt)}원 <span className="text-[10px] text-slate-500">(계약 시 1회)</span></td>
                       </tr>
                     )}
                     <tr style={{ borderBottom: '1px solid #dbeafe', background: '#eff6ff' }}>
                       <td style={{ padding: '10px 12px', fontWeight: 700, color: '#1d4ed8', verticalAlign: 'middle' }}>
-                        월 렌탈료<br/><span style={{ fontSize: 9, fontWeight: 400, color: '#60a5fa' }}>(VAT 포함)</span>
+                        월 렌탈료<br/><span style={{ fontSize: 9, fontWeight: 400, color: '#2563eb' }}>(VAT 포함)</span>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', letterSpacing: '-0.5px' }}>{f(rentWithVAT)}<span style={{ fontSize: 12, fontWeight: 600 }}>원</span></span>
@@ -1040,7 +1040,7 @@ export default function QuoteDetailPage() {
                       </td>
                     </tr>
                     {contractType === 'buyout' && (
-                      <tr className="border-b border-gray-100 bg-amber-50">
+                      <tr className="border-b border-black/5 bg-amber-50">
                         <td className="px-3 py-1.5 font-bold text-amber-600">만기 인수가</td>
                         <td className="px-3 py-1.5 font-black text-amber-700 text-sm">{f(buyoutPrice)}<span className="text-[10px]">원</span> <span className="text-[10px] font-normal text-amber-400">잔존가율 {detail.residual_rate || '-'}%</span></td>
                       </tr>
@@ -1051,17 +1051,17 @@ export default function QuoteDetailPage() {
 
               {/* ── 5. 자동차보험 보장내역 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">자동차보험 보장내역</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">자동차보험 보장내역</p>
+                <div className="border border-black/[0.06] rounded-lg overflow-hidden">
                   <table className="w-full text-xs"><tbody>
-                    <tr className="border-b border-gray-100 bg-gray-50">
-                      <td className="px-3 py-1 font-bold text-gray-500 w-36">보장항목</td>
-                      <td className="px-3 py-1 font-bold text-gray-500">보장내용</td>
+                    <tr className="border-b border-black/5 bg-gray-50">
+                      <td className="px-3 py-1 font-bold text-slate-500 w-36">보장항목</td>
+                      <td className="px-3 py-1 font-bold text-slate-500">보장내용</td>
                     </tr>
                     {(savedInsuranceCoverage || DEFAULT_INSURANCE_COVERAGE).map((item: any, idx: number) => (
-                      <tr key={idx} className={idx < (savedInsuranceCoverage || DEFAULT_INSURANCE_COVERAGE).length - 1 ? 'border-b border-gray-100' : ''}>
-                        <td className="px-3 py-1.5 font-bold text-gray-700">{item.label}</td>
-                        <td className="px-3 py-1.5 text-gray-600">
+                      <tr key={idx} className={idx < (savedInsuranceCoverage || DEFAULT_INSURANCE_COVERAGE).length - 1 ? 'border-b border-black/5' : ''}>
+                        <td className="px-3 py-1.5 font-bold text-slate-600">{item.label}</td>
+                        <td className="px-3 py-1.5 text-slate-400">
                           {(item.description || '').replace(/\{deductible\}/g, f(deductible))}
                           {(item.description || '').includes('{deductible}') && deductible === 0 && (
                             <span className="text-green-600 font-bold ml-1">(완전면책)</span>
@@ -1071,25 +1071,25 @@ export default function QuoteDetailPage() {
                     ))}
                   </tbody></table>
                 </div>
-                <p className="text-[8px] text-gray-400 mt-1">※ {savedInsuranceNote || '렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함'}</p>
+                <p className="text-[8px] text-slate-500 mt-1">※ {savedInsuranceNote || '렌터카 공제조합 가입 · 보험기간: 계약기간 동안 연단위 자동갱신 · 보험료 렌탈료 포함'}</p>
               </div>
 
               {/* ── 5-1. 렌탈료 포함 서비스 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">렌탈료 포함 서비스</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">렌탈료 포함 서비스</p>
+                <div className="border border-black/[0.06] rounded-lg overflow-hidden">
                   <table className="w-full text-xs"><tbody>
-                    <tr className="border-b border-gray-100">
+                    <tr className="border-b border-black/5">
                       <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700 w-28">자동차보험</td>
                       <td className="px-3 py-1 text-blue-600">
                         종합 (대인II·대물1억·자손·무보험차·자차) · {deductible > 0 ? `면책 ${f(deductible)}원` : '완전자차'} · 만 {driverAgeGroup}
                       </td>
                     </tr>
-                    <tr className="border-b border-gray-100">
+                    <tr className="border-b border-black/5">
                       <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">세금</td>
                       <td className="px-3 py-1 text-blue-600">자동차세·취득세 렌탈료 포함</td>
                     </tr>
-                    <tr className="border-b border-gray-100">
+                    <tr className="border-b border-black/5">
                       <td className="bg-blue-50 px-3 py-1 font-bold text-blue-700">등록비용</td>
                       <td className="px-3 py-1 text-blue-600">번호판·인지세·공채·등록대행</td>
                     </tr>
@@ -1103,8 +1103,8 @@ export default function QuoteDetailPage() {
 
               {/* ── 6. 약정 조건 상세 ── */}
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">약정 조건</p>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">약정 조건</p>
+                <div className="border border-black/[0.06] rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <tbody>
                       <TRow label="계약기간" value={`${termMonths}개월 (${fDate(quote.start_date)} ~ ${fDate(quote.end_date)})`} bold />
@@ -1134,7 +1134,7 @@ export default function QuoteDetailPage() {
               {/* ── 7. 보증금/선납금 할인 효과 안내 ── */}
               {(depositDiscount > 0 || prepaymentDiscount > 0) && (
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">보증금 · 선납금 할인 효과</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">보증금 · 선납금 할인 효과</p>
                   <div className="border border-green-200 rounded-lg overflow-hidden">
                     <table className="w-full text-xs"><tbody>
                       {depositDiscount > 0 && (
@@ -1160,7 +1160,7 @@ export default function QuoteDetailPage() {
               {/* ── 8. 인수 안내 (인수형만) ── */}
               {contractType === 'buyout' && (
                 <div>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">인수 안내</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">인수 안내</p>
                   <div className="border border-amber-200 rounded-lg overflow-hidden">
                     <table className="w-full text-xs"><tbody>
                       <tr className="border-b border-amber-100">
@@ -1169,11 +1169,11 @@ export default function QuoteDetailPage() {
                       </tr>
                       <tr className="border-b border-amber-100">
                         <td className="bg-amber-50 px-3 py-1.5 font-bold text-amber-600">잔존가치율</td>
-                        <td className="px-3 py-1.5 font-bold text-gray-700">{detail.residual_rate || '-'}%</td>
+                        <td className="px-3 py-1.5 font-bold text-slate-600">{detail.residual_rate || '-'}%</td>
                       </tr>
                       <tr className="border-b border-amber-100">
                         <td className="bg-amber-50 px-3 py-1.5 font-bold text-amber-600">총 투자비용</td>
-                        <td className="px-3 py-1.5 font-bold text-gray-700">{f(totalWithBuyout)}원</td>
+                        <td className="px-3 py-1.5 font-bold text-slate-600">{f(totalWithBuyout)}원</td>
                       </tr>
                       <tr>
                         <td colSpan={2} className="px-3 py-1 text-[10px] text-amber-600 bg-amber-50/50">
@@ -1191,16 +1191,16 @@ export default function QuoteDetailPage() {
                   <table className="w-full text-xs"><tbody>
                     <tr>
                       <td className="bg-yellow-50 px-3 py-1.5 font-bold text-yellow-700 w-16 align-top">비고</td>
-                      <td className="px-3 py-1.5 text-gray-700 whitespace-pre-wrap">{detail.note}</td>
+                      <td className="px-3 py-1.5 text-slate-600 whitespace-pre-wrap">{detail.note}</td>
                     </tr>
                   </tbody></table>
                 </div>
               )}
 
               {/* ── 10. 유의사항 ── */}
-              <div className="border-t border-gray-200 pt-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">유의사항 및 특약</p>
-                <div className="text-[10px] text-gray-500 space-y-1 leading-relaxed">
+              <div className="border-t border-black/[0.06] pt-3">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">유의사항 및 특약</p>
+                <div className="text-[10px] text-slate-500 space-y-1 leading-relaxed">
                   {(savedQuoteNotices || DEFAULT_QUOTE_NOTICES).map((item: any, idx: number) => {
                     // 조건부 항목 처리
                     if (item?.condition === 'buyout' && contractType !== 'buyout') return null
@@ -1222,23 +1222,23 @@ export default function QuoteDetailPage() {
               {/* ── 11. 서명란 ── */}
               <div className="grid grid-cols-2 gap-8 pt-6">
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 mb-10">임대인 (서명/인)</p>
-                  <div className="border-t border-gray-300 pt-2">
-                    <p className="text-sm font-bold text-gray-700">{company?.name || '당사'}</p>
+                  <p className="text-xs text-slate-500 mb-10">임대인 (서명/인)</p>
+                  <div className="border-t border-black/10 pt-2">
+                    <p className="text-sm font-bold text-slate-600">{company?.name || '당사'}</p>
                   </div>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 mb-10">임차인 (서명/인)</p>
-                  <div className="border-t border-gray-300 pt-2">
-                    <p className="text-sm font-bold text-gray-700">{customerName}</p>
+                  <p className="text-xs text-slate-500 mb-10">임차인 (서명/인)</p>
+                  <div className="border-t border-black/10 pt-2">
+                    <p className="text-sm font-bold text-slate-600">{customerName}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* 푸터 */}
-            <div className="bg-gray-50 px-8 py-4 border-t border-gray-200 text-center rounded-b-2xl">
-              <p className="text-[10px] text-gray-400">
+            <div className="bg-gray-50 px-8 py-4 border-t border-black/[0.06] text-center rounded-b-2xl">
+              <p className="text-[10px] text-slate-500">
                 본 견적서는 {company?.name || '당사'}에서 발행한 공식 견적서입니다. 문의: {company?.phone || '-'}
               </p>
             </div>
@@ -1257,9 +1257,9 @@ export default function QuoteDetailPage() {
             <div className="lg:col-span-7 space-y-4">
 
               {/* 고객 + 차량 요약 카드 */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                  <h3 className="font-bold text-gray-800 text-sm">견적 기본 정보</h3>
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-black/5 bg-gray-50/50">
+                  <h3 className="font-bold text-slate-700 text-sm">견적 기본 정보</h3>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex items-center gap-5">
@@ -1270,10 +1270,10 @@ export default function QuoteDetailPage() {
                     )}
                     <div className="flex-1">
                       <div className="flex justify-between items-center">
-                        <span className="font-black text-lg text-gray-900">{displayBrand} {displayModel}</span>
-                        {displayNumber && <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold">{displayNumber}</span>}
+                        <span className="font-black text-lg text-slate-800">{displayBrand} {displayModel}</span>
+                        {displayNumber && <span className="px-3 py-1 bg-gray-100 text-slate-400 rounded-lg text-sm font-bold">{displayNumber}</span>}
                       </div>
-                      <p className="text-gray-500 text-sm">{displayTrim} · {displayYear}년식 · {displayFuel}</p>
+                      <p className="text-slate-500 text-sm">{displayTrim} · {displayYear}년식 · {displayFuel}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -1286,7 +1286,7 @@ export default function QuoteDetailPage() {
                       ['보증금', `${f(depositAmt)}원`],
                     ].map(([l, v], i) => (
                       <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-2">
-                        <span className="text-gray-500">{l}</span>
+                        <span className="text-slate-500">{l}</span>
                         <span className="font-bold">{v}</span>
                       </div>
                     ))}
@@ -1295,9 +1295,9 @@ export default function QuoteDetailPage() {
               </div>
 
               {/* 감가 분석 */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                  <h3 className="font-bold text-gray-800 text-sm">감가상각 분석</h3>
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-black/5 bg-gray-50/50">
+                  <h3 className="font-bold text-slate-700 text-sm">감가상각 분석</h3>
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-4">
@@ -1309,7 +1309,7 @@ export default function QuoteDetailPage() {
                       ['만기시장가', f(detail.end_market_value) + '원'],
                     ].map(([l, v], i) => (
                       <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
-                        <p className="text-gray-400 text-xs mb-1">{l}</p>
+                        <p className="text-slate-500 text-xs mb-1">{l}</p>
                         <p className="font-black text-sm">{v}</p>
                       </div>
                     ))}
@@ -1332,29 +1332,29 @@ export default function QuoteDetailPage() {
               </div>
 
               {/* 금융 분석 */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                  <h3 className="font-bold text-gray-800 text-sm">금융비용 분석 (평균잔액법)</h3>
+              <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-black/5 bg-gray-50/50">
+                  <h3 className="font-bold text-slate-700 text-sm">금융비용 분석 (평균잔액법)</h3>
                 </div>
                 <div className="p-6 grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-400 text-xs mb-2 font-bold">대출</p>
+                    <p className="text-slate-500 text-xs mb-2 font-bold">대출</p>
                     <div className="space-y-2">
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">대출금액</span><span className="font-bold">{f(detail.loan_amount)}원</span></div>
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">대출금리</span><span className="font-bold">{detail.loan_rate || 0}%</span></div>
+                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">대출금액</span><span className="font-bold">{f(detail.loan_amount)}원</span></div>
+                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">대출금리</span><span className="font-bold">{detail.loan_rate || 0}%</span></div>
                       {costBreakdown.avg_loan_balance > 0 && (
-                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_loan_balance)}원</span></div>
+                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_loan_balance)}원</span></div>
                       )}
                       <div className="flex justify-between bg-blue-50 rounded-lg px-3 py-2"><span className="text-blue-600">월 이자</span><span className="font-black text-blue-700">{f(monthlyLoanInterest)}원</span></div>
                     </div>
                   </div>
                   <div>
-                    <p className="text-gray-400 text-xs mb-2 font-bold">자기자본 / 기회비용</p>
+                    <p className="text-slate-500 text-xs mb-2 font-bold">자기자본 / 기회비용</p>
                     <div className="space-y-2">
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">자기자본</span><span className="font-bold">{f(totalAcquisitionCost - (detail.loan_amount || 0))}원</span></div>
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">투자수익률</span><span className="font-bold">{detail.investment_rate || 0}%</span></div>
+                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">자기자본</span><span className="font-bold">{f(totalAcquisitionCost - (detail.loan_amount || 0))}원</span></div>
+                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">투자수익률</span><span className="font-bold">{detail.investment_rate || 0}%</span></div>
                       {costBreakdown.avg_equity_balance > 0 && (
-                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-gray-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_equity_balance)}원</span></div>
+                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_equity_balance)}원</span></div>
                       )}
                       <div className="flex justify-between bg-purple-50 rounded-lg px-3 py-2"><span className="text-purple-600">월 기회비용</span><span className="font-black text-purple-700">{f(monthlyOpportunityCost)}원</span></div>
                     </div>
@@ -1364,8 +1364,8 @@ export default function QuoteDetailPage() {
 
               {/* 보증금 & 선납금 효과 */}
               {(depositDiscount > 0 || prepaymentDiscount > 0) && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50"><h3 className="font-bold text-gray-800 text-sm">보증금 & 선납금 효과</h3></div>
+                <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-black/5 bg-gray-50/50"><h3 className="font-bold text-slate-700 text-sm">보증금 & 선납금 효과</h3></div>
                   <div className="p-6 space-y-3 text-sm">
                     {depositDiscount > 0 && <div className="flex justify-between bg-green-50 rounded-lg px-3 py-2"><span className="text-green-600">보증금 할인 효과</span><span className="font-black text-green-700">-{f(depositDiscount)}원/월</span></div>}
                     {prepaymentDiscount > 0 && <div className="flex justify-between bg-green-50 rounded-lg px-3 py-2"><span className="text-green-600">선납금 할인 효과</span><span className="font-black text-green-700">-{f(prepaymentDiscount)}원/월</span></div>}
@@ -1378,19 +1378,19 @@ export default function QuoteDetailPage() {
             <div className="lg:col-span-5 space-y-3">
 
               {/* 원가분석 결과 (다크 카드) */}
-              <div className="bg-gray-900 text-white rounded-2xl shadow-xl p-4">
+              <div className="bg-gray-50 text-white rounded-2xl shadow-xl p-4">
                 <div className="border-b border-gray-700 pb-2 mb-3">
-                  <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Pricing Analysis</p>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Pricing Analysis</p>
                   <h2 className="text-base font-black mt-0.5">원가분석 결과</h2>
                 </div>
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between"><span className="text-gray-400">감가상각</span><span className="font-bold">{f(monthlyDep)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">대출이자</span><span className="font-bold">{f(monthlyLoanInterest)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">기회비용</span><span className="font-bold">{f(monthlyOpportunityCost)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">보험료</span><span className="font-bold">{f(monthlyInsurance)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">정비비</span><span className="font-bold">{f(monthlyMaint)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">자동차세</span><span className="font-bold">{f(monthlyTax)}원</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">리스크적립</span><span className="font-bold">{f(monthlyRisk)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">감가상각</span><span className="font-bold">{f(monthlyDep)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">대출이자</span><span className="font-bold">{f(monthlyLoanInterest)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">기회비용</span><span className="font-bold">{f(monthlyOpportunityCost)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">보험료</span><span className="font-bold">{f(monthlyInsurance)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">정비비</span><span className="font-bold">{f(monthlyMaint)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">자동차세</span><span className="font-bold">{f(monthlyTax)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">리스크적립</span><span className="font-bold">{f(monthlyRisk)}원</span></div>
                   {(depositDiscount > 0 || prepaymentDiscount > 0) && (
                     <>
                       <div className="border-t border-gray-700 my-1" />
@@ -1399,21 +1399,21 @@ export default function QuoteDetailPage() {
                     </>
                   )}
                   <div className="border-t border-gray-700 my-2 pt-2">
-                    <div className="flex justify-between"><span className="text-gray-300 font-bold">총 원가</span><span className="font-black text-sm">{f(totalMonthlyCost)}원</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400 font-bold">총 원가</span><span className="font-black text-sm">{f(totalMonthlyCost)}원</span></div>
                   </div>
                   <div className="flex justify-between text-green-400"><span className="font-bold">+ 마진</span><span className="font-bold">{f(margin)}원</span></div>
                   <div className="border-t border-gray-500 my-2 pt-2">
                     <div className="text-right">
                       <p className="text-[10px] text-yellow-400 font-bold mb-0.5">월 렌트료 (VAT 포함)</p>
                       <p className="text-2xl font-black tracking-tight">{f(rentWithVAT)}<span className="text-sm ml-1">원</span></p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">공급가 {f(suggestedRent)}원 + VAT {f(rentVAT)}원</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">공급가 {f(suggestedRent)}원 + VAT {f(rentVAT)}원</p>
                     </div>
                   </div>
                 </div>
 
                 {/* 원가 비중 바 */}
                 <div className="mt-3 pt-3 border-t border-gray-700">
-                  <p className="text-[10px] text-gray-400 mb-2 font-bold">원가 비중</p>
+                  <p className="text-[10px] text-slate-500 mb-2 font-bold">원가 비중</p>
                   <div className="space-y-1.5">
                     <CostBar label="감가" value={monthlyDep} total={totalCostForBar} color="bg-red-500" />
                     <CostBar label="금융" value={monthlyFinance} total={totalCostForBar} color="bg-blue-500" />
@@ -1426,7 +1426,7 @@ export default function QuoteDetailPage() {
                 {worksheet && (
                   <div className="mt-3 pt-3 border-t border-gray-700">
                     <button onClick={handleEditWorksheet} className="w-full py-2.5 bg-steel-600 hover:bg-steel-500 text-white rounded-xl font-bold text-xs transition-colors">렌트가 산출 수정 →</button>
-                    <p className="text-[10px] text-gray-500 text-center mt-1">워크시트: {String(worksheet.id).slice(0, 8)} · {fDate(worksheet.updated_at)}</p>
+                    <p className="text-[10px] text-slate-500 text-center mt-1">워크시트: {String(worksheet.id).slice(0, 8)} · {fDate(worksheet.updated_at)}</p>
                   </div>
                 )}
               </div>
@@ -1434,34 +1434,34 @@ export default function QuoteDetailPage() {
               {/* 수익성 + 초과주행 — 2열 그리드 */}
               <div className="grid grid-cols-2 gap-3">
                 {/* 수익성 요약 */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
-                  <h3 className="font-bold text-gray-700 mb-2 text-xs">수익성 요약</h3>
+                <div className="bg-white rounded-xl border border-black/[0.06] shadow-sm p-3">
+                  <h3 className="font-bold text-slate-600 mb-2 text-xs">수익성 요약</h3>
                   <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs"><span className="text-gray-500">월 순이익</span><span className="font-bold text-green-600">{f(margin)}원</span></div>
-                    <div className="flex justify-between text-xs"><span className="text-gray-500">총이익</span><span className="font-black text-green-700">{f(margin * termMonths)}원</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-slate-500">월 순이익</span><span className="font-bold text-green-600">{f(margin)}원</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-slate-500">총이익</span><span className="font-black text-green-700">{f(margin * termMonths)}원</span></div>
                     <div className="border-t pt-1.5 space-y-1">
-                      <div className="flex justify-between text-xs"><span className="text-gray-500">마진율</span><span className="font-bold text-steel-600">{suggestedRent > 0 ? (margin / suggestedRent * 100).toFixed(1) : 0}%</span></div>
-                      <div className="flex justify-between text-xs"><span className="text-gray-500">연 ROI</span><span className="font-bold text-steel-600">{totalAcquisitionCost > 0 ? ((margin * 12) / totalAcquisitionCost * 100).toFixed(1) : 0}%</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-slate-500">마진율</span><span className="font-bold text-steel-600">{suggestedRent > 0 ? (margin / suggestedRent * 100).toFixed(1) : 0}%</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-slate-500">연 ROI</span><span className="font-bold text-steel-600">{totalAcquisitionCost > 0 ? ((margin * 12) / totalAcquisitionCost * 100).toFixed(1) : 0}%</span></div>
                     </div>
                   </div>
                 </div>
 
                 {/* 초과주행 요금 */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
-                  <h3 className="font-bold text-gray-700 mb-2 text-xs">초과주행 요금</h3>
+                <div className="bg-white rounded-xl border border-black/[0.06] shadow-sm p-3">
+                  <h3 className="font-bold text-slate-600 mb-2 text-xs">초과주행 요금</h3>
                   {excessMileageRate > 0 ? (
                     <>
                       <div className="text-center bg-red-50 rounded-lg p-2 mb-2">
                         <p className="text-red-500 text-[10px] font-bold mb-0.5">km당</p>
                         <p className="text-lg font-black text-red-600">{f(excessMileageRate)}원</p>
                       </div>
-                      <div className="text-[10px] text-gray-500 space-y-0.5">
+                      <div className="text-[10px] text-slate-500 space-y-0.5">
                         <p>연 {f(annualMileage * 10000)}km</p>
                         <p>총 {f(totalMileageLimit)}km</p>
                       </div>
                     </>
                   ) : (
-                    <p className="text-xs text-gray-400">설정 없음</p>
+                    <p className="text-xs text-slate-500">설정 없음</p>
                   )}
                 </div>
               </div>
@@ -1475,14 +1475,14 @@ export default function QuoteDetailPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print" onClick={() => { setShowShareModal(false); setSendResult(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-black text-gray-900">견적서 발송</h3>
-              <button onClick={() => { setShowShareModal(false); setSendResult(null) }} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+              <h3 className="text-lg font-black text-slate-800">견적서 발송</h3>
+              <button onClick={() => { setShowShareModal(false); setSendResult(null) }} className="text-slate-500 hover:text-slate-400 text-xl font-bold">&times;</button>
             </div>
 
             {shareLoading ? (
               <div className="text-center py-8">
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">링크 생성 중...</p>
+                <p className="text-slate-500 text-sm">링크 생성 중...</p>
               </div>
             ) : shareUrl ? (
               <div className="space-y-3">
@@ -1502,7 +1502,7 @@ export default function QuoteDetailPage() {
 
                 {/* 발송 채널 선택 */}
                 <div>
-                  <p className="text-xs font-bold text-gray-500 mb-2">발송 방법</p>
+                  <p className="text-xs font-bold text-slate-500 mb-2">발송 방법</p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {([
                       { key: 'copy', icon: '📋', label: '복사' },
@@ -1516,7 +1516,7 @@ export default function QuoteDetailPage() {
                         className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border-2 ${
                           sendChannel === ch.key
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                            : 'border-black/[0.06] bg-white text-slate-500 hover:border-black/10'
                         }`}
                       >
                         <span className="text-base block mb-0.5">{ch.icon}</span>
@@ -1540,22 +1540,22 @@ export default function QuoteDetailPage() {
                       </button>
                       <button
                         onClick={() => handleCopyShareUrl('link')}
-                        className="py-3 rounded-xl text-sm font-bold bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        className="py-3 rounded-xl text-sm font-bold bg-gray-100 text-slate-600 hover:bg-gray-100"
                       >
                         🔗 링크만 복사
                       </button>
                     </div>
-                    <p className="text-[10px] text-gray-400">복사한 내용을 카카오톡/문자에 붙여넣기하여 전송하세요.</p>
+                    <p className="text-[10px] text-slate-500">복사한 내용을 카카오톡/문자에 붙여넣기하여 전송하세요.</p>
                   </div>
                 ) : sendChannel === 'email' ? (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500">수신 이메일</label>
+                    <label className="text-xs font-bold text-slate-500">수신 이메일</label>
                     <input
                       type="email"
                       value={sendEmail}
                       onChange={e => setSendEmail(e.target.value)}
                       placeholder="customer@example.com"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <button
                       onClick={handleDirectSend}
@@ -1567,23 +1567,23 @@ export default function QuoteDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500">수신 전화번호</label>
+                    <label className="text-xs font-bold text-slate-500">수신 전화번호</label>
                     <input
                       type="tel"
                       value={sendPhone}
                       onChange={e => setSendPhone(e.target.value)}
                       placeholder="010-1234-5678"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <button
                       onClick={handleDirectSend}
                       disabled={sending || !sendPhone}
-                      className="w-full py-3 rounded-xl text-sm font-bold bg-yellow-400 text-gray-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full py-3 rounded-xl text-sm font-bold bg-yellow-400 text-slate-800 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {sending ? '발송 중...' : sendChannel === 'kakao' ? '💬 카카오 알림톡 발송' : '📱 문자(SMS) 발송'}
                     </button>
                     {sendChannel === 'kakao' && (
-                      <p className="text-[10px] text-gray-400">* 카카오 알림톡 발송 실패 시 자동으로 SMS로 대체 발송됩니다.</p>
+                      <p className="text-[10px] text-slate-500">* 카카오 알림톡 발송 실패 시 자동으로 SMS로 대체 발송됩니다.</p>
                     )}
                   </div>
                 )}
@@ -1598,13 +1598,13 @@ export default function QuoteDetailPage() {
                 )}
 
                 {/* 하단 정보 */}
-                <div className="flex justify-between items-center text-xs text-gray-400 pt-1 border-t border-gray-100">
+                <div className="flex justify-between items-center text-xs text-slate-500 pt-1 border-t border-black/5">
                   <span>유효기간: 7일</span>
                   <button onClick={handleRevokeShare} className="text-red-400 hover:text-red-600 font-bold">링크 비활성화</button>
                 </div>
               </div>
             ) : (
-              <p className="text-gray-500 text-sm text-center py-4">공유 링크를 생성할 수 없습니다.</p>
+              <p className="text-slate-500 text-sm text-center py-4">공유 링크를 생성할 수 없습니다.</p>
             )}
           </div>
         </div>
@@ -1666,14 +1666,14 @@ export default function QuoteDetailPage() {
           }
 
           /* 배경색 인쇄 보장 */
-          .bg-gray-900 {
+          .bg-gray-50 {
             background-color: #111827 !important;
           }
           .bg-gray-50 {
             background-color: #f9fafb !important;
           }
           .bg-gray-100 {
-            background-color: #f3f4f6 !important;
+            background-color: rgba(0,0,0,0.04) !important;
           }
 
           /* 텍스트 크기 미세 조정 (인쇄 가독성) */

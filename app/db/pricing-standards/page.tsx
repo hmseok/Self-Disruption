@@ -47,23 +47,23 @@ export default function PricingStandardsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-white/[0.02]">
       {/* 헤더 */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
+      <div className="bg-gray-50 border-b border-black/[0.06] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📊 산출 기준 관리</h1>
-              <p className="text-gray-500 mt-1 text-sm">
+              <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">📊 산출 기준 관리</h1>
+              <p className="text-slate-400 mt-1 text-sm">
                 렌트료 산출에 필요한 기본 데이터와 시장 가격 기준을 관리합니다
               </p>
             </div>
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-black/[0.06] text-slate-400 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
             >
               {showGuide ? '가이드 숨기기' : '가이드 보기'}
-              <span className="text-gray-500">💡</span>
+              <span className="text-slate-400">💡</span>
             </button>
           </div>
         </div>
@@ -71,34 +71,34 @@ export default function PricingStandardsPage() {
 
       {/* 초보자 가이드 배너 */}
       {showGuide && (
-        <div className="bg-gradient-to-r from-slate-50 to-zinc-50 border-b border-slate-200">
+        <div className="bg-gradient-to-r from-white/5 to-white/[0.02] border-b border-black/[0.06]">
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
                 <span className="text-xl flex-shrink-0">📊</span>
                 <div>
-                  <p className="font-bold text-gray-800 mb-1">기준 데이터란?</p>
-                  <p className="text-gray-600 leading-relaxed">
+                  <p className="font-bold text-slate-800 mb-1">기준 데이터란?</p>
+                  <p className="text-slate-600 leading-relaxed">
                     렌트료를 산출할 때 필요한 감가율, 보험료, 정비비, 세금, 금리 등의 기초 데이터입니다.
                     대형 렌터카사(롯데·SK·현대캐피탈)도 동일한 구조의 기준표를 관리합니다.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
                 <span className="text-xl flex-shrink-0">🔍</span>
                 <div>
-                  <p className="font-bold text-gray-800 mb-1">실시간 검증이란?</p>
-                  <p className="text-gray-600 leading-relaxed">
+                  <p className="font-bold text-slate-800 mb-1">실시간 검증이란?</p>
+                  <p className="text-slate-600 leading-relaxed">
                     각 탭 오른쪽의 검증 패널에서 Gemini AI로 현재 시장 데이터를 실시간 조회합니다.
                     우리 기준표와 시장가를 비교해 적정성을 판단할 수 있습니다.
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-white/70 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
                 <span className="text-xl flex-shrink-0">🏢</span>
                 <div>
-                  <p className="font-bold text-gray-800 mb-1">업계 비교 기준</p>
-                  <p className="text-gray-600 leading-relaxed">
+                  <p className="font-bold text-slate-800 mb-1">업계 비교 기준</p>
+                  <p className="text-slate-600 leading-relaxed">
                     롯데렌탈·SK렌터카·현대캐피탈 등 대형사 기준을 참고합니다.
                     소규모 렌터카도 동일 원가구조를 이해하면 전문가 수준의 산출이 가능합니다.
                   </p>
@@ -110,7 +110,7 @@ export default function PricingStandardsPage() {
       )}
 
       {/* 탭 바 */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-gray-50 border-b border-black/[0.06]">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
             {tabs.map((tab) => (
@@ -121,15 +121,15 @@ export default function PricingStandardsPage() {
                   flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold min-w-fit
                   ${
                     activeTab === tab.id
-                      ? 'bg-gray-900 text-white shadow-md shadow-gray-400'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-white/20 text-white shadow-md shadow-white/10'
+                      : 'bg-gray-100 text-slate-400 hover:bg-gray-100'
                   }
                 `}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
                 {activeTab === tab.id && (
-                  <span className="text-gray-300 text-[10px] hidden sm:inline">
+                  <span className="text-slate-400 text-[10px] hidden sm:inline">
                     {tab.desc}
                   </span>
                 )}

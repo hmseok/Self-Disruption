@@ -105,31 +105,31 @@ export default function MaintenanceTab() {
   const formatCurrency = (value: number) => new Intl.NumberFormat('ko-KR').format(value)
 
   if (loading) {
-    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
+    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-slate-400">로딩 중...</p></div>
   }
 
   return (
     <div className="space-y-4">
       {showGuide && (
-        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-2xl p-5 border border-teal-100">
+        <div className="bg-gradient-to-r from-teal-900/20 to-cyan-900/20 rounded-2xl p-5 border border-teal-700/30">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🔧</span>
-              <h3 className="text-sm font-bold text-gray-800">정비비 기준이란?</h3>
+              <h3 className="text-sm font-bold text-slate-800">정비비 기준이란?</h3>
             </div>
-            <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+            <button onClick={() => setShowGuide(false)} className="text-xs text-slate-400 hover:text-slate-600">닫기</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 leading-relaxed">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 leading-relaxed">
             <div>
-              <p className="font-semibold text-gray-700 mb-1">개념</p>
+              <p className="font-semibold text-slate-700 mb-1">개념</p>
               <p>렌터카 운영 중 발생하는 정기 정비·소모품 교체·돌발 수리비를 월 단위로 평균한 값입니다. 차종·연식에 따라 크게 다르며, 렌트료의 10~15%를 차지합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">산출 방식</p>
+              <p className="font-semibold text-slate-700 mb-1">산출 방식</p>
               <p>대형사는 과거 정비 이력 빅데이터로 차종·연식별 평균 정비비를 산출합니다. 소규모 업체는 업계 평균을 참고하되, 수입차·고연식 차량은 별도 관리가 필요합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">주의사항</p>
+              <p className="font-semibold text-slate-700 mb-1">주의사항</p>
               <p>전기차는 엔진오일·미션 정비가 없어 내연기관 대비 40~60% 저렴합니다. 다만 타이어 마모가 빠르고, 고전압 배터리 이슈 시 고비용이 발생할 수 있습니다.</p>
             </div>
           </div>
@@ -138,28 +138,28 @@ export default function MaintenanceTab() {
 
       {/* 차종 분류 기준 + 정비 항목 참고 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">📋</span>
-            <h3 className="text-xs font-bold text-gray-700">차종 분류 기준 (정비비 적용 기준)</h3>
+            <h3 className="text-xs font-bold text-slate-700">차종 분류 기준 (정비비 적용 기준)</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="text-xs">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">분류</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">해당 차종</th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">비용 범위</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">특이사항</th>
+                <tr className="bg-gray-100 border-b border-black/[0.06]">
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">분류</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">해당 차종</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">비용 범위</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">특이사항</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-200">
                 {CLASSIFICATION_INFO.map((info) => (
-                  <tr key={info.type} className="hover:bg-gray-50/50">
-                    <td className="px-3 py-2 font-semibold text-gray-800">{info.type}</td>
-                    <td className="px-3 py-2 text-gray-500">{info.desc}</td>
-                    <td className="px-3 py-2 text-center font-medium text-steel-600">{info.costRange}</td>
-                    <td className="px-3 py-2 text-gray-500">{info.note}</td>
+                  <tr key={info.type} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-semibold text-slate-700">{info.type}</td>
+                    <td className="px-3 py-2 text-slate-400">{info.desc}</td>
+                    <td className="px-3 py-2 text-center font-medium text-blue-400">{info.costRange}</td>
+                    <td className="px-3 py-2 text-slate-400">{info.note}</td>
                   </tr>
                 ))}
               </tbody>
@@ -167,28 +167,28 @@ export default function MaintenanceTab() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">🛠️</span>
-            <h3 className="text-xs font-bold text-gray-700">주요 정비 항목 및 주기 참고</h3>
+            <h3 className="text-xs font-bold text-slate-700">주요 정비 항목 및 주기 참고</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="text-xs">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">항목</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">교체주기</th>
-                  <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">비용</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">참고</th>
+                <tr className="bg-gray-100 border-b border-black/[0.06]">
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">항목</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">교체주기</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">비용</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">참고</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-200">
                 {MAINTENANCE_ITEMS.map((item) => (
-                  <tr key={item.item} className="hover:bg-gray-50/50">
-                    <td className="px-3 py-2 font-medium text-gray-800">{item.item}</td>
-                    <td className="px-3 py-2 text-gray-600">{item.cycle}</td>
-                    <td className="px-3 py-2 text-center text-gray-700">{item.cost}</td>
-                    <td className="px-3 py-2 text-gray-500">{item.note}</td>
+                  <tr key={item.item} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-slate-700">{item.item}</td>
+                    <td className="px-3 py-2 text-slate-400">{item.cycle}</td>
+                    <td className="px-3 py-2 text-center text-slate-600">{item.cost}</td>
+                    <td className="px-3 py-2 text-slate-400">{item.note}</td>
                   </tr>
                 ))}
               </tbody>
@@ -198,11 +198,11 @@ export default function MaintenanceTab() {
       </div>
 
       {/* Full-width table section */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-black/[0.06]">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06]">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">정비비 기준표 (편집 가능)</h3>
-            <p className="text-xs text-gray-400 mt-0.5">차종별·연료별·연식별 월 정비비 기준</p>
+            <h3 className="text-sm font-bold text-slate-800">정비비 기준표 (편집 가능)</h3>
+            <p className="text-xs text-slate-400 mt-0.5">차종별·연료별·연식별 월 정비비 기준</p>
           </div>
           <div className="flex gap-2">
             {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드 💡</button>}
@@ -216,43 +216,43 @@ export default function MaintenanceTab() {
         <div className="overflow-x-auto">
           <table className="text-xs">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">차종</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">연료</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">연식~</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">~연식</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">월정비비</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">포함</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">비고</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">삭제</th>
+              <tr className="bg-gray-100 border-b border-black/[0.06]">
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">차종</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">연료</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">연식~</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">~연식</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">월정비비</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">포함</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">비고</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">삭제</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition">
+                  <tr key={row.id} className="border-b border-black/5 hover:bg-gray-50 transition">
                     <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'vehicle_type' ? (
                         <select value={row.vehicle_type} onChange={(e) => { updateField(row.id, 'vehicle_type', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white">
                           {VEHICLE_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('vehicle_type') }}
-                          className="cursor-pointer text-gray-800 hover:text-gray-600 font-medium inline-block">{row.vehicle_type}</span>
+                          className="cursor-pointer text-slate-700 hover:text-slate-800 font-medium inline-block">{row.vehicle_type}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'fuel_type' ? (
                         <select value={row.fuel_type} onChange={(e) => { updateField(row.id, 'fuel_type', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white">
                           {FUEL_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('fuel_type') }}
-                          className="cursor-pointer text-gray-700 hover:text-gray-600 inline-block">{row.fuel_type}</span>
+                          className="cursor-pointer text-slate-600 hover:text-slate-700 inline-block">{row.fuel_type}</span>
                       )}
                     </td>
                     {(['age_min', 'age_max'] as const).map(field => (
@@ -260,10 +260,10 @@ export default function MaintenanceTab() {
                         {editingId === row.id && editingField === field ? (
                           <input type="number" value={row[field]} onChange={(e) => updateField(row.id, field, parseInt(e.target.value) || 0)}
                             onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                            className="w-14 px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none text-center" />
+                            className="w-14 px-2 py-1 border border-white/20 rounded text-xs focus:outline-none text-center bg-gray-100 text-white" />
                         ) : (
                           <span onClick={() => { setEditingId(row.id || null); setEditingField(field) }}
-                            className="cursor-pointer text-gray-700 hover:text-gray-600 inline-block">{row[field]}년</span>
+                            className="cursor-pointer text-slate-600 hover:text-slate-700 inline-block">{row[field]}년</span>
                         )}
                       </td>
                     ))}
@@ -271,10 +271,10 @@ export default function MaintenanceTab() {
                       {editingId === row.id && editingField === 'monthly_cost' ? (
                         <input type="number" value={row.monthly_cost} onChange={(e) => updateField(row.id, 'monthly_cost', parseInt(e.target.value) || 0)}
                           onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-20 px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none text-center" />
+                          className="w-20 px-2 py-1 border border-white/20 rounded text-xs focus:outline-none text-center bg-gray-100 text-white" />
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('monthly_cost') }}
-                          className="cursor-pointer font-bold text-steel-600 hover:text-steel-700 inline-block">{formatCurrency(row.monthly_cost)}원</span>
+                          className="cursor-pointer font-bold text-blue-400 hover:text-blue-300 inline-block">{formatCurrency(row.monthly_cost)}원</span>
                       )}
                     </td>
                     {(['includes', 'notes'] as const).map(field => (
@@ -282,10 +282,10 @@ export default function MaintenanceTab() {
                         {editingId === row.id && editingField === field ? (
                           <input type="text" value={row[field]} onChange={(e) => updateField(row.id, field, e.target.value)}
                             onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                            className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none" />
+                            className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white" />
                         ) : (
                           <span onClick={() => { setEditingId(row.id || null); setEditingField(field) }}
-                            className="cursor-pointer text-gray-500 hover:text-gray-600 inline-block">{row[field] || '—'}</span>
+                            className="cursor-pointer text-slate-500 hover:text-slate-400 inline-block">{row[field] || '—'}</span>
                         )}
                       </td>
                     ))}
@@ -308,7 +308,7 @@ export default function MaintenanceTab() {
 
           <div className="space-y-3 mb-4">
             <div>
-              <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">차종</label>
+              <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">차종</label>
               <select value={searchVehicleType} onChange={(e) => setSearchVehicleType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500">
                 <option value="">선택하세요</option>
@@ -316,7 +316,7 @@ export default function MaintenanceTab() {
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">차량 연식 (년차)</label>
+              <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">차량 연식 (년차)</label>
               <input type="number" value={searchAge} onChange={(e) => setSearchAge(parseInt(e.target.value) || 1)} min="1"
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500" />
             </div>
@@ -332,7 +332,7 @@ export default function MaintenanceTab() {
                   <div className="flex justify-between"><span className="text-slate-400">차종</span><span className="text-white">{matched.vehicle_type}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">연식 범위</span><span className="text-white">{matched.age_min}~{matched.age_max}년</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">월 정비비</span><span className="font-bold text-steel-400">{formatCurrency(matched.monthly_cost)}원</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">연 환산</span><span className="text-slate-300">{formatCurrency(matched.monthly_cost * 12)}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">연 환산</span><span className="text-slate-600">{formatCurrency(matched.monthly_cost * 12)}원</span></div>
                 </div>
               </div>
             ) : (
@@ -350,10 +350,10 @@ export default function MaintenanceTab() {
           {searchResults && (
             <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[10px] font-semibold text-slate-300">Gemini 검증 결과</h4>
+                <h4 className="text-[10px] font-semibold text-slate-600">Gemini 검증 결과</h4>
                 <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
               </div>
-              <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+              <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                 {searchResults.results}
               </div>
               {searchResults.sources?.length > 0 && (

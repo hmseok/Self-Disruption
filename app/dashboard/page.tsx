@@ -164,233 +164,265 @@ export default function DashboardPage() {
   const showInvest = hasModule('/invest') || hasModule('/jiip')
   const showFinance = hasModule('/finance') || hasModule('/quotes')
 
+  // ── 가동률 계산 ──
+  const utilRate = stats.totalCars > 0 ? Math.round((stats.rentedCars / stats.totalCars) * 100) : 0
+
+  // ── 주의 항목 수집 ──
+  const alerts: { label: string; count: number; color: string; href: string }[] = []
+  if (opsStats.inspectionsOverdue > 0) alerts.push({ label: '검사 만기초과', count: opsStats.inspectionsOverdue, color: 'text-red-400', href: '/maintenance' })
+  if (opsStats.inspectionsDueSoon > 0) alerts.push({ label: '검사 7일내', count: opsStats.inspectionsDueSoon, color: 'text-orange-400', href: '/maintenance' })
+  if (collectionStats.overdueCount > 0) alerts.push({ label: '수금 연체', count: collectionStats.overdueCount, color: 'text-red-400', href: '/finance/collections' })
+  if (opsStats.activeAccidents > 0) alerts.push({ label: '사고 처리중', count: opsStats.activeAccidents, color: 'text-purple-400', href: '/claims/accident-mgmt' })
+  if (opsStats.maintenanceWaiting > 0) alerts.push({ label: '정비 대기', count: opsStats.maintenanceWaiting, color: 'text-amber-400', href: '/maintenance' })
+
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* 상단 인사 영역 */}
+      {/* ═══ 상단 인사 헤더 ═══ */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
           <p className="text-slate-400 text-xs sm:text-sm font-medium">
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight mt-1">
-            {getGreeting()}, <span className="text-blue-400">주식회사 에프엠아이</span>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mt-1">
+            {getGreeting()}, <span className="text-blue-600">주식회사 에프엠아이</span>
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">오늘의 업무 현황을 확인하세요</p>
         </div>
         <div className="flex gap-2 items-center">
-            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300">FMI</span>
-            {position && (
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300">{position.name}</span>
-            )}
-          </div>
-      </div>
-
-      {/* KPI 카드 — god admin 스타일 다크 그라데이션 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-        {showCars && (
-          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">보유 차량</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">🚗</span>
-            </div>
-            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : stats.totalCars}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">대</span></p>
-            <div className="mt-1 md:mt-2 flex flex-wrap gap-1.5 md:gap-2 text-[10px] md:text-[11px] font-medium text-steel-200">
-              <span>대기 {stats.availableCars}</span>
-              <span>·</span>
-              <span>대여 {stats.rentedCars}</span>
-              <span>·</span>
-              <span>정비 {stats.maintenanceCars}</span>
-            </div>
-          </div>
-        )}
-        {showCustomers && (
-          <div className="bg-gradient-to-br from-steel-700 to-steel-900 rounded-2xl p-4 md:p-5 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">고객 수</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">👥</span>
-            </div>
-            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : stats.totalCustomers}<span className="text-sm md:text-base font-bold text-steel-200 ml-1">명</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">등록된 전체 고객</p>
-          </div>
-        )}
-        {showInvest && (
-          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-sky-200 uppercase">투자 유치</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💰</span>
-            </div>
-            <p className="text-2xl md:text-3xl font-black">{loading ? '-' : formatMoney(stats.totalInvestAmount)}<span className="text-sm md:text-base font-bold text-sky-200 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-sky-200">일반 {stats.activeInvestments}건 · 지입 {stats.jiipContracts}건</p>
-          </div>
-        )}
-        {showCars && (
-          <div className="glass-3 rounded-2xl p-4 md:p-5 border border-white/[0.06] shadow-sm">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase">가동률</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-sm">📊</span>
-            </div>
-            <p className="text-2xl md:text-3xl font-black text-slate-100">
-              {loading || stats.totalCars === 0 ? '-' : Math.round((stats.rentedCars / stats.totalCars) * 100)}
-              <span className="text-sm md:text-base font-bold text-slate-400 ml-1">%</span>
-            </p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-slate-400">대여 중 / 전체 비율</p>
-          </div>
-        )}
-        {!showCars && !showCustomers && !showInvest && (
-          <div className="col-span-2 md:col-span-4 bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-6 text-white shadow-lg text-center">
-            <p className="text-lg font-black">활성화된 모듈이 없습니다</p>
-            <p className="text-steel-200 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
-          </div>
-        )}
-      </div>
-
-      {/* 경영 현황판 — 다크 스타일 */}
-      {showFinance && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-8">
-          <div className="bg-gradient-to-br from-steel-600 to-steel-800 rounded-2xl p-4 md:p-5 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-steel-200 uppercase">월 예상 매출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💵</span>
-            </div>
-            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-sm font-bold text-steel-200 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-steel-200">활성 렌트 계약 기준</p>
-          </div>
-          <div className="bg-gradient-to-br from-red-500 to-rose-700 rounded-2xl p-4 md:p-5 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-red-200 uppercase">월 고정 지출</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm">💸</span>
-            </div>
-            <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-red-200 ml-1">원</span></p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-red-200">할부금 + 보험료 (월 환산)</p>
-          </div>
-          <div className="glass-3 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-white/[0.06]">
-            <div className="flex items-center justify-between mb-2 md:mb-3">
-              <span className="text-[10px] md:text-xs font-bold text-amber-400 uppercase">월 순수익</span>
-              <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-sm">🏆</span>
-            </div>
-            <p className={`text-xl md:text-2xl font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {loading ? '-' : formatMoney(stats.netProfit)}<span className="text-sm font-bold text-slate-500 ml-1">원</span>
-            </p>
-            <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-slate-500">매출 - 고정지출</p>
-          </div>
+          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600">FMI</span>
+          {position && (
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600">{position.name}</span>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* ── 수금 현황 ── */}
-      {showFinance && !loading && (collectionStats.pendingCount > 0 || collectionStats.overdueCount > 0 || collectionStats.completedCount > 0) && (
-        <div className="mb-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider">이번달 수금 현황</h2>
-            <Link href="/finance/collections" className="text-xs font-bold text-blue-300 hover:text-blue-200 transition-colors">
-              자세히 보기 →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">수금율</span>
-                <span className="text-base">{collectionStats.collectionRate >= 80 ? '✅' : collectionStats.collectionRate >= 50 ? '⚠️' : '🔴'}</span>
+      {/* ═══ B-스타일 2컬럼 레이아웃 ═══ */}
+      <div className="flex flex-col lg:flex-row gap-5">
+
+        {/* ── 좌측: 종합 요약 카드 (고정 폭) ── */}
+        <div className="w-full lg:w-[340px] flex-shrink-0 space-y-4">
+
+          {/* 차량 현황 요약 카드 */}
+          {showCars && (
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">차량 현황</span>
+                <Link href="/cars" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
               </div>
-              <p className={`text-xl font-black ${collectionStats.collectionRate >= 80 ? 'text-emerald-400' : collectionStats.collectionRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                {collectionStats.collectionRate}%
-              </p>
-            </div>
-            <div className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">수금 완료</span>
-                <span className="text-base">💰</span>
+
+              {/* 큰 숫자 */}
+              <div className="text-center mb-5">
+                <p className="text-5xl font-black text-slate-800">{loading ? '-' : stats.totalCars}</p>
+                <p className="text-xs text-slate-400 font-medium mt-1">보유 차량 (대)</p>
               </div>
-              <p className="text-xl font-black text-emerald-400">{formatMoney(collectionStats.completedAmount)}<span className="text-xs font-bold text-slate-400 ml-1">원</span></p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{collectionStats.completedCount}건</p>
-            </div>
-            <Link href="/finance/collections" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">미수금</span>
-                <span className="text-base">⏳</span>
-              </div>
-              <p className="text-xl font-black text-amber-400">{formatMoney(collectionStats.pendingAmount)}<span className="text-xs font-bold text-slate-400 ml-1">원</span></p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{collectionStats.pendingCount}건</p>
-            </Link>
-            {collectionStats.overdueCount > 0 && (
-              <Link href="/finance/collections" className="glass-3 rounded-xl p-4 border border-red-400/40 shadow-sm hover:border-red-400/60 transition-colors">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold text-red-400 uppercase">연체</span>
-                  <span className="text-base">🚨</span>
+
+              {/* 상태 분류 */}
+              <div className="space-y-2.5 mb-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px rgba(52,211,153,0.4)' }} />
+                    <span className="text-xs text-slate-600 font-medium">대기 가능</span>
+                  </div>
+                  <span className="text-sm font-black text-slate-800">{stats.availableCars}<span className="text-slate-500 text-xs ml-0.5">대</span></span>
                 </div>
-                <p className="text-xl font-black text-red-400">{formatMoney(collectionStats.overdueAmount)}<span className="text-xs font-bold text-slate-400 ml-1">원</span></p>
-                <p className="text-[10px] text-red-400 mt-0.5">{collectionStats.overdueCount}건</p>
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-400" style={{ boxShadow: '0 0 6px rgba(96,165,250,0.4)' }} />
+                    <span className="text-xs text-slate-600 font-medium">대여 중</span>
+                  </div>
+                  <span className="text-sm font-black text-slate-800">{stats.rentedCars}<span className="text-slate-500 text-xs ml-0.5">대</span></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251,191,36,0.4)' }} />
+                    <span className="text-xs text-slate-600 font-medium">정비 중</span>
+                  </div>
+                  <span className="text-sm font-black text-slate-800">{stats.maintenanceCars}<span className="text-slate-500 text-xs ml-0.5">대</span></span>
+                </div>
+              </div>
 
-      {/* ── 차량운영 현황 ── */}
-      {showCars && !loading && (opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0 || opsStats.maintenanceWaiting > 0 || opsStats.inspectionsOverdue > 0 || opsStats.activeAccidents > 0) && (
-        <div className="mb-8 space-y-4">
-          <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider">차량운영 현황</h2>
+              {/* 가동률 프로그레스 바 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">가동률</span>
+                  <span className={`text-sm font-black ${utilRate >= 70 ? 'text-emerald-400' : utilRate >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {loading ? '-' : utilRate}%
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${loading ? 0 : utilRate}%`,
+                      background: utilRate >= 70 ? 'linear-gradient(90deg, #34d399, #10b981)' : utilRate >= 40 ? 'linear-gradient(90deg, #fbbf24, #f59e0b)' : 'linear-gradient(90deg, #f87171, #ef4444)',
+                      boxShadow: utilRate >= 70 ? '0 0 10px rgba(52,211,153,0.4)' : utilRate >= 40 ? '0 0 10px rgba(251,191,36,0.4)' : '0 0 10px rgba(248,113,113,0.4)',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* 운영 KPI 미니카드 */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link href="/operations" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">금일 출고</span>
-                <span className="text-base">🚚</span>
+          {/* 경영 요약 카드 */}
+          {showFinance && (
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">이번달 경영</span>
+                <Link href="/finance" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
               </div>
-              <p className="text-xl font-black text-slate-100">{opsStats.todayDeliveries.length}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
-            </Link>
-            <Link href="/operations" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">금일 반납</span>
-                <span className="text-base">📥</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">매출</span>
+                  <span className="text-sm font-black text-slate-800">{loading ? '-' : formatMoney(stats.monthlyRevenue)}<span className="text-slate-500 text-[10px] ml-0.5">원</span></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">지출</span>
+                  <span className="text-sm font-black text-red-400">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-slate-500 text-[10px] ml-0.5">원</span></span>
+                </div>
+                <div className="h-px bg-gray-100" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600">순수익</span>
+                  <span className={`text-base font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {loading ? '-' : formatMoney(stats.netProfit)}<span className="text-slate-500 text-xs ml-0.5">원</span>
+                  </span>
+                </div>
               </div>
-              <p className="text-xl font-black text-slate-100">{opsStats.todayReturns.length}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
-            </Link>
-            <Link href="/maintenance" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">정비 대기</span>
-                <span className="text-base">🔧</span>
+            </div>
+          )}
+
+          {/* 수금 현황 카드 */}
+          {showFinance && !loading && (collectionStats.pendingCount > 0 || collectionStats.overdueCount > 0 || collectionStats.completedCount > 0) && (
+            <div className="si-card rounded-2xl p-5 border border-black/[0.06]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">수금 현황</span>
+                <Link href="/finance/collections" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">상세 →</Link>
               </div>
-              <p className="text-xl font-black text-slate-100">{opsStats.maintenanceWaiting}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
-              {opsStats.maintenanceInShop > 0 && <p className="text-[10px] text-amber-400 font-bold mt-0.5">정비중 {opsStats.maintenanceInShop}건</p>}
-            </Link>
-            <div className="glass-3 rounded-xl p-4 border shadow-sm flex flex-col" style={{ borderColor: opsStats.inspectionsOverdue > 0 ? 'rgba(244, 63, 94, 0.4)' : opsStats.activeAccidents > 0 ? 'rgba(180, 83, 9, 0.4)' : 'rgba(255, 255, 255, 0.06)' }}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">주의 항목</span>
-                <span className="text-base">⚠️</span>
+              {/* 수금율 프로그레스 */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-bold text-slate-400">수금율</span>
+                  <span className={`text-sm font-black ${collectionStats.collectionRate >= 80 ? 'text-emerald-400' : collectionStats.collectionRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {collectionStats.collectionRate}%
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${collectionStats.collectionRate}%`,
+                      background: collectionStats.collectionRate >= 80 ? 'linear-gradient(90deg, #34d399, #10b981)' : collectionStats.collectionRate >= 50 ? 'linear-gradient(90deg, #fbbf24, #f59e0b)' : 'linear-gradient(90deg, #f87171, #ef4444)',
+                    }}
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-0.5">
-                {opsStats.inspectionsOverdue > 0 && (
-                  <Link href="/maintenance" className="text-[11px] font-bold text-red-400 hover:underline">검사 만기초과 {opsStats.inspectionsOverdue}건</Link>
-                )}
-                {opsStats.inspectionsDueSoon > 0 && (
-                  <Link href="/maintenance" className="text-[11px] font-bold text-orange-400 hover:underline">검사 7일내 {opsStats.inspectionsDueSoon}건</Link>
-                )}
-                {opsStats.activeAccidents > 0 && (
-                  <Link href="/accidents" className="text-[11px] font-bold text-purple-400 hover:underline">사고 처리중 {opsStats.activeAccidents}건</Link>
-                )}
-                {opsStats.inspectionsOverdue === 0 && opsStats.inspectionsDueSoon === 0 && opsStats.activeAccidents === 0 && (
-                  <p className="text-[11px] text-emerald-400 font-bold">이상 없음 ✓</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-emerald-400">완료</span>
+                  <span className="text-xs font-bold text-slate-700">{formatMoney(collectionStats.completedAmount)}원 <span className="text-slate-500">({collectionStats.completedCount}건)</span></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-amber-400">미수금</span>
+                  <span className="text-xs font-bold text-slate-700">{formatMoney(collectionStats.pendingAmount)}원 <span className="text-slate-500">({collectionStats.pendingCount}건)</span></span>
+                </div>
+                {collectionStats.overdueCount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-red-400">연체</span>
+                    <span className="text-xs font-bold text-red-400">{formatMoney(collectionStats.overdueAmount)}원 <span className="text-red-400/60">({collectionStats.overdueCount}건)</span></span>
+                  </div>
                 )}
               </div>
             </div>
+          )}
+
+          {/* 알림/주의 사항 */}
+          {!loading && alerts.length > 0 && (
+            <div className="si-card rounded-2xl p-5 border border-red-500/20" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                <span className="text-xs font-bold text-red-400 uppercase tracking-wider">주의 항목</span>
+                <span className="text-[10px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded-full font-bold ml-auto">{alerts.length}</span>
+              </div>
+              <div className="space-y-2">
+                {alerts.map((a, i) => (
+                  <Link key={i} href={a.href} className="flex items-center justify-between hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2 transition-colors">
+                    <span className={`text-xs font-medium ${a.color}`}>{a.label}</span>
+                    <span className={`text-sm font-black ${a.color}`}>{a.count}<span className="text-slate-500 text-[10px] ml-0.5">건</span></span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 알림 없을 때 */}
+          {!loading && alerts.length === 0 && (
+            <div className="si-card rounded-2xl p-5 border border-emerald-500/20" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-bold text-emerald-400">모든 항목 정상</span>
+              </div>
+            </div>
+          )}
+
+          {/* 모듈 없음 */}
+          {!showCars && !showCustomers && !showInvest && !showFinance && (
+            <div className="si-card rounded-2xl p-6 border border-black/[0.06] text-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%)' }}>
+              <p className="text-lg font-black text-slate-600">활성화된 모듈이 없습니다</p>
+              <p className="text-slate-500 text-sm mt-1">관리자에게 모듈 활성화를 요청해주세요</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── 우측: 상세 정보 영역 ── */}
+        <div className="flex-1 min-w-0 space-y-5">
+
+          {/* 핵심 KPI 4개 미니카드 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {showCars && (
+              <div className="glass-3 rounded-xl p-3.5 border border-blue-500/20" style={{ boxShadow: '0 0 15px rgba(59,130,246,0.08)' }}>
+                <span className="text-[10px] font-bold text-blue-600 uppercase">보유</span>
+                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : stats.totalCars}<span className="text-slate-500 text-xs ml-0.5">대</span></p>
+              </div>
+            )}
+            {showCustomers && (
+              <div className="glass-3 rounded-xl p-3.5 border border-emerald-500/20" style={{ boxShadow: '0 0 15px rgba(52,211,153,0.08)' }}>
+                <span className="text-[10px] font-bold text-emerald-400 uppercase">고객</span>
+                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : stats.totalCustomers}<span className="text-slate-500 text-xs ml-0.5">명</span></p>
+              </div>
+            )}
+            {showInvest && (
+              <div className="glass-3 rounded-xl p-3.5 border border-sky-500/20" style={{ boxShadow: '0 0 15px rgba(56,189,248,0.08)' }}>
+                <span className="text-[10px] font-bold text-sky-400 uppercase">투자</span>
+                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : formatMoney(stats.totalInvestAmount)}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">일반 {stats.activeInvestments} · 지입 {stats.jiipContracts}</p>
+              </div>
+            )}
+            {showFinance && (
+              <div className="glass-3 rounded-xl p-3.5 border border-amber-500/20" style={{ boxShadow: '0 0 15px rgba(251,191,36,0.08)' }}>
+                <span className="text-[10px] font-bold text-amber-400 uppercase">순수익</span>
+                <p className={`text-xl font-black mt-0.5 ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {loading ? '-' : formatMoney(stats.netProfit)}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* 오늘의 출고/반납 상세 리스트 */}
-          {(opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0) && (
-            <div className="glass-3 rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <span className="text-sm font-black text-slate-100">오늘의 출고/반납</span>
-                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full font-bold">{opsStats.todayDeliveries.length + opsStats.todayReturns.length}건</span>
+          {/* 오늘의 운영 현황 */}
+          {showCars && !loading && (opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0) && (
+            <div className="si-card rounded-2xl border border-black/[0.06] overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-black/[0.06] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-400" style={{ boxShadow: '0 0 6px rgba(96,165,250,0.5)' }} />
+                  <span className="text-sm font-black text-slate-800">오늘의 출고/반납</span>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">{opsStats.todayDeliveries.length + opsStats.todayReturns.length}건</span>
+                </div>
+                <Link href="/operations" className="text-[10px] font-bold text-blue-600 hover:text-blue-500 transition-colors">전체 보기 →</Link>
               </div>
-              <div className="divide-y divide-white/5">
-                {[...opsStats.todayDeliveries, ...opsStats.todayReturns].map((op: any) => {
+              <div className="divide-y divide-gray-200">
+                {[...opsStats.todayDeliveries, ...opsStats.todayReturns].slice(0, 6).map((op: any) => {
                   const isDelivery = op.operation_type === 'delivery'
                   const statusColors: Record<string, string> = {
-                    scheduled: 'bg-white/10 text-slate-300', preparing: 'bg-blue-500/20 text-blue-300',
+                    scheduled: 'bg-gray-100 text-slate-600', preparing: 'bg-blue-500/10 text-blue-600',
                     inspecting: 'bg-purple-500/20 text-purple-300', in_transit: 'bg-amber-500/20 text-amber-300',
                     completed: 'bg-emerald-500/20 text-emerald-300',
                   }
@@ -398,21 +430,21 @@ export default function DashboardPage() {
                     scheduled: '예정', preparing: '준비중', inspecting: '점검중', in_transit: '이동중', completed: '완료',
                   }
                   return (
-                    <Link key={op.id} href="/operations" className="flex items-center gap-3 px-5 py-3 hover:bg-white/10 transition-colors">
-                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isDelivery ? 'bg-blue-500/20' : 'bg-amber-500/20'}`}>
+                    <Link key={op.id} href="/operations" className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isDelivery ? 'bg-blue-500/15' : 'bg-amber-500/15'}`}>
                         {isDelivery ? '🚚' : '📥'}
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-100 text-sm">{op.car?.brand} {op.car?.model}</span>
-                          {op.car?.number && <span className="text-[10px] text-blue-400 font-bold">[{op.car.number}]</span>}
+                          <span className="font-bold text-slate-800 text-sm truncate">{op.car?.brand} {op.car?.model}</span>
+                          {op.car?.number && <span className="text-[10px] text-blue-600 font-bold flex-shrink-0">[{op.car.number}]</span>}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-slate-400">{op.scheduled_time?.substring(0, 5) || ''}</span>
-                          <span className="text-[10px] text-slate-400">{op.customer?.name || ''}</span>
+                          <span className="text-[10px] text-slate-500">{op.scheduled_time?.substring(0, 5) || ''}</span>
+                          <span className="text-[10px] text-slate-500">{op.customer?.name || ''}</span>
                         </div>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColors[op.status] || 'bg-white/10 text-slate-300'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${statusColors[op.status] || 'bg-gray-100 text-slate-600'}`}>
                         {statusLabels[op.status] || op.status}
                       </span>
                     </Link>
@@ -421,28 +453,56 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* 업무 바로가기 — 다크 카드 스타일 */}
-      {quickActions.length > 0 && (
-        <div>
-          <h2 className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-3">업무 바로가기</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {quickActions.map(action => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="group glass-3 rounded-xl p-4 md:p-5 hover:bg-white/10 transition-all hover:scale-[1.02] border border-white/[0.06]"
-              >
-                <span className="text-2xl">{action.icon}</span>
-                <p className="text-slate-100 font-bold text-sm mt-2">{action.label}</p>
-                <p className="text-slate-400 text-xs mt-0.5">{action.desc}</p>
+          {/* 운영 KPI 미니카드 행 */}
+          {showCars && !loading && (opsStats.maintenanceWaiting > 0 || opsStats.inspectionsOverdue > 0 || opsStats.todayDeliveries.length > 0) && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Link href="/operations" className="glass-3 rounded-xl p-3.5 border border-black/[0.06] hover:border-blue-400/30 transition-colors">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">금일 출고</span>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{opsStats.todayDeliveries.length}<span className="text-slate-500 text-xs ml-0.5">건</span></p>
               </Link>
-            ))}
-          </div>
+              <Link href="/operations" className="glass-3 rounded-xl p-3.5 border border-black/[0.06] hover:border-blue-400/30 transition-colors">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">금일 반납</span>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{opsStats.todayReturns.length}<span className="text-slate-500 text-xs ml-0.5">건</span></p>
+              </Link>
+              <Link href="/maintenance" className="glass-3 rounded-xl p-3.5 border border-black/[0.06] hover:border-amber-400/30 transition-colors">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">정비 대기</span>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{opsStats.maintenanceWaiting}<span className="text-slate-500 text-xs ml-0.5">건</span></p>
+                {opsStats.maintenanceInShop > 0 && <p className="text-[10px] text-amber-400 font-bold">정비중 {opsStats.maintenanceInShop}건</p>}
+              </Link>
+              <div className="glass-3 rounded-xl p-3.5 border border-black/[0.06]">
+                <span className="text-[10px] font-bold text-slate-500 uppercase">사고</span>
+                <p className="text-lg font-black text-slate-800 mt-0.5">{opsStats.activeAccidents}<span className="text-slate-500 text-xs ml-0.5">건</span></p>
+                {opsStats.accidentsThisMonth.length > 0 && <p className="text-[10px] text-purple-400 font-bold">이번달 {opsStats.accidentsThisMonth.length}건</p>}
+              </div>
+            </div>
+          )}
+
+          {/* 업무 바로가기 */}
+          {quickActions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">업무 바로가기</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {quickActions.map(action => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className="group glass-3 rounded-xl p-4 hover:bg-gray-100 transition-all hover:scale-[1.02] border border-black/[0.06] hover:border-blue-500/20"
+                  >
+                    <span className="text-xl">{action.icon}</span>
+                    <p className="text-slate-800 font-bold text-sm mt-1.5">{action.label}</p>
+                    <p className="text-slate-500 text-[11px] mt-0.5">{action.desc}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
+      </div>
     </div>
     </div>
   )

@@ -234,22 +234,22 @@ export default function ReportDashboard() {
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-5xl mb-4 animate-pulse">📊</div>
-          <p className="text-gray-500 font-bold">리포트 데이터를 불러오는 중...</p>
+          <p className="text-slate-500 font-bold">리포트 데이터를 불러오는 중...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen">
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+            <svg style={{ width: 28, height: 28, color: 'rgba(59,130,246,0.9)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             리포트 / 통계
           </h1>
-          <p className="text-gray-500 text-sm mt-1">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
+          <p className="text-slate-500 text-sm mt-1">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
         </div>
         <div className="flex gap-2">
           {[3, 6, 12].map(m => (
@@ -257,7 +257,7 @@ export default function ReportDashboard() {
               key={m}
               onClick={() => setPeriodMonths(m)}
               className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                periodMonths === m ? 'bg-steel-600 text-white shadow' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                periodMonths === m ? 'bg-steel-600 text-white shadow' : 'bg-white border border-black/[0.06] text-slate-500 hover:bg-gray-50'
               }`}
             >
               최근 {m}개월
@@ -267,7 +267,7 @@ export default function ReportDashboard() {
       </div>
 
       {/* 탭 네비게이션 */}
-      <div className="flex gap-1 overflow-x-auto pb-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 overflow-x-auto pb-1 mb-6 border-b border-black/[0.06]">
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -275,7 +275,7 @@ export default function ReportDashboard() {
             className={`px-4 py-3 text-sm font-bold transition-all whitespace-nowrap border-b-2 ${
               activeTab === tab.key
                 ? 'border-steel-600 text-steel-600'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+                : 'border-transparent text-slate-500 hover:text-slate-400'
             }`}
           >
             {tab.label}
@@ -336,7 +336,7 @@ function KPICard({ label, value, unit, color = 'gray', sub }: {
   label: string; value: string; unit?: string; color?: string; sub?: string
 }) {
   const colorMap: Record<string, string> = {
-    gray: 'bg-white border-gray-200',
+    gray: 'bg-white border-black/[0.06]',
     green: 'bg-green-50 border-green-100',
     red: 'bg-red-50 border-red-100',
     blue: 'bg-blue-50 border-blue-100',
@@ -344,7 +344,7 @@ function KPICard({ label, value, unit, color = 'gray', sub }: {
     steel: 'bg-steel-50 border-steel-100',
   }
   const textMap: Record<string, string> = {
-    gray: 'text-gray-800',
+    gray: 'text-slate-700',
     green: 'text-green-700',
     red: 'text-red-600',
     blue: 'text-blue-700',
@@ -352,7 +352,7 @@ function KPICard({ label, value, unit, color = 'gray', sub }: {
     steel: 'text-steel-700',
   }
   const labelMap: Record<string, string> = {
-    gray: 'text-gray-400',
+    gray: 'text-slate-500',
     green: 'text-green-600',
     red: 'text-red-500',
     blue: 'text-blue-500',
@@ -366,7 +366,7 @@ function KPICard({ label, value, unit, color = 'gray', sub }: {
       <p className={`text-lg md:text-xl font-black mt-1 ${textMap[color]}`}>
         {value}{unit && <span className="text-xs ml-0.5 opacity-60">{unit}</span>}
       </p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
     </div>
   )
 }
@@ -380,7 +380,7 @@ function BarChart({ data, maxVal }: { data: { label: string; income: number; exp
     <div className="space-y-3">
       {data.map((d, i) => (
         <div key={i} className="flex items-center gap-3">
-          <div className="w-10 text-xs font-bold text-gray-500 text-right shrink-0">{d.label}</div>
+          <div className="w-10 text-xs font-bold text-slate-500 text-right shrink-0">{d.label}</div>
           <div className="flex-1 flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <div className="h-5 rounded-r bg-green-400" style={{ width: `${Math.max((d.income / max) * 100, 0.5)}%` }} />
@@ -408,24 +408,24 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
     <div className="space-y-6">
       {/* 핵심 KPI */}
       <div className="bg-gradient-to-r from-gray-900 to-steel-800 rounded-2xl p-6 md:p-8 text-white">
-        <h3 className="text-sm font-bold text-gray-300 mb-4">경영 요약</h3>
+        <h3 className="text-sm font-bold text-slate-600 mb-4">경영 요약</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <div>
-            <p className="text-xs text-gray-400">총 매출</p>
-            <p className="text-2xl md:text-3xl font-black mt-1">{formatSimpleMoney(totalIncome)}<span className="text-sm ml-1 text-gray-400">원</span></p>
+            <p className="text-xs text-slate-500">총 매출</p>
+            <p className="text-2xl md:text-3xl font-black mt-1">{formatSimpleMoney(totalIncome)}<span className="text-sm ml-1 text-slate-500">원</span></p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">총 비용</p>
+            <p className="text-xs text-slate-500">총 비용</p>
             <p className="text-2xl md:text-3xl font-black mt-1 text-red-400">{formatSimpleMoney(totalExpense)}<span className="text-sm ml-1 text-red-400/60">원</span></p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">순이익</p>
+            <p className="text-xs text-slate-500">순이익</p>
             <p className={`text-2xl md:text-3xl font-black mt-1 ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {netProfit >= 0 ? '+' : ''}{formatSimpleMoney(netProfit)}<span className="text-sm ml-1 opacity-60">원</span>
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">이익률</p>
+            <p className="text-xs text-slate-500">이익률</p>
             <p className={`text-2xl md:text-3xl font-black mt-1 ${profitRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {profitRate.toFixed(1)}<span className="text-sm ml-1 opacity-60">%</span>
             </p>
@@ -443,25 +443,25 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
       </div>
 
       {/* 월별 수입/지출 트렌드 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">월별 수입 / 지출 추이</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">월별 수입 / 지출 추이</h3>
         <BarChart
           data={monthlyData}
           maxVal={Math.max(...monthlyData.map((d: any) => Math.max(d.income, d.expense)), 1)}
         />
         <div className="flex gap-4 mt-4">
-          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-green-400" /><span className="text-xs text-gray-500">수입</span></div>
-          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-red-400" /><span className="text-xs text-gray-500">지출</span></div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-green-400" /><span className="text-xs text-slate-500">수입</span></div>
+          <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-red-400" /><span className="text-xs text-slate-500">지출</span></div>
         </div>
       </div>
 
       {/* 최근 거래 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-gray-100">
-          <h3 className="text-sm font-bold text-gray-900">최근 거래 내역</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-black/5">
+          <h3 className="text-sm font-bold text-slate-800">최근 거래 내역</h3>
         </div>
         {recentTx.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 text-sm">거래 내역이 없습니다.</div>
+          <div className="p-10 text-center text-slate-500 text-sm">거래 내역이 없습니다.</div>
         ) : (
           <div className="divide-y divide-gray-50">
             {recentTx.map((tx: Transaction) => (
@@ -473,8 +473,8 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
                     {tx.type === 'income' ? '↑' : '↓'}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{tx.description || tx.category || '-'}</p>
-                    <p className="text-xs text-gray-400">{tx.transaction_date} · {tx.client_name || '미지정'}</p>
+                    <p className="text-sm font-bold text-slate-800">{tx.description || tx.category || '-'}</p>
+                    <p className="text-xs text-slate-500">{tx.transaction_date} · {tx.client_name || '미지정'}</p>
                   </div>
                 </div>
                 <p className={`font-black text-sm ${tx.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
@@ -513,17 +513,17 @@ function RevenueTab({ totalIncome, monthlyData, incomeByCat, transactions }: any
       </div>
 
       {/* 월별 매출 추이 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">월별 매출 추이</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">월별 매출 추이</h3>
         <div className="space-y-2">
           {monthlyData.map((d: any, i: number) => {
             const maxIncome = Math.max(...monthlyData.map((m: any) => m.income), 1)
             return (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-10 text-xs font-bold text-gray-500 text-right shrink-0">{d.label}</div>
+                <div className="w-10 text-xs font-bold text-slate-500 text-right shrink-0">{d.label}</div>
                 <div className="flex-1 flex items-center gap-2">
                   <div className="h-6 rounded-r bg-gradient-to-r from-green-400 to-green-500" style={{ width: `${Math.max((d.income / maxIncome) * 100, 1)}%` }} />
-                  <span className="text-xs text-gray-600 font-bold whitespace-nowrap">{formatSimpleMoney(d.income)}원</span>
+                  <span className="text-xs text-slate-400 font-bold whitespace-nowrap">{formatSimpleMoney(d.income)}원</span>
                 </div>
               </div>
             )
@@ -532,10 +532,10 @@ function RevenueTab({ totalIncome, monthlyData, incomeByCat, transactions }: any
       </div>
 
       {/* 카테고리별 수입 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">수입 카테고리 비중</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">수입 카테고리 비중</h3>
         {incomeByCat.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">수입 데이터가 없습니다.</p>
+          <p className="text-slate-500 text-sm text-center py-6">수입 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {incomeByCat.map(([cat, amount]: [string, number], i: number) => {
@@ -544,8 +544,8 @@ function RevenueTab({ totalIncome, monthlyData, incomeByCat, transactions }: any
               return (
                 <div key={cat}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-bold text-gray-700">{cat}</span>
-                    <span className="text-sm text-gray-500">{f(amount)}원 ({pct.toFixed(1)}%)</span>
+                    <span className="text-sm font-bold text-slate-600">{cat}</span>
+                    <span className="text-sm text-slate-500">{f(amount)}원 ({pct.toFixed(1)}%)</span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${pct}%` }} />
@@ -577,17 +577,17 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
       </div>
 
       {/* 월별 지출 추이 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">월별 지출 추이</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">월별 지출 추이</h3>
         <div className="space-y-2">
           {monthlyData.map((d: any, i: number) => {
             const maxExpense = Math.max(...monthlyData.map((m: any) => m.expense), 1)
             return (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-10 text-xs font-bold text-gray-500 text-right shrink-0">{d.label}</div>
+                <div className="w-10 text-xs font-bold text-slate-500 text-right shrink-0">{d.label}</div>
                 <div className="flex-1 flex items-center gap-2">
                   <div className="h-6 rounded-r bg-gradient-to-r from-red-400 to-red-500" style={{ width: `${Math.max((d.expense / maxExpense) * 100, 1)}%` }} />
-                  <span className="text-xs text-gray-600 font-bold whitespace-nowrap">{formatSimpleMoney(d.expense)}원</span>
+                  <span className="text-xs text-slate-400 font-bold whitespace-nowrap">{formatSimpleMoney(d.expense)}원</span>
                 </div>
               </div>
             )
@@ -596,10 +596,10 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
       </div>
 
       {/* 카테고리별 지출 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">지출 카테고리 비중</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">지출 카테고리 비중</h3>
         {expenseByCat.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">지출 데이터가 없습니다.</p>
+          <p className="text-slate-500 text-sm text-center py-6">지출 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {expenseByCat.map(([cat, amount]: [string, number], i: number) => {
@@ -608,8 +608,8 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
               return (
                 <div key={cat}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-bold text-gray-700">{cat}</span>
-                    <span className="text-sm text-gray-500">{f(amount)}원 ({pct.toFixed(1)}%)</span>
+                    <span className="text-sm font-bold text-slate-600">{cat}</span>
+                    <span className="text-sm text-slate-500">{f(amount)}원 ({pct.toFixed(1)}%)</span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${pct}%` }} />
@@ -622,8 +622,8 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
       </div>
 
       {/* 고정 비용 구조 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">월 고정 비용 구조</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">월 고정 비용 구조</h3>
         <div className="space-y-4">
           {[
             { label: '지입 관리비', amount: partnerStats.jiipMonthly, count: partnerStats.jiipCount, color: 'bg-blue-500' },
@@ -634,8 +634,8 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
               <div className={`w-3 h-3 rounded-full ${item.color} shrink-0`} />
               <div className="flex-1">
                 <div className="flex justify-between">
-                  <span className="text-sm font-bold text-gray-700">{item.label} ({item.count}건)</span>
-                  <span className="text-sm font-black text-gray-900">{f(Math.round(item.amount))}원</span>
+                  <span className="text-sm font-bold text-slate-600">{item.label} ({item.count}건)</span>
+                  <span className="text-sm font-black text-slate-800">{f(Math.round(item.amount))}원</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full mt-1 overflow-hidden">
                   <div className={`h-full rounded-full ${item.color}`} style={{ width: `${monthlyFixedCost > 0 ? (item.amount / monthlyFixedCost) * 100 : 0}%` }} />
@@ -680,12 +680,12 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
       </div>
 
       {/* 가동률 게이지 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">차량 가동률</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">차량 가동률</h3>
         <div className="flex items-center gap-6">
           <div className="relative w-32 h-32">
             <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="50" fill="none" stroke="#f3f4f6" strokeWidth="12" />
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="12" />
               <circle
                 cx="60" cy="60" r="50" fill="none"
                 stroke={carStats.utilizationRate >= 70 ? '#22c55e' : carStats.utilizationRate >= 40 ? '#f59e0b' : '#ef4444'}
@@ -696,16 +696,16 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-black text-gray-900">{carStats.utilizationRate.toFixed(0)}%</span>
+              <span className="text-2xl font-black text-slate-800">{carStats.utilizationRate.toFixed(0)}%</span>
             </div>
           </div>
           <div className="flex-1 space-y-3">
             {statusData.map((s, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${s.color}`} />
-                <span className="text-sm text-gray-600 flex-1">{s.label}</span>
+                <span className="text-sm text-slate-400 flex-1">{s.label}</span>
                 <span className={`text-sm font-black ${s.textColor}`}>{s.count}대</span>
-                <span className="text-xs text-gray-400">({carStats.total > 0 ? ((s.count / carStats.total) * 100).toFixed(0) : 0}%)</span>
+                <span className="text-xs text-slate-500">({carStats.total > 0 ? ((s.count / carStats.total) * 100).toFixed(0) : 0}%)</span>
               </div>
             ))}
           </div>
@@ -713,10 +713,10 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
       </div>
 
       {/* 브랜드별 분포 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">브랜드별 보유 현황</h3>
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
+        <h3 className="text-sm font-bold text-slate-800 mb-4">브랜드별 보유 현황</h3>
         {brandDist.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">차량 데이터가 없습니다.</p>
+          <p className="text-slate-500 text-sm text-center py-6">차량 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {brandDist.map(([brand, count], i) => {
@@ -725,8 +725,8 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
               return (
                 <div key={brand}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-bold text-gray-700">{brand}</span>
-                    <span className="text-sm text-gray-500">{count}대 ({pct.toFixed(0)}%)</span>
+                    <span className="text-sm font-bold text-slate-600">{brand}</span>
+                    <span className="text-sm text-slate-500">{count}대 ({pct.toFixed(0)}%)</span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${pct}%` }} />
@@ -774,44 +774,44 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
       </div>
 
       {/* 지입 현황 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-bold text-gray-900">지입/위수탁 현황</h3>
+          <h3 className="text-sm font-bold text-slate-800">지입/위수탁 현황</h3>
           <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-lg font-bold">운영 중 {activeJiip.length}건</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">총 계약</p>
-            <p className="text-lg font-black text-gray-900">{jiipContracts.length}건</p>
+            <p className="text-xs text-slate-500 mb-1">총 계약</p>
+            <p className="text-lg font-black text-slate-800">{jiipContracts.length}건</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">월 관리비 합계</p>
+            <p className="text-xs text-slate-500 mb-1">월 관리비 합계</p>
             <p className="text-lg font-black text-blue-600">{f(partnerStats.jiipMonthly)}원</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">총 투자 유치</p>
+            <p className="text-xs text-slate-500 mb-1">총 투자 유치</p>
             <p className="text-lg font-black text-steel-600">{formatSimpleMoney(jiipContracts.reduce((s: number, j: JiipContract) => s + (j.invest_amount || 0), 0))}원</p>
           </div>
         </div>
       </div>
 
       {/* 일반 투자 현황 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-bold text-gray-900">일반 투자 현황</h3>
+          <h3 className="text-sm font-bold text-slate-800">일반 투자 현황</h3>
           <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-lg font-bold">운용 중 {activeInvest.length}건</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">총 투자 원금</p>
-            <p className="text-lg font-black text-gray-900">{formatSimpleMoney(partnerStats.investPrincipal)}원</p>
+            <p className="text-xs text-slate-500 mb-1">총 투자 원금</p>
+            <p className="text-lg font-black text-slate-800">{formatSimpleMoney(partnerStats.investPrincipal)}원</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">월 예상 이자</p>
+            <p className="text-xs text-slate-500 mb-1">월 예상 이자</p>
             <p className="text-lg font-black text-red-600">{f(Math.round(partnerStats.investMonthlyInterest))}원</p>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">평균 이자율</p>
+            <p className="text-xs text-slate-500 mb-1">평균 이자율</p>
             <p className="text-lg font-black text-steel-600">
               {activeInvest.length > 0
                 ? (activeInvest.reduce((s: number, i: Investment) => s + (i.interest_rate || 0), 0) / activeInvest.length).toFixed(1)
@@ -822,13 +822,13 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
       </div>
 
       {/* 대출 타입별 현황 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6">
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-bold text-gray-900">대출/금융 타입별 현황</h3>
+          <h3 className="text-sm font-bold text-slate-800">대출/금융 타입별 현황</h3>
           <span className="text-xs bg-amber-100 text-amber-600 px-2 py-1 rounded-lg font-bold">총 {loans.length}건</span>
         </div>
         {loanTypeDist.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">대출 데이터가 없습니다.</p>
+          <p className="text-slate-500 text-sm text-center py-6">대출 데이터가 없습니다.</p>
         ) : (
           <div className="space-y-3">
             {loanTypeDist.map(([type, data], i) => {
@@ -837,8 +837,8 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
               return (
                 <div key={type}>
                   <div className="flex justify-between mb-1">
-                    <span className="text-sm font-bold text-gray-700">{type} ({data.count}건)</span>
-                    <span className="text-sm text-gray-500">{formatSimpleMoney(data.total)}원 ({pct.toFixed(0)}%)</span>
+                    <span className="text-sm font-bold text-slate-600">{type} ({data.count}건)</span>
+                    <span className="text-sm text-slate-500">{formatSimpleMoney(data.total)}원 ({pct.toFixed(0)}%)</span>
                   </div>
                   <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${colors[i % colors.length]}`} style={{ width: `${pct}%` }} />
@@ -852,22 +852,22 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
 
       {/* 종합 부채 구조 */}
       <div className="bg-gradient-to-r from-gray-900 to-steel-800 rounded-2xl p-5 md:p-6 text-white">
-        <h3 className="text-sm font-bold text-gray-300 mb-4">종합 부채/의무 구조</h3>
+        <h3 className="text-sm font-bold text-slate-600 mb-4">종합 부채/의무 구조</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-xs text-gray-400">투자자 원금</p>
-            <p className="text-xl font-black mt-1">{formatSimpleMoney(partnerStats.investPrincipal)}<span className="text-xs ml-1 text-gray-400">원</span></p>
+            <p className="text-xs text-slate-500">투자자 원금</p>
+            <p className="text-xl font-black mt-1">{formatSimpleMoney(partnerStats.investPrincipal)}<span className="text-xs ml-1 text-slate-500">원</span></p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">대출 잔액</p>
-            <p className="text-xl font-black mt-1">{formatSimpleMoney(partnerStats.loanTotal)}<span className="text-xs ml-1 text-gray-400">원</span></p>
+            <p className="text-xs text-slate-500">대출 잔액</p>
+            <p className="text-xl font-black mt-1">{formatSimpleMoney(partnerStats.loanTotal)}<span className="text-xs ml-1 text-slate-500">원</span></p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">총 의무 금액</p>
+            <p className="text-xs text-slate-500">총 의무 금액</p>
             <p className="text-xl font-black mt-1 text-amber-400">{formatSimpleMoney(totalObligation)}<span className="text-xs ml-1 text-amber-400/60">원</span></p>
           </div>
           <div>
-            <p className="text-xs text-gray-400">월 고정 상환</p>
+            <p className="text-xs text-slate-500">월 고정 상환</p>
             <p className="text-xl font-black mt-1 text-red-400">{f(Math.round(partnerStats.jiipMonthly + partnerStats.investMonthlyInterest + partnerStats.loanMonthly))}<span className="text-xs ml-1 text-red-400/60">원</span></p>
           </div>
         </div>

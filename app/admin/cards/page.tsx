@@ -247,7 +247,7 @@ export default function CorporateCardsPage() {
 
         {cards.length === 0 && (
           <div className="col-span-full bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-16">
-            <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+            <svg className="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
             <p className="font-semibold text-sm text-slate-500">등록된 법인카드가 없습니다</p>
             <p className="text-xs text-slate-400 mt-1">카드를 등록하면 카드 내역 업로드 시 자동 매칭됩니다</p>
           </div>

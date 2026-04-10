@@ -97,31 +97,31 @@ export default function FinanceTab() {
   }
 
   if (loading) {
-    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
+    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-slate-400">로딩 중...</p></div>
   }
 
   return (
     <div className="space-y-4">
       {showGuide && (
-        <div className="bg-gradient-to-r from-slate-50 to-zinc-50 rounded-2xl p-5 border border-slate-200">
+        <div className="bg-gradient-to-r from-slate-900/20 to-zinc-900/20 rounded-2xl p-5 border border-slate-700/30">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🏦</span>
-              <h3 className="text-sm font-bold text-gray-800">금융금리 기준이란?</h3>
+              <h3 className="text-sm font-bold text-slate-800">금융금리 기준이란?</h3>
             </div>
-            <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+            <button onClick={() => setShowGuide(false)} className="text-xs text-slate-400 hover:text-slate-600">닫기</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 leading-relaxed">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 leading-relaxed">
             <div>
-              <p className="font-semibold text-gray-700 mb-1">개념</p>
+              <p className="font-semibold text-slate-700 mb-1">개념</p>
               <p>차량 구매 자금의 금융 비용(이자)입니다. 캐피탈 대출, 리스, 자체자금 중 어떤 방식으로 조달하느냐에 따라 비용이 달라집니다. 렌트료의 15~25%를 차지합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">대형사 기준</p>
+              <p className="font-semibold text-slate-700 mb-1">대형사 기준</p>
               <p>롯데렌탈·SK렌터카는 캐피탈사와 특별금리(우대금리)로 대량 조달합니다. 소규모 업체는 개별 금리가 1~2%p 높을 수 있으므로, 실제 적용 금리를 정확히 반영해야 합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">자체자금의 기회비용</p>
+              <p className="font-semibold text-slate-700 mb-1">자체자금의 기회비용</p>
               <p>자체자금은 실제 이자가 없지만, 그 돈을 투자했을 때의 수익(기회비용)을 산출에 반영합니다. 보통 정기예금 금리(3~4%) 수준을 적용합니다.</p>
             </div>
           </div>
@@ -130,20 +130,20 @@ export default function FinanceTab() {
 
       {/* 금융상품 분류 기준 + 시장금리 참고 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">📋</span>
-            <h3 className="text-xs font-bold text-gray-700">금융상품 분류 기준</h3>
+            <h3 className="text-xs font-bold text-slate-700">금융상품 분류 기준</h3>
           </div>
           <div className="space-y-3">
             {CLASSIFICATION_INFO.map((info) => (
-              <div key={info.type} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <div key={info.type} className="p-3 bg-gray-100 rounded-lg border border-black/10">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-gray-800">{info.type}</span>
-                  <span className="text-xs font-semibold text-steel-600">{info.rateRange}</span>
+                  <span className="text-xs font-bold text-slate-800">{info.type}</span>
+                  <span className="text-xs font-semibold text-blue-400">{info.rateRange}</span>
                 </div>
-                <p className="text-xs text-gray-600 mb-1">{info.desc}</p>
-                <div className="flex justify-between text-[10px] text-gray-500">
+                <p className="text-xs text-slate-600 mb-1">{info.desc}</p>
+                <div className="flex justify-between text-[10px] text-slate-400">
                   <span>기간: {info.term}</span>
                   <span>{info.note}</span>
                 </div>
@@ -152,32 +152,32 @@ export default function FinanceTab() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm">📊</span>
-            <h3 className="text-xs font-bold text-gray-700">시장 금리 참고 (검수용)</h3>
+            <h3 className="text-xs font-bold text-slate-700">시장 금리 참고 (검수용)</h3>
           </div>
           <div className="space-y-2">
             {MARKET_REFERENCE.map((ref) => (
-              <div key={ref.item} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <div key={ref.item} className="flex items-center justify-between p-3 bg-gray-100 rounded-lg border border-black/10">
                 <div>
-                  <p className="text-xs font-medium text-gray-800">{ref.item}</p>
-                  <p className="text-[10px] text-gray-500">{ref.note}</p>
+                  <p className="text-xs font-medium text-slate-800">{ref.item}</p>
+                  <p className="text-[10px] text-slate-400">{ref.note}</p>
                 </div>
-                <span className="text-xs font-bold text-steel-600">{ref.value}</span>
+                <span className="text-xs font-bold text-blue-400">{ref.value}</span>
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-gray-400 mt-3">* 시장 금리는 수시 변동됩니다. 실시간 검증으로 최신 정보를 확인하세요.</p>
+          <p className="text-[10px] text-slate-400 mt-3">* 시장 금리는 수시 변동됩니다. 실시간 검증으로 최신 정보를 확인하세요.</p>
         </div>
       </div>
 
       {/* Table Section - Full Width */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-black/[0.06]">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06]">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">금융상품 요율표 (편집 가능)</h3>
-            <p className="text-xs text-gray-400 mt-0.5">위 분류기준·시장금리를 참고하여 검수한 후 사용하세요</p>
+            <h3 className="text-sm font-bold text-slate-800">금융상품 요율표 (편집 가능)</h3>
+            <p className="text-xs text-slate-400 mt-0.5">위 분류기준·시장금리를 참고하여 검수한 후 사용하세요</p>
           </div>
           <div className="flex gap-2">
             {!showGuide && <button onClick={() => setShowGuide(true)} className="px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드 💡</button>}
@@ -191,56 +191,56 @@ export default function FinanceTab() {
         <div className="overflow-x-auto">
           <table className="text-xs">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">유형</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">최소(월)</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">최대(월)</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">연이율</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">월이자</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">설명</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">적용일</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">비고</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">삭제</th>
+              <tr className="bg-gray-100 border-b border-black/[0.06]">
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">유형</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">최소(월)</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">최대(월)</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">연이율</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">월이자</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">설명</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">적용일</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">비고</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">삭제</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition">
+                  <tr key={row.id} className="border-b border-black/5 hover:bg-gray-50 transition">
                     <td className="px-3 py-2">
                       <select value={row.finance_type} onChange={(e) => handleUpdateField(row.id, 'finance_type', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-steel-400 focus:outline-none">
+                        className="w-full px-2 py-1 text-xs border border-white/20 rounded text-white bg-gray-100 focus:border-white/40 focus:outline-none">
                         {FINANCE_TYPES.map(type => (<option key={type} value={type}>{type}</option>))}
                       </select>
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" value={row.term_months_min} onChange={(e) => handleUpdateField(row.id, 'term_months_min', parseInt(e.target.value))}
-                        className="w-16 px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-steel-400 focus:outline-none" />
+                        className="w-16 px-2 py-1 text-xs border border-white/20 rounded text-white text-center bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" value={row.term_months_max} onChange={(e) => handleUpdateField(row.id, 'term_months_max', parseInt(e.target.value))}
-                        className="w-16 px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center focus:border-steel-400 focus:outline-none" />
+                        className="w-16 px-2 py-1 text-xs border border-white/20 rounded text-white text-center bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" step="0.01" value={row.annual_rate} onChange={(e) => handleUpdateField(row.id, 'annual_rate', parseFloat(e.target.value))}
-                        className="w-16 px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 text-center font-bold focus:border-steel-400 focus:outline-none" />
+                        className="w-16 px-2 py-1 text-xs border border-white/20 rounded text-white text-center font-bold bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                      <span className="text-steel-600 font-semibold">{simulateMonthlyInterest(row.annual_rate).toLocaleString()}원</span>
+                      <span className="text-blue-400 font-semibold">{simulateMonthlyInterest(row.annual_rate).toLocaleString()}원</span>
                     </td>
                     <td className="px-3 py-2">
                       <input type="text" value={row.description} onChange={(e) => handleUpdateField(row.id, 'description', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-steel-400 focus:outline-none" />
+                        className="w-full px-2 py-1 text-xs border border-white/20 rounded text-white bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2">
                       <input type="date" value={row.effective_date} onChange={(e) => handleUpdateField(row.id, 'effective_date', e.target.value)}
-                        className="px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-steel-400 focus:outline-none" />
+                        className="px-2 py-1 text-xs border border-white/20 rounded text-white bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2">
                       <input type="text" value={row.notes} onChange={(e) => handleUpdateField(row.id, 'notes', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-gray-900 focus:border-steel-400 focus:outline-none" />
+                        className="w-full px-2 py-1 text-xs border border-white/20 rounded text-white bg-gray-100 focus:border-white/40 focus:outline-none" />
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button onClick={() => handleDeleteRow(row.id)} className="text-red-400 hover:text-red-600 text-xs">삭제</button>
@@ -273,10 +273,10 @@ export default function FinanceTab() {
               {searchResults && (
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[10px] font-semibold text-slate-300">Gemini 검증 결과</h4>
+                    <h4 className="text-[10px] font-semibold text-slate-600">Gemini 검증 결과</h4>
                     <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
                   </div>
-                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                  <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                     {searchResults.results}
                   </div>
                   {searchResults.sources?.length > 0 && (
@@ -294,7 +294,7 @@ export default function FinanceTab() {
             <div>
               {/* 금리별 월이자 비교 */}
               <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                <p className="text-[10px] font-semibold text-slate-300 mb-2">금리별 월이자 비교 (3천만원 기준)</p>
+                <p className="text-[10px] font-semibold text-slate-600 mb-2">금리별 월이자 비교 (3천만원 기준)</p>
                 <div className="space-y-1.5 text-xs">
                   {[4, 5, 6, 7, 8, 9].map(rate => (
                     <div key={rate} className="flex justify-between items-center">

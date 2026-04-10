@@ -220,39 +220,39 @@ export default function LoanListPage() {
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="bg-white rounded-2xl border border-gray-200 p-20 text-center">
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-20 text-center">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen animate-fade-in">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen animate-fade-in">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
       {/* KPI 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-xs text-gray-400 font-bold">총 대출 잔액</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{f(totalDebt)}<span className="text-xs text-gray-400 font-bold ml-0.5">원</span></p>
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-sm">
+          <p className="text-xs text-slate-400 font-bold">총 대출 잔액</p>
+          <p className="text-xl font-black text-slate-800 mt-1">{f(totalDebt)}<span className="text-xs text-slate-400 font-bold ml-0.5">원</span></p>
         </div>
-        <div className="bg-red-50 rounded-2xl border border-red-100 p-4">
-          <p className="text-xs text-red-500 font-bold">월 고정 지출</p>
-          <p className="text-xl font-black text-red-600 mt-1">{f(monthlyOut)}<span className="text-xs font-bold ml-0.5">원</span></p>
+        <div className="bg-red-900/20 rounded-2xl border border-red-700/30 p-4">
+          <p className="text-xs text-red-400 font-bold">월 고정 지출</p>
+          <p className="text-xl font-black text-red-300 mt-1">{f(monthlyOut)}<span className="text-xs font-bold ml-0.5">원</span></p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-xs text-gray-400 font-bold">계약 건수</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{loans.length}<span className="text-xs text-gray-400 font-bold ml-0.5">건</span></p>
+        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-sm">
+          <p className="text-xs text-slate-400 font-bold">계약 건수</p>
+          <p className="text-xl font-black text-slate-800 mt-1">{loans.length}<span className="text-xs text-slate-400 font-bold ml-0.5">건</span></p>
         </div>
-        <div className={`rounded-2xl border p-4 ${expiringCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200 shadow-sm'}`}>
-          <p className={`text-xs font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>만기 임박 (90일)</p>
-          <p className={`text-xl font-black mt-1 ${expiringCount > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{expiringCount}<span className="text-xs font-bold ml-0.5">건</span></p>
+        <div className={`rounded-2xl border p-4 ${expiringCount > 0 ? 'bg-amber-900/20 border-amber-700/30' : 'bg-white border-black/[0.06] shadow-sm'}`}>
+          <p className={`text-xs font-bold ${expiringCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>만기 임박 (90일)</p>
+          <p className={`text-xl font-black mt-1 ${expiringCount > 0 ? 'text-amber-300' : 'text-slate-800'}`}>{expiringCount}<span className="text-xs font-bold ml-0.5">건</span></p>
         </div>
-        <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
-          <p className="text-xs text-blue-500 font-bold">평균 이자율</p>
-          <p className="text-xl font-black text-blue-600 mt-1">{avgRate}<span className="text-xs font-bold ml-0.5">%</span></p>
+        <div className="bg-blue-900/20 rounded-2xl border border-blue-700/30 p-4">
+          <p className="text-xs text-blue-400 font-bold">평균 이자율</p>
+          <p className="text-xl font-black text-blue-300 mt-1">{avgRate}<span className="text-xs font-bold ml-0.5">%</span></p>
         </div>
       </div>
 
@@ -265,36 +265,36 @@ export default function LoanListPage() {
           onClick={() => !ocrProcessing && fileInputRef.current?.click()}
           className={`flex-1 border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
             isDragging
-              ? 'border-steel-500 bg-steel-50 scale-[1.01]'
+              ? 'border-blue-500 bg-blue-900/20 scale-[1.01]'
               : ocrProcessing
-                ? 'border-gray-200 bg-gray-50 cursor-wait'
-                : 'border-gray-200 bg-white hover:border-steel-400 hover:bg-steel-50/30'
+                ? 'border-black/10 bg-gray-50 cursor-wait'
+                : 'border-black/10 bg-white/[0.05] hover:border-blue-500/50 hover:bg-gray-100'
           }`}
         >
           {ocrProcessing ? (
             <div>
               <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-300 border-t-steel-600 rounded-full"></span>
-                <span className="text-sm font-bold text-gray-700">AI 견적서 분석 중...</span>
+                <span className="animate-spin inline-block w-4 h-4 border-2 border-slate-600 border-t-blue-500 rounded-full"></span>
+                <span className="text-sm font-bold text-slate-600">AI 견적서 분석 중...</span>
               </div>
-              <div className="w-full max-w-xs mx-auto bg-gray-200 rounded-full h-1.5">
-                <div className="bg-steel-500 h-1.5 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 10}%` }}></div>
+              <div className="w-full max-w-xs mx-auto bg-gray-100 rounded-full h-1.5">
+                <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 10}%` }}></div>
               </div>
-              <div className="mt-2 text-xs text-gray-400 space-y-0.5">
+              <div className="mt-2 text-xs text-slate-400 space-y-0.5">
                 {ocrLogs.slice(0, 2).map((log, i) => <div key={i}>{log}</div>)}
               </div>
             </div>
           ) : (
             <>
               <div className="text-2xl mb-1">{isDragging ? '📥' : '📄'}</div>
-              <p className="text-sm font-bold text-gray-700">{isDragging ? '여기에 파일을 놓으세요' : '할부 견적서 드래그 또는 클릭'}</p>
-              <p className="text-xs text-gray-400 mt-0.5">이미지/PDF · AI 자동 인식</p>
+              <p className="text-sm font-bold text-slate-800">{isDragging ? '여기에 파일을 놓으세요' : '할부 견적서 드래그 또는 클릭'}</p>
+              <p className="text-xs text-slate-400 mt-0.5">이미지/PDF · AI 자동 인식</p>
             </>
           )}
         </div>
         <button
           onClick={() => router.push('/loans/new')}
-          className="px-6 py-5 bg-steel-600 text-white rounded-2xl font-bold text-sm hover:bg-steel-700 transition-colors shadow-sm flex flex-col items-center justify-center gap-1"
+          className="px-6 py-5 bg-blue-600 text-white rounded-2xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm flex flex-col items-center justify-center gap-1"
         >
           <span className="text-lg">+</span>
           <span>직접 등록</span>
@@ -303,10 +303,10 @@ export default function LoanListPage() {
 
       {/* 만기 임박 경고 배너 */}
       {expiringLoans.length > 0 && !ocrProcessing && (
-        <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+        <div className="mb-6 bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-700/30 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-lg">⚠️</span>
-            <h3 className="font-bold text-amber-800 text-sm">만기 임박 {expiringLoans.length}건 — 90일 이내</h3>
+            <h3 className="font-bold text-amber-300 text-sm">만기 임박 {expiringLoans.length}건 — 90일 이내</h3>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {expiringLoans.slice(0, 8).map(loan => {

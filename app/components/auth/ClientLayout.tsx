@@ -157,8 +157,8 @@ function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; 
             ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20'
             : 'bg-blue-500/15 text-blue-300 border border-blue-500/20 shadow-sm shadow-blue-500/10'
           : accent
-            ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300 border border-transparent'
-            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
+            ? 'text-slate-500 hover:bg-gray-50 hover:text-slate-600 border border-transparent'
+            : 'text-slate-400 hover:bg-gray-50 hover:text-slate-700 border border-transparent'
       }`}
     >
       <Icon />
@@ -267,7 +267,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // 로딩 중 → 깔끔한 스플래시 (빈 레이아웃 깨짐 방지)
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#0f1729' }}>
+      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#f0f4f8' }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto" />
           <p className="mt-3 text-sm text-slate-500 font-medium">로딩 중...</p>
@@ -297,7 +297,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const showSettings = role === 'admin'
 
   return (
-    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#0f1729', overflowX: 'hidden', overflowY: 'hidden' }}>
+    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f0f4f8', overflowX: 'hidden', overflowY: 'hidden' }}>
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
         <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(15,23,41,0.95)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -351,7 +351,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
               <div className="mt-2 flex gap-1 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                   role === 'admin' ? 'bg-blue-500/15 text-blue-400' :
-                  'bg-white/5 text-slate-400'
+                  'bg-gray-50 text-slate-400'
                 }`} style={{ border: role === 'admin' ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
                   {role === 'admin' ? '관리자' : '직원'}
                 </span>
@@ -376,7 +376,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
                   pathname === '/dashboard'
                     ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20 shadow-sm shadow-blue-500/10'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
+                    : 'text-slate-400 hover:bg-gray-50 hover:text-slate-700 border border-transparent'
                 }`}
               >
                 <Icons.Home />

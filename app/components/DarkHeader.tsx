@@ -3,18 +3,17 @@
 import { ReactNode } from 'react'
 
 // ═══════════════════════════════════════════════════════════════════════
-// DarkHeader — 전체 페이지 공통 헤더 컴포넌트
-// 디자인: 라이트 프리미엄 (글래스 헤더 + 다크 연결 탭 + 다크 요약 바)
-// 메인 컬러: #2d5fa8 (steel blue)
+// DarkHeader — Light Glass Morphism 헤더 컴포넌트
+// A-패턴 통합: KPI 스탯 카드 → 액션 바 → 커스텀 영역
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface DarkHeaderStat {
   label: string
   value: number | string
-  color: string        // 값 텍스트 색상
-  bgColor: string      // 뱃지 배경
-  borderColor: string  // 뱃지 테두리
-  labelColor?: string  // 라벨 색상
+  color: string
+  bgColor: string
+  borderColor: string
+  labelColor?: string
   onClick?: () => void
 }
 
@@ -40,39 +39,40 @@ const actionStyles: Record<string, React.CSSProperties> = {
     background: '#2d5fa8', color: '#fff', border: 'none',
   },
   secondary: {
-    background: '#fff', color: '#334155',
-    border: '1px solid #d1d5db',
+    background: 'rgba(255,255,255,0.70)', color: '#334155',
+    border: '1px solid rgba(0,0,0,0.08)',
   },
   danger: {
-    background: '#fef2f2', color: '#dc2626',
-    border: '1px solid #fecaca',
+    background: 'rgba(239,68,68,0.08)', color: '#dc2626',
+    border: '1px solid rgba(239,68,68,0.20)',
   },
 }
 
-// ── 라이트 프리미엄 stat 색상 프리셋 ──
-// 페이지에서 사용할 표준 색상
+// ── 라이트 글래스 stat 색상 프리셋 ──
 export const STAT_COLORS = {
-  white: { color: '#334155', bgColor: '#fff', borderColor: '#e2e8f0', labelColor: '#94a3b8' },
-  green: { color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
-  yellow: { color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
-  red: { color: '#dc2626', bgColor: '#fef2f2', borderColor: '#fecaca', labelColor: '#fca5a5' },
-  blue: { color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
-  purple: { color: '#7c3aed', bgColor: '#f5f3ff', borderColor: '#ddd6fe', labelColor: '#c4b5fd' },
+  white: { color: '#334155', bgColor: 'rgba(255,255,255,0.60)', borderColor: 'rgba(0,0,0,0.06)', labelColor: '#94a3b8' },
+  green: { color: '#059669', bgColor: 'rgba(52,211,153,0.08)', borderColor: 'rgba(52,211,153,0.20)', labelColor: '#6ee7b7' },
+  yellow: { color: '#d97706', bgColor: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.20)', labelColor: '#fcd34d' },
+  red: { color: '#dc2626', bgColor: 'rgba(248,113,113,0.08)', borderColor: 'rgba(248,113,113,0.20)', labelColor: '#fca5a5' },
+  blue: { color: '#2563eb', bgColor: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.20)', labelColor: '#93c5fd' },
+  purple: { color: '#7c3aed', bgColor: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.20)', labelColor: '#c4b5fd' },
 }
 
 export default function DarkHeader({ icon, title, subtitle, stats, actions, children }: DarkHeaderProps) {
-  // stats도 actions도 children도 없으면 렌더링 안 함 (PageTitle이 레이아웃에서 제공)
   const hasContent = (stats && stats.length > 0) || (actions && actions.length > 0) || children
   if (!hasContent) return null
 
   return (
-    <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '0 2px 16px rgba(45,95,168,0.08)' }}>
-      {/* ── 통계/액션 바 (제목은 PageTitle에서 제공) ── */}
+    <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '0 2px 16px rgba(0,0,0,0.04)' }}>
+      {/* ── 통계/액션 바 ── */}
       {((stats && stats.length > 0) || (actions && actions.length > 0)) && (
         <div style={{
-          background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
-          padding: '12px 20px',
+          background: 'rgba(255,255,255,0.75)',
+          backdropFilter: 'blur(20px)',
+          padding: '14px 20px',
           borderBottom: children ? 'none' : undefined,
+          border: '1px solid rgba(0,0,0,0.06)',
+          borderRadius: children ? '16px 16px 0 0' : 16,
         }}>
           {/* 액션 버튼 */}
           {actions && actions.length > 0 && (
@@ -103,14 +103,14 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
                     flex: 1,
                     background: s.bgColor,
                     borderRadius: 10,
-                    padding: '9px 12px',
+                    padding: '10px 12px',
                     border: `1px solid ${s.borderColor}`,
                     textAlign: 'center',
                     cursor: s.onClick ? 'pointer' : 'default',
                     transition: 'transform 0.15s, box-shadow 0.15s',
                     minWidth: 0,
                   }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: s.labelColor || '#94a3b8', marginBottom: 3, letterSpacing: '0.02em' }}>{s.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: s.labelColor || '#94a3b8', marginBottom: 3, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{s.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: s.color, lineHeight: 1 }}>{typeof s.value === 'number' ? s.value.toLocaleString() : s.value}</div>
                 </div>
               ))}
@@ -121,7 +121,14 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
 
       {/* ── 하단 커스텀 영역 ── */}
       {children && (
-        <div style={{ background: '#fff' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.65)',
+          backdropFilter: 'blur(16px)',
+          borderLeft: '1px solid rgba(0,0,0,0.06)',
+          borderRight: '1px solid rgba(0,0,0,0.06)',
+          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          borderRadius: '0 0 16px 16px',
+        }}>
           {children}
         </div>
       )}
@@ -130,7 +137,7 @@ export default function DarkHeader({ icon, title, subtitle, stats, actions, chil
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// DarkHeaderTabs — 다크 연결 탭 (헤더 아래 #2d5fa8 배경)
+// DarkHeaderTabs — 탭 (헤더 아래)
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface TabItem {
@@ -147,7 +154,12 @@ export function DarkHeaderTabs({ tabs, activeTab, onTabChange, rightContent }: {
   rightContent?: ReactNode
 }) {
   return (
-    <div style={{ background: '#2d5fa8', padding: '0 20px', display: 'flex', alignItems: 'flex-end' }}>
+    <div style={{
+      background: '#2d5fa8',
+      padding: '0 20px',
+      display: 'flex',
+      alignItems: 'flex-end',
+    }}>
       <div style={{ display: 'flex', gap: 2, paddingTop: 6 }}>
         {tabs.map(tab => {
           const active = activeTab === tab.key
@@ -204,16 +216,20 @@ export function DarkHeaderFilterBar({ filters, activeFilter, onFilterChange, rig
   rightContent?: ReactNode
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 20px', gap: 6, borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', padding: '8px 20px', gap: 6,
+      borderBottom: '1px solid rgba(0,0,0,0.06)',
+      background: 'rgba(255,255,255,0.60)',
+    }}>
       {filters.map(f => {
         const active = activeFilter === f.key
         return (
           <button key={f.key} onClick={() => onFilterChange(f.key)}
             style={{
               padding: '5px 12px', borderRadius: 6, fontWeight: 700, fontSize: 11, cursor: 'pointer',
-              background: active ? 'rgba(45,95,168,0.08)' : '#f8fafc',
+              background: active ? 'rgba(45,95,168,0.08)' : 'rgba(241,245,249,0.80)',
               color: active ? '#2d5fa8' : '#64748b',
-              border: active ? '1px solid rgba(45,95,168,0.3)' : '1px solid #e2e8f0',
+              border: active ? '1px solid rgba(45,95,168,0.20)' : '1px solid rgba(0,0,0,0.06)',
               transition: 'all 0.15s',
             }}>
             {f.label}{f.count !== undefined ? ` ${f.count}` : ''}
@@ -230,13 +246,13 @@ export function DarkHeaderFilterBar({ filters, activeFilter, onFilterChange, rig
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// DarkHeaderSummaryBar — 다크 하단 요약 바 (#2d5fa8 배경)
+// DarkHeaderSummaryBar — 하단 요약 바
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface SummaryItem {
   label: string
   value: string | number
-  color?: string  // 값 색상 (기본: #fff)
+  color?: string
 }
 
 export interface SummaryAction {

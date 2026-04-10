@@ -5710,7 +5710,7 @@ function UploadContent() {
                               style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 }}
                               onMouseEnter={e => e.currentTarget.style.color = '#f87171'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>×</button>
                             <span style={{ color: '#94a3b8', minWidth: 130, fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11 }}>{dt.time}</span></>}</>})()}</span>
-                            <span style={{ color: '#e2e8f0', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, fontSize: 13 }}>{item.client_name}</span>
+                            <span style={{ color: '#1e293b', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, fontSize: 13 }}>{item.client_name}</span>
                             <span style={{ color: item.type === 'income' ? '#60a5fa' : '#f87171', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 13 }}>
                               {item.type === 'income' ? '+' : '-'}{Math.abs(item.amount).toLocaleString()}
                             </span>
@@ -6591,7 +6591,7 @@ function UploadContent() {
                                             {categoryMode === 'display' ? catParts.group.replace(/^[^\s]+\s/, '') : catParts.group}
                                           </span>
                                           {catParts.item && <>
-                                            <span style={{ fontSize: 9, color: '#cbd5e1' }}>›</span>
+                                            <span style={{ fontSize: 9, color: '#334155' }}>›</span>
                                             <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{groupIcon} {catParts.item}</span>
                                           </>}
                                         </div>

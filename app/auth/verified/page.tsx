@@ -84,7 +84,7 @@ export default function VerifiedPage() {
 
         {/* Self-Disruption 브랜딩 */}
         <div className="mt-6 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-slate-300">
+          <div className="flex items-center justify-center gap-1.5 text-slate-600">
             <div className="w-5 h-5 bg-slate-200 rounded flex items-center justify-center">
               <span className="text-slate-500 font-black text-[10px]">S</span>
             </div>

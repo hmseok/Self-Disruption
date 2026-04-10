@@ -240,11 +240,11 @@ export default function CodefPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-slate-950">
       <DarkHeader icon="Building2" title="은행/카드 자동연동" subtitle="Codef API로 거래내역을 자동 수집합니다" />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-white mb-8">Codef 금융 데이터 연동</h1>
+        <h1 className="text-3xl font-bold text-slate-800 mb-8">Codef 금융 데이터 연동</h1>
 
         {/* Message */}
         {message && (
@@ -263,16 +263,16 @@ export default function CodefPage() {
 
         {/* Add Connection Form */}
         {showForm && (
-          <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-gray-700">
+          <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
             <h2 className="text-xl font-bold text-white mb-6">계정 연동 추가</h2>
 
             <form onSubmit={handleAddConnection} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">연동 유형</label>
+                <label className="block text-sm font-medium text-slate-600 mb-2">연동 유형</label>
                 <select
                   value={form.action}
                   onChange={(e) => setForm({ ...form, action: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white"
                 >
                   <option value="create">새로운 연동 생성</option>
                   <option value="add">기존 연동에 추가</option>
@@ -281,11 +281,11 @@ export default function CodefPage() {
 
               {form.action === 'add' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">기존 연동 ID</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-2">기존 연동 ID</label>
                   <select
                     value={form.connectedId}
                     onChange={(e) => setForm({ ...form, connectedId: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                    className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white"
                   >
                     <option value="">선택...</option>
                     {connections.map((c) => (
@@ -298,11 +298,11 @@ export default function CodefPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">기관</label>
+                <label className="block text-sm font-medium text-slate-600 mb-2">기관</label>
                 <select
                   value={form.orgCode}
                   onChange={(e) => setForm({ ...form, orgCode: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white"
                 >
                   <optgroup label="은행">
                     <option value="0020">우리은행</option>
@@ -318,7 +318,7 @@ export default function CodefPage() {
 
               {/* 로그인 방식 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">로그인 방식</label>
+                <label className="block text-sm font-medium text-slate-600 mb-2">로그인 방식</label>
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -326,7 +326,7 @@ export default function CodefPage() {
                     className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
                       form.loginType === '0'
                         ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                        : 'bg-gray-100 border-black/[0.06] text-slate-600 hover:bg-gray-100'
                     }`}
                   >
                     🔐 공동인증서
@@ -337,7 +337,7 @@ export default function CodefPage() {
                     className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
                       form.loginType === '1'
                         ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                        : 'bg-gray-100 border-black/[0.06] text-slate-600 hover:bg-gray-100'
                     }`}
                   >
                     🔑 ID/비밀번호
@@ -349,35 +349,35 @@ export default function CodefPage() {
               {form.loginType === '0' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">인증서 파일 (signCert.der)</label>
-                    <p className="text-xs text-gray-500 mb-2">NPKI 폴더 안의 signCert.der 파일을 선택하세요</p>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">인증서 파일 (signCert.der)</label>
+                    <p className="text-xs text-slate-500 mb-2">NPKI 폴더 안의 signCert.der 파일을 선택하세요</p>
                     <input
                       type="file"
                       accept=".der"
                       onChange={(e) => handleCertFileChange(e, 'cert')}
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
                     />
                     {certFile && <p className="text-xs text-green-400 mt-1">✓ 인증서 파일 로드됨</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">개인키 파일 (signPri.key)</label>
-                    <p className="text-xs text-gray-500 mb-2">NPKI 폴더 안의 signPri.key 파일을 선택하세요</p>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">개인키 파일 (signPri.key)</label>
+                    <p className="text-xs text-slate-500 mb-2">NPKI 폴더 안의 signPri.key 파일을 선택하세요</p>
                     <input
                       type="file"
                       accept=".key"
                       onChange={(e) => handleCertFileChange(e, 'key')}
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white"
                     />
                     {keyFile && <p className="text-xs text-green-400 mt-1">✓ 개인키 파일 로드됨</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">인증서 비밀번호</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-2">인증서 비밀번호</label>
                     <input
                       type="password"
                       value={form.certPassword}
                       onChange={(e) => setForm({ ...form, certPassword: e.target.value })}
                       placeholder="공동인증서 비밀번호 (암호화되어 전송됩니다)"
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                      className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white placeholder-slate-500"
                     />
                   </div>
                 </>
@@ -387,47 +387,47 @@ export default function CodefPage() {
               {form.loginType === '1' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 아이디</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-2">인터넷뱅킹 아이디</label>
                     <input
                       type="text"
                       value={form.loginId}
                       onChange={(e) => setForm({ ...form, loginId: e.target.value })}
                       placeholder="인터넷뱅킹 로그인 아이디"
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                      className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white placeholder-slate-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">인터넷뱅킹 비밀번호</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-2">인터넷뱅킹 비밀번호</label>
                     <input
                       type="password"
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                       placeholder="인터넷뱅킹 로그인 비밀번호 (암호화되어 전송됩니다)"
-                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                      className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white placeholder-slate-500"
                     />
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">사업자등록번호</label>
+                <label className="block text-sm font-medium text-slate-600 mb-2">사업자등록번호</label>
                 <input
                   type="text"
                   value={form.identity}
                   onChange={(e) => setForm({ ...form, identity: e.target.value })}
                   placeholder="사업자등록번호 (예: 032-88-01234)"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white placeholder-slate-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">계좌/카드번호</label>
+                <label className="block text-sm font-medium text-slate-600 mb-2">계좌/카드번호</label>
                 <input
                   type="text"
                   value={form.accountNumber}
                   onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
                   placeholder="계좌번호 또는 카드번호"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white placeholder-slate-500"
                 />
               </div>
 
@@ -441,7 +441,7 @@ export default function CodefPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+                  className="flex-1 bg-gray-100 hover:bg-gray-100 text-white font-bold py-2 px-4 rounded"
                 >
                   취소
                 </button>
@@ -451,7 +451,7 @@ export default function CodefPage() {
         )}
 
         {/* Connected Accounts */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-gray-700">
+        <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">연동된 계정</h2>
             <button
@@ -463,25 +463,25 @@ export default function CodefPage() {
           </div>
 
           {connections.length === 0 ? (
-            <p className="text-gray-400">연동된 계정이 없습니다.</p>
+            <p className="text-slate-500">연동된 계정이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">기관명</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">유형</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">계좌/카드번호</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">연동일</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">상태</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-semibold">작업</th>
+                  <tr className="border-b border-black/[0.06]">
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">기관명</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">유형</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">계좌/카드번호</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">연동일</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">상태</th>
+                    <th className="text-left py-3 px-4 text-slate-600 font-semibold">작업</th>
                   </tr>
                 </thead>
                 <tbody>
                   {connections.map((conn) => (
-                    <tr key={conn.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                    <tr key={conn.id} className="border-b border-black/[0.06] hover:bg-white/[0.04]">
                       <td className="py-3 px-4 text-white font-medium">{conn.org_name}</td>
-                      <td className="py-3 px-4 text-gray-300">
+                      <td className="py-3 px-4 text-slate-600">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${
                             conn.org_type === 'bank'
@@ -492,8 +492,8 @@ export default function CodefPage() {
                           {conn.org_type === 'bank' ? '은행' : '카드'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-gray-300">{conn.account_number || '—'}</td>
-                      <td className="py-3 px-4 text-gray-400">
+                      <td className="py-3 px-4 text-slate-600">{conn.account_number || '—'}</td>
+                      <td className="py-3 px-4 text-slate-500">
                         {new Date(conn.created_at).toLocaleDateString('ko-KR')}
                       </td>
                       <td className="py-3 px-4">
@@ -518,26 +518,26 @@ export default function CodefPage() {
         </div>
 
         {/* Sync Section */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-gray-700">
+        <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
           <h2 className="text-xl font-bold text-white mb-6">거래 동기화</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">시작일</label>
+              <label className="block text-sm font-medium text-slate-600 mb-2">시작일</label>
               <input
                 type="date"
                 value={dateRange.startDate}
                 onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">종료일</label>
+              <label className="block text-sm font-medium text-slate-600 mb-2">종료일</label>
               <input
                 type="date"
                 value={dateRange.endDate}
                 onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-4 py-2 bg-gray-100 border border-black/[0.06] rounded text-white"
               />
             </div>
           </div>
@@ -547,7 +547,7 @@ export default function CodefPage() {
             disabled={syncing || connections.length === 0}
             className={`w-full py-3 px-4 rounded font-bold text-white ${
               syncing || connections.length === 0
-                ? 'bg-gray-600 cursor-not-allowed'
+                ? 'bg-gray-100 cursor-not-allowed'
                 : 'bg-green-600 hover:bg-green-700'
             }`}
           >
@@ -556,22 +556,22 @@ export default function CodefPage() {
         </div>
 
         {/* Sync Logs */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="bg-gray-50 rounded-lg p-6 border border-black/[0.06]">
           <h2 className="text-xl font-bold text-white mb-6">동기화 기록</h2>
 
           {logs.length === 0 ? (
-            <p className="text-gray-400">동기화 기록이 없습니다.</p>
+            <p className="text-slate-500">동기화 기록이 없습니다.</p>
           ) : (
             <div className="space-y-4">
               {logs.map((log) => (
-                <div key={log.id} className="border border-gray-700 rounded p-4 bg-gray-700/30">
+                <div key={log.id} className="border border-black/[0.06] rounded p-4 bg-gray-100/30">
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="text-white font-semibold">
                         {log.sync_type === 'bank' ? '은행' : log.sync_type === 'card' ? '카드' : '전체'} 동기화
                         {log.org_name && ` - ${log.org_name}`}
                       </h3>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-slate-500">
                         {new Date(log.synced_at).toLocaleString('ko-KR')}
                       </p>
                     </div>
@@ -586,7 +586,7 @@ export default function CodefPage() {
                     </span>
                   </div>
 
-                  <div className="flex gap-6 text-sm text-gray-300">
+                  <div className="flex gap-6 text-sm text-slate-600">
                     <span>조회: {log.fetched}건</span>
                     <span>저장: {log.inserted}건</span>
                   </div>

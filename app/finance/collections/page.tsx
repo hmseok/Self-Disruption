@@ -221,11 +221,11 @@ export default function CollectionsPage() {
       <div className="page-bg">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">📋 수금 관리</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">📋 수금 관리</h1>
             <p className="text-slate-400 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
           </div>
         </div>
-        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
+        <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm text-center py-20">
           <p className="text-4xl mb-3">🏢</p>
           <p className="font-semibold text-sm text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
           <p className="text-xs text-slate-500 mt-1">회사 선택 후 수금 관리를 이용할 수 있습니다</p>
@@ -243,7 +243,7 @@ export default function CollectionsPage() {
           title="수금 관리"
           subtitle="납부 현황 확인 및 수금 관리 · 안내 발송"
           stats={[
-            { label: '이번달 예상 수금', value: `${nf(totalExpected)}원`, color: '#60a5fa', bgColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)', labelColor: 'rgba(59, 130, 246, 0.4)' },
+            { label: '이번달 예상 수금', value: `${nf(totalExpected)}원`, color: '#2563eb', bgColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)', labelColor: 'rgba(59, 130, 246, 0.4)' },
             { label: '수금 완료', value: `${nf(totalCollected)}원`, color: '#34d399', bgColor: 'rgba(52, 211, 153, 0.1)', borderColor: 'rgba(52, 211, 153, 0.3)', labelColor: 'rgba(52, 211, 153, 0.4)' },
             { label: '수금율', value: `${collectionRate}%`, color: collectionRate >= 80 ? '#34d399' : collectionRate >= 50 ? '#fbbf24' : '#f87171', bgColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.1)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(248, 113, 113, 0.1)', borderColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.3)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.3)' : 'rgba(248, 113, 113, 0.3)', labelColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.4)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.4)' : 'rgba(248, 113, 113, 0.4)' },
             { label: '연체', value: `${nf(overdueTotal)}원`, color: overdueSchedules.length > 0 ? '#f87171' : '#cbd5e1', bgColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.1)' : 'rgba(203, 213, 225, 0.1)', borderColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.3)' : 'rgba(203, 213, 225, 0.3)', labelColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.4)' : 'rgba(203, 213, 225, 0.4)' },
@@ -251,16 +251,16 @@ export default function CollectionsPage() {
         >
           {/* Month navigation in children */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px' }}>
-            <button onClick={() => changeMonth(-1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#cbd5e1' }}>‹</button>
+            <button onClick={() => changeMonth(-1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#334155' }}>‹</button>
             <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
-              style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: '#e2e8f0' }} />
-            <button onClick={() => changeMonth(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#cbd5e1' }}>›</button>
+              style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: '#1e293b' }} />
+            <button onClick={() => changeMonth(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#334155' }}>›</button>
           </div>
         </DarkHeader>
 
         {/* 탭 + 액션 바 */}
-        <div className="bg-[#1e2a45] rounded-2xl shadow-sm border border-white/[0.06]">
-          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-2 border-b border-white/5 flex-wrap gap-3">
+        <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06]">
+          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-2 border-b border-black/5 flex-wrap gap-3">
             <div className="flex gap-1">
               {tabs.map(tab => (
                 <button
@@ -269,7 +269,7 @@ export default function CollectionsPage() {
                   className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
                     activeTab === tab.key
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-400 hover:bg-white/5'
+                      : 'text-slate-400 hover:bg-gray-50'
                   }`}
                 >
                   {tab.label}
@@ -286,7 +286,7 @@ export default function CollectionsPage() {
                 <select
                   value={sendChannel}
                   onChange={(e) => setSendChannel(e.target.value as 'sms' | 'email')}
-                  className="px-3 py-1.5 rounded-lg border border-white/[0.06] text-xs font-bold focus:outline-none bg-white/5 text-slate-200"
+                  className="px-3 py-1.5 rounded-lg border border-black/[0.06] text-xs font-bold focus:outline-none bg-gray-50 text-slate-700"
                 >
                   <option value="sms">SMS</option>
                   <option value="email">이메일</option>
@@ -318,7 +318,7 @@ export default function CollectionsPage() {
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/5 text-slate-500 text-[11px] uppercase font-black">
+                  <tr className="border-b border-black/5 text-slate-500 text-[11px] uppercase font-black">
                     {(activeTab === 'pending' || activeTab === 'overdue') && (
                       <th className="py-3 px-4 text-center w-10">
                         <input
@@ -343,7 +343,7 @@ export default function CollectionsPage() {
                   {displayList.map(s => (
                     <tr
                       key={s.id}
-                      className={`border-b border-white/5 hover:bg-white/[0.03] transition-colors ${
+                      className={`border-b border-black/5 hover:bg-white/[0.03] transition-colors ${
                         activeTab === 'overdue' ? 'bg-red-500/10' : ''
                       }`}
                     >
@@ -357,7 +357,7 @@ export default function CollectionsPage() {
                           />
                         </td>
                       )}
-                      <td className="py-3 px-4 font-bold text-slate-100">{s.customer_name || '-'}</td>
+                      <td className="py-3 px-4 font-bold text-slate-800">{s.customer_name || '-'}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                           s.contract_type === 'jiip'
@@ -375,7 +375,7 @@ export default function CollectionsPage() {
                           </span>
                         </td>
                       )}
-                      <td className="py-3 px-4 text-right font-bold text-slate-100">{nf(Number(s.expected_amount))}원</td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-800">{nf(Number(s.expected_amount))}원</td>
                       {activeTab === 'completed' && (
                         <td className="py-3 px-4 text-right font-bold text-emerald-400">{nf(Number(s.actual_amount || s.expected_amount))}원</td>
                       )}
@@ -412,9 +412,9 @@ export default function CollectionsPage() {
 
           {/* 하단 합계 */}
           {displayList.length > 0 && (
-            <div className="px-6 py-3 border-t border-white/5 flex justify-between items-center text-sm">
+            <div className="px-6 py-3 border-t border-black/5 flex justify-between items-center text-sm">
               <span className="text-slate-400">총 {displayList.length}건</span>
-              <span className="font-black text-slate-100">
+              <span className="font-black text-slate-800">
                 합계: {nf(displayList.reduce((a, s) => a + Number(s.expected_amount || 0), 0))}원
               </span>
             </div>
@@ -447,19 +447,19 @@ export default function CollectionsPage() {
 // ── KPI 카드 컴포넌트 ──
 function KPICard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   const colors: Record<string, string> = {
-    slate: 'border-white/[0.06]',
+    slate: 'border-black/[0.06]',
     green: 'border-emerald-500/40 bg-emerald-500/5',
     amber: 'border-amber-500/40 bg-amber-500/5',
     red: 'border-red-500/40 bg-red-500/5',
   }
   const valueColors: Record<string, string> = {
-    slate: 'text-slate-100',
+    slate: 'text-slate-800',
     green: 'text-emerald-400',
     amber: 'text-amber-400',
     red: 'text-red-400',
   }
   return (
-    <div className={`bg-white/5 rounded-2xl border p-4 shadow-sm ${colors[color] || colors.slate}`}>
+    <div className={`bg-gray-50 rounded-2xl border p-4 shadow-sm ${colors[color] || colors.slate}`}>
       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{label}</p>
       <p className={`text-xl font-bold mt-1 ${valueColors[color] || valueColors.slate}`}>{value}</p>
       <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
@@ -473,7 +473,7 @@ function StatusBadge({ status, paymentDate }: { status: string; paymentDate: str
   if (isOverdue) return <span className="px-2 py-0.5 rounded bg-red-900/40 text-red-400 text-[11px] font-bold">연체</span>
   if (status === 'completed') return <span className="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 text-[11px] font-bold">완료</span>
   if (status === 'partial') return <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-400 text-[11px] font-bold">부분입금</span>
-  return <span className="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[11px] font-bold">대기</span>
+  return <span className="px-2 py-0.5 rounded bg-gray-50 text-slate-400 text-[11px] font-bold">대기</span>
 }
 
 // ── 모달 래퍼 (토큰 비동기 처리) ──

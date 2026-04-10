@@ -33,12 +33,12 @@ const DISPATCH_CATEGORY_LABELS: Record<string, { label: string; desc: string; co
   insurance_victim:   { label: '피해자대차', desc: '상대 과실로 사고 → 상대 보험사 청구', color: 'text-blue-700' },
   insurance_at_fault: { label: '가해자대차', desc: '당사 고객 과실 → 당사 보험사 또는 자비', color: 'text-red-700' },
   insurance_own:      { label: '자차대차',   desc: '자차사고(단독) → 당사 보험 자차담보 청구', color: 'text-amber-700' },
-  maintenance:        { label: '정비대차',   desc: '정비/검사 기간 동안 대체 차량 제공', color: 'text-gray-700' },
+  maintenance:        { label: '정비대차',   desc: '정비/검사 기간 동안 대체 차량 제공', color: 'text-slate-600' },
 }
 
 const BILLING_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   none:     { label: '-', color: '' },
-  pending:  { label: '청구대기', color: 'bg-gray-100 text-gray-600' },
+  pending:  { label: '청구대기', color: 'bg-gray-100 text-slate-400' },
   billed:   { label: '청구완료', color: 'bg-blue-100 text-blue-700' },
   approved: { label: '승인', color: 'bg-cyan-100 text-cyan-700' },
   paid:     { label: '입금완료', color: 'bg-green-100 text-green-700' },
@@ -483,11 +483,11 @@ export default function DispatchModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10">
-          <h2 className="text-xl font-black text-gray-900">
+        <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 flex justify-between items-center z-10">
+          <h2 className="text-xl font-black text-slate-800">
             {editingOp ? '배차 수정' : '새 배차 등록'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-400 text-2xl">×</button>
         </div>
 
         {/* Dispatch Type Tabs */}
@@ -504,7 +504,7 @@ export default function DispatchModal({
                     ? tab.color === 'blue' ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : tab.color === 'purple' ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-amber-500 bg-amber-50 text-amber-700'
-                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                    : 'border-black/[0.06] bg-white text-slate-500 hover:border-black/10'
                 }`}>
                 {tab.label}
               </button>
@@ -520,20 +520,20 @@ export default function DispatchModal({
           {(dispatchType === 'long_term' || (editingOp && (!editingOp.dispatch_category || editingOp.dispatch_category === 'regular'))) && (
             <>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">작업 유형</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">작업 유형</label>
                 <div className="flex gap-2">
                   <button onClick={() => setForm({ ...form, operation_type: 'delivery' })}
-                    className={`flex-1 py-2 rounded-lg font-bold text-sm ${form.operation_type === 'delivery' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>출고</button>
+                    className={`flex-1 py-2 rounded-lg font-bold text-sm ${form.operation_type === 'delivery' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-slate-400 hover:bg-gray-100'}`}>출고</button>
                   <button onClick={() => setForm({ ...form, operation_type: 'return' })}
-                    className={`flex-1 py-2 rounded-lg font-bold text-sm ${form.operation_type === 'return' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>반납</button>
+                    className={`flex-1 py-2 rounded-lg font-bold text-sm ${form.operation_type === 'return' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-slate-400 hover:bg-gray-100'}`}>반납</button>
                 </div>
               </div>
 
               {!editingOp && (
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">연동 계약</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">연동 계약</label>
                   <select value={form.contract_id} onChange={e => handleContractSelect(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
                     <option value="">계약 선택 (선택사항)</option>
                     {contracts.map(c => {
                       const car = cars.find(cr => String(cr.id) === String(c.car_id))
@@ -548,9 +548,9 @@ export default function DispatchModal({
               {form.operation_type === 'return' && renderReturnFields()}
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">메모</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">메모</label>
                 <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-steel-500" rows={2} />
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-steel-500" rows={2} />
               </div>
             </>
           )}
@@ -562,19 +562,19 @@ export default function DispatchModal({
             <>
               {/* Dispatch Category */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">배차 유형</label>
+                <label className="block text-sm font-bold text-slate-600 mb-2">배차 유형</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(DISPATCH_CATEGORY_LABELS) as Array<'insurance_victim' | 'insurance_at_fault' | 'insurance_own' | 'maintenance'>).map(key => (
                     <button key={key} onClick={() => setInsuranceForm({ ...insuranceForm, dispatch_category: key })}
                       className={`p-2.5 rounded-lg text-left border-2 transition-all ${
                         insuranceForm.dispatch_category === key
                           ? 'border-amber-500 bg-amber-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-black/[0.06] hover:border-black/10'
                       }`}>
                       <div className={`font-bold text-sm ${DISPATCH_CATEGORY_LABELS[key].color}`}>
                         {DISPATCH_CATEGORY_LABELS[key].label}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">{DISPATCH_CATEGORY_LABELS[key].desc}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{DISPATCH_CATEGORY_LABELS[key].desc}</div>
                     </button>
                   ))}
                 </div>
@@ -583,9 +583,9 @@ export default function DispatchModal({
               {/* Link to Accident Record */}
               {insuranceForm.dispatch_category !== 'maintenance' && (
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">사고 기록 연동</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">사고 기록 연동</label>
                   <select value={insuranceForm.accident_id} onChange={e => handleAccidentSelect(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
                     <option value="">사고 기록 선택 (선택사항)</option>
                     {accidents.map(acc => {
                       const car = cars.find(c => String(c.id) === String(acc.car_id))
@@ -601,9 +601,9 @@ export default function DispatchModal({
 
               {/* Damaged Car (the car being repaired) */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">수리중 차량 (사고 차량)</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">수리중 차량 (사고 차량)</label>
                 <select value={insuranceForm.damaged_car_id} onChange={e => setInsuranceForm({ ...insuranceForm, damaged_car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
                   <option value="">수리중 차량 선택</option>
                   {cars.map(c => <option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model}</option>)}
                 </select>
@@ -612,14 +612,14 @@ export default function DispatchModal({
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">이용 고객명</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">이용 고객명</label>
                   <input type="text" value={insuranceForm.customer_name} onChange={e => setInsuranceForm({ ...insuranceForm, customer_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="대차 이용 고객" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="대차 이용 고객" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">고객 연락처</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">고객 연락처</label>
                   <input type="tel" value={insuranceForm.customer_phone} onChange={e => setInsuranceForm({ ...insuranceForm, customer_phone: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="010-0000-0000" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="010-0000-0000" />
                 </div>
               </div>
 
@@ -638,7 +638,7 @@ export default function DispatchModal({
                     <div className="flex items-center gap-3">
                       <input type="range" min="0" max="100" step="5" value={insuranceForm.fault_ratio}
                         onChange={e => setInsuranceForm({ ...insuranceForm, fault_ratio: Number(e.target.value) })}
-                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                        className="flex-1 h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer" />
                       <div className="bg-white border border-amber-300 rounded-lg px-3 py-1.5 min-w-[80px] text-center">
                         <span className="font-black text-amber-800">{insuranceForm.fault_ratio}%</span>
                       </div>
@@ -679,35 +679,35 @@ export default function DispatchModal({
               {/* Replacement Period */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">대차 시작일</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">대차 시작일</label>
                   <input type="date" value={insuranceForm.replacement_start_date}
                     onChange={e => {
                       setInsuranceForm({ ...insuranceForm, replacement_start_date: e.target.value })
                       setForm(prev => ({ ...prev, scheduled_date: e.target.value }))
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">예상 반납일 (수리완료일)</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">예상 반납일 (수리완료일)</label>
                   <input type="date" value={insuranceForm.replacement_end_date}
                     onChange={e => setInsuranceForm({ ...insuranceForm, replacement_end_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                 </div>
               </div>
 
               {/* Repair Shop */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">수리업체</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">수리업체</label>
                 <input type="text" value={insuranceForm.repair_shop_name}
                   onChange={e => setInsuranceForm({ ...insuranceForm, repair_shop_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="수리업체명" />
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" placeholder="수리업체명" />
               </div>
 
               {/* Replacement Car Selection */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">대차 차량 (제공할 차량)</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">대차 차량 (제공할 차량)</label>
                 <select value={form.car_id} onChange={e => setForm({ ...form, car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
                   <option value="">대차 차량 선택</option>
                   {availableCars.map(c => (
                     <option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model} {c.status === 'available' ? '(가용)' : ''}</option>
@@ -718,38 +718,38 @@ export default function DispatchModal({
               {/* Delivery time/location/handler */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">출고 시간</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">출고 시간</label>
                   <input type="time" value={form.scheduled_time} onChange={e => setForm({ ...form, scheduled_time: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">출고 장소</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">출고 장소</label>
                   <input type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="장소"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">담당자</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">담당자</label>
                   <input type="text" value={form.handler_name} onChange={e => setForm({ ...form, handler_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                 </div>
               </div>
 
               {/* Cost Summary */}
               {insuranceForm.dispatch_category !== 'maintenance' && insuranceForm.insurance_daily_rate > 0 && (
-                <div className="bg-gray-900 text-white rounded-xl p-4">
-                  <h3 className="font-bold text-sm mb-3 text-gray-300">비용 정산 요약</h3>
+                <div className="bg-gray-50 text-white rounded-xl p-4">
+                  <h3 className="font-bold text-sm mb-3 text-slate-600">비용 정산 요약</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">일일 대차료</span>
+                      <span className="text-slate-500">일일 대차료</span>
                       <span className="font-bold">{insuranceForm.insurance_daily_rate.toLocaleString()}원</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">예상 대차일수</span>
+                      <span className="text-slate-500">예상 대차일수</span>
                       <span className="font-bold">{insuranceDays}일</span>
                     </div>
-                    <div className="border-t border-gray-700 my-1"></div>
+                    <div className="border-t border-black/10 my-1"></div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">총 대차비</span>
+                      <span className="text-slate-500">총 대차비</span>
                       <span className="font-bold text-base">{insuranceTotalCost.toLocaleString()}원</span>
                     </div>
                     <div className="flex justify-between text-blue-400">
@@ -768,9 +768,9 @@ export default function DispatchModal({
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">메모</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">메모</label>
                 <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-amber-500" rows={2} />
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-amber-500" rows={2} />
               </div>
             </>
           )}
@@ -782,16 +782,16 @@ export default function DispatchModal({
             <>
               <div className="flex gap-2">
                 <button onClick={() => setUseExistingQuote(false)}
-                  className={`flex-1 py-2 rounded-lg font-bold text-sm border-2 ${!useExistingQuote ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500'}`}>새로 작성</button>
+                  className={`flex-1 py-2 rounded-lg font-bold text-sm border-2 ${!useExistingQuote ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-black/[0.06] text-slate-500'}`}>새로 작성</button>
                 <button onClick={() => setUseExistingQuote(true)}
-                  className={`flex-1 py-2 rounded-lg font-bold text-sm border-2 ${useExistingQuote ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500'}`}>견적 불러오기</button>
+                  className={`flex-1 py-2 rounded-lg font-bold text-sm border-2 ${useExistingQuote ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-black/[0.06] text-slate-500'}`}>견적 불러오기</button>
               </div>
 
               {useExistingQuote && (
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">단기 견적 선택</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">단기 견적 선택</label>
                   <select value={shortTermForm.selected_quote_id} onChange={e => loadQuote(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500">
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500">
                     <option value="">견적 선택</option>
                     {shortTermQuotes.map(q => (
                       <option key={q.id} value={q.id}>{q.customer_name} - {q.quote_detail?.daily_rate?.toLocaleString() || 0}원/일 ({q.created_at?.split('T')[0]})</option>
@@ -802,21 +802,21 @@ export default function DispatchModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">고객명</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">고객명</label>
                   <input type="text" value={shortTermForm.customer_name} onChange={e => setShortTermForm({ ...shortTermForm, customer_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" placeholder="홍길동" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" placeholder="홍길동" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">연락처</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">연락처</label>
                   <input type="tel" value={shortTermForm.customer_phone} onChange={e => setShortTermForm({ ...shortTermForm, customer_phone: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" placeholder="010-0000-0000" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" placeholder="010-0000-0000" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">차량</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">차량</label>
                 <select value={form.car_id} onChange={e => setForm({ ...form, car_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500">
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500">
                   <option value="">차량 선택</option>
                   {availableCars.map(c => (
                     <option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model} {c.status === 'available' ? '(가용)' : ''}</option>
@@ -826,29 +826,29 @@ export default function DispatchModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">시작일</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">시작일</label>
                   <input type="date" value={shortTermForm.start_date} onChange={e => setShortTermForm({ ...shortTermForm, start_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">종료일</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">종료일</label>
                   <input type="date" value={shortTermForm.end_date} onChange={e => setShortTermForm({ ...shortTermForm, end_date: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">일일 요금 (원)</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">일일 요금 (원)</label>
                   <input type="text" value={shortTermForm.daily_rate ? shortTermForm.daily_rate.toLocaleString() : ''}
                     onChange={e => setShortTermForm({ ...shortTermForm, daily_rate: Number(e.target.value.replace(/,/g, '')) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-right font-bold focus:outline-none focus:border-purple-500" placeholder="50,000" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm text-right font-bold focus:outline-none focus:border-purple-500" placeholder="50,000" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">보증금 (원)</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">보증금 (원)</label>
                   <input type="text" value={shortTermForm.deposit ? shortTermForm.deposit.toLocaleString() : ''}
                     onChange={e => setShortTermForm({ ...shortTermForm, deposit: Number(e.target.value.replace(/,/g, '')) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-right font-bold focus:outline-none focus:border-purple-500" placeholder="0" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm text-right font-bold focus:outline-none focus:border-purple-500" placeholder="0" />
                 </div>
               </div>
 
@@ -866,42 +866,42 @@ export default function DispatchModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">출고 시간</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">출고 시간</label>
                   <input type="time" value={form.scheduled_time} onChange={e => setForm({ ...form, scheduled_time: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">출고 장소</label>
+                  <label className="block text-sm font-bold text-slate-600 mb-1.5">출고 장소</label>
                   <input type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="출고 장소"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">담당자</label>
+                <label className="block text-sm font-bold text-slate-600 mb-1.5">담당자</label>
                 <input type="text" value={form.handler_name} onChange={e => setForm({ ...form, handler_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
+                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500" />
               </div>
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex gap-3 justify-end">
-          <button onClick={onClose} className="px-5 py-2.5 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">취소</button>
+        <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50 text-sm">취소</button>
           {dispatchType === 'short_term' && !editingOp ? (
             <button onClick={handleCreateShortTermContract} disabled={saving}
-              className="px-6 py-2.5 rounded-lg font-bold bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400 text-sm shadow-lg">
+              className="px-6 py-2.5 rounded-lg font-bold bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-600 text-sm shadow-lg">
               {saving ? '처리중...' : '계약 확정 + 출고 등록'}
             </button>
           ) : dispatchType === 'replacement' && !editingOp ? (
             <button onClick={handleSaveInsuranceDispatch} disabled={saving}
-              className="px-6 py-2.5 rounded-lg font-bold bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-400 text-sm shadow-lg">
+              className="px-6 py-2.5 rounded-lg font-bold bg-amber-600 text-white hover:bg-amber-700 disabled:bg-slate-600 text-sm shadow-lg">
               {saving ? '처리중...' : '보험배차 등록'}
             </button>
           ) : (
             <button onClick={handleSaveOperation} disabled={saving}
-              className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-gray-400 text-sm shadow-lg">
+              className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600 text-sm shadow-lg">
               {saving ? '저장중...' : editingOp ? '수정 완료' : '배차 등록'}
             </button>
           )}
@@ -918,56 +918,56 @@ export default function DispatchModal({
       <>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">차량</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">차량</label>
             <select value={form.car_id} onChange={e => setForm({ ...form, car_id: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
               <option value="">차량 선택</option>
               {cars.map(c => (<option key={c.id} value={c.id}>{c.number} - {c.brand} {c.model}</option>))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">일정 날짜</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">일정 날짜</label>
             <input type="date" value={form.scheduled_date} onChange={e => setForm({ ...form, scheduled_date: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">시간</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">시간</label>
             <input type="time" value={form.scheduled_time} onChange={e => setForm({ ...form, scheduled_time: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">장소</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">장소</label>
             <input type="text" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="출고/반납 장소"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">담당자</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">담당자</label>
             <input type="text" value={form.handler_name} onChange={e => setForm({ ...form, handler_name: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">운전자</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">운전자</label>
             <input type="text" value={form.driver_name} onChange={e => setForm({ ...form, driver_name: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">주행거리 (km)</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">주행거리 (km)</label>
             <input type="number" value={form.mileage_at_op} onChange={e => setForm({ ...form, mileage_at_op: parseInt(e.target.value) || 0 })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500" />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">연료</label>
+            <label className="block text-sm font-bold text-slate-600 mb-1.5">연료</label>
             <select value={form.fuel_level} onChange={e => setForm({ ...form, fuel_level: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
+              className="w-full border border-black/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-steel-500">
               {FUEL_LEVELS.map(f => <option key={f} value={f}>{FUEL_LABELS[f]}</option>)}
             </select>
           </div>

@@ -715,7 +715,7 @@ export default function DepreciationTab() {
           <p className="text-[10px] text-slate-400 mb-4">Gemini AI로 현재 중고차 시세를 조회하여 잔존율 적정성을 검증합니다</p>
 
           <div className="mb-3">
-            <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">검증할 차종</label>
+            <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">검증할 차종</label>
             <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-steel-500">
               <option value="">선택하세요</option>
@@ -736,20 +736,20 @@ export default function DepreciationTab() {
             <div className="space-y-3">
               <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[10px] font-semibold text-slate-300">Gemini 검증 결과</h4>
+                  <h4 className="text-[10px] font-semibold text-slate-600">Gemini 검증 결과</h4>
                   <span className="text-[9px] text-slate-500">{searchResults.searched_at}</span>
                 </div>
-                <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                <div className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                   {searchResults.results}
                 </div>
               </div>
               {searchResults.sources?.length > 0 && (
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                  <h4 className="text-[10px] font-semibold text-slate-300 mb-2">참고 출처</h4>
+                  <h4 className="text-[10px] font-semibold text-slate-600 mb-2">참고 출처</h4>
                   <div className="space-y-1">
                     {searchResults.sources.map((source, idx) => (
                       <a key={idx} href={source} target="_blank" rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-slate-300 text-[10px] break-all underline block leading-snug">
+                        className="text-slate-400 hover:text-slate-600 text-[10px] break-all underline block leading-snug">
                         {source.length > 60 ? source.substring(0, 60) + '...' : source}
                       </a>
                     ))}

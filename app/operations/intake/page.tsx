@@ -56,7 +56,7 @@ type CustomerNote = { id: number; customer_id: number; author_name: string; note
 // ============================================
 const SOURCE_MAP: Record<string, { label: string; bg: string }> = {
   cafe24: { label: '구전산', bg: 'bg-purple-500' },
-  manual: { label: '수동', bg: 'bg-gray-400' },
+  manual: { label: '수동', bg: 'bg-slate-500' },
 }
 const STAGE_MAP: Record<string, { label: string; color: string }> = {
   accident_reported: { label: '사고접수', color: '#ef4444' },
@@ -78,7 +78,7 @@ const STAGE_MAP: Record<string, { label: string; color: string }> = {
 const ACC_TYPE: Record<string, string> = { collision: '충돌', self_damage: '자손', hit_and_run: '뺑소니', theft: '도난', natural_disaster: '자연재해', vandalism: '파손', fire: '화재', other: '기타' }
 const COND: Record<string, string> = { minor: '경미', repairable: '수리가능', total_loss: '전손' }
 const INS_ST: Record<string, string> = { none: '미접수', filed: '접수', processing: '처리중', approved: '승인', denied: '거절', partial: '부분' }
-const BILLING_ST: Record<string, { l: string; c: string }> = { none: { l: '미청구', c: 'text-gray-400' }, pending: { l: '청구대기', c: 'text-yellow-600' }, billed: { l: '청구완료', c: 'text-blue-600' }, approved: { l: '승인', c: 'text-cyan-600' }, paid: { l: '입금완료', c: 'text-green-600' }, partial: { l: '부분', c: 'text-amber-600' }, denied: { l: '거절', c: 'text-red-600' } }
+const BILLING_ST: Record<string, { l: string; c: string }> = { none: { l: '미청구', c: 'text-slate-500' }, pending: { l: '청구대기', c: 'text-yellow-600' }, billed: { l: '청구완료', c: 'text-blue-600' }, approved: { l: '승인', c: 'text-cyan-600' }, paid: { l: '입금완료', c: 'text-green-600' }, partial: { l: '부분', c: 'text-amber-600' }, denied: { l: '거절', c: 'text-red-600' } }
 
 // ============================================
 // Helpers
@@ -358,12 +358,12 @@ export default function IntakePage() {
   useEffect(() => { setAiAnalysis(null); setAiError(null) }, [selectedId])
 
   // ── Render ──
-  if (!companyId) return <div className="p-8 text-center text-gray-500">회사 정보를 불러오는 중...</div>
+  if (!companyId) return <div className="p-8 text-center text-slate-500">회사 정보를 불러오는 중...</div>
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#f8f9fb' }}>
       {/* ── Stage Pipeline ── */}
-      <div style={{ borderBottom: '1px solid #e5e7eb', background: '#fff', padding: '12px 20px', overflowX: 'auto' }}>
+      <div style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#fff', padding: '12px 20px', overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 'max-content' }}>
           <PipeBtn label={`전체 ${cafe24Records.length}`} active={stageFilter === 'all'} color="#374151" onClick={() => setStageFilter('all')} />
           <PipeBtn label={`신규접수 ${(stageCounts['accident_reported'] || 0) + (stageCounts['replacement_requested'] || 0)}`} active={stageFilter === 'new'} color="#ef4444" onClick={() => setStageFilter('new')} />
@@ -376,21 +376,21 @@ export default function IntakePage() {
           <PipeBtn label={`종결 ${stageCounts['closed'] || 0}`} active={stageFilter === 'closed'} color="#64748b" onClick={() => setStageFilter('closed')} />
           <div style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#22c55e', fontWeight: 600 }}>배차가능 {availableCarCount}대</span>
-            <button onClick={() => { fetchSupportData(); fetchCafe24() }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
+            <button onClick={() => { fetchSupportData(); fetchCafe24() }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(0,0,0,0.06)', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>새로고침</button>
           </div>
         </div>
       </div>
 
       {/* ── Filters ── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '8px 20px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '8px 20px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...selectStyle, width: 130 }} />
-        <span style={{ color: '#9ca3af', fontSize: 12 }}>~</span>
+        <span style={{ color: '#64748b', fontSize: 12 }}>~</span>
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...selectStyle, width: 130 }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="차량번호, 고객명, 접수번호, 보험사..." style={{ ...selectStyle, flex: 1, minWidth: 200 }} />
         {(dateFrom || dateTo || search) && (
           <button onClick={() => { setDateFrom(''); setDateTo(''); setSearch('') }} style={{ fontSize: 11, color: '#6b7280', cursor: 'pointer', background: 'none', border: 'none', textDecoration: 'underline' }}>초기화</button>
         )}
-        <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>{filtered.length}건</span>
+        <span style={{ fontSize: 11, color: '#64748b', marginLeft: 'auto' }}>{filtered.length}건</span>
       </div>
 
       {/* ── Main Split ── */}
@@ -399,7 +399,7 @@ export default function IntakePage() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 1 }}>
                 <Th w={50} onClick={() => toggleSort('id')} active={sortKey === 'id'} dir={sortDir}>#</Th>
                 <Th w={60}>소스</Th>
                 <Th w={100} onClick={() => toggleSort('date')} active={sortKey === 'date'} dir={sortDir}>사고일</Th>
@@ -415,9 +415,9 @@ export default function IntakePage() {
             </thead>
             <tbody>
               {(loading || cafe24Loading) ? (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>데이터 불러오는 중...</td></tr>
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>데이터 불러오는 중...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>검색 결과 없음</td></tr>
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>검색 결과 없음</td></tr>
               ) : filtered.map(r => {
                 const jd = extractJandi(r.jandi_raw, r.notes)
                 const stage = STAGE_MAP[r.workflow_stage || 'accident_reported']
@@ -426,11 +426,11 @@ export default function IntakePage() {
                 const retDiff = r.replacement_end ? daysDiff(r.replacement_end) : null
                 return (
                   <tr key={r.id} onClick={() => { setSelectedId(r.id); setDetailTab('info') }}
-                    style={{ cursor: 'pointer', background: isSel ? '#eef2ff' : '#fff', borderBottom: '1px solid #f3f4f6', transition: 'background .1s' }}
+                    style={{ cursor: 'pointer', background: isSel ? '#eef2ff' : '#fff', borderBottom: '1px solid rgba(0,0,0,0.04)', transition: 'background .1s' }}
                     onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#fafafa' }}
                     onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = '#fff' }}>
                     <Td style={{ fontWeight: 500, color: '#6b7280' }}>{r.source === 'cafe24' ? (r.insurance_claim_no || `C${-r.id}`) : r.id}</Td>
-                    <Td><span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, color: '#fff', background: src?.bg === 'bg-red-500' ? '#ef4444' : src?.bg === 'bg-orange-500' ? '#f97316' : src?.bg === 'bg-purple-500' ? '#8b5cf6' : '#9ca3af', whiteSpace: 'nowrap' }}>{src?.label}</span></Td>
+                    <Td><span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, color: '#fff', background: src?.bg === 'bg-red-500' ? '#ef4444' : src?.bg === 'bg-orange-500' ? '#f97316' : src?.bg === 'bg-purple-500' ? '#8b5cf6' : '#64748b', whiteSpace: 'nowrap' }}>{src?.label}</span></Td>
                     <Td style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(r.accident_date)}</Td>
                     <Td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{jd.carNumber || '-'}</Td>
                     <Td style={{ color: '#6b7280', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{jd.carModel || '-'}</Td>
@@ -438,19 +438,19 @@ export default function IntakePage() {
                       <div style={{ lineHeight: 1.3 }}>
                         <div style={{ fontWeight: 500 }}>{jd.customerName || r.driver_name || '-'}</div>
                         {r.driver_name && jd.customerName && r.driver_name !== jd.customerName && (
-                          <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.driver_name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{r.driver_name}</div>
                         )}
                       </div>
                     </Td>
                     <Td style={{ color: '#6b7280' }}>{r.insurance_company || '-'}</Td>
                     <Td style={{ textAlign: 'center', color: r.fault_ratio === 100 ? '#ef4444' : r.fault_ratio === 0 ? '#22c55e' : '#6b7280' }}>{r.fault_ratio != null ? `${r.fault_ratio}%` : '-'}</Td>
                     <Td>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, border: `1px solid ${stage?.color || '#d1d5db'}`, color: stage?.color || '#6b7280', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, border: `1px solid ${stage?.color || 'rgba(255,255,255,0.1)'}`, color: stage?.color || '#6b7280', fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {stage?.label || '-'}
                       </span>
                     </Td>
                     <Td style={{ fontFamily: 'monospace', fontSize: 12, color: '#6366f1' }}>{r.replacement_car?.number || '-'}</Td>
-                    <Td style={{ fontSize: 11, color: '#9ca3af' }}>
+                    <Td style={{ fontSize: 11, color: '#64748b' }}>
                       {timeAgo(r.created_at)}
                       {retDiff !== null && retDiff >= 0 && retDiff <= 3 && (
                         <div style={{ fontSize: 10, color: retDiff === 0 ? '#ef4444' : '#f97316', fontWeight: 600 }}>반납 D{retDiff === 0 ? '-day' : `-${retDiff}`}</div>
@@ -468,18 +468,18 @@ export default function IntakePage() {
           const jd = extractJandi(selected.jandi_raw, selected.notes)
           const stage = STAGE_MAP[selected.workflow_stage || 'accident_reported']
           return (
-            <div style={{ width: 400, borderLeft: '1px solid #e5e7eb', background: '#fff', overflow: 'auto', flexShrink: 0 }}>
+            <div style={{ width: 400, borderLeft: '1px solid rgba(0,0,0,0.06)', background: '#fff', overflow: 'auto', flexShrink: 0 }}>
               {/* Header */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>#{selected.id} · {fmtFull(selected.created_at)}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>#{selected.id} · {fmtFull(selected.created_at)}</div>
                     <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>{jd.carNumber || '-'}</div>
                     <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{jd.carModel}</div>
                     {jd.customerName && <div style={{ fontSize: 13, color: '#374151', marginTop: 2 }}>{jd.customerName}</div>}
                   </div>
                   <select value={selected.workflow_stage || 'accident_reported'} onChange={e => handleStageChange(selected.id, e.target.value)}
-                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${stage?.color || '#d1d5db'}`, color: stage?.color, fontWeight: 600, background: '#fff', cursor: 'pointer' }}>
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${stage?.color || 'rgba(255,255,255,0.1)'}`, color: stage?.color, fontWeight: 600, background: '#fff', cursor: 'pointer' }}>
                     {Object.entries(STAGE_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
@@ -496,9 +496,9 @@ export default function IntakePage() {
               </div>
 
               {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                 {([['info', '접수정보'], ['notes', '상담이력'], ['billing', '보험/청구'], ['ai', 'AI 분석']] as const).map(([k, l]) => (
-                  <button key={k} onClick={() => setDetailTab(k)} style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: detailTab === k ? 600 : 400, color: detailTab === k ? '#4f46e5' : '#9ca3af', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: detailTab === k ? '#4f46e5' : 'transparent', cursor: 'pointer' }}>{l}</button>
+                  <button key={k} onClick={() => setDetailTab(k)} style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: detailTab === k ? 600 : 400, color: detailTab === k ? '#4f46e5' : '#64748b', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: detailTab === k ? '#4f46e5' : 'transparent', cursor: 'pointer' }}>{l}</button>
                 ))}
               </div>
 
@@ -551,13 +551,13 @@ export default function IntakePage() {
                       <>
                         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                           <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()}
-                            placeholder="상담 메모..." style={{ flex: 1, padding: '8px 10px', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none' }} />
+                            placeholder="상담 메모..." style={{ flex: 1, padding: '8px 10px', fontSize: 12, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, outline: 'none' }} />
                           <button onClick={addNote} disabled={savingNote || !newNote.trim()} style={{ padding: '8px 14px', fontSize: 12, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: savingNote ? 0.5 : 1 }}>저장</button>
                         </div>
-                        {customerNotes.length === 0 ? <p style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', padding: 20 }}>이력 없음</p> :
+                        {customerNotes.length === 0 ? <p style={{ color: '#64748b', fontSize: 12, textAlign: 'center', padding: 20 }}>이력 없음</p> :
                           customerNotes.map(n => (
-                            <div key={n.id} style={{ padding: 10, marginBottom: 6, background: '#f9fafb', borderRadius: 6, border: '1px solid #f3f4f6' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
+                            <div key={n.id} style={{ padding: 10, marginBottom: 6, background: '#f9fafb', borderRadius: 6, border: '1px solid rgba(0,0,0,0.04)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 4 }}>
                                 <span style={{ fontWeight: 500, color: '#374151' }}>{n.author_name}</span>
                                 <span>{fmtFull(n.created_at)}</span>
                               </div>
@@ -566,7 +566,7 @@ export default function IntakePage() {
                           ))
                         }
                       </>
-                    ) : <p style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', padding: 20 }}>고객 미연결</p>}
+                    ) : <p style={{ color: '#64748b', fontSize: 12, textAlign: 'center', padding: 20 }}>고객 미연결</p>}
                   </div>
                 )}
                 {detailTab === 'billing' && (
@@ -593,7 +593,7 @@ export default function IntakePage() {
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>🤖</div>
                         <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>접수 내용을 AI가 분석합니다</p>
-                        <p style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>예상 과실비율, 유사 판례, 보험사기 의심 포인트를 확인합니다</p>
+                        <p style={{ fontSize: 11, color: '#64748b', marginBottom: 16 }}>예상 과실비율, 유사 판례, 보험사기 의심 포인트를 확인합니다</p>
                         <button onClick={() => runAiAnalysis(selected)}
                           style={{ padding: '10px 24px', fontSize: 13, fontWeight: 600, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                           AI 분석 시작
@@ -605,7 +605,7 @@ export default function IntakePage() {
                       <div style={{ textAlign: 'center', padding: '40px 0' }}>
                         <div style={{ fontSize: 24, marginBottom: 8, animation: 'spin 1s linear infinite' }}>⚙️</div>
                         <p style={{ fontSize: 13, color: '#6b7280' }}>AI 분석 중...</p>
-                        <p style={{ fontSize: 11, color: '#9ca3af' }}>약 5-10초 소요</p>
+                        <p style={{ fontSize: 11, color: '#64748b' }}>약 5-10초 소요</p>
                       </div>
                     )}
                     {aiAnalysis && (
@@ -648,7 +648,7 @@ export default function IntakePage() {
                         {aiAnalysis.similarCases?.length > 0 && (
                           <DSection title="📚 유사 사례/판례">
                             {aiAnalysis.similarCases.map((c: any, i: number) => (
-                              <div key={i} style={{ padding: 10, marginBottom: 6, background: '#f9fafb', borderRadius: 6, border: '1px solid #f3f4f6' }}>
+                              <div key={i} style={{ padding: 10, marginBottom: 6, background: '#f9fafb', borderRadius: 6, border: '1px solid rgba(0,0,0,0.04)' }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>{c.title}</div>
                                 <p style={{ fontSize: 11, color: '#6b7280', margin: '0 0 4px 0', lineHeight: 1.5 }}>{c.summary}</p>
                                 <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
@@ -679,7 +679,7 @@ export default function IntakePage() {
                           {aiAnalysis.fraudDetection?.suspiciousPoints?.length > 0 && (
                             <div style={{ marginBottom: 8 }}>
                               {aiAnalysis.fraudDetection.suspiciousPoints.map((p: any, i: number) => (
-                                <div key={i} style={{ padding: 8, marginBottom: 4, borderRadius: 6, border: '1px solid #f3f4f6', background: '#fff' }}>
+                                <div key={i} style={{ padding: 8, marginBottom: 4, borderRadius: 6, border: '1px solid rgba(0,0,0,0.04)', background: '#fff' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                                     <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                                       {p.severity === 'high' ? '🔴' : p.severity === 'medium' ? '🟡' : '🟢'} {p.point}
@@ -706,7 +706,7 @@ export default function IntakePage() {
                         )}
 
                         <button onClick={() => runAiAnalysis(selected)}
-                          style={{ width: '100%', padding: '8px', fontSize: 12, color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', marginTop: 4 }}>
+                          style={{ width: '100%', padding: '8px', fontSize: 12, color: '#6b7280', background: '#f9fafb', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, cursor: 'pointer', marginTop: 4 }}>
                           🔄 재분석
                         </button>
                       </>
@@ -725,15 +725,15 @@ export default function IntakePage() {
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 400, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>문자 발송</h3>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{smsTarget.name} ({smsTarget.phone})</p>
-            <textarea value={smsMessage} onChange={e => setSmsMessage(e.target.value)} rows={4} placeholder="메시지..." style={{ width: '100%', padding: 10, fontSize: 13, border: '1px solid #e5e7eb', borderRadius: 8, resize: 'none', outline: 'none' }} />
+            <textarea value={smsMessage} onChange={e => setSmsMessage(e.target.value)} rows={4} placeholder="메시지..." style={{ width: '100%', padding: 10, fontSize: 13, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, resize: 'none', outline: 'none' }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button onClick={() => setShowSmsModal(false)} style={{ padding: '8px 16px', fontSize: 13, background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer' }}>취소</button>
+              <button onClick={() => setShowSmsModal(false)} style={{ padding: '8px 16px', fontSize: 13, background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>취소</button>
               <button onClick={sendSms} disabled={smsSending || !smsMessage.trim()} style={{ padding: '8px 16px', fontSize: 13, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: smsSending ? 0.5 : 1 }}>{smsSending ? '발송중...' : '발송'}</button>
             </div>
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>빠른 템플릿</div>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>빠른 템플릿</div>
               {['배차 일정 확인 부탁드립니다.', '대차 차량 반납 안내드립니다.', '보험 청구 관련 연락드립니다.'].map((t, i) => (
-                <button key={i} onClick={() => setSmsMessage(`안녕하세요, 셀프디스럽션입니다. ${t}`)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: 12, background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: 4, cursor: 'pointer', marginBottom: 4, color: '#374151' }}>{t}</button>
+                <button key={i} onClick={() => setSmsMessage(`안녕하세요, 셀프디스럽션입니다. ${t}`)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: 12, background: '#f9fafb', border: '1px solid rgba(0,0,0,0.04)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, color: '#374151' }}>{t}</button>
               ))}
             </div>
           </div>
@@ -746,13 +746,13 @@ export default function IntakePage() {
 // ============================================
 // Shared Style & Components
 // ============================================
-const selectStyle: React.CSSProperties = { padding: '6px 10px', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 6, outline: 'none', background: '#fff', color: '#374151' }
+const selectStyle: React.CSSProperties = { padding: '6px 10px', fontSize: 12, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, outline: 'none', background: '#fff', color: '#374151' }
 
 function PipeBtn({ label, active, color, onClick }: { label: string; active: boolean; color: string; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
       padding: '5px 12px', fontSize: 12, fontWeight: active ? 600 : 400, borderRadius: 6,
-      border: active ? `1.5px solid ${color}` : '1px solid #e5e7eb',
+      border: active ? `1.5px solid ${color}` : '1px solid rgba(0,0,0,0.06)',
       background: active ? `${color}10` : '#fff', color: active ? color : '#6b7280',
       cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all .15s',
     }}>{label}</button>
@@ -779,7 +779,7 @@ function DRow({ l, v, phone }: { l: string; v: string | number | null | undefine
   const d = v == null || v === '' ? '-' : String(v)
   return (
     <div style={{ display: 'flex', fontSize: 12, padding: '3px 0', borderBottom: '1px solid #f9fafb' }}>
-      <span style={{ width: 70, color: '#9ca3af', flexShrink: 0 }}>{l}</span>
+      <span style={{ width: 70, color: '#64748b', flexShrink: 0 }}>{l}</span>
       {phone && d !== '-' ? <a href={`tel:${d}`} style={{ color: '#4f46e5', textDecoration: 'none' }}>{d}</a> : <span style={{ color: '#374151' }}>{d}</span>}
     </div>
   )

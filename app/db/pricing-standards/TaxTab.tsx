@@ -169,32 +169,32 @@ export default function TaxTab() {
   const sim = simulateTax()
 
   if (loading) {
-    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
+    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-slate-400">로딩 중...</p></div>
   }
 
   return (
     <div className="space-y-4">
       {/* 가이드 */}
       {showGuide && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-5 border border-amber-100">
+        <div className="bg-gradient-to-r from-amber-900/20 to-orange-900/20 rounded-2xl p-5 border border-amber-700/30">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🏛️</span>
-              <h3 className="text-sm font-bold text-gray-800">자동차세 기준이란?</h3>
+              <h3 className="text-sm font-bold text-slate-800">자동차세 기준이란?</h3>
             </div>
-            <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+            <button onClick={() => setShowGuide(false)} className="text-xs text-slate-400 hover:text-slate-600">닫기</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 leading-relaxed">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 leading-relaxed">
             <div>
-              <p className="font-semibold text-gray-700 mb-1">핵심 개념</p>
-              <p>자동차세는 배기량(cc) × 세율로 산출됩니다. <strong className="text-red-600">렌터카는 영업용</strong>으로 분류되어 비영업용(자가용)의 약 1/10 수준입니다. 이 차이가 렌트 사업의 핵심 수익원 중 하나입니다.</p>
+              <p className="font-semibold text-slate-700 mb-1">핵심 개념</p>
+              <p>자동차세는 배기량(cc) × 세율로 산출됩니다. <strong className="text-red-400">렌터카는 영업용</strong>으로 분류되어 비영업용(자가용)의 약 1/10 수준입니다. 이 차이가 렌트 사업의 핵심 수익원 중 하나입니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">영업용 세율 혜택</p>
+              <p className="font-semibold text-slate-700 mb-1">영업용 세율 혜택</p>
               <p>렌터카=영업용 등록이므로 자가용 대비 약 1/10 세율입니다. 예) 2,000cc: <strong>영업용 38,000원 vs 자가용 520,000원</strong>. 이 차이가 렌트료에 직접 반영됩니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">차령 경감</p>
+              <p className="font-semibold text-slate-700 mb-1">차령 경감</p>
               <p>3년차부터 매년 5%씩 감면, 최대 50%까지 경감됩니다. 12년 이상 차량은 세금이 절반입니다. 장기 보유 차량일수록 세 부담이 줄어듭니다.</p>
             </div>
           </div>
@@ -202,34 +202,34 @@ export default function TaxTab() {
       )}
 
       {/* 법정 세율 기준표 (영업용 + 비영업용 + 전기차) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+      <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="text-sm">⚖️</span>
-            <h3 className="text-xs font-bold text-gray-700">법정 자동차세 세율표 (검수용 참고 기준)</h3>
+            <h3 className="text-xs font-bold text-slate-700">법정 자동차세 세율표 (검수용 참고 기준)</h3>
           </div>
-          <span className="text-[10px] text-gray-400">지방세법 기준 · 이 표를 기준으로 아래 기준표의 정확성을 검증하세요</span>
+          <span className="text-[10px] text-slate-400">지방세법 기준 · 이 표를 기준으로 아래 기준표의 정확성을 검증하세요</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Object.entries(LEGAL_TAX_STANDARDS).map(([key, std]) => (
-            <div key={key} className={`rounded-xl p-4 border ${key === '영업용' ? 'bg-steel-50 border-steel-200' : 'bg-green-50 border-green-200'}`}>
-              <p className="text-xs font-bold text-gray-800 mb-1">{std.title}</p>
-              <p className="text-[10px] text-gray-500 mb-3">{std.legalBasis}</p>
+            <div key={key} className={`rounded-xl p-4 border ${key === '영업용' ? 'bg-gray-100 border-white/20' : 'bg-green-900/20 border-green-700/30'}`}>
+              <p className="text-xs font-bold text-slate-800 mb-1">{std.title}</p>
+              <p className="text-[10px] text-slate-400 mb-3">{std.legalBasis}</p>
               <div className="space-y-1.5">
                 {std.rows.map((r, i) => (
                   <div key={i} className="flex justify-between items-center text-xs">
-                    <span className="text-gray-600 whitespace-nowrap">{r.cc}</span>
-                    <span className="font-semibold text-gray-800 whitespace-nowrap">{r.rate}</span>
+                    <span className="text-slate-400 whitespace-nowrap">{r.cc}</span>
+                    <span className="font-semibold text-slate-700 whitespace-nowrap">{r.rate}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-2 pt-2 border-t border-gray-200/50">
-                <p className="text-[10px] text-gray-500">{std.note}</p>
+              <div className="mt-2 pt-2 border-t border-black/10">
+                <p className="text-[10px] text-slate-400">{std.note}</p>
               </div>
               <div className="mt-2 space-y-0.5">
                 {std.rows.map((r, i) => (
-                  <p key={i} className="text-[10px] text-gray-400 whitespace-nowrap">{r.example}</p>
+                  <p key={i} className="text-[10px] text-slate-500 whitespace-nowrap">{r.example}</p>
                 ))}
               </div>
             </div>
@@ -237,12 +237,12 @@ export default function TaxTab() {
         </div>
 
         {/* 차령 경감율 */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-          <p className="text-xs font-semibold text-gray-600 mb-2">📅 차령 경감율 (3년차부터 적용)</p>
+        <div className="mt-4 p-3 bg-gray-100 rounded-lg border border-black/10">
+          <p className="text-xs font-semibold text-slate-400 mb-2">📅 차령 경감율 (3년차부터 적용)</p>
           <div className="flex flex-wrap gap-2">
             {AGE_REDUCTION.map((a) => (
-              <span key={a.year} className="px-2 py-1 bg-white rounded border border-gray-200 text-[10px] text-gray-600">
-                {a.year}: <strong className="text-gray-800">-{a.rate}</strong>
+              <span key={a.year} className="px-2 py-1 bg-gray-50 rounded border border-black/10 text-[10px] text-slate-400">
+                {a.year}: <strong className="text-slate-700">-{a.rate}</strong>
               </span>
             ))}
           </div>
@@ -250,11 +250,11 @@ export default function TaxTab() {
       </div>
 
       {/* 자동차세 기준표 (전체 너비) */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm overflow-visible border border-black/[0.06]">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06]">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">자동차세 기준표 (편집 가능)</h3>
-            <p className="text-xs text-gray-400 mt-0.5">위 법정 세율표를 기준으로 검수한 후 사용하세요</p>
+            <h3 className="text-sm font-bold text-slate-800">자동차세 기준표 (편집 가능)</h3>
+            <p className="text-xs text-slate-400 mt-0.5">위 법정 세율표를 기준으로 검수한 후 사용하세요</p>
           </div>
           <div className="flex gap-2">
             {!showGuide && (
@@ -271,33 +271,33 @@ export default function TaxTab() {
         <div className="overflow-x-auto">
           <table className="text-xs">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">구분</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">연료</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">cc하한</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">cc상한</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">세율</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">고정세</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">교육세</th>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">비고</th>
-                <th className="px-3 py-2 text-center font-semibold text-gray-600 whitespace-nowrap">삭제</th>
+              <tr className="bg-gray-100 border-b border-black/[0.06]">
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">구분</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">연료</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">cc하한</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">cc상한</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">세율</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">고정세</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">교육세</th>
+                <th className="px-3 py-2 text-left font-semibold text-slate-400 whitespace-nowrap">비고</th>
+                <th className="px-3 py-2 text-center font-semibold text-slate-400 whitespace-nowrap">삭제</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">데이터가 없습니다.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/30 transition">
+                  <tr key={row.id} className="border-b border-black/5 hover:bg-gray-50 transition">
                     <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'tax_type' ? (
                         <select value={row.tax_type} onChange={(e) => { updateField(row.id, 'tax_type', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white">
                           {TAX_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('tax_type') }}
-                          className={`cursor-pointer inline-block font-bold px-2 py-0.5 rounded text-xs ${row.tax_type === '영업용' ? 'text-steel-700 bg-steel-50' : 'text-orange-700 bg-orange-50'}`}>
+                          className={`cursor-pointer inline-block font-bold px-2 py-0.5 rounded text-xs ${row.tax_type === '영업용' ? 'text-blue-400 bg-blue-900/30' : 'text-orange-400 bg-orange-900/30'}`}>
                           {row.tax_type}
                         </span>
                       )}
@@ -305,12 +305,12 @@ export default function TaxTab() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       {editingId === row.id && editingField === 'fuel_category' ? (
                         <select value={row.fuel_category} onChange={(e) => { updateField(row.id, 'fuel_category', e.target.value); setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none">
+                          className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white">
                           {FUEL_CATEGORIES.map(t => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('fuel_category') }}
-                          className="cursor-pointer text-gray-800 hover:text-gray-600 inline-block">{row.fuel_category}</span>
+                          className="cursor-pointer text-slate-700 hover:text-slate-800 inline-block">{row.fuel_category}</span>
                       )}
                     </td>
                     {(['cc_min', 'cc_max', 'rate_per_cc', 'fixed_annual', 'education_tax_rate'] as const).map((field) => (
@@ -318,10 +318,10 @@ export default function TaxTab() {
                         {editingId === row.id && editingField === field ? (
                           <input type="number" value={row[field]} onChange={(e) => updateField(row.id, field, parseInt(e.target.value) || 0)}
                             onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                            className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none text-center" />
+                            className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none text-center bg-gray-100 text-white" />
                         ) : (
                           <span onClick={() => { setEditingId(row.id || null); setEditingField(field) }}
-                            className={`cursor-pointer hover:text-gray-600 inline-block ${field === 'rate_per_cc' ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
+                            className={`cursor-pointer hover:text-slate-800 inline-block ${field === 'rate_per_cc' ? 'font-bold text-slate-800' : 'text-slate-600'}`}>
                             {field === 'rate_per_cc' ? `${formatCurrency(row[field])}원` :
                              field === 'education_tax_rate' ? `${row[field]}%` :
                              field === 'fixed_annual' ? (row[field] > 0 ? `${formatCurrency(row[field])}원` : '—') :
@@ -334,10 +334,10 @@ export default function TaxTab() {
                       {editingId === row.id && editingField === 'notes' ? (
                         <input type="text" value={row.notes} onChange={(e) => updateField(row.id, 'notes', e.target.value)}
                           onBlur={() => { setEditingId(null); setEditingField(null) }} autoFocus
-                          className="w-full px-2 py-1 border border-steel-400 rounded text-xs focus:outline-none" />
+                          className="w-full px-2 py-1 border border-white/20 rounded text-xs focus:outline-none bg-gray-100 text-white" />
                       ) : (
                         <span onClick={() => { setEditingId(row.id || null); setEditingField('notes') }}
-                          className="cursor-pointer text-gray-500 hover:text-gray-600 inline-block">{row.notes || '—'}</span>
+                          className="cursor-pointer text-slate-500 hover:text-slate-400 inline-block">{row.notes || '—'}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -359,19 +359,19 @@ export default function TaxTab() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* 시뮬레이터 */}
             <div className="lg:col-span-1">
-              <h4 className="text-xs font-bold text-slate-300 mb-3">세금 시뮬레이터</h4>
+              <h4 className="text-xs font-bold text-slate-600 mb-3">세금 시뮬레이터</h4>
               <p className="text-[10px] text-slate-400 mb-4">차량 정보를 입력하면 자동차세를 계산합니다</p>
 
               <div className="space-y-3 mb-4">
                 <div>
-                  <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">구분</label>
+                  <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">구분</label>
                   <select value={simTaxType} onChange={(e) => setSimTaxType(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500">
                     {TAX_TYPES.map(t => (<option key={t} value={t}>{t}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">연료</label>
+                  <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">연료</label>
                   <select value={simFuel} onChange={(e) => setSimFuel(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500">
                     {FUEL_CATEGORIES.map(t => (<option key={t} value={t}>{t}</option>))}
@@ -379,13 +379,13 @@ export default function TaxTab() {
                 </div>
                 {simFuel === '내연기관' && (
                   <div>
-                    <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">배기량 (cc)</label>
+                    <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">배기량 (cc)</label>
                     <input type="number" value={simCc} onChange={(e) => setSimCc(parseInt(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500" />
                   </div>
                 )}
                 <div>
-                  <label className="text-[10px] font-semibold text-slate-300 block mb-1.5">차량 연식 (년차)</label>
+                  <label className="text-[10px] font-semibold text-slate-600 block mb-1.5">차량 연식 (년차)</label>
                   <input type="number" value={simAge} onChange={(e) => setSimAge(parseInt(e.target.value) || 1)} min="1" max="20"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-steel-500" />
                 </div>
@@ -393,7 +393,7 @@ export default function TaxTab() {
 
               {/* 계산 결과 */}
               <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                <p className="text-[10px] font-semibold text-slate-300 mb-3">계산 결과</p>
+                <p className="text-[10px] font-semibold text-slate-600 mb-3">계산 결과</p>
                 <div className="space-y-2 text-xs">
                   {simFuel === '내연기관' && (
                     <div className="flex justify-between">
@@ -410,7 +410,7 @@ export default function TaxTab() {
                     <span className="text-white">{sim.educationTax > 0 ? formatCurrency(sim.educationTax) + '원' : '비과세'}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-600 pt-2">
-                    <span className="text-slate-300 font-semibold">세금 합계</span>
+                    <span className="text-slate-600 font-semibold">세금 합계</span>
                     <span className="text-white font-bold">{formatCurrency(sim.total)}원</span>
                   </div>
                   {sim.ageReduction > 0 && (
@@ -420,14 +420,14 @@ export default function TaxTab() {
                         <span>-{formatCurrency(sim.ageReduction)}원</span>
                       </div>
                       <div className="flex justify-between border-t border-slate-600 pt-2">
-                        <span className="text-slate-300 font-bold">최종 세액</span>
-                        <span className="text-slate-300 font-bold text-sm">{formatCurrency(sim.finalTotal)}원/년</span>
+                        <span className="text-slate-600 font-bold">최종 세액</span>
+                        <span className="text-slate-600 font-bold text-sm">{formatCurrency(sim.finalTotal)}원/년</span>
                       </div>
                     </>
                   )}
                   <div className="flex justify-between pt-1">
                     <span className="text-slate-500">월 환산</span>
-                    <span className="text-slate-300 font-semibold">{formatCurrency(Math.round(sim.finalTotal / 12))}원/월</span>
+                    <span className="text-slate-600 font-semibold">{formatCurrency(Math.round(sim.finalTotal / 12))}원/월</span>
                   </div>
                 </div>
               </div>

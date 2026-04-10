@@ -106,7 +106,7 @@ const GRADES = ['일반', '우수', 'VIP', '주의'] as const
 const GRADE_COLORS: Record<string, string> = {
   'VIP': 'bg-amber-900/30 text-amber-400 border-amber-700/40',
   '우수': 'bg-blue-900/30 text-blue-400 border-blue-700/40',
-  '일반': 'bg-white/5 text-slate-400 border-white/[0.06]',
+  '일반': 'bg-gray-50 text-slate-400 border-black/[0.06]',
   '주의': 'bg-red-900/30 text-red-400 border-red-700/40',
 }
 const TYPE_COLORS: Record<string, string> = {
@@ -117,7 +117,7 @@ const TYPE_COLORS: Record<string, string> = {
 const LICENSE_TYPES = ['1종대형', '1종보통', '1종소형', '2종보통', '2종소형', '원동기'] as const
 const NOTE_TYPES = ['일반', '상담', '클레임', '정비요청', '사고접수'] as const
 const NOTE_TYPE_COLORS: Record<string, string> = {
-  '일반': 'bg-white/5 text-slate-400',
+  '일반': 'bg-gray-50 text-slate-400',
   '상담': 'bg-blue-900/30 text-blue-400',
   '클레임': 'bg-red-900/30 text-red-400',
   '정비요청': 'bg-amber-900/30 text-amber-400',
@@ -127,7 +127,7 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   '결제완료': 'bg-emerald-900/30 text-emerald-400',
   '미결제': 'bg-red-900/30 text-red-400',
   '부분결제': 'bg-amber-900/30 text-amber-400',
-  '환불': 'bg-white/5 text-slate-400',
+  '환불': 'bg-gray-50 text-slate-400',
 }
 
 const EMPTY_FORM: Partial<Customer> = {
@@ -519,7 +519,7 @@ export default function CustomerPage() {
       <label className="text-[11px] font-bold text-slate-400 mb-1 block">{label}</label>
       <div className="flex gap-2">
         <input
-          className="flex-1 px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm bg-white/5 text-slate-300 outline-none disabled:text-slate-500"
+          className="flex-1 px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm bg-gray-50 text-slate-600 outline-none disabled:text-slate-500"
           placeholder="주소 검색을 눌러주세요"
           value={form[key] || ''}
           readOnly
@@ -529,13 +529,13 @@ export default function CustomerPage() {
           <button
             type="button"
             onClick={() => openAddressSearch(key, form, setForm)}
-            className="px-3 py-2.5 bg-white/10 text-slate-300 rounded-xl text-xs font-bold hover:bg-white/15 transition-colors whitespace-nowrap border border-white/[0.06]">
+            className="px-3 py-2.5 bg-gray-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-white/15 transition-colors whitespace-nowrap border border-black/[0.06]">
             🔍 검색
           </button>
         )}
       </div>
       <input
-        className="w-full mt-2 px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-white/5 disabled:text-slate-400"
+        className="w-full mt-2 px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-gray-50 disabled:text-slate-400"
         placeholder="상세주소 입력 (동/호수 등)"
         value={form[detailKey] || ''}
         onChange={e => setForm({ ...form, [detailKey]: e.target.value })}
@@ -552,7 +552,7 @@ export default function CustomerPage() {
       <label className="text-[11px] font-bold text-slate-400 mb-1 block">{label}</label>
       <input
         type={opts?.type || 'text'}
-        className="w-full px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-white/5 disabled:text-slate-400"
+        className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-gray-50 disabled:text-slate-400"
         placeholder={opts?.placeholder || ''}
         value={form[key] || ''}
         onChange={e => setForm({ ...form, [key]: e.target.value })}
@@ -570,7 +570,7 @@ export default function CustomerPage() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-          <span className="text-xs font-bold text-slate-200">기본 정보</span>
+          <span className="text-xs font-bold text-slate-700">기본 정보</span>
         </div>
         <div className="space-y-3">
           <div>
@@ -579,7 +579,7 @@ export default function CustomerPage() {
               {(['개인', '법인', '외국인'] as const).map(t => (
                 <button key={t} onClick={() => !disabled && setForm({ ...form, type: t })}
                   className={`flex-1 py-2 text-xs rounded-xl font-bold border transition-colors ${
-                    form.type === t ? 'bg-blue-900/40 text-blue-200 border-blue-600/40' : 'bg-white/5 text-slate-400 border-white/[0.06] hover:border-blue-600/40'
+                    form.type === t ? 'bg-blue-900/40 text-blue-200 border-blue-600/40' : 'bg-gray-50 text-slate-400 border-black/[0.06] hover:border-blue-600/40'
                   } ${disabled ? 'pointer-events-none' : ''}`}>
                   {t}
                 </button>
@@ -598,7 +598,7 @@ export default function CustomerPage() {
               {GRADES.map(g => (
                 <button key={g} onClick={() => !disabled && setForm({ ...form, grade: g })}
                   className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
-                    form.grade === g ? GRADE_COLORS[g] + ' border' : 'bg-white/5 text-slate-400 border-white/[0.06]'
+                    form.grade === g ? GRADE_COLORS[g] + ' border' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
                   } ${disabled ? 'pointer-events-none' : ''}`}>
                   {g}
                 </button>
@@ -613,7 +613,7 @@ export default function CustomerPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold text-slate-200">면허 정보</span>
+            <span className="text-xs font-bold text-slate-700">면허 정보</span>
           </div>
           <div className="space-y-3">
             {form.type === '개인' && (
@@ -622,7 +622,7 @@ export default function CustomerPage() {
                 <div className="flex-1 min-w-0">
                   <label className="text-[11px] font-bold text-slate-400 mb-1 block">면허종류</label>
                   <select
-                    className="w-full px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm focus:border-blue-400 outline-none disabled:bg-white/5 text-slate-300"
+                    className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 outline-none disabled:bg-gray-50 text-slate-600"
                     value={form.license_type || ''}
                     onChange={e => setForm({ ...form, license_type: e.target.value })}
                     disabled={disabled}>
@@ -654,7 +654,7 @@ export default function CustomerPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-            <span className="text-xs font-bold text-slate-200">사업자 정보</span>
+            <span className="text-xs font-bold text-slate-700">사업자 정보</span>
           </div>
           <div className="space-y-3">
             <div className="flex gap-3">
@@ -675,7 +675,7 @@ export default function CustomerPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            <span className="text-xs font-bold text-slate-200">담당자 정보</span>
+            <span className="text-xs font-bold text-slate-700">담당자 정보</span>
           </div>
           <div className="space-y-3">
             {renderField('담당자명', 'contact_person', form, setForm, { placeholder: '김담당', disabled })}
@@ -692,7 +692,7 @@ export default function CustomerPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="text-xs font-bold text-slate-200">세금계산서</span>
+            <span className="text-xs font-bold text-slate-700">세금계산서</span>
           </div>
           <div className="space-y-3">
             <div>
@@ -701,7 +701,7 @@ export default function CustomerPage() {
                 {['전자세금계산서', '수기세금계산서', '미발행'].map(t => (
                   <button key={t} onClick={() => !disabled && setForm({ ...form, tax_type: t })}
                     className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
-                      form.tax_type === t ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-white/5 text-slate-400 border-white/[0.06]'
+                      form.tax_type === t ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
                     } ${disabled ? 'pointer-events-none' : ''}`}>
                     {t}
                   </button>
@@ -722,7 +722,7 @@ export default function CustomerPage() {
       <div>
         <label className="text-[11px] font-bold text-slate-400 mb-1 block">메모</label>
         <textarea
-          className="w-full px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none disabled:bg-white/5 text-slate-300"
+          className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none disabled:bg-gray-50 text-slate-600"
           placeholder="특이사항, 선호차종, 주의사항 등"
           value={form.memo || ''}
           onChange={e => setForm({ ...form, memo: e.target.value })}
@@ -741,7 +741,7 @@ export default function CustomerPage() {
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -787,7 +787,7 @@ export default function CustomerPage() {
           <div className="flex gap-1.5">
             {CUSTOMER_TYPES.map(t => (
               <button key={t} onClick={() => setTypeFilter(t)}
-                className={`si-tab ${typeFilter === t ? 'si-tab-active !border-b-0 !bg-white/10' : ''} !px-4 !py-2.5 !rounded-lg !border-0`}>
+                className={`si-tab ${typeFilter === t ? 'si-tab-active !border-b-0 !bg-gray-100' : ''} !px-4 !py-2.5 !rounded-lg !border-0`}>
                 {t}
               </button>
             ))}
@@ -823,7 +823,7 @@ export default function CustomerPage() {
         {/* 고객 목록 */}
         <div className={`${selectedCustomer ? 'w-[420px] flex-shrink-0' : 'w-full'} transition-all`}>
           <div className="si-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-black/[0.06] flex items-center justify-between">
               <span className="text-xs font-bold text-slate-400">
                 {filteredCustomers.length}명 {typeFilter !== '전체' ? `(${typeFilter})` : ''}
               </span>
@@ -840,12 +840,12 @@ export default function CustomerPage() {
                 {searchQuery ? '검색 결과가 없습니다.' : '등록된 고객이 없습니다.'}
               </div>
             ) : (
-              <div className="divide-y divide-white/5 max-h-[calc(100vh-380px)] overflow-y-auto">
+              <div className="divide-y divide-gray-200 max-h-[calc(100vh-380px)] overflow-y-auto">
                 {filteredCustomers.map(cust => (
                   <button
                     key={cust.id}
                     onClick={() => handleSelectCustomer(cust)}
-                    className={`w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-white/5 transition-colors ${
+                    className={`w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-gray-50 transition-colors ${
                       selectedCustomer?.id === cust.id ? 'bg-blue-900/20 border-l-[3px] border-l-blue-400' : ''
                     }`}>
                     {/* 아바타 */}
@@ -855,7 +855,7 @@ export default function CustomerPage() {
                     {/* 정보 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold text-slate-100 text-sm truncate">{cust.name}</span>
+                        <span className="font-bold text-slate-800 text-sm truncate">{cust.name}</span>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${GRADE_COLORS[cust.grade] || GRADE_COLORS['일반']}`}>
                           {cust.grade || '일반'}
                         </span>
@@ -887,9 +887,9 @@ export default function CustomerPage() {
         {/* 상세 패널 */}
         {selectedCustomer && (
           <div className="flex-1 min-w-0">
-            <div className="bg-[#1e2a45] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="bg-white border border-black/[0.06] rounded-2xl overflow-hidden">
               {/* 상세 헤더 */}
-              <div className="px-6 py-5 border-b border-white/[0.06]">
+              <div className="px-6 py-5 border-b border-black/[0.06]">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-white text-lg ${TYPE_COLORS[selectedCustomer.type] || 'bg-slate-600'}`}>
@@ -897,11 +897,11 @@ export default function CustomerPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-black text-slate-100">{selectedCustomer.name}</h2>
+                        <h2 className="text-lg font-black text-slate-800">{selectedCustomer.name}</h2>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${GRADE_COLORS[selectedCustomer.grade] || GRADE_COLORS['일반']}`}>
                           {selectedCustomer.grade || '일반'}
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-400">{selectedCustomer.type}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-50 text-slate-400">{selectedCustomer.type}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
                         {selectedCustomer.phone && <span>{formatPhone(selectedCustomer.phone)}</span>}
@@ -912,7 +912,7 @@ export default function CustomerPage() {
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedCustomer(null)} className="text-slate-500 hover:text-slate-300 text-xl">✕</button>
+                  <button onClick={() => setSelectedCustomer(null)} className="text-slate-500 hover:text-slate-600 text-xl">✕</button>
                 </div>
 
                 {/* 상세 탭 */}
@@ -926,7 +926,7 @@ export default function CustomerPage() {
                   ] as const).map(tab => (
                     <button key={tab.key} onClick={() => setDetailTab(tab.key)}
                       className={`px-3 py-2 rounded-xl font-bold text-xs transition-colors ${
-                        detailTab === tab.key ? 'bg-blue-900/40 text-blue-200' : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                        detailTab === tab.key ? 'bg-blue-900/40 text-blue-200' : 'bg-gray-50 text-slate-400 hover:bg-gray-100'
                       }`}>
                       {tab.icon} {tab.label}
                     </button>
@@ -945,14 +945,14 @@ export default function CustomerPage() {
                         {isEditing ? (
                           <>
                             <button onClick={() => setIsEditing(false)}
-                              className="py-1.5 px-4 border border-white/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-white/5">취소</button>
+                              className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-gray-50">취소</button>
                             <button onClick={handleUpdateCustomer}
                               className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60">저장</button>
                           </>
                         ) : (
                           <>
                             <button onClick={() => { setIsEditing(true); setEditForm({ ...selectedCustomer }) }}
-                              className="py-1.5 px-4 border border-white/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-white/5">수정</button>
+                              className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-gray-50">수정</button>
                             <button onClick={() => handleDeleteCustomer(selectedCustomer.id)}
                               className="py-1.5 px-4 border border-red-900/40 rounded-xl text-xs font-bold text-red-400 hover:bg-red-900/20">삭제</button>
                           </>
@@ -979,19 +979,19 @@ export default function CustomerPage() {
                         {contracts.map((c: any) => (
                           <div
                             key={c.id}
-                            className="border border-white/[0.06] rounded-xl p-4 hover:bg-white/5 transition-colors cursor-pointer"
+                            className="border border-black/[0.06] rounded-xl p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                             onClick={() => window.open(`/contracts/${c.id}`, '_blank')}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                                   c.status === 'active' ? 'bg-emerald-900/30 text-emerald-400' :
-                                  c.status === 'draft' ? 'bg-white/5 text-slate-400' :
+                                  c.status === 'draft' ? 'bg-gray-50 text-slate-400' :
                                   'bg-blue-900/30 text-blue-400'
                                 }`}>
                                   {c.status === 'active' ? '진행중' : c.status === 'draft' ? '임시저장' : c.status === 'completed' ? '완료' : c.status}
                                 </span>
-                                <span className="text-sm font-bold text-slate-200">
+                                <span className="text-sm font-bold text-slate-700">
                                   {c.car_name || c.vehicle_name || '차량 미지정'}
                                 </span>
                               </div>
@@ -1038,7 +1038,7 @@ export default function CustomerPage() {
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">유형</label>
-                            <select className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               value={paymentForm.payment_type}
                               onChange={e => setPaymentForm({ ...paymentForm, payment_type: e.target.value })}>
                               <option value="charge">청구</option>
@@ -1048,7 +1048,7 @@ export default function CustomerPage() {
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">결제수단</label>
-                            <select className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               value={paymentForm.payment_method}
                               onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}>
                               <option value="카드">카드</option>
@@ -1059,14 +1059,14 @@ export default function CustomerPage() {
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">금액 (원)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               placeholder="0"
                               value={paymentForm.amount}
                               onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">상태</label>
-                            <select className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               value={paymentForm.status}
                               onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}>
                               <option value="미결제">미결제</option>
@@ -1078,13 +1078,13 @@ export default function CustomerPage() {
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">결제기한</label>
-                            <input type="date" className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input type="date" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               value={paymentForm.due_date}
                               onChange={e => setPaymentForm({ ...paymentForm, due_date: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">설명</label>
-                            <input className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               placeholder="3월 렌탈료"
                               value={paymentForm.description}
                               onChange={e => setPaymentForm({ ...paymentForm, description: e.target.value })} />
@@ -1092,7 +1092,7 @@ export default function CustomerPage() {
                         </div>
                         <div className="flex justify-end gap-2">
                           <button onClick={() => setShowPaymentForm(false)}
-                            className="py-1.5 px-4 border border-white/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
+                            className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
                           <button onClick={handleAddPayment}
                             className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60">저장</button>
                         </div>
@@ -1108,13 +1108,13 @@ export default function CustomerPage() {
                     ) : (
                       <div className="space-y-2">
                         {payments.map(p => (
-                          <div key={p.id} className="border border-white/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/5">
+                          <div key={p.id} className="border border-black/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-gray-50">
                             <div className="flex items-center gap-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${PAYMENT_STATUS_COLORS[p.status] || 'bg-white/5 text-slate-400'}`}>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${PAYMENT_STATUS_COLORS[p.status] || 'bg-gray-50 text-slate-400'}`}>
                                 {p.status}
                               </span>
                               <div>
-                                <span className="text-sm font-bold text-slate-200">{p.description || (p.payment_type === 'charge' ? '청구' : p.payment_type === 'refund' ? '환불' : '결제')}</span>
+                                <span className="text-sm font-bold text-slate-700">{p.description || (p.payment_type === 'charge' ? '청구' : p.payment_type === 'refund' ? '환불' : '결제')}</span>
                                 <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
                                   <span>{p.payment_method}</span>
                                   {p.due_date && <span>기한: {p.due_date}</span>}
@@ -1122,7 +1122,7 @@ export default function CustomerPage() {
                                 </div>
                               </div>
                             </div>
-                            <span className={`text-sm font-black ${p.payment_type === 'refund' ? 'text-blue-400' : p.status === '미결제' ? 'text-red-400' : 'text-slate-200'}`}>
+                            <span className={`text-sm font-black ${p.payment_type === 'refund' ? 'text-blue-400' : p.status === '미결제' ? 'text-red-400' : 'text-slate-700'}`}>
                               {p.payment_type === 'refund' ? '-' : ''}{formatMoney(p.amount)}원
                             </span>
                           </div>
@@ -1153,23 +1153,23 @@ export default function CustomerPage() {
                         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
                           <div className="flex justify-between">
                             <span className="text-slate-500">사업자번호</span>
-                            <span className="font-bold text-slate-200">{formatBizNo(selectedCustomer.business_number) || '미등록'}</span>
+                            <span className="font-bold text-slate-700">{formatBizNo(selectedCustomer.business_number) || '미등록'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">상호</span>
-                            <span className="font-bold text-slate-200">{selectedCustomer.name}</span>
+                            <span className="font-bold text-slate-700">{selectedCustomer.name}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">대표자</span>
-                            <span className="font-bold text-slate-200">{selectedCustomer.ceo_name || '미등록'}</span>
+                            <span className="font-bold text-slate-700">{selectedCustomer.ceo_name || '미등록'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">발행유형</span>
-                            <span className="font-bold text-slate-200">{selectedCustomer.tax_type || '미발행'}</span>
+                            <span className="font-bold text-slate-700">{selectedCustomer.tax_type || '미발행'}</span>
                           </div>
                           <div className="flex justify-between col-span-2">
                             <span className="text-slate-500">수신 이메일</span>
-                            <span className="font-bold text-slate-200">{selectedCustomer.tax_email || selectedCustomer.email || '미등록'}</span>
+                            <span className="font-bold text-slate-700">{selectedCustomer.tax_email || selectedCustomer.email || '미등록'}</span>
                           </div>
                         </div>
                       </div>
@@ -1181,36 +1181,36 @@ export default function CustomerPage() {
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">발행일</label>
-                            <input type="date" className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input type="date" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               value={invoiceForm.issue_date}
                               onChange={e => setInvoiceForm({ ...invoiceForm, issue_date: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">품목/적요</label>
-                            <input className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               placeholder="차량 임대료"
                               value={invoiceForm.description}
                               onChange={e => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">공급가액 (원)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               placeholder="0"
                               value={invoiceForm.supply_amount}
                               onChange={e => setInvoiceForm({ ...invoiceForm, supply_amount: e.target.value })} />
                           </div>
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 mb-1 block">세액 (미입력시 10%)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-white/[0.06] rounded-lg text-xs text-slate-300"
+                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
                               placeholder="자동계산"
                               value={invoiceForm.tax_amount}
                               onChange={e => setInvoiceForm({ ...invoiceForm, tax_amount: e.target.value })} />
                           </div>
                         </div>
                         {invoiceForm.supply_amount && (
-                          <div className="bg-white/5 border border-white/[0.06] rounded-lg px-3 py-2 mb-3 text-xs">
+                          <div className="bg-gray-50 border border-black/[0.06] rounded-lg px-3 py-2 mb-3 text-xs">
                             <span className="text-slate-500">합계: </span>
-                            <span className="font-black text-slate-200">
+                            <span className="font-black text-slate-700">
                               {formatMoney(
                                 Number(invoiceForm.supply_amount) +
                                 (invoiceForm.tax_amount ? Number(invoiceForm.tax_amount) : Math.round(Number(invoiceForm.supply_amount) * 0.1))
@@ -1223,7 +1223,7 @@ export default function CustomerPage() {
                         )}
                         <div className="flex justify-end gap-2">
                           <button onClick={() => setShowInvoiceForm(false)}
-                            className="py-1.5 px-4 border border-white/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
+                            className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
                           <button onClick={handleAddInvoice}
                             className="py-1.5 px-4 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700">발행</button>
                         </div>
@@ -1239,14 +1239,14 @@ export default function CustomerPage() {
                     ) : (
                       <div className="space-y-2">
                         {taxInvoices.map(inv => (
-                          <div key={inv.id} className="border border-white/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/5">
+                          <div key={inv.id} className="border border-black/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-gray-50">
                             <div className="flex items-center gap-3">
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                                 inv.status === '발행' ? 'bg-emerald-900/30 text-emerald-400' :
                                 inv.status === '취소' ? 'bg-red-900/30 text-red-400' : 'bg-amber-900/30 text-amber-400'
                               }`}>{inv.status}</span>
                               <div>
-                                <span className="text-sm font-bold text-slate-200">{inv.description || '세금계산서'}</span>
+                                <span className="text-sm font-bold text-slate-700">{inv.description || '세금계산서'}</span>
                                 <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
                                   <span>발행일: {inv.issue_date}</span>
                                   {inv.sent_to_email && <span>→ {inv.sent_to_email}</span>}
@@ -1254,7 +1254,7 @@ export default function CustomerPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="text-sm font-black text-slate-200">{formatMoney(inv.total_amount)}원</span>
+                              <span className="text-sm font-black text-slate-700">{formatMoney(inv.total_amount)}원</span>
                               <div className="text-[10px] text-slate-500">
                                 공급가 {formatMoney(inv.supply_amount)} / 세액 {formatMoney(inv.tax_amount)}
                               </div>
@@ -1274,19 +1274,19 @@ export default function CustomerPage() {
                     </div>
 
                     {/* 메모 입력 */}
-                    <div className="border border-white/[0.06] rounded-xl p-4 mb-4">
+                    <div className="border border-black/[0.06] rounded-xl p-4 mb-4">
                       <div className="flex gap-1.5 mb-3">
                         {NOTE_TYPES.map(t => (
                           <button key={t} onClick={() => setNewNoteType(t)}
                             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${
-                              newNoteType === t ? NOTE_TYPE_COLORS[t] : 'bg-white/5 text-slate-500'
+                              newNoteType === t ? NOTE_TYPE_COLORS[t] : 'bg-gray-50 text-slate-500'
                             }`}>
                             {t}
                           </button>
                         ))}
                       </div>
                       <textarea
-                        className="w-full px-3 py-2.5 border border-white/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none text-slate-300"
+                        className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none text-slate-600"
                         placeholder="상담 내용, 고객 요청사항, 특이사항 등을 기록하세요..."
                         value={newNote}
                         onChange={e => setNewNote(e.target.value)}
@@ -1309,7 +1309,7 @@ export default function CustomerPage() {
                     ) : (
                       <div className="space-y-3">
                         {notes.map(n => (
-                          <div key={n.id} className="border border-white/[0.06] rounded-xl p-4">
+                          <div key={n.id} className="border border-black/[0.06] rounded-xl p-4">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${NOTE_TYPE_COLORS[n.note_type] || NOTE_TYPE_COLORS['일반']}`}>
@@ -1321,7 +1321,7 @@ export default function CustomerPage() {
                                 {n.created_at ? new Date(n.created_at).toLocaleString('ko-KR') : ''}
                               </span>
                             </div>
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{n.content}</p>
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap">{n.content}</p>
                           </div>
                         ))}
                       </div>
@@ -1337,17 +1337,17 @@ export default function CustomerPage() {
       {/* ── 신규 고객 등록 모달 ── */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
-          <div className="bg-[#1e2a45] rounded-2xl w-full max-w-xl shadow-2xl mb-10 border border-white/[0.06]">
-            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
-              <h2 className="font-black text-slate-100">신규 고객 등록</h2>
-              <button onClick={() => setShowNewModal(false)} className="text-slate-500 hover:text-slate-300 text-xl">✕</button>
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl mb-10 border border-black/[0.06]">
+            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between">
+              <h2 className="font-black text-slate-800">신규 고객 등록</h2>
+              <button onClick={() => setShowNewModal(false)} className="text-slate-500 hover:text-slate-600 text-xl">✕</button>
             </div>
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               {renderCustomerForm(newForm, setNewForm)}
             </div>
-            <div className="px-6 py-4 border-t border-white/[0.06] flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-black/[0.06] flex justify-end gap-3">
               <button onClick={() => setShowNewModal(false)}
-                className="py-2.5 px-5 border border-white/[0.06] rounded-xl font-bold text-sm text-slate-400 hover:bg-white/5">취소</button>
+                className="py-2.5 px-5 border border-black/[0.06] rounded-xl font-bold text-sm text-slate-400 hover:bg-gray-50">취소</button>
               <button onClick={handleCreateCustomer}
                 className="py-2.5 px-5 bg-blue-900/40 text-blue-200 rounded-xl font-bold text-sm hover:bg-blue-900/60">등록</button>
             </div>

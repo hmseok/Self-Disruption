@@ -99,31 +99,31 @@ export default function BusinessRulesTab() {
   }
 
   if (loading) {
-    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-gray-500">로딩 중...</p></div>
+    return <div className="bg-white rounded-2xl shadow-sm p-8 text-center"><p className="text-slate-400">로딩 중...</p></div>
   }
 
   return (
     <div className="space-y-4">
       {showGuide && (
-        <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl p-5 border border-gray-200">
+        <div className="bg-gradient-to-r from-white/5 to-slate-900/10 rounded-2xl p-5 border border-black/10">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">⚙️</span>
-              <h3 className="text-sm font-bold text-gray-800">기본 설정이란?</h3>
+              <h3 className="text-sm font-bold text-slate-800">기본 설정이란?</h3>
             </div>
-            <button onClick={() => setShowGuide(false)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+            <button onClick={() => setShowGuide(false)} className="text-xs text-slate-400 hover:text-slate-600">닫기</button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600 leading-relaxed">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 leading-relaxed">
             <div>
-              <p className="font-semibold text-gray-700 mb-1">개념</p>
+              <p className="font-semibold text-slate-700 mb-1">개념</p>
               <p>렌트료 산출 공식에 사용되는 시스템 기본 파라미터입니다. 감가율, 금리, 세율, 마진율 등의 기본값을 설정하며, 개별 견적 시 이 값을 기본으로 조정합니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">검수 방법</p>
+              <p className="font-semibold text-slate-700 mb-1">검수 방법</p>
               <p>각 설정값 옆에 <strong>업계 참고</strong> 범위가 표시됩니다. 현재값이 업계 범위 내에 있는지 확인하세요. 범위를 벗어나면 이유를 명확히 기록해두는 것이 좋습니다.</p>
             </div>
             <div>
-              <p className="font-semibold text-gray-700 mb-1">주의사항</p>
+              <p className="font-semibold text-slate-700 mb-1">주의사항</p>
               <p>여기서 변경한 값은 새로 생성하는 견적에 기본값으로 적용됩니다. 기존 견적에는 영향이 없습니다. 변경 시 자동 저장되며, 변경 이력이 시간과 함께 기록됩니다.</p>
             </div>
           </div>
@@ -141,12 +141,12 @@ export default function BusinessRulesTab() {
               if (categoryRules.length === 0) return null
 
               return (
-                <div key={category.name} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <div key={category.name} className="bg-white rounded-2xl shadow-sm border border-black/[0.06] p-5">
                   <div className="flex items-center gap-2 mb-1">
                     <span>{category.icon}</span>
-                    <h3 className="text-sm font-bold text-gray-900">{category.name}</h3>
+                    <h3 className="text-sm font-bold text-slate-800">{category.name}</h3>
                   </div>
-                  <p className="text-xs text-gray-500 mb-4 leading-relaxed">{category.explanation}</p>
+                  <p className="text-xs text-slate-400 mb-4 leading-relaxed">{category.explanation}</p>
 
                   <div className="space-y-3">
                     {categoryRules.map((rule) => {
@@ -155,16 +155,16 @@ export default function BusinessRulesTab() {
                       const valueType = typeof rule.value
 
                       return (
-                        <div key={rule.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <div key={rule.id} className="p-4 bg-gray-100 rounded-xl border border-black/10">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-bold text-gray-800">{detail?.label || rule.key}</span>
-                                <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 text-gray-500 rounded font-mono">{rule.key}</span>
+                                <span className="text-xs font-bold text-slate-800">{detail?.label || rule.key}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-slate-400 rounded font-mono">{rule.key}</span>
                               </div>
-                              <p className="text-xs text-gray-500">{rule.description}</p>
+                              <p className="text-xs text-slate-400">{rule.description}</p>
                             </div>
-                            <div className="text-[10px] text-gray-400 text-right flex-shrink-0 ml-3">
+                            <div className="text-[10px] text-slate-500 text-right flex-shrink-0 ml-3">
                               {formatDate(rule.updated_at)}
                             </div>
                           </div>
@@ -172,9 +172,9 @@ export default function BusinessRulesTab() {
                           {/* 업계 참고 정보 */}
                           {detail && (
                             <div className="flex flex-wrap gap-3 mb-3 text-[10px]">
-                              <span className="px-2 py-0.5 bg-steel-50 text-steel-600 rounded-full">적정 범위: {detail.range}</span>
-                              <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full">업계: {detail.industryRef}</span>
-                              {detail.unit && <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">단위: {detail.unit}</span>}
+                              <span className="px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">적정 범위: {detail.range}</span>
+                              <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded-full">업계: {detail.industryRef}</span>
+                              {detail.unit && <span className="px-2 py-0.5 bg-gray-100 text-slate-400 rounded-full">단위: {detail.unit}</span>}
                             </div>
                           )}
 
@@ -188,20 +188,20 @@ export default function BusinessRulesTab() {
                                   const v = parseFloat(e.target.value)
                                   if (!isNaN(v) && v !== rule.value) handleSave(rule.id, v)
                                 }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
+                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`} />
                             ) : valueType === 'boolean' ? (
                               <select defaultValue={rule.value ? 'true' : 'false'}
                                 onChange={(e) => handleSave(rule.id, e.target.value === 'true')}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}>
+                                className={`flex-1 px-3 py-2 text-xs border rounded-lg bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`}>
                                 <option value="true">활성화</option>
                                 <option value="false">비활성화</option>
                               </select>
                             ) : (
                               <input type="text" defaultValue={rule.value}
                                 onBlur={(e) => { if (e.target.value !== rule.value) handleSave(rule.id, e.target.value) }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 ${isSaved ? 'border-green-500 bg-green-50' : 'border-gray-300'}`} />
+                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`} />
                             )}
-                            {isSaved && <span className="text-green-600 text-xs font-semibold">💾 저장됨</span>}
+                            {isSaved && <span className="text-green-400 text-xs font-semibold">💾 저장됨</span>}
                           </div>
                         </div>
                       )
@@ -236,8 +236,8 @@ export default function BusinessRulesTab() {
               </div>
 
               <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] font-semibold text-slate-300 mb-2">주요 설정값 요약</div>
-                <div className="space-y-1 text-xs text-slate-300">
+                <div className="text-[10px] font-semibold text-slate-600 mb-2">주요 설정값 요약</div>
+                <div className="space-y-1 text-xs text-slate-600">
                   {getRuleByKey('DEFAULT_MARGIN_RATE') && <div className="flex justify-between"><span>마진율</span><span className="font-semibold text-white">{getRuleByKey('DEFAULT_MARGIN_RATE')!.value}%</span></div>}
                   {getRuleByKey('VAT_RATE') && <div className="flex justify-between"><span>부가세율</span><span className="font-semibold text-white">{getRuleByKey('VAT_RATE')!.value}%</span></div>}
                   {getRuleByKey('DEFAULT_TERM_MONTHS') && <div className="flex justify-between"><span>기본 기간</span><span className="font-semibold text-white">{getRuleByKey('DEFAULT_TERM_MONTHS')!.value}개월</span></div>}
@@ -247,7 +247,7 @@ export default function BusinessRulesTab() {
               </div>
 
               <div className="p-3 bg-gradient-to-br from-steel-800 to-slate-900 rounded-lg border border-steel-700">
-                <div className="text-[10px] font-semibold text-slate-300 mb-1">월 금융비용 합계</div>
+                <div className="text-[10px] font-semibold text-slate-600 mb-1">월 금융비용 합계</div>
                 <div className="text-lg font-black text-white">
                   {(calculateMonthlyInterest() + calculateOpportunityCost() + calculateRiskReserve()).toLocaleString()}원
                 </div>

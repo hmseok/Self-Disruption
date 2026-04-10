@@ -149,10 +149,10 @@ export default function CarListPage() {
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-white/5 transition-all text-left"
+                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-gray-50 transition-all text-left"
                   style={{ border: '1px solid rgba(239,68,68,0.15)' }}
                 >
-                  <div className="font-bold text-slate-200 text-sm">{car.number}</div>
+                  <div className="font-bold text-slate-700 text-sm">{car.number}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{car.brand} {car.model}</div>
                 </button>
               ))}
@@ -177,10 +177,10 @@ export default function CarListPage() {
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-white/5 transition-all text-left"
+                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-gray-50 transition-all text-left"
                   style={{ border: '1px solid rgba(59,130,246,0.12)' }}
                 >
-                  <div className="font-bold text-slate-200 text-sm">{car.number}</div>
+                  <div className="font-bold text-slate-700 text-sm">{car.number}</div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-500">{car.brand}</span>
                     <span className="text-[10px] text-blue-400 font-bold">{car.created_at.split('T')[0]}</span>
@@ -206,7 +206,7 @@ export default function CarListPage() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-slate-500 hidden sm:inline">
-                검색결과 <strong className="text-slate-300">{filteredCars.length}</strong>대
+                검색결과 <strong className="text-slate-600">{filteredCars.length}</strong>대
               </span>
               <button
                 onClick={() => {
@@ -278,15 +278,15 @@ export default function CarListPage() {
                         onClick={() => router.push(`/cars/${car.id}`)}
                         className="cursor-pointer group"
                       >
-                        <td className="font-black text-slate-100 text-base group-hover:text-blue-400 transition-colors">
+                        <td className="font-black text-slate-800 text-base group-hover:text-blue-400 transition-colors">
                           {car.number}
                         </td>
                         <td>
-                          <div className="font-bold text-slate-200 text-sm">{car.brand}</div>
+                          <div className="font-bold text-slate-700 text-sm">{car.brand}</div>
                           <div className="text-xs text-slate-500 mt-0.5">{car.model}</div>
                         </td>
                         <td>
-                          <span className="font-medium text-slate-300 text-sm">{car.year}년</span>
+                          <span className="font-medium text-slate-600 text-sm">{car.year}년</span>
                           <span className="text-xs text-slate-500 block">{car.fuel}</span>
                         </td>
                         <td className="text-center">
@@ -314,7 +314,7 @@ export default function CarListPage() {
                             {statusLabel(car.status)}
                           </span>
                         </td>
-                        <td className="text-right font-bold text-slate-300 text-sm">
+                        <td className="text-right font-bold text-slate-600 text-sm">
                           {formatMoney(car.purchase_price)}원
                         </td>
                         <td className="text-center text-xs text-slate-500">
@@ -327,12 +327,12 @@ export default function CarListPage() {
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-white/5">
+              <div className="md:hidden divide-y divide-gray-200">
                 {filteredCars.map((car) => (
                   <button
                     key={car.id}
                     onClick={() => router.push(`/cars/${car.id}`)}
-                    className="w-full text-left px-4 py-3.5 hover:bg-white/5 transition-colors"
+                    className="w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5">
@@ -350,8 +350,8 @@ export default function CarListPage() {
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
-                        <div className="font-black text-slate-100 text-base mb-0.5">{car.number}</div>
-                        <div className="text-sm text-slate-300 font-bold">{car.brand} {car.model}</div>
+                        <div className="font-black text-slate-800 text-base mb-0.5">{car.number}</div>
+                        <div className="text-sm text-slate-600 font-bold">{car.brand} {car.model}</div>
                         <div className="text-xs text-slate-500">{car.year}년 · {car.fuel}</div>
                       </div>
                       <div className="text-right">

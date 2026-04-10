@@ -93,7 +93,7 @@ export default function OpenbankingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <DarkHeader icon="Building2" title="오픈뱅킹 연동" subtitle="금융결제원 오픈뱅킹 API로 거래내역을 자동 수집합니다" />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -103,19 +103,19 @@ export default function OpenbankingPage() {
         {message && (
           <div className={`mb-6 p-4 rounded-lg whitespace-pre-line ${
             message.type === 'success'
-              ? 'bg-green-900 border border-green-700 text-green-200'
-              : 'bg-red-900 border border-red-700 text-red-200'
+              ? 'bg-green-900/30 border border-green-700/50 text-green-300'
+              : 'bg-red-900/30 border border-red-700/50 text-red-300'
           }`}>
             {message.text}
           </div>
         )}
 
         {/* 계좌 연동 */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
+        <div className="bg-white rounded-lg p-6 mb-6 border border-black/[0.06]">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h2 className="text-xl font-bold text-white">연동된 계좌</h2>
-              <p className="text-sm text-gray-400 mt-1">오픈뱅킹 인증을 통해 은행 계좌를 연동합니다</p>
+              <h2 className="text-xl font-bold text-slate-800">연동된 계좌</h2>
+              <p className="text-sm text-slate-400 mt-1">오픈뱅킹 인증을 통해 은행 계좌를 연동합니다</p>
             </div>
             <button
               onClick={handleConnect}
@@ -126,10 +126,10 @@ export default function OpenbankingPage() {
           </div>
 
           {loading ? (
-            <p className="text-gray-400">불러오는 중...</p>
+            <p className="text-slate-400">불러오는 중...</p>
           ) : accounts.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-400 mb-4">연동된 계좌가 없습니다.</p>
+              <p className="text-slate-400 mb-4">연동된 계좌가 없습니다.</p>
               <button
                 onClick={handleConnect}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg"
@@ -141,32 +141,32 @@ export default function OpenbankingPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left py-3 px-4 text-gray-300">은행</th>
-                    <th className="text-left py-3 px-4 text-gray-300">계좌번호</th>
-                    <th className="text-left py-3 px-4 text-gray-300">예금주</th>
-                    <th className="text-left py-3 px-4 text-gray-300">토큰 만료</th>
-                    <th className="text-left py-3 px-4 text-gray-300">상태</th>
+                  <tr className="border-b border-black/10">
+                    <th className="text-left py-3 px-4 text-slate-400">은행</th>
+                    <th className="text-left py-3 px-4 text-slate-400">계좌번호</th>
+                    <th className="text-left py-3 px-4 text-slate-400">예금주</th>
+                    <th className="text-left py-3 px-4 text-slate-400">토큰 만료</th>
+                    <th className="text-left py-3 px-4 text-slate-400">상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {accounts.map((acc) => {
                     const expired = new Date(acc.token_expires_at) < new Date()
                     return (
-                      <tr key={acc.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                        <td className="py-3 px-4 text-white font-medium">{acc.bank_name}</td>
-                        <td className="py-3 px-4 text-gray-300">{acc.account_num_masked}</td>
-                        <td className="py-3 px-4 text-gray-300">{acc.account_holder_name}</td>
-                        <td className="py-3 px-4 text-gray-400 text-xs">
+                      <tr key={acc.id} className="border-b border-black/10 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-slate-800 font-medium">{acc.bank_name}</td>
+                        <td className="py-3 px-4 text-slate-600">{acc.account_num_masked}</td>
+                        <td className="py-3 px-4 text-slate-600">{acc.account_holder_name}</td>
+                        <td className="py-3 px-4 text-slate-400 text-xs">
                           {new Date(acc.token_expires_at).toLocaleDateString('ko-KR')}
                         </td>
                         <td className="py-3 px-4">
                           {expired ? (
-                            <span className="px-2 py-1 rounded text-xs font-semibold bg-red-900 text-red-200">
+                            <span className="px-2 py-1 rounded text-xs font-semibold bg-red-900/30 text-red-300">
                               만료 — 재연동 필요
                             </span>
                           ) : (
-                            <span className="px-2 py-1 rounded text-xs font-semibold bg-green-900 text-green-200">
+                            <span className="px-2 py-1 rounded text-xs font-semibold bg-green-900/30 text-green-300">
                               활성
                             </span>
                           )}
@@ -181,26 +181,26 @@ export default function OpenbankingPage() {
         </div>
 
         {/* 거래내역 동기화 */}
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-bold text-white mb-4">거래내역 동기화</h2>
+        <div className="bg-white rounded-lg p-6 border border-black/[0.06]">
+          <h2 className="text-xl font-bold text-slate-800 mb-4">거래내역 동기화</h2>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">시작일</label>
+              <label className="block text-sm font-medium text-slate-600 mb-2">시작일</label>
               <input
                 type="date"
                 value={dateRange.startDate}
                 onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-4 py-2 bg-gray-100 border border-white/20 rounded text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">종료일</label>
+              <label className="block text-sm font-medium text-slate-600 mb-2">종료일</label>
               <input
                 type="date"
                 value={dateRange.endDate}
                 onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                className="w-full px-4 py-2 bg-gray-100 border border-white/20 rounded text-white"
               />
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function OpenbankingPage() {
             disabled={syncing || accounts.length === 0}
             className={`w-full py-3 px-4 rounded font-bold text-white ${
               syncing || accounts.length === 0
-                ? 'bg-gray-600 cursor-not-allowed'
+                ? 'bg-gray-50 cursor-not-allowed'
                 : 'bg-green-600 hover:bg-green-700'
             }`}
           >

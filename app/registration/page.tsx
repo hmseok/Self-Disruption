@@ -21,8 +21,8 @@ const Icons = {
   Upload: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
   Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>,
   Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-  File: () => <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-  Search: () => <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+  File: () => <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  Search: () => <svg className="w-12 h-12 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
 }
 
 // 유틸리티
@@ -358,21 +358,21 @@ const { company, role, adminSelectedCompanyId } = useApp()
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-white rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen">
 
        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📋 등록/제원 상세</h1>
-            <p className="text-gray-500 text-sm mt-1">차량 등록·이전 서류 및 제원 관리</p>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">📋 등록/제원 상세</h1>
+            <p className="text-slate-500 text-sm mt-1">차량 등록·이전 서류 및 제원 관리</p>
          </div>
          <div className="flex gap-3">
             <button
@@ -384,7 +384,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                 <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
             </button>
             <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-slate-600 border border-black/[0.06] px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
                 <Icons.Plus /> <span>신규차량등록</span>
             </button>
          </div>
@@ -400,21 +400,21 @@ const { company, role, adminSelectedCompanyId } = useApp()
            className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
              isDragging
                ? 'border-steel-500 bg-steel-50 scale-[1.01]'
-               : 'border-gray-300 bg-white hover:border-steel-400 hover:bg-steel-50/30'
+               : 'border-black/10 bg-white hover:border-steel-400 hover:bg-steel-50/30'
            }`}
          >
            <div className="text-3xl mb-2">{isDragging ? '📥' : '🚗'}</div>
-           <p className="text-sm font-bold text-gray-700">
+           <p className="text-sm font-bold text-slate-600">
              {isDragging ? '여기에 파일을 놓으세요' : '등록증 파일을 드래그하여 업로드'}
            </p>
-           <p className="text-xs text-gray-400 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
+           <p className="text-xs text-slate-500 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
          </div>
        )}
 
        {/* 📊 KPI 대시보드 */}
        {cars.length > 0 && !bulkProcessing && (
          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-           <div style={{ flex: 1, background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', minWidth: 0 }}>
+           <div style={{ flex: 1, background: '#fff', padding: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', minWidth: 0 }}>
              <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 700, whiteSpace: 'nowrap' as const }}>등록 차량</p>
              <p style={{ fontSize: 24, fontWeight: 900, color: '#111827', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.total}<span style={{ fontSize: 14, color: '#9ca3af', marginLeft: 2 }}>대</span></p>
            </div>
@@ -462,9 +462,9 @@ const { company, role, adminSelectedCompanyId } = useApp()
                  onClick={() => router.push(`/registration/${car.id}`)}
                  className="bg-white border border-steel-200 rounded-xl px-3 py-2 flex-shrink-0 cursor-pointer hover:shadow-md transition-all hover:border-steel-400"
                >
-                 <div className="font-bold text-gray-800 text-sm">{car.number}</div>
+                 <div className="font-bold text-slate-700 text-sm">{car.number}</div>
                  <div className="flex items-center gap-2 mt-0.5">
-                   <span className="text-xs text-gray-500">{car.brand}</span>
+                   <span className="text-xs text-slate-500">{car.brand}</span>
                    <span className="text-[10px] text-steel-500 font-bold">{car.created_at?.split('T')[0]}</span>
                  </div>
                </div>
@@ -480,7 +480,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
        {/* 진행 상태창 */}
        {bulkProcessing && (
-         <div className="mb-10 bg-gray-900 rounded-2xl p-6 shadow-2xl ring-4 ring-steel-500/10 overflow-hidden relative">
+         <div className="mb-10 bg-slate-900 rounded-2xl p-6 shadow-2xl ring-4 ring-steel-500/10 overflow-hidden relative">
             <div className="flex justify-between items-end mb-4 relative z-10 text-white">
                 <div className="flex items-center gap-3"><span className="animate-spin text-xl">⚙️</span><span className="font-bold">AI 분석 진행 중...</span></div>
                 <div className="flex items-center gap-3">
@@ -490,7 +490,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                     disabled={cancelRef.current}
                     className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       cancelRef.current
-                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                         : 'bg-red-500 text-white hover:bg-red-600 shadow-lg'
                     }`}
                   >
@@ -498,13 +498,13 @@ const { company, role, adminSelectedCompanyId } = useApp()
                   </button>
                 </div>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2 mb-4"><div className="bg-gradient-to-r from-steel-500 to-steel-600 h-2 rounded-full transition-all" style={{ width: `${(progress.current / progress.total) * 100}%` }}></div></div>
+            <div className="w-full bg-slate-700 rounded-full h-2 mb-4"><div className="bg-gradient-to-r from-steel-500 to-steel-600 h-2 rounded-full transition-all" style={{ width: `${(progress.current / progress.total) * 100}%` }}></div></div>
             <div className="flex gap-6 text-xs font-bold mb-4 font-mono">
                 <span className="text-green-400">✅ 성공: {progress.success}</span>
                 <span className="text-yellow-400">⚠️ 중복: {progress.skipped}</span>
                 <span className="text-red-400">❌ 실패: {progress.fail}</span>
             </div>
-            <div className="h-32 overflow-y-auto font-mono text-xs text-gray-300 border-t border-gray-700 pt-2 scrollbar-hide">{logs.map((log, i) => <div key={i}>{log}</div>)}</div>
+            <div className="h-32 overflow-y-auto font-mono text-xs text-slate-600 border-t border-slate-700 pt-2 scrollbar-hide">{logs.map((log, i) => <div key={i}>{log}</div>)}</div>
          </div>
        )}
 
@@ -524,7 +524,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
              </button>
              <button
                onClick={() => setFailedFiles([])}
-               className="px-4 py-2.5 bg-white text-gray-500 border border-gray-300 rounded-xl font-bold text-sm hover:bg-gray-50"
+               className="px-4 py-2.5 bg-white text-slate-500 border border-black/10 rounded-xl font-bold text-sm hover:bg-gray-50"
              >
                무시
              </button>
@@ -533,15 +533,15 @@ const { company, role, adminSelectedCompanyId } = useApp()
        )}
 
        {/* 리스트 테이블 */}
-       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.06)' }}>
          {cars.length === 0 ? (
-           <div className="p-12 md:p-20 text-center text-gray-400">등록된 차량이 없습니다.</div>
+           <div className="p-12 md:p-20 text-center text-slate-500">등록된 차량이 없습니다.</div>
          ) : (
            <>
              {/* Desktop Table View */}
              <div style={{ overflowX: 'auto', display: 'block' }}>
                  <table className="w-full text-left border-collapse min-w-[650px]">
-                     <thead className="bg-steel-50 border-b border-gray-100 text-steel-900 uppercase text-xs font-bold tracking-wider">
+                     <thead className="bg-steel-50 border-b border-black/5 text-steel-900 uppercase text-xs font-bold tracking-wider">
                          <tr>
                              <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
                              <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
@@ -551,7 +551,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
                              <th className="p-3 md:p-5 text-center">관리</th>
                          </tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-100">
+                     <tbody className="divide-y divide-gray-200">
                          {cars.map((car) => (
                              <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-steel-50/30 transition-colors cursor-pointer">
                                  <td className="p-3 md:p-5 pl-4 md:pl-8">
@@ -561,20 +561,20 @@ const { company, role, adminSelectedCompanyId } = useApp()
                                                  <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-xs">PDF</div> :
                                                  <img src={car.registration_image_url} className="w-full h-full object-cover" />
                                              ) :
-                                             <div className="flex items-center justify-center h-full text-gray-300"><Icons.File /></div>
+                                             <div className="flex items-center justify-center h-full text-slate-600"><Icons.File /></div>
                                          }
                                      </div>
                                  </td>
                                  <td className="p-3 md:p-5">
-                                     <div className="font-black text-gray-900 text-lg">{car.number}</div>
-                                     <div className="text-gray-500 text-sm font-medium">
+                                     <div className="font-black text-slate-800 text-lg">{car.number}</div>
+                                     <div className="text-slate-500 text-sm font-medium">
                                          <span className="text-steel-600 font-bold mr-1">{car.brand}</span>
                                          {car.model}
                                      </div>
                                  </td>
                                  <td className="p-3 md:p-5">
-                                     <div className="text-gray-900 font-bold">{car.owner_name || '-'}</div>
-                                     <div className="text-xs text-gray-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-gray-100 select-all">
+                                     <div className="text-slate-800 font-bold">{car.owner_name || '-'}</div>
+                                     <div className="text-xs text-slate-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-black/5 select-all">
                                          {car.vin || '-'}
                                      </div>
                                  </td>
@@ -585,21 +585,21 @@ const { company, role, adminSelectedCompanyId } = useApp()
                                          {car.ownership_type && car.ownership_type !== 'company' && (
                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.ownership_type === 'consignment' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{car.ownership_type === 'consignment' ? '지입' : '임차'}</span>
                                          )}
-                                         <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
+                                         <span className="bg-gray-100 text-slate-400 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
                                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.fuel_type === '전기' ? 'bg-steel-100 text-steel-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type || '기타'}</span>
                                      </div>
                                      {car.is_used && car.purchase_mileage > 0 && (
-                                       <div className="text-[10px] text-gray-400 mt-1">구입시 {(car.purchase_mileage / 10000).toFixed(1)}만km</div>
+                                       <div className="text-[10px] text-slate-500 mt-1">구입시 {(car.purchase_mileage / 10000).toFixed(1)}만km</div>
                                      )}
                                  </td>
                                  <td className="p-3 md:p-5 text-right">
-                                     <div className="font-bold text-gray-700">{f(car.purchase_price)}원</div>
+                                     <div className="font-bold text-slate-600">{f(car.purchase_price)}원</div>
                                      {car.total_cost > 0 && car.total_cost !== car.purchase_price && (
                                        <div className="text-xs font-bold text-emerald-600 mt-0.5">총 {f(car.total_cost)}원</div>
                                      )}
                                  </td>
                                  <td className="p-3 md:p-5 text-center">
-                                     <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
+                                     <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
                                  </td>
                              </tr>
                          ))}
@@ -617,12 +617,12 @@ const { company, role, adminSelectedCompanyId } = useApp()
                          <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-[10px]">PDF</div> :
                          <img src={car.registration_image_url} className="w-full h-full object-cover" />
                        ) :
-                       <div className="flex items-center justify-center h-full text-gray-300"><Icons.File /></div>
+                       <div className="flex items-center justify-center h-full text-slate-600"><Icons.File /></div>
                      }
                    </div>
                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/registration/${car.id}`)}>
-                     <div className="font-black text-gray-900">{car.number}</div>
-                     <div className="text-xs text-gray-500 truncate">
+                     <div className="font-black text-slate-800">{car.number}</div>
+                     <div className="text-xs text-slate-500 truncate">
                        <span className="text-steel-600 font-bold">{car.brand}</span> {car.model}
                      </div>
                      <div className="flex gap-1 mt-1">
@@ -631,16 +631,16 @@ const { company, role, adminSelectedCompanyId } = useApp()
                        {car.ownership_type && car.ownership_type !== 'company' && (
                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.ownership_type === 'consignment' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{car.ownership_type === 'consignment' ? '지입' : '임차'}</span>
                        )}
-                       {car.year && <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold">{car.year}년</span>}
+                       {car.year && <span className="bg-gray-100 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-bold">{car.year}년</span>}
                        {car.fuel_type && <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.fuel_type === '전기' ? 'bg-steel-100 text-steel-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type}</span>}
                      </div>
                    </div>
                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                     <span className="font-bold text-gray-700 text-sm">{f(car.purchase_price)}원</span>
+                     <span className="font-bold text-slate-600 text-sm">{f(car.purchase_price)}원</span>
                      {car.total_cost > 0 && car.total_cost !== car.purchase_price && (
                        <span className="text-[10px] font-bold text-emerald-600">총 {f(car.total_cost)}원</span>
                      )}
-                     <button onClick={(e) => handleDelete(car.id, e)} className="p-1.5 text-gray-300 hover:text-red-500 rounded"><Icons.Trash /></button>
+                     <button onClick={(e) => handleDelete(car.id, e)} className="p-1.5 text-slate-600 hover:text-red-500 rounded"><Icons.Trash /></button>
                    </div>
                  </div>
                ))}
@@ -654,11 +654,11 @@ const { company, role, adminSelectedCompanyId } = useApp()
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowResultModal(false)}>
             <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center" onClick={e => e.stopPropagation()}>
                 <div className="w-16 h-16 bg-steel-100 text-steel-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🎉</div>
-                <h2 className="text-xl font-black text-gray-900 mb-2">분석 완료</h2>
-                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
-                    <div className="flex justify-between py-1 border-b border-gray-200"><span className="text-gray-500">총 파일</span><span className="font-bold">{progress.total}건</span></div>
-                    <div className="flex justify-between py-1 border-b border-gray-200 mt-2"><span className="text-steel-600 font-bold">신규 등록</span><span className="font-bold text-steel-600">{progress.success}건</span></div>
-                    <div className="flex justify-between py-1 border-b border-gray-200 mt-2"><span className="text-yellow-600 font-bold">중복 제외</span><span className="font-bold text-yellow-600">{progress.skipped}건</span></div>
+                <h2 className="text-xl font-black text-slate-800 mb-2">분석 완료</h2>
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-black/5">
+                    <div className="flex justify-between py-1 border-b border-black/[0.06]"><span className="text-slate-500">총 파일</span><span className="font-bold">{progress.total}건</span></div>
+                    <div className="flex justify-between py-1 border-b border-black/[0.06] mt-2"><span className="text-steel-600 font-bold">신규 등록</span><span className="font-bold text-steel-600">{progress.success}건</span></div>
+                    <div className="flex justify-between py-1 border-b border-black/[0.06] mt-2"><span className="text-yellow-600 font-bold">중복 제외</span><span className="font-bold text-yellow-600">{progress.skipped}건</span></div>
                     <div className="flex justify-between py-1 mt-2"><span className="text-red-500">실패</span><span className="font-bold text-red-500">{progress.fail}건</span></div>
                 </div>
                 <div className="flex gap-2">
@@ -682,27 +682,27 @@ const { company, role, adminSelectedCompanyId } = useApp()
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-8 py-6 border-b bg-gray-50 flex justify-between items-center">
-                <h2 className="text-xl font-black text-gray-900">🚙 수동 등록</h2>
-                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                <h2 className="text-xl font-black text-slate-800">🚙 수동 등록</h2>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-slate-400 text-2xl">&times;</button>
             </div>
             <div className="p-8 space-y-5">
                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">차량 번호</label><input className="w-full p-3 border rounded-xl font-bold" placeholder="12가 3456" value={carNum} onChange={e=>setCarNum(e.target.value)} /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 mb-1">차대 번호 (필수)</label><input className="w-full p-3 border rounded-xl font-mono uppercase" placeholder="VIN 입력" value={vin} onChange={e=>setVin(e.target.value)} /></div>
+                    <div><label className="block text-xs font-bold text-slate-500 mb-1">차량 번호</label><input className="w-full p-3 border rounded-xl font-bold" placeholder="12가 3456" value={carNum} onChange={e=>setCarNum(e.target.value)} /></div>
+                    <div><label className="block text-xs font-bold text-slate-500 mb-1">차대 번호 (필수)</label><input className="w-full p-3 border rounded-xl font-mono uppercase" placeholder="VIN 입력" value={vin} onChange={e=>setVin(e.target.value)} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">모델</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">모델</label>
                         <select className="w-full p-3 border rounded-xl" onChange={e=>setSelectedModelName(e.target.value)} defaultValue=""><option value="" disabled>선택</option>{uniqueModels.map((m, i) => <option key={i} value={m}>{m}</option>)}</select>
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">등급</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">등급</label>
                         <select className="w-full p-3 border rounded-xl" onChange={e=>setSelectedTrim(standardCodes.find(s => s.id === Number(e.target.value)))} disabled={!selectedModelName} defaultValue=""><option value="" disabled>선택</option>{standardCodes.filter(s => s.model_name === selectedModelName).map(t => (<option key={t.id} value={t.id}>{t.trim_name} ({t.year}년)</option>))}</select>
                     </div>
                 </div>
             </div>
             <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
-                <button onClick={()=>setIsModalOpen(false)} className="px-5 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-200">취소</button>
+                <button onClick={()=>setIsModalOpen(false)} className="px-5 py-3 rounded-xl font-bold text-slate-500 hover:bg-gray-100">취소</button>
                 <button onClick={handleRegister} className="px-6 py-3 rounded-xl font-bold bg-steel-600 text-white hover:bg-steel-700 shadow-lg">등록 완료</button>
             </div>
           </div>

@@ -352,27 +352,27 @@ export default function BenchmarkPage() {
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className="text-2xl font-black">{stats.total}</p>
-              <p className="text-[10px] text-slate-300">수집 견적</p>
+              <p className="text-[10px] text-slate-600">수집 견적</p>
             </div>
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className="text-2xl font-black">{stats.analyzed}</p>
-              <p className="text-[10px] text-slate-300">분석 완료</p>
+              <p className="text-[10px] text-slate-600">분석 완료</p>
             </div>
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className={`text-2xl font-black ${stats.avgGap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {stats.analyzed > 0 ? pct(stats.avgGap) : '-'}
               </p>
-              <p className="text-[10px] text-slate-300">평균 갭</p>
+              <p className="text-[10px] text-slate-600">평균 갭</p>
             </div>
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className="text-2xl font-black text-emerald-400">{stats.advantage}</p>
-              <p className="text-[10px] text-slate-300">가격 우위</p>
+              <p className="text-[10px] text-slate-600">가격 우위</p>
             </div>
-            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className="text-2xl font-black text-red-400">{stats.disadvantage}</p>
-              <p className="text-[10px] text-slate-300">경쟁 열위</p>
+              <p className="text-[10px] text-slate-600">경쟁 열위</p>
             </div>
           </div>
         </div>
@@ -474,7 +474,7 @@ export default function BenchmarkPage() {
                       {selectedItem.gap !== null && (
                         <div className={`mt-2 rounded-lg p-2 text-center ${selectedItem.gap >= 0 ? 'bg-emerald-900/30' : 'bg-red-900/30'}`}>
                           <span className={`text-sm font-black ${selectedItem.gap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{pct(selectedItem.gap)}</span>
-                          <span className="text-[10px] text-slate-300 ml-2">{selectedItem.gap >= 0 ? '마진 확보 가능' : '원가 절감 필요'}</span>
+                          <span className="text-[10px] text-slate-600 ml-2">{selectedItem.gap >= 0 ? '마진 확보 가능' : '원가 절감 필요'}</span>
                         </div>
                       )}
                     </div>

@@ -39,7 +39,7 @@ function ProgressBar({ paid, total }: { paid: number; total: number }) {
   const pct = total > 0 ? (paid / total) * 100 : 0
   return (
     <div className="flex items-center gap-1.5">
-      <div className="w-14 h-1.5 bg-white/10 rounded-full overflow-hidden">
+      <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
       <span className="text-[10px] text-slate-500 font-bold">{paid}/{total}</span>
@@ -170,7 +170,7 @@ export default function ContractListMain() {
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@ export default function ContractListMain() {
               />
             </div>
             <span className="text-xs text-slate-500 hidden sm:inline">
-              <strong className="text-slate-300">{filteredContracts.length}</strong>건
+              <strong className="text-slate-600">{filteredContracts.length}</strong>건
             </span>
           </div>
 
@@ -292,20 +292,20 @@ export default function ContractListMain() {
                         className="cursor-pointer group"
                       >
                         <td><ContractStatusBadge contract={c} /></td>
-                        <td className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors">
+                        <td className="font-bold text-slate-800 group-hover:text-blue-400 transition-colors">
                           {c.customer?.name || c.customer_name}
                         </td>
                         <td>
                           <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 rounded-lg bg-white/5 overflow-hidden border border-white/[0.06] flex-shrink-0 flex items-center justify-center">
+                            <div className="w-9 h-9 rounded-lg bg-gray-50 overflow-hidden border border-black/[0.06] flex-shrink-0 flex items-center justify-center">
                               {c.car?.image_url ? (
                                 <img src={c.car.image_url} alt="" className="w-full h-full object-cover" />
                               ) : (
-                                <span className="text-[8px] text-slate-300">No Img</span>
+                                <span className="text-[8px] text-slate-600">No Img</span>
                               )}
                             </div>
                             <div>
-                              <div className="font-bold text-slate-200 text-xs">{c.car?.number || '-'}</div>
+                              <div className="font-bold text-slate-700 text-xs">{c.car?.number || '-'}</div>
                               <div className="text-[11px] text-slate-500">{c.car?.brand} {c.car?.model}</div>
                             </div>
                           </div>
@@ -329,12 +329,12 @@ export default function ContractListMain() {
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-white/5">
+              <div className="md:hidden divide-y divide-gray-200">
                 {filteredContracts.map(c => (
                   <button
                     key={c.id}
                     onClick={() => router.push(`/contracts/${c.id}`)}
-                    className="w-full text-left px-4 py-3.5 hover:bg-white/5 transition-colors"
+                    className="w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <ContractStatusBadge contract={c} />
@@ -342,7 +342,7 @@ export default function ContractListMain() {
                     </div>
                     <div className="flex justify-between items-end">
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-slate-100 text-sm mb-0.5">{c.customer?.name || c.customer_name}</div>
+                        <div className="font-bold text-slate-800 text-sm mb-0.5">{c.customer?.name || c.customer_name}</div>
                         <div className="text-xs text-slate-400">{c.car?.brand} {c.car?.model} {c.car?.number ? `(${c.car.number})` : ''}</div>
                         <div className="text-[11px] text-slate-500">{formatDate(c.start_date)} ~ {formatDate(c.end_date)}</div>
                       </div>

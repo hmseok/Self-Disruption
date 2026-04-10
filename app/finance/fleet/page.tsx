@@ -373,10 +373,10 @@ export default function FleetPnlPage() {
 
       <div className='max-w-7xl mx-auto mt-8'>
         {/* 필터 & 제어 */}
-        <div className='bg-white/[0.08] backdrop-blur-xl rounded-xl p-6 border border-white/[0.1] mb-6'>
+        <div className='bg-gray-100 backdrop-blur-xl rounded-xl p-6 border border-white/[0.1] mb-6'>
           <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mb-4'>
             <div>
-              <label className='block text-sm font-medium text-slate-300 mb-2'>조회 기간</label>
+              <label className='block text-sm font-medium text-slate-600 mb-2'>조회 기간</label>
               <input
                 type='month'
                 value={filterDate}
@@ -385,7 +385,7 @@ export default function FleetPnlPage() {
               />
             </div>
             <div>
-              <label className='block text-sm font-medium text-slate-300 mb-2'>상태</label>
+              <label className='block text-sm font-medium text-slate-600 mb-2'>상태</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -397,7 +397,7 @@ export default function FleetPnlPage() {
               </select>
             </div>
             <div>
-              <label className='block text-sm font-medium text-slate-300 mb-2'>정렬</label>
+              <label className='block text-sm font-medium text-slate-600 mb-2'>정렬</label>
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
@@ -412,7 +412,7 @@ export default function FleetPnlPage() {
               </select>
             </div>
             <div>
-              <label className='block text-sm font-medium text-slate-300 mb-2'>검색</label>
+              <label className='block text-sm font-medium text-slate-600 mb-2'>검색</label>
               <input
                 type='text'
                 placeholder='차량번호, 모델명...'
@@ -449,25 +449,25 @@ export default function FleetPnlPage() {
         </div>
 
         {/* 테이블 */}
-        <div className='bg-white/[0.08] backdrop-blur-xl rounded-xl border border-white/[0.1] overflow-hidden'>
+        <div className='bg-gray-100 backdrop-blur-xl rounded-xl border border-white/[0.1] overflow-hidden'>
           <table className='w-full text-sm'>
             <thead>
               <tr className='border-b border-white/[0.1] bg-white/[0.03]'>
-                <th className='px-4 py-3 text-left text-slate-300 font-medium'>차량번호</th>
-                <th className='px-4 py-3 text-left text-slate-300 font-medium'>모델</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>매출</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>비용</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>영업이익</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>정산</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>순이익</th>
-                <th className='px-4 py-3 text-right text-slate-300 font-medium'>수익률</th>
+                <th className='px-4 py-3 text-left text-slate-600 font-medium'>차량번호</th>
+                <th className='px-4 py-3 text-left text-slate-600 font-medium'>모델</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>매출</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>비용</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>영업이익</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>정산</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>순이익</th>
+                <th className='px-4 py-3 text-right text-slate-600 font-medium'>수익률</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((pnl, idx) => (
                 <tr key={pnl.carId} className='border-b border-white/[0.05] hover:bg-white/[0.03] transition'>
-                  <td className='px-4 py-3 text-slate-100 font-mono'>{pnl.number}</td>
-                  <td className='px-4 py-3 text-slate-300'>{pnl.model}</td>
+                  <td className='px-4 py-3 text-slate-800 font-mono'>{pnl.number}</td>
+                  <td className='px-4 py-3 text-slate-600'>{pnl.model}</td>
                   <td className='px-4 py-3 text-right text-blue-300'>{fMan(pnl.revenue)}</td>
                   <td className='px-4 py-3 text-right text-red-300'>{fMan(pnl.expense)}</td>
                   <td className='px-4 py-3 text-right text-yellow-300'>{fMan(pnl.operatingProfit)}</td>
@@ -475,7 +475,7 @@ export default function FleetPnlPage() {
                   <td className={`px-4 py-3 text-right font-semibold ${pnl.netProfit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
                     {fMan(pnl.netProfit)}
                   </td>
-                  <td className='px-4 py-3 text-right text-slate-300'>{pnl.profitRate.toFixed(1)}%</td>
+                  <td className='px-4 py-3 text-right text-slate-600'>{pnl.profitRate.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>

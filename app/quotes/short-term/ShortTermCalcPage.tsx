@@ -325,9 +325,9 @@ export default function ShortTermCalcPage() {
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-white rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
@@ -343,21 +343,21 @@ export default function ShortTermCalcPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         {/* 왼쪽: 차종 선택 */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           {/* 할인율 */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>롯데 기준 할인율</span>
               <input
                 type="range" min="0" max="60" step="5" value={calcDiscount}
                 onChange={e => setCalcDiscount(Number(e.target.value))}
-                style={{ flex: 1, accentColor: '#2d5fa8' }}
+                style={{ flex: 1, accentColor: 'rgba(59,130,246,0.9)' }}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input
                   type="number" min="0" max="70" value={calcDiscount}
                   onChange={e => setCalcDiscount(Math.min(70, Math.max(0, Number(e.target.value))))}
-                  style={{ width: 52, textAlign: 'center', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: '#2d5fa8' }}
+                  style={{ width: 52, textAlign: 'center', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: 'rgba(59,130,246,0.9)' }}
                 />
                 <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 700 }}>%</span>
               </div>
@@ -365,18 +365,18 @@ export default function ShortTermCalcPage() {
           </div>
 
           {/* 카테고리 + 검색 */}
-          <div style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', gap: 10, alignItems: 'center' }}>
             <select
               value={calcCat}
               onChange={e => { setCalcCat(e.target.value); setCalcSelected(null) }}
-              style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 12, fontWeight: 600 }}
             >
               {LOTTE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <input
               type="text" placeholder="차종명으로 검색 (예: 쏘나타, G80, 카니발)"
               value={calcSearch} onChange={e => setCalcSearch(e.target.value)}
-              style={{ flex: 1, padding: '7px 12px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13 }}
+              style={{ flex: 1, padding: '7px 12px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13 }}
             />
           </div>
 
@@ -390,7 +390,7 @@ export default function ShortTermCalcPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 20px', cursor: 'pointer', transition: 'background 0.1s',
                   background: calcSelected === v ? '#eff6ff' : 'transparent',
-                  borderBottom: '1px solid #f3f4f6', borderLeft: calcSelected === v ? '3px solid #2d5fa8' : '3px solid transparent',
+                  borderBottom: '1px solid rgba(0,0,0,0.04)', borderLeft: calcSelected === v ? '3px solid rgba(59,130,246,0.9)' : '3px solid transparent',
                 }}
               >
                 <div>
@@ -399,7 +399,7 @@ export default function ShortTermCalcPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: 12, color: '#9ca3af', textDecoration: 'line-through', marginRight: 8 }}>{f(v.rate)}원</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#2d5fa8' }}>{f(Math.round(v.rate * (1 - calcDiscount / 100)))}원</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'rgba(59,130,246,0.9)' }}>{f(Math.round(v.rate * (1 - calcDiscount / 100)))}원</span>
                   <span style={{ fontSize: 11, color: '#9ca3af' }}>/일</span>
                 </div>
               </div>
@@ -485,7 +485,7 @@ export default function ShortTermCalcPage() {
                   {f(calcResult)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
                 </div>
                 {calcDays > 0 && (
-                  <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#2563eb', marginTop: 2 }}>
                     하루 {f(Math.round(calcResult / calcDays))}원
                   </div>
                 )}
@@ -538,7 +538,7 @@ export default function ShortTermCalcPage() {
               onClick={() => setInvoiceOpen(true)}
               style={{
                 marginTop: 12, width: '100%', padding: '14px', border: 'none', borderRadius: 10,
-                background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff',
+                background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff',
                 fontWeight: 800, fontSize: 15, cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
                 transition: 'all 0.2s',
@@ -554,7 +554,7 @@ export default function ShortTermCalcPage() {
 
       {/* ═══ 청구서 작성 모달 ═══ */}
       {invoiceOpen && (() => {
-        const iS = { width: '100%', padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none' }
+        const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none' }
         const lS = { fontSize: 10, fontWeight: 700 as const, color: '#6b7280', display: 'block', marginBottom: 2 }
         const rentalCarValue = calcSelected ? `${calcSelected.cat} ${calcSelected.name}` : inv.rental_car || ''
         return (
@@ -582,7 +582,7 @@ export default function ShortTermCalcPage() {
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>임차인 정보</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>임차인 정보</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div><label style={lS}>임차인 *</label><input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} /></div>
                   <div><label style={lS}>연락처</label><input value={inv.tenant_phone} onChange={e => setField('tenant_phone', fmtPhone(e.target.value))} placeholder="010-0000-0000" style={iS} inputMode="tel" /></div>
@@ -591,7 +591,7 @@ export default function ShortTermCalcPage() {
                     <label style={lS}>주소</label>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: '#fafafa' }} onClick={openAddressSearch} />
-                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, background: '#f9fafb', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: '#f9fafb', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
                     </div>
                   </div>
                   <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
@@ -599,9 +599,9 @@ export default function ShortTermCalcPage() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>대차 정보</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>대차 정보</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div><label style={lS}>차종 {calcSelected ? '(연동)' : ''}</label><input value={rentalCarValue} onChange={e => { if (!calcSelected) setField('rental_car' as any, e.target.value) }} readOnly={!!calcSelected} placeholder="차종" style={{ ...iS, ...(calcSelected ? { background: '#f3f4f6' } : {}) }} /></div>
+                  <div><label style={lS}>차종 {calcSelected ? '(연동)' : ''}</label><input value={rentalCarValue} onChange={e => { if (!calcSelected) setField('rental_car' as any, e.target.value) }} readOnly={!!calcSelected} placeholder="차종" style={{ ...iS, ...(calcSelected ? { background: 'rgba(0,0,0,0.04)' } : {}) }} /></div>
                   <div><label style={lS}>차량번호</label><input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} /></div>
                   <div><label style={lS}>유종</label><select value={inv.fuel_type} onChange={e => setField('fuel_type', e.target.value)} style={iS}><option>전기</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option></select></div>
                   <div><label style={lS}>대여일시</label><input type="datetime-local" value={inv.rental_start} onChange={e => setField('rental_start', e.target.value)} style={iS} /></div>
@@ -625,16 +625,16 @@ export default function ShortTermCalcPage() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>기타 / 저장</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a5f', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>기타 / 저장</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div><label style={lS}>메모</label><textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항" rows={3} style={{ ...iS, resize: 'vertical' }} /></div>
                   {!calcSelected && (
-                    <div><label style={lS}>직접 금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#2d5fa8', textAlign: 'right' }} /></div>
+                    <div><label style={lS}>직접 금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: 'rgba(59,130,246,0.9)', textAlign: 'right' }} /></div>
                   )}
                 </div>
               </div>
             </div>
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginTop: 20 }}>
+            <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 16, marginTop: 20 }}>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', lineHeight: '32px' }}>발송:</span>
                 <button
@@ -662,7 +662,7 @@ export default function ShortTermCalcPage() {
                       alert(`발송 오류: ${err.message}`)
                     }
                   }}
-                  style={{ padding: '6px 14px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 12, fontWeight: 700, color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ padding: '6px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, background: '#fff', fontSize: 12, fontWeight: 700, color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                 >💬 문자</button>
                 <button
                   onClick={async () => {
@@ -687,16 +687,16 @@ export default function ShortTermCalcPage() {
                 >📧 이메일</button>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
                 <button
                   onClick={() => { handleInvoiceSave(false, calcSelected ? calcResult : invManualAmount); setInvoiceOpen(false) }}
                   disabled={qSaving}
-                  style={{ padding: '10px 20px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
+                  style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
                 >{qSaving ? '저장 중...' : '저장'}</button>
                 <button
                   onClick={() => { handleInvoiceSave(true, calcSelected ? calcResult : invManualAmount); setInvoiceOpen(false) }}
                   disabled={qSaving}
-                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 14px rgba(45,95,168,0.3)', opacity: qSaving ? 0.5 : 1 }}
+                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 14px rgba(45,95,168,0.3)', opacity: qSaving ? 0.5 : 1 }}
                 >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
               </div>
             </div>

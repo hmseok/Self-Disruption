@@ -168,7 +168,7 @@ const router = useRouter()
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
             <p className="text-xs text-slate-500 mt-1">회사 선택 후 자금 장부를 이용할 수 있습니다</p>
           </div>
         </div>
@@ -229,28 +229,28 @@ const router = useRouter()
       {/* 4. 입력 폼 (Ref) */}
       <div ref={formRef} className="si-card p-4 md:p-6 mb-8 scroll-mt-32">
           <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-100 flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   {activeTab === 'schedule' ? '🗓️ 예정 내역 등록' : '✏️ 입출금 내역 등록'}
               </h3>
-              <span className="text-xs text-slate-400 bg-white/5 px-2 py-1 rounded">
+              <span className="text-xs text-slate-400 bg-gray-50 px-2 py-1 rounded">
                   {activeTab === 'schedule' ? '아직 돈이 나가지 않은 예정 건' : '실제 통장 거래 내역'}
               </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
               <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-400 mb-1">날짜</label>
-                  <input type="date" className="w-full border border-white/[0.06] p-2.5 rounded-xl bg-white/5 text-sm font-bold" value={form.transaction_date} onChange={e=>setForm({...form, transaction_date: e.target.value})} />
+                  <input type="date" className="w-full border border-black/[0.06] p-2.5 rounded-xl bg-gray-50 text-sm font-bold" value={form.transaction_date} onChange={e=>setForm({...form, transaction_date: e.target.value})} />
               </div>
               <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-400 mb-1">구분</label>
-                  <select className="w-full border border-white/[0.06] p-2.5 rounded-xl bg-white/5 text-sm font-bold" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
+                  <select className="w-full border border-black/[0.06] p-2.5 rounded-xl bg-gray-50 text-sm font-bold" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
                       <option value="expense">🔴 지출 (출금)</option>
                       <option value="income">🔵 수입 (입금)</option>
                   </select>
               </div>
               <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-400 mb-1">계정과목</label>
-                  <input placeholder="검색 또는 입력" className="w-full border border-white/[0.06] p-2.5 rounded-xl text-sm" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} list="category-list" />
+                  <input placeholder="검색 또는 입력" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-sm" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} list="category-list" />
                   <datalist id="category-list">
                       <option value="투자이자" /><option value="지입정산금" /><option value="보험료" />
                       <option value="대출원리금" /><option value="차량할부금" /><option value="관리비수입" />
@@ -258,11 +258,11 @@ const router = useRouter()
               </div>
               <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-slate-400 mb-1">거래처/내용</label>
-                  <input placeholder="내용 입력" className="w-full border border-white/[0.06] p-2.5 rounded-xl text-sm" value={form.client_name} onChange={e=>setForm({...form, client_name: e.target.value})} />
+                  <input placeholder="내용 입력" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-sm" value={form.client_name} onChange={e=>setForm({...form, client_name: e.target.value})} />
               </div>
               <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-400 mb-1">금액</label>
-                  <input type="text" placeholder="0" className="w-full border border-white/[0.06] p-2.5 rounded-xl text-right font-black text-slate-100" value={form.amount ? Number(form.amount).toLocaleString() : ''} onChange={e=>setForm({...form, amount: e.target.value.replace(/,/g, '')})} />
+                  <input type="text" placeholder="0" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-right font-black text-slate-800" value={form.amount ? Number(form.amount).toLocaleString() : ''} onChange={e=>setForm({...form, amount: e.target.value.replace(/,/g, '')})} />
               </div>
               <div className="md:col-span-1">
                   <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
@@ -275,8 +275,8 @@ const router = useRouter()
 
       {/* 5. 리스트 뷰 */}
       <div className="si-card min-h-[400px]">
-          <div className="px-5 py-3 border-b border-white/5 flex justify-between items-center">
-              <h3 className="font-bold text-slate-300 text-sm">
+          <div className="px-5 py-3 border-b border-black/5 flex justify-between items-center">
+              <h3 className="font-bold text-slate-600 text-sm">
                   {activeTab === 'ledger' ? '📚 거래 내역 장부' : '🗓️ 자금 집행 스케줄'}
               </h3>
               <span className="si-badge si-badge-gray">총 {filteredList.length}건</span>
@@ -310,16 +310,16 @@ const router = useRouter()
                           </thead>
                           <tbody>
                               {filteredList.map((item) => (
-                                  <tr key={item.id} className="hover:bg-white/5 transition-colors group">
-                                      <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-slate-300">{item.transaction_date.slice(5)}</td>
+                                  <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                                      <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-slate-600">{item.transaction_date.slice(5)}</td>
                                       <td className="p-3 md:p-4">
                                           <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-400/20 text-blue-400' : 'bg-red-400/20 text-red-400'}`}>
                                               {item.type === 'income' ? '수입' : '지출'}
                                           </span>
                                       </td>
-                                      <td className="p-3 md:p-4 font-bold text-slate-300">{item.category}</td>
+                                      <td className="p-3 md:p-4 font-bold text-slate-600">{item.category}</td>
                                       <td className="p-3 md:p-4">
-                                          <div className="font-bold text-slate-100">{item.client_name}</div>
+                                          <div className="font-bold text-slate-800">{item.client_name}</div>
                                           <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>
                                       </td>
                                       <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-400' : 'text-red-400'}`}>
@@ -349,19 +349,19 @@ const router = useRouter()
                   <div className="md:hidden" style={{ padding: '8px 12px' }}>
                       {filteredList.map((item) => (
                           <div key={item.id}
-                            style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'income' ? 'bg-blue-400/20 text-blue-400' : 'bg-red-400/20 text-red-400'}`}>
                                   {item.type === 'income' ? '수입' : '지출'}
                                 </span>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd5e1' }}>{item.category}</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>{item.category}</span>
                               </div>
                               <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{item.transaction_date.slice(5)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 14 }}>{item.client_name}</div>
+                                <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 14 }}>{item.client_name}</div>
                                 {item.description && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{item.description}</div>}
                               </div>
                               <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>

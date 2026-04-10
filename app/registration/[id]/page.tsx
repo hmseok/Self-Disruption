@@ -137,10 +137,10 @@ export default function RegistrationDetailPage() {
     { key: '등록', color: 'bg-purple-100 text-purple-700' },
     { key: '보험', color: 'bg-green-100 text-green-700' },
     { key: '정비', color: 'bg-yellow-100 text-yellow-700' },
-    { key: '기타', color: 'bg-gray-100 text-gray-700' },
+    { key: '기타', color: 'bg-gray-100 text-slate-600' },
   ]
 
-  const getCategoryColor = (cat: string) => costCategories.find(c => c.key === cat)?.color || 'bg-gray-100 text-gray-700'
+  const getCategoryColor = (cat: string) => costCategories.find(c => c.key === cat)?.color || 'bg-gray-100 text-slate-600'
 
   // 비용 목록 조회
   const fetchCosts = async () => {
@@ -451,21 +451,21 @@ export default function RegistrationDetailPage() {
     setCar((prev: any) => ({ ...prev, location: fullAddress }));
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">데이터 로딩 중...</div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-slate-500">데이터 로딩 중...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50/50 py-10 pb-24 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-10 pb-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
 
         {/* 헤더 */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-black/5">
             <div className="flex items-center gap-4">
-                <button onClick={() => router.push('/registration')} className="bg-gray-100 p-3 rounded-xl text-gray-500 hover:text-black hover:bg-gray-200 transition-all">
+                <button onClick={() => router.push('/registration')} className="bg-gray-100 p-3 rounded-xl text-slate-500 hover:text-black hover:bg-gray-100 transition-all">
                     <Icons.Back />
                 </button>
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">{car.number}</h1>
-                    <p className="text-gray-500 font-medium mt-1">{baseModelName || car.model}</p>
+                    <h1 className="text-3xl font-black text-slate-800 tracking-tight">{car.number}</h1>
+                    <p className="text-slate-500 font-medium mt-1">{baseModelName || car.model}</p>
                 </div>
             </div>
             <button onClick={handleSave} className="flex items-center gap-2 bg-steel-700 text-white px-8 py-4 rounded-xl font-bold hover:bg-steel-800 shadow-lg hover:shadow-xl transition-all">
@@ -477,7 +477,7 @@ export default function RegistrationDetailPage() {
             {/* 좌측 폼 영역 */}
             <div className="lg:col-span-7 space-y-6">
                 {/* 트림 선택 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 relative overflow-hidden">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06] relative overflow-hidden">
                     {isAnalyzing && (
                         <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-steel-600 border-t-transparent mb-3"></div>
@@ -485,18 +485,18 @@ export default function RegistrationDetailPage() {
                         </div>
                     )}
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 border-b pb-2 w-full"><span className="w-1 h-5 bg-steel-600 rounded-full"></span>차종 및 트림 정보</h2>
+                        <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2 border-b pb-2 w-full"><span className="w-1 h-5 bg-steel-600 rounded-full"></span>차종 및 트림 정보</h2>
                         <button onClick={handleReanalyze} className="flex items-center gap-1.5 text-xs bg-steel-50 text-steel-700 px-3 py-1.5 rounded-lg font-bold hover:bg-steel-100 transition-colors"><Icons.Refresh /> AI 정보 갱신</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 mb-1.5 uppercase">모델명 (자동인식)</label>
-                            <div className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-2"><Icons.Car /> {baseModelName || car.model}</div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">모델명 (자동인식)</label>
+                            <div className="w-full p-4 bg-gray-50 border border-black/[0.06] rounded-xl font-bold text-slate-600 flex items-center gap-2"><Icons.Car /> {baseModelName || car.model}</div>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-steel-600 mb-1.5 uppercase">상세 트림 선택</label>
                             <select
-                                className="w-full p-4 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 focus:border-steel-500 outline-none transition-all cursor-pointer"
+                                className="w-full p-4 bg-white border border-black/[0.06] rounded-xl font-bold text-slate-700 focus:border-steel-500 outline-none transition-all cursor-pointer"
                                 value={selectedTrimId}
                                 onChange={(e) => setSelectedTrimId(e.target.value)}
                             >
@@ -510,8 +510,8 @@ export default function RegistrationDetailPage() {
                 </div>
 
                 {/* 기본 정보 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 기본 정보</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
+                    <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 기본 정보</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div><label className="label">차량번호</label><input className="input" value={car.number || ''} onChange={e=>handleChange('number', e.target.value)} /></div>
                         <div><label className="label">소유자</label><input className="input" value={car.owner_name || ''} onChange={e=>handleChange('owner_name', e.target.value)} /></div>
@@ -537,18 +537,18 @@ export default function RegistrationDetailPage() {
                         <div className="mt-5 p-4 bg-steel-50 rounded-xl border border-steel-100">
                             <div className="flex justify-between items-center mb-3">
                                 <h4 className="text-xs font-bold text-steel-700 uppercase">VIN 조회 결과 (NHTSA)</h4>
-                                <button onClick={() => setVinResult(null)} className="text-xs text-gray-400 hover:text-gray-600">&times; 닫기</button>
+                                <button onClick={() => setVinResult(null)} className="text-xs text-slate-500 hover:text-slate-400">&times; 닫기</button>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                                {vinResult.make && <div><span className="text-xs text-gray-400 block">제조사</span><span className="font-bold text-gray-800">{vinResult.make}</span></div>}
-                                {vinResult.model && <div><span className="text-xs text-gray-400 block">모델</span><span className="font-bold text-gray-800">{vinResult.model}</span></div>}
-                                {vinResult.year && <div><span className="text-xs text-gray-400 block">연식</span><span className="font-bold text-gray-800">{vinResult.year}년</span></div>}
-                                {vinResult.trim && <div><span className="text-xs text-gray-400 block">트림</span><span className="font-bold text-steel-700">{vinResult.trim}</span></div>}
-                                {vinResult.fuel_type && <div><span className="text-xs text-gray-400 block">연료</span><span className="font-bold text-gray-800">{vinResult.fuel_type}</span></div>}
-                                {vinResult.displacement && <div><span className="text-xs text-gray-400 block">배기량</span><span className="font-bold text-gray-800">{vinResult.displacement}L</span></div>}
-                                {vinResult.body_class && <div><span className="text-xs text-gray-400 block">차체</span><span className="font-bold text-gray-800">{vinResult.body_class}</span></div>}
-                                {vinResult.drive_type && <div><span className="text-xs text-gray-400 block">구동</span><span className="font-bold text-gray-800">{vinResult.drive_type}</span></div>}
-                                {vinResult.plant_country && <div><span className="text-xs text-gray-400 block">생산국</span><span className="font-bold text-gray-800">{vinResult.plant_country}</span></div>}
+                                {vinResult.make && <div><span className="text-xs text-slate-500 block">제조사</span><span className="font-bold text-slate-700">{vinResult.make}</span></div>}
+                                {vinResult.model && <div><span className="text-xs text-slate-500 block">모델</span><span className="font-bold text-slate-700">{vinResult.model}</span></div>}
+                                {vinResult.year && <div><span className="text-xs text-slate-500 block">연식</span><span className="font-bold text-slate-700">{vinResult.year}년</span></div>}
+                                {vinResult.trim && <div><span className="text-xs text-slate-500 block">트림</span><span className="font-bold text-steel-700">{vinResult.trim}</span></div>}
+                                {vinResult.fuel_type && <div><span className="text-xs text-slate-500 block">연료</span><span className="font-bold text-slate-700">{vinResult.fuel_type}</span></div>}
+                                {vinResult.displacement && <div><span className="text-xs text-slate-500 block">배기량</span><span className="font-bold text-slate-700">{vinResult.displacement}L</span></div>}
+                                {vinResult.body_class && <div><span className="text-xs text-slate-500 block">차체</span><span className="font-bold text-slate-700">{vinResult.body_class}</span></div>}
+                                {vinResult.drive_type && <div><span className="text-xs text-slate-500 block">구동</span><span className="font-bold text-slate-700">{vinResult.drive_type}</span></div>}
+                                {vinResult.plant_country && <div><span className="text-xs text-slate-500 block">생산국</span><span className="font-bold text-slate-700">{vinResult.plant_country}</span></div>}
                             </div>
                             {vinResult.trim && (
                                 <button
@@ -564,25 +564,25 @@ export default function RegistrationDetailPage() {
                                 </button>
                             )}
                             {!vinResult.make && !vinResult.model && (
-                                <p className="text-xs text-gray-400 mt-2">이 VIN에 대한 정보가 NHTSA에 등록되어 있지 않습니다.</p>
+                                <p className="text-xs text-slate-500 mt-2">이 VIN에 대한 정보가 NHTSA에 등록되어 있지 않습니다.</p>
                             )}
                         </div>
                     )}
                 </div>
 
                 {/* 차량 구분 (신차/중고 + 영업용/비영업용) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 차량 구분</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
+                    <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 차량 구분</h2>
 
                     {/* 신차 / 중고차 */}
-                    <p className="text-xs font-bold text-gray-400 mb-2 uppercase">차량 상태</p>
+                    <p className="text-xs font-bold text-slate-500 mb-2 uppercase">차량 상태</p>
                     <div className="flex items-center gap-3 mb-5">
                       <button
                         onClick={() => setCar((prev: any) => ({ ...prev, is_used: false, purchase_mileage: 0 }))}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                           !car.is_used
                             ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                            : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                            : 'border-black/[0.06] bg-gray-50 text-slate-500 hover:border-black/10'
                         }`}
                       >
                         🆕 신차
@@ -592,7 +592,7 @@ export default function RegistrationDetailPage() {
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                           car.is_used
                             ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm'
-                            : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                            : 'border-black/[0.06] bg-gray-50 text-slate-500 hover:border-black/10'
                         }`}
                       >
                         🔄 중고차
@@ -609,20 +609,20 @@ export default function RegistrationDetailPage() {
                           onChange={e => handleChange('purchase_mileage', Number(e.target.value))}
                         />
                         {car.purchase_mileage > 0 && (
-                          <p className="text-xs text-gray-400 mt-1 text-right">{(car.purchase_mileage / 10000).toFixed(1)}만km</p>
+                          <p className="text-xs text-slate-500 mt-1 text-right">{(car.purchase_mileage / 10000).toFixed(1)}만km</p>
                         )}
                       </div>
                     )}
 
                     {/* 영업용 / 비영업용 */}
-                    <p className="text-xs font-bold text-gray-400 mb-2 uppercase">용도 구분</p>
+                    <p className="text-xs font-bold text-slate-500 mb-2 uppercase">용도 구분</p>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setCar((prev: any) => ({ ...prev, is_commercial: true }))}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                           car.is_commercial !== false
                             ? 'border-steel-500 bg-steel-50 text-steel-700 shadow-sm'
-                            : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                            : 'border-black/[0.06] bg-gray-50 text-slate-500 hover:border-black/10'
                         }`}
                       >
                         🏢 영업용
@@ -632,7 +632,7 @@ export default function RegistrationDetailPage() {
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                           car.is_commercial === false
                             ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
-                            : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                            : 'border-black/[0.06] bg-gray-50 text-slate-500 hover:border-black/10'
                         }`}
                       >
                         🏠 비영업용
@@ -646,8 +646,8 @@ export default function RegistrationDetailPage() {
                 </div>
 
                 {/* 🤝 소유 구분 및 지입 관리 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-amber-500 rounded-full"></span> 소유 구분</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
+                    <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-amber-500 rounded-full"></span> 소유 구분</h2>
 
                     {/* 소유구분 3버튼 */}
                     <div className="flex gap-3 mb-4">
@@ -663,20 +663,20 @@ export default function RegistrationDetailPage() {
                               ? opt.color === 'blue' ? 'border-blue-500 bg-blue-50'
                                 : opt.color === 'amber' ? 'border-amber-500 bg-amber-50'
                                 : 'border-purple-500 bg-purple-50'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-black/[0.06] hover:border-black/10'
                           }`}>
                           <div className="font-bold text-sm">{opt.label}</div>
-                          <div className="text-[10px] text-gray-500 mt-0.5">{opt.desc}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{opt.desc}</div>
                         </button>
                       ))}
                     </div>
 
                     {/* 지입/임차인 경우 상세 정보 */}
                     {(car.ownership_type === 'consignment' || car.ownership_type === 'leased_in') && (
-                      <div className="space-y-4 mt-4 pt-4 border-t border-gray-100">
+                      <div className="space-y-4 mt-4 pt-4 border-t border-black/5">
                         {/* 지입주 정보 + 정산 계좌 */}
                         <div>
-                          <h3 className="text-sm font-bold text-gray-700 mb-3">👤 {car.ownership_type === 'consignment' ? '지입주' : '임대인'} 정보</h3>
+                          <h3 className="text-sm font-bold text-slate-600 mb-3">👤 {car.ownership_type === 'consignment' ? '지입주' : '임대인'} 정보</h3>
                           <div className="grid grid-cols-2 gap-3">
                             <div><label className="label">이름</label><input className="input" placeholder="홍길동" value={car.owner_name || ''} onChange={e=>handleChange('owner_name', e.target.value)} /></div>
                             <div><label className="label">연락처</label><input className="input" placeholder="010-0000-0000" value={car.owner_phone || ''} onChange={e=>handleChange('owner_phone', e.target.value)} /></div>
@@ -685,7 +685,7 @@ export default function RegistrationDetailPage() {
 
                         {/* 정산 계좌 */}
                         <div>
-                          <h3 className="text-sm font-bold text-gray-700 mb-3">🏦 정산 계좌</h3>
+                          <h3 className="text-sm font-bold text-slate-600 mb-3">🏦 정산 계좌</h3>
                           <div className="grid grid-cols-3 gap-3">
                             <div><label className="label">은행</label><input className="input" placeholder="신한은행" value={car.owner_bank || ''} onChange={e=>handleChange('owner_bank', e.target.value)} /></div>
                             <div><label className="label">계좌번호</label><input className="input" placeholder="110-123-456789" value={car.owner_account || ''} onChange={e=>handleChange('owner_account', e.target.value)} /></div>
@@ -695,7 +695,7 @@ export default function RegistrationDetailPage() {
 
                         {/* 계약 조건 */}
                         <div>
-                          <h3 className="text-sm font-bold text-gray-700 mb-3">📝 계약 조건</h3>
+                          <h3 className="text-sm font-bold text-slate-600 mb-3">📝 계약 조건</h3>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="label">월 {car.ownership_type === 'consignment' ? '지입료' : '임차료'}</label>
@@ -745,8 +745,8 @@ export default function RegistrationDetailPage() {
                 </div>
 
                 {/* 제원 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 제원 및 유효기간</h2>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
+                    <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2 border-b pb-2"><span className="w-1 h-5 bg-steel-600 rounded-full"></span> 제원 및 유효기간</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
                         <div><label className="label text-red-500">검사유효기간 만료일</label><input type="date" className="input border-red-100 text-red-600 bg-red-50/50" value={car.inspection_end_date || ''} onChange={e=>handleChange('inspection_end_date', e.target.value)} /></div>
                         <div><label className="label text-red-500">차령 만료일</label><input type="date" className="input border-red-100 text-red-600 bg-red-50/50" value={car.vehicle_age_expiry || ''} onChange={e=>handleChange('vehicle_age_expiry', e.target.value)} /></div>
@@ -759,15 +759,15 @@ export default function RegistrationDetailPage() {
                 </div>
 
                 {/* 비고 */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
                     <label className="label mb-2 block">비고</label>
-                    <textarea className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-xl resize-none outline-none" value={car.notes || ''} onChange={e=>handleChange('notes', e.target.value)}></textarea>
+                    <textarea className="w-full h-32 p-4 bg-gray-50 border border-black/[0.06] rounded-xl resize-none outline-none" value={car.notes || ''} onChange={e=>handleChange('notes', e.target.value)}></textarea>
                 </div>
 
                 {/* 💰 취득원가 (신차/중고 통합 비용) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
                     <div className="flex justify-between items-center mb-3 border-b pb-2">
-                      <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
                         <span className="w-1 h-5 bg-emerald-500 rounded-full"></span>
                         취득원가
                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${car.is_used ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -795,7 +795,7 @@ export default function RegistrationDetailPage() {
                         )}
                         <button
                           onClick={() => setShowCostDetail(!showCostDetail)}
-                          className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+                          className="text-xs bg-gray-100 text-slate-400 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-100 transition-colors"
                         >
                           {showCostDetail ? '요약보기' : '상세보기'}
                         </button>
@@ -803,18 +803,18 @@ export default function RegistrationDetailPage() {
                     </div>
 
                     {/* 요약: 차량가 + 총 취득원가 (하단 비용항목에서 자동 계산) */}
-                    <div className="bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl p-3 mb-4 border border-gray-200">
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl p-3 mb-4 border border-black/[0.06]">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">{car.is_used ? '중고 매입가' : '등록증 취득가액'}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{car.is_used ? '실제 구입 금액 (하단 차량 매입가 항목)' : '등록증 기재 금액 (하단 출고가 항목)'}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase">{car.is_used ? '중고 매입가' : '등록증 취득가액'}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{car.is_used ? '실제 구입 금액 (하단 차량 매입가 항목)' : '등록증 기재 금액 (하단 출고가 항목)'}</p>
                         </div>
                         <span className="text-lg font-black text-steel-700">
                           {f(costs.find(c => c.category === '차량')?.amount || car.purchase_price)}원
                         </span>
                       </div>
                       {totalCost > 0 && (
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/[0.06]">
                           <p className="text-[10px] font-bold text-emerald-600 uppercase">총 취득원가</p>
                           <span className="text-lg font-black text-emerald-700">{f(totalCost)}원</span>
                         </div>
@@ -825,7 +825,7 @@ export default function RegistrationDetailPage() {
                     {!showCostDetail && (
                       <div>
                         {costs.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400">
+                          <div className="text-center py-8 text-slate-500">
                             <p className="text-sm">등록된 비용 항목이 없습니다</p>
                             <p className="text-xs mt-1">"기본항목 생성" 버튼을 눌러 시작하세요</p>
                           </div>
@@ -846,12 +846,12 @@ export default function RegistrationDetailPage() {
                             {/* 카테고리별 소계 */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                               {costByCategory.map(cat => (
-                                <div key={cat.key} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                <div key={cat.key} className="bg-gray-50 rounded-xl p-3 border border-black/5">
                                   <div className="flex items-center gap-1.5 mb-1">
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${cat.color}`}>{cat.key}</span>
                                   </div>
-                                  <p className="text-sm font-black text-gray-800">{f(cat.total)}원</p>
-                                  <p className="text-[10px] text-gray-400 mt-0.5">{cat.items.length}개 항목</p>
+                                  <p className="text-sm font-black text-slate-700">{f(cat.total)}원</p>
+                                  <p className="text-[10px] text-slate-500 mt-0.5">{cat.items.length}개 항목</p>
                                 </div>
                               ))}
                             </div>
@@ -864,36 +864,36 @@ export default function RegistrationDetailPage() {
                     {showCostDetail && (
                       <div>
                         {costsLoading ? (
-                          <div className="text-center py-8 text-gray-400">로딩 중...</div>
+                          <div className="text-center py-8 text-slate-500">로딩 중...</div>
                         ) : (
                           <>
                             {/* 항목 리스트 — 테이블 정렬 */}
                             <table className="w-full mb-5">
                               <thead>
-                                <tr className="border-b border-gray-200">
-                                  <th className="text-left text-[10px] font-bold text-gray-400 uppercase pb-2 pl-1">구분</th>
-                                  <th className="text-left text-[10px] font-bold text-gray-400 uppercase pb-2">항목명</th>
-                                  <th className="text-right text-[10px] font-bold text-gray-400 uppercase pb-2">금액</th>
-                                  <th className="text-left text-[10px] font-bold text-gray-400 uppercase pb-2 pl-3">비고</th>
+                                <tr className="border-b border-black/[0.06]">
+                                  <th className="text-left text-[10px] font-bold text-slate-500 uppercase pb-2 pl-1">구분</th>
+                                  <th className="text-left text-[10px] font-bold text-slate-500 uppercase pb-2">항목명</th>
+                                  <th className="text-right text-[10px] font-bold text-slate-500 uppercase pb-2">금액</th>
+                                  <th className="text-left text-[10px] font-bold text-slate-500 uppercase pb-2 pl-3">비고</th>
                                   <th className="w-6"></th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {costs.map(cost => (
-                                  <tr key={cost.id} className="group border-b border-gray-100 last:border-0">
+                                  <tr key={cost.id} className="group border-b border-black/5 last:border-0">
                                     <td className="py-1.5 pl-1 w-12">
                                       <span className={`inline-block w-10 text-center py-0.5 rounded text-[10px] font-bold ${getCategoryColor(cost.category)}`}>
                                         {cost.category}
                                       </span>
                                     </td>
                                     <td className="py-1.5">
-                                      <span className="text-sm font-bold text-gray-800">{cost.item_name}</span>
+                                      <span className="text-sm font-bold text-slate-700">{cost.item_name}</span>
                                     </td>
                                     <td className="py-1.5 w-44">
                                       <div className="flex items-center justify-end gap-1">
                                         <input
                                           type="text"
-                                          className="w-36 text-right text-xs font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:bg-white focus:border-steel-500 outline-none transition-all"
+                                          className="w-36 text-right text-xs font-bold text-slate-400 bg-gray-50 border border-black/[0.06] rounded-xl px-3 py-2 focus:bg-gray-100 focus:border-steel-500 outline-none transition-all"
                                           value={cost.amount ? f(cost.amount) : ''}
                                           onChange={e => {
                                             const val = Number(e.target.value.replace(/[^0-9]/g, '')) || 0
@@ -905,13 +905,13 @@ export default function RegistrationDetailPage() {
                                           }}
                                           placeholder="0"
                                         />
-                                        <span className="text-xs text-gray-400">원</span>
+                                        <span className="text-xs text-slate-500">원</span>
                                       </div>
                                     </td>
                                     <td className="py-1.5 pl-3 w-28">
                                       <input
                                         type="text"
-                                        className="w-full text-xs text-gray-500 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-steel-400 outline-none px-1 py-1 transition-colors"
+                                        className="w-full text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-black/[0.06] focus:border-steel-400 outline-none px-1 py-1 transition-colors"
                                         value={cost.notes || ''}
                                         onChange={e => setCosts(prev => prev.map(c => c.id === cost.id ? { ...c, notes: e.target.value } : c))}
                                         onBlur={e => handleCostUpdate(cost.id, 'notes', e.target.value)}
@@ -921,7 +921,7 @@ export default function RegistrationDetailPage() {
                                     <td className="py-1.5 w-6">
                                       <button
                                         onClick={() => handleDeleteCostItem(cost.id)}
-                                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1"
+                                        className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all p-1"
                                       >
                                         ×
                                       </button>
@@ -933,19 +933,19 @@ export default function RegistrationDetailPage() {
 
                             {/* 합계 */}
                             {costs.length > 0 && (
-                              <div className="flex items-center pt-3 border-t-2 border-gray-300 mb-5">
-                                <span className="text-sm font-extrabold text-gray-500 uppercase">합계</span>
+                              <div className="flex items-center pt-3 border-t-2 border-black/10 mb-5">
+                                <span className="text-sm font-extrabold text-slate-500 uppercase">합계</span>
                                 <span className="text-xl font-black text-emerald-700 ml-auto">{f(totalCost)}</span>
-                                <span className="text-xs text-gray-400 ml-1">원</span>
+                                <span className="text-xs text-slate-500 ml-1">원</span>
                               </div>
                             )}
 
                             {/* 항목 추가 */}
-                            <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-gray-300">
-                              <p className="text-xs font-bold text-gray-500 mb-3">+ 항목 추가</p>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-black/10">
+                              <p className="text-xs font-bold text-slate-500 mb-3">+ 항목 추가</p>
                               <div className="flex flex-wrap gap-2">
                                 <select
-                                  className="text-xs font-bold bg-white border border-gray-200 rounded-lg px-2 py-2 outline-none"
+                                  className="text-xs font-bold bg-white border border-black/[0.06] rounded-lg px-2 py-2 outline-none"
                                   value={newCostItem.category}
                                   onChange={e => setNewCostItem(prev => ({ ...prev, category: e.target.value }))}
                                 >
@@ -953,14 +953,14 @@ export default function RegistrationDetailPage() {
                                 </select>
                                 <input
                                   type="text"
-                                  className="flex-1 min-w-[120px] text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-steel-500"
+                                  className="flex-1 min-w-[120px] text-sm bg-white border border-black/[0.06] rounded-lg px-3 py-2 font-bold outline-none focus:border-steel-500"
                                   placeholder="항목명"
                                   value={newCostItem.item_name}
                                   onChange={e => setNewCostItem(prev => ({ ...prev, item_name: e.target.value }))}
                                 />
                                 <input
                                   type="text"
-                                  className="w-32 text-sm text-right bg-white border border-gray-200 rounded-lg px-3 py-2 font-bold outline-none focus:border-steel-500"
+                                  className="w-32 text-sm text-right bg-white border border-black/[0.06] rounded-lg px-3 py-2 font-bold outline-none focus:border-steel-500"
                                   placeholder="금액"
                                   value={newCostItem.amount ? f(newCostItem.amount) : ''}
                                   onChange={e => setNewCostItem(prev => ({ ...prev, amount: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 }))}
@@ -980,9 +980,9 @@ export default function RegistrationDetailPage() {
                 </div>
 
                 {/* 🏦 자금조달 (대출 연동) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/[0.06]">
                   <div className="flex justify-between items-center mb-3 border-b pb-2">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
                       <span className="w-1 h-5 bg-indigo-500 rounded-full"></span>
                       자금조달
                     </h2>
@@ -1003,27 +1003,27 @@ export default function RegistrationDetailPage() {
                               <span className="text-sm font-bold text-indigo-900">{loan.finance_name}</span>
                               <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold">{loan.type}</span>
                             </div>
-                            <span className="text-xs text-gray-400">{loan.months}개월 · {loan.interest_rate}%</span>
+                            <span className="text-xs text-slate-500">{loan.months}개월 · {loan.interest_rate}%</span>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">선수금</p>
-                              <p className="text-sm font-black text-gray-800">
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">선수금</p>
+                              <p className="text-sm font-black text-slate-700">
                                 {(loan.deposit || 0).toLocaleString()}원
                                 {loan.advance_rate > 0 && <span className="text-[10px] text-indigo-500 ml-1">({loan.advance_rate}%)</span>}
                               </p>
                             </div>
                             <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">대출금</p>
-                              <p className="text-sm font-black text-gray-800">{(loan.total_amount || 0).toLocaleString()}원</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">대출금</p>
+                              <p className="text-sm font-black text-slate-700">{(loan.total_amount || 0).toLocaleString()}원</p>
                             </div>
                             <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">월 납입금</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">월 납입금</p>
                               <p className="text-sm font-black text-red-600">{(loan.monthly_payment || 0).toLocaleString()}원</p>
                             </div>
                             <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase">고객 초기납입금</p>
-                              <p className="text-sm font-black text-gray-800">{(loan.customer_initial_payment || 0).toLocaleString()}원</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">고객 초기납입금</p>
+                              <p className="text-sm font-black text-slate-700">{(loan.customer_initial_payment || 0).toLocaleString()}원</p>
                             </div>
                           </div>
                           <button
@@ -1036,9 +1036,9 @@ export default function RegistrationDetailPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300 text-center">
-                      <p className="text-sm text-gray-400 mb-2">연동된 대출 정보가 없습니다</p>
-                      <p className="text-xs text-gray-300">대출/금융 관리에서 이 차량에 대한 금융 정보를 등록하세요</p>
+                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-black/10 text-center">
+                      <p className="text-sm text-slate-500 mb-2">연동된 대출 정보가 없습니다</p>
+                      <p className="text-xs text-slate-600">대출/금융 관리에서 이 차량에 대한 금융 정보를 등록하세요</p>
                     </div>
                   )}
                 </div>
@@ -1051,9 +1051,9 @@ export default function RegistrationDetailPage() {
                       const url = car.registration_image_url
                       const isPdf = url && isPdfUrl(url)
                       return (
-                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                        <div className="bg-white p-5 rounded-2xl border border-black/[0.06] shadow-sm">
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-steel-500"></span>
                                     🚗 등록증
                                 </h3>
@@ -1067,30 +1067,30 @@ export default function RegistrationDetailPage() {
                             </div>
                             <div
                                 onClick={() => url && setIsImageModalOpen(true)}
-                                className={`aspect-[1/1.4] bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden ${url ? 'cursor-pointer group hover:border-steel-400' : ''} transition-colors relative`}
+                                className={`aspect-[1/1.4] bg-gray-100 rounded-xl border-2 border-dashed border-black/10 flex items-center justify-center overflow-hidden ${url ? 'cursor-pointer group hover:border-steel-400' : ''} transition-colors relative`}
                             >
                                 {url ? (
                                     isPdf ? (
                                         <>
-                                            <div className="flex flex-col items-center text-gray-500">
+                                            <div className="flex flex-col items-center text-slate-500">
                                                 <Icons.File />
                                                 <p className="text-xs font-bold mt-2">PDF 문서</p>
-                                                <p className="text-xs text-gray-400 mt-1">클릭하여 보기</p>
+                                                <p className="text-xs text-slate-500 mt-1">클릭하여 보기</p>
                                             </div>
                                             <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <span className="bg-white text-gray-800 px-4 py-2 rounded-full font-bold shadow-lg text-sm">🔍 크게 보기</span>
+                                                <span className="bg-white text-slate-700 px-4 py-2 rounded-full font-bold shadow-lg text-sm">🔍 크게 보기</span>
                                             </div>
                                         </>
                                     ) : (
                                         <>
                                             <img src={url} className="w-full h-full object-contain" alt="등록증" />
                                             <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <span className="bg-white text-gray-800 px-4 py-2 rounded-full font-bold shadow-lg text-sm">🔍 크게 보기</span>
+                                                <span className="bg-white text-slate-700 px-4 py-2 rounded-full font-bold shadow-lg text-sm">🔍 크게 보기</span>
                                             </div>
                                         </>
                                     )
                                 ) : (
-                                    <div className="text-gray-400 flex flex-col items-center cursor-pointer" onClick={() => regFileRef.current?.click()}>
+                                    <div className="text-slate-500 flex flex-col items-center cursor-pointer" onClick={() => regFileRef.current?.click()}>
                                         <Icons.Upload />
                                         <p className="text-xs mt-2 font-medium">클릭하여 파일 업로드</p>
                                     </div>
@@ -1105,7 +1105,7 @@ export default function RegistrationDetailPage() {
 
       {/* 하단 고정 저장 바 */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
-        <div className="bg-white/90 backdrop-blur-xl border-t border-gray-100 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
+        <div className="bg-white/90 backdrop-blur-xl border-t border-black/5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between gap-4">
               {/* 좌: 차량 정보 */}
@@ -1114,8 +1114,8 @@ export default function RegistrationDetailPage() {
                   <span className="text-sm">🚗</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-gray-900 truncate leading-tight">{car.number}</p>
-                  <p className="text-[11px] text-gray-400 font-medium truncate leading-tight">{baseModelName || car.model || ''}</p>
+                  <p className="text-sm font-black text-slate-800 truncate leading-tight">{car.number}</p>
+                  <p className="text-[11px] text-slate-500 font-medium truncate leading-tight">{baseModelName || car.model || ''}</p>
                 </div>
               </div>
 
@@ -1144,7 +1144,7 @@ export default function RegistrationDetailPage() {
 
       <style jsx>{`
         .label { display: block; font-size: 0.75rem; font-weight: 800; color: #9ca3af; margin-bottom: 0.4rem; text-transform: uppercase; }
-        .input { width: 100%; padding: 0.875rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.75rem; font-weight: 700; transition: all 0.2s; }
+        .input { width: 100%; padding: 0.875rem; background-color: #f9fafb; border: 1px solid rgba(0,0,0,0.06); border-radius: 0.75rem; font-weight: 700; transition: all 0.2s; }
         .input:focus { background-color: #ffffff; border-color: #1e3a4c; outline: none; box-shadow: 0 0 0 3px rgba(30, 58, 76, 0.1); }
       `}</style>
     </div>

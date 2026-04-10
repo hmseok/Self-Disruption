@@ -107,7 +107,7 @@ type Car = {
 // Constants
 // ============================================
 const OP_STATUS: Record<string, { label: string; color: string; icon: string }> = {
-  scheduled: { label: '예정', color: 'bg-gray-100 text-gray-700', icon: '📅' },
+  scheduled: { label: '예정', color: 'bg-gray-100 text-slate-600', icon: '📅' },
   preparing: { label: '준비중', color: 'bg-blue-100 text-blue-700', icon: '🔧' },
   inspecting: { label: '점검중', color: 'bg-purple-100 text-purple-700', icon: '🔍' },
   in_transit: { label: '이동중', color: 'bg-amber-100 text-amber-700', icon: '🚗' },
@@ -132,11 +132,11 @@ const FUEL_LABELS: Record<string, string> = {
 }
 
 const DISPATCH_CATEGORY: Record<string, { label: string; color: string; bg: string }> = {
-  regular:           { label: '일반', color: 'text-gray-600', bg: 'bg-gray-100' },
+  regular:           { label: '일반', color: 'text-slate-400', bg: 'bg-gray-100' },
   insurance_victim:  { label: '피해자대차', color: 'text-blue-700', bg: 'bg-blue-100' },
   insurance_at_fault:{ label: '가해자대차', color: 'text-red-700', bg: 'bg-red-100' },
   insurance_own:     { label: '자차대차', color: 'text-amber-700', bg: 'bg-amber-100' },
-  maintenance:       { label: '정비대차', color: 'text-gray-700', bg: 'bg-gray-200' },
+  maintenance:       { label: '정비대차', color: 'text-slate-600', bg: 'bg-gray-100' },
 }
 
 const BILLING_STATUS: Record<string, { label: string; color: string }> = {
@@ -431,9 +431,9 @@ export default function OperationsMainPage() {
   if (!company) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-gray-400 text-sm bg-white rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-white rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-gray-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
@@ -457,13 +457,13 @@ export default function OperationsMainPage() {
     }).sort((a, b) => (b.hasSchedule ? 1 : 0) - (a.hasSchedule ? 1 : 0))
 
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
         {/* Timeline Controls */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-3 border-b border-black/[0.06] bg-gray-50">
           <div className="flex items-center gap-2">
-            <button onClick={() => shiftTimeline('prev')} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50">← 이전</button>
+            <button onClick={() => shiftTimeline('prev')} className="px-3 py-1.5 bg-white border border-black/[0.06] rounded-lg text-sm font-bold hover:bg-gray-50">← 이전</button>
             <button onClick={() => shiftTimeline('today')} className="px-3 py-1.5 bg-steel-600 text-white rounded-lg text-sm font-bold hover:bg-steel-700">오늘</button>
-            <button onClick={() => shiftTimeline('next')} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50">다음 →</button>
+            <button onClick={() => shiftTimeline('next')} className="px-3 py-1.5 bg-white border border-black/[0.06] rounded-lg text-sm font-bold hover:bg-gray-50">다음 →</button>
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500"></span> 장기</span>
@@ -477,13 +477,13 @@ export default function OperationsMainPage() {
         <div className="overflow-x-auto">
           <div style={{ display: 'grid', gridTemplateColumns: `160px repeat(${timelineDays}, minmax(36px, 1fr))`, minWidth: `${160 + timelineDays * 36}px` }}>
             {/* Header - date labels */}
-            <div className="sticky left-0 z-20 bg-gray-50 border-r border-b border-gray-200 p-2 text-xs font-bold text-gray-500">차량</div>
+            <div className="sticky left-0 z-20 bg-gray-50 border-r border-b border-black/[0.06] p-2 text-xs font-bold text-slate-500">차량</div>
             {dates.map((date, i) => {
               const d = new Date(date)
               const isToday = date === today
               const isWeekend = d.getDay() === 0 || d.getDay() === 6
               return (
-                <div key={date} className={`border-b border-r border-gray-200 text-center py-1 text-[10px] font-bold ${isToday ? 'bg-blue-50 text-blue-700' : isWeekend ? 'bg-red-50 text-red-400' : 'bg-gray-50 text-gray-500'}`}>
+                <div key={date} className={`border-b border-r border-black/[0.06] text-center py-1 text-[10px] font-bold ${isToday ? 'bg-blue-50 text-blue-700' : isWeekend ? 'bg-red-50 text-red-400' : 'bg-gray-50 text-slate-500'}`}>
                   <div>{d.getMonth() + 1}/{d.getDate()}</div>
                   <div className="text-[9px] font-normal">{['일','월','화','수','목','금','토'][d.getDay()]}</div>
                 </div>
@@ -496,16 +496,16 @@ export default function OperationsMainPage() {
               return (
                 <div key={car.id} className="contents">
                   {/* Car label */}
-                  <div className={`sticky left-0 z-10 border-r border-b border-gray-200 p-2 text-xs truncate ${hasNoSchedule ? 'bg-green-50' : 'bg-white'}`}>
-                    <div className="font-bold text-gray-800">{car.number}</div>
-                    <div className="text-[10px] text-gray-400 truncate">{car.brand} {car.model}</div>
+                  <div className={`sticky left-0 z-10 border-r border-b border-black/[0.06] p-2 text-xs truncate ${hasNoSchedule ? 'bg-green-50' : 'bg-white'}`}>
+                    <div className="font-bold text-slate-700">{car.number}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{car.brand} {car.model}</div>
                   </div>
                   {/* Day cells */}
                   {dates.map((date) => {
                     const isToday = date === today
                     const cellSchedules = carSchedules.filter(s => date >= s.start_date && date <= s.end_date)
                     return (
-                      <div key={`${car.id}-${date}`} className={`border-r border-b border-gray-100 relative min-h-[40px] ${isToday ? 'bg-blue-50/30' : hasNoSchedule ? 'bg-green-50/30' : ''}`}>
+                      <div key={`${car.id}-${date}`} className={`border-r border-b border-black/5 relative min-h-[40px] ${isToday ? 'bg-blue-50/30' : hasNoSchedule ? 'bg-green-50/30' : ''}`}>
                         {cellSchedules.map(sched => {
                           const isStart = date === sched.start_date
                           const isEnd = date === sched.end_date
@@ -531,7 +531,7 @@ export default function OperationsMainPage() {
         </div>
 
         {allCarsForTimeline.length === 0 && (
-          <div className="p-12 text-center text-gray-400 text-sm">등록된 차량이 없습니다.</div>
+          <div className="p-12 text-center text-slate-500 text-sm">등록된 차량이 없습니다.</div>
         )}
       </div>
     )
@@ -541,27 +541,27 @@ export default function OperationsMainPage() {
   // List View
   // ============================================
   const renderListView = () => (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
       {/* List Filters */}
-      <div className="flex items-center gap-2 p-3 border-b border-gray-100 overflow-x-auto">
+      <div className="flex items-center gap-2 p-3 border-b border-black/5 overflow-x-auto">
         {[
           { key: 'today', label: '오늘' },
           { key: 'week', label: '이번주' },
           { key: 'all', label: '전체' },
         ].map(f => (
           <button key={f.key} onClick={() => setListFilter(f.key as any)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${listFilter === f.key ? 'bg-steel-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${listFilter === f.key ? 'bg-steel-600 text-white' : 'bg-gray-100 text-slate-400 hover:bg-gray-100'}`}>
             {f.label}
           </button>
         ))}
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-gray-100 mx-1" />
         {['all', 'scheduled', 'preparing', 'inspecting', 'in_transit', 'completed'].map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-gray-800 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-[#2a3447] text-white' : 'bg-gray-50 text-slate-500 hover:bg-gray-100'}`}>
             {s === 'all' ? '전체' : OP_STATUS[s]?.label}
           </button>
         ))}
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-gray-100 mx-1" />
         {[
           { key: 'all', label: '전체배차' },
           { key: 'regular', label: '일반' },
@@ -569,19 +569,19 @@ export default function OperationsMainPage() {
           { key: 'maintenance', label: '정비대차' },
         ].map(f => (
           <button key={f.key} onClick={() => setDispatchFilter(f.key as any)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${dispatchFilter === f.key ? 'bg-teal-600 text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${dispatchFilter === f.key ? 'bg-teal-600 text-white' : 'bg-gray-50 text-slate-500 hover:bg-gray-100'}`}>
             {f.label}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="p-20 text-center text-gray-400 flex flex-col items-center">
+        <div className="p-20 text-center text-slate-500 flex flex-col items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
           데이터를 불러오는 중...
         </div>
       ) : filteredOperations.length === 0 ? (
-        <div className="p-12 text-center text-gray-400 text-sm">
+        <div className="p-12 text-center text-slate-500 text-sm">
           {searchQuery ? '검색 결과가 없습니다.' : '해당 조건에 맞는 배차가 없습니다.'}
         </div>
       ) : (
@@ -589,7 +589,7 @@ export default function OperationsMainPage() {
           {/* Desktop Table */}
           <div style={{ overflowX: 'auto' }} className="hidden md:block">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b border-gray-100">
+              <thead className="bg-gray-50 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
                 <tr>
                   <th className="p-3">일정</th>
                   <th className="p-3">유형</th>
@@ -602,7 +602,7 @@ export default function OperationsMainPage() {
                   <th className="p-3 text-center">액션</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-200">
                 {filteredOperations.map(op => {
                   const car = getCar(op.car_id)
                   const cust = getCustomer(op.customer_id)
@@ -613,8 +613,8 @@ export default function OperationsMainPage() {
                   return (
                     <tr key={op.id} className="hover:bg-steel-50/50 transition-colors">
                       <td className="p-3 text-sm">
-                        <div className="font-bold text-gray-900">{op.scheduled_date}</div>
-                        <div className="text-xs text-gray-400">{op.scheduled_time}</div>
+                        <div className="font-bold text-slate-800">{op.scheduled_date}</div>
+                        <div className="text-xs text-slate-500">{op.scheduled_time}</div>
                       </td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -626,20 +626,20 @@ export default function OperationsMainPage() {
                           {catInfo.label}
                         </span>
                         {isInsuranceOp && op.fault_ratio != null && (
-                          <div className="text-[10px] text-gray-400 mt-0.5">과실 {op.fault_ratio}%</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">과실 {op.fault_ratio}%</div>
                         )}
                       </td>
                       <td className="p-3 text-sm">
-                        <div className="font-bold text-gray-800">{car?.number || '-'}</div>
-                        <div className="text-xs text-gray-400">{car?.brand} {car?.model}</div>
+                        <div className="font-bold text-slate-700">{car?.number || '-'}</div>
+                        <div className="text-xs text-slate-500">{car?.brand} {car?.model}</div>
                       </td>
                       <td className="p-3 text-sm">
-                        <div className="font-bold text-gray-800">{cust?.name || '-'}</div>
-                        <div className="text-xs text-gray-400">{cust?.phone || ''}</div>
+                        <div className="font-bold text-slate-700">{cust?.name || '-'}</div>
+                        <div className="text-xs text-slate-500">{cust?.phone || ''}</div>
                       </td>
                       <td className="p-3 text-sm">
-                        <div className="text-gray-700">{op.location || '-'}</div>
-                        <div className="text-xs text-gray-400 truncate max-w-[150px]">{op.location_address}</div>
+                        <div className="text-slate-600">{op.location || '-'}</div>
+                        <div className="text-xs text-slate-500 truncate max-w-[150px]">{op.location_address}</div>
                       </td>
                       <td className="p-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${OP_STATUS[op.status]?.color}`}>
@@ -655,23 +655,23 @@ export default function OperationsMainPage() {
                               </span>
                             )}
                             {op.insurance_company_billing && (
-                              <div className="text-[10px] text-gray-500 mt-0.5 truncate max-w-[100px]">{op.insurance_company_billing}</div>
+                              <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[100px]">{op.insurance_company_billing}</div>
                             )}
                             {(op.insurance_billed_amount || 0) > 0 && (
-                              <div className="text-[10px] text-gray-400 mt-0.5">
+                              <div className="text-[10px] text-slate-500 mt-0.5">
                                 {Number(op.insurance_billed_amount).toLocaleString()}원
                               </div>
                             )}
                           </div>
                         ) : cat === 'maintenance' ? (
-                          <span className="text-[10px] text-gray-400">{op.repair_shop_name || '-'}</span>
+                          <span className="text-[10px] text-slate-500">{op.repair_shop_name || '-'}</span>
                         ) : (
-                          <span className="text-[10px] text-gray-400">{op.handler_name || '-'}</span>
+                          <span className="text-[10px] text-slate-500">{op.handler_name || '-'}</span>
                         )}
                       </td>
                       <td className="p-3">
                         <div className="flex gap-1.5 justify-center flex-wrap">
-                          <button onClick={() => openEditModal(op)} className="px-2 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">수정</button>
+                          <button onClick={() => openEditModal(op)} className="px-2 py-1 rounded-lg text-xs font-bold bg-gray-100 text-slate-400 hover:bg-gray-100">수정</button>
                           {renderStatusButtons(op)}
                         </div>
                       </td>
@@ -695,13 +695,13 @@ export default function OperationsMainPage() {
                 <div
                   key={op.id}
                   onClick={() => openEditModal(op)}
-                  className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white border border-black/[0.06] rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
                 >
                   {/* Date and Type */}
                   <div className="flex justify-between items-start">
                     <div className="flex flex-col gap-1">
-                      <div className="font-bold text-gray-900 text-sm">{op.scheduled_date}</div>
-                      <div className="text-xs text-gray-400">{op.scheduled_time}</div>
+                      <div className="font-bold text-slate-800 text-sm">{op.scheduled_date}</div>
+                      <div className="text-xs text-slate-500">{op.scheduled_time}</div>
                     </div>
                     <div className="flex flex-col gap-2 items-end">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -714,46 +714,46 @@ export default function OperationsMainPage() {
                   </div>
 
                   {/* Car Info */}
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="font-bold text-gray-800 text-sm">{car?.number || '-'}</div>
-                    <div className="text-xs text-gray-400">{car?.brand} {car?.model}</div>
+                  <div className="border-t border-black/5 pt-3">
+                    <div className="font-bold text-slate-700 text-sm">{car?.number || '-'}</div>
+                    <div className="text-xs text-slate-500">{car?.brand} {car?.model}</div>
                   </div>
 
                   {/* Customer and Driver */}
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="text-xs text-gray-500 font-semibold mb-1">고객</div>
-                    <div className="font-bold text-gray-800 text-sm">{cust?.name || '-'}</div>
-                    <div className="text-xs text-gray-400">{cust?.phone || ''}</div>
+                  <div className="border-t border-black/5 pt-3">
+                    <div className="text-xs text-slate-500 font-semibold mb-1">고객</div>
+                    <div className="font-bold text-slate-700 text-sm">{cust?.name || '-'}</div>
+                    <div className="text-xs text-slate-500">{cust?.phone || ''}</div>
                   </div>
 
                   {/* Location */}
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="text-xs text-gray-500 font-semibold mb-1">장소</div>
-                    <div className="text-gray-700 text-sm">{op.location || '-'}</div>
-                    <div className="text-xs text-gray-400 truncate">{op.location_address}</div>
+                  <div className="border-t border-black/5 pt-3">
+                    <div className="text-xs text-slate-500 font-semibold mb-1">장소</div>
+                    <div className="text-slate-600 text-sm">{op.location || '-'}</div>
+                    <div className="text-xs text-slate-500 truncate">{op.location_address}</div>
                   </div>
 
                   {/* Status and Billing */}
-                  <div className="border-t border-gray-100 pt-3 flex justify-between items-start">
+                  <div className="border-t border-black/5 pt-3 flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="text-xs text-gray-500 font-semibold mb-1">상태</div>
+                      <div className="text-xs text-slate-500 font-semibold mb-1">상태</div>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-block ${OP_STATUS[op.status]?.color}`}>
                         {OP_STATUS[op.status]?.icon} {OP_STATUS[op.status]?.label}
                       </span>
                     </div>
                     {isInsuranceOp && (
                       <div className="flex-1 text-right">
-                        <div className="text-xs text-gray-500 font-semibold mb-1">보험/정산</div>
+                        <div className="text-xs text-slate-500 font-semibold mb-1">보험/정산</div>
                         {billingInfo && billingInfo.label !== '-' && (
                           <div className={`text-[10px] font-bold inline-block ${billingInfo.color}`}>
                             {billingInfo.label}
                           </div>
                         )}
                         {op.insurance_company_billing && (
-                          <div className="text-[10px] text-gray-500 truncate">{op.insurance_company_billing}</div>
+                          <div className="text-[10px] text-slate-500 truncate">{op.insurance_company_billing}</div>
                         )}
                         {(op.insurance_billed_amount || 0) > 0 && (
-                          <div className="text-[10px] text-gray-400">
+                          <div className="text-[10px] text-slate-500">
                             {Number(op.insurance_billed_amount).toLocaleString()}원
                           </div>
                         )}
@@ -762,8 +762,8 @@ export default function OperationsMainPage() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="border-t border-gray-100 pt-3 flex gap-2 flex-wrap">
-                    <button onClick={(e) => { e.stopPropagation(); openEditModal(op); }} className="flex-1 px-2 py-2 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">수정</button>
+                  <div className="border-t border-black/5 pt-3 flex gap-2 flex-wrap">
+                    <button onClick={(e) => { e.stopPropagation(); openEditModal(op); }} className="flex-1 px-2 py-2 rounded-lg text-xs font-bold bg-gray-100 text-slate-400 hover:bg-gray-100">수정</button>
                     {renderStatusButtons(op)}
                   </div>
                 </div>
@@ -798,7 +798,7 @@ export default function OperationsMainPage() {
 
     if (size === 'compact') {
       return (
-        <div key={op.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+        <div key={op.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-black/[0.06] hover:shadow-md transition-shadow cursor-pointer"
           onClick={() => openEditModal(op)}>
           {/* 유형 아이콘 */}
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${isDelivery ? 'bg-blue-100' : 'bg-amber-100'}`}>
@@ -807,22 +807,22 @@ export default function OperationsMainPage() {
           {/* 정보 */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-black text-sm text-gray-900">{car?.number || '-'}</span>
+              <span className="font-black text-sm text-slate-800">{car?.number || '-'}</span>
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>{catInfo.label}</span>
             </div>
-            <div className="text-xs text-gray-500 truncate">{car?.brand} {car?.model} · {cust?.name || '고객 미지정'}</div>
+            <div className="text-xs text-slate-500 truncate">{car?.brand} {car?.model} · {cust?.name || '고객 미지정'}</div>
           </div>
           {/* 시간 */}
           <div className="text-right flex-shrink-0">
-            <div className="text-xs font-bold text-gray-700">{op.scheduled_time || '-'}</div>
-            <div className="text-[10px] text-gray-400 truncate max-w-[80px]">{op.location || ''}</div>
+            <div className="text-xs font-bold text-slate-600">{op.scheduled_time || '-'}</div>
+            <div className="text-[10px] text-slate-500 truncate max-w-[80px]">{op.location || ''}</div>
           </div>
         </div>
       )
     }
 
     return (
-      <div key={op.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all overflow-hidden">
+      <div key={op.id} className="bg-white rounded-2xl border border-black/[0.06] shadow-sm hover:shadow-lg transition-all overflow-hidden">
         {/* 상단: 유형 + 상태 */}
         <div className={`px-4 py-2.5 flex items-center justify-between ${isDelivery ? 'bg-blue-50 border-b border-blue-100' : 'bg-amber-50 border-b border-amber-100'}`}>
           <div className="flex items-center gap-2">
@@ -841,12 +841,12 @@ export default function OperationsMainPage() {
         <div className="p-4 cursor-pointer" onClick={() => openEditModal(op)}>
           <div className="flex items-start justify-between mb-3">
             <div>
-              <div className="text-lg font-black text-gray-900">{car?.number || '-'}</div>
-              <div className="text-sm text-gray-500">{car?.brand} {car?.model}</div>
+              <div className="text-lg font-black text-slate-800">{car?.number || '-'}</div>
+              <div className="text-sm text-slate-500">{car?.brand} {car?.model}</div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-black text-gray-900">{op.scheduled_time || '-'}</div>
-              <div className="text-xs text-gray-400">{op.scheduled_date}</div>
+              <div className="text-lg font-black text-slate-800">{op.scheduled_time || '-'}</div>
+              <div className="text-xs text-slate-500">{op.scheduled_date}</div>
             </div>
           </div>
 
@@ -854,15 +854,15 @@ export default function OperationsMainPage() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             {cust?.name && (
               <div className="bg-gray-50 rounded-lg p-2">
-                <div className="text-[10px] text-gray-400 font-bold">고객</div>
-                <div className="font-bold text-gray-800">{cust.name}</div>
-                {cust.phone && <div className="text-xs text-gray-500">{cust.phone}</div>}
+                <div className="text-[10px] text-slate-500 font-bold">고객</div>
+                <div className="font-bold text-slate-700">{cust.name}</div>
+                {cust.phone && <div className="text-xs text-slate-500">{cust.phone}</div>}
               </div>
             )}
             {op.location && (
               <div className="bg-gray-50 rounded-lg p-2">
-                <div className="text-[10px] text-gray-400 font-bold">장소</div>
-                <div className="font-bold text-gray-800 truncate">{op.location}</div>
+                <div className="text-[10px] text-slate-500 font-bold">장소</div>
+                <div className="font-bold text-slate-700 truncate">{op.location}</div>
               </div>
             )}
           </div>
@@ -923,12 +923,12 @@ export default function OperationsMainPage() {
 
         {/* 오늘 할 일 */}
         <div>
-          <h2 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
-            <span className="w-8 h-8 bg-gray-900 text-white rounded-xl flex items-center justify-center text-sm">
+          <h2 className="text-lg font-black text-slate-800 mb-3 flex items-center gap-2">
+            <span className="w-8 h-8 bg-gray-50 text-white rounded-xl flex items-center justify-center text-sm">
               {new Date().getDate()}
             </span>
             오늘 ({todayDayName})
-            {todayOps.length === 0 && <span className="text-sm font-normal text-gray-400 ml-1">— 예정 없음</span>}
+            {todayOps.length === 0 && <span className="text-sm font-normal text-slate-500 ml-1">— 예정 없음</span>}
           </h2>
 
           {(todayDeliveries.length > 0 || todayReturns.length > 0) ? (
@@ -974,9 +974,9 @@ export default function OperationsMainPage() {
               <div className="text-sm text-green-600">총 {todayCompleted.length}건 처리 완료</div>
             </div>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
+            <div className="bg-gray-50 border border-black/[0.06] rounded-2xl p-8 text-center">
               <div className="text-3xl mb-2">📋</div>
-              <div className="font-bold text-gray-500">오늘 예정된 배차가 없습니다</div>
+              <div className="font-bold text-slate-500">오늘 예정된 배차가 없습니다</div>
             </div>
           )}
         </div>
@@ -984,8 +984,8 @@ export default function OperationsMainPage() {
         {/* 내일 예정 */}
         {tomorrowOps.length > 0 && (
           <div>
-            <h2 className="text-base font-black text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-7 h-7 bg-gray-200 text-gray-600 rounded-lg flex items-center justify-center text-xs font-black">
+            <h2 className="text-base font-black text-slate-600 mb-3 flex items-center gap-2">
+              <span className="w-7 h-7 bg-gray-100 text-slate-400 rounded-lg flex items-center justify-center text-xs font-black">
                 {new Date(tomorrowDate).getDate()}
               </span>
               내일 ({tomorrowDayName}) — {tomorrowOps.length}건
@@ -999,7 +999,7 @@ export default function OperationsMainPage() {
         {/* 이번 주 나머지 예정 */}
         {weekOps.length > 0 && (
           <div>
-            <h2 className="text-base font-black text-gray-600 mb-3 flex items-center gap-2">
+            <h2 className="text-base font-black text-slate-400 mb-3 flex items-center gap-2">
               <span className="text-lg">📅</span>
               이번 주 예정 — {weekOps.length}건
             </h2>
@@ -1013,7 +1013,7 @@ export default function OperationsMainPage() {
                 }, {} as Record<string, Operation[]>)
               ).map(([date, ops]) => (
                 <div key={date} className="bg-gray-50 rounded-xl p-3">
-                  <div className="text-xs font-bold text-gray-500 mb-2">
+                  <div className="text-xs font-bold text-slate-500 mb-2">
                     {date} ({dayNames[new Date(date).getDay()]})
                   </div>
                   <div className="space-y-2">
@@ -1028,7 +1028,7 @@ export default function OperationsMainPage() {
         {/* 다음 주 예정 */}
         {nextWeekOps.length > 0 && (
           <div>
-            <h2 className="text-base font-black text-gray-600 mb-3 flex items-center gap-2">
+            <h2 className="text-base font-black text-slate-400 mb-3 flex items-center gap-2">
               <span className="text-lg">📆</span>
               다음 주 예정 — {nextWeekOps.length}건
             </h2>
@@ -1042,7 +1042,7 @@ export default function OperationsMainPage() {
                 }, {} as Record<string, Operation[]>)
               ).map(([date, ops]) => (
                 <div key={date} className="bg-gray-50 rounded-xl p-3">
-                  <div className="text-xs font-bold text-gray-500 mb-2">
+                  <div className="text-xs font-bold text-slate-500 mb-2">
                     {date} ({dayNames[new Date(date).getDay()]})
                   </div>
                   <div className="space-y-2">
@@ -1056,8 +1056,8 @@ export default function OperationsMainPage() {
 
         {/* 이번 주 완료 요약 */}
         {weekCompleted.length > 0 && (
-          <div className="border-t border-gray-200 pt-4">
-            <h2 className="text-sm font-black text-gray-400 mb-3 flex items-center gap-2">
+          <div className="border-t border-black/[0.06] pt-4">
+            <h2 className="text-sm font-black text-slate-500 mb-3 flex items-center gap-2">
               <span className="text-base">✅</span>
               이번 주 처리 완료 — {weekCompleted.length}건
             </h2>
@@ -1071,14 +1071,14 @@ export default function OperationsMainPage() {
                     <span className={`w-6 h-6 rounded flex items-center justify-center text-xs ${isDelivery ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
                       {isDelivery ? '출' : '반'}
                     </span>
-                    <span className="font-bold text-gray-600">{car?.number || '-'}</span>
-                    <span className="text-gray-400 text-xs">{op.scheduled_date}</span>
+                    <span className="font-bold text-slate-400">{car?.number || '-'}</span>
+                    <span className="text-slate-500 text-xs">{op.scheduled_date}</span>
                     <span className="ml-auto text-green-500 text-xs">✓</span>
                   </div>
                 )
               })}
               {weekCompleted.length > 6 && (
-                <div className="flex items-center justify-center p-2 text-xs text-gray-400">
+                <div className="flex items-center justify-center p-2 text-xs text-slate-500">
                   외 {weekCompleted.length - 6}건 더...
                 </div>
               )}
@@ -1129,14 +1129,14 @@ export default function OperationsMainPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚚 출고/반납 관리</h1>
-          <p className="text-gray-500 mt-1 text-sm">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🚚 출고/반납 관리</h1>
+          <p className="text-slate-500 mt-1 text-sm">
             배차 스케줄 관리 · 출고/반납 처리 · 단기대차 계약
           </p>
         </div>
         <div className="flex gap-2 items-center">
           <input type="text" placeholder="🔍 차량번호, 고객명 검색..."
-            className="px-3 py-2.5 border border-gray-300 rounded-xl flex-1 md:flex-none md:min-w-[220px] focus:outline-none focus:border-steel-500 shadow-sm text-sm"
+            className="px-3 py-2.5 border border-black/10 rounded-xl flex-1 md:flex-none md:min-w-[220px] focus:outline-none focus:border-steel-500 shadow-sm text-sm"
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           <button onClick={() => { setEditingOp(null); setShowDispatchModal(true) }}
             className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
@@ -1147,33 +1147,33 @@ export default function OperationsMainPage() {
 
       {/* KPI Cards - 대시보드 외 뷰에서만 표시 */}
       <div className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5 ${viewMode === 'dashboard' ? 'hidden' : ''}`}>
-        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[11px] text-gray-400 font-bold">오늘 출고</p>
-          <p className="text-xl font-black text-blue-600 mt-1">{stats.todayDeliveries}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+          <p className="text-[11px] text-slate-500 font-bold">오늘 출고</p>
+          <p className="text-xl font-black text-blue-600 mt-1">{stats.todayDeliveries}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[11px] text-gray-400 font-bold">오늘 반납</p>
-          <p className="text-xl font-black text-amber-600 mt-1">{stats.todayReturns}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+          <p className="text-[11px] text-slate-500 font-bold">오늘 반납</p>
+          <p className="text-xl font-black text-amber-600 mt-1">{stats.todayReturns}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[11px] text-gray-400 font-bold">현재 진행중</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{stats.inProgress}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+          <p className="text-[11px] text-slate-500 font-bold">현재 진행중</p>
+          <p className="text-xl font-black text-slate-800 mt-1">{stats.inProgress}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-          <p className="text-[11px] text-gray-400 font-bold">이번주 예정</p>
-          <p className="text-xl font-black text-gray-900 mt-1">{stats.weekScheduled}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
+          <p className="text-[11px] text-slate-500 font-bold">이번주 예정</p>
+          <p className="text-xl font-black text-slate-800 mt-1">{stats.weekScheduled}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
         <div className="bg-white p-3 rounded-xl border border-purple-200 shadow-sm">
           <p className="text-[11px] text-purple-500 font-bold">단기대차 진행</p>
-          <p className="text-xl font-black text-purple-600 mt-1">{stats.shortTermActive}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+          <p className="text-xl font-black text-purple-600 mt-1">{stats.shortTermActive}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
         <div className="bg-white p-3 rounded-xl border border-teal-200 shadow-sm">
           <p className="text-[11px] text-teal-600 font-bold">보험배차 진행</p>
-          <p className="text-xl font-black text-teal-600 mt-1">{stats.insuranceActive}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+          <p className="text-xl font-black text-teal-600 mt-1">{stats.insuranceActive}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
         <div className="bg-white p-3 rounded-xl border border-yellow-200 shadow-sm">
           <p className="text-[11px] text-yellow-600 font-bold">보험청구 대기</p>
-          <p className="text-xl font-black text-yellow-600 mt-1">{stats.insurancePendingBilling}<span className="text-sm text-gray-400 ml-0.5">건</span></p>
+          <p className="text-xl font-black text-yellow-600 mt-1">{stats.insurancePendingBilling}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
         </div>
       </div>
 
@@ -1186,7 +1186,7 @@ export default function OperationsMainPage() {
           { key: 'calendar', label: '📅 캘린더', },
         ].map(v => (
           <button key={v.key} onClick={() => setViewMode(v.key as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === v.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === v.key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}>
             {v.label}
           </button>
         ))}
