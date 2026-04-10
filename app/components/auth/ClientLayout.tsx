@@ -90,21 +90,26 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/admin/code-master': '기초코드 관리',
 }
 
-// 숨길 메뉴 경로 (v2 — 중복/미사용/리다이렉트/통합완료 메뉴 제거)
+// 숨길 메뉴 경로 (v3 — 삭제된 모듈 + 미사용 메뉴 제거)
 const HIDDEN_PATHS = new Set([
-  // 리다이렉트 전용 (실제 페이지 아님)
-  '/jiip',                   // → /invest?tab=jiip 리다이렉트
-  '/invest',                 // → /finance/settlement 리다이렉트
-  // 중복 메뉴 (다른 경로로 통합됨)
-  '/accidents',              // → /claims/accident-mgmt 중복
-  '/rental',                 // → /claims/rental 중복
+  // ── 삭제된 모듈 (코드 제거됨) ──
+  '/jiip',                   // 삭제됨
+  '/invest',                 // 삭제됨
+  '/accidents',              // 삭제됨
+  '/rental',                 // 삭제됨
+  '/insurance',              // 삭제됨
+  '/claims/accident-mgmt',   // 삭제됨
+  '/claims/billing-mgmt',    // 삭제됨
+  '/claims/intake', '/claims/investigation',
+  '/claims/assessment', '/claims/billing', '/claims/rental',
+  '/fleet/factory-mgmt',     // 삭제됨
+  '/fleet/vehicle-lookup',   // 삭제됨
+  '/db/depreciation', '/db/maintenance', '/db/models', // 삭제됨
+  // ── 중복/통합 완료 ──
   '/e-contract',             // → 계약 관리에 흡수
   '/quotes/pricing',         // → /quotes/create 통합
   '/quotes/short-term',      // → /quotes/create 통합
-  // 사고/보상 하위 단계 (accident-mgmt, billing-mgmt만 노출)
-  '/claims/intake', '/claims/investigation',
-  '/claims/assessment', '/claims/billing', '/claims/rental',
-  // 미사용/불필요
+  // ── 미사용/불필요 ──
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
   '/system-admin',           // 모듈 구독관리
