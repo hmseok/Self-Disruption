@@ -86,7 +86,7 @@ function ShortTermDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-[#131926] rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1e2a45] rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-5 border-b border-white/[0.06] flex justify-between items-start">
           <div>
@@ -1190,7 +1190,7 @@ export default function QuoteListPage() {
           : { label: '임시저장', bg: 'rgba(251,191,36,0.2)', color: '#fbbf24' }
 
         return (
-        <div style={{ background: '#131926', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ background: '#1e2a45', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
           {filteredInvoiceQuotes.length === 0 ? (
             <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
@@ -1268,7 +1268,7 @@ export default function QuoteListPage() {
 
       {/* ═══ TAB: 장기 견적 목록 ═══ */}
       {mainTab === 'long_term' && (
-      <div style={{ background: '#131926', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ background: '#1e2a45', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.06)' }}>
         {loading ? (
           <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
         ) : (
@@ -1413,7 +1413,7 @@ export default function QuoteListPage() {
             onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
           />
           <div style={{
-            position: 'relative', background: '#131926', borderRadius: 16, padding: '24px 28px',
+            position: 'relative', background: '#1e2a45', borderRadius: 16, padding: '24px 28px',
             width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             animation: 'fadeInUp 0.2s ease-out',

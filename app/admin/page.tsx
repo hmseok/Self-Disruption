@@ -164,7 +164,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#131926]">
+      <div className="min-h-screen flex items-center justify-center bg-[#1e2a45]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
       </div>
     )
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
 
   // ===== 회사 카드 렌더러 =====
   const renderCompanyCard = (comp: CompanyWithUsers) => (
-    <div key={comp.id} className={`bg-[#131926]/80 rounded-2xl border shadow-sm overflow-hidden ${
+    <div key={comp.id} className={`bg-[#1e2a45]/80 rounded-2xl border shadow-sm overflow-hidden ${
       !comp.is_active ? 'border-yellow-400/50 ring-1 ring-yellow-400/20' : 'border-white/[0.06]'
     }`}>
       {/* 회사 헤더 */}
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
           {filteredCompanies.map(comp => renderCompanyCard(comp))}
 
           {filteredCompanies.length === 0 && (
-            <div className="bg-[#131926]/80 rounded-2xl p-12 border border-white/[0.06] text-center">
+            <div className="bg-[#1e2a45]/80 rounded-2xl p-12 border border-white/[0.06] text-center">
               <p className="text-slate-400 font-bold">해당 조건의 회사가 없습니다</p>
             </div>
           )}

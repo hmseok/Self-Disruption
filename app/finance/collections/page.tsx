@@ -225,7 +225,7 @@ export default function CollectionsPage() {
             <p className="text-slate-400 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
           </div>
         </div>
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
           <p className="text-4xl mb-3">🏢</p>
           <p className="font-semibold text-sm text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
           <p className="text-xs text-slate-500 mt-1">회사 선택 후 수금 관리를 이용할 수 있습니다</p>
@@ -259,7 +259,7 @@ export default function CollectionsPage() {
         </DarkHeader>
 
         {/* 탭 + 액션 바 */}
-        <div className="bg-[#131926] rounded-2xl shadow-sm border border-white/[0.06]">
+        <div className="bg-[#1e2a45] rounded-2xl shadow-sm border border-white/[0.06]">
           <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-2 border-b border-white/5 flex-wrap gap-3">
             <div className="flex gap-1">
               {tabs.map(tab => (

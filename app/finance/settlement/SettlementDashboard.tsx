@@ -1948,7 +1948,7 @@ export default function SettlementDashboard() {
   if (!company) {
     return (
       <div className="page-bg">
-        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-[#131926] rounded-2xl">
+        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-[#1e2a45] rounded-2xl">
           <span className="text-4xl block mb-3">🏢</span>
           <p className="font-bold text-slate-300">좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
@@ -1968,7 +1968,7 @@ export default function SettlementDashboard() {
             <p className="text-slate-400 text-sm mt-1">매출 분석, 정산 현황, 손익계산서를 한눈에 관리합니다.</p>
           </div>
         </div>
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm text-center py-20">
           <p className="text-4xl mb-3">🏢</p>
           <p className="font-semibold text-sm text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
           <p className="text-xs text-slate-500 mt-1">회사 선택 후 매출 정산을 이용할 수 있습니다</p>
@@ -2043,7 +2043,7 @@ export default function SettlementDashboard() {
 
       {/* ═══ 탭 네비게이션 ═══ */}
       <div style={{
-        display: 'flex', gap: 0, background: '#131926',
+        display: 'flex', gap: 0, background: '#1e2a45',
         borderBottom: '2px solid rgba(255,255,255,0.1)', padding: '0 24px',
       }}>
         {[
@@ -2082,7 +2082,7 @@ export default function SettlementDashboard() {
       </div>
 
       {/* ═══ 탭 콘텐츠 ═══ */}
-      <div style={{ background: '#131926', borderRadius: '0 0 16px 16px', border: '1px solid rgba(255,255,255,0.1)', borderTop: 'none' }}>
+      <div style={{ background: '#1e2a45', borderRadius: '0 0 16px 16px', border: '1px solid rgba(255,255,255,0.1)', borderTop: 'none' }}>
         {loading ? (
           <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>데이터를 불러오는 중...</div>
         ) : (
@@ -2129,7 +2129,7 @@ export default function SettlementDashboard() {
           padding: 16,
         }}>
           <div style={{
-            background: '#131926', borderRadius: 16, width: '100%', maxWidth: 680,
+            background: '#1e2a45', borderRadius: 16, width: '100%', maxWidth: 680,
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
             boxShadow: '0 25px 50px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)',
           }}>
@@ -2231,7 +2231,7 @@ export default function SettlementDashboard() {
                         key={r.key}
                         style={{
                           padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                          background: hasContact ? '#131926' : 'rgba(248, 113, 113, 0.1)',
+                          background: hasContact ? '#1e2a45' : 'rgba(248, 113, 113, 0.1)',
                           opacity: hasContact ? 1 : 0.8,
                         }}
                       >
@@ -2428,7 +2428,7 @@ function KPICard({ label, value, suffix, color, icon }: {
   }
 
   return (
-    <div className={`p-3 md:p-4 rounded-2xl border shadow-sm ${colorMap[color] || 'bg-[#131926] border-white/5'}`}>
+    <div className={`p-3 md:p-4 rounded-2xl border shadow-sm ${colorMap[color] || 'bg-[#1e2a45] border-white/5'}`}>
       <div className="flex justify-between items-start mb-1">
         <p className="text-xs font-bold opacity-70">{label}</p>
         <span className="text-lg">{icon}</span>
@@ -2465,7 +2465,7 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
   return (
     <div className="space-y-6">
       {/* 매출 소스별 분석 */}
-      <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+      <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
         <div className="p-5 border-b border-white/5 bg-white/[0.03]/50">
           <h3 className="font-bold text-slate-100">📊 매출 소스별 분석</h3>
           <p className="text-xs text-slate-500 mt-1">수입원별로 매출을 분류합니다</p>
@@ -2519,7 +2519,7 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                           {data.items.map(item => (
-                            <tr key={item.id} className="hover:bg-[#131926] transition-colors">
+                            <tr key={item.id} className="hover:bg-[#1e2a45] transition-colors">
                               <td className="p-3 text-slate-300">{item.transaction_date.slice(5)}</td>
                               <td className="p-3 font-bold text-slate-100">{item.client_name}</td>
                               <td className="p-3 text-slate-400 text-xs">{item.description}</td>
@@ -2538,7 +2538,7 @@ function RevenueTab({ revenueBySource, totalIncome, transactions }: {
       </div>
 
       {/* 일별 매출 추이 */}
-      <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm p-5">
+      <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm p-5">
         <h3 className="font-bold text-slate-100 mb-4">📅 일별 매출 추이</h3>
         {Object.keys(dailyRevenue.byDate).length === 0 ? (
           <p className="text-slate-500 text-sm text-center py-8">매출 데이터가 없습니다.</p>
@@ -2768,7 +2768,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
 
               {/* 통장 거래 내역 (수입/비용 원본) */}
               {txsForMonth.length > 0 && (
-                <div className="bg-[#131926] rounded-xl p-4 text-sm border border-white/[0.06]">
+                <div className="bg-[#1e2a45] rounded-xl p-4 text-sm border border-white/[0.06]">
                   <p className="text-xs font-bold text-slate-400 mb-3">📋 {item.monthLabel?.slice(5)}월 통장 분류 내역 ({item.carNumber})</p>
 
                   {incomeTxs.length > 0 && (
@@ -2869,7 +2869,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
               </div>
 
               {/* 투자금 거래 내역 (통장 거래 기반 원금 변동 히스토리) */}
-              <div className="bg-[#131926] rounded-xl p-4 text-sm border border-white/[0.06]">
+              <div className="bg-[#1e2a45] rounded-xl p-4 text-sm border border-white/[0.06]">
                 <p className="text-xs font-bold text-slate-400 mb-3">📋 투자금 거래 내역 ({allInvestTxs.length}건)</p>
                 {allInvestTxs.length > 0 ? (
                   <div className="space-y-1">
@@ -2995,7 +2995,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
       {viewMode === 'byDate' && (
         <div className="space-y-3">
           {dateGroups.length === 0 ? (
-            <div className="bg-[#131926] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
+            <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
               해당 조건의 정산 항목이 없습니다.
             </div>
           ) : (
@@ -3005,7 +3005,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
               const allPaid = group.pendingCount === 0
 
               return (
-                <div key={group.day} className={`bg-[#131926] rounded-2xl border shadow-sm overflow-hidden ${
+                <div key={group.day} className={`bg-[#1e2a45] rounded-2xl border shadow-sm overflow-hidden ${
                   isToday ? 'border-blue-300 ring-2 ring-blue-100' :
                   isPast && group.pendingCount > 0 ? 'border-red-200' :
                   allPaid ? 'border-green-200' : 'border-white/[0.06]'
@@ -3048,7 +3048,7 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
 
       {/* 리스트 뷰 */}
       {viewMode === 'list' && (
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
           {filtered.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">해당 조건의 정산 항목이 없습니다.</div>
           ) : (
@@ -3063,14 +3063,14 @@ function SettlementTab({ items, summary, carTxHistory, investDepositHistory }: {
       {viewMode === 'byCar' && (
         <div className="space-y-3">
           {carGroups.length === 0 ? (
-            <div className="bg-[#131926] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
+            <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] p-12 text-center text-slate-500 text-sm">
               해당 조건의 정산 항목이 없습니다.
             </div>
           ) : (
             carGroups.map(group => {
               const isExpanded = expandedCars.has(group.carNumber)
               return (
-                <div key={group.carNumber} className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+                <div key={group.carNumber} className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
                   {/* 차량 헤더 */}
                   <button
                     onClick={() => toggleCarExpand(group.carNumber)}
@@ -3141,11 +3141,11 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[#131926]/10 rounded-xl p-4">
+          <div className="bg-[#1e2a45]/10 rounded-xl p-4">
             <p className="text-xs text-slate-500 font-bold">총 매출 (수입)</p>
             <p className="text-xl font-black text-blue-300 mt-1">{nf(totalIncome)}</p>
           </div>
-          <div className="bg-[#131926]/10 rounded-xl p-4">
+          <div className="bg-[#1e2a45]/10 rounded-xl p-4">
             <p className="text-xs text-slate-500 font-bold">총 비용 (지출)</p>
             <p className="text-xl font-black text-red-300 mt-1">{nf(totalExpense)}</p>
           </div>
@@ -3154,7 +3154,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 수입 항목 */}
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
           <div className="p-4 border-b border-white/5 bg-blue-500/5/50">
             <h3 className="font-bold text-blue-300 flex items-center gap-2">
               🔵 수입 항목
@@ -3182,7 +3182,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
         </div>
 
         {/* 지출 항목 */}
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
           <div className="p-4 border-b border-white/5 bg-red-500/5/50">
             <h3 className="font-bold text-red-800 flex items-center gap-2">
               🔴 지출 항목
@@ -3212,7 +3212,7 @@ function PnLTab({ revenueBySource, expenseByGroup, summary, filterDate }: {
 
       {/* 비용 구조 시각화 */}
       {expenseByGroup.length > 0 && (
-        <div className="bg-[#131926] rounded-2xl border border-white/[0.06] shadow-sm p-5">
+        <div className="bg-[#1e2a45] rounded-2xl border border-white/[0.06] shadow-sm p-5">
           <h3 className="font-bold text-slate-100 mb-4">📊 비용 구조</h3>
           <div className="space-y-3">
             {expenseByGroup.map(([group, data]) => {

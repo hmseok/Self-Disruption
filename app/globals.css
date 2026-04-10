@@ -11,16 +11,16 @@
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
 
 :root {
-  --background: #080b14;
+  --background: #0f1729;
   --foreground: #e2e8f0;
 
-  /* Dark Glass Morphism — Core palette */
-  --navy-deep:    #080b14;
-  --navy-base:    #0d1117;
-  --navy-surface: #131926;
-  --navy-card:    #1a2035;
-  --navy-hover:   #1f2b42;
-  --navy-border:  rgba(255,255,255,0.06);
+  /* Dark Glass Morphism — Core palette (밝은 네이비) */
+  --navy-deep:    #0b1120;
+  --navy-base:    #0f1729;
+  --navy-surface: #162036;
+  --navy-card:    #1e2a45;
+  --navy-hover:   #263552;
+  --navy-border:  rgba(255,255,255,0.08);
 
   /* Accent gradients */
   --accent-blue:    #3b82f6;
@@ -178,51 +178,51 @@ body.app-shell {
    Dark Glass Morphism Design System — Utility Classes
    ══════════════════════════════════════════════════════════════ */
 
-/* ── Glass Depth Levels (Dark — 밝기 UP, 레이어 구분 강화) ── */
+/* ── Glass Depth Levels (밝은 네이비 — 레이어 구분 강화) ── */
 /* L5: 네비게이션 바 (가장 위) */
 .glass-5 {
-  background: rgba(22,28,45,0.92);
+  background: rgba(22,32,54,0.95);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255,255,255,0.10);
 }
 /* L4: 테이블 카드, 모달 (밝은 표면) */
 .glass-4 {
-  background: rgba(30,38,60,0.88);
+  background: rgba(30,42,69,0.92);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
 }
 /* L3: 스탯 카드, 일반 카드 (가장 눈에 띄는 레벨) */
 .glass-3 {
-  background: rgba(35,44,68,0.85);
+  background: rgba(38,53,82,0.90);
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.15);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.12);
 }
 /* L2: 사이드바, 서브 패널 */
 .glass-2 {
-  background: rgba(20,26,42,0.80);
+  background: rgba(22,32,54,0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 /* L1: 인풋, 검색바 (오목) */
 .glass-1 {
-  background: rgba(15,20,35,0.75);
+  background: rgba(15,23,41,0.80);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
 }
 /* Legacy .glass */
 .glass {
-  background: rgba(30,38,60,0.85);
+  background: rgba(30,42,69,0.90);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
 }
 
 /* ── 색상 틴트 보더 (L3 카드용 — 글로우 강화) ── */
@@ -253,7 +253,7 @@ body.app-shell {
 
 /* ── 공통 페이지 배경 (Dark Navy Gradient) ── */
 .page-bg {
-  background: linear-gradient(180deg, #080b14 0%, #0d1117 30%, #131926 70%, #0d1117 100%);
+  background: linear-gradient(180deg, #0b1120 0%, #0f1729 40%, #162036 80%, #0f1729 100%);
   min-height: 100vh;
 }
 
@@ -280,7 +280,7 @@ body.app-shell {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #94a3b8;
-  background: rgba(15,20,35,0.60);
+  background: rgba(15,23,41,0.70);
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .si-table tbody td {
@@ -299,14 +299,14 @@ body.app-shell {
   border-bottom: none;
 }
 
-/* ── Dark Glass 카드 (밝은 표면) ── */
+/* ── Dark Glass 카드 (밝은 네이비 표면) ── */
 .si-card {
-  background: rgba(30,38,60,0.88);
+  background: rgba(30,42,69,0.92);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 1px rgba(255,255,255,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2), 0 0 1px rgba(255,255,255,0.08);
   overflow: hidden;
 }
 
@@ -334,12 +334,12 @@ body.app-shell {
 .si-input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(15,20,35,0.70);
+  background: rgba(15,23,41,0.80);
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: 10px;
   font-size: 13px;
   color: #f1f5f9;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .si-input:focus {
@@ -424,8 +424,8 @@ body.app-shell {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(15,20,38,0.50);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(15,23,41,0.60);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 /* ===== Mobile Responsive ===== */

@@ -267,7 +267,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // 로딩 중 → 깔끔한 스플래시 (빈 레이아웃 깨짐 방지)
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#080b14' }}>
+      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#0f1729' }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto" />
           <p className="mt-3 text-sm text-slate-500 font-medium">로딩 중...</p>
@@ -297,10 +297,10 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const showSettings = role === 'admin'
 
   return (
-    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#080b14', overflowX: 'hidden', overflowY: 'hidden' }}>
+    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#0f1729', overflowX: 'hidden', overflowY: 'hidden' }}>
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(8,11,20,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(15,23,41,0.95)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
@@ -326,7 +326,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       />
 
       {/* 사이드바 */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`} style={{ background: 'rgba(8,11,20,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`} style={{ background: 'rgba(11,17,32,0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
@@ -567,7 +567,7 @@ function UploadProgressWidget() {
   return (
     <div ref={widgetRef} style={{
       ...posStyle, width: 300, borderRadius: 14, overflow: 'hidden',
-      background: 'rgba(19,25,38,0.95)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)',
+      background: 'rgba(22,32,54,0.97)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)',
     }}>
       {/* 헤더 (드래그 핸들) */}
       <div

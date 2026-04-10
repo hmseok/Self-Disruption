@@ -887,7 +887,7 @@ export default function CustomerPage() {
         {/* 상세 패널 */}
         {selectedCustomer && (
           <div className="flex-1 min-w-0">
-            <div className="bg-[#131926] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="bg-[#1e2a45] border border-white/[0.06] rounded-2xl overflow-hidden">
               {/* 상세 헤더 */}
               <div className="px-6 py-5 border-b border-white/[0.06]">
                 <div className="flex items-center justify-between mb-3">
@@ -1337,7 +1337,7 @@ export default function CustomerPage() {
       {/* ── 신규 고객 등록 모달 ── */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
-          <div className="bg-[#131926] rounded-2xl w-full max-w-xl shadow-2xl mb-10 border border-white/[0.06]">
+          <div className="bg-[#1e2a45] rounded-2xl w-full max-w-xl shadow-2xl mb-10 border border-white/[0.06]">
             <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
               <h2 className="font-black text-slate-100">신규 고객 등록</h2>
               <button onClick={() => setShowNewModal(false)} className="text-slate-500 hover:text-slate-300 text-xl">✕</button>

@@ -447,7 +447,7 @@ export default function OrgManagementPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(19,25,38,0.8)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(30,42,69,0.8)' }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.06)', borderTopColor: '#60a5fa', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
@@ -533,7 +533,7 @@ export default function OrgManagementPage() {
         <>
           {/* ═══ 통계 카드 ═══ */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <div style={{ flex: 1, background: 'rgba(19,25,38,0.8)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
+            <div style={{ flex: 1, background: 'rgba(30,42,69,0.8)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
               <p style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', margin: 0 }}>전체 직원</p>
               <p style={{ fontSize: 28, fontWeight: 900, color: '#e2e8f0', margin: '4px 0 0' }}>{employees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginLeft: 2 }}>명</span></p>
             </div>
@@ -574,7 +574,7 @@ export default function OrgManagementPage() {
           {activeTab === 'organization' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* 직원 목록 */}
-              <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>직원 목록</h2>
@@ -602,7 +602,7 @@ export default function OrgManagementPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 {/* 직급 관리 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
                     <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>직급 추가</h2>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -619,7 +619,7 @@ export default function OrgManagementPage() {
                       <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0 }}>직급 목록 ({positions.length})</h3>
                     </div>
@@ -640,7 +640,7 @@ export default function OrgManagementPage() {
 
                 {/* 부서 관리 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 20 }}>
                     <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, margin: '0 0 12px' }}>부서 추가</h2>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -651,7 +651,7 @@ export default function OrgManagementPage() {
                       <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', margin: 0 }}>부서 목록 ({departments.length})</h3>
                     </div>
@@ -669,7 +669,7 @@ export default function OrgManagementPage() {
               </div>
 
               {/* 초대 관리 */}
-              <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>초대 관리</h2>
                   <p className="text-xs text-slate-400 mt-0.5">총 {invitations.length}개 · 대기중: {pendingInvitationCount}개</p>
@@ -761,19 +761,19 @@ export default function OrgManagementPage() {
             {activeTab === 'permissions' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {assignableEmployees.length === 0 ? (
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: '32px 48px', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: '32px 48px', textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: 14 }}>권한을 설정할 일반 직원이 없습니다.</p>
                     <p style={{ fontSize: 12, color: '#cbd5e1', marginTop: 4 }}>관리자(master)와 GOD ADMIN은 항상 전체 접근 권한을 가집니다.</p>
                   </div>
                 ) : activeModules.length === 0 ? (
-                  <div style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 32, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', padding: 32, textAlign: 'center' }}>
                     <p style={{ color: '#94a3b8', fontSize: 14 }}>활성화된 모듈이 없습니다.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'row', gap: 0, height: 'calc(100vh - 200px)' }}>
 
                     {/* ── 좌측: 직원 목록 (고정) ── */}
-                    <div style={{ width: 288, flexShrink: 0, background: 'rgba(19,25,38,0.8)', borderRadius: '16px 0 0 16px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ width: 288, flexShrink: 0, background: 'rgba(30,42,69,0.8)', borderRadius: '16px 0 0 16px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                       <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
                         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>직원 목록</h3>
                         <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{assignableEmployees.length}명 · 클릭하여 권한 설정</p>
@@ -830,7 +830,7 @@ export default function OrgManagementPage() {
                     </div>
 
                     {/* ── 우측: 권한 설정 패널 (스크롤) ── */}
-                    <div style={{ flex: 1, background: 'rgba(19,25,38,0.8)', borderRadius: '0 16px 16px 0', border: '1px solid rgba(255,255,255,0.06)', borderLeft: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ flex: 1, background: 'rgba(30,42,69,0.8)', borderRadius: '0 16px 16px 0', border: '1px solid rgba(255,255,255,0.06)', borderLeft: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                       {!selectedPermUserId ? (
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
                           <div style={{ textAlign: 'center' }}>
@@ -920,7 +920,7 @@ export default function OrgManagementPage() {
                                               ))}
                                               <select value={perm?.data_scope || 'all'}
                                                 onChange={e => matrixChangeScope(emp.id, mod.path, e.target.value)}
-                                                style={{ fontSize: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 6px', background: 'rgba(19,25,38,0.8)', fontWeight: 700, marginLeft: 'auto' }}>
+                                                style={{ fontSize: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 6px', background: 'rgba(30,42,69,0.8)', fontWeight: 700, marginLeft: 'auto' }}>
                                                 {DATA_SCOPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                               </select>
                                             </div>
@@ -968,7 +968,7 @@ export default function OrgManagementPage() {
         <div onClick={closeEditModal}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: 'rgba(19,25,38,0.8)', borderRadius: 16, width: '100%', maxWidth: 512, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            style={{ background: 'rgba(30,42,69,0.8)', borderRadius: 16, width: '100%', maxWidth: 512, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: 'rgba(15,23,42,0.5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0', margin: 0 }}>직원 정보 수정</h3>
@@ -993,7 +993,7 @@ export default function OrgManagementPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>역할</label>
                     <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(30,42,69,0.8)', outline: 'none' }}>
                       <option value="user">직원</option>
                       <option value="master">관리자</option>
                       {role === 'admin' && <option value="admin">GOD ADMIN</option>}
@@ -1002,7 +1002,7 @@ export default function OrgManagementPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>상태</label>
                     <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(30,42,69,0.8)', outline: 'none' }}>
                       <option value="active">활성</option>
                       <option value="inactive">비활성</option>
                     </select>
@@ -1012,7 +1012,7 @@ export default function OrgManagementPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>직급</label>
                     <select value={editForm.position_id} onChange={e => setEditForm({ ...editForm, position_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(30,42,69,0.8)', outline: 'none' }}>
                       <option value="">미지정</option>
                       {positions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
@@ -1020,7 +1020,7 @@ export default function OrgManagementPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>부서</label>
                     <select value={editForm.department_id} onChange={e => setEditForm({ ...editForm, department_id: e.target.value })}
-                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(19,25,38,0.8)', outline: 'none' }}>
+                      style={{ width: '100%', padding: 12, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, fontSize: 14, background: 'rgba(30,42,69,0.8)', outline: 'none' }}>
                       <option value="">미지정</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
@@ -1049,7 +1049,7 @@ export default function OrgManagementPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => withdrawEmployee(false)} disabled={withdrawing}
-                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#f87171', border: '1px solid #fecaca', background: 'rgba(19,25,38,0.8)', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
+                      style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, color: '#f87171', border: '1px solid #fecaca', background: 'rgba(30,42,69,0.8)', borderRadius: 8, cursor: withdrawing ? 'not-allowed' : 'pointer', opacity: withdrawing ? 0.5 : 1 }}>
                       {withdrawing ? '처리 중...' : '비활성화'}
                     </button>
                     <button onClick={() => withdrawEmployee(true)} disabled={withdrawing}
@@ -1063,7 +1063,7 @@ export default function OrgManagementPage() {
 
             <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: 'rgba(15,23,42,0.5)', display: 'flex', gap: 12 }}>
               <button onClick={closeEditModal}
-                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(19,25,38,0.8)', color: '#4b5563', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(30,42,69,0.8)', color: '#4b5563', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
               <button onClick={saveEdit} disabled={savingEdit}
