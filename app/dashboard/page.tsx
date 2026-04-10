@@ -226,7 +226,7 @@ export default function DashboardPage() {
           </div>
         )}
         {showCars && (
-          <div className="bg-white/5 rounded-2xl p-4 md:p-5 border border-white/[0.06] shadow-sm">
+          <div className="glass-3 rounded-2xl p-4 md:p-5 border border-white/[0.06] shadow-sm">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase">가동률</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-sm">📊</span>
@@ -265,7 +265,7 @@ export default function DashboardPage() {
             <p className="text-xl md:text-2xl font-black">{loading ? '-' : formatMoney(stats.monthlyExpense)}<span className="text-sm font-bold text-red-200 ml-1">원</span></p>
             <p className="mt-1 md:mt-2 text-[10px] md:text-[11px] text-red-200">할부금 + 보험료 (월 환산)</p>
           </div>
-          <div className="bg-white/5 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-white/[0.06]">
+          <div className="glass-3 rounded-2xl p-4 md:p-5 shadow-lg ring-2 ring-white/[0.06]">
             <div className="flex items-center justify-between mb-2 md:mb-3">
               <span className="text-[10px] md:text-xs font-bold text-amber-400 uppercase">월 순수익</span>
               <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-sm">🏆</span>
@@ -288,7 +288,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm">
+            <div className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">수금율</span>
                 <span className="text-base">{collectionStats.collectionRate >= 80 ? '✅' : collectionStats.collectionRate >= 50 ? '⚠️' : '🔴'}</span>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                 {collectionStats.collectionRate}%
               </p>
             </div>
-            <div className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm">
+            <div className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">수금 완료</span>
                 <span className="text-base">💰</span>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
               <p className="text-xl font-black text-emerald-400">{formatMoney(collectionStats.completedAmount)}<span className="text-xs font-bold text-slate-400 ml-1">원</span></p>
               <p className="text-[10px] text-slate-400 mt-0.5">{collectionStats.completedCount}건</p>
             </div>
-            <Link href="/finance/collections" className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
+            <Link href="/finance/collections" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">미수금</span>
                 <span className="text-base">⏳</span>
@@ -314,7 +314,7 @@ export default function DashboardPage() {
               <p className="text-[10px] text-slate-400 mt-0.5">{collectionStats.pendingCount}건</p>
             </Link>
             {collectionStats.overdueCount > 0 && (
-              <Link href="/finance/collections" className="bg-white/5 rounded-xl p-4 border border-red-400/40 shadow-sm hover:border-red-400/60 transition-colors">
+              <Link href="/finance/collections" className="glass-3 rounded-xl p-4 border border-red-400/40 shadow-sm hover:border-red-400/60 transition-colors">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-bold text-red-400 uppercase">연체</span>
                   <span className="text-base">🚨</span>
@@ -334,21 +334,21 @@ export default function DashboardPage() {
 
           {/* 운영 KPI 미니카드 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link href="/operations" className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
+            <Link href="/operations" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">금일 출고</span>
                 <span className="text-base">🚚</span>
               </div>
               <p className="text-xl font-black text-slate-100">{opsStats.todayDeliveries.length}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
             </Link>
-            <Link href="/operations" className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
+            <Link href="/operations" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-blue-400/40 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">금일 반납</span>
                 <span className="text-base">📥</span>
               </div>
               <p className="text-xl font-black text-slate-100">{opsStats.todayReturns.length}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
             </Link>
-            <Link href="/maintenance" className="bg-white/5 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
+            <Link href="/maintenance" className="glass-3 rounded-xl p-4 border border-white/[0.06] shadow-sm hover:border-amber-400/40 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">정비 대기</span>
                 <span className="text-base">🔧</span>
@@ -356,7 +356,7 @@ export default function DashboardPage() {
               <p className="text-xl font-black text-slate-100">{opsStats.maintenanceWaiting}<span className="text-xs font-bold text-slate-400 ml-1">건</span></p>
               {opsStats.maintenanceInShop > 0 && <p className="text-[10px] text-amber-400 font-bold mt-0.5">정비중 {opsStats.maintenanceInShop}건</p>}
             </Link>
-            <div className="bg-white/5 rounded-xl p-4 border shadow-sm flex flex-col" style={{ borderColor: opsStats.inspectionsOverdue > 0 ? 'rgba(244, 63, 94, 0.4)' : opsStats.activeAccidents > 0 ? 'rgba(180, 83, 9, 0.4)' : 'rgba(255, 255, 255, 0.06)' }}>
+            <div className="glass-3 rounded-xl p-4 border shadow-sm flex flex-col" style={{ borderColor: opsStats.inspectionsOverdue > 0 ? 'rgba(244, 63, 94, 0.4)' : opsStats.activeAccidents > 0 ? 'rgba(180, 83, 9, 0.4)' : 'rgba(255, 255, 255, 0.06)' }}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">주의 항목</span>
                 <span className="text-base">⚠️</span>
@@ -380,7 +380,7 @@ export default function DashboardPage() {
 
           {/* 오늘의 출고/반납 상세 리스트 */}
           {(opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0) && (
-            <div className="bg-white/5 rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+            <div className="glass-3 rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-400" />
                 <span className="text-sm font-black text-slate-100">오늘의 출고/반납</span>
@@ -398,7 +398,7 @@ export default function DashboardPage() {
                     scheduled: '예정', preparing: '준비중', inspecting: '점검중', in_transit: '이동중', completed: '완료',
                   }
                   return (
-                    <Link key={op.id} href="/operations" className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors">
+                    <Link key={op.id} href="/operations" className="flex items-center gap-3 px-5 py-3 hover:bg-white/10 transition-colors">
                       <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isDelivery ? 'bg-blue-500/20' : 'bg-amber-500/20'}`}>
                         {isDelivery ? '🚚' : '📥'}
                       </span>
@@ -433,7 +433,7 @@ export default function DashboardPage() {
               <Link
                 key={action.href}
                 href={action.href}
-                className="group bg-white/5 rounded-xl p-4 md:p-5 hover:bg-white/10 transition-all hover:scale-[1.02] border border-white/[0.06]"
+                className="group glass-3 rounded-xl p-4 md:p-5 hover:bg-white/10 transition-all hover:scale-[1.02] border border-white/[0.06]"
               >
                 <span className="text-2xl">{action.icon}</span>
                 <p className="text-slate-100 font-bold text-sm mt-2">{action.label}</p>

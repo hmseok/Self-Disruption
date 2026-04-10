@@ -178,74 +178,77 @@ body.app-shell {
    Dark Glass Morphism Design System — Utility Classes
    ══════════════════════════════════════════════════════════════ */
 
-/* ── Glass Depth Levels (Dark) ── */
-/* L5: 네비게이션 바 (가장 위, 가장 불투명) */
+/* ── Glass Depth Levels (Dark — 밝기 UP, 레이어 구분 강화) ── */
+/* L5: 네비게이션 바 (가장 위) */
 .glass-5 {
-  background: rgba(13,17,23,0.85);
+  background: rgba(22,28,45,0.92);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
 }
-/* L4: 테이블 카드, 모달 */
+/* L4: 테이블 카드, 모달 (밝은 표면) */
 .glass-4 {
-  background: rgba(19,25,38,0.80);
+  background: rgba(30,38,60,0.88);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
 }
-/* L3: 스탯 카드, 일반 카드 */
+/* L3: 스탯 카드, 일반 카드 (가장 눈에 띄는 레벨) */
 .glass-3 {
-  background: rgba(26,32,53,0.70);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  background: rgba(35,44,68,0.85);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.15);
 }
 /* L2: 사이드바, 서브 패널 */
 .glass-2 {
-  background: rgba(13,17,23,0.60);
+  background: rgba(20,26,42,0.80);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
 }
-/* L1: 인풋, 검색바 (오목 — 배경보다 어두움) */
+/* L1: 인풋, 검색바 (오목) */
 .glass-1 {
-  background: rgba(8,11,20,0.60);
+  background: rgba(15,20,35,0.75);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
 }
 /* Legacy .glass */
 .glass {
-  background: rgba(19,25,38,0.70);
+  background: rgba(30,38,60,0.85);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-/* ── 색상 틴트 보더 (L3 카드용 — 글로우 효과) ── */
+/* ── 색상 틴트 보더 (L3 카드용 — 글로우 강화) ── */
 .glass-border-blue {
-  border: 1px solid rgba(59,130,246,0.25);
-  box-shadow: 0 0 12px rgba(59,130,246,0.06), inset 0 1px 0 rgba(59,130,246,0.08);
+  border: 1px solid rgba(59,130,246,0.35);
+  box-shadow: 0 0 20px rgba(59,130,246,0.08), inset 0 1px 0 rgba(59,130,246,0.12);
 }
 .glass-border-green {
-  border: 1px solid rgba(34,197,94,0.25);
-  box-shadow: 0 0 12px rgba(34,197,94,0.06), inset 0 1px 0 rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.35);
+  box-shadow: 0 0 20px rgba(34,197,94,0.08), inset 0 1px 0 rgba(34,197,94,0.12);
 }
 .glass-border-red {
-  border: 1px solid rgba(239,68,68,0.25);
-  box-shadow: 0 0 12px rgba(239,68,68,0.06), inset 0 1px 0 rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.35);
+  box-shadow: 0 0 20px rgba(239,68,68,0.08), inset 0 1px 0 rgba(239,68,68,0.12);
 }
 .glass-border-amber {
-  border: 1px solid rgba(245,158,11,0.25);
-  box-shadow: 0 0 12px rgba(245,158,11,0.06), inset 0 1px 0 rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.35);
+  box-shadow: 0 0 20px rgba(245,158,11,0.08), inset 0 1px 0 rgba(245,158,11,0.12);
 }
 .glass-border-purple {
-  border: 1px solid rgba(139,92,246,0.25);
-  box-shadow: 0 0 12px rgba(139,92,246,0.06), inset 0 1px 0 rgba(139,92,246,0.08);
+  border: 1px solid rgba(139,92,246,0.35);
+  box-shadow: 0 0 20px rgba(139,92,246,0.08), inset 0 1px 0 rgba(139,92,246,0.12);
 }
 .glass-border-cyan {
-  border: 1px solid rgba(6,182,212,0.25);
-  box-shadow: 0 0 12px rgba(6,182,212,0.06), inset 0 1px 0 rgba(6,182,212,0.08);
+  border: 1px solid rgba(6,182,212,0.35);
+  box-shadow: 0 0 20px rgba(6,182,212,0.08), inset 0 1px 0 rgba(6,182,212,0.12);
 }
 
 /* ── 공통 페이지 배경 (Dark Navy Gradient) ── */
@@ -276,9 +279,9 @@ body.app-shell {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
-  background: rgba(8,11,20,0.50);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: #94a3b8;
+  background: rgba(15,20,35,0.60);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .si-table tbody td {
   padding: 12px 16px;
@@ -296,14 +299,14 @@ body.app-shell {
   border-bottom: none;
 }
 
-/* ── Dark Glass 카드 ── */
+/* ── Dark Glass 카드 (밝은 표면) ── */
 .si-card {
-  background: rgba(19,25,38,0.75);
+  background: rgba(30,38,60,0.88);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.25), 0 0 1px rgba(255,255,255,0.05);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 1px rgba(255,255,255,0.08);
   overflow: hidden;
 }
 
@@ -331,12 +334,12 @@ body.app-shell {
 .si-input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(8,11,20,0.60);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(15,20,35,0.70);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 10px;
   font-size: 13px;
   color: #f1f5f9;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .si-input:focus {
@@ -421,8 +424,8 @@ body.app-shell {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(8,11,20,0.40);
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  background: rgba(15,20,38,0.50);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 /* ===== Mobile Responsive ===== */
