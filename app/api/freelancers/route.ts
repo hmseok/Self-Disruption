@@ -9,27 +9,28 @@ function serialize<T>(data: T): T {
 }
 
 // GET /api/freelancers
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { searchParams } = request.nextUrl
-    const companyId = searchParams.get('company_id') || user.company_id
     const isActive = searchParams.get('is_active')
 
-    let query = 'SELECT * FROM freelancers WHERE company_id = ?'
-    const params: any[] = [companyId]
+    let query = 'SELECT * FROM freelancers'
+    const conditions: string[] = []
 
     if (isActive === 'true') {
-      query += ' AND is_active = true'
+      conditions.push('is_active = true')
     } else if (isActive === 'false') {
-      query += ' AND is_active = false'
+      conditions.push('is_active = false')
     }
 
+    if (conditions.length > 0) query += ` WHERE ${conditions.join(' AND ')}`
     query += ' ORDER BY name'
 
-    const data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    const data = await prisma.$queryRawUnsafe<any[]>(query)
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -44,15 +45,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
-    const companyId = body.company_id || user.company_id
 
     await prisma.$executeRaw`
       INSERT INTO freelancers (
-        id, company_id, name, phone, email, bank_name, account_number,
+        id, name, phone, email, bank_name, account_number,
         account_holder, reg_number, tax_type, service_type, is_active, memo,
         created_at, updated_at
       ) VALUES (
-        ${id}, ${companyId}, ${body.name}, ${body.phone || null}, ${body.email || null},
+        ${id}, ${body.name}, ${body.phone || null}, ${body.email || null},
         ${body.bank_name || null}, ${body.account_number || null},
         ${body.account_holder || null}, ${body.reg_number || null}, ${body.tax_type || null},
         ${body.service_type || null}, ${body.is_active !== false}, ${body.memo || null},

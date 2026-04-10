@@ -8,7 +8,8 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// GET /api/loans?car_id=xxx&company_id=xxx
+// GET /api/loans?car_id=xxx
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -16,7 +17,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const carId = searchParams.get('car_id')
-    const companyId = searchParams.get('company_id') || user.company_id
 
     let data: any[]
     if (carId) {
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       data = await prisma.$queryRaw<any[]>`
         SELECT l.*, c.number as car_number FROM loans l
         LEFT JOIN cars c ON l.car_id = c.id
-        WHERE l.company_id = ${companyId}
         ORDER BY l.created_at DESC
       `
     }
@@ -52,22 +51,20 @@ export async function POST(request: NextRequest) {
     const {
       car_id, finance_name, type = '할부', total_amount = 0,
       monthly_payment = 0, payment_date = 25, start_date = null, end_date = null,
-      company_id,
     } = body
 
     if (!finance_name || !total_amount) {
       return NextResponse.json({ error: '금융사명과 원금은 필수입니다.' }, { status: 400 })
     }
 
-    const companyId = company_id || user.company_id
     const id = crypto.randomUUID()
 
     await prisma.$executeRaw`
       INSERT INTO loans (
-        id, car_id, company_id, finance_name, type, total_amount,
+        id, car_id, finance_name, type, total_amount,
         monthly_payment, payment_date, start_date, end_date, created_at, updated_at
       ) VALUES (
-        ${id}, ${car_id || null}, ${companyId}, ${finance_name}, ${type},
+        ${id}, ${car_id || null}, ${finance_name}, ${type},
         ${Number(total_amount)}, ${Number(monthly_payment)}, ${Number(payment_date)},
         ${start_date || null}, ${end_date || null}, NOW(), NOW()
       )

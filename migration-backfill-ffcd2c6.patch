@@ -1,0 +1,120 @@
+From ffcd2c6a47aac1efd21bf6ee01399abe7dc63f83 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EC=84=9D=ED=98=B8=EB=AF=BC?= <sukhomin87@gmail.com>
+Date: Thu, 9 Apr 2026 18:38:33 +0900
+Subject: [PATCH] =?UTF-8?q?feat:=20/api/admin/migration-backfill=20?=
+ =?UTF-8?q?=E2=80=94=20Supabase=20=EB=A7=88=EC=9D=B4=EA=B7=B8=EB=A0=88?=
+ =?UTF-8?q?=EC=9D=B4=EC=85=98=20=EC=9E=94=EC=97=AC=20NULL=20=EB=B3=B5?=
+ =?UTF-8?q?=EA=B5=AC=20=EC=97=94=EB=93=9C=ED=8F=AC=EC=9D=B8=ED=8A=B8?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+2개 작업 지원:
+- shares_total_amount: settlement_shares.total_amount = Σ items[].amount 자동 백필
+- cars_mileage: cars.mileage 수동 배치 복구 (body.cars 배열)
+
+관리자 전용 POST. 내일(4/10) 지급 직전 데이터 정합성 확보 목적.
+---
+ app/api/admin/migration-backfill/route.ts | 90 +++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
+ create mode 100644 app/api/admin/migration-backfill/route.ts
+
+diff --git a/app/api/admin/migration-backfill/route.ts b/app/api/admin/migration-backfill/route.ts
+new file mode 100644
+index 0000000..124958d
+--- /dev/null
++++ b/app/api/admin/migration-backfill/route.ts
+@@ -0,0 +1,90 @@
++import { NextRequest, NextResponse } from 'next/server'
++import { verifyUser } from '@/lib/auth-server'
++import { prisma } from '@/lib/prisma'
++
++// POST /api/admin/migration-backfill
++// Supabase → MySQL 마이그레이션 잔여 NULL 필드 일괄 복구용
++//
++// 현재 지원 작업:
++//   - shares_total_amount : settlement_shares.total_amount = Σ items[].amount
++//   - cars_mileage        : body.cars = [{ id, mileage }]  수동 지정 복구
++//
++// body: { op: 'shares_total_amount' } | { op: 'cars_mileage', cars: [...] }
++export async function POST(request: NextRequest) {
++  const user = await verifyUser(request)
++  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
++  if (user.role !== 'admin') return NextResponse.json({ error: '관리자 전용' }, { status: 403 })
++
++  try {
++    const body = await request.json()
++    const op: string = body?.op || ''
++
++    if (op === 'shares_total_amount') {
++      // settlement_shares.total_amount 백필
++      const rows = await prisma.$queryRaw<Array<{ id: string; items: any }>>`
++        SELECT id, items FROM settlement_shares WHERE total_amount IS NULL
++      `
++      let ok = 0
++      let fail = 0
++      const errors: string[] = []
++      for (const r of rows) {
++        try {
++          let items: any[] = []
++          if (typeof r.items === 'string') {
++            try { items = JSON.parse(r.items) } catch { items = [] }
++          } else if (Array.isArray(r.items)) {
++            items = r.items
++          }
++          const total = items.reduce((s, it) => s + (Number(it?.amount) || 0), 0)
++          if (!Number.isFinite(total) || total <= 0) {
++            fail++
++            if (errors.length < 10) errors.push(`${r.id}: invalid items sum = ${total}`)
++            continue
++          }
++          const result = await prisma.$executeRaw`
++            UPDATE settlement_shares SET total_amount = ${total}, updated_at = NOW() WHERE id = ${r.id}
++          `
++          if (result > 0) ok++
++          else { fail++; if (errors.length < 10) errors.push(`${r.id}: 0 rows affected`) }
++        } catch (e: any) {
++          fail++
++          if (errors.length < 10) errors.push(`${r.id}: ${e.message}`)
++        }
++      }
++      return NextResponse.json({ data: { op, scanned: rows.length, ok, fail, errors }, error: null })
++    }
++
++    if (op === 'cars_mileage') {
++      const cars: Array<{ id: string | number; mileage: number }> = Array.isArray(body?.cars) ? body.cars : []
++      if (cars.length === 0) return NextResponse.json({ error: 'cars 배열 필요' }, { status: 400 })
++
++      let ok = 0
++      let fail = 0
++      const errors: string[] = []
++      for (const c of cars) {
++        const m = Number(c.mileage)
++        if (!Number.isFinite(m) || m < 0) {
++          fail++
++          if (errors.length < 10) errors.push(`${c.id}: bad mileage`)
++          continue
++        }
++        try {
++          const result = await prisma.$executeRaw`
++            UPDATE cars SET mileage = ${m}, updated_at = NOW() WHERE id = ${String(c.id)}
++          `
++          if (result > 0) ok++
++          else { fail++; if (errors.length < 10) errors.push(`${c.id}: 0 rows affected`) }
++        } catch (e: any) {
++          fail++
++          if (errors.length < 10) errors.push(`${c.id}: ${e.message}`)
++        }
++      }
++      return NextResponse.json({ data: { op, total: cars.length, ok, fail, errors }, error: null })
++    }
++
++    return NextResponse.json({ error: `unknown op: ${op}` }, { status: 400 })
++  } catch (e: any) {
++    console.error('[POST /api/admin/migration-backfill]', e)
++    return NextResponse.json({ error: e.message }, { status: 500 })
++  }
++}
+-- 
+2.34.1
+

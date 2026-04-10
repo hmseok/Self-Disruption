@@ -7,16 +7,16 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// GET: list contracts for a company
+// GET: list contracts
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const company_id = searchParams.get('company_id')
   const status = searchParams.get('status')
 
-  if (!company_id) return NextResponse.json({ error: 'company_id required' }, { status: 400 })
-
-  let query = `SELECT * FROM short_term_rental_contracts WHERE company_id = ${company_id}`
-  if (status && status !== 'all') query += ` AND status = '${status}'`
+  let query = `SELECT * FROM short_term_rental_contracts`
+  const conditions: string[] = []
+  if (status && status !== 'all') conditions.push(`status = '${status}'`)
+  if (conditions.length > 0) query += ` WHERE ${conditions.join(' AND ')}`
   query += ` ORDER BY created_at DESC`
 
   try {

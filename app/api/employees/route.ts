@@ -8,47 +8,26 @@ function serialize<T>(data: T): T {
   ))
 }
 
-// GET /api/employees
+// GET /api/employees — 단독 회사 ERP: profiles 테이블 사용
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const { searchParams } = request.nextUrl
-    const companyId = searchParams.get('company_id')
-
-    let query = 'SELECT * FROM employees'
-    const params: any[] = []
-
-    if (companyId) {
-      query += ' WHERE company_id = ?'
-      params.push(companyId)
-    }
-
-    query += ' ORDER BY created_at DESC'
-
-    const data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
+    const data = await prisma.$queryRaw<any[]>`SELECT * FROM profiles ORDER BY created_at DESC`
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 
-// POST /api/employees
+// POST /api/employees — 직원 추가는 member-invite를 통해 진행
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const body = await request.json()
-    const id = crypto.randomUUID()
-
-    await prisma.$executeRaw`
-      INSERT INTO employees (id, created_at, updated_at) VALUES (${id}, NOW(), NOW())
-    `
-
-    const created = await prisma.$queryRaw<any[]>`SELECT * FROM employees WHERE id = ${id} LIMIT 1`
-    return NextResponse.json({ data: serialize(created[0]), error: null }, { status: 201 })
+    return NextResponse.json({ error: '직원 추가는 초대 기능(/api/member-invite)을 이용해주세요.' }, { status: 400 })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

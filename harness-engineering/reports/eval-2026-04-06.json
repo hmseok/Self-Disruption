@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-04-06T23:57:02.976Z",
+  "baseUrl": "https://hmseok.com",
+  "scores": {
+    "uiux": 10,
+    "functionality": 12,
+    "codeQuality": 6,
+    "responsive": 8,
+    "security": 10,
+    "design": 7,
+    "originality": 10,
+    "completeness": 4,
+    "usability": 12
+  },
+  "total": 7.9,
+  "passed": false,
+  "passThreshold": 8,
+  "pass": [
+    "로그인 페이지",
+    "초대 수락 페이지",
+    "직원초대 검증",
+    "공개 견적 조회",
+    "견적 목록",
+    "프로필",
+    "시스템 모듈",
+    "차량 목록",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: page.tsx",
+    "파일: auth-server.ts",
+    "파일: prisma.ts",
+    "TypeScript 컴파일",
+    "mobile (375px)",
+    "tablet (768px)",
+    "desktop (1280px)",
+    "JWT 인증 구현",
+    "비밀번호 해싱 (bcrypt)",
+    "환경변수 파일",
+    "초대수락 비밀번호 해싱",
+    "body 배경 (rgb(249, 250, 251))",
+    "웹폰트 로드",
+    "색상 틴트 다양성 (5/5)",
+    "글래스 깊이 다양성 (11단계)",
+    "그라데이션 사용 (45개 파일)",
+    "라우트 /",
+    "라우트 /invite/test-token",
+    "이메일/ID 입력 필드",
+    "비밀번호 입력 필드",
+    "제출 버튼",
+    "로그인 API 응답 (401)"
+  ],
+  "fail": [
+    "SQL Injection 패턴",
+    "backdrop-filter 사용",
+    "메인 영역 패딩",
+    "콘솔 에러 0 (실제 1개)",
+    "요청 실패 0 (실제 1개)"
+  ],
+  "warn": [
+    "console.log 53개 파일"
+  ],
+  "failureDetails": [
+    {
+      "category": "코드품질",
+      "item": "SQL Injection 패턴",
+      "reason": "74개 파일",
+      "hint": "파라미터 바인딩으로 전환"
+    },
+    {
+      "category": "디자인품질",
+      "item": "backdrop-filter 사용",
+      "reason": "0개 요소",
+      "hint": "backdrop-blur-* 클래스 추가"
+    },
+    {
+      "category": "디자인품질",
+      "item": "메인 영역 패딩",
+      "reason": "",
+      "hint": "main에 padding 추가"
+    },
+    {
+      "category": "완성도",
+      "item": "콘솔 에러 0 (실제 1개)",
+      "reason": "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "hint": "런타임 에러 수정"
+    },
+    {
+      "category": "완성도",
+      "item": "요청 실패 0 (실제 1개)",
+      "reason": "https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516",
+      "hint": "404/실패 리소스 제거"
+    }
+  ],
+  "screenshots": [
+    {
+      "viewport": "mobile",
+      "path": "/sessions/clever-blissful-euler/mnt/Self-Disruption/harness-engineering/reports/screenshots/mobile-1775519810304.png"
+    },
+    {
+      "viewport": "tablet",
+      "path": "/sessions/clever-blissful-euler/mnt/Self-Disruption/harness-engineering/reports/screenshots/tablet-1775519811669.png"
+    },
+    {
+      "viewport": "desktop",
+      "path": "/sessions/clever-blissful-euler/mnt/Self-Disruption/harness-engineering/reports/screenshots/desktop-1775519812595.png"
+    }
+  ]
+}

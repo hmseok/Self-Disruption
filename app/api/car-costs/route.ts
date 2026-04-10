@@ -8,6 +8,7 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -16,8 +17,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const carId = searchParams.get('car_id')
 
-    let query = `SELECT * FROM car_costs WHERE company_id = ${user.company_id}`
-    if (carId) query += ` AND car_id = ${carId}`
+    let query = `SELECT * FROM car_costs`
+    if (carId) query += ` WHERE car_id = ${carId}`
     query += ` ORDER BY created_at DESC LIMIT 500`
 
     const data = await prisma.$queryRawUnsafe<any[]>(query)
@@ -34,8 +35,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const id = crypto.randomUUID()
     await prisma.$queryRaw`
-      INSERT INTO car_costs (id, company_id, car_id, cost_type, amount, notes, created_by)
-      VALUES (${id}, ${user.company_id}, ${body.car_id}, ${body.cost_type}, ${body.amount}, ${body.notes}, ${user.id})
+      INSERT INTO car_costs (id, car_id, cost_type, amount, notes, created_by)
+      VALUES (${id}, ${body.car_id}, ${body.cost_type}, ${body.amount}, ${body.notes}, ${user.id})
     `
     return NextResponse.json({ data: { id }, error: null }, { status: 201 })
   } catch (e: any) {

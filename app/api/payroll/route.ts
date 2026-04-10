@@ -33,16 +33,10 @@ async function verifyAdmin(request: NextRequest) {
 }
 
 // GET: 급여 설정 목록
+// 단독 회사 ERP — company_id 컬럼은 employee_salaries 테이블에 유지됨
 export async function GET(request: NextRequest) {
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
-
-  const { searchParams } = new URL(request.url)
-  const companyId = searchParams.get('company_id')
-
-  if (!companyId) {
-    return NextResponse.json({ error: 'company_id 필수 파라미터입니다.' }, { status: 400 })
-  }
 
   try {
     // Raw query to fetch employee salaries with profile joins
@@ -55,7 +49,6 @@ export async function GET(request: NextRequest) {
         p.phone
       FROM employee_salaries es
       LEFT JOIN profiles p ON es.employee_id = p.id
-      WHERE es.company_id = ${companyId}
       ORDER BY es.created_at DESC
     `
 

@@ -12,18 +12,16 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { searchParams } = request.nextUrl
-    const companyId = searchParams.get('company_id') || user.company_id
     const search = searchParams.get('search') || ''
 
     let data: any[]
     if (search) {
       data = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT * FROM contracts WHERE company_id = ? AND (customer_name LIKE ?) ORDER BY id DESC`,
-        companyId,
+        `SELECT * FROM contracts WHERE (customer_name LIKE ?) ORDER BY id DESC`,
         `%${search}%`
       )
     } else {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM contracts WHERE company_id = ${companyId} ORDER BY id DESC LIMIT 1000`
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM contracts ORDER BY id DESC LIMIT 1000`
     }
 
     return NextResponse.json({ data: serialize(data), error: null })
@@ -39,11 +37,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
-    const companyId = body.company_id || user.company_id
 
     const fields = ['customer_id', 'customer_name', 'car_id', 'quote_id', 'start_date', 'end_date', 'term_months', 'deposit', 'monthly_rent', 'status', 'special_terms', 'terms_version_id', 'signature_id']
-    const cols = ['id', 'company_id', ...fields.filter(f => body[f] !== undefined)]
-    const vals = [id, companyId, ...fields.filter(f => body[f] !== undefined).map(f => body[f] || null)]
+    const cols = ['id', ...fields.filter(f => body[f] !== undefined)]
+    const vals = [id, ...fields.filter(f => body[f] !== undefined).map(f => body[f] || null)]
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO contracts (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`,

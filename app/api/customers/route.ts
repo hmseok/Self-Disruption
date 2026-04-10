@@ -12,13 +12,11 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { searchParams } = request.nextUrl
-    const companyId = searchParams.get('company_id') || user.company_id
     const search = searchParams.get('search') || ''
     const idsParam = searchParams.get('ids') || ''
 
     let data: any[]
     if (idsParam) {
-      // Handle comma-separated IDs
       const ids = idsParam.split(',').filter(id => id.trim())
       if (ids.length === 0) {
         data = []
@@ -31,14 +29,13 @@ export async function GET(request: NextRequest) {
       }
     } else if (search) {
       data = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT * FROM customers WHERE company_id = ? AND (name LIKE ? OR phone LIKE ? OR email LIKE ?) ORDER BY created_at DESC`,
-        companyId,
+        `SELECT * FROM customers WHERE (name LIKE ? OR phone LIKE ? OR email LIKE ?) ORDER BY created_at DESC`,
         `%${search}%`,
         `%${search}%`,
         `%${search}%`
       )
     } else {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM customers WHERE company_id = ${companyId} ORDER BY created_at DESC LIMIT 500`
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM customers ORDER BY created_at DESC LIMIT 500`
     }
 
     return NextResponse.json({ data: serialize(data), error: null })
@@ -54,11 +51,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
-    const companyId = body.company_id || user.company_id
 
     const fields = ['name', 'phone', 'email', 'address', 'birth_date', 'id_number', 'driver_license', 'license_type', 'license_expiry', 'resident_number', 'business_name', 'business_number', 'representative_name', 'type', 'memo', 'status']
-    const cols = ['id', 'company_id', ...fields.filter(f => body[f] !== undefined)]
-    const vals = [id, companyId, ...fields.filter(f => body[f] !== undefined).map(f => body[f] || null)]
+    const cols = ['id', ...fields.filter(f => body[f] !== undefined)]
+    const vals = [id, ...fields.filter(f => body[f] !== undefined).map(f => body[f] || null)]
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO customers (${cols.join(', ')}, created_at, updated_at) VALUES (${cols.map(() => '?').join(', ')}, NOW(), NOW())`,

@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     const toDate = `${month}-${String(lastDay).padStart(2, '0')}`
 
     // 데이터 병렬 로드
+    // general_investments, jiip_contracts, loans 테이블은 company_id 컬럼이 있으므로 유지
     const [investors, jiips, loans, existingTxs] = await Promise.all([
       prisma.$queryRaw<any[]>`SELECT * FROM general_investments WHERE status = 'active' AND company_id = ${companyId}`,
       prisma.$queryRaw<any[]>`SELECT * FROM jiip_contracts WHERE status = 'active' AND company_id = ${companyId}`,

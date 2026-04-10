@@ -9,6 +9,7 @@ function serialize<T>(data: T): T {
 }
 
 // GET /api/financial-products?car_id=xxx
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -16,13 +17,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const carId = searchParams.get('car_id')
-    const companyId = searchParams.get('company_id') || user.company_id
 
     let data: any[]
     if (carId) {
       data = await prisma.$queryRaw<any[]>`SELECT * FROM financial_products WHERE car_id = ${carId} ORDER BY id DESC`
     } else {
-      data = await prisma.$queryRaw<any[]>`SELECT * FROM financial_products WHERE company_id = ${companyId} ORDER BY id DESC LIMIT 500`
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM financial_products ORDER BY id DESC LIMIT 500`
     }
 
     return NextResponse.json({ data: serialize(data), error: null })
@@ -41,18 +41,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       car_id, finance_name, type, total_amount = 0, interest_rate = 0,
-      term_months, monthly_payment = 0, payment_date, start_date, end_date, company_id,
+      term_months, monthly_payment = 0, payment_date, start_date, end_date,
     } = body
 
-    const companyId = company_id || user.company_id
     const id = crypto.randomUUID()
 
     await prisma.$executeRaw`
       INSERT INTO financial_products (
-        id, car_id, company_id, finance_name, type, total_amount, interest_rate,
+        id, car_id, finance_name, type, total_amount, interest_rate,
         term_months, monthly_payment, payment_date, start_date, end_date, created_at, updated_at
       ) VALUES (
-        ${id}, ${car_id || null}, ${companyId}, ${finance_name || null}, ${type || null},
+        ${id}, ${car_id || null}, ${finance_name || null}, ${type || null},
         ${Number(total_amount)}, ${Number(interest_rate)}, ${term_months || null},
         ${Number(monthly_payment)}, ${payment_date || null},
         ${start_date || null}, ${end_date || null}, NOW(), NOW()

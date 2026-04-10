@@ -8,6 +8,7 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
@@ -17,9 +18,11 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
 
-    let query = `SELECT * FROM vehicle_schedules WHERE company_id = ${user.company_id}`
-    if (startDate) query += ` AND end_date >= '${startDate}'`
-    if (endDate) query += ` AND start_date <= '${endDate}'`
+    let query = `SELECT * FROM vehicle_schedules`
+    const conditions: string[] = []
+    if (startDate) conditions.push(`end_date >= '${startDate}'`)
+    if (endDate) conditions.push(`start_date <= '${endDate}'`)
+    if (conditions.length > 0) query += ` WHERE ${conditions.join(' AND ')}`
     query += ` ORDER BY start_date DESC LIMIT 500`
 
     const data = await prisma.$queryRawUnsafe<any[]>(query)
@@ -36,8 +39,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const id = crypto.randomUUID()
     await prisma.$queryRaw`
-      INSERT INTO vehicle_schedules (id, company_id, car_id, schedule_type, start_date, end_date, title, color, contract_id, created_by, notes)
-      VALUES (${id}, ${user.company_id}, ${body.car_id}, ${body.schedule_type}, ${body.start_date}, ${body.end_date}, ${body.title}, ${body.color}, ${body.contract_id || null}, ${user.id}, ${body.notes || null})
+      INSERT INTO vehicle_schedules (id, car_id, schedule_type, start_date, end_date, title, color, contract_id, created_by, notes)
+      VALUES (${id}, ${body.car_id}, ${body.schedule_type}, ${body.start_date}, ${body.end_date}, ${body.title}, ${body.color}, ${body.contract_id || null}, ${user.id}, ${body.notes || null})
     `
     return NextResponse.json({ data: { id }, error: null }, { status: 201 })
   } catch (e: any) {

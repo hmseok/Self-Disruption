@@ -1,0 +1,250 @@
+From 7e7396a25a6a0fa00513be1c4f5c8a4b4012dd87 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=EC=84=9D=ED=98=B8=EB=AF=BC?= <sukhomin87@gmail.com>
+Date: Thu, 9 Apr 2026 14:12:23 +0900
+Subject: [PATCH] =?UTF-8?q?fix:=202=EC=B0=A8=20=EB=B0=B0=EC=B9=98=20?=
+ =?UTF-8?q?=EC=A4=91=EB=B3=B5=20id=20=EC=84=A0=EC=96=B8=2021=EA=B1=B4=20?=
+ =?UTF-8?q?=EC=A0=9C=EA=B1=B0=20(Turbopack=20build=20=EC=97=90=EB=9F=AC=20?=
+ =?UTF-8?q?=ED=95=B4=EC=86=8C)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 48파일 일괄 수정 시 에이전트가 await params 추가하면서
+  기존 const { id } = params / const id = id 줄을 제거하지 않아
+  동일 스코프 내 중복 선언으로 빌드 실패
+- 영향 파일 11개 (handlers 21곳)에서 중복 줄 삭제
+  codes, contract_special_terms, contract_term_articles,
+  contract_terms, contracts/payment-schedule, corporate_cards,
+  departments, employee_salaries, freelancers, message_templates,
+  positions
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+---
+ app/api/codes/[id]/route.ts                      | 2 --
+ app/api/contract_special_terms/[id]/route.ts     | 2 --
+ app/api/contract_term_articles/[id]/route.ts     | 2 --
+ app/api/contract_terms/[id]/route.ts             | 2 --
+ app/api/contracts/[id]/payment-schedule/route.ts | 1 -
+ app/api/corporate_cards/[id]/route.ts            | 2 --
+ app/api/departments/[id]/route.ts                | 2 --
+ app/api/employee_salaries/[id]/route.ts          | 2 --
+ app/api/freelancers/[id]/route.ts                | 2 --
+ app/api/message_templates/[id]/route.ts          | 2 --
+ app/api/positions/[id]/route.ts                  | 2 --
+ 11 files changed, 21 deletions(-)
+
+diff --git a/app/api/codes/[id]/route.ts b/app/api/codes/[id]/route.ts
+index 1bce023..006a401 100644
+--- a/app/api/codes/[id]/route.ts
++++ b/app/api/codes/[id]/route.ts
+@@ -17,7 +17,6 @@ export async function PATCH(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+     const body = await request.json()
+ 
+     const updated = await prisma.$queryRaw<any[]>`
+@@ -49,7 +48,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM common_codes WHERE id = ${id}
+diff --git a/app/api/contract_special_terms/[id]/route.ts b/app/api/contract_special_terms/[id]/route.ts
+index b85f703..55aaca8 100644
+--- a/app/api/contract_special_terms/[id]/route.ts
++++ b/app/api/contract_special_terms/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM contract_special_terms WHERE id = ${id}
+diff --git a/app/api/contract_term_articles/[id]/route.ts b/app/api/contract_term_articles/[id]/route.ts
+index c998611..18a091d 100644
+--- a/app/api/contract_term_articles/[id]/route.ts
++++ b/app/api/contract_term_articles/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM contract_term_articles WHERE id = ${id}
+diff --git a/app/api/contract_terms/[id]/route.ts b/app/api/contract_terms/[id]/route.ts
+index e1efa83..c34c217 100644
+--- a/app/api/contract_terms/[id]/route.ts
++++ b/app/api/contract_terms/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       UPDATE contract_terms SET
+@@ -54,7 +53,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM contract_terms WHERE id = ${id}
+diff --git a/app/api/contracts/[id]/payment-schedule/route.ts b/app/api/contracts/[id]/payment-schedule/route.ts
+index 63179f5..512e490 100644
+--- a/app/api/contracts/[id]/payment-schedule/route.ts
++++ b/app/api/contracts/[id]/payment-schedule/route.ts
+@@ -12,7 +12,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const { id } = params
+     const data = await prisma.$queryRaw<any[]>`SELECT * FROM payment_schedules WHERE contract_id = ${id} ORDER BY round_number ASC`
+ 
+     return NextResponse.json({ data: serialize(data), error: null })
+diff --git a/app/api/corporate_cards/[id]/route.ts b/app/api/corporate_cards/[id]/route.ts
+index 5ce0cb5..588f78c 100644
+--- a/app/api/corporate_cards/[id]/route.ts
++++ b/app/api/corporate_cards/[id]/route.ts
+@@ -16,7 +16,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const { id } = params
+ 
+     await prisma.$executeRaw`
+       UPDATE corporate_cards
+@@ -47,7 +46,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const { id } = params
+ 
+     await prisma.$executeRaw`DELETE FROM corporate_cards WHERE id = ${id}`
+     return NextResponse.json({ data: null, error: null })
+diff --git a/app/api/departments/[id]/route.ts b/app/api/departments/[id]/route.ts
+index 803bb69..d0c3b75 100644
+--- a/app/api/departments/[id]/route.ts
++++ b/app/api/departments/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM departments WHERE id = ${id}
+diff --git a/app/api/employee_salaries/[id]/route.ts b/app/api/employee_salaries/[id]/route.ts
+index 51c8596..6ae96c8 100644
+--- a/app/api/employee_salaries/[id]/route.ts
++++ b/app/api/employee_salaries/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM employee_salaries WHERE id = ${id}
+diff --git a/app/api/freelancers/[id]/route.ts b/app/api/freelancers/[id]/route.ts
+index 949f1f7..1fe4c5a 100644
+--- a/app/api/freelancers/[id]/route.ts
++++ b/app/api/freelancers/[id]/route.ts
+@@ -16,7 +16,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const { id } = params
+ 
+     const updates: string[] = []
+     const values: any[] = []
+@@ -52,7 +51,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const { id } = params
+     await prisma.$executeRaw`DELETE FROM freelancers WHERE id = ${id}`
+     return NextResponse.json({ data: null, error: null })
+   } catch (e: any) {
+diff --git a/app/api/message_templates/[id]/route.ts b/app/api/message_templates/[id]/route.ts
+index ae55cb8..3a1c606 100644
+--- a/app/api/message_templates/[id]/route.ts
++++ b/app/api/message_templates/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM message_templates WHERE id = ${id}
+diff --git a/app/api/positions/[id]/route.ts b/app/api/positions/[id]/route.ts
+index a8ce646..40328ff 100644
+--- a/app/api/positions/[id]/route.ts
++++ b/app/api/positions/[id]/route.ts
+@@ -19,7 +19,6 @@ export async function PATCH(
+     const { id } = await params
+ 
+     const body = await request.json()
+-    const id = id
+ 
+     // TODO: Adjust UPDATE statement based on table schema
+     await prisma.$executeRaw`
+@@ -45,7 +44,6 @@ export async function DELETE(
+     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+     const { id } = await params
+ 
+-    const id = id
+ 
+     await prisma.$executeRaw`
+       DELETE FROM positions WHERE id = ${id}
+-- 
+2.34.1
+
