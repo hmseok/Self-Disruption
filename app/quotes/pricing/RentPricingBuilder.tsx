@@ -1334,7 +1334,7 @@ export default function RentPricingBuilder() {
     setDeliveryFee(dlvFee)
 
     const miscItems = regCosts.filter(r => ['번호판', '인지세', '대행료', '검사비'].includes(r.cost_type))
-    const miscTotal = miscItems.reduce((s, r) => s + (r.fixed_amount || 0), 0) || 167000
+    const miscTotal = miscItems.reduce((s, r) => s + (Number(r.fixed_amount) || 0), 0) || 167000
     setMiscFee(miscTotal)
 
     const totalAcq = carInfo.purchase_price + acqTaxAmt + bondNet + dlvFee + miscTotal

@@ -1282,8 +1282,8 @@ export default function CorporateCardsPage() {
           const theme = themePool[gi % themePool.length]
           const icon = getIconForGroup(group)
           const groupCards = grouped[group]
-          const groupUsage = groupCards.reduce((s, c) => s + (cardUsage[c.id]?.total || 0), 0)
-          const cardSumLimit = groupCards.reduce((s, c) => s + (c.monthly_limit || 0), 0)
+          const groupUsage = groupCards.reduce((s, c) => s + (Number(cardUsage[c.id]?.total) || 0), 0)
+          const cardSumLimit = groupCards.reduce((s, c) => s + (Number(c.monthly_limit) || 0), 0)
           // 계층별 한도: 설정된 그룹 한도 우선, 없으면 개별 카드 한도 합산
           const settingType = groupMode === 'company' ? 'card_company' : 'dept'
           const settingLimit = getGroupLimit(settingType, group)
@@ -2073,7 +2073,7 @@ export default function CorporateCardsPage() {
                   <p style={{ fontSize: 11, color: '#94a3b8', marginBottom: 16 }}>카드사별 전체 한도를 설정합니다. 해당 카드사의 모든 카드 사용 합계가 이 한도에 포함됩니다.</p>
                   {[...new Set(cards.map(c => c.card_company).filter(Boolean))].map(company => {
                     const companyCards = cards.filter(c => c.card_company === company)
-                    const companyUsage = companyCards.reduce((s, c) => s + (cardUsage[c.id]?.total || 0), 0)
+                    const companyUsage = companyCards.reduce((s, c) => s + (Number(cardUsage[c.id]?.total) || 0), 0)
                     const settingKey = `card_company::${company}`
                     const currentLimit = limitSettings[settingKey] || 0
                     const rate = currentLimit > 0 ? Math.min(100, Math.round((companyUsage / currentLimit) * 100)) : 0
@@ -2147,7 +2147,7 @@ export default function CorporateCardsPage() {
                     </div>
                   ) : departments.map(dept => {
                     const deptCards = cards.filter(c => c.card_alias === dept)
-                    const deptUsage = deptCards.reduce((s, c) => s + (cardUsage[c.id]?.total || 0), 0)
+                    const deptUsage = deptCards.reduce((s, c) => s + (Number(cardUsage[c.id]?.total) || 0), 0)
                     const settingKey = `dept::${dept}`
                     const currentLimit = limitSettings[settingKey] || 0
                     const rate = currentLimit > 0 ? Math.min(100, Math.round((deptUsage / currentLimit) * 100)) : 0

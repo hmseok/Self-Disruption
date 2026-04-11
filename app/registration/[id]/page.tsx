@@ -243,11 +243,11 @@ export default function RegistrationDetailPage() {
   // 카테고리별 소계
   const costByCategory = costCategories.map(cat => ({
     ...cat,
-    total: costs.filter(c => c.category === cat.key).reduce((s, c) => s + (c.amount || 0), 0),
+    total: costs.filter(c => c.category === cat.key).reduce((s, c) => s + (Number(c.amount) || 0), 0),
     items: costs.filter(c => c.category === cat.key),
   })).filter(cat => cat.total > 0 || cat.items.length > 0)
 
-  const totalCost = costs.reduce((s, c) => s + (c.amount || 0), 0)
+  const totalCost = costs.reduce((s, c) => s + (Number(c.amount) || 0), 0)
 
   useEffect(() => {
     if (carId) {

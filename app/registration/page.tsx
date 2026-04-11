@@ -342,9 +342,9 @@ const { company, role, adminSelectedCompanyId } = useApp()
   // 📊 KPI 통계
   const stats = {
     total: cars.length,
-    totalValue: cars.reduce((s, c) => s + (c.purchase_price || 0), 0),
-    totalCost: cars.reduce((s, c) => s + (c.total_cost || c.purchase_price || 0), 0),
-    avgValue: cars.length > 0 ? Math.round(cars.reduce((s, c) => s + (c.purchase_price || 0), 0) / cars.length) : 0,
+    totalValue: cars.reduce((s, c) => s + (Number(c.purchase_price) || 0), 0),
+    totalCost: cars.reduce((s, c) => s + (Number(c.total_cost) || Number(c.purchase_price) || 0), 0),
+    avgValue: cars.length > 0 ? Math.round(cars.reduce((s, c) => s + (Number(c.purchase_price) || 0), 0) / cars.length) : 0,
     electric: cars.filter(c => c.fuel_type === '전기').length,
     hybrid: cars.filter(c => (c.fuel_type || '').includes('하이브리드')).length,
     consignment: cars.filter(c => c.ownership_type === 'consignment').length,

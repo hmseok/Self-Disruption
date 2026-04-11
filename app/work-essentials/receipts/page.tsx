@@ -528,9 +528,9 @@ export default function ReceiptsPage() {
         )
       })
     : allRawItems
-  const totalAmount = allDisplayItems.reduce((s, i) => s + (i.amount || 0), 0)
+  const totalAmount = allDisplayItems.reduce((s, i) => s + (Number(i.amount) || 0), 0)
   const categoryTotals = allDisplayItems.reduce<Record<string, number>>((acc, i) => {
-    if (i.category) acc[i.category] = (acc[i.category] || 0) + (i.amount || 0)
+    if (i.category) acc[i.category] = (acc[i.category] || 0) + (Number(i.amount) || 0)
     return acc
   }, {})
   const incompleteCount = allDisplayItems.filter(i => i._incomplete).length
@@ -1008,7 +1008,7 @@ export default function ReceiptsPage() {
       {/* ── 플로팅 하단 액션바 (단일 플로우) ── */}
       {selectedIds.size > 0 && (() => {
         const selItems = allDisplayItems.filter(i => i.id && selectedIds.has(i.id))
-        const total = selItems.reduce((s, i) => s + (i.amount || 0), 0)
+        const total = selItems.reduce((s, i) => s + (Number(i.amount) || 0), 0)
         return (
           <div style={{
             position: 'fixed', bottom: isMobile ? 0 : 24, left: isMobile ? 0 : '50%', right: isMobile ? 0 : 'auto', transform: isMobile ? 'none' : 'translateX(-50%)',

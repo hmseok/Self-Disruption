@@ -183,8 +183,8 @@ export default function ReportDashboard() {
   }, [transactions])
 
   // 총 수입/지출
-  const totalIncome = useMemo(() => transactions.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0), [transactions])
-  const totalExpense = useMemo(() => transactions.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0), [transactions])
+  const totalIncome = useMemo(() => transactions.filter(t => t.type === 'income').reduce((s, t) => s + (Number(t.amount) || 0), 0), [transactions])
+  const totalExpense = useMemo(() => transactions.filter(t => t.type === 'expense').reduce((s, t) => s + (Number(t.amount) || 0), 0), [transactions])
   const netProfit = totalIncome - totalExpense
   const profitRate = totalIncome > 0 ? ((netProfit / totalIncome) * 100) : 0
 
@@ -194,7 +194,7 @@ export default function ReportDashboard() {
     available: cars.filter(c => c.status === 'available').length,
     rented: cars.filter(c => c.status === 'rented').length,
     maintenance: cars.filter(c => c.status === 'maintenance').length,
-    totalValue: cars.reduce((s, c) => s + (c.purchase_price || 0), 0),
+    totalValue: cars.reduce((s, c) => s + (Number(c.purchase_price) || 0), 0),
     utilizationRate: cars.length > 0 ? ((cars.filter(c => c.status === 'rented').length / cars.length) * 100) : 0,
   }), [cars])
 
@@ -205,13 +205,13 @@ export default function ReportDashboard() {
 
     return {
       jiipCount: activeJiip.length,
-      jiipMonthly: activeJiip.reduce((s, j) => s + (j.admin_fee || 0), 0),
+      jiipMonthly: activeJiip.reduce((s, j) => s + (Number(j.admin_fee) || 0), 0),
       investCount: activeInvest.length,
-      investPrincipal: activeInvest.reduce((s, i) => s + (i.invest_amount || 0), 0),
-      investMonthlyInterest: activeInvest.reduce((s, i) => s + ((i.invest_amount || 0) * (i.interest_rate || 0) / 100 / 12), 0),
+      investPrincipal: activeInvest.reduce((s, i) => s + (Number(i.invest_amount) || 0), 0),
+      investMonthlyInterest: activeInvest.reduce((s, i) => s + ((Number(i.invest_amount) || 0) * (Number(i.interest_rate) || 0) / 100 / 12), 0),
       loanCount: loans.length,
-      loanTotal: loans.reduce((s, l) => s + (l.total_amount || 0), 0),
-      loanMonthly: loans.reduce((s, l) => s + (l.monthly_payment || 0), 0),
+      loanTotal: loans.reduce((s, l) => s + (Number(l.total_amount) || 0), 0),
+      loanMonthly: loans.reduce((s, l) => s + (Number(l.monthly_payment) || 0), 0),
     }
   }, [jiipContracts, investments, loans])
 
