@@ -111,40 +111,30 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
   if (!pageName || pathname === '/dashboard') return null
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      {/* 도트 마커 + 1행 브레드크럼 */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '12px 20px',
-      }}>
-        {/* 블루 도트 — 뉴모피즘 레이즈드 */}
-        <div style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-          flexShrink: 0,
-          boxShadow: '2px 2px 4px rgba(140,170,210,0.19), -1px -1px 3px rgba(255,255,255,0.47)',
-        }} />
-        {/* 섹션 라벨 */}
-        {sectionLabel && (
-          <>
-            <span style={{ fontSize: 11, color: '#8aabc7', fontWeight: 500 }}>{sectionLabel}</span>
-            <span style={{ color: '#64748b', fontSize: 11 }}>&rsaquo;</span>
-          </>
-        )}
-        {/* 페이지 이름 */}
-        <span style={{ fontSize: 15, fontWeight: 800, color: '#0f2440' }}>{pageName}</span>
+    <div style={{
+      background: 'rgba(255,255,255,0.75)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      padding: '14px 24px',
+      borderBottom: '1px solid rgba(0,0,0,0.06)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+    }}>
+      {/* 컬러 도트 (맥 윈도우 스타일) */}
+      <div style={{ display: 'flex', gap: 6, marginRight: 4 }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f87171' }} />
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fbbf24' }} />
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#34d399' }} />
       </div>
-      {/* 뉴모피즘 인셋 디바이더 */}
-      <div style={{
-        height: 1,
-        margin: '0 20px',
-        background: 'linear-gradient(90deg, rgba(59,110,181,0.25), rgba(140,170,210,0.10), transparent)',
-        boxShadow: '0 1px 0 rgba(255,255,255,0.47)',
-      }} />
+      {/* 브레드크럼 */}
+      {sectionLabel && (
+        <>
+          <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sectionLabel}</span>
+          <span style={{ color: '#94a3b8', fontSize: 11 }}>›</span>
+        </>
+      )}
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f2440' }}>{pageName}</span>
     </div>
   )
 }

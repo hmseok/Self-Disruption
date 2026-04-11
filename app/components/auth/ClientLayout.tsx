@@ -479,8 +479,23 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          <PageTitle />
-          {children}
+          {/* ═══ 프리뷰 스타일 글래스 프레임 ═══ */}
+          <div style={{
+            margin: '16px 20px 0',
+            background: '#f2f1ef',
+            borderRadius: 20,
+            overflow: 'hidden',
+            boxShadow: '12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            minHeight: 'calc(100dvh - 100px)',
+          }}>
+            {/* 프레임 헤더 — 브레드크럼 */}
+            <PageTitle />
+            {/* 프레임 콘텐츠 */}
+            <div style={{ padding: '0 4px 24px' }}>
+              {children}
+            </div>
+          </div>
         </div>
       </main>
 
