@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { auth } from '@/lib/auth-client'
 import { useApp } from '../../context/AppContext'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 
 // ════════════════════════════════════════════
 // 내 정보 페이지 — 프로필 + 법인카드 관리
@@ -193,9 +194,19 @@ export default function MyInfoPage() {
   }
 
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-      {/* ── 프로필 섹션 ── */}
+        <DcStatStrip
+          stats={[
+            { label: '이메일', value: user?.email || '-' },
+            { label: '이름', value: name || '-' },
+            { label: '등록 카드', value: cards.length, unit: '장' },
+          ] as StatItem[]}
+          fullWidth
+        />
+
+        {/* ── 프로필 섹션 ── */}
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '28px 24px', marginBottom: 24 }}>
         <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 4, marginTop: 0 }}>내 프로필</h2>
         <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>기본 정보를 확인하고 수정할 수 있습니다</p>
@@ -407,6 +418,7 @@ export default function MyInfoPage() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   )

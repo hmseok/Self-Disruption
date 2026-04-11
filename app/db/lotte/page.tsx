@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
 
 // ============================================================================
 // AUTH HELPER
@@ -316,85 +318,61 @@ export default function BenchmarkPage() {
   const gapBg = (g: number | null) => g === null ? 'bg-gray-50 border-gray-200' : g > 0 ? 'bg-emerald-50 border-emerald-200' : g > -5 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-gray-500">벤치마크 데이터 로딩 중...</p>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <div className="text-center py-20 text-slate-400">
+          <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm">벤치마크 데이터 로딩 중...</p>
+        </div>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* ─── 헤더 ─── */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📈 벤치마크 비교</h1>
-              <p className="text-gray-500 mt-1 text-sm">경쟁사 렌트 견적 vs 우리 원가 · 상세 조건 비교 · 가격 경쟁력 진단</p>
-            </div>
-            {isAdmin && (
-              <div className="flex gap-2">
-                <button onClick={() => setShowAiModal(true)} className="px-4 py-2 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700">
-                  AI 경쟁사 조회
-                </button>
-                <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800">
-                  + 수동 등록
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+    <>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-      {/* ─── 대시보드 ─── */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
-              <p className="text-2xl font-black">{stats.total}</p>
-              <p className="text-[10px] text-slate-600">수집 견적</p>
-            </div>
-            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
-              <p className="text-2xl font-black">{stats.analyzed}</p>
-              <p className="text-[10px] text-slate-600">분석 완료</p>
-            </div>
-            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
-              <p className={`text-2xl font-black ${stats.avgGap >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {stats.analyzed > 0 ? pct(stats.avgGap) : '-'}
-              </p>
-              <p className="text-[10px] text-slate-600">평균 갭</p>
-            </div>
-            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-emerald-400">{stats.advantage}</p>
-              <p className="text-[10px] text-slate-600">가격 우위</p>
-            </div>
-            <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-red-400">{stats.disadvantage}</p>
-              <p className="text-[10px] text-slate-600">경쟁 열위</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        {/* ═══ Stats Strip ═══ */}
+        <DcStatStrip
+          stats={[
+            { label: '수집 견적', value: stats.total },
+            { label: '분석 완료', value: stats.analyzed },
+            { label: '평균 갭', value: stats.analyzed > 0 ? pct(stats.avgGap) : '-' },
+            { label: '가격 우위', value: stats.advantage },
+            { label: '경쟁 열위', value: stats.disadvantage },
+          ] as StatItem[]}
+          actions={isAdmin ? [
+            { label: 'AI 경쟁사 조회', onClick: () => setShowAiModal(true), variant: 'primary' as const, icon: '🤖' },
+            { label: '수동 등록', onClick: () => setShowAddModal(true), variant: 'secondary' as const, icon: '➕' },
+          ] : undefined}
+        />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-          {/* ═══ 왼쪽: 목록 ═══ */}
-          <div className="lg:col-span-7">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                placeholder="브랜드·모델 검색..." className="flex-1 min-w-[120px] px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white" />
-              <select value={filterCompetitor} onChange={e => setFilterCompetitor(e.target.value)} className="px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white">
+        {/* ═══ Toolbar ═══ */}
+        <DcToolbar
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
+          placeholder="브랜드·모델 검색..."
+          trailing={
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <select value={filterCompetitor} onChange={e => setFilterCompetitor(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
                 <option value="all">전체 경쟁사</option>
                 {COMPETITORS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <select value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))} className="px-2 py-2 text-xs border border-gray-200 rounded-lg bg-white">
+              <select value={filterTerm} onChange={e => setFilterTerm(Number(e.target.value))}
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
                 <option value={0}>전체 기간</option>
                 {TERM_OPTIONS.map(t => <option key={t} value={t}>{t}개월</option>)}
               </select>
             </div>
+          }
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+          {/* ═══ 왼쪽: 목록 ═══ */}
+          <div className="lg:col-span-7">
 
             <div className="space-y-2">
               {filteredList.length === 0 && (
@@ -800,5 +778,6 @@ export default function BenchmarkPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

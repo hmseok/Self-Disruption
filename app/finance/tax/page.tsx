@@ -2,6 +2,8 @@
 
 import { useApp } from '../../context/AppContext'
 import { useEffect, useState, useMemo } from 'react'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -472,44 +474,43 @@ export default function TaxManagementPage() {
   }
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>세금 관리</h1>
-          <p style={{ fontSize: 13, color: '#9ca3af', margin: '4px 0 0' }}>원천세 · 부가세 통합 관리</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => changeMonth(-1)} style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', background: '#fff', fontWeight: 700, fontSize: 14 }}>◀</button>
-          <span style={{ fontSize: 16, fontWeight: 800, color: '#111827', minWidth: 100, textAlign: 'center' }}>
-            {filterMonth.replace('-', '년 ')}월
-          </span>
-          <button onClick={() => changeMonth(1)} style={{ padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', background: '#fff', fontWeight: 700, fontSize: 14 }}>▶</button>
-        </div>
-      </div>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-      {/* 탭 */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e5e7eb', marginBottom: 20 }}>
-        {[
-          { key: 'overview' as const, label: '전체 현황' },
-          { key: 'withholding' as const, label: '원천세' },
-          { key: 'vat' as const, label: '부가세' },
-          { key: 'history' as const, label: '신고 이력' },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            style={{
-              padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              border: 'none', borderBottom: activeTab === t.key ? '3px solid #3b6eb5' : '3px solid transparent',
-              color: activeTab === t.key ? '#3b6eb5' : '#9ca3af',
-              background: 'transparent',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* ═══ Stats Strip ═══ */}
+      <DcStatStrip
+        stats={[
+          { label: '원천세', value: loading ? '-' : nf(summary.totalWithholdingTax), unit: '원' },
+          { label: '지방소득세', value: loading ? '-' : nf(summary.totalLocalTax), unit: '원' },
+          { label: '부가세', value: loading ? '-' : nf(summary.totalVatAmount), unit: '원' },
+          { label: '총 납부액', value: loading ? '-' : nf(summary.totalTaxPayable + summary.totalVatAmount), unit: '원' },
+        ] as StatItem[]}
+        fullWidth
+      />
+
+      {/* ═══ Toolbar with tabs + month nav ═══ */}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        placeholder=""
+        filters={[
+          { key: 'overview', label: '전체 현황' },
+          { key: 'withholding', label: '원천세' },
+          { key: 'vat', label: '부가세' },
+          { key: 'history', label: '신고 이력' },
+        ]}
+        activeFilter={activeTab}
+        onFilterChange={(key) => setActiveTab(key as any)}
+        trailing={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+            <button onClick={() => changeMonth(-1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, color: '#64748b' }}>◀</button>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#0f2440', minWidth: 90, textAlign: 'center' }}>
+              {filterMonth.replace('-', '년 ')}월
+            </span>
+            <button onClick={() => changeMonth(1)} style={{ padding: '5px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer', background: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 13, color: '#64748b' }}>▶</button>
+          </div>
+        }
+      />
 
       {loading ? (
         <div style={{ padding: 80, textAlign: 'center', color: '#9ca3af' }}>데이터 집계 중...</div>
@@ -521,6 +522,7 @@ export default function TaxManagementPage() {
           {activeTab === 'history' && <HistoryTab companyId={effectiveCompanyId} />}
         </>
       )}
+      </div>
     </div>
   )
 }

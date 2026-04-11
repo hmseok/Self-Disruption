@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -2014,86 +2015,38 @@ export default function SettlementDashboard() {
         fullWidth
       />
 
-      {/* ═══ 필터 & 액션 버튼 ═══ */}
-      <div style={{
-        display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16,
-        justifyContent: 'flex-end',
-      }}>
-        <input
-          type="month"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          style={{
-            background: 'rgba(255,255,255,0.72)', color: '#334155',
-            border: '1px solid rgba(100,116,139,0.12)', padding: '6px 12px',
-            borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            outline: 'none',
-          }}
-        />
-        <button
-          onClick={() => router.push('/finance')}
-          style={{
-            background: 'rgba(255,255,255,0.72)', color: '#334155',
-            border: '1px solid rgba(100,116,139,0.12)', padding: '6px 12px',
-            borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          📚 자금 장부
-        </button>
-        <button
-          onClick={() => router.push('/finance/upload')}
-          style={{
-            background: '#60a5fa', color: '#fff', border: 'none',
-            padding: '6px 12px', borderRadius: 7, fontSize: 11,
-            fontWeight: 800, cursor: 'pointer',
-          }}
-        >
-          📂 엑셀 등록
-        </button>
-      </div>
-
-      {/* ═══ 탭 네비게이션 ═══ */}
-      <div style={{
-        display: 'flex', gap: 0, background: '#fff',
-        borderBottom: '2px solid rgba(255,255,255,0.1)', padding: '0 24px',
-      }}>
-        {[
-          { key: 'contracts' as const, label: '📋 계약 현황' },
-          { key: 'revenue' as const, label: '📈 매출 분석' },
-          { key: 'settlement' as const, label: '💳 지급 관리' },
-          { key: 'pnl' as const, label: '📊 손익계산서' },
-          { key: 'execute' as const, label: '⚡ 정산 실행' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '12px 20px', fontSize: 13, fontWeight: 700,
-              color: activeTab === tab.key ? '#60a5fa' : '#94a3b8',
-              cursor: 'pointer', background: 'none',
-              borderBottom: activeTab === tab.key ? '3px solid #60a5fa' : '3px solid transparent',
-              marginBottom: -2,
-              display: 'flex', alignItems: 'center', gap: 6,
-              transition: 'all 0.15s',
-              borderLeft: 'none', borderRight: 'none', borderTop: 'none',
-            }}
-          >
-            {tab.label}
-            {(tab.key === 'settlement' || tab.key === 'execute') && settlementSummary.pendingCount > 0 && (
-              <span style={{
-                padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-                background: activeTab === tab.key ? 'rgba(248, 113, 113, 0.2)' : 'rgba(248, 113, 113, 0.1)',
-                color: '#f87171',
-              }}>
-                {settlementSummary.pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* ═══ Toolbar with tabs ═══ */}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        placeholder=""
+        filters={[
+          { key: 'contracts', label: '📋 계약 현황' },
+          { key: 'revenue', label: '📈 매출 분석' },
+          { key: 'settlement', label: '💳 지급 관리', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
+          { key: 'pnl', label: '📊 손익계산서' },
+          { key: 'execute', label: '⚡ 정산 실행', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
+        ]}
+        activeFilter={activeTab}
+        onFilterChange={(key) => setActiveTab(key as any)}
+        trailing={
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 'auto', alignItems: 'center' }}>
+            <input type="month" value={filterDate} onChange={e => setFilterDate(e.target.value)}
+              style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }} />
+            <button onClick={() => router.push('/finance')}
+              style={{ padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              📚 장부
+            </button>
+            <button onClick={() => router.push('/finance/upload')}
+              style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              📂 엑셀
+            </button>
+          </div>
+        }
+      />
 
       {/* ═══ 탭 콘텐츠 ═══ */}
-      <div style={{ background: '#fff', borderRadius: '0 0 16px 16px', border: '1px solid rgba(255,255,255,0.1)', borderTop: 'none' }}>
+      <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
         {loading ? (
           <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>데이터를 불러오는 중...</div>
         ) : (

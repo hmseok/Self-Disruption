@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { auth } from '@/lib/auth-client'
 import { useApp } from '../../context/AppContext'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
 
 // ════════════════════════════════════════════
 // 영수증 제출 / 법인카드 사용내역 관리
@@ -813,23 +815,27 @@ export default function ReceiptsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 12px' : '24px 16px', overflowX: 'hidden', boxSizing: 'border-box', width: '100%' }}>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-      {/* ── 헤더 ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>법인카드 사용내역</h1>
-          <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-            영수증을 올리면 <strong style={{ color: '#3b6eb5' }}>Gemini AI</strong>가 자동 분석합니다
-          </p>
+        <DcStatStrip
+          stats={[
+            { label: '총 지출액', value: fmt(totalAmount), unit: '원' },
+            { label: '등록 항목', value: allRawItems.length, unit: '건' },
+            { label: '미비 항목', value: incompleteCount, unit: '건' },
+          ] as StatItem[]}
+          fullWidth
+        />
+
+        {/* ── 다운로드 버튼 ── */}
+        <div style={{ marginBottom: 20, textAlign: 'right' }}>
+          <button
+            onClick={handleDownloadXlsx}
+            style={{ padding: '10px 18px', background: '#059669', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {isMobile ? '다운로드' : '엑셀 다운로드'}
+          </button>
         </div>
-        <button
-          onClick={handleDownloadXlsx}
-          style={{ padding: '10px 18px', background: '#059669', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          {isMobile ? '다운로드' : '엑셀 다운로드'}
-        </button>
-      </div>
 
       {/* ── 드롭존 ── */}
       <div
@@ -1201,6 +1207,7 @@ export default function ReceiptsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -3707,31 +3707,27 @@ function UploadContent() {
 
   if (!company?.id) {
     return (
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#334155', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <svg style={{ width: 24, height: 24, color: '#3b6eb5' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-              카드/통장 관리
-            </h1>
-            <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>엑셀·영수증·PDF를 AI로 자동 분류하여 장부에 반영합니다</p>
+      <div className="page-bg">
+        <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '1.5rem' }}>
+            <button onClick={() => router.back()} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: 12, color: '#64748b', cursor: 'pointer' }}>
+              ← 돌아가기
+            </button>
           </div>
-          <button onClick={() => router.back()} style={{ padding: '8px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: 12, color: '#64748b', cursor: 'pointer' }}>
-            ← 돌아가기
-          </button>
-        </div>
-        <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🏢</p>
-          <p style={{ fontWeight: 700, fontSize: 14, color: '#475569' }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>회사 선택 후 AI 분석기를 이용할 수 있습니다</p>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 80, textAlign: 'center', border: '1px solid #e2e8f0' }}>
+            <p style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🏢</p>
+            <p style={{ fontWeight: 700, fontSize: 14, color: '#475569' }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
+            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>회사 선택 후 AI 분석기를 이용할 수 있습니다</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-      style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6"
+        onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
 
       {/* ═══ 탭바 카드 (PageTitle은 레이아웃에서 자동 제공) ═══ */}
       <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '4px 4px 12px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.6)', background: '#fff' }}>
@@ -7763,6 +7759,7 @@ function UploadContent() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

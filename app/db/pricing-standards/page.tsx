@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import dynamicImport from 'next/dynamic'
+import DcToolbar from '../../components/DcToolbar'
 
 // 탭 설정 — 각 탭에 설명 추가
 const tabs = [
@@ -50,32 +51,41 @@ export default function PricingStandardsPage() {
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-        {/* 헤더 */}
-        <div className="bg-gray-50 border-b border-black/[0.06] sticky top-0 z-40 -mx-4 -mt-4 px-4 md:px-6 py-5 md:rounded-t-xl">
-          <div className="max-w-[1400px] mx-auto flex items-start justify-between">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">📊 산출 기준 관리</h2>
-              <p className="text-slate-400 mt-1 text-sm">
-                렌트료 산출에 필요한 기본 데이터와 시장 가격 기준을 관리합니다
-              </p>
-            </div>
+        {/* ═══ Toolbar with tab filters ═══ */}
+        <DcToolbar
+          search=""
+          onSearchChange={() => {}}
+          placeholder=""
+          filters={tabs.map(tab => ({ key: tab.id, label: `${tab.icon} ${tab.label}` }))}
+          activeFilter={activeTab}
+          onFilterChange={(key) => setActiveTab(key)}
+          trailing={
             <button
               onClick={() => setShowGuide(!showGuide)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-black/[0.06] text-slate-400 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              style={{
+                padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+                border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
+                color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}
             >
-              {showGuide ? '가이드 숨기기' : '가이드 보기'}
-              <span className="text-slate-400">💡</span>
+              💡 {showGuide ? '가이드 숨기기' : '가이드 보기'}
             </button>
-          </div>
-        </div>
-      </div>
+          }
+        />
 
-      {/* 초보자 가이드 배너 */}
-      {showGuide && (
-        <div className="bg-gradient-to-r from-white/5 to-white/[0.02] border-b border-black/[0.06]">
-          <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-4">
+        {/* 초보자 가이드 배너 */}
+        {showGuide && (
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 16,
+            border: '1px solid rgba(0,0,0,0.05)',
+            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          }}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-white/60 rounded-xl">
                 <span className="text-xl flex-shrink-0">📊</span>
                 <div>
                   <p className="font-bold text-slate-800 mb-1">기준 데이터란?</p>
@@ -85,7 +95,7 @@ export default function PricingStandardsPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-white/60 rounded-xl">
                 <span className="text-xl flex-shrink-0">🔍</span>
                 <div>
                   <p className="font-bold text-slate-800 mb-1">실시간 검증이란?</p>
@@ -95,7 +105,7 @@ export default function PricingStandardsPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-100 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-white/60 rounded-xl">
                 <span className="text-xl flex-shrink-0">🏢</span>
                 <div>
                   <p className="font-bold text-slate-800 mb-1">업계 비교 기준</p>
@@ -107,41 +117,9 @@ export default function PricingStandardsPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 탭 바 */}
-      <div className="bg-gray-50 border-b border-black/[0.06]">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-          <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all text-xs font-semibold min-w-fit
-                  ${
-                    activeTab === tab.id
-                      ? 'bg-white/20 text-white shadow-md shadow-white/10'
-                      : 'bg-gray-100 text-slate-400 hover:bg-gray-100'
-                  }
-                `}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-                {activeTab === tab.id && (
-                  <span className="text-slate-400 text-[10px] hidden sm:inline">
-                    {tab.desc}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 탭 컨텐츠 */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6">
+        {/* 탭 컨텐츠 */}
         {getCurrentTabComponent()}
       </div>
     </div>

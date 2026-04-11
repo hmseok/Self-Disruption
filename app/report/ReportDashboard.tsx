@@ -246,21 +246,7 @@ export default function ReportDashboard() {
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-        <div className="flex gap-2 mb-6">
-          {[3, 6, 12].map(m => (
-            <button
-              key={m}
-              onClick={() => setPeriodMonths(m)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                periodMonths === m ? 'bg-steel-600 text-white shadow' : 'bg-white border border-black/[0.06] text-slate-500 hover:bg-gray-50'
-              }`}
-            >
-              최근 {m}개월
-            </button>
-          ))}
-        </div>
-
-      {/* 탭 네비게이션 */}
+      {/* ═══ Toolbar with tabs + period buttons ═══ */}
       <DcToolbar
         search=""
         onSearchChange={() => {}}
@@ -268,6 +254,22 @@ export default function ReportDashboard() {
         filters={tabs.map(t => ({ key: t.key, label: t.label }))}
         activeFilter={activeTab}
         onFilterChange={setActiveTab}
+        trailing={
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 'auto' }}>
+            {[3, 6, 12].map(m => (
+              <button key={m} onClick={() => setPeriodMonths(m)}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  border: periodMonths === m ? 'none' : '1px solid rgba(0,0,0,0.06)',
+                  background: periodMonths === m ? '#0f2440' : 'rgba(255,255,255,0.6)',
+                  color: periodMonths === m ? '#fff' : '#64748b',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}>
+                {m}개월
+              </button>
+            ))}
+          </div>
+        }
       />
 
       {/* 탭 컨텐츠 */}
@@ -394,33 +396,6 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
 
   return (
     <div className="space-y-6">
-      {/* 핵심 KPI */}
-      <div className="bg-gradient-to-r from-gray-900 to-steel-800 rounded-2xl p-6 md:p-8 text-white">
-        <h3 className="text-sm font-bold text-slate-600 mb-4">경영 요약</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <div>
-            <p className="text-xs text-slate-500">총 매출</p>
-            <p className="text-2xl md:text-3xl font-black mt-1">{formatSimpleMoney(totalIncome)}<span className="text-sm ml-1 text-slate-500">원</span></p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500">총 비용</p>
-            <p className="text-2xl md:text-3xl font-black mt-1 text-red-400">{formatSimpleMoney(totalExpense)}<span className="text-sm ml-1 text-red-400/60">원</span></p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500">순이익</p>
-            <p className={`text-2xl md:text-3xl font-black mt-1 ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {netProfit >= 0 ? '+' : ''}{formatSimpleMoney(netProfit)}<span className="text-sm ml-1 opacity-60">원</span>
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-500">이익률</p>
-            <p className={`text-2xl md:text-3xl font-black mt-1 ${profitRate >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {profitRate.toFixed(1)}<span className="text-sm ml-1 opacity-60">%</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* 운영 현황 KPI */}
       <DcStatStrip
         stats={[

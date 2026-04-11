@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -384,63 +385,40 @@ export default function FleetPnlPage() {
           fullWidth
         />
 
-        {/* Search Section */}
-        <div className='bg-gray-100 backdrop-blur-xl rounded-xl p-6 border border-white/[0.1] mb-6'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mb-4'>
-            <div>
-              <label className='block text-sm font-medium text-slate-600 mb-2'>조회 기간</label>
-              <input
-                type='month'
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className='w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white'
-              />
-            </div>
-            <div>
-              <label className='block text-sm font-medium text-slate-600 mb-2'>상태</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className='w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white'
-              >
-                <option value='all'>전체</option>
-                <option value='active'>운영 중</option>
-                <option value='inactive'>중지</option>
+        {/* ═══ Toolbar ═══ */}
+        <DcToolbar
+          search={searchText}
+          onSearchChange={setSearchText}
+          placeholder="차량번호, 모델명..."
+          filters={[
+            { key: 'all', label: '전체' },
+            { key: 'active', label: '운영 중' },
+            { key: 'inactive', label: '중지' },
+          ]}
+          activeFilter={statusFilter}
+          onFilterChange={setStatusFilter}
+          trailing={
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+              <input type="month" value={filterDate} onChange={e => setFilterDate(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }} />
+              <select value={sortKey} onChange={e => setSortKey(e.target.value as any)}
+                style={{ padding: '6px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)', color: '#334155', cursor: 'pointer' }}>
+                <option value="revenue">매출순</option>
+                <option value="expense">비용순</option>
+                <option value="operating">영업이익순</option>
+                <option value="settlement">정산순</option>
+                <option value="net">순이익순</option>
+                <option value="rate">수익률순</option>
               </select>
             </div>
-            <div>
-              <label className='block text-sm font-medium text-slate-600 mb-2'>정렬</label>
-              <select
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className='w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white'
-              >
-                <option value='revenue'>매출</option>
-                <option value='expense'>비용</option>
-                <option value='operating'>영업이익</option>
-                <option value='settlement'>정산</option>
-                <option value='net'>순이익</option>
-                <option value='rate'>수익률</option>
-              </select>
-            </div>
-            <div>
-              <label className='block text-sm font-medium text-slate-600 mb-2'>검색</label>
-              <input
-                type='text'
-                placeholder='차량번호, 모델명...'
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className='w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500'
-              />
-            </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Table Section */}
-        <div className='bg-gray-100 backdrop-blur-xl rounded-xl border border-white/[0.1] overflow-hidden'>
+        <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           <table className='w-full text-sm'>
             <thead>
-              <tr className='border-b border-white/[0.1] bg-white/[0.03]'>
+              <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(249,250,251,0.5)' }}>
                 <th className='px-4 py-3 text-left text-slate-600 font-medium'>차량번호</th>
                 <th className='px-4 py-3 text-left text-slate-600 font-medium'>모델</th>
                 <th className='px-4 py-3 text-right text-slate-600 font-medium'>매출</th>
@@ -453,14 +431,14 @@ export default function FleetPnlPage() {
             </thead>
             <tbody>
               {sorted.map((pnl, idx) => (
-                <tr key={pnl.carId} className='border-b border-white/[0.05] hover:bg-white/[0.03] transition'>
+                <tr key={pnl.carId} style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }} className='hover:bg-slate-50/50 transition'>
                   <td className='px-4 py-3 text-slate-800 font-mono'>{pnl.number}</td>
                   <td className='px-4 py-3 text-slate-600'>{pnl.model}</td>
-                  <td className='px-4 py-3 text-right text-blue-300'>{fMan(pnl.revenue)}</td>
-                  <td className='px-4 py-3 text-right text-red-300'>{fMan(pnl.expense)}</td>
-                  <td className='px-4 py-3 text-right text-yellow-300'>{fMan(pnl.operatingProfit)}</td>
-                  <td className='px-4 py-3 text-right text-purple-300'>{fMan(pnl.settlement)}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${pnl.netProfit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                  <td className='px-4 py-3 text-right text-blue-600'>{fMan(pnl.revenue)}</td>
+                  <td className='px-4 py-3 text-right text-red-500'>{fMan(pnl.expense)}</td>
+                  <td className='px-4 py-3 text-right text-amber-600'>{fMan(pnl.operatingProfit)}</td>
+                  <td className='px-4 py-3 text-right text-purple-600'>{fMan(pnl.settlement)}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${pnl.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {fMan(pnl.netProfit)}
                   </td>
                   <td className='px-4 py-3 text-right text-slate-600'>{pnl.profitRate.toFixed(1)}%</td>
