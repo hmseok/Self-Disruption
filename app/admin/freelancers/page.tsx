@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import NeuFilterTabs from '../../components/NeuFilterTabs'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -254,35 +255,30 @@ export default function FreelancersPage() {
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
-      {/* DarkHeader */}
-      <DarkHeader
-        icon="👷"
-        title="프리랜서/용역 관리"
-        subtitle="외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동"
-        stats={activeTab === 'payments' ? [
-          { label: '총 지급건수', value: payments.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
-          { label: '총 지급액(세전)', value: `${formatMoney(totalGross)}원`, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
-          { label: '원천징수세', value: `${formatMoney(totalTax)}원`, color: '#dc2626', bgColor: '#fef2f2', borderColor: '#fecaca', labelColor: '#fca5a5' },
-          { label: '실지급액', value: `${formatMoney(totalNet)}원`, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
-        ] : []}
-        actions={[
-          { label: activeTab === 'list' ? '프리랜서 등록' : '지급 등록', icon: '➕', onClick: () => { if (activeTab === 'list') { setForm(emptyForm); setEditingId(null); setShowForm(true) } else { setShowPaymentForm(true) } }, variant: 'primary' }
-        ]}
-      >
-        {/* 탭 */}
-        <div style={{ display: 'flex', gap: 4, padding: '8px 16px' }}>
-          {TABS.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', borderRadius: 8, fontWeight: 600, fontSize: 13,
-                background: activeTab === tab.key ? '#0f172a' : 'transparent', color: activeTab === tab.key ? '#fff' : '#94a3b8',
-                border: 'none', cursor: 'pointer', transition: 'all 0.15s'
-              }}>
-              <span style={{ fontSize: 11 }}>{tab.icon}</span>{tab.label}
-            </button>
-          ))}
-        </div>
-      </DarkHeader>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">👷 프리랜서/용역 관리</h1>
+        <p className="text-slate-600 text-sm">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+      </div>
+
+      {/* Stats - Show only on payments tab */}
+      {activeTab === 'payments' && (
+        <NeuStatCards
+          items={[
+            { key: 'count', label: '총 지급건수', value: payments.length, color: 'blue', icon: '📊' },
+            { key: 'gross', label: '총 지급액(세전)', value: totalGross, unit: '원', format: true, color: 'green', icon: '💰' },
+            { key: 'tax', label: '원천징수세', value: totalTax, unit: '원', format: true, color: 'red', icon: '🏛️' },
+            { key: 'net', label: '실지급액', value: totalNet, unit: '원', format: true, color: 'amber', icon: '✓' },
+          ]}
+        />
+      )}
+
+      {/* Tabs */}
+      <NeuFilterTabs
+        tabs={TABS.map(tab => ({ key: tab.key, label: `${tab.icon} ${tab.label}` }))}
+        activeKey={activeTab}
+        onSelect={(key) => setActiveTab(key as 'list' | 'payments')}
+      />
 
       {/* Tab 1: 프리랜서 목록 */}
       {activeTab === 'list' && (

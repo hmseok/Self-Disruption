@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -164,20 +164,26 @@ export default function CorporateCardsPage() {
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
 
-      {/* DarkHeader */}
-      <DarkHeader
-        icon="💳"
-        title="법인카드 관리"
-        subtitle="법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리"
-        stats={[
-          { label: '등록 카드', value: cards.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: '#bfdbfe', labelColor: '#93c5fd' },
-          { label: '이번달 사용건수', value: totalMonthlyCount, color: '#059669', bgColor: '#ecfdf5', borderColor: '#bbf7d0', labelColor: '#6ee7b7' },
-          { label: '총 사용액', value: `${formatMoney(totalMonthlyUsage)}원`, color: '#d97706', bgColor: '#fffbeb', borderColor: '#fde68a', labelColor: '#fcd34d' },
-        ]}
-        actions={[
-          { label: '카드 등록', icon: '➕', onClick: () => { setForm(emptyForm); setEditingId(null); setShowForm(true) }, variant: 'primary' }
+      {/* NeuStatCards */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">💳 법인카드 관리</h1>
+        <p className="text-slate-600 text-sm">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
+      </div>
+
+      <NeuStatCards
+        items={[
+          { key: 'cards', label: '등록 카드', value: cards.length, color: 'blue', icon: '💳' },
+          { key: 'count', label: '이번달 사용건수', value: totalMonthlyCount, color: 'green', icon: '📊' },
+          { key: 'usage', label: '총 사용액', value: totalMonthlyUsage, unit: '원', format: true, color: 'amber', icon: '💰' },
         ]}
       />
+
+      <div className="mb-6 flex justify-end">
+        <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
+          className="px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800 transition-colors flex items-center gap-1.5">
+          <span>➕</span>카드 등록
+        </button>
+      </div>
 
       {/* 카드 목록 - 카드형 UI */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

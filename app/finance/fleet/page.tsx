@@ -2,7 +2,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
-import DarkHeader from '../../components/DarkHeader'
 import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -361,19 +360,31 @@ export default function FleetPnlPage() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8'>
-        <DarkHeader icon='🚗' title='Fleet P&L Dashboard' />
-        <div className='text-center text-slate-400 mt-8'>로딩 중...</div>
+      <div className='min-h-screen page-bg p-8'>
+        <div className='max-w-7xl mx-auto'>
+          <div className='text-center text-slate-400 mt-8'>로딩 중...</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8'>
-      <DarkHeader icon='🚗' title='Fleet P&L Dashboard' />
+    <div className='min-h-screen page-bg p-8'>
 
-      <div className='max-w-7xl mx-auto mt-8'>
-        {/* 필터 & 제어 */}
+      <div className='max-w-7xl mx-auto'>
+        {/* Stats Section */}
+        <NeuStatCards
+          items={[
+            { key: 'revenue', label: '총 매출', value: totals.revenue, unit: '원', format: true, color: 'blue', icon: '💰' },
+            { key: 'expense', label: '총 비용', value: totals.expense, unit: '원', format: true, color: 'red', icon: '📉' },
+            { key: 'operating', label: '영업이익', value: totals.operatingProfit, unit: '원', format: true, color: 'amber', icon: '📊' },
+            { key: 'settlement', label: '정산액', value: totals.settlement, unit: '원', format: true, color: 'purple', icon: '💵' },
+            { key: 'net', label: '순이익', value: totals.netProfit, unit: '원', format: true, color: totals.netProfit >= 0 ? 'green' : 'red', icon: '✓' },
+          ] as StatCardItem[]}
+          columns={5}
+        />
+
+        {/* Search Section */}
         <div className='bg-gray-100 backdrop-blur-xl rounded-xl p-6 border border-white/[0.1] mb-6'>
           <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mb-4'>
             <div>
@@ -425,19 +436,7 @@ export default function FleetPnlPage() {
           </div>
         </div>
 
-        {/* 요약 통계 */}
-        <NeuStatCards
-          items={[
-            { key: 'revenue', label: '총 매출', value: totals.revenue, unit: '원', format: true, color: 'blue', icon: '💰' },
-            { key: 'expense', label: '총 비용', value: totals.expense, unit: '원', format: true, color: 'red', icon: '📉' },
-            { key: 'operating', label: '영업이익', value: totals.operatingProfit, unit: '원', format: true, color: 'amber', icon: '📊' },
-            { key: 'settlement', label: '정산액', value: totals.settlement, unit: '원', format: true, color: 'purple', icon: '💵' },
-            { key: 'net', label: '순이익', value: totals.netProfit, unit: '원', format: true, color: totals.netProfit >= 0 ? 'green' : 'red', icon: '✓' },
-          ] as StatCardItem[]}
-          columns={5}
-        />
-
-        {/* 테이블 */}
+        {/* Table Section */}
         <div className='bg-gray-100 backdrop-blur-xl rounded-xl border border-white/[0.1] overflow-hidden'>
           <table className='w-full text-sm'>
             <thead>

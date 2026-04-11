@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -240,11 +240,16 @@ export default function CodefPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <DarkHeader icon="Building2" title="은행/카드 자동연동" subtitle="Codef API로 거래내역을 자동 수집합니다" />
-
+    <div className="min-h-screen page-bg">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-8">Codef 금융 데이터 연동</h1>
+        {/* Stats Section */}
+        <NeuStatCards
+          items={[
+            { key: 'connections', label: '연동 계정', value: connections.length, unit: '개', format: false, color: 'blue', icon: '🔗' },
+            { key: 'syncs', label: '동기화 기록', value: logs.length, unit: '건', format: false, color: 'green', icon: '📊' },
+          ] as StatCardItem[]}
+          columns={2}
+        />
 
         {/* Message */}
         {message && (

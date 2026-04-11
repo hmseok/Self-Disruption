@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 import { getAuthHeader } from '@/app/utils/auth-client'
 
 interface Account {
@@ -93,11 +93,16 @@ export default function OpenbankingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DarkHeader icon="Building2" title="오픈뱅킹 연동" subtitle="금융결제원 오픈뱅킹 API로 거래내역을 자동 수집합니다" />
-
+    <div className="min-h-screen page-bg">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-white mb-8">오픈뱅킹 거래내역 연동</h1>
+        {/* Stats Section */}
+        <NeuStatCards
+          items={[
+            { key: 'accounts', label: '연동 계좌', value: accounts.length, unit: '개', format: false, color: 'blue', icon: '🏦' },
+            { key: 'active', label: '활성 계좌', value: accounts.filter(a => !new Date(a.token_expires_at) < new Date()).length, unit: '개', format: false, color: 'green', icon: '✓' },
+          ] as StatCardItem[]}
+          columns={2}
+        />
 
         {/* 메시지 */}
         {message && (

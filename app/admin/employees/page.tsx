@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import NeuFilterTabs from '../../components/NeuFilterTabs'
 import { auth } from '@/lib/auth-client'
 
 // ────────────────────────────────────────────────────────────────
@@ -514,59 +515,33 @@ export default function OrgManagementPage() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* ═══ DarkHeader ═══ */}
-      <DarkHeader
-        icon="👥"
-        title="조직/권한 통합 관리"
-        subtitle="직원 관리 및 페이지 권한 설정"
-        stats={activeCompanyId ? [
-          { label: '전체 직원', value: employees.length, color: '#2563eb', bgColor: '#eff6ff', borderColor: 'rgba(96,165,250,0.3)', labelColor: '#93c5fd' },
-          { label: '대기중 초대', value: pendingInvitationCount, color: '#fbbf24', bgColor: '#fffbeb', borderColor: 'rgba(251,191,36,0.3)', labelColor: '#fcd34d' },
-          { label: '권한설정 대상', value: assignableEmployees.length, color: '#059669', bgColor: '#ecfdf5', borderColor: 'rgba(74,222,128,0.3)', labelColor: '#6ee7b7' },
-        ] : []}
-        actions={activeCompanyId ? [
-          { label: '직원 초대', icon: '➕', onClick: () => setShowInviteModal(true), variant: 'primary' }
-        ] : []}
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">👥 조직/권한 통합 관리</h1>
+        <p className="text-slate-600 text-sm">직원 관리 및 페이지 권한 설정</p>
+      </div>
+
+      {/* Stats */}
+      {activeCompanyId && (
+        <NeuStatCards
+          items={[
+            { key: 'employees', label: '전체 직원', value: employees.length, color: 'blue', icon: '👥' },
+            { key: 'invitations', label: '대기중 초대', value: pendingInvitationCount, color: 'amber', icon: '📬' },
+            { key: 'perms', label: '권한설정 대상', value: assignableEmployees.length, color: 'green', icon: '🔐' },
+          ]}
+        />
+      )}
+
+      {/* Tabs */}
+      <NeuFilterTabs
+        tabs={TABS}
+        activeKey={activeTab}
+        onSelect={(key) => setActiveTab(key as 'organization' | 'permissions')}
       />
 
       {role === 'admin' && !company ? null : (
         <>
-          {/* ═══ 통계 카드 ═══ */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.8)', borderRadius: 12, padding: '16px 20px', border: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', margin: 0 }}>전체 직원</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#1e293b', margin: '4px 0 0' }}>{employees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#64748b', marginLeft: 2 }}>명</span></p>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(250,204,21,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #fde68a', cursor: 'pointer' }} onClick={() => setActiveTab('organization')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24', margin: 0 }}>대기중 초대</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#f59e0b', margin: '4px 0 0' }}>{pendingInvitationCount}<span style={{ fontSize: 14, fontWeight: 500, color: '#fbbf24', marginLeft: 2 }}>건</span></p>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(34,197,94,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #bbf7d0' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#4ade80', margin: 0 }}>직급/부서</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#22c55e', margin: '4px 0 0' }}>{positions.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#4ade80', marginLeft: 2 }}>직급</span> · {departments.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#4ade80', marginLeft: 2 }}>부서</span></p>
-            </div>
-            <div style={{ flex: 1, background: 'rgba(59,130,246,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', cursor: 'pointer' }} onClick={() => setActiveTab('permissions')}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', margin: 0 }}>권한 설정 대상</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#3b6eb5', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>명</span></p>
-            </div>
-          </div>
 
-          {/* ═══ 탭 ═══ */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {TABS.map(tab => (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                style={{
-                  padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  background: activeTab === tab.key ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.04)',
-                  color: activeTab === tab.key ? '#60a5fa' : '#64748b',
-                  border: activeTab === tab.key ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(0,0,0,0.06)',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                {tab.label}
-                <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 10, background: activeTab === tab.key ? 'rgba(96,165,250,0.25)' : 'rgba(0,0,0,0.06)', color: activeTab === tab.key ? '#60a5fa' : '#64748b' }}>{tab.count}</span>
-              </button>
-            ))}
-          </div>
 
           {/* ================================================================ */}
           {/* Tab 1: 조직 관리 (직원, 직급, 부서, 초대) */}

@@ -4,7 +4,8 @@ import { auth } from '@/lib/auth-client'
 import { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import ConfirmPaymentModal from './ConfirmPaymentModal'
-import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import NeuFilterTabs from '../../components/NeuFilterTabs'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -234,76 +235,147 @@ export default function CollectionsPage() {
     )
   }
 
+  // Build stat cards
+  const statCards: StatCardItem[] = [
+    {
+      key: 'expected',
+      label: '이번달 예상 수금',
+      value: totalExpected,
+      format: true,
+      unit: '원',
+      icon: '💰',
+      color: 'blue',
+    },
+    {
+      key: 'collected',
+      label: '수금 완료',
+      value: totalCollected,
+      format: true,
+      unit: '원',
+      icon: '✅',
+      color: 'green',
+    },
+    {
+      key: 'rate',
+      label: '수금율',
+      value: collectionRate,
+      format: false,
+      unit: '%',
+      icon: '📊',
+      color: collectionRate >= 80 ? 'green' : collectionRate >= 50 ? 'amber' : 'red',
+    },
+    {
+      key: 'overdue',
+      label: '연체',
+      value: overdueTotal,
+      format: true,
+      unit: '원',
+      icon: '⚠️',
+      color: overdueSchedules.length > 0 ? 'red' : 'slate',
+    },
+  ]
+
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6 space-y-6">
-        {/* DarkHeader */}
-        <DarkHeader
-          icon="💰"
-          title="수금 관리"
-          subtitle="납부 현황 확인 및 수금 관리 · 안내 발송"
-          stats={[
-            { label: '이번달 예상 수금', value: `${nf(totalExpected)}원`, color: '#2563eb', bgColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)', labelColor: 'rgba(59, 130, 246, 0.4)' },
-            { label: '수금 완료', value: `${nf(totalCollected)}원`, color: '#34d399', bgColor: 'rgba(52, 211, 153, 0.1)', borderColor: 'rgba(52, 211, 153, 0.3)', labelColor: 'rgba(52, 211, 153, 0.4)' },
-            { label: '수금율', value: `${collectionRate}%`, color: collectionRate >= 80 ? '#34d399' : collectionRate >= 50 ? '#fbbf24' : '#f87171', bgColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.1)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(248, 113, 113, 0.1)', borderColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.3)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.3)' : 'rgba(248, 113, 113, 0.3)', labelColor: collectionRate >= 80 ? 'rgba(52, 211, 153, 0.4)' : collectionRate >= 50 ? 'rgba(251, 191, 36, 0.4)' : 'rgba(248, 113, 113, 0.4)' },
-            { label: '연체', value: `${nf(overdueTotal)}원`, color: overdueSchedules.length > 0 ? '#f87171' : '#cbd5e1', bgColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.1)' : 'rgba(203, 213, 225, 0.1)', borderColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.3)' : 'rgba(203, 213, 225, 0.3)', labelColor: overdueSchedules.length > 0 ? 'rgba(248, 113, 113, 0.4)' : 'rgba(203, 213, 225, 0.4)' },
-          ]}
-        >
-          {/* Month navigation in children */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px' }}>
-            <button onClick={() => changeMonth(-1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#334155' }}>‹</button>
-            <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
-              style={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', color: '#1e293b' }} />
-            <button onClick={() => changeMonth(1)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(255, 255, 255, 0.05)', cursor: 'pointer', color: '#334155' }}>›</button>
+        {/* Page Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">💰 수금 관리</h1>
+            <p className="text-slate-400 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
           </div>
-        </DarkHeader>
+        </div>
 
-        {/* 탭 + 액션 바 */}
+        {/* Stat Cards */}
+        <NeuStatCards items={statCards} columns={4} />
+
+        {/* Month Navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0' }}>
+          <button
+            onClick={() => changeMonth(-1)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              background: 'rgba(255, 255, 255, 0.72)',
+              cursor: 'pointer',
+              color: '#64748b',
+              fontWeight: 600,
+              fontSize: 14,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            ‹
+          </button>
+          <input
+            type="month"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            style={{
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'rgba(255, 255, 255, 0.72)',
+              color: '#1e293b',
+            }}
+          />
+          <button
+            onClick={() => changeMonth(1)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              background: 'rgba(255, 255, 255, 0.72)',
+              cursor: 'pointer',
+              color: '#64748b',
+              fontWeight: 600,
+              fontSize: 14,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            ›
+          </button>
+        </div>
+
+        {/* Tabs + Action Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06]">
-          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-2 border-b border-black/5 flex-wrap gap-3">
-            <div className="flex gap-1">
-              {tabs.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => { setActiveTab(tab.key); setSelectedIds(new Set()) }}
-                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                    activeTab === tab.key
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-400 hover:bg-gray-50'
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`ml-1.5 text-xs font-black ${activeTab === tab.key ? 'text-white/70' : tab.color}`}>
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* 액션 버튼 */}
-            {(activeTab === 'pending' || activeTab === 'overdue') && (
-              <div className="flex items-center gap-2">
-                <select
-                  value={sendChannel}
-                  onChange={(e) => setSendChannel(e.target.value as 'sms' | 'email')}
-                  className="px-3 py-1.5 rounded-lg border border-black/[0.06] text-xs font-bold focus:outline-none bg-gray-50 text-slate-700"
-                >
-                  <option value="sms">SMS</option>
-                  <option value="email">이메일</option>
-                </select>
-                <button
-                  onClick={handleSendReminder}
-                  disabled={selectedIds.size === 0 || sending}
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-40 transition-all shadow-sm"
-                >
-                  {sending ? '발송중...' : `납부 안내 발송 (${selectedIds.size})`}
-                </button>
-              </div>
-            )}
+          {/* NeuFilterTabs with action buttons in trailing */}
+          <div className="px-4 sm:px-6 pt-4">
+            <NeuFilterTabs
+              tabs={tabs}
+              activeKey={activeTab}
+              onSelect={(key) => {
+                setActiveTab(key as Tab)
+                setSelectedIds(new Set())
+              }}
+              trailing={
+                (activeTab === 'pending' || activeTab === 'overdue') && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={sendChannel}
+                      onChange={(e) => setSendChannel(e.target.value as 'sms' | 'email')}
+                      className="px-3 py-1.5 rounded-lg border border-black/[0.06] text-xs font-bold focus:outline-none bg-gray-50 text-slate-700"
+                    >
+                      <option value="sms">SMS</option>
+                      <option value="email">이메일</option>
+                    </select>
+                    <button
+                      onClick={handleSendReminder}
+                      disabled={selectedIds.size === 0 || sending}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-40 transition-all shadow-sm"
+                    >
+                      {sending ? '발송중...' : `납부 안내 발송 (${selectedIds.size})`}
+                    </button>
+                  </div>
+                )
+              }
+            />
           </div>
 
-          {/* 테이블 */}
-          <div className="overflow-x-auto">
+          {/* Table */}
+          <div className="overflow-x-auto border-t border-black/5">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">

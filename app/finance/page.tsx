@@ -14,7 +14,8 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import DarkHeader from '../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuFilterTabs from '../components/NeuFilterTabs'
 export default function FinancePage() {
   const { company, role } = useApp()
 
@@ -176,54 +177,105 @@ const router = useRouter()
     )
   }
 
+  // Build stat cards
+  const statCards: StatCardItem[] = [
+    {
+      key: 'income',
+      label: '총 수입',
+      value: summary.income,
+      format: true,
+      unit: '원',
+      icon: '💵',
+      color: 'blue',
+    },
+    {
+      key: 'expense',
+      label: '총 지출',
+      value: summary.expense,
+      format: true,
+      unit: '원',
+      icon: '💸',
+      color: 'red',
+    },
+    {
+      key: 'profit',
+      label: '손익',
+      value: summary.profit,
+      format: true,
+      unit: '원',
+      icon: '📈',
+      color: summary.profit >= 0 ? 'green' : 'red',
+    },
+  ]
+
+  const filterTabs = [
+    { key: 'ledger', label: '📊 확정된 장부', count: filteredList.length },
+    { key: 'schedule', label: '🗓️ 예정 스케줄', count: filteredList.length },
+  ]
+
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
-
-      {/* ── KPI 스탯 카드 ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <div className="glass-3 glass-border-blue rounded-xl p-4 text-center">
-          <div className="text-base mb-1">💵</div>
-          <div className="text-xl font-black text-blue-400">{nf(summary.income)}원</div>
-          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">총 수입</div>
-        </div>
-        <div className="glass-3 glass-border-red rounded-xl p-4 text-center">
-          <div className="text-base mb-1">💸</div>
-          <div className="text-xl font-black text-red-400">{nf(summary.expense)}원</div>
-          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">총 지출</div>
-        </div>
-        <div className={`glass-3 ${summary.profit >= 0 ? 'glass-border-green' : 'glass-border-red'} rounded-xl p-4 text-center`}>
-          <div className="text-base mb-1">📈</div>
-          <div className={`text-xl font-black ${summary.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{summary.profit > 0 ? '+' : ''}{nf(summary.profit)}원</div>
-          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">손익</div>
-        </div>
-      </div>
-
-      {/* 액션 + 월 선택 */}
-      <div className="si-card mb-6">
-        <div className="si-search-bar">
-          <input type="month" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
-            className="si-input !w-auto text-sm" />
-          <div className="ml-auto flex gap-2">
-            <button onClick={() => router.push('/finance/upload')} className="si-btn si-btn-secondary text-xs">📂 엑셀 등록</button>
-            <button onClick={scrollToForm} className="si-btn si-btn-primary text-xs">✏️ 직접 입력</button>
+        {/* Page Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">💰 자금 장부</h1>
+            <p className="text-slate-400 text-sm mt-1">입출금 관리 및 자금 계획</p>
           </div>
         </div>
 
-        {/* Tab switcher */}
-        <div className="si-tabs">
-          <button onClick={() => setActiveTab('ledger')} className={`si-tab ${activeTab === 'ledger' ? 'si-tab-active' : ''}`}>
-            📊 확정된 장부
-          </button>
-          <button onClick={() => setActiveTab('schedule')} className={`si-tab ${activeTab === 'schedule' ? 'si-tab-active' : ''}`}>
-            🗓️ 예정 스케줄
-          </button>
-          {activeTab === 'schedule' && (
-            <button onClick={generateMonthlySchedule} className="si-btn si-btn-primary text-xs ml-auto my-1.5 mr-3">
-              ⚡ 정기 지출 생성
+        {/* Stat Cards */}
+        <NeuStatCards items={statCards} columns={3} />
+
+      {/* Search Bar + Month Selection */}
+      <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] px-4 sm:px-6 py-4 mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <input
+            type="month"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            style={{
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'rgba(255, 255, 255, 0.72)',
+              color: '#1e293b',
+            }}
+          />
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => router.push('/finance/upload')}
+              className="px-4 py-2.5 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-300 transition-all shadow-sm"
+            >
+              📂 엑셀 등록
             </button>
-          )}
+            <button
+              onClick={scrollToForm}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+            >
+              ✏️ 직접 입력
+            </button>
+          </div>
         </div>
+
+        {/* Tabs with trailing action */}
+        <NeuFilterTabs
+          tabs={filterTabs}
+          activeKey={activeTab}
+          onSelect={(key) => setActiveTab(key as 'ledger' | 'schedule')}
+          trailing={
+            activeTab === 'schedule' && (
+              <button
+                onClick={generateMonthlySchedule}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+              >
+                ⚡ 정기 지출 생성
+              </button>
+            )
+          }
+        />
       </div>
 
       {/* 4. 입력 폼 (Ref) */}
