@@ -229,7 +229,7 @@ export default function MaintenanceTab() {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">데이터가 없습니다.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-4 text-center text-slate-500">데이터가 없습니다.</td></tr>
               ) : (
                 rows.map((row) => (
                   <tr key={row.id} className="border-b border-black/5 hover:bg-gray-50 transition">

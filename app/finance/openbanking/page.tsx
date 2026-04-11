@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import { getAuthHeader } from '@/app/utils/auth-client'
 
 interface Account {
@@ -96,12 +96,12 @@ export default function OpenbankingPage() {
     <div className="min-h-screen page-bg">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Stats Section */}
-        <NeuStatCards
-          items={[
-            { key: 'accounts', label: '연동 계좌', value: accounts.length, unit: '개', format: false, color: 'blue', icon: '🏦' },
-            { key: 'active', label: '활성 계좌', value: accounts.filter(a => !new Date(a.token_expires_at) < new Date()).length, unit: '개', format: false, color: 'green', icon: '✓' },
-          ] as StatCardItem[]}
-          columns={2}
+        <DcStatStrip
+          stats={[
+            { label: '연동 계좌', value: accounts.length, unit: '개' },
+            { label: '활성 계좌', value: accounts.filter(a => !(new Date(a.token_expires_at) < new Date())).length, unit: '개' },
+          ] as StatItem[]}
+          fullWidth
         />
 
         {/* 메시지 */}

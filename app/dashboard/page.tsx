@@ -178,7 +178,7 @@ export default function DashboardPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
       {/* ═══ 상단 인사 헤더 ═══ */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>

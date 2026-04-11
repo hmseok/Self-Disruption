@@ -3602,7 +3602,7 @@ export default function RentPricingBuilder() {
   // Step 1: 원가분석 (기존 UI)
   // ============================================
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50/50 min-h-screen">
 
       {/* ===== 스텝 인디케이터 + 헤더 ===== */}
       <div style={{ marginBottom: 24 }}>

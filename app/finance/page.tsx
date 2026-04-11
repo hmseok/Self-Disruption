@@ -167,7 +167,7 @@ const router = useRouter()
   if (!company && !loading) {
     return (
       <div className="page-bg">
-        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto py-4 px-4 md:px-6">
           <div className="si-card p-12 md:p-20 text-center">
             <span className="text-4xl block mb-3">🏢</span>
             <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
@@ -204,7 +204,7 @@ const router = useRouter()
 
   return (
     <div className="page-bg">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
         {/* Page Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>

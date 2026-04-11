@@ -745,7 +745,7 @@ export default function ContractDetailPage() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50/50 min-h-screen">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '2rem' }}>
         <div style={{ textAlign: 'left' }}>

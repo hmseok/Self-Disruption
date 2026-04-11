@@ -513,7 +513,7 @@ export default function OrgManagementPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
       {/* Header */}
       <div className="mb-6">

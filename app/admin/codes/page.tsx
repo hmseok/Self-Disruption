@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 export default function AdminCodesPage() {
   return (
-    <div className="max-w-5xl mx-auto py-10">
+    <div className="max-w-5xl mx-auto py-4">
       <CodeManager />
     </div>
   );

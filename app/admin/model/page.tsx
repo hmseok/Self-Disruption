@@ -125,7 +125,7 @@ export default function VehicleCodeManager() {
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50/50 min-h-screen">
       <div className="flex justify-between items-end mb-6 md:mb-8">
         <div>
             <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">🚙 차량 표준 코드 관리</h1>

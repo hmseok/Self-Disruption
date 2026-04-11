@@ -454,8 +454,8 @@ export default function RegistrationDetailPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-slate-500">데이터 로딩 중...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 pb-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 py-4 pb-24 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto">
 
         {/* 헤더 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-black/5">
@@ -1106,7 +1106,7 @@ export default function RegistrationDetailPage() {
       {/* 하단 고정 저장 바 */}
       <div className="fixed bottom-0 left-0 right-0 z-30">
         <div className="bg-white/90 backdrop-blur-xl border-t border-black/5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between gap-4">
               {/* 좌: 차량 정보 */}
               <div className="flex items-center gap-3 min-w-0">

@@ -569,7 +569,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
 
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 min-h-screen bg-gray-50">
         <div style={{
           background: 'rgba(255,255,255,0.72)',
           borderRadius: 16,
@@ -586,7 +586,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50 min-h-screen">
 
        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
          <div style={{ textAlign: 'left' }}>

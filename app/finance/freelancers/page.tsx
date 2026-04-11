@@ -556,7 +556,7 @@ export default function FreelancersPage() {
   if (!companyId && !loading) {
     return (
       <div className="page-bg">
-        <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
+        <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
             <div style={{ textAlign: 'left' }}>
               <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 프리랜서 관리</h1>
@@ -581,7 +581,7 @@ export default function FreelancersPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ── 헤더 ── */}
         <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMI ERP — Layout Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'IBM Plex Sans KR', -apple-system, sans-serif; background: #f2f1ef; color: #0f2440; }
+
+  /* ─── Navigation ─── */
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding: 16px 32px; display: flex; align-items: center; gap: 20px;
+  }
+  .top-nav h1 { font-size: 18px; font-weight: 800; color: #0f2440; }
+  .top-nav .subtitle { font-size: 13px; color: #64748b; }
+
+  /* ─── Tab Selector ─── */
+  .design-tabs {
+    display: flex; gap: 0; background: rgba(255,255,255,0.72);
+    border-radius: 16px; padding: 6px; margin: 24px 32px 0;
+    box-shadow: 8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47);
+    border: 1px solid rgba(0,0,0,0.06);
+    overflow-x: auto;
+  }
+  .design-tab {
+    padding: 12px 24px; border: none; cursor: pointer; border-radius: 12px;
+    font-size: 14px; font-weight: 700; background: transparent; color: #64748b;
+    transition: all 0.25s; white-space: nowrap; font-family: inherit;
+  }
+  .design-tab.active {
+    background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff;
+    box-shadow: 4px 4px 12px rgba(59,110,181,0.3);
+  }
+  .design-tab:hover:not(.active) { background: rgba(59,110,181,0.08); color: #3b6eb5; }
+
+  /* ─── Page Selector ─── */
+  .page-tabs {
+    display: flex; gap: 8px; margin: 16px 32px 0; flex-wrap: wrap;
+  }
+  .page-tab {
+    padding: 8px 16px; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px;
+    font-size: 12px; font-weight: 600; background: #fff; color: #64748b;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .page-tab.active { background: #0f2440; color: #fff; border-color: #0f2440; }
+
+  /* ─── Preview Frame ─── */
+  .preview-area { padding: 24px 32px 60px; }
+  .preview-frame {
+    background: #f2f1ef; border-radius: 20px; overflow: hidden;
+    box-shadow: 12px 12px 30px rgba(140,170,210,0.25), -8px -8px 20px rgba(255,255,255,0.5);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .preview-header {
+    background: rgba(255,255,255,0.75); padding: 16px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .preview-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .preview-header .breadcrumb { font-size: 12px; color: #64748b; font-weight: 500; }
+  .preview-content { padding: 24px; min-height: 600px; }
+
+  .design-panel { display: none; }
+  .design-panel.active { display: block; }
+
+  /* ─── Shared Card Styles ─── */
+  .card-neu {
+    background: rgba(255,255,255,0.72); border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47);
+  }
+  .card-flat {
+    background: #fff; border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card-soft {
+    background: rgba(255,255,255,0.60); border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.04);
+    box-shadow: 6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.6);
+  }
+
+  /* ─── Design A: Current ─── */
+  .da-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+  .da-stat {
+    background: rgba(255,255,255,0.72); border-radius: 16px; padding: 16px; text-align: center;
+    box-shadow: 8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .da-stat .icon { font-size: 20px; margin-bottom: 6px; }
+  .da-stat .label { font-size: 11px; color: #64748b; font-weight: 600; }
+  .da-stat .value { font-size: 22px; font-weight: 800; color: #0f2440; }
+  .da-stat .unit { font-size: 12px; color: #8aabc7; font-weight: 600; }
+
+  .da-search {
+    background: rgba(255,255,255,0.40); border-radius: 12px; padding: 10px 16px;
+    border: 1px solid rgba(0,0,0,0.05); margin-bottom: 16px;
+    box-shadow: inset 2px 2px 6px rgba(140,170,210,0.12), inset -2px -2px 6px rgba(255,255,255,0.35);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .da-search input {
+    flex: 1; border: none; background: transparent; font-size: 14px; outline: none;
+    color: #2a4a6b; font-family: inherit;
+  }
+  .da-search .result { font-size: 12px; color: #8aabc7; font-weight: 600; white-space: nowrap; }
+  .da-search .btn-pri {
+    padding: 8px 16px; background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff;
+    border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+
+  .da-tabs {
+    background: rgba(255,255,255,0.40); border-radius: 14px; padding: 6px; display: flex; gap: 4px;
+    margin-bottom: 16px;
+    box-shadow: inset 2px 2px 6px rgba(140,170,210,0.12), inset -2px -2px 6px rgba(255,255,255,0.35);
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .da-tab {
+    padding: 8px 16px; border: none; border-radius: 10px; font-size: 13px; font-weight: 700;
+    background: transparent; color: #64748b; cursor: pointer; font-family: inherit; transition: all 0.2s;
+  }
+  .da-tab.active {
+    background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff;
+    box-shadow: 3px 3px 8px rgba(59,110,181,0.25);
+  }
+  .da-tab .cnt { font-size: 10px; font-weight: 800; margin-left: 4px; opacity: 0.7; }
+
+  .da-table {
+    background: rgba(255,255,255,0.72); border-radius: 16px; overflow: hidden;
+    box-shadow: 8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .da-table table { width: 100%; border-collapse: collapse; }
+  .da-table th {
+    padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700;
+    color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(0,0,0,0.06); background: rgba(255,255,255,0.3);
+  }
+  .da-table td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,0.03); }
+  .da-table tr:hover td { background: rgba(59,110,181,0.03); }
+
+  /* ─── Design B: Compact Card ─── */
+  .db-header {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;
+  }
+  .db-title { font-size: 20px; font-weight: 800; color: #0f2440; }
+  .db-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+  .db-stats {
+    display: flex; gap: 8px; padding: 16px 20px; margin-bottom: 16px;
+    background: rgba(255,255,255,0.72); border-radius: 16px;
+    box-shadow: 8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47);
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .db-stat {
+    flex: 1; padding: 12px 16px; border-radius: 12px; text-align: center;
+    border: 1px solid transparent; transition: all 0.2s; cursor: pointer;
+  }
+  .db-stat:hover { border-color: rgba(59,110,181,0.15); background: rgba(59,110,181,0.03); }
+  .db-stat .label { font-size: 11px; color: #8aabc7; font-weight: 600; margin-bottom: 4px; }
+  .db-stat .value { font-size: 20px; font-weight: 800; }
+  .db-stat .unit { font-size: 11px; font-weight: 600; color: #8aabc7; }
+  .db-stat.blue .value { color: #3b6eb5; }
+  .db-stat.green .value { color: #16a34a; }
+  .db-stat.red .value { color: #dc2626; }
+  .db-stat.amber .value { color: #d97706; }
+  .db-stat.purple .value { color: #7c3aed; }
+  .db-divider { width: 1px; background: rgba(0,0,0,0.06); margin: 4px 0; }
+
+  .db-toolbar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .db-search-wrap {
+    flex: 1; display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.50); border-radius: 12px; padding: 10px 16px;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: inset 1px 1px 4px rgba(140,170,210,0.08);
+  }
+  .db-search-wrap input { flex: 1; border: none; background: transparent; font-size: 13px; outline: none; font-family: inherit; color: #2a4a6b; }
+  .db-search-wrap .icon { color: #8aabc7; }
+
+  .db-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid rgba(0,0,0,0.06); margin-bottom: 16px;
+  }
+  .db-tab {
+    padding: 10px 18px; border: none; background: transparent; font-size: 13px; font-weight: 700;
+    color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .db-tab.active { color: #3b6eb5; border-bottom-color: #3b6eb5; }
+  .db-tab .cnt {
+    margin-left: 4px; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    background: rgba(59,110,181,0.1); color: #3b6eb5;
+  }
+
+  /* ─── Design C: Dashboard Grid ─── */
+  .dc-top { display: grid; grid-template-columns: 1fr 280px; gap: 16px; margin-bottom: 16px; }
+
+  .dc-stat-strip {
+    display: flex; gap: 0;
+    background: linear-gradient(135deg, #3b6eb5, #2d5a9e); border-radius: 16px;
+    overflow: hidden; box-shadow: 6px 6px 16px rgba(59,110,181,0.2);
+  }
+  .dc-sstat {
+    flex: 1; padding: 16px 20px; text-align: center; position: relative;
+    border-right: 1px solid rgba(255,255,255,0.1);
+  }
+  .dc-sstat:last-child { border-right: none; }
+  .dc-sstat .label { font-size: 10px; color: rgba(255,255,255,0.6); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .dc-sstat .value { font-size: 22px; font-weight: 800; color: #fff; margin-top: 4px; }
+  .dc-sstat .unit { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+  .dc-actions {
+    display: flex; flex-direction: column; gap: 8px; justify-content: center;
+  }
+  .dc-action-btn {
+    padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.06);
+    background: rgba(255,255,255,0.72); font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; transition: all 0.2s; font-family: inherit;
+    box-shadow: 4px 4px 10px rgba(140,170,210,0.15), -2px -2px 6px rgba(255,255,255,0.4);
+  }
+  .dc-action-btn:hover { transform: translateY(-1px); box-shadow: 6px 6px 14px rgba(140,170,210,0.2); }
+  .dc-action-btn.primary { background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff; border: none; }
+
+  .dc-bar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    background: rgba(255,255,255,0.72); border-radius: 14px; padding: 8px 8px 8px 20px;
+    box-shadow: 6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5);
+    border: 1px solid rgba(0,0,0,0.05);
+  }
+  .dc-bar input {
+    flex: 1; border: none; background: transparent; font-size: 13px; outline: none; font-family: inherit; color: #2a4a6b;
+  }
+  .dc-bar .filters { display: flex; gap: 4px; }
+  .dc-bar .filter {
+    padding: 7px 14px; border-radius: 10px; border: none; font-size: 12px; font-weight: 700;
+    background: transparent; color: #64748b; cursor: pointer; font-family: inherit; transition: all 0.15s;
+  }
+  .dc-bar .filter.active { background: #0f2440; color: #fff; }
+
+  /* ─── Design D: Minimal Line ─── */
+  .dd-page-title {
+    font-size: 24px; font-weight: 800; color: #0f2440; margin-bottom: 4px;
+  }
+  .dd-page-sub { font-size: 13px; color: #8aabc7; margin-bottom: 24px; }
+
+  .dd-stats { display: flex; gap: 24px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .dd-stat { display: flex; align-items: baseline; gap: 8px; }
+  .dd-stat .label { font-size: 12px; color: #8aabc7; font-weight: 600; }
+  .dd-stat .value { font-size: 28px; font-weight: 800; color: #0f2440; }
+  .dd-stat .unit { font-size: 13px; color: #8aabc7; font-weight: 600; }
+  .dd-stat .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .dd-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .dd-search {
+    flex: 1; padding: 10px 16px; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px;
+    font-size: 13px; outline: none; background: #fff; font-family: inherit; color: #2a4a6b;
+  }
+  .dd-search:focus { border-color: #3b6eb5; box-shadow: 0 0 0 3px rgba(59,110,181,0.1); }
+  .dd-btn {
+    padding: 10px 18px; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px;
+    font-size: 13px; font-weight: 700; background: #fff; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .dd-btn.primary { background: #0f2440; color: #fff; border-color: #0f2440; }
+
+  .dd-tabs { display: flex; gap: 0; margin-bottom: 16px; }
+  .dd-tab {
+    padding: 8px 16px; border: none; background: transparent; font-size: 13px; font-weight: 600;
+    color: #94a3b8; cursor: pointer; transition: all 0.15s; font-family: inherit;
+    border-bottom: 2px solid transparent;
+  }
+  .dd-tab.active { color: #0f2440; border-bottom-color: #0f2440; font-weight: 700; }
+
+  .dd-table { width: 100%; border-collapse: collapse; }
+  .dd-table th {
+    padding: 10px 16px; text-align: left; font-size: 11px; color: #8aabc7; font-weight: 600;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+  }
+  .dd-table td {
+    padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .dd-table tr:hover td { background: rgba(59,110,181,0.02); }
+
+  /* ─── Badges ─── */
+  .badge {
+    padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    display: inline-block;
+  }
+  .badge-blue { background: rgba(59,110,181,0.12); color: #3b6eb5; }
+  .badge-green { background: rgba(22,163,74,0.12); color: #16a34a; }
+  .badge-amber { background: rgba(217,119,6,0.12); color: #d97706; }
+  .badge-red { background: rgba(220,38,38,0.12); color: #dc2626; }
+  .badge-purple { background: rgba(124,58,237,0.12); color: #7c3aed; }
+  .badge-gray { background: rgba(100,116,139,0.12); color: #64748b; }
+
+  .hidden { display: none; }
+
+  /* Description box */
+  .desc-box {
+    margin: 16px 32px 0; padding: 16px 20px;
+    background: rgba(255,255,255,0.72); border-radius: 14px;
+    border: 1px solid rgba(59,110,181,0.15);
+    font-size: 13px; color: #2a4a6b; line-height: 1.7;
+  }
+  .desc-box strong { color: #3b6eb5; }
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <h1>FMI ERP 레이아웃 디자인 프리뷰</h1>
+  <span class="subtitle">각 디자인을 클릭하여 비교 · 페이지 탭으로 다른 페이지 레이아웃 확인</span>
+</div>
+
+<!-- Design Tabs -->
+<div class="design-tabs" id="designTabs">
+  <button class="design-tab active" onclick="switchDesign('A')">A. 현재 (뉴모피즘)</button>
+  <button class="design-tab" onclick="switchDesign('B')">B. 컴팩트 카드</button>
+  <button class="design-tab" onclick="switchDesign('C')">C. 대시보드 그리드</button>
+  <button class="design-tab" onclick="switchDesign('D')">D. 미니멀 라인</button>
+</div>
+
+<!-- Description -->
+<div class="desc-box" id="descBox">
+  <strong>A. 현재 뉴모피즘</strong> — 각 스탯 카드가 개별 그림자를 가진 독립 카드. 인셋 검색바, 그래디언트 필터 탭, 그림자 테이블 카드. 시각적으로 풍부하지만 요소마다 그림자가 달라 통일감이 약할 수 있음.
+</div>
+
+<!-- Page Tabs -->
+<div class="page-tabs" id="pageTabs">
+  <button class="page-tab active" onclick="switchPage('customers')">고객 관리</button>
+  <button class="page-tab" onclick="switchPage('collections')">수금/회수</button>
+  <button class="page-tab" onclick="switchPage('operations')">차량 운영</button>
+  <button class="page-tab" onclick="switchPage('registration')">차량 등록증</button>
+</div>
+
+<div class="preview-area">
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- DESIGN A: Current Neumorphism -->
+<!-- ════════════════════════════════════════════════ -->
+
+<!-- A - Customers -->
+<div class="design-panel active" data-design="A" data-page="customers">
+  <div class="preview-frame">
+    <div class="preview-header">
+      <div class="dot" style="background:#f87171"></div>
+      <div class="dot" style="background:#fbbf24"></div>
+      <div class="dot" style="background:#34d399"></div>
+      <span class="breadcrumb">영업/계약 › 고객 관리</span>
+    </div>
+    <div class="preview-content">
+      <div class="da-stats">
+        <div class="da-stat"><div class="icon">👥</div><div class="label">전체</div><div class="value">24<span class="unit">명</span></div></div>
+        <div class="da-stat"><div class="icon">👤</div><div class="label">개인</div><div class="value">18<span class="unit">명</span></div></div>
+        <div class="da-stat"><div class="icon">🏢</div><div class="label">법인</div><div class="value">5<span class="unit">명</span></div></div>
+        <div class="da-stat"><div class="icon">🌍</div><div class="label">외국인</div><div class="value">1<span class="unit">명</span></div></div>
+        <div class="da-stat"><div class="icon">⭐</div><div class="label">VIP</div><div class="value">3<span class="unit">명</span></div></div>
+      </div>
+      <div class="da-search">
+        <span style="color:#8aabc7">🔍</span>
+        <input placeholder="이름, 연락처, 이메일, 사업자번호로 검색...">
+        <span class="result">검색결과 24명</span>
+        <button class="btn-pri">+ 신규 고객</button>
+      </div>
+      <div class="da-tabs">
+        <button class="da-tab active">전체<span class="cnt">24</span></button>
+        <button class="da-tab">개인<span class="cnt">18</span></button>
+        <button class="da-tab">법인<span class="cnt">5</span></button>
+        <button class="da-tab">외국인<span class="cnt">1</span></button>
+      </div>
+      <div class="da-table">
+        <table>
+          <thead><tr><th>고객명</th><th>연락처</th><th>등급</th><th>미수금</th><th>등록일</th></tr></thead>
+          <tbody>
+            <tr><td><strong>(주)제이디오토</strong> <span class="badge badge-blue">법인</span></td><td>010-2340-5106</td><td><span class="badge badge-amber">VIP</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-02-20</td></tr>
+            <tr><td><strong>김민수</strong> <span class="badge badge-green">개인</span></td><td>010-5555-1234</td><td><span class="badge badge-gray">일반</span></td><td style="font-weight:700">120,000원</td><td style="color:#8aabc7">2026-03-15</td></tr>
+            <tr><td><strong>이정현</strong> <span class="badge badge-green">개인</span></td><td>010-9876-5432</td><td><span class="badge badge-purple">우수</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-01-08</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- A - Collections -->
+<div class="design-panel" data-design="A" data-page="collections">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 수금/회수</span></div>
+    <div class="preview-content">
+      <div class="da-stats" style="grid-template-columns:repeat(4,1fr)">
+        <div class="da-stat"><div class="icon">💰</div><div class="label">이번달 예상 수금</div><div class="value" style="font-size:18px;color:#3b6eb5">1,250,000<span class="unit">원</span></div></div>
+        <div class="da-stat"><div class="icon">✅</div><div class="label">수금 완료</div><div class="value" style="font-size:18px;color:#16a34a">890,000<span class="unit">원</span></div></div>
+        <div class="da-stat"><div class="icon">📊</div><div class="label">수금율</div><div class="value" style="font-size:18px;color:#16a34a">71<span class="unit">%</span></div></div>
+        <div class="da-stat"><div class="icon">⚠️</div><div class="label">연체</div><div class="value" style="font-size:18px;color:#dc2626">360,000<span class="unit">원</span></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button style="padding:6px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer;font-weight:700;font-family:inherit">‹</button>
+        <span style="font-weight:700;font-size:14px">2026년 4월</span>
+        <button style="padding:6px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer;font-weight:700;font-family:inherit">›</button>
+      </div>
+      <div class="da-tabs">
+        <button class="da-tab active">미수금<span class="cnt">5</span></button>
+        <button class="da-tab">연체<span class="cnt">2</span></button>
+        <button class="da-tab">수금완료<span class="cnt">8</span></button>
+      </div>
+      <div class="da-table">
+        <table>
+          <thead><tr><th>고객명</th><th>계약유형</th><th>납부기한</th><th style="text-align:right">청구금액</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td><strong>김민수</strong></td><td>지입</td><td>2026-04-15</td><td style="text-align:right;font-weight:700">250,000원</td><td><span class="badge badge-amber">미납</span></td></tr>
+            <tr><td><strong>박지현</strong></td><td>투자</td><td>2026-04-20</td><td style="text-align:right;font-weight:700">110,000원</td><td><span class="badge badge-amber">미납</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- A - Operations -->
+<div class="design-panel" data-design="A" data-page="operations">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량운영</span></div>
+    <div class="preview-content">
+      <div class="da-stats">
+        <div class="da-stat"><div class="icon">🚚</div><div class="label">오늘 출고</div><div class="value">3<span class="unit">건</span></div></div>
+        <div class="da-stat"><div class="icon">🔙</div><div class="label">오늘 반납</div><div class="value">2<span class="unit">건</span></div></div>
+        <div class="da-stat"><div class="icon">⚡</div><div class="label">현재 진행중</div><div class="value">1<span class="unit">건</span></div></div>
+        <div class="da-stat"><div class="icon">📅</div><div class="label">이번주 예정</div><div class="value">7<span class="unit">건</span></div></div>
+        <div class="da-stat"><div class="icon">📋</div><div class="label">보험청구 대기</div><div class="value" style="color:#dc2626">10<span class="unit">건</span></div></div>
+      </div>
+      <div class="da-search">
+        <span style="color:#8aabc7">🔍</span><input placeholder="차량번호, 고객명 검색..."><span class="result">검색결과 404건</span><button class="btn-pri">+ 새 배차</button>
+      </div>
+      <div class="da-tabs">
+        <button class="da-tab active">📋 리스트</button>
+        <button class="da-tab">🏠 대시보드</button>
+        <button class="da-tab">📊 타임라인</button>
+        <button class="da-tab">📅 캘린더</button>
+      </div>
+      <div class="da-tabs">
+        <button class="da-tab active">오늘</button>
+        <button class="da-tab">이번주</button>
+        <button class="da-tab">전체</button>
+      </div>
+      <div class="da-tabs">
+        <button class="da-tab active">전체</button>
+        <button class="da-tab">예정</button>
+        <button class="da-tab">준비중</button>
+        <button class="da-tab">점검중</button>
+        <button class="da-tab">이동중</button>
+        <button class="da-tab">완료</button>
+      </div>
+      <div class="da-table">
+        <table>
+          <thead><tr><th>일정</th><th>유형</th><th>배차구분</th><th>차량</th><th>고객</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>2026-04-11</td><td><span class="badge badge-blue">출고</span></td><td><span class="badge badge-red">피해자대차</span></td><td><strong>125허2050</strong></td><td>-</td><td><span class="badge badge-green">✅ 완료</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- A - Registration -->
+<div class="design-panel" data-design="A" data-page="registration">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량 등록증</span></div>
+    <div class="preview-content">
+      <div style="padding:32px;text-align:center;border:2px dashed rgba(0,0,0,0.08);border-radius:16px;margin-bottom:16px;background:rgba(255,255,255,0.3)">
+        <div style="font-size:32px;margin-bottom:8px">🚗</div>
+        <div style="font-weight:700;font-size:14px;color:#64748b">등록증 파일을 드래그하여 업로드</div>
+      </div>
+      <div class="da-stats" style="grid-template-columns:repeat(5,1fr)">
+        <div class="da-stat"><div class="icon">🚗</div><div class="label">등록 차량</div><div class="value">18<span class="unit">대</span></div></div>
+        <div class="da-stat"><div class="icon">🌿</div><div class="label">친환경 차량</div><div class="value">11<span class="unit">대</span></div></div>
+        <div class="da-stat"><div class="icon">🏢</div><div class="label">지입/임차</div><div class="value">6<span class="unit">대</span></div></div>
+        <div class="da-stat"><div class="icon">📋</div><div class="label">최근 7일 등록</div><div class="value">0<span class="unit">대</span></div></div>
+        <div class="da-stat"><div class="icon">💰</div><div class="label">총 취득가액</div><div class="value" style="font-size:16px">751,547,047<span class="unit">원</span></div></div>
+      </div>
+      <div class="da-search"><span style="color:#8aabc7">🔍</span><input placeholder="차량번호, 브랜드, 모델 검색..."><span class="result">검색결과 18대</span></div>
+      <div class="da-tabs">
+        <button class="da-tab active">전체<span class="cnt">18</span></button>
+        <button class="da-tab">전기<span class="cnt">6</span></button>
+        <button class="da-tab">하이브리드<span class="cnt">5</span></button>
+        <button class="da-tab">휘발유/경유<span class="cnt">7</span></button>
+        <button class="da-tab">지입/임차<span class="cnt">6</span></button>
+      </div>
+      <div class="da-table">
+        <table>
+          <thead><tr><th>차량 정보</th><th>소유자 / 차대번호</th><th>연식 / 연료 / 구분</th><th>취득가액</th></tr></thead>
+          <tbody>
+            <tr><td><strong>125하4207</strong><br><span style="color:#8aabc7;font-size:12px">현대 투싼</span></td><td>-</td><td><span class="badge badge-blue">diesel</span> <span class="badge badge-green">신차</span> <span class="badge badge-purple">영업</span></td><td style="font-weight:700">0원</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- DESIGN B: Compact Card -->
+<!-- ════════════════════════════════════════════════ -->
+
+<!-- B - Customers -->
+<div class="design-panel" data-design="B" data-page="customers">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 고객 관리</span></div>
+    <div class="preview-content">
+      <div class="db-stats">
+        <div class="db-stat blue"><div class="label">전체</div><div class="value">24<span class="unit">명</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat green"><div class="label">개인</div><div class="value">18<span class="unit">명</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat blue"><div class="label">법인</div><div class="value">5<span class="unit">명</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat purple"><div class="label">외국인</div><div class="value">1<span class="unit">명</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat amber"><div class="label">VIP</div><div class="value">3<span class="unit">명</span></div></div>
+      </div>
+      <div class="db-toolbar">
+        <div class="db-search-wrap"><span class="icon">🔍</span><input placeholder="이름, 연락처, 이메일로 검색..."></div>
+        <select style="padding:9px 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.08);font-size:13px;font-weight:600;font-family:inherit;background:#fff">
+          <option>최신순</option><option>이름순</option><option>등급순</option>
+        </select>
+        <button class="btn-pri" style="padding:9px 16px;border-radius:10px;font-size:13px">+ 신규 고객</button>
+      </div>
+      <div class="db-tabs">
+        <button class="db-tab active">전체<span class="cnt">24</span></button>
+        <button class="db-tab">개인<span class="cnt">18</span></button>
+        <button class="db-tab">법인<span class="cnt">5</span></button>
+        <button class="db-tab">외국인<span class="cnt">1</span></button>
+      </div>
+      <div class="da-table">
+        <table>
+          <thead><tr><th>고객명</th><th>연락처</th><th>등급</th><th>미수금</th><th>등록일</th></tr></thead>
+          <tbody>
+            <tr><td><strong>(주)제이디오토</strong> <span class="badge badge-blue">법인</span></td><td>010-2340-5106</td><td><span class="badge badge-amber">VIP</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-02-20</td></tr>
+            <tr><td><strong>김민수</strong> <span class="badge badge-green">개인</span></td><td>010-5555-1234</td><td><span class="badge badge-gray">일반</span></td><td style="font-weight:700">120,000원</td><td style="color:#8aabc7">2026-03-15</td></tr>
+            <tr><td><strong>이정현</strong> <span class="badge badge-green">개인</span></td><td>010-9876-5432</td><td><span class="badge badge-purple">우수</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-01-08</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- B - Collections -->
+<div class="design-panel" data-design="B" data-page="collections">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 수금/회수</span></div>
+    <div class="preview-content">
+      <div class="db-stats">
+        <div class="db-stat blue"><div class="label">이번달 예상 수금</div><div class="value" style="font-size:17px">1,250,000<span class="unit">원</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat green"><div class="label">수금 완료</div><div class="value" style="font-size:17px">890,000<span class="unit">원</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat green"><div class="label">수금율</div><div class="value">71<span class="unit">%</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat red"><div class="label">연체</div><div class="value" style="font-size:17px">360,000<span class="unit">원</span></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <button style="padding:6px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer;font-weight:700;font-family:inherit">‹</button>
+        <span style="font-weight:700;font-size:14px">2026년 4월</span>
+        <button style="padding:6px 12px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:#fff;cursor:pointer;font-weight:700;font-family:inherit">›</button>
+      </div>
+      <div class="db-tabs">
+        <button class="db-tab active">미수금<span class="cnt">5</span></button>
+        <button class="db-tab">연체<span class="cnt">2</span></button>
+        <button class="db-tab">수금완료<span class="cnt">8</span></button>
+      </div>
+      <div class="da-table"><table><thead><tr><th>고객명</th><th>계약유형</th><th>납부기한</th><th style="text-align:right">청구금액</th><th>상태</th></tr></thead>
+        <tbody><tr><td><strong>김민수</strong></td><td>지입</td><td>2026-04-15</td><td style="text-align:right;font-weight:700">250,000원</td><td><span class="badge badge-amber">미납</span></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- B - Operations -->
+<div class="design-panel" data-design="B" data-page="operations">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량운영</span></div>
+    <div class="preview-content">
+      <div class="db-stats">
+        <div class="db-stat blue"><div class="label">오늘 출고</div><div class="value">3<span class="unit">건</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat green"><div class="label">오늘 반납</div><div class="value">2<span class="unit">건</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat amber"><div class="label">진행중</div><div class="value">1<span class="unit">건</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat blue"><div class="label">이번주 예정</div><div class="value">7<span class="unit">건</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat red"><div class="label">보험청구 대기</div><div class="value">10<span class="unit">건</span></div></div>
+      </div>
+      <div class="db-toolbar">
+        <div class="db-search-wrap"><span class="icon">🔍</span><input placeholder="차량번호, 고객명 검색..."></div>
+        <button class="btn-pri" style="padding:9px 16px;border-radius:10px;font-size:13px">+ 새 배차</button>
+      </div>
+      <div class="db-tabs">
+        <button class="db-tab active">📋 리스트</button>
+        <button class="db-tab">🏠 대시보드</button>
+        <button class="db-tab">📊 타임라인</button>
+        <button class="db-tab">📅 캘린더</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <span class="badge badge-blue" style="cursor:pointer;padding:5px 12px;font-size:12px">오늘</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">이번주</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">전체</span>
+        <span style="width:1px;background:rgba(0,0,0,0.08);margin:0 4px"></span>
+        <span class="badge badge-blue" style="cursor:pointer;padding:5px 12px;font-size:12px">전체</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">예정</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">준비중</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">점검중</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">완료</span>
+      </div>
+      <div class="da-table"><table><thead><tr><th>일정</th><th>유형</th><th>배차구분</th><th>차량</th><th>고객</th><th>상태</th></tr></thead>
+        <tbody><tr><td>2026-04-11</td><td><span class="badge badge-blue">출고</span></td><td><span class="badge badge-red">피해자대차</span></td><td><strong>125허2050</strong></td><td>-</td><td><span class="badge badge-green">✅ 완료</span></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- B - Registration -->
+<div class="design-panel" data-design="B" data-page="registration">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량 등록증</span></div>
+    <div class="preview-content">
+      <div style="padding:28px;text-align:center;border:2px dashed rgba(0,0,0,0.08);border-radius:14px;margin-bottom:16px;background:rgba(255,255,255,0.4)">
+        <div style="font-size:28px;margin-bottom:6px">🚗</div>
+        <div style="font-weight:700;font-size:13px;color:#64748b">등록증 파일을 드래그하여 업로드</div>
+      </div>
+      <div class="db-stats">
+        <div class="db-stat blue"><div class="label">등록 차량</div><div class="value">18<span class="unit">대</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat green"><div class="label">친환경</div><div class="value">11<span class="unit">대</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat blue"><div class="label">지입/임차</div><div class="value">6<span class="unit">대</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat purple"><div class="label">최근 7일</div><div class="value">0<span class="unit">대</span></div></div>
+        <div class="db-divider"></div>
+        <div class="db-stat amber"><div class="label">총 취득가액</div><div class="value" style="font-size:15px">7.5억<span class="unit">원</span></div></div>
+      </div>
+      <div class="db-toolbar"><div class="db-search-wrap"><span class="icon">🔍</span><input placeholder="차량번호, 브랜드, 모델 검색..."></div></div>
+      <div class="db-tabs">
+        <button class="db-tab active">전체<span class="cnt">18</span></button>
+        <button class="db-tab">전기<span class="cnt">6</span></button>
+        <button class="db-tab">하이브리드<span class="cnt">5</span></button>
+        <button class="db-tab">휘발유/경유<span class="cnt">7</span></button>
+        <button class="db-tab">지입/임차<span class="cnt">6</span></button>
+      </div>
+      <div class="da-table"><table><thead><tr><th>차량 정보</th><th>소유자 / 차대번호</th><th>연식 / 연료 / 구분</th><th>취득가액</th></tr></thead>
+        <tbody><tr><td><strong>125하4207</strong><br><span style="color:#8aabc7;font-size:12px">현대 투싼</span></td><td>-</td><td><span class="badge badge-blue">diesel</span> <span class="badge badge-green">신차</span></td><td style="font-weight:700">0원</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- DESIGN C: Dashboard Grid -->
+<!-- ════════════════════════════════════════════════ -->
+
+<!-- C - Customers -->
+<div class="design-panel" data-design="C" data-page="customers">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 고객 관리</span></div>
+    <div class="preview-content">
+      <div class="dc-top">
+        <div class="dc-stat-strip">
+          <div class="dc-sstat"><div class="label">전체</div><div class="value">24<span class="unit">명</span></div></div>
+          <div class="dc-sstat"><div class="label">개인</div><div class="value">18<span class="unit">명</span></div></div>
+          <div class="dc-sstat"><div class="label">법인</div><div class="value">5<span class="unit">명</span></div></div>
+          <div class="dc-sstat"><div class="label">외국인</div><div class="value">1<span class="unit">명</span></div></div>
+          <div class="dc-sstat"><div class="label">VIP</div><div class="value">3<span class="unit">명</span></div></div>
+        </div>
+        <div class="dc-actions">
+          <button class="dc-action-btn primary">+ 신규 고객</button>
+          <button class="dc-action-btn">📥 엑셀 다운로드</button>
+        </div>
+      </div>
+      <div class="dc-bar">
+        <span style="color:#8aabc7">🔍</span>
+        <input placeholder="이름, 연락처, 이메일로 검색...">
+        <div class="filters">
+          <button class="filter active">전체</button>
+          <button class="filter">개인</button>
+          <button class="filter">법인</button>
+          <button class="filter">외국인</button>
+        </div>
+      </div>
+      <div class="da-table"><table><thead><tr><th>고객명</th><th>연락처</th><th>등급</th><th>미수금</th><th>등록일</th></tr></thead>
+        <tbody>
+          <tr><td><strong>(주)제이디오토</strong> <span class="badge badge-blue">법인</span></td><td>010-2340-5106</td><td><span class="badge badge-amber">VIP</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-02-20</td></tr>
+          <tr><td><strong>김민수</strong> <span class="badge badge-green">개인</span></td><td>010-5555-1234</td><td><span class="badge badge-gray">일반</span></td><td style="font-weight:700">120,000원</td><td style="color:#8aabc7">2026-03-15</td></tr>
+        </tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- C - Collections -->
+<div class="design-panel" data-design="C" data-page="collections">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 수금/회수</span></div>
+    <div class="preview-content">
+      <div class="dc-top">
+        <div class="dc-stat-strip">
+          <div class="dc-sstat"><div class="label">예상 수금</div><div class="value" style="font-size:18px">1,250,000<span class="unit">원</span></div></div>
+          <div class="dc-sstat"><div class="label">수금 완료</div><div class="value" style="font-size:18px">890,000<span class="unit">원</span></div></div>
+          <div class="dc-sstat"><div class="label">수금율</div><div class="value">71<span class="unit">%</span></div></div>
+          <div class="dc-sstat"><div class="label">연체</div><div class="value" style="font-size:18px">360,000<span class="unit">원</span></div></div>
+        </div>
+        <div class="dc-actions">
+          <button class="dc-action-btn primary">납부 안내 발송</button>
+          <button class="dc-action-btn">📤 SMS 전송</button>
+        </div>
+      </div>
+      <div class="dc-bar">
+        <span style="font-weight:700;font-size:14px;white-space:nowrap">2026년 4월</span>
+        <span style="color:#8aabc7;margin:0 4px">|</span>
+        <input placeholder="고객명, 계약번호 검색...">
+        <div class="filters">
+          <button class="filter active">미수금</button>
+          <button class="filter">연체</button>
+          <button class="filter">수금완료</button>
+        </div>
+      </div>
+      <div class="da-table"><table><thead><tr><th>고객명</th><th>계약유형</th><th>납부기한</th><th style="text-align:right">청구금액</th><th>상태</th></tr></thead>
+        <tbody><tr><td><strong>김민수</strong></td><td>지입</td><td>2026-04-15</td><td style="text-align:right;font-weight:700">250,000원</td><td><span class="badge badge-amber">미납</span></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- C - Operations -->
+<div class="design-panel" data-design="C" data-page="operations">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량운영</span></div>
+    <div class="preview-content">
+      <div class="dc-top">
+        <div class="dc-stat-strip">
+          <div class="dc-sstat"><div class="label">오늘 출고</div><div class="value">3<span class="unit">건</span></div></div>
+          <div class="dc-sstat"><div class="label">오늘 반납</div><div class="value">2<span class="unit">건</span></div></div>
+          <div class="dc-sstat"><div class="label">진행중</div><div class="value">1<span class="unit">건</span></div></div>
+          <div class="dc-sstat"><div class="label">이번주</div><div class="value">7<span class="unit">건</span></div></div>
+          <div class="dc-sstat"><div class="label">보험 대기</div><div class="value">10<span class="unit">건</span></div></div>
+        </div>
+        <div class="dc-actions">
+          <button class="dc-action-btn primary">+ 새 배차</button>
+        </div>
+      </div>
+      <div class="dc-bar">
+        <span style="color:#8aabc7">🔍</span>
+        <input placeholder="차량번호, 고객명 검색...">
+        <div class="filters">
+          <button class="filter active">리스트</button>
+          <button class="filter">대시보드</button>
+          <button class="filter">타임라인</button>
+          <button class="filter">캘린더</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <span class="badge badge-blue" style="cursor:pointer;padding:5px 12px;font-size:12px">오늘</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">이번주</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">전체</span>
+        <span style="width:1px;background:rgba(0,0,0,0.08);margin:0 4px"></span>
+        <span class="badge badge-blue" style="cursor:pointer;padding:5px 12px;font-size:12px">전체</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">예정</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">준비중</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">완료</span>
+      </div>
+      <div class="da-table"><table><thead><tr><th>일정</th><th>유형</th><th>배차구분</th><th>차량</th><th>고객</th><th>상태</th></tr></thead>
+        <tbody><tr><td>2026-04-11</td><td><span class="badge badge-blue">출고</span></td><td><span class="badge badge-red">피해자대차</span></td><td><strong>125허2050</strong></td><td>-</td><td><span class="badge badge-green">✅ 완료</span></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- C - Registration -->
+<div class="design-panel" data-design="C" data-page="registration">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량 등록증</span></div>
+    <div class="preview-content">
+      <div style="padding:28px;text-align:center;border:2px dashed rgba(0,0,0,0.08);border-radius:14px;margin-bottom:16px;background:rgba(255,255,255,0.4)">
+        <div style="font-size:28px;margin-bottom:6px">🚗</div>
+        <div style="font-weight:700;font-size:13px;color:#64748b">등록증 파일을 드래그하여 업로드</div>
+      </div>
+      <div class="dc-top">
+        <div class="dc-stat-strip">
+          <div class="dc-sstat"><div class="label">등록 차량</div><div class="value">18<span class="unit">대</span></div></div>
+          <div class="dc-sstat"><div class="label">친환경</div><div class="value">11<span class="unit">대</span></div></div>
+          <div class="dc-sstat"><div class="label">지입/임차</div><div class="value">6<span class="unit">대</span></div></div>
+          <div class="dc-sstat"><div class="label">최근 7일</div><div class="value">0<span class="unit">대</span></div></div>
+          <div class="dc-sstat"><div class="label">총 취득가액</div><div class="value" style="font-size:16px">7.5억<span class="unit">원</span></div></div>
+        </div>
+        <div class="dc-actions">
+          <button class="dc-action-btn primary">+ 신규차량등록</button>
+          <button class="dc-action-btn">📤 등록증 업로드</button>
+        </div>
+      </div>
+      <div class="dc-bar">
+        <span style="color:#8aabc7">🔍</span><input placeholder="차량번호, 브랜드, 모델 검색...">
+        <div class="filters">
+          <button class="filter active">전체</button>
+          <button class="filter">전기</button>
+          <button class="filter">하이브리드</button>
+          <button class="filter">휘발유/경유</button>
+          <button class="filter">지입/임차</button>
+        </div>
+      </div>
+      <div class="da-table"><table><thead><tr><th>차량 정보</th><th>소유자 / 차대번호</th><th>연식 / 연료 / 구분</th><th>취득가액</th></tr></thead>
+        <tbody><tr><td><strong>125하4207</strong><br><span style="color:#8aabc7;font-size:12px">현대 투싼</span></td><td>-</td><td><span class="badge badge-blue">diesel</span> <span class="badge badge-green">신차</span></td><td style="font-weight:700">0원</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ -->
+<!-- DESIGN D: Minimal Line -->
+<!-- ════════════════════════════════════════════════ -->
+
+<!-- D - Customers -->
+<div class="design-panel" data-design="D" data-page="customers">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 고객 관리</span></div>
+    <div class="preview-content" style="background:#fff">
+      <div class="dd-page-title">고객 관리</div>
+      <div class="dd-page-sub">고객 정보 관리 · 등급 · 미수금 현황</div>
+      <div class="dd-stats">
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">전체</div><div class="value">24</div><div class="unit">명</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#16a34a"></div><div class="label">개인</div><div class="value">18</div><div class="unit">명</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">법인</div><div class="value">5</div><div class="unit">명</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#7c3aed"></div><div class="label">외국인</div><div class="value">1</div><div class="unit">명</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#d97706"></div><div class="label">VIP</div><div class="value">3</div><div class="unit">명</div></div>
+      </div>
+      <div class="dd-controls">
+        <input class="dd-search" placeholder="이름, 연락처, 이메일, 사업자번호로 검색...">
+        <select class="dd-btn" style="font-family:inherit"><option>최신순</option><option>이름순</option></select>
+        <button class="dd-btn primary">+ 신규 고객</button>
+      </div>
+      <div class="dd-tabs">
+        <button class="dd-tab active">전체 24</button>
+        <button class="dd-tab">개인 18</button>
+        <button class="dd-tab">법인 5</button>
+        <button class="dd-tab">외국인 1</button>
+      </div>
+      <table class="dd-table"><thead><tr><th>고객명</th><th>연락처</th><th>등급</th><th>미수금</th><th>등록일</th></tr></thead>
+        <tbody>
+          <tr><td><strong>(주)제이디오토</strong> <span class="badge badge-blue">법인</span></td><td>010-2340-5106</td><td><span class="badge badge-amber">VIP</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-02-20</td></tr>
+          <tr><td><strong>김민수</strong> <span class="badge badge-green">개인</span></td><td>010-5555-1234</td><td><span class="badge badge-gray">일반</span></td><td style="font-weight:700">120,000원</td><td style="color:#8aabc7">2026-03-15</td></tr>
+          <tr><td><strong>이정현</strong> <span class="badge badge-green">개인</span></td><td>010-9876-5432</td><td><span class="badge badge-purple">우수</span></td><td style="font-weight:700">0원</td><td style="color:#8aabc7">2026-01-08</td></tr>
+        </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- D - Collections -->
+<div class="design-panel" data-design="D" data-page="collections">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">영업/계약 › 수금/회수</span></div>
+    <div class="preview-content" style="background:#fff">
+      <div class="dd-page-title">수금 관리</div>
+      <div class="dd-page-sub">납부 현황 · 수금율 · 연체 관리</div>
+      <div class="dd-stats">
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">예상 수금</div><div class="value" style="font-size:22px">1,250,000</div><div class="unit">원</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#16a34a"></div><div class="label">수금 완료</div><div class="value" style="font-size:22px">890,000</div><div class="unit">원</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#16a34a"></div><div class="label">수금율</div><div class="value">71</div><div class="unit">%</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#dc2626"></div><div class="label">연체</div><div class="value" style="font-size:22px">360,000</div><div class="unit">원</div></div>
+      </div>
+      <div class="dd-controls">
+        <button class="dd-btn" style="font-family:inherit">‹</button>
+        <span style="font-weight:700;font-size:14px">2026년 4월</span>
+        <button class="dd-btn" style="font-family:inherit">›</button>
+        <div style="flex:1"></div>
+        <button class="dd-btn primary">납부 안내 발송</button>
+      </div>
+      <div class="dd-tabs">
+        <button class="dd-tab active">미수금 5</button>
+        <button class="dd-tab">연체 2</button>
+        <button class="dd-tab">수금완료 8</button>
+      </div>
+      <table class="dd-table"><thead><tr><th>고객명</th><th>계약유형</th><th>납부기한</th><th style="text-align:right">청구금액</th><th>상태</th></tr></thead>
+        <tbody><tr><td><strong>김민수</strong></td><td>지입</td><td>2026-04-15</td><td style="text-align:right;font-weight:700">250,000원</td><td><span class="badge badge-amber">미납</span></td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- D - Operations -->
+<div class="design-panel" data-design="D" data-page="operations">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량운영</span></div>
+    <div class="preview-content" style="background:#fff">
+      <div class="dd-page-title">출고/반납 관리</div>
+      <div class="dd-page-sub">배차 스케줄 관리 · 출고/반납 처리</div>
+      <div class="dd-stats">
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">오늘 출고</div><div class="value">3</div><div class="unit">건</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#16a34a"></div><div class="label">오늘 반납</div><div class="value">2</div><div class="unit">건</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#d97706"></div><div class="label">진행중</div><div class="value">1</div><div class="unit">건</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">이번주</div><div class="value">7</div><div class="unit">건</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#dc2626"></div><div class="label">보험 대기</div><div class="value">10</div><div class="unit">건</div></div>
+      </div>
+      <div class="dd-controls">
+        <input class="dd-search" placeholder="차량번호, 고객명 검색...">
+        <button class="dd-btn primary">+ 새 배차</button>
+      </div>
+      <div class="dd-tabs">
+        <button class="dd-tab active">📋 리스트</button>
+        <button class="dd-tab">🏠 대시보드</button>
+        <button class="dd-tab">📊 타임라인</button>
+        <button class="dd-tab">📅 캘린더</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <span class="badge" style="cursor:pointer;padding:5px 12px;font-size:12px;background:#0f2440;color:#fff">오늘</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">이번주</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">전체</span>
+        <span style="width:1px;background:rgba(0,0,0,0.08);margin:0 4px"></span>
+        <span class="badge" style="cursor:pointer;padding:5px 12px;font-size:12px;background:#0f2440;color:#fff">전체</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">예정</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">준비중</span>
+        <span class="badge badge-gray" style="cursor:pointer;padding:5px 12px;font-size:12px">완료</span>
+      </div>
+      <table class="dd-table"><thead><tr><th>일정</th><th>유형</th><th>배차구분</th><th>차량</th><th>고객</th><th>상태</th></tr></thead>
+        <tbody><tr><td>2026-04-11</td><td><span class="badge badge-blue">출고</span></td><td><span class="badge badge-red">피해자대차</span></td><td><strong>125허2050</strong></td><td>-</td><td><span class="badge badge-green">✅ 완료</span></td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- D - Registration -->
+<div class="design-panel" data-design="D" data-page="registration">
+  <div class="preview-frame">
+    <div class="preview-header"><div class="dot" style="background:#f87171"></div><div class="dot" style="background:#fbbf24"></div><div class="dot" style="background:#34d399"></div><span class="breadcrumb">차량관리 › 차량 등록증</span></div>
+    <div class="preview-content" style="background:#fff">
+      <div class="dd-page-title">차량 등록증</div>
+      <div class="dd-page-sub">차량 등록·이전 서류 및 제원 관리</div>
+      <div style="padding:24px;text-align:center;border:1px dashed rgba(0,0,0,0.12);border-radius:12px;margin-bottom:20px">
+        <div style="font-size:24px;margin-bottom:6px">🚗</div>
+        <div style="font-weight:600;font-size:13px;color:#64748b">등록증 파일을 드래그하여 업로드</div>
+      </div>
+      <div class="dd-stats">
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">등록 차량</div><div class="value">18</div><div class="unit">대</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#16a34a"></div><div class="label">친환경</div><div class="value">11</div><div class="unit">대</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#3b6eb5"></div><div class="label">지입/임차</div><div class="value">6</div><div class="unit">대</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#7c3aed"></div><div class="label">최근 7일</div><div class="value">0</div><div class="unit">대</div></div>
+        <div class="dd-stat"><div class="dot" style="background:#d97706"></div><div class="label">총 취득가액</div><div class="value" style="font-size:22px">7.5억</div><div class="unit">원</div></div>
+      </div>
+      <div class="dd-controls">
+        <input class="dd-search" placeholder="차량번호, 브랜드, 모델 검색...">
+      </div>
+      <div class="dd-tabs">
+        <button class="dd-tab active">전체 18</button>
+        <button class="dd-tab">전기 6</button>
+        <button class="dd-tab">하이브리드 5</button>
+        <button class="dd-tab">휘발유/경유 7</button>
+        <button class="dd-tab">지입/임차 6</button>
+      </div>
+      <table class="dd-table"><thead><tr><th>차량 정보</th><th>소유자 / 차대번호</th><th>연식 / 연료 / 구분</th><th>취득가액</th></tr></thead>
+        <tbody><tr><td><strong>125하4207</strong><br><span style="color:#8aabc7;font-size:12px">현대 투싼</span></td><td>-</td><td><span class="badge badge-blue">diesel</span> <span class="badge badge-green">신차</span></td><td style="font-weight:700">0원</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /preview-area -->
+
+<script>
+  const descriptions = {
+    A: '<strong>A. 현재 뉴모피즘</strong> — 각 스탯 카드가 개별 그림자를 가진 독립 카드. 인셋 검색바, 그래디언트 필터 탭, 그림자 테이블 카드. 시각적으로 풍부하지만 요소마다 그림자가 달라 페이지 간 통일감이 약할 수 있음.',
+    B: '<strong>B. 컴팩트 카드</strong> — 스탯들이 하나의 카드 안에 디바이더로 구분. 검색+정렬+액션이 한 줄 툴바. 언더라인 탭. 깔끔하고 콤팩트한 SaaS 스타일. <em>통일하기 가장 쉬운 구조.</em>',
+    C: '<strong>C. 대시보드 그리드</strong> — 블루 그래디언트 스탯 스트립 + 우측 액션 버튼 2열 그리드. 검색+필터가 하나의 바에 통합. 대시보드 느낌이 강하고 시각적 임팩트가 있음.',
+    D: '<strong>D. 미니멀 라인</strong> — 흰 배경, 그림자 없음, 숫자만 크게. 컬러 도트로 구분. 심플한 border-bottom 탭. 가장 깔끔하고 가벼운 느낌. 텍스트 중심의 비즈니스 툴 스타일.',
+  }
+
+  let currentDesign = 'A'
+  let currentPage = 'customers'
+
+  function switchDesign(d) {
+    currentDesign = d
+    document.querySelectorAll('.design-tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.design-tab').forEach(t => { if (t.textContent.startsWith(d + '.')) t.classList.add('active') })
+    document.getElementById('descBox').innerHTML = descriptions[d]
+    updatePanels()
+  }
+
+  function switchPage(p) {
+    currentPage = p
+    document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.page-tab').forEach(t => { if (t.getAttribute('onclick')?.includes(p)) t.classList.add('active') })
+    updatePanels()
+  }
+
+  function updatePanels() {
+    document.querySelectorAll('.design-panel').forEach(panel => {
+      const match = panel.dataset.design === currentDesign && panel.dataset.page === currentPage
+      panel.classList.toggle('active', match)
+    })
+  }
+</script>
+</body>
+</html>

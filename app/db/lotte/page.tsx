@@ -328,7 +328,7 @@ export default function BenchmarkPage() {
     <div className="min-h-screen bg-gray-50/50">
       {/* ─── 헤더 ─── */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">📈 벤치마크 비교</h1>
@@ -350,7 +350,7 @@ export default function BenchmarkPage() {
 
       {/* ─── 대시보드 ─── */}
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-gray-100 backdrop-blur rounded-xl p-3 text-center">
               <p className="text-2xl font-black">{stats.total}</p>
@@ -378,7 +378,7 @@ export default function BenchmarkPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-5">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
           {/* ═══ 왼쪽: 목록 ═══ */}

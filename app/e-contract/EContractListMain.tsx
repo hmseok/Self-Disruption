@@ -125,7 +125,7 @@ export default function EContractListMain() {
   // ============================================================================
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 min-h-screen bg-gray-50">
         <div className="p-12 md:p-20 text-center text-slate-400 text-sm bg-white rounded-2xl border border-black/[0.06]">
           <span className="text-4xl block mb-3">🏢</span>
           <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>

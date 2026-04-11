@@ -472,7 +472,7 @@ export default function TaxManagementPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-[1400px] mx-auto">
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>

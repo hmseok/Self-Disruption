@@ -670,7 +670,7 @@ export default function CustomerPage() {
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="page-bg">
-        <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
+        <div className="max-w-[1400px] mx-auto py-4 px-4 md:px-6">
           <div style={{
             background: 'rgba(255,255,255,0.72)',
             borderRadius: 16,
@@ -689,7 +689,7 @@ export default function CustomerPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ── KPI 스탯 바 ── */}
         {!loading && customers.length > 0 && (

@@ -233,7 +233,7 @@ export default function ReportDashboard() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen flex items-center justify-center">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-5xl mb-4 animate-pulse">📊</div>
           <p className="text-slate-500 font-bold">리포트 데이터를 불러오는 중...</p>
@@ -243,7 +243,7 @@ export default function ReportDashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50 min-h-screen">
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'left' }}>

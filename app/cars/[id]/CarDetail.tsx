@@ -34,7 +34,7 @@ function InsuranceInlineTab({ carId, onNavigate }: { carId: string; onNavigate: 
     load()
   }, [carId])
 
-  if (loading) return <div className="text-center py-10 text-gray-400">로딩 중...</div>
+  if (loading) return <div className="text-center py-4 text-gray-400">로딩 중...</div>
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -120,7 +120,7 @@ function InvestInlineTab({ carId }: { carId: string }) {
     load()
   }, [carId])
 
-  if (loading) return <div className="text-center py-10 text-gray-400">로딩 중...</div>
+  if (loading) return <div className="text-center py-4 text-gray-400">로딩 중...</div>
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -336,7 +336,7 @@ export default function CarDetailPage() {
   if (!car) return null
 
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in-up pb-20">
+    <div className="max-w-[1400px] mx-auto py-4 px-6 animate-fade-in-up pb-20">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
@@ -886,9 +886,9 @@ export default function CarDetailPage() {
                 {/* 2. 목록 리스트 */}
                 <div className="space-y-4">
                   <h3 className="font-bold text-gray-800 flex items-center gap-2">📋 등록된 금융 리스트 ({loans.length})</h3>
-                  {loadingLoans ? <p className="text-center py-10 text-gray-400">로딩 중...</p> : (
+                  {loadingLoans ? <p className="text-center py-4 text-gray-400">로딩 중...</p> : (
                     loans.length === 0 ? (
-                      <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400">등록된 금융 정보가 없습니다.</div>
+                      <div className="text-center py-4 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400">등록된 금융 정보가 없습니다.</div>
                     ) : (
                       loans.map((loan) => (
                         <div key={loan.id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 hover:border-steel-200 transition-all group">

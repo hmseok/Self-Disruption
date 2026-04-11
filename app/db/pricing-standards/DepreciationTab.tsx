@@ -451,7 +451,7 @@ export default function DepreciationTab() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredRates.length === 0 ? (
-                <tr><td colSpan={hasActiveAdjustments ? 11 : 10} className="px-4 py-10 text-center text-gray-400">
+                <tr><td colSpan={hasActiveAdjustments ? 11 : 10} className="px-4 py-4 text-center text-gray-400">
                   {rates.length === 0 ? '데이터가 없습니다. 행을 추가해주세요.' : '필터 조건에 맞는 데이터가 없습니다.'}
                 </td></tr>
               ) : (

@@ -239,7 +239,7 @@ export default function LoanListPage() {
 
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 min-h-screen bg-gray-50">
         <div className="bg-white rounded-2xl border border-black/[0.06] p-20 text-center">
           <span className="text-4xl block mb-3">🏢</span>
           <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
@@ -391,7 +391,7 @@ export default function LoanListPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen animate-fade-in">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50 min-h-screen animate-fade-in">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
       {/* DcStatStrip + Actions */}

@@ -162,7 +162,7 @@ export default function CorporateCardsPage() {
   const activeCards = cards.filter(c => c.is_active).length
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+    <div className="max-w-6xl mx-auto py-4 px-4 md:py-5 md:px-6 bg-slate-50 min-h-screen pb-32">
 
       {/* NeuStatCards */}
       <div className="mb-6">

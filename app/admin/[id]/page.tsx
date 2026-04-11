@@ -41,7 +41,7 @@ const [loading, setLoading] = useState(true)
   if (loading) return <div className="p-8">로딩 중...</div>
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 max-w-[1400px] mx-auto">
       {/* 1. 상단 헤더 */}
       <div className="flex justify-between items-end mb-8">
         <div>

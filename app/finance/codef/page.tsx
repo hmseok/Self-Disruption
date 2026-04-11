@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -243,12 +243,12 @@ export default function CodefPage() {
     <div className="min-h-screen page-bg">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Stats Section */}
-        <NeuStatCards
-          items={[
-            { key: 'connections', label: '연동 계정', value: connections.length, unit: '개', format: false, color: 'blue', icon: '🔗' },
-            { key: 'syncs', label: '동기화 기록', value: logs.length, unit: '건', format: false, color: 'green', icon: '📊' },
-          ] as StatCardItem[]}
-          columns={2}
+        <DcStatStrip
+          stats={[
+            { label: '연동 계정', value: connections.length, unit: '개' },
+            { label: '동기화 기록', value: logs.length, unit: '건' },
+          ] as StatItem[]}
+          fullWidth
         />
 
         {/* Message */}

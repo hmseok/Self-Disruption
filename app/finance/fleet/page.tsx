@@ -361,7 +361,7 @@ export default function FleetPnlPage() {
   if (loading) {
     return (
       <div className='min-h-screen page-bg p-8'>
-        <div className='max-w-7xl mx-auto'>
+        <div className='max-w-[1400px] mx-auto'>
           <div className='text-center text-slate-400 mt-8'>로딩 중...</div>
         </div>
       </div>
@@ -371,7 +371,7 @@ export default function FleetPnlPage() {
   return (
     <div className='min-h-screen page-bg p-8'>
 
-      <div className='max-w-7xl mx-auto'>
+      <div className='max-w-[1400px] mx-auto'>
         {/* Stats Section */}
         <DcStatStrip
           stats={[

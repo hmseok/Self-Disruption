@@ -43,7 +43,7 @@ export default function CarListPage() {
   const f = (n: number) => n?.toLocaleString() || '0'
 
   return (
-    <div className="max-w-7xl mx-auto py-10 px-6 animate-fade-in">
+    <div className="max-w-[1400px] mx-auto py-4 px-6 animate-fade-in">
 
       {/* 상단 헤더 영역 */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">

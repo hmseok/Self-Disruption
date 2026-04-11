@@ -253,7 +253,7 @@ export default function FreelancersPage() {
   ]
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4 md:py-8 md:px-6 bg-slate-50 min-h-screen pb-32">
+    <div className="max-w-6xl mx-auto py-4 px-4 md:py-5 md:px-6 bg-slate-50 min-h-screen pb-32">
 
       {/* Header */}
       <div className="mb-6">
