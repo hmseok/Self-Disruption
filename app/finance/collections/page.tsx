@@ -4,8 +4,8 @@ import { auth } from '@/lib/auth-client'
 import { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import ConfirmPaymentModal from './ConfirmPaymentModal'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
-import NeuFilterTabs from '../../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -195,7 +195,7 @@ export default function CollectionsPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const nf = (n: number) => n.toLocaleString('ko-KR')
+  const nf = (n: number) => n.toLocaleString()
 
   const overdueDays = (dateStr: string) => {
     const diff = new Date().getTime() - new Date(dateStr).getTime()
@@ -236,44 +236,36 @@ export default function CollectionsPage() {
   }
 
   // Build stat cards
-  const statCards: StatCardItem[] = [
+  const statCards: StatItem[] = [
     {
-      key: 'expected',
-      label: '이번달 예상 수금',
-      value: totalExpected,
-      format: true,
+      label: '예상 수금',
+      value: nf(totalExpected),
       unit: '원',
-      icon: '💰',
-      color: 'blue',
     },
     {
-      key: 'collected',
       label: '수금 완료',
-      value: totalCollected,
-      format: true,
+      value: nf(totalCollected),
       unit: '원',
-      icon: '✅',
-      color: 'green',
     },
     {
-      key: 'rate',
       label: '수금율',
-      value: collectionRate,
-      format: false,
-      unit: '%',
-      icon: '📊',
-      color: collectionRate >= 80 ? 'green' : collectionRate >= 50 ? 'amber' : 'red',
+      value: `${collectionRate}%`,
+      unit: '',
     },
     {
-      key: 'overdue',
-      label: '연체',
-      value: overdueTotal,
-      format: true,
+      label: '연체금액',
+      value: nf(overdueTotal),
       unit: '원',
-      icon: '⚠️',
-      color: overdueSchedules.length > 0 ? 'red' : 'slate',
     },
   ]
+
+  const filterTabs: FilterItem[] = [
+    { key: 'pending', label: '미수금', count: pendingSchedules.length },
+    { key: 'overdue', label: '연체', count: overdueSchedules.length },
+    { key: 'completed', label: '수금완료', count: completedSchedules.length },
+  ]
+
+  const [searchText, setSearchText] = useState('')
 
   return (
     <div className="page-bg">
@@ -287,95 +279,116 @@ export default function CollectionsPage() {
         </div>
 
         {/* Stat Cards */}
-        <NeuStatCards items={statCards} columns={4} />
+        <DcStatStrip stats={statCards} fullWidth />
 
-        {/* Month Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0' }}>
-          <button
-            onClick={() => changeMonth(-1)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              background: 'rgba(255, 255, 255, 0.72)',
-              cursor: 'pointer',
-              color: '#64748b',
-              fontWeight: 600,
-              fontSize: 14,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            ‹
-          </button>
-          <input
-            type="month"
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            style={{
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 13,
-              fontWeight: 600,
-              background: 'rgba(255, 255, 255, 0.72)',
-              color: '#1e293b',
-            }}
-          />
-          <button
-            onClick={() => changeMonth(1)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: 8,
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              background: 'rgba(255, 255, 255, 0.72)',
-              cursor: 'pointer',
-              color: '#64748b',
-              fontWeight: 600,
-              fontSize: 14,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            ›
-          </button>
-        </div>
+        {/* Toolbar with month navigation + filters + actions */}
+        <DcToolbar
+          search={searchText}
+          onSearchChange={setSearchText}
+          placeholder="고객명 검색..."
+          filters={filterTabs}
+          activeFilter={activeTab}
+          onFilterChange={(key) => {
+            setActiveTab(key as Tab)
+            setSelectedIds(new Set())
+          }}
+          leading={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+              <button
+                onClick={() => changeMonth(-1)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  fontSize: 16,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                ‹
+              </button>
+              <input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                style={{
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: 'transparent',
+                  color: '#2a4a6b',
+                }}
+              />
+              <button
+                onClick={() => changeMonth(1)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  fontSize: 16,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                ›
+              </button>
+            </div>
+          }
+          trailing={
+            (activeTab === 'pending' || activeTab === 'overdue') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                <select
+                  value={sendChannel}
+                  onChange={(e) => setSendChannel(e.target.value as 'sms' | 'email')}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(0,0,0,0.06)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: 'transparent',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="sms">SMS</option>
+                  <option value="email">이메일</option>
+                </select>
+                <button
+                  onClick={handleSendReminder}
+                  disabled={selectedIds.size === 0 || sending}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: selectedIds.size === 0 || sending ? '#cbd5e1' : '#2563eb',
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: selectedIds.size === 0 || sending ? 'default' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {sending ? '발송중...' : `발송 (${selectedIds.size})`}
+                </button>
+              </div>
+            )
+          }
+        />
 
-        {/* Tabs + Action Bar */}
+        {/* Table Container */}
         <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06]">
-          {/* NeuFilterTabs with action buttons in trailing */}
-          <div className="px-4 sm:px-6 pt-4">
-            <NeuFilterTabs
-              tabs={tabs}
-              activeKey={activeTab}
-              onSelect={(key) => {
-                setActiveTab(key as Tab)
-                setSelectedIds(new Set())
-              }}
-              trailing={
-                (activeTab === 'pending' || activeTab === 'overdue') && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={sendChannel}
-                      onChange={(e) => setSendChannel(e.target.value as 'sms' | 'email')}
-                      className="px-3 py-1.5 rounded-lg border border-black/[0.06] text-xs font-bold focus:outline-none bg-gray-50 text-slate-700"
-                    >
-                      <option value="sms">SMS</option>
-                      <option value="email">이메일</option>
-                    </select>
-                    <button
-                      onClick={handleSendReminder}
-                      disabled={selectedIds.size === 0 || sending}
-                      className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:opacity-40 transition-all shadow-sm"
-                    >
-                      {sending ? '발송중...' : `납부 안내 발송 (${selectedIds.size})`}
-                    </button>
-                  </div>
-                )
-              }
-            />
-          </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto border-t border-black/5">
+        {/* Table */}
+        <div className="overflow-x-auto border-t border-black/5">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">
@@ -479,19 +492,19 @@ export default function CollectionsPage() {
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
-
-          {/* 하단 합계 */}
-          {displayList.length > 0 && (
-            <div className="px-6 py-3 border-t border-black/5 flex justify-between items-center text-sm">
-              <span className="text-slate-400">총 {displayList.length}건</span>
-              <span className="font-black text-slate-800">
-                합계: {nf(displayList.reduce((a, s) => a + Number(s.expected_amount || 0), 0))}원
-              </span>
-            </div>
           )}
         </div>
+
+        {/* 하단 합계 */}
+        {displayList.length > 0 && (
+          <div className="px-6 py-3 border-t border-black/5 flex justify-between items-center text-sm bg-white rounded-b-2xl">
+            <span className="text-slate-400">총 {displayList.length}건</span>
+            <span className="font-black text-slate-800">
+              합계: {nf(displayList.reduce((a, s) => a + Number(s.expected_amount || 0), 0))}원
+            </span>
+          </div>
+        )}
+      </div>
       </div>
 
       {/* 수금 확인 모달 */}

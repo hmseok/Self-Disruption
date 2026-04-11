@@ -14,8 +14,8 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuFilterTabs from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 export default function FinancePage() {
   const { company, role } = useApp()
 
@@ -27,6 +27,7 @@ const router = useRouter()
   const [list, setList] = useState<any[]>([])
   const [summary, setSummary] = useState({ income: 0, expense: 0, profit: 0, pendingExpense: 0 })
   const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
+  const [searchText, setSearchText] = useState('')
 
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -178,39 +179,27 @@ const router = useRouter()
   }
 
   // Build stat cards
-  const statCards: StatCardItem[] = [
+  const statCards: StatItem[] = [
     {
-      key: 'income',
       label: '총 수입',
-      value: summary.income,
-      format: true,
+      value: nf(summary.income),
       unit: '원',
-      icon: '💵',
-      color: 'blue',
     },
     {
-      key: 'expense',
       label: '총 지출',
-      value: summary.expense,
-      format: true,
+      value: nf(summary.expense),
       unit: '원',
-      icon: '💸',
-      color: 'red',
     },
     {
-      key: 'profit',
       label: '손익',
-      value: summary.profit,
-      format: true,
+      value: nf(summary.profit),
       unit: '원',
-      icon: '📈',
-      color: summary.profit >= 0 ? 'green' : 'red',
     },
   ]
 
-  const filterTabs = [
-    { key: 'ledger', label: '📊 확정된 장부', count: filteredList.length },
-    { key: 'schedule', label: '🗓️ 예정 스케줄', count: filteredList.length },
+  const filterTabs: FilterItem[] = [
+    { key: 'ledger', label: '확정된 장부', count: filteredList.length },
+    { key: 'schedule', label: '예정 스케줄', count: filteredList.length },
   ]
 
   return (
@@ -225,58 +214,88 @@ const router = useRouter()
         </div>
 
         {/* Stat Cards */}
-        <NeuStatCards items={statCards} columns={3} />
+        <DcStatStrip stats={statCards} fullWidth />
 
-      {/* Search Bar + Month Selection */}
-      <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] px-4 sm:px-6 py-4 mb-6">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+      {/* Toolbar + Month Selection */}
+      <DcToolbar
+        search={searchText}
+        onSearchChange={setSearchText}
+        placeholder="거래처/내용 검색..."
+        filters={filterTabs}
+        activeFilter={activeTab}
+        onFilterChange={(key) => setActiveTab(key as 'ledger' | 'schedule')}
+        leading={
           <input
             type="month"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
             style={{
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              borderRadius: 8,
-              padding: '8px 12px',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 10px',
               fontSize: 13,
               fontWeight: 600,
-              background: 'rgba(255, 255, 255, 0.72)',
-              color: '#1e293b',
+              background: 'transparent',
+              color: '#2a4a6b',
+              minWidth: 100,
             }}
           />
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        }
+        trailing={
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
             <button
               onClick={() => router.push('/finance/upload')}
-              className="px-4 py-2.5 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-300 transition-all shadow-sm"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(0,0,0,0.06)',
+                background: 'transparent',
+                color: '#64748b',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
             >
-              📂 엑셀 등록
+              📂 엑셀
             </button>
             <button
               onClick={scrollToForm}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#2563eb',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
             >
               ✏️ 직접 입력
             </button>
-          </div>
-        </div>
-
-        {/* Tabs with trailing action */}
-        <NeuFilterTabs
-          tabs={filterTabs}
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key as 'ledger' | 'schedule')}
-          trailing={
-            activeTab === 'schedule' && (
+            {activeTab === 'schedule' && (
               <button
                 onClick={generateMonthlySchedule}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-all shadow-sm"
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
               >
-                ⚡ 정기 지출 생성
+                ⚡ 생성
               </button>
-            )
-          }
-        />
-      </div>
+            )}
+          </div>
+        }
+      />
 
       {/* 4. 입력 폼 (Ref) */}
       <div ref={formRef} className="si-card p-4 md:p-6 mb-8 scroll-mt-32">

@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
+import DcToolbar from '../components/DcToolbar'
+import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 import CalendarView from './CalendarView'
 import DispatchModal from './DispatchModal'
@@ -732,44 +732,45 @@ export default function OperationsMainPage() {
 
     return (
       <div>
-        {/* List View Filter Tabs */}
-        <NeuFilterTabs
-          tabs={[
-            { key: 'today', label: '오늘' },
-            { key: 'week', label: '이번주' },
-            { key: 'all', label: '전체' },
+        {/* List View Sub-filters - DcSubFilters with 3 groups */}
+        <DcSubFilters
+          groups={[
+            {
+              key: 'time',
+              activeKey: listFilter,
+              onSelect: (k) => setListFilter(k as any),
+              items: [
+                { key: 'today', label: '오늘' },
+                { key: 'week', label: '이번주' },
+                { key: 'all', label: '전체' },
+              ],
+            },
+            {
+              key: 'status',
+              activeKey: statusFilter,
+              onSelect: setStatusFilter,
+              items: [
+                { key: 'all', label: '전체' },
+                { key: 'scheduled', label: OP_STATUS['scheduled']?.label || 'scheduled' },
+                { key: 'preparing', label: OP_STATUS['preparing']?.label || 'preparing' },
+                { key: 'inspecting', label: OP_STATUS['inspecting']?.label || 'inspecting' },
+                { key: 'in_transit', label: OP_STATUS['in_transit']?.label || 'in_transit' },
+                { key: 'completed', label: OP_STATUS['completed']?.label || 'completed' },
+              ],
+            },
+            {
+              key: 'dispatch',
+              activeKey: dispatchFilter,
+              onSelect: (k) => setDispatchFilter(k as any),
+              items: [
+                { key: 'all', label: '전체배차' },
+                { key: 'regular', label: '일반' },
+                { key: 'insurance', label: '보험배차' },
+                { key: 'maintenance', label: '정비대차' },
+              ],
+            },
           ]}
-          activeKey={listFilter}
-          onSelect={(k) => setListFilter(k as any)}
-          compact={true}
         />
-
-        {/* Status + Dispatch Filter Tabs */}
-        <div style={{ marginBottom: 12 }}>
-          <NeuFilterTabs
-            tabs={['all', 'scheduled', 'preparing', 'inspecting', 'in_transit', 'completed'].map(s => ({
-              key: s,
-              label: s === 'all' ? '전체' : OP_STATUS[s]?.label || s,
-            }))}
-            activeKey={statusFilter}
-            onSelect={setStatusFilter}
-            compact={true}
-          />
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <NeuFilterTabs
-            tabs={[
-              { key: 'all', label: '전체배차' },
-              { key: 'regular', label: '일반' },
-              { key: 'insurance', label: '보험배차' },
-              { key: 'maintenance', label: '정비대차' },
-            ]}
-            activeKey={dispatchFilter}
-            onSelect={(k) => setDispatchFilter(k as any)}
-            compact={true}
-          />
-        </div>
 
         {/* Data Table */}
         <NeuDataTable
@@ -1147,50 +1148,45 @@ export default function OperationsMainPage() {
         </div>
       </div>
 
-      {/* KPI Cards - NeuStatCards */}
+      {/* KPI Cards - DcStatStrip */}
       {(viewMode !== 'dashboard' && operations.length > 0) && (
-        <NeuStatCards
-          items={[
-            { key: 'todayDeliveries', label: '오늘 출고', value: stats.todayDeliveries, unit: '건', icon: '🚚', color: 'blue' },
-            { key: 'todayReturns', label: '오늘 반납', value: stats.todayReturns, unit: '건', icon: '🔙', color: 'amber' },
-            { key: 'inProgress', label: '현재 진행중', value: stats.inProgress, unit: '건', icon: '⚡', color: 'slate' },
-            { key: 'weekScheduled', label: '이번주 예정', value: stats.weekScheduled, unit: '건', icon: '📅', color: 'slate' },
-            { key: 'shortTermActive', label: '단기대차 진행', value: stats.shortTermActive, unit: '건', icon: '📋', color: 'purple' },
-            { key: 'insuranceActive', label: '보험배차 진행', value: stats.insuranceActive, unit: '건', icon: '🛡️', color: 'blue' },
-            { key: 'insurancePendingBilling', label: '보험청구 대기', value: stats.insurancePendingBilling, unit: '건', icon: '⏳', color: 'amber' },
+        <DcStatStrip
+          stats={[
+            { label: '오늘 출고', value: stats.todayDeliveries, unit: '건' },
+            { label: '오늘 반납', value: stats.todayReturns, unit: '건' },
+            { label: '현재 진행중', value: stats.inProgress, unit: '건' },
+            { label: '이번주 예정', value: stats.weekScheduled, unit: '건' },
+            { label: '단기대차 진행', value: stats.shortTermActive, unit: '건' },
+            { label: '보험배차 진행', value: stats.insuranceActive, unit: '건' },
+            { label: '보험청구 대기', value: stats.insurancePendingBilling, unit: '건' },
           ]}
-          columns={7}
+          actions={[
+            {
+              label: '+ 새 배차',
+              variant: 'primary',
+              icon: '🚚',
+              onClick: () => {
+                setEditingOp(null)
+                setShowDispatchModal(true)
+              },
+            },
+          ]}
         />
       )}
 
-      {/* Search Bar + New Dispatch Button */}
-      <NeuSearchBar
-        value={searchQuery}
-        onChange={setSearchQuery}
+      {/* View Mode Toolbar - DcToolbar */}
+      <DcToolbar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
         placeholder="🔍 차량번호, 고객명 검색..."
-        resultText={`검색결과 ${filteredOperations.length}건`}
-        actions={[
-          {
-            label: '+ 새 배차',
-            variant: 'primary',
-            onClick: () => {
-              setEditingOp(null)
-              setShowDispatchModal(true)
-            },
-          },
-        ]}
-      />
-
-      {/* View Mode Tabs - NeuFilterTabs */}
-      <NeuFilterTabs
-        tabs={[
+        filters={[
           { key: 'dashboard', label: '🏠 대시보드' },
           { key: 'list', label: '📋 리스트' },
           { key: 'timeline', label: '📊 타임라인' },
           { key: 'calendar', label: '📅 캘린더' },
         ]}
-        activeKey={viewMode}
-        onSelect={(k) => setViewMode(k as any)}
+        activeFilter={viewMode}
+        onFilterChange={(k) => setViewMode(k as any)}
       />
 
       {/* View Content */}

@@ -2,9 +2,8 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ─────────────────────────────────────────────
@@ -556,17 +555,32 @@ export default function CustomerPage() {
   }
 
   // ── Stat Cards ──
-  const statItems: StatCardItem[] = [
-    { key: 'total', label: '전체', value: stats.total, icon: '👥', color: 'blue' },
-    { key: 'personal', label: '개인', value: stats.personal, icon: '👤', color: 'blue' },
-    { key: 'corporate', label: '법인', value: stats.corporate, icon: '🏢', color: 'green' },
-    { key: 'foreign', label: '외국인', value: stats.foreign, icon: '🌐', color: 'purple' },
-    { key: 'vip', label: 'VIP', value: stats.vip, icon: '⭐', color: 'amber' },
+  const statItems: StatItem[] = [
+    { label: '전체', value: String(stats.total), unit: '' },
+    { label: '개인', value: String(stats.personal), unit: '' },
+    { label: '법인', value: String(stats.corporate), unit: '' },
+    { label: '외국인', value: String(stats.foreign), unit: '' },
+    { label: 'VIP', value: String(stats.vip), unit: '' },
   ]
 
-  // ── Filter Tabs ──
-  const filterTabs: FilterTab[] = [
-    { key: 'all', label: '모두', count: filteredCustomers.length },
+  const actionButtons: ActionButton[] = [
+    {
+      label: '+ 신규 고객',
+      variant: 'primary',
+      onClick: () => {
+        setShowNewModal(true)
+        setNewForm({ ...EMPTY_FORM })
+      },
+    },
+  ]
+
+  // ── Filter Items ──
+  const filterItems: FilterItem[] = [
+    ...CUSTOMER_TYPES.map(t => ({
+      key: t,
+      label: t,
+      count: t === '전체' ? customers.length : stats[t === '개인' ? 'personal' : t === '법인' ? 'corporate' : 'foreign'],
+    })),
   ]
 
   // ── 데이터 테이블 컬럼 ──
@@ -677,55 +691,22 @@ export default function CustomerPage() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-        {/* ── KPI 스탯 카드 ── */}
+        {/* ── KPI 스탯 바 ── */}
         {!loading && customers.length > 0 && (
-          <NeuStatCards
-            items={statItems}
-            columns={5}
+          <DcStatStrip
+            stats={statItems}
+            actions={actionButtons}
           />
         )}
 
-        {/* ── 검색바 ── */}
-        <NeuSearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
+        {/* ── 검색 및 필터 바 ── */}
+        <DcToolbar
+          search={searchQuery}
+          onSearchChange={setSearchQuery}
           placeholder="이름, 연락처, 이메일, 사업자번호로 검색..."
-          resultText={`검색결과 ${filteredCustomers.length}명`}
-          actions={[{
-            label: '+ 신규 고객',
-            variant: 'primary',
-            onClick: () => {
-              setShowNewModal(true)
-              setNewForm({ ...EMPTY_FORM })
-            },
-          }]}
-          extra={
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
-              style={{
-                padding: '9px 12px',
-                fontSize: 13,
-                color: '#1e293b',
-                background: 'rgba(255,255,255,0.40)',
-                border: '1px solid rgba(0,0,0,0.05)',
-                borderRadius: 10,
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="latest">최신순</option>
-              <option value="name">이름순</option>
-              <option value="grade">등급순</option>
-            </select>
-          }
-        />
-
-        {/* ── 필터 탭 ── */}
-        <NeuFilterTabs
-          tabs={CUSTOMER_TYPES.map(t => ({ key: t, label: t }))}
-          activeKey={typeFilter}
-          onSelect={setTypeFilter}
+          filters={filterItems}
+          activeFilter={typeFilter}
+          onFilterChange={setTypeFilter}
           trailing={
             <select
               value={gradeFilter}

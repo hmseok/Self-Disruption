@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -379,12 +379,12 @@ export default function DashboardPage() {
 
           {/* 핵심 KPI 4개 미니카드 */}
           {(() => {
-            const items: StatCardItem[] = []
-            if (showCars) items.push({ key: 'cars', label: '보유', value: loading ? '-' : stats.totalCars, unit: '대', color: 'blue', icon: '🚗', format: false })
-            if (showCustomers) items.push({ key: 'customers', label: '고객', value: loading ? '-' : stats.totalCustomers, unit: '명', color: 'green', icon: '👥', format: false })
-            if (showInvest) items.push({ key: 'invest', label: '투자', value: loading ? '-' : formatMoney(stats.totalInvestAmount), color: 'slate', icon: '💰', format: false, subtitle: `일반 ${stats.activeInvestments} · 지입 ${stats.jiipContracts}` })
-            if (showFinance) items.push({ key: 'profit', label: '순수익', value: loading ? '-' : formatMoney(stats.netProfit), color: stats.netProfit >= 0 ? 'green' : 'red', icon: '📈', format: false })
-            return items.length > 0 ? <NeuStatCards items={items} columns={items.length as any} /> : null
+            const items: StatItem[] = []
+            if (showCars) items.push({ label: '보유', value: loading ? '-' : stats.totalCars, unit: '대' })
+            if (showCustomers) items.push({ label: '고객', value: loading ? '-' : stats.totalCustomers, unit: '명' })
+            if (showInvest) items.push({ label: '투자', value: loading ? '-' : formatMoney(stats.totalInvestAmount), unit: '원' })
+            if (showFinance) items.push({ label: '순수익', value: loading ? '-' : formatMoney(stats.netProfit), unit: '원' })
+            return items.length > 0 ? <DcStatStrip stats={items} fullWidth={true} /> : null
           })()}
 
           {/* 오늘의 운영 현황 */}

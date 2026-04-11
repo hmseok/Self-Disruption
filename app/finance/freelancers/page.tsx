@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
-import NeuSearchBar from '../../components/NeuSearchBar'
-import NeuFilterTabs from '../../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../../components/NeuDataTable'
 import * as XLSX from 'xlsx'
 
@@ -72,6 +71,7 @@ export default function FreelancersPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('active')
+  const [filterSearchText, setFilterSearchText] = useState('')
   const [paymentMonth, setPaymentMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -598,40 +598,7 @@ export default function FreelancersPage() {
           </div>
         </div>
 
-        {/* ── 드래그앤드롭 업로드 영역 (별도 유지) ── */}
-        <div
-          onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-          style={{
-            border: isDragging ? '2px dashed #6366f1' : '2px dashed #d1d5db',
-            borderRadius: 16, padding: aiParsing ? '32px 20px' : '24px 20px', marginBottom: 24, textAlign: 'center',
-            background: isDragging ? 'linear-gradient(135deg, #eef2ff, #e0e7ff)' : aiParsing ? 'linear-gradient(135deg, #f0fdf4, #ecfdf5)' : '#fff',
-            transition: 'all 0.3s', cursor: 'pointer', position: 'relative',
-          }}>
-          {aiParsing ? (
-            <>
-              <div style={{ width: 32, height: 32, border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-              <p style={{ fontWeight: 800, fontSize: 14, color: '#166534', margin: 0 }}>🤖 Gemini AI가 파일을 분석 중...</p>
-              <p style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>엑셀, 이미지, PDF 어떤 형식이든 자동으로 인식합니다</p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            </>
-          ) : (
-            <>
-              <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>{isDragging ? '📥' : '📂'}</span>
-              <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? '#4338ca' : '#0f172a', margin: 0 }}>
-                {isDragging ? '여기에 놓으세요!' : '프리랜서 엑셀/이미지 파일을 드래그하여 일괄 등록'}
-              </p>
-              <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-                엑셀 · CSV · 이미지 · PDF 지원 · 여러 파일 동시 가능 · Gemini AI 자동 분석
-              </p>
-              <input ref={bulkFileRef} type="file" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg,.pdf"
-                multiple
-                onChange={handleBulkFile}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-            </>
-          )}
-        </div>
-
-        {/* ── 일괄등록 로그 & 미리보기 (별도 유지) ── */}
+        {/* ── 일괄등록 로그 & 미리보기 (제거됨) ── */}
         {(bulkLogs.length > 0 || bulkData.length > 0) && (
           <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', marginBottom: 24 }}>
             {bulkLogs.length > 0 && (
@@ -699,50 +666,48 @@ export default function FreelancersPage() {
           </div>
         )}
 
-        {/* ── KPI 스탯 카드 (NeuStatCards 사용) ── */}
+        {/* ── KPI 스탯 카드 (DcStatStrip 사용) ── */}
         {freelancers.length > 0 && (
-          <NeuStatCards
-            items={[
-              { key: 'all', label: '전체 인원', value: freelancers.length, unit: '명', icon: '👥', color: 'blue' },
-              { key: 'active', label: '활성', value: activeCount, unit: '명', icon: '✅', color: 'green' },
-              { key: 'inactive', label: '비활성', value: inactiveCount, unit: '명', icon: '⏸', color: 'red' },
-              { key: 'tax33', label: '3.3% 과세', value: freelancers.filter(f => f.tax_type?.includes('3.3')).length, unit: '명', icon: '📊', color: 'amber' },
-              { key: 'tax88', label: '8.8% 과세', value: freelancers.filter(f => f.tax_type?.includes('8.8')).length, unit: '명', icon: '📈', color: 'purple' },
-            ]}
-            columns={5}
+          <DcStatStrip
+            stats={[
+              { label: '전체', value: freelancers.length, unit: '명' },
+              { label: '활성', value: activeCount, unit: '명' },
+              { label: '비활성', value: inactiveCount, unit: '명' },
+              { label: '3.3%', value: freelancers.filter(f => f.tax_type?.includes('3.3')).length, unit: '명' },
+              { label: '8.8%', value: freelancers.filter(f => f.tax_type?.includes('8.8')).length, unit: '명' },
+            ] as StatItem[]}
+            fullWidth
           />
         )}
 
-        {/* ── 탭 (NeuFilterTabs 사용) ── */}
-        <NeuFilterTabs
-          tabs={[
-            { key: 'list', label: '📋 프리랜서 목록', count: freelancers.length },
-            { key: 'payments', label: '💰 지급 내역', count: 0 },
-          ]}
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key as 'list' | 'payments')}
+        {/* ── 탭 (DcToolbar 사용) ── */}
+        <DcToolbar
+          search={listSearchTerm}
+          onSearchChange={setListSearchTerm}
+          placeholder="이름, 연락처, 은행, 업종 검색..."
+          filters={[
+            { key: 'list', label: '프리랜서 목록', count: freelancers.length },
+            { key: 'payments', label: '지급 내역', count: 0 },
+          ] as FilterItem[]}
+          activeFilter={activeTab}
+          onFilterChange={(key) => setActiveTab(key as 'list' | 'payments')}
         />
 
-        {/* ──── 탭1: 프리랜서 목록 (NeuSearchBar + NeuFilterTabs + NeuDataTable) ──── */}
+        {/* ──── 탭1: 프리랜서 목록 (DcToolbar + DcSubFilters + NeuDataTable) ──── */}
         {activeTab === 'list' && (
           <>
-            {/* 검색바 (NeuSearchBar 사용) */}
-            <NeuSearchBar
-              value={listSearchTerm}
-              onChange={setListSearchTerm}
-              placeholder="이름, 연락처, 은행, 업종 검색..."
-              resultText={`검색결과 ${filteredFreelancers.length}명`}
-            />
-
-            {/* 필터 탭 (NeuFilterTabs 사용) */}
-            <NeuFilterTabs
-              tabs={[
+            {/* 필터 (DcToolbar의 filters prop 사용) */}
+            <DcToolbar
+              search={filterSearchText}
+              onSearchChange={setFilterSearchText}
+              placeholder="필터 검색..."
+              filters={[
                 { key: 'all', label: '전체', count: freelancers.length },
                 { key: 'active', label: '활성', count: activeCount },
                 { key: 'inactive', label: '비활성', count: inactiveCount },
-              ]}
-              activeKey={filter}
-              onSelect={(key) => setFilter(key as 'all' | 'active' | 'inactive')}
+              ] as FilterItem[]}
+              activeFilter={filter}
+              onFilterChange={(key) => setFilter(key as 'all' | 'active' | 'inactive')}
             />
 
             {/* 데이터 테이블 (NeuDataTable 사용) */}

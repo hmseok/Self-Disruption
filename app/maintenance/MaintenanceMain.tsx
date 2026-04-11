@@ -3,9 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import Link from 'next/link'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import DcStatStrip from '../components/DcStatStrip'
+import DcToolbar from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -545,68 +544,71 @@ export default function MaintenanceMainPage() {
           </Link>
         </div>
 
-        {/* KPI Cards using NeuStatCards */}
+        {/* KPI Cards using DcStatStrip */}
         {(maintenanceRecords.length > 0 || inspectionRecords.length > 0) && (
-          <NeuStatCards
-            items={[
-              { key: 'maintPending', label: '정비 대기', value: stats.maintPending, unit: '건', icon: '⏳', color: 'blue' },
-              { key: 'maintInProgress', label: '정비 진행', value: stats.maintInProgress, unit: '건', icon: '🔧', color: 'amber' },
-              { key: 'inspUpcoming', label: '검사 예정', value: stats.inspUpcoming, unit: '건', icon: '📋', color: 'slate' },
-              { key: 'inspOverdue', label: '만기 초과', value: stats.inspOverdue, unit: '건', icon: stats.inspOverdue > 0 ? '⚠️' : '✅', color: stats.inspOverdue > 0 ? 'red' : 'green' },
+          <DcStatStrip
+            stats={[
+              { label: '정비 대기', value: stats.maintPending, unit: '건' },
+              { label: '정비 진행', value: stats.maintInProgress, unit: '건' },
+              { label: '검사 예정', value: stats.inspUpcoming, unit: '건' },
+              { label: '만기 초과', value: stats.inspOverdue, unit: '건' },
             ]}
-            columns={4}
           />
         )}
 
-        {/* Tab Navigation using NeuFilterTabs */}
-        <NeuFilterTabs
-          tabs={[
+        {/* Tab Navigation + Search Bar using DcToolbar */}
+        <DcToolbar
+          search={mainTab === 'maintenance' ? maintSearchQuery : ''}
+          onSearchChange={(v) => mainTab === 'maintenance' && setMaintSearchQuery(v)}
+          placeholder={mainTab === 'maintenance' ? '🔍 차량번호, 정비소, 메모로 검색...' : ''}
+          filters={[
             { key: 'maintenance', label: '정비 이력', count: maintenanceRecords.length },
             { key: 'inspection', label: '법정 검사', count: inspectionRecords.length },
           ]}
-          activeKey={mainTab}
-          onSelect={(key) => setMainTab(key as any)}
-          compact={false}
+          activeFilter={mainTab}
+          onFilterChange={(key) => setMainTab(key as any)}
+          trailing={
+            mainTab === 'inspection' ? (
+              <button
+                onClick={openCreateInspectionModal}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                + 신규 검사
+              </button>
+            ) : (
+              <button
+                onClick={openCreateMaintenanceModal}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                + 신규 정비
+              </button>
+            )
+          }
         />
-
-        {/* Search Bar - SHARED across all tabs */}
-        {mainTab === 'maintenance' && (
-          <NeuSearchBar
-            value={maintSearchQuery}
-            onChange={setMaintSearchQuery}
-            placeholder="🔍 차량번호, 정비소, 메모로 검색..."
-            resultText={`검색결과 ${filteredMaintenanceRecords.length}건`}
-            actions={[
-              {
-                label: '+ 신규 정비',
-                variant: 'primary',
-                onClick: openCreateMaintenanceModal,
-              },
-            ]}
-          />
-        )}
-
-        {mainTab === 'inspection' && (
-          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={openCreateInspectionModal}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 10,
-                border: 'none',
-                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                color: '#fff',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              + 신규 검사
-            </button>
-          </div>
-        )}
 
         {/* Filter Dropdowns - SHARED across all tabs */}
         {mainTab === 'maintenance' && (

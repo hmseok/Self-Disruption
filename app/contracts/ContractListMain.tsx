@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ═══════════════════════════════════════════════════════════════
@@ -211,17 +210,17 @@ export default function ContractListMain() {
       }
     })
 
-  // ── NeuStatCards 데이터 ──
-  const statItems: StatCardItem[] = [
-    { key: 'all', label: '전체', value: contractStats.total, unit: '건', icon: '📋', color: 'blue' },
-    { key: 'active', label: '진행중', value: contractStats.active, unit: '건', icon: '✅', color: 'green' },
-    { key: 'expiring', label: '만료임박', value: contractStats.expiringSoon, unit: '건', icon: '⏳', color: 'amber' },
-    { key: 'ended', label: '종료', value: contractStats.ended, unit: '건', icon: '📁', color: 'slate' },
-    { key: 'cancelled', label: '해지', value: contractStats.cancelled, unit: '건', icon: '🚫', color: 'red' },
+  // ── DcStatStrip 데이터 ──
+  const statItems: StatItem[] = [
+    { label: '전체', value: contractStats.total, unit: '건' },
+    { label: '진행중', value: contractStats.active, unit: '건' },
+    { label: '만료임박', value: contractStats.expiringSoon, unit: '건' },
+    { label: '종료', value: contractStats.ended, unit: '건' },
+    { label: '해지', value: contractStats.cancelled, unit: '건' },
   ]
 
-  // ── NeuFilterTabs 데이터 ──
-  const filterTabs = [
+  // ── DcToolbar 필터 데이터 ──
+  const filterTabs: FilterItem[] = [
     { key: 'all', label: '전체', count: contractStats.total },
     { key: 'active', label: '진행중', count: contractStats.active },
     { key: 'expiring', label: '만료임박', count: contractStats.expiringSoon },
@@ -374,46 +373,42 @@ export default function ContractListMain() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-        {/* ── KPI 스탯 카드 ── */}
+        {/* ── KPI 스탯 스트립 ── */}
         {contracts.length > 0 && (
-          <NeuStatCards
-            items={statItems}
-            activeKey={contractStatusFilter}
-            onSelect={(key) => setContractStatusFilter(key as ContractStatusFilter)}
-            columns={5}
-          />
+          <DcStatStrip stats={statItems} fullWidth />
         )}
 
-        {/* ── 검색바 ── */}
-        <NeuSearchBar
-          value={searchTerm}
-          onChange={setSearchTerm}
+        {/* ── 검색 + 필터 툴바 ── */}
+        <DcToolbar
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
           placeholder="고객명, 차량번호, 브랜드 검색..."
-          resultText={`검색결과 ${filteredContracts.length}건`}
-          extra={
+          filters={filterTabs}
+          activeFilter={contractStatusFilter}
+          onFilterChange={(key) => setContractStatusFilter(key as ContractStatusFilter)}
+          trailing={
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 6,
               paddingLeft: 12,
               borderLeft: '1px solid rgba(0,0,0,0.06)',
+              flexShrink: 0,
             }}>
               <span style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>정렬</span>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value as SortOption)}
                 style={{
-                  padding: '8px 10px',
+                  padding: '6px 10px',
                   fontSize: 12,
-                  background: 'rgba(255,255,255,0.60)',
-                  border: '1px solid rgba(0,0,0,0.05)',
-                  borderRadius: 8,
+                  background: 'transparent',
+                  border: 'none',
                   color: '#1e293b',
                   fontWeight: 500,
                   cursor: 'pointer',
                   outline: 'none',
-                  boxShadow: '2px 2px 6px rgba(140,170,210,0.10), -2px -2px 6px rgba(255,255,255,0.40)',
-                  transition: 'all 0.2s',
+                  fontFamily: 'inherit',
                 }}
               >
                 <option value="latest">최신순</option>
@@ -423,13 +418,6 @@ export default function ContractListMain() {
               </select>
             </div>
           }
-        />
-
-        {/* ── 필터 탭 ── */}
-        <NeuFilterTabs
-          tabs={filterTabs}
-          activeKey={contractStatusFilter}
-          onSelect={(key) => setContractStatusFilter(key as ContractStatusFilter)}
         />
 
         {/* ── 데이터 테이블 ── */}

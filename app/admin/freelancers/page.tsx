@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
-import NeuFilterTabs from '../../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -263,21 +263,24 @@ export default function FreelancersPage() {
 
       {/* Stats - Show only on payments tab */}
       {activeTab === 'payments' && (
-        <NeuStatCards
-          items={[
-            { key: 'count', label: '총 지급건수', value: payments.length, color: 'blue', icon: '📊' },
-            { key: 'gross', label: '총 지급액(세전)', value: totalGross, unit: '원', format: true, color: 'green', icon: '💰' },
-            { key: 'tax', label: '원천징수세', value: totalTax, unit: '원', format: true, color: 'red', icon: '🏛️' },
-            { key: 'net', label: '실지급액', value: totalNet, unit: '원', format: true, color: 'amber', icon: '✓' },
+        <DcStatStrip
+          stats={[
+            { label: '총 지급건수', value: payments.length },
+            { label: '총 지급액(세전)', value: totalGross, unit: '원' },
+            { label: '원천징수세', value: totalTax, unit: '원' },
+            { label: '실지급액', value: totalNet, unit: '원' },
           ]}
+          fullWidth={true}
         />
       )}
 
       {/* Tabs */}
-      <NeuFilterTabs
-        tabs={TABS.map(tab => ({ key: tab.key, label: `${tab.icon} ${tab.label}` }))}
-        activeKey={activeTab}
-        onSelect={(key) => setActiveTab(key as 'list' | 'payments')}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        filters={TABS.map(tab => ({ key: tab.key, label: `${tab.icon} ${tab.label}` }))}
+        activeFilter={activeTab}
+        onFilterChange={(key) => setActiveTab(key as 'list' | 'payments')}
       />
 
       {/* Tab 1: 프리랜서 목록 */}

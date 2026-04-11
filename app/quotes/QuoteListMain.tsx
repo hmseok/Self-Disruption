@@ -6,9 +6,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
+import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ============================================================================
@@ -951,15 +951,17 @@ export default function QuoteListPage() {
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
-        {/* ═══ Main Tab Bar (NeuFilterTabs) ═══ */}
-        <NeuFilterTabs
-          tabs={[
+        {/* ═══ Main Tab Bar (DcToolbar) ═══ */}
+        <DcToolbar
+          search=""
+          onSearchChange={() => {}}
+          filters={[
             { key: 'long_term', label: '장기', count: mainTabCounts.long_term },
             { key: 'short_term', label: '단기', count: mainTabCounts.short_term },
             { key: 'lotte_rate', label: '요금표' },
           ]}
-          activeKey={mainTab}
-          onSelect={(key) => {
+          activeFilter={mainTab}
+          onFilterChange={(key) => {
             setMainTab(key as MainTab)
             setStatusFilter('all')
             setShortStatusFilter('all')
@@ -976,6 +978,8 @@ export default function QuoteListPage() {
                   borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
                   boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  marginLeft: 'auto',
+                  flexShrink: 0,
                 }}
               >
                 + 새 견적
@@ -983,63 +987,41 @@ export default function QuoteListPage() {
             ) : undefined
           }
         />
+        <style>{`
+          input[type="text"]::placeholder {
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+        `}</style>
 
-        {/* ═══ Stat Cards ═══ */}
+        {/* ═══ Stat Strip ═══ */}
         {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
-          <NeuStatCards
-            items={mainTab === 'long_term' ? [
-              { key: 'all', label: '전체', value: statusCounts.all, unit: '건', icon: '📋', color: 'blue' as const },
-              { key: 'draft', label: '작성중', value: statusCounts.draft, unit: '건', icon: '✏️', color: 'amber' as const },
-              { key: 'shared', label: '발송됨', value: statusCounts.shared, unit: '건', icon: '📤', color: 'blue' as const },
-              { key: 'signed', label: '서명완료', value: statusCounts.signed, unit: '건', icon: '✅', color: 'green' as const },
-              { key: 'contracted', label: '계약전환', value: statusCounts.contracted, unit: '건', icon: '📝', color: 'purple' as const },
+          <DcStatStrip
+            stats={mainTab === 'long_term' ? [
+              { label: '전체', value: statusCounts.all, unit: '건' },
+              { label: '작성중', value: statusCounts.draft, unit: '건' },
+              { label: '발송됨', value: statusCounts.shared, unit: '건' },
+              { label: '서명완료', value: statusCounts.signed, unit: '건' },
+              { label: '계약전환', value: statusCounts.contracted, unit: '건' },
             ] : [
-              { key: 'all', label: '전체', value: invoiceStatusCounts.all, unit: '건', icon: '📋', color: 'blue' as const },
-              { key: 'draft', label: '임시저장', value: invoiceStatusCounts.draft, unit: '건', icon: '✏️', color: 'amber' as const },
-              { key: 'shared', label: '발송됨', value: invoiceStatusCounts.shared, unit: '건', icon: '📤', color: 'blue' as const },
-              { key: 'signed', label: '서명완료', value: invoiceStatusCounts.signed, unit: '건', icon: '✅', color: 'green' as const },
+              { label: '전체', value: invoiceStatusCounts.all, unit: '건' },
+              { label: '임시저장', value: invoiceStatusCounts.draft, unit: '건' },
+              { label: '발송됨', value: invoiceStatusCounts.shared, unit: '건' },
+              { label: '서명완료', value: invoiceStatusCounts.signed, unit: '건' },
             ]}
-            columns={mainTab === 'long_term' ? 5 : 4}
+            fullWidth
           />
         )}
 
-        {/* ═══ 검색 + 정렬 (모든 탭에서 공통) ═══ */}
+        {/* ═══ 검색 + 정렬 + 필터 (모든 탭에서 공통) ═══ */}
         {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
           <>
-            {/* NeuSearchBar */}
-            <NeuSearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
+            {/* DcToolbar with Search + Filters */}
+            <DcToolbar
+              search={searchTerm}
+              onSearchChange={setSearchTerm}
               placeholder={mainTab === 'long_term' ? '고객명, 차량번호, 브랜드 검색...' : '임차인명, 청구서 검색...'}
-              resultText={mainTab === 'long_term' ? `검색결과 ${displayedQuotes.length}건` : `검색결과 ${filteredInvoiceQuotes.length}건`}
-              extra={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {mainTab === 'long_term' && (
-                    <>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
-                      <select
-                        value={sortBy}
-                        onChange={e => setSortBy(e.target.value as SortOption)}
-                        style={{
-                          padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
-                          fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
-                          boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
-                        }}
-                      >
-                        <option value="latest">최신순</option>
-                        <option value="customer">고객명순</option>
-                        <option value="expiry">만료일순</option>
-                        <option value="rent">렌트료순</option>
-                      </select>
-                    </>
-                  )}
-                </div>
-              }
-            />
-
-            {/* NeuFilterTabs */}
-            <NeuFilterTabs
-              tabs={
+              filters={
                 mainTab === 'long_term'
                   ? [
                       { key: 'all', label: '전체', count: statusCounts.all },
@@ -1056,11 +1038,39 @@ export default function QuoteListPage() {
                       { key: 'signed', label: '서명완료', count: invoiceStatusCounts.signed },
                     ]
               }
-              activeKey={mainTab === 'long_term' ? statusFilter : invoiceStatusFilter}
-              onSelect={(key) => {
+              activeFilter={mainTab === 'long_term' ? statusFilter : invoiceStatusFilter}
+              onFilterChange={(key) => {
                 if (mainTab === 'long_term') setStatusFilter(key as StatusFilter)
                 else setInvoiceStatusFilter(key as InvoiceStatusFilter)
               }}
+              trailing={
+                mainTab === 'long_term' ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingLeft: 12,
+                    borderLeft: '1px solid rgba(0,0,0,0.06)',
+                    flexShrink: 0,
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
+                    <select
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value as SortOption)}
+                      style={{
+                        padding: '6px 10px', border: 'none', borderRadius: 8,
+                        fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'transparent', color: '#1e293b',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value="latest">최신순</option>
+                      <option value="customer">고객명순</option>
+                      <option value="expiry">만료일순</option>
+                      <option value="rent">렌트료순</option>
+                    </select>
+                  </div>
+                ) : undefined
+              }
             />
           </>
         )}

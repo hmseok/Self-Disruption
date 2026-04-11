@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ═══════════════════════════════════════════════════════════════
@@ -103,17 +102,31 @@ export default function CarListPage() {
   const statusLabel = (s: string) => s === 'available' ? '대기' : s === 'rented' ? '대여' : s === 'maintenance' ? '정비' : s
   const statusBadge = (s: string) => s === 'available' ? 'si-badge-green' : s === 'rented' ? 'si-badge-blue' : 'si-badge-red'
 
-  // ── NeuStatCards 데이터 ──
-  const statItems: StatCardItem[] = [
-    { key: 'all', label: '전체', value: stats.total, unit: '대', icon: '🚗', color: 'blue' },
-    { key: 'available', label: '대기중', value: stats.available, unit: '대', icon: '✅', color: 'green' },
-    { key: 'rented', label: '대여중', value: stats.rented, unit: '대', icon: '🔑', color: 'blue' },
-    { key: 'maintenance', label: '정비/사고', value: stats.maintenance, unit: '대', icon: '🔧', color: 'amber' },
-    { key: '_util', label: '가동률', value: `${utilizationRate}%`, format: false, icon: '📊', color: utilizationRate >= 70 ? 'green' : 'amber' },
+  // ── DcStatStrip 데이터 ──
+  const statItems: StatItem[] = [
+    { label: '전체', value: String(stats.total), unit: '대' },
+    { label: '대기중', value: String(stats.available), unit: '대' },
+    { label: '대여중', value: String(stats.rented), unit: '대' },
+    { label: '정비/사고', value: String(stats.maintenance), unit: '대' },
+    { label: '가동률', value: `${utilizationRate}%`, unit: '' },
   ]
 
-  // ── NeuFilterTabs 데이터 ──
-  const filterTabs = [
+  const actionButtons: ActionButton[] = [
+    {
+      label: '+ 차량 등록',
+      variant: 'primary',
+      onClick: () => {
+        if (role === 'admin' && !adminSelectedCompanyId) {
+          alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
+          return
+        }
+        router.push('/cars/new')
+      },
+    },
+  ]
+
+  // ── DcToolbar filters ──
+  const filterItems: FilterItem[] = [
     { key: 'all', label: '전체', count: stats.total },
     { key: 'available', label: '대기중', count: stats.available },
     { key: 'rented', label: '대여중', count: stats.rented },
@@ -244,13 +257,11 @@ export default function CarListPage() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-        {/* ── KPI 스탯 카드 ── */}
+        {/* ── KPI 스탯 바 ── */}
         {cars.length > 0 && (
-          <NeuStatCards
-            items={statItems}
-            activeKey={filter}
-            onSelect={(key) => key !== '_util' && setFilter(key)}
-            columns={5}
+          <DcStatStrip
+            stats={statItems}
+            actions={actionButtons}
           />
         )}
 
@@ -354,30 +365,14 @@ export default function CarListPage() {
           </div>
         )}
 
-        {/* ── 검색바 ── */}
-        <NeuSearchBar
-          value={searchTerm}
-          onChange={setSearchTerm}
+        {/* ── 검색 및 필터 바 ── */}
+        <DcToolbar
+          search={searchTerm}
+          onSearchChange={setSearchTerm}
           placeholder="차량번호, 브랜드, 모델 검색..."
-          resultText={`검색결과 ${filteredCars.length}대`}
-          actions={[{
-            label: '+ 차량 등록',
-            variant: 'primary',
-            onClick: () => {
-              if (role === 'admin' && !adminSelectedCompanyId) {
-                alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
-                return
-              }
-              router.push('/cars/new')
-            },
-          }]}
-        />
-
-        {/* ── 필터 탭 ── */}
-        <NeuFilterTabs
-          tabs={filterTabs}
-          activeKey={filter}
-          onSelect={setFilter}
+          filters={filterItems}
+          activeFilter={filter}
+          onFilterChange={setFilter}
         />
 
         {/* ── 데이터 테이블 ── */}

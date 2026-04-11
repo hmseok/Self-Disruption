@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -1983,50 +1983,35 @@ export default function SettlementDashboard() {
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
       {/* ═══ 통합 KPI 카드 ═══ */}
-      <NeuStatCards
-        items={[
+      <DcStatStrip
+        stats={[
           {
-            key: 'income',
             label: '총 매출',
-            value: summary.income,
+            value: N(summary.income).toLocaleString(),
             unit: '원',
-            icon: '📈',
-            color: 'blue',
           },
           {
-            key: 'expense',
             label: '총 지출',
-            value: summary.expense,
+            value: N(summary.expense).toLocaleString(),
             unit: '원',
-            icon: '💸',
-            color: 'red',
           },
           {
-            key: 'profit',
             label: '영업이익',
-            value: summary.profit,
+            value: N(summary.profit).toLocaleString(),
             unit: '원',
-            icon: summary.profit >= 0 ? '✅' : '⚠️',
-            color: summary.profit >= 0 ? 'green' : 'red',
           },
           {
-            key: 'pending-count',
             label: '미정산',
             value: settlementSummary.pendingCount,
             unit: '건',
-            icon: '⏳',
-            color: 'amber',
           },
           {
-            key: 'pending-amount',
-            label: '미정산 금액',
-            value: settlementSummary.pendingAmount,
+            label: '미정산액',
+            value: N(settlementSummary.pendingAmount).toLocaleString(),
             unit: '원',
-            icon: '💰',
-            color: 'amber',
           },
-        ]}
-        columns={5}
+        ] as StatItem[]}
+        fullWidth
       />
 
       {/* ═══ 필터 & 액션 버튼 ═══ */}

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import {
   calculatePayroll, reverseCalculatePayroll,
   annualToMonthly, hourlyToMonthly, dailyToMonthly,
@@ -678,15 +678,15 @@ export default function PayrollPage() {
       {tab === 'ledger' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* KPI 스탯 카드 */}
-          <NeuStatCards
-            items={[
-              { key: 'total-gross', label: '총 지급액', value: totalGross, unit: '원', icon: '💰', color: 'blue' },
-              { key: 'total-deductions', label: '총 공제액', value: totalDeductions, unit: '원', icon: '📉', color: 'red' },
-              { key: 'total-net', label: '실지급 총액', value: totalNet, unit: '원', icon: '✅', color: 'green' },
-              { key: 'regular', label: '정규직', value: regularCount, unit: '명', icon: '👔', color: 'blue' },
-              { key: 'freelancer', label: '프리랜서', value: flCount, unit: '명', icon: '🎯', color: 'amber' },
+          <DcStatStrip
+            stats={[
+              { label: '총 지급액', value: totalGross, unit: '원' },
+              { label: '총 공제액', value: totalDeductions, unit: '원' },
+              { label: '실지급 총액', value: totalNet, unit: '원' },
+              { label: '정규직', value: regularCount, unit: '명' },
+              { label: '프리랜서', value: flCount, unit: '명' },
             ]}
-            columns={5}
+            fullWidth={true}
           />
 
           {/* 필터 탭 + 검색 + 액션 버튼 */}
@@ -880,14 +880,14 @@ export default function PayrollPage() {
           <div style={{ marginTop: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 800, color: C.gray900, margin: '0 0 16px' }}>용역비 지급 내역</h3>
             {/* KPI 스탯 카드 */}
-            <NeuStatCards
-              items={[
-                { key: 'fl-count', label: '총 지급 건수', value: flPayments.length, unit: '건', icon: '📊', color: 'blue' },
-                { key: 'fl-gross', label: '총 지급액 (세전)', value: payTotalGross, unit: '원', icon: '💰', color: 'blue' },
-                { key: 'fl-tax', label: '원천징수세', value: payTotalTax, unit: '원', icon: '💸', color: 'red' },
-                { key: 'fl-net', label: '실지급 총액', value: payTotalNet, unit: '원', icon: '✅', color: 'green' },
+            <DcStatStrip
+              stats={[
+                { label: '총 지급 건수', value: flPayments.length, unit: '건' },
+                { label: '총 지급액 (세전)', value: payTotalGross, unit: '원' },
+                { label: '원천징수세', value: payTotalTax, unit: '원' },
+                { label: '실지급 총액', value: payTotalNet, unit: '원' },
               ]}
-              columns={4}
+              fullWidth={true}
             />
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, marginBottom: 12 }}>

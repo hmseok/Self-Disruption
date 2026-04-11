@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -373,15 +373,15 @@ export default function FleetPnlPage() {
 
       <div className='max-w-7xl mx-auto'>
         {/* Stats Section */}
-        <NeuStatCards
-          items={[
-            { key: 'revenue', label: '총 매출', value: totals.revenue, unit: '원', format: true, color: 'blue', icon: '💰' },
-            { key: 'expense', label: '총 비용', value: totals.expense, unit: '원', format: true, color: 'red', icon: '📉' },
-            { key: 'operating', label: '영업이익', value: totals.operatingProfit, unit: '원', format: true, color: 'amber', icon: '📊' },
-            { key: 'settlement', label: '정산액', value: totals.settlement, unit: '원', format: true, color: 'purple', icon: '💵' },
-            { key: 'net', label: '순이익', value: totals.netProfit, unit: '원', format: true, color: totals.netProfit >= 0 ? 'green' : 'red', icon: '✓' },
-          ] as StatCardItem[]}
-          columns={5}
+        <DcStatStrip
+          stats={[
+            { label: '총 매출', value: fMan(totals.revenue), unit: '원' },
+            { label: '총 비용', value: fMan(totals.expense), unit: '원' },
+            { label: '영업이익', value: fMan(totals.operatingProfit), unit: '원' },
+            { label: '정산액', value: fMan(totals.settlement), unit: '원' },
+            { label: '순이익', value: fMan(totals.netProfit), unit: '원' },
+          ] as StatItem[]}
+          fullWidth
         />
 
         {/* Search Section */}

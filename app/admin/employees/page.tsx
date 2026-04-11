@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
 import InviteModal from '../../components/InviteModal'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
-import NeuFilterTabs from '../../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 import { auth } from '@/lib/auth-client'
 
 // ────────────────────────────────────────────────────────────────
@@ -523,20 +523,23 @@ export default function OrgManagementPage() {
 
       {/* Stats */}
       {activeCompanyId && (
-        <NeuStatCards
-          items={[
-            { key: 'employees', label: '전체 직원', value: employees.length, color: 'blue', icon: '👥' },
-            { key: 'invitations', label: '대기중 초대', value: pendingInvitationCount, color: 'amber', icon: '📬' },
-            { key: 'perms', label: '권한설정 대상', value: assignableEmployees.length, color: 'green', icon: '🔐' },
+        <DcStatStrip
+          stats={[
+            { label: '전체 직원', value: employees.length },
+            { label: '대기중 초대', value: pendingInvitationCount },
+            { label: '권한설정 대상', value: assignableEmployees.length },
           ]}
+          fullWidth={true}
         />
       )}
 
       {/* Tabs */}
-      <NeuFilterTabs
-        tabs={TABS}
-        activeKey={activeTab}
-        onSelect={(key) => setActiveTab(key as 'organization' | 'permissions')}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        filters={TABS.map(tab => ({ key: tab.key, label: tab.label, count: tab.count }))}
+        activeFilter={activeTab}
+        onFilterChange={(key) => setActiveTab(key as 'organization' | 'permissions')}
       />
 
       {role === 'admin' && !company ? null : (

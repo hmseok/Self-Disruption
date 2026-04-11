@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -170,12 +170,13 @@ export default function CorporateCardsPage() {
         <p className="text-slate-600 text-sm">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
       </div>
 
-      <NeuStatCards
-        items={[
-          { key: 'cards', label: '등록 카드', value: cards.length, color: 'blue', icon: '💳' },
-          { key: 'count', label: '이번달 사용건수', value: totalMonthlyCount, color: 'green', icon: '📊' },
-          { key: 'usage', label: '총 사용액', value: totalMonthlyUsage, unit: '원', format: true, color: 'amber', icon: '💰' },
+      <DcStatStrip
+        stats={[
+          { label: '등록 카드', value: cards.length },
+          { label: '이번달 사용건수', value: totalMonthlyCount },
+          { label: '총 사용액', value: totalMonthlyUsage, unit: '원' },
         ]}
+        fullWidth={true}
       />
 
       <div className="mb-6 flex justify-end">

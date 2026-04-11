@@ -2,8 +2,8 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -269,11 +269,13 @@ export default function ReportDashboard() {
       </div>
 
       {/* 탭 네비게이션 */}
-      <NeuFilterTabs
-        tabs={tabs as FilterTab[]}
-        activeKey={activeTab}
-        onSelect={setActiveTab}
-        compact={false}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        placeholder=""
+        filters={tabs.map(t => ({ key: t.key, label: t.label }))}
+        activeFilter={activeTab}
+        onFilterChange={setActiveTab}
       />
 
       {/* 탭 컨텐츠 */}
@@ -427,15 +429,15 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
       </div>
 
       {/* 운영 현황 KPI */}
-      <NeuStatCards
-        items={[
-          { key: 'cars', label: '보유 차량', value: carStats.total, unit: '대', color: 'slate', icon: '🚗', subtitle: `가동률 ${carStats.utilizationRate.toFixed(0)}%` },
-          { key: 'rented', label: '대여 중', value: carStats.rented, unit: '대', color: 'green', icon: '🚙' },
-          { key: 'fixed', label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원', color: 'red', icon: '💸', format: false, subtitle: '지입+투자이자+대출' },
-          { key: 'invest', label: '총 투자 유치', value: formatSimpleMoney(partnerStats.investPrincipal), unit: '원', color: 'blue', icon: '💰', format: false },
-          { key: 'loan', label: '총 대출 잔액', value: formatSimpleMoney(partnerStats.loanTotal), unit: '원', color: 'amber', icon: '🏦', format: false },
-        ] as StatCardItem[]}
-        columns={5}
+      <DcStatStrip
+        stats={[
+          { label: '보유 차량', value: carStats.total, unit: '대' },
+          { label: '대여 중', value: carStats.rented, unit: '대' },
+          { label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원' },
+          { label: '총 투자 유치', value: formatSimpleMoney(partnerStats.investPrincipal), unit: '원' },
+          { label: '총 대출 잔액', value: formatSimpleMoney(partnerStats.loanTotal), unit: '원' },
+        ] as StatItem[]}
+        fullWidth={true}
       />
 
       {/* 월별 수입/지출 트렌드 */}
@@ -501,14 +503,14 @@ function RevenueTab({ totalIncome, monthlyData, incomeByCat, transactions }: any
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <NeuStatCards
-        items={[
-          { key: 'total', label: '총 매출', value: formatSimpleMoney(totalIncome), unit: '원', color: 'green', icon: '📈', format: false },
-          { key: 'avg', label: '월 평균 매출', value: formatSimpleMoney(avgMonthlyIncome), unit: '원', color: 'blue', icon: '📊', format: false },
-          { key: 'max', label: '최고 매출 월', value: maxMonth?.label || '-', color: 'slate', icon: '⭐', format: false, subtitle: maxMonth ? formatSimpleMoney(maxMonth.income) + '원' : '' },
-          { key: 'cats', label: '수입 카테고리', value: incomeByCat.length, unit: '개', color: 'purple', icon: '🏷️' },
-        ] as StatCardItem[]}
-        columns={4}
+      <DcStatStrip
+        stats={[
+          { label: '총 매출', value: formatSimpleMoney(totalIncome), unit: '원' },
+          { label: '월 평균 매출', value: formatSimpleMoney(avgMonthlyIncome), unit: '원' },
+          { label: '최고 매출 월', value: maxMonth?.label || '-' },
+          { label: '수입 카테고리', value: incomeByCat.length, unit: '개' },
+        ] as StatItem[]}
+        fullWidth={true}
       />
 
       {/* 월별 매출 추이 */}
@@ -568,14 +570,14 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <NeuStatCards
-        items={[
-          { key: 'total', label: '총 비용', value: formatSimpleMoney(totalExpense), unit: '원', color: 'red', icon: '📉', format: false },
-          { key: 'fixed', label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원', color: 'amber', icon: '💸', format: false, subtitle: '파트너 정산 합계' },
-          { key: 'loan', label: '대출 월 납입', value: formatSimpleMoney(partnerStats.loanMonthly), unit: '원', color: 'blue', icon: '🏦', format: false },
-          { key: 'interest', label: '투자자 이자', value: formatSimpleMoney(partnerStats.investMonthlyInterest), unit: '원', color: 'purple', icon: '💰', format: false, subtitle: '월 예상 이자' },
-        ] as StatCardItem[]}
-        columns={4}
+      <DcStatStrip
+        stats={[
+          { label: '총 비용', value: formatSimpleMoney(totalExpense), unit: '원' },
+          { label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원' },
+          { label: '대출 월 납입', value: formatSimpleMoney(partnerStats.loanMonthly), unit: '원' },
+          { label: '투자자 이자', value: formatSimpleMoney(partnerStats.investMonthlyInterest), unit: '원' },
+        ] as StatItem[]}
+        fullWidth={true}
       />
 
       {/* 월별 지출 추이 */}
@@ -673,15 +675,15 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <NeuStatCards
-        items={[
-          { key: 'total', label: '전체 차량', value: carStats.total, unit: '대', color: 'slate', icon: '🚗' },
-          { key: 'rented', label: '대여 중', value: carStats.rented, unit: '대', color: 'green', icon: '🚙' },
-          { key: 'available', label: '대기 중', value: carStats.available, unit: '대', color: 'blue', icon: '🅿️' },
-          { key: 'maintenance', label: '정비/사고', value: carStats.maintenance, unit: '대', color: 'amber', icon: '🔧' },
-          { key: 'value', label: '총 자산가치', value: formatSimpleMoney(carStats.totalValue), unit: '원', color: 'purple', icon: '💎', format: false },
-        ] as StatCardItem[]}
-        columns={5}
+      <DcStatStrip
+        stats={[
+          { label: '전체 차량', value: carStats.total, unit: '대' },
+          { label: '대여 중', value: carStats.rented, unit: '대' },
+          { label: '대기 중', value: carStats.available, unit: '대' },
+          { label: '정비/사고', value: carStats.maintenance, unit: '대' },
+          { label: '총 자산가치', value: formatSimpleMoney(carStats.totalValue), unit: '원' },
+        ] as StatItem[]}
+        fullWidth={true}
       />
 
       {/* 가동률 게이지 */}
@@ -771,14 +773,14 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <NeuStatCards
-        items={[
-          { key: 'total', label: '총 자금 조달', value: formatSimpleMoney(totalObligation), unit: '원', color: 'slate', icon: '💰', format: false, subtitle: '투자+대출 합계' },
-          { key: 'settlement', label: '월 정산 합계', value: formatSimpleMoney(partnerStats.jiipMonthly + partnerStats.investMonthlyInterest + partnerStats.loanMonthly), unit: '원', color: 'red', icon: '💸', format: false },
-          { key: 'partners', label: '활성 파트너', value: partnerStats.jiipCount + partnerStats.investCount, unit: '건', color: 'green', icon: '🤝', subtitle: '지입+투자' },
-          { key: 'loans', label: '대출 건수', value: partnerStats.loanCount, unit: '건', color: 'amber', icon: '🏦' },
-        ] as StatCardItem[]}
-        columns={4}
+      <DcStatStrip
+        stats={[
+          { label: '총 자금 조달', value: formatSimpleMoney(totalObligation), unit: '원' },
+          { label: '월 정산 합계', value: formatSimpleMoney(partnerStats.jiipMonthly + partnerStats.investMonthlyInterest + partnerStats.loanMonthly), unit: '원' },
+          { label: '활성 파트너', value: partnerStats.jiipCount + partnerStats.investCount, unit: '건' },
+          { label: '대출 건수', value: partnerStats.loanCount, unit: '건' },
+        ] as StatItem[]}
+        fullWidth={true}
       />
 
       {/* 지입 현황 */}

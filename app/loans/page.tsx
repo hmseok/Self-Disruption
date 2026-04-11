@@ -2,9 +2,8 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -249,17 +248,21 @@ export default function LoanListPage() {
     )
   }
 
-  // ─── NeuStatCards 데이터 ───
-  const statItems: StatCardItem[] = [
-    { key: 'totalDebt', label: '총 대출 잔액', value: totalDebt, unit: '원', format: true, color: 'blue' },
-    { key: 'monthlyOut', label: '월 고정 지출', value: monthlyOut, unit: '원', format: true, color: 'red' },
-    { key: 'contracts', label: '계약 건수', value: loans.length, unit: '건', format: false, color: 'blue' },
-    { key: 'expiring', label: '만기 임박 (90일)', value: expiringCount, unit: '건', format: false, color: expiringCount > 0 ? 'amber' : 'slate' },
-    { key: 'avgRate', label: '평균 이자율', value: avgRate, unit: '%', format: false, color: 'blue' },
+  // ─── DcStatStrip 데이터 ───
+  const statItems: StatItem[] = [
+    { label: '총 대출 잔액', value: f(totalDebt), unit: '원' },
+    { label: '월 고정 지출', value: f(monthlyOut), unit: '원' },
+    { label: '계약 건수', value: loans.length, unit: '건' },
+    { label: '만기 임박 (90일)', value: expiringCount, unit: '건' },
+    { label: '평균 이자율', value: avgRate, unit: '%' },
   ]
 
-  // ─── NeuFilterTabs 데이터 ───
-  const filterTabs: FilterTab[] = [
+  const statActions: ActionButton[] = [
+    { label: '직접 등록', onClick: () => router.push('/loans/new'), variant: 'primary', icon: '+' },
+  ]
+
+  // ─── DcToolbar 필터 데이터 ───
+  const filterItems: FilterItem[] = [
     { key: 'all', label: '전체', count: typeStats['all'] },
     { key: '할부', label: '할부', count: typeStats['할부'] },
     { key: '리스', label: '리스', count: typeStats['리스'] },
@@ -391,55 +394,46 @@ export default function LoanListPage() {
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen animate-fade-in">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
-      {/* KPI 카드 */}
-      <NeuStatCards
-        items={statItems}
-        columns={5}
+      {/* DcStatStrip + Actions */}
+      <DcStatStrip
+        stats={statItems}
+        actions={statActions}
       />
 
-      {/* 액션 버튼 + 드래그 영역 */}
-      <div className="flex gap-3 mb-6">
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !ocrProcessing && fileInputRef.current?.click()}
-          className={`flex-1 border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
-            isDragging
-              ? 'border-blue-500 bg-blue-900/20 scale-[1.01]'
-              : ocrProcessing
-                ? 'border-black/10 bg-gray-50 cursor-wait'
-                : 'border-black/10 bg-white/[0.05] hover:border-blue-500/50 hover:bg-gray-100'
-          }`}
-        >
-          {ocrProcessing ? (
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="animate-spin inline-block w-4 h-4 border-2 border-slate-600 border-t-blue-500 rounded-full"></span>
-                <span className="text-sm font-bold text-slate-600">AI 견적서 분석 중...</span>
-              </div>
-              <div className="w-full max-w-xs mx-auto bg-gray-100 rounded-full h-1.5">
-                <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 10}%` }}></div>
-              </div>
-              <div className="mt-2 text-xs text-slate-400 space-y-0.5">
-                {ocrLogs.slice(0, 2).map((log, i) => <div key={i}>{log}</div>)}
-              </div>
+      {/* 드래그 앤 드롭 영역 (할부 견적서) */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !ocrProcessing && fileInputRef.current?.click()}
+        className={`mb-6 border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
+          isDragging
+            ? 'border-blue-500 bg-blue-900/20 scale-[1.01]'
+            : ocrProcessing
+              ? 'border-black/10 bg-gray-50 cursor-wait'
+              : 'border-black/10 bg-white/[0.05] hover:border-blue-500/50 hover:bg-gray-100'
+        }`}
+      >
+        {ocrProcessing ? (
+          <div>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="animate-spin inline-block w-4 h-4 border-2 border-slate-600 border-t-blue-500 rounded-full"></span>
+              <span className="text-sm font-bold text-slate-600">AI 견적서 분석 중...</span>
             </div>
-          ) : (
-            <>
-              <div className="text-2xl mb-1">{isDragging ? '📥' : '📄'}</div>
-              <p className="text-sm font-bold text-slate-800">{isDragging ? '여기에 파일을 놓으세요' : '할부 견적서 드래그 또는 클릭'}</p>
-              <p className="text-xs text-slate-400 mt-0.5">이미지/PDF · AI 자동 인식</p>
-            </>
-          )}
-        </div>
-        <button
-          onClick={() => router.push('/loans/new')}
-          className="px-6 py-5 bg-blue-600 text-white rounded-2xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm flex flex-col items-center justify-center gap-1"
-        >
-          <span className="text-lg">+</span>
-          <span>직접 등록</span>
-        </button>
+            <div className="w-full max-w-xs mx-auto bg-gray-100 rounded-full h-1.5">
+              <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${ocrProgress.total > 0 ? (ocrProgress.current / ocrProgress.total) * 100 : 10}%` }}></div>
+            </div>
+            <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+              {ocrLogs.slice(0, 2).map((log, i) => <div key={i}>{log}</div>)}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="text-2xl mb-1">{isDragging ? '📥' : '📄'}</div>
+            <p className="text-sm font-bold text-slate-800">{isDragging ? '여기에 파일을 놓으세요' : '할부 견적서 드래그 또는 클릭'}</p>
+            <p className="text-xs text-slate-400 mt-0.5">이미지/PDF · AI 자동 인식</p>
+          </>
+        )}
       </div>
 
       {/* 만기 임박 경고 배너 */}
@@ -472,19 +466,14 @@ export default function LoanListPage() {
         </div>
       )}
 
-      {/* 검색 바 */}
-      <NeuSearchBar
-        value={searchTerm}
-        onChange={setSearchTerm}
+      {/* DcToolbar (Search + Filter in one bar) */}
+      <DcToolbar
+        search={searchTerm}
+        onSearchChange={setSearchTerm}
         placeholder="차량번호, 금융사 검색..."
-        resultText={`검색결과 ${filteredLoans.length}건`}
-      />
-
-      {/* 필터 탭 */}
-      <NeuFilterTabs
-        tabs={filterTabs}
-        activeKey={typeFilter}
-        onSelect={setTypeFilter}
+        filters={filterItems}
+        activeFilter={typeFilter}
+        onFilterChange={setTypeFilter}
       />
 
       {/* 데이터 테이블 */}

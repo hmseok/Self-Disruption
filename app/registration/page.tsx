@@ -3,10 +3,9 @@ import { auth } from '@/lib/auth-client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
-import NeuSearchBar from '../components/NeuSearchBar'
+import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
-import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -408,7 +407,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
   })
 
   // 필터 탭 생성
-  const filterTabs: FilterTab[] = [
+  const filterItems: FilterItem[] = [
     { key: 'all', label: '전체', count: cars.length },
     { key: 'electric', label: '전기', count: stats.electric },
     { key: 'hybrid', label: '하이브리드', count: stats.hybrid },
@@ -416,22 +415,18 @@ const { company, role, adminSelectedCompanyId } = useApp()
     { key: 'consignment', label: '지입/임차', count: stats.consignment + stats.leasedIn },
   ].filter(tab => tab.count > 0 || tab.key === 'all') // 0개 카테고리는 제외 (전체 제외)
 
-  // NeuStatCards 데이터
-  const statItems: StatCardItem[] = [
-    { key: 'total', label: '등록 차량', value: stats.total, unit: '대', icon: '🚗', color: 'blue' },
-    { key: 'eco', label: '친환경 차량', value: stats.electric + stats.hybrid, unit: '대', icon: '♻️', color: 'green', subtitle: `전기 ${stats.electric} · 하이브리드 ${stats.hybrid}` },
-    ...(stats.consignment + stats.leasedIn > 0 ? [{
-      key: 'ownership',
-      label: '지입/임차',
-      value: stats.consignment + stats.leasedIn,
-      unit: '대',
-      icon: '📋',
-      color: 'amber',
-      subtitle: `지입 ${stats.consignment} · 임차 ${stats.leasedIn}` as any
-    }] : []),
-    { key: 'recent', label: '최근 7일 등록', value: recentCars.length, unit: '대', icon: '🆕', color: 'amber' },
-    { key: 'totalValue', label: '총 취득가액', value: stats.totalValue, unit: '원', icon: '💰', color: 'blue', format: true },
-    { key: 'avgValue', label: '차량 평균가', value: stats.avgValue, unit: '원', icon: '📊', color: 'slate', format: true },
+  // DcStatStrip 데이터
+  const statItems: StatItem[] = [
+    { label: '등록 차량', value: stats.total, unit: '대' },
+    { label: '친환경 차량', value: stats.electric + stats.hybrid, unit: '대' },
+    ...(stats.consignment + stats.leasedIn > 0 ? [{ label: '지입/임차', value: stats.consignment + stats.leasedIn, unit: '대' }] : []),
+    { label: '최근 7일 등록', value: recentCars.length, unit: '대' },
+    { label: '총 취득가액', value: f(stats.totalValue), unit: '원' },
+  ]
+
+  const statActions: ActionButton[] = [
+    { label: '등록증 업로드', onClick: () => fileInputRef.current?.click(), variant: 'secondary', icon: '📤' },
+    { label: '신규차량등록', onClick: () => setIsModalOpen(true), variant: 'primary', icon: '+' },
   ]
 
   // NeuDataTable 컬럼
@@ -598,48 +593,15 @@ const { company, role, adminSelectedCompanyId } = useApp()
             <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">📋 등록/제원 상세</h1>
             <p className="text-slate-500 text-sm mt-1">차량 등록·이전 서류 및 제원 관리</p>
          </div>
-         <div className="flex gap-3">
-            <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={bulkProcessing}
-                className={`cursor-pointer group flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors ${bulkProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-                <Icons.Upload />
-                <span>{bulkProcessing ? '분석 중...' : '등록증 업로드'}</span>
-            </button>
-            <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-white text-slate-600 border border-black/[0.06] px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-gray-50 transition-colors">
-                <Icons.Plus /> <span>신규차량등록</span>
-            </button>
-         </div>
        </div>
 
-       {/* 드래그 앤 드롭 업로드 영역 (최상단) */}
-       {!bulkProcessing && (
-         <div
-           onDragOver={handleDragOver}
-           onDragLeave={handleDragLeave}
-           onDrop={handleDrop}
-           onClick={() => fileInputRef.current?.click()}
-           className={`mb-6 border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-             isDragging
-               ? 'border-steel-500 bg-steel-50 scale-[1.01]'
-               : 'border-black/10 bg-white hover:border-steel-400 hover:bg-steel-50/30'
-           }`}
-         >
-           <div className="text-3xl mb-2">{isDragging ? '📥' : '🚗'}</div>
-           <p className="text-sm font-bold text-slate-600">
-             {isDragging ? '여기에 파일을 놓으세요' : '등록증 파일을 드래그하여 업로드'}
-           </p>
-           <p className="text-xs text-slate-500 mt-1">이미지 또는 PDF 파일 지원 · 클릭하여 파일 선택</p>
-         </div>
-       )}
+       <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
 
-       {/* 📊 KPI 스탯 카드 */}
+       {/* DcStatStrip + Actions */}
        {cars.length > 0 && !bulkProcessing && (
-         <NeuStatCards
-           items={statItems}
-           columns={stats.consignment + stats.leasedIn > 0 ? 5 : 4}
+         <DcStatStrip
+           stats={statItems}
+           actions={statActions}
          />
        )}
 
@@ -727,19 +689,14 @@ const { company, role, adminSelectedCompanyId } = useApp()
          </div>
        )}
 
-       {/* 검색바 */}
-       <NeuSearchBar
-         value={searchTerm}
-         onChange={setSearchTerm}
+       {/* DcToolbar (Search + Filter in one bar) */}
+       <DcToolbar
+         search={searchTerm}
+         onSearchChange={setSearchTerm}
          placeholder="차량번호, 브랜드, 모델, 차대번호 검색..."
-         resultText={`검색결과 ${filteredCars.length}대`}
-       />
-
-       {/* 필터 탭 */}
-       <NeuFilterTabs
-         tabs={filterTabs}
-         activeKey={filterType}
-         onSelect={setFilterType}
+         filters={filterItems}
+         activeFilter={filterType}
+         onFilterChange={setFilterType}
        />
 
        {/* 데이터 테이블 */}
