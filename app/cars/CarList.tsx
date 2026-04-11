@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
+
+// ═══════════════════════════════════════════════════════════════
+// 차량 관리 — 공유 컴포넌트 기반 (기준 페이지)
+// ═══════════════════════════════════════════════════════════════
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -64,6 +72,7 @@ export default function CarListPage() {
     fetchCars()
   }, [company, role, adminSelectedCompanyId])
 
+  // ── 필터링 ──
   const filteredCars = cars.filter(car => {
     const statusMatch = filter === 'all' || car.status === filter
       || (filter === 'consignment' && car.ownership_type === 'consignment')
@@ -76,8 +85,7 @@ export default function CarListPage() {
     return statusMatch && searchMatch
   })
 
-  const formatMoney = (amount?: number) => amount?.toLocaleString() || '0'
-
+  // ── 통계 ──
   const stats = {
     total: cars.length,
     available: cars.filter(c => c.status === 'available').length,
@@ -85,23 +93,147 @@ export default function CarListPage() {
     maintenance: cars.filter(c => c.status === 'maintenance').length,
     consignment: cars.filter(c => c.ownership_type === 'consignment').length,
   }
-
   const maintenanceCars = cars.filter(c => c.status === 'maintenance')
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
   const utilizationRate = stats.total > 0 ? Math.round((stats.rented / stats.total) * 100) : 0
 
+  // ── 유틸 ──
+  const formatMoney = (amount?: number | string) => (Number(amount) || 0).toLocaleString()
   const statusLabel = (s: string) => s === 'available' ? '대기' : s === 'rented' ? '대여' : s === 'maintenance' ? '정비' : s
   const statusBadge = (s: string) => s === 'available' ? 'si-badge-green' : s === 'rented' ? 'si-badge-blue' : 'si-badge-red'
 
-  // Admin이 회사 미선택 시
+  // ── NeuStatCards 데이터 ──
+  const statItems: StatCardItem[] = [
+    { key: 'all', label: '전체', value: stats.total, unit: '대', icon: '🚗', color: 'blue' },
+    { key: 'available', label: '대기중', value: stats.available, unit: '대', icon: '✅', color: 'green' },
+    { key: 'rented', label: '대여중', value: stats.rented, unit: '대', icon: '🔑', color: 'blue' },
+    { key: 'maintenance', label: '정비/사고', value: stats.maintenance, unit: '대', icon: '🔧', color: 'amber' },
+    { key: '_util', label: '가동률', value: `${utilizationRate}%`, format: false, icon: '📊', color: utilizationRate >= 70 ? 'green' : 'amber' },
+  ]
+
+  // ── NeuFilterTabs 데이터 ──
+  const filterTabs = [
+    { key: 'all', label: '전체', count: stats.total },
+    { key: 'available', label: '대기중', count: stats.available },
+    { key: 'rented', label: '대여중', count: stats.rented },
+    { key: 'maintenance', label: '정비/사고', count: stats.maintenance },
+    ...(stats.consignment > 0 ? [{ key: 'consignment', label: '지입차량', count: stats.consignment }] : []),
+  ]
+
+  // ── NeuDataTable 컬럼 ──
+  const columns: TableColumn<Car>[] = [
+    {
+      key: 'number',
+      label: '차량번호',
+      render: (car) => (
+        <span style={{ fontWeight: 900, fontSize: 15, color: '#0f2440' }}>{car.number}</span>
+      ),
+    },
+    {
+      key: 'model',
+      label: '차종',
+      render: (car) => (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car.brand}</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{car.model}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'year',
+      label: '연식',
+      render: (car) => (
+        <div>
+          <span style={{ fontWeight: 500, fontSize: 13, color: '#1e293b' }}>{car.year}년</span>
+          <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>{car.fuel}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      label: '구분',
+      align: 'center',
+      render: (car) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 3 }}>
+          <span className={`si-badge ${car.is_used ? 'si-badge-amber' : 'si-badge-blue'}`}>
+            {car.is_used ? '중고' : '신차'}
+          </span>
+          <span className={`si-badge ${car.is_commercial === false ? 'si-badge-teal' : 'si-badge-steel'}`}>
+            {car.is_commercial === false ? '비영업' : '영업'}
+          </span>
+          {car.ownership_type && car.ownership_type !== 'company' && (
+            <span className={`si-badge ${car.ownership_type === 'consignment' ? 'si-badge-amber' : 'si-badge-purple'}`}>
+              {car.ownership_type === 'consignment' ? '지입' : '임차'}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: '상태',
+      align: 'center',
+      render: (car) => (
+        <span className={`si-badge ${statusBadge(car.status)}`}>{statusLabel(car.status)}</span>
+      ),
+    },
+    {
+      key: 'price',
+      label: '취득가액',
+      align: 'right',
+      render: (car) => (
+        <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{formatMoney(car.purchase_price)}원</span>
+      ),
+    },
+    {
+      key: 'date',
+      label: '등록일',
+      align: 'center',
+      render: (car) => (
+        <span style={{ fontSize: 12, color: '#64748b' }}>{car.created_at.split('T')[0]}</span>
+      ),
+    },
+  ]
+
+  // ── 모바일 카드 설정 ──
+  const mobileCard: MobileCardConfig<Car> = {
+    title: (car) => car.number,
+    subtitle: (car) => `${car.brand} ${car.model} · ${car.year}년 · ${car.fuel}`,
+    trailing: (car) => (
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{formatMoney(car.purchase_price)}원</div>
+        <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{car.created_at.split('T')[0]}</div>
+      </div>
+    ),
+    badges: (car) => (
+      <>
+        <span className={`si-badge ${statusBadge(car.status)}`}>{statusLabel(car.status)}</span>
+        <span className={`si-badge ${car.is_used ? 'si-badge-amber' : 'si-badge-blue'}`}>
+          {car.is_used ? '중고' : '신차'}
+        </span>
+        <span className={`si-badge ${car.is_commercial === false ? 'si-badge-teal' : 'si-badge-steel'}`}>
+          {car.is_commercial === false ? '비영업' : '영업'}
+        </span>
+      </>
+    ),
+  }
+
+  // ── Admin 회사 미선택 ──
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="page-bg">
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
-          <div className="si-card p-12 md:p-20 text-center">
-            <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            borderRadius: 16,
+            border: '1px solid rgba(0,0,0,0.06)',
+            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            padding: '48px 20px',
+            textAlign: 'center',
+          }}>
+            <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>🏢</span>
+            <p style={{ color: '#8aabc7', fontWeight: 600, fontSize: 14 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -114,50 +246,63 @@ export default function CarListPage() {
 
         {/* ── KPI 스탯 카드 ── */}
         {cars.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            {[
-              { label: '전체', value: stats.total, key: 'all', badge: 'glass-border-blue', icon: '🚗', color: 'text-blue-400' },
-              { label: '대기중', value: stats.available, key: 'available', badge: 'glass-border-green', icon: '✅', color: 'text-emerald-400' },
-              { label: '대여중', value: stats.rented, key: 'rented', badge: 'glass-border-cyan', icon: '🔑', color: 'text-cyan-400' },
-              { label: '정비/사고', value: stats.maintenance, key: 'maintenance', badge: 'glass-border-amber', icon: '🔧', color: 'text-amber-400' },
-              { label: '가동률', value: `${utilizationRate}%`, key: '_util', badge: 'glass-border-purple', icon: '📊', color: utilizationRate >= 70 ? 'text-emerald-400' : 'text-amber-400' },
-            ].map(s => (
-              <button
-                key={s.key}
-                onClick={() => s.key !== '_util' && setFilter(s.key)}
-                className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center transition-all hover:scale-[1.02] ${filter === s.key ? 'ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10' : ''}`}
-              >
-                <div className="text-base mb-1">{s.icon}</div>
-                <div className={`text-xl md:text-2xl font-black ${s.color}`}>
-                  {loading ? '-' : s.value}
-                </div>
-                <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
-              </button>
-            ))}
-          </div>
+          <NeuStatCards
+            items={statItems}
+            activeKey={filter}
+            onSelect={(key) => key !== '_util' && setFilter(key)}
+            columns={5}
+          />
         )}
 
         {/* ── 정비/사고 경고 배너 ── */}
         {maintenanceCars.length > 0 && (
-          <div className="glass-3 glass-border-red rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-base">🔧</span>
-              <h3 className="font-bold text-red-400 text-sm">정비/사고 차량 ({maintenanceCars.length}대)</h3>
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            border: '1.5px solid rgba(239,68,68,0.15)',
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 12,
+            boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>🔧</span>
+              <h3 style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>
+                정비/사고 차량 ({maintenanceCars.length}대)
+              </h3>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
               {maintenanceCars.slice(0, 8).map(car => (
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-gray-50 transition-all text-left"
-                  style={{ border: '1px solid rgba(239,68,68,0.15)' }}
+                  style={{
+                    background: 'rgba(255,255,255,0.60)',
+                    border: '1px solid rgba(239,68,68,0.12)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',
+                    transition: 'all 0.15s',
+                  }}
                 >
-                  <div className="font-bold text-slate-700 text-sm">{car.number}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{car.brand} {car.model}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car.number}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{car.brand} {car.model}</div>
                 </button>
               ))}
               {maintenanceCars.length > 8 && (
-                <div className="si-badge-red rounded-lg px-3 py-2 flex-shrink-0 flex items-center text-xs font-bold">
+                <div style={{
+                  background: '#fee2e2',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#dc2626',
+                }}>
                   +{maintenanceCars.length - 8}대
                 </div>
               )}
@@ -167,23 +312,41 @@ export default function CarListPage() {
 
         {/* ── 최근 등록 배너 ── */}
         {recentCars.length > 0 && (
-          <div className="glass-3 glass-border-blue rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-base">🆕</span>
-              <h3 className="font-bold text-blue-400 text-sm">최근 7일 신규 등록 ({recentCars.length}대)</h3>
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            border: '1.5px solid rgba(59,130,246,0.12)',
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 12,
+            boxShadow: '4px 4px 12px rgba(140,170,210,0.14), -4px -4px 12px rgba(255,255,255,0.47)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>🆕</span>
+              <h3 style={{ fontWeight: 700, color: '#3b6eb5', fontSize: 13 }}>
+                최근 7일 신규 등록 ({recentCars.length}대)
+              </h3>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
               {recentCars.slice(0, 8).map(car => (
                 <button
                   key={car.id}
                   onClick={() => router.push(`/cars/${car.id}`)}
-                  className="glass-4 rounded-lg px-3 py-2 flex-shrink-0 hover:bg-gray-50 transition-all text-left"
-                  style={{ border: '1px solid rgba(59,130,246,0.12)' }}
+                  style={{
+                    background: 'rgba(255,255,255,0.60)',
+                    border: '1px solid rgba(59,130,246,0.10)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.35)',
+                    transition: 'all 0.15s',
+                  }}
                 >
-                  <div className="font-bold text-slate-700 text-sm">{car.number}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-500">{car.brand}</span>
-                    <span className="text-[10px] text-blue-400 font-bold">{car.created_at.split('T')[0]}</span>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car.number}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{car.brand}</span>
+                    <span style={{ fontSize: 10, color: '#3b6eb5', fontWeight: 700 }}>{car.created_at.split('T')[0]}</span>
                   </div>
                 </button>
               ))}
@@ -191,179 +354,43 @@ export default function CarListPage() {
           </div>
         )}
 
-        {/* ── 메인 테이블 카드 ── */}
-        <div className="si-card">
-          {/* 검색 + 액션 바 */}
-          <div className="si-search-bar">
-            <div className="flex-1 max-w-sm">
-              <input
-                type="text"
-                placeholder="차량번호, 브랜드, 모델 검색..."
-                className="si-input text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-slate-500 hidden sm:inline">
-                검색결과 <strong className="text-slate-600">{filteredCars.length}</strong>대
-              </span>
-              <button
-                onClick={() => {
-                  if (role === 'admin' && !adminSelectedCompanyId) {
-                    alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
-                    return
-                  }
-                  router.push('/cars/new')
-                }}
-                className="si-btn si-btn-primary text-xs"
-              >
-                + 차량 등록
-              </button>
-            </div>
-          </div>
+        {/* ── 검색바 ── */}
+        <NeuSearchBar
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="차량번호, 브랜드, 모델 검색..."
+          resultText={`검색결과 ${filteredCars.length}대`}
+          actions={[{
+            label: '+ 차량 등록',
+            variant: 'primary',
+            onClick: () => {
+              if (role === 'admin' && !adminSelectedCompanyId) {
+                alert('⚠️ 좌측 상단에서 회사를 먼저 선택해주세요.')
+                return
+              }
+              router.push('/cars/new')
+            },
+          }]}
+        />
 
-          {/* 탭 필터 */}
-          <div className="si-tabs">
-            {[
-              { key: 'all', label: '전체' },
-              { key: 'available', label: '대기중' },
-              { key: 'rented', label: '대여중' },
-              { key: 'maintenance', label: '정비/사고' },
-              ...(stats.consignment > 0 ? [{ key: 'consignment', label: '지입차량' }] : []),
-            ].map(t => (
-              <button
-                key={t.key}
-                onClick={() => setFilter(t.key)}
-                className={`si-tab ${filter === t.key ? 'si-tab-active' : ''}`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        {/* ── 필터 탭 ── */}
+        <NeuFilterTabs
+          tabs={filterTabs}
+          activeKey={filter}
+          onSelect={setFilter}
+        />
 
-          {/* 테이블 콘텐츠 */}
-          {loading ? (
-            <div className="p-20 text-center text-slate-500 flex flex-col items-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
-              <span className="text-sm">차량 데이터를 불러오는 중...</span>
-            </div>
-          ) : filteredCars.length === 0 ? (
-            <div className="p-12 md:p-20 text-center">
-              <span className="text-3xl block mb-3">🚗</span>
-              <p className="text-slate-500 text-sm">
-                {searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="si-table">
-                  <thead>
-                    <tr>
-                      <th>차량번호</th>
-                      <th>차종</th>
-                      <th>연식</th>
-                      <th className="text-center">구분</th>
-                      <th className="text-center">상태</th>
-                      <th className="text-right">취득가액</th>
-                      <th className="text-center">등록일</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCars.map((car) => (
-                      <tr
-                        key={car.id}
-                        onClick={() => router.push(`/cars/${car.id}`)}
-                        className="cursor-pointer group"
-                      >
-                        <td className="font-black text-slate-800 text-base group-hover:text-blue-400 transition-colors">
-                          {car.number}
-                        </td>
-                        <td>
-                          <div className="font-bold text-slate-700 text-sm">{car.brand}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{car.model}</div>
-                        </td>
-                        <td>
-                          <span className="font-medium text-slate-600 text-sm">{car.year}년</span>
-                          <span className="text-xs text-slate-500 block">{car.fuel}</span>
-                        </td>
-                        <td className="text-center">
-                          <div className="flex flex-wrap justify-center gap-1">
-                            <span className={`si-badge ${car.is_used ? 'si-badge-amber' : 'si-badge-blue'}`}>
-                              {car.is_used ? '중고' : '신차'}
-                            </span>
-                            <span className={`si-badge ${car.is_commercial === false ? 'si-badge-teal' : 'si-badge-steel'}`}>
-                              {car.is_commercial === false ? '비영업' : '영업'}
-                            </span>
-                            {car.ownership_type && car.ownership_type !== 'company' && (
-                              <span className={`si-badge ${car.ownership_type === 'consignment' ? 'si-badge-amber' : 'si-badge-purple'}`}>
-                                {car.ownership_type === 'consignment' ? '지입' : '임차'}
-                              </span>
-                            )}
-                          </div>
-                          {car.is_used && (car.purchase_mileage || 0) > 0 && (
-                            <span className="text-[10px] text-slate-500 block mt-1">
-                              구입시 {((car.purchase_mileage || 0) / 10000).toFixed(1)}만km
-                            </span>
-                          )}
-                        </td>
-                        <td className="text-center">
-                          <span className={`si-badge ${statusBadge(car.status)}`}>
-                            {statusLabel(car.status)}
-                          </span>
-                        </td>
-                        <td className="text-right font-bold text-slate-600 text-sm">
-                          {formatMoney(car.purchase_price)}원
-                        </td>
-                        <td className="text-center text-xs text-slate-500">
-                          {car.created_at.split('T')[0]}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-gray-200">
-                {filteredCars.map((car) => (
-                  <button
-                    key={car.id}
-                    onClick={() => router.push(`/cars/${car.id}`)}
-                    className="w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`si-badge ${statusBadge(car.status)}`}>
-                          {statusLabel(car.status)}
-                        </span>
-                        <span className={`si-badge ${car.is_used ? 'si-badge-amber' : 'si-badge-blue'}`}>
-                          {car.is_used ? '중고' : '신차'}
-                        </span>
-                        <span className={`si-badge ${car.is_commercial === false ? 'si-badge-teal' : 'si-badge-steel'}`}>
-                          {car.is_commercial === false ? '비영업' : '영업'}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-500">{car.created_at.split('T')[0]}</span>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <div className="font-black text-slate-800 text-base mb-0.5">{car.number}</div>
-                        <div className="text-sm text-slate-600 font-bold">{car.brand} {car.model}</div>
-                        <div className="text-xs text-slate-500">{car.year}년 · {car.fuel}</div>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-black text-blue-400 text-sm">{formatMoney(car.purchase_price)}원</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        {/* ── 데이터 테이블 ── */}
+        <NeuDataTable
+          columns={columns}
+          data={filteredCars}
+          rowKey={(car) => car.id}
+          onRowClick={(car) => router.push(`/cars/${car.id}`)}
+          loading={loading}
+          emptyIcon="🚗"
+          emptyMessage={searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
+          mobileCard={mobileCard}
+        />
 
       </div>
     </div>

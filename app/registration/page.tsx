@@ -3,6 +3,9 @@ import { auth } from '@/lib/auth-client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -66,12 +69,32 @@ const compressImage = async (file: File): Promise<File> => {
   });
 };
 
+type RegistrationCar = {
+  id: number
+  number: string
+  brand: string
+  model: string
+  year: number
+  vin: string
+  owner_name?: string
+  purchase_price: number
+  total_cost?: number
+  fuel_type?: string
+  is_used?: boolean
+  is_commercial?: boolean
+  ownership_type?: string
+  purchase_mileage?: number
+  registration_image_url?: string
+  created_at: string
+}
+
 export default function RegistrationListPage() {
 
 // MySQL API 전환 완료
 const router = useRouter()
 const { company, role, adminSelectedCompanyId } = useApp()
-  const [cars, setCars] = useState<any[]>([])
+  const [cars, setCars] = useState<RegistrationCar[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
@@ -337,7 +360,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
     setCreating(false)
   }
 
-  const f = (n: number) => n?.toLocaleString() || '0'
+  const f = (n: number) => Number(n)?.toLocaleString() || '0'
 
   // 📊 KPI 통계
   const stats = {
@@ -355,12 +378,184 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
 
+  // 필터링된 차량
+  const searchLower = searchTerm.toLowerCase()
+  const filteredCars = cars.filter(car =>
+    (car.number || '').toLowerCase().includes(searchLower) ||
+    (car.brand || '').toLowerCase().includes(searchLower) ||
+    (car.model || '').toLowerCase().includes(searchLower) ||
+    (car.vin || '').toLowerCase().includes(searchLower)
+  )
+
+  // NeuStatCards 데이터
+  const statItems: StatCardItem[] = [
+    { key: 'total', label: '등록 차량', value: stats.total, unit: '대', icon: '🚗', color: 'blue' },
+    { key: 'eco', label: '친환경 차량', value: stats.electric + stats.hybrid, unit: '대', icon: '♻️', color: 'green', subtitle: `전기 ${stats.electric} · 하이브리드 ${stats.hybrid}` },
+    ...(stats.consignment + stats.leasedIn > 0 ? [{
+      key: 'ownership',
+      label: '지입/임차',
+      value: stats.consignment + stats.leasedIn,
+      unit: '대',
+      icon: '📋',
+      color: 'amber',
+      subtitle: `지입 ${stats.consignment} · 임차 ${stats.leasedIn}` as any
+    }] : []),
+    { key: 'recent', label: '최근 7일 등록', value: recentCars.length, unit: '대', icon: '🆕', color: 'amber' },
+    { key: 'totalValue', label: '총 취득가액', value: stats.totalValue, unit: '원', icon: '💰', color: 'blue', format: true },
+    { key: 'avgValue', label: '차량 평균가', value: stats.avgValue, unit: '원', icon: '📊', color: 'slate', format: true },
+  ]
+
+  // NeuDataTable 컬럼
+  const columns: TableColumn<RegistrationCar>[] = [
+    {
+      key: 'image',
+      label: '이미지',
+      width: '80px',
+      render: (car) => (
+        <div style={{ width: 56, height: 40, background: '#f3f4f6', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {car.registration_image_url ? (
+            car.registration_image_url.endsWith('.pdf') ? (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fee2e2', color: '#dc2626', fontWeight: 'bold', fontSize: 10 }}>PDF</div>
+            ) : (
+              <img src={car.registration_image_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            )
+          ) : (
+            <span style={{ color: '#64748b' }}><Icons.File /></span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'carInfo',
+      label: '차량 정보 (번호/모델)',
+      render: (car) => (
+        <div>
+          <div style={{ fontWeight: 900, fontSize: 15, color: '#0f2440' }}>{car.number}</div>
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+            <span style={{ fontWeight: 700, color: '#1e293b', marginRight: 4 }}>{car.brand}</span>
+            {car.model}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'owner',
+      label: '소유자 / 차대번호',
+      render: (car) => (
+        <div>
+          <div style={{ fontWeight: 700, color: '#1e293b' }}>{car.owner_name || '-'}</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, fontFamily: 'monospace', background: '#f3f4f6', padding: '2px 6px', borderRadius: 4, display: 'inline-block', border: '1px solid rgba(0,0,0,0.05)' }}>
+            {car.vin || '-'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'specs',
+      label: '연식 / 연료 / 구분',
+      render: (car) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontSize: 11 }}>
+          <span style={{ background: '#f3f4f6', color: '#64748b', padding: '2px 6px', borderRadius: 4, fontWeight: 500 }}>{car.year}년</span>
+          <span style={{ background: car.fuel_type === '전기' ? '#e0f2fe' : '#dcfce7', color: car.fuel_type === '전기' ? '#0369a1' : '#166534', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{car.fuel_type || '기타'}</span>
+          {car.is_used !== undefined && (
+            <span style={{ background: car.is_used ? '#fed7aa' : '#dbeafe', color: car.is_used ? '#b45309' : '#1d4ed8', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{car.is_used ? '중고' : '신차'}</span>
+          )}
+          {car.is_commercial !== undefined && (
+            <span style={{ background: car.is_commercial === false ? '#99f6e4' : '#e0e7ff', color: car.is_commercial === false ? '#0d7377' : '#4338ca', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{car.is_commercial === false ? '비영업' : '영업'}</span>
+          )}
+          {car.ownership_type && car.ownership_type !== 'company' && (
+            <span style={{ background: car.ownership_type === 'consignment' ? '#fed7aa' : '#e9d5ff', color: car.ownership_type === 'consignment' ? '#b45309' : '#6b21a8', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{car.ownership_type === 'consignment' ? '지입' : '임차'}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'price',
+      label: '취득가액 / 총비용',
+      align: 'right',
+      render: (car) => (
+        <div>
+          <div style={{ fontWeight: 700, color: '#1e293b' }}>{f(Number(car.purchase_price))}원</div>
+          {car.total_cost && car.total_cost > 0 && car.total_cost !== car.purchase_price && (
+            <div style={{ fontSize: 11, color: '#059669', fontWeight: 700, marginTop: 4 }}>총 {f(Number(car.total_cost))}원</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'center',
+      render: (car) => (
+        <button
+          onClick={(e) => handleDelete(car.id, e)}
+          style={{
+            padding: 8,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#64748b',
+            transition: 'all 0.2s',
+            borderRadius: 6,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          <Icons.Trash />
+        </button>
+      ),
+    },
+  ]
+
+  // 모바일 카드 설정
+  const mobileCard: MobileCardConfig<RegistrationCar> = {
+    title: (car) => car.number,
+    subtitle: (car) => `${car.brand} ${car.model} · ${car.year}년 · ${car.fuel_type || '기타'}`,
+    trailing: (car) => (
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{f(Number(car.purchase_price))}원</div>
+        <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{car.created_at?.split('T')[0]}</div>
+      </div>
+    ),
+    badges: (car) => (
+      <>
+        {car.is_used !== undefined && (
+          <span style={{ background: car.is_used ? '#fed7aa' : '#dbeafe', color: car.is_used ? '#b45309' : '#1d4ed8', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+            {car.is_used ? '중고' : '신차'}
+          </span>
+        )}
+        {car.is_commercial !== undefined && (
+          <span style={{ background: car.is_commercial === false ? '#99f6e4' : '#e0e7ff', color: car.is_commercial === false ? '#0d7377' : '#4338ca', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+            {car.is_commercial === false ? '비영업' : '영업'}
+          </span>
+        )}
+        {car.ownership_type && car.ownership_type !== 'company' && (
+          <span style={{ background: car.ownership_type === 'consignment' ? '#fed7aa' : '#e9d5ff', color: car.ownership_type === 'consignment' ? '#b45309' : '#6b21a8', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+            {car.ownership_type === 'consignment' ? '지입' : '임차'}
+          </span>
+        )}
+        {car.fuel_type && (
+          <span style={{ background: car.fuel_type === '전기' ? '#e0f2fe' : '#dcfce7', color: car.fuel_type === '전기' ? '#0369a1' : '#166534', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>
+            {car.fuel_type}
+          </span>
+        )}
+      </>
+    ),
+  }
+
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50">
-        <div className="p-12 md:p-20 text-center text-slate-500 text-sm bg-white rounded-2xl">
-          <span className="text-4xl block mb-3">🏢</span>
-          <p className="font-bold text-slate-400">좌측 상단에서 회사를 먼저 선택해주세요</p>
+        <div style={{
+          background: 'rgba(255,255,255,0.72)',
+          borderRadius: 16,
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+          padding: '48px 20px',
+          textAlign: 'center',
+        }}>
+          <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>🏢</span>
+          <p style={{ color: '#8aabc7', fontWeight: 600, fontSize: 14 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
         </div>
       </div>
     )
@@ -411,41 +606,12 @@ const { company, role, adminSelectedCompanyId } = useApp()
          </div>
        )}
 
-       {/* 📊 KPI 대시보드 */}
+       {/* 📊 KPI 스탯 카드 */}
        {cars.length > 0 && !bulkProcessing && (
-         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-           <div style={{ flex: 1, background: '#fff', padding: 16, borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 700, whiteSpace: 'nowrap' as const }}>등록 차량</p>
-             <p style={{ fontSize: 24, fontWeight: 900, color: '#111827', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.total}<span style={{ fontSize: 14, color: '#9ca3af', marginLeft: 2 }}>대</span></p>
-           </div>
-           <div style={{ flex: 1, background: '#f0fdf4', padding: 16, borderRadius: 12, border: '1px solid #dcfce7', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, whiteSpace: 'nowrap' as const }}>친환경 차량</p>
-             <p style={{ fontSize: 24, fontWeight: 900, color: '#15803d', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.electric + stats.hybrid}<span style={{ fontSize: 14, color: '#22c55e', marginLeft: 2 }}>대</span></p>
-             <p style={{ fontSize: 10, color: '#22c55e', marginTop: 2, whiteSpace: 'nowrap' as const }}>전기 {stats.electric} · 하이브리드 {stats.hybrid}</p>
-           </div>
-           {(stats.consignment + stats.leasedIn) > 0 && (
-             <div style={{ flex: 1, background: '#fffbeb', padding: 16, borderRadius: 12, border: '1px solid #fde68a', minWidth: 0 }}>
-               <p style={{ fontSize: 12, color: '#d97706', fontWeight: 700, whiteSpace: 'nowrap' as const }}>지입/임차</p>
-               <p style={{ fontSize: 24, fontWeight: 900, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' as const }}>{stats.consignment + stats.leasedIn}<span style={{ fontSize: 14, color: '#f59e0b', marginLeft: 2 }}>대</span></p>
-               <p style={{ fontSize: 10, color: '#f59e0b', marginTop: 2, whiteSpace: 'nowrap' as const }}>지입 {stats.consignment} · 임차 {stats.leasedIn}</p>
-             </div>
-           )}
-           <div style={{ flex: 1, background: '#fffbeb', padding: 16, borderRadius: 12, border: recentCars.length > 0 ? '1px solid #fde68a' : '1px solid #fef3c7', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#d97706', fontWeight: 700, whiteSpace: 'nowrap' as const }}>최근 7일 등록</p>
-             <p style={{ fontSize: 24, fontWeight: 900, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' as const }}>{recentCars.length}<span style={{ fontSize: 14, color: '#f59e0b', marginLeft: 2 }}>대</span></p>
-           </div>
-           <div style={{ flex: 1, background: '#eff6ff', padding: 16, borderRadius: 12, border: '1px solid #bfdbfe', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#3b6eb5', fontWeight: 700, whiteSpace: 'nowrap' as const }}>총 취득가액</p>
-             <p style={{ fontSize: 20, fontWeight: 900, color: '#1d4ed8', marginTop: 4, whiteSpace: 'nowrap' as const }}>{f(stats.totalValue)}<span style={{ fontSize: 14, color: '#93c5fd', marginLeft: 2 }}>원</span></p>
-             {stats.totalCost > stats.totalValue && (
-               <p style={{ fontSize: 10, color: '#059669', fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' as const }}>실투자 {f(stats.totalCost)}원</p>
-             )}
-           </div>
-           <div style={{ flex: 1, background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' as const }}>차량 평균가</p>
-             <p style={{ fontSize: 20, fontWeight: 900, color: '#475569', marginTop: 4, whiteSpace: 'nowrap' as const }}>{f(stats.avgValue)}<span style={{ fontSize: 14, color: '#94a3b8', marginLeft: 2 }}>원</span></p>
-           </div>
-         </div>
+         <NeuStatCards
+           items={statItems}
+           columns={stats.consignment + stats.leasedIn > 0 ? 5 : 4}
+         />
        )}
 
        {/* 🆕 최근 등록 차량 배너 */}
@@ -532,122 +698,24 @@ const { company, role, adminSelectedCompanyId } = useApp()
          </div>
        )}
 
-       {/* 리스트 테이블 */}
-       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.06)' }}>
-         {cars.length === 0 ? (
-           <div className="p-12 md:p-20 text-center text-slate-500">등록된 차량이 없습니다.</div>
-         ) : (
-           <>
-             {/* Desktop Table View */}
-             <div style={{ overflowX: 'auto', display: 'block' }}>
-                 <table className="w-full text-left border-collapse min-w-[650px]">
-                     <thead className="bg-steel-50 border-b border-black/5 text-steel-900 uppercase text-xs font-bold tracking-wider">
-                         <tr>
-                             <th className="p-3 md:p-5 pl-4 md:pl-8 w-20">이미지</th>
-                             <th className="p-3 md:p-5">차량 정보 (번호/모델)</th>
-                             <th className="p-3 md:p-5">소유자 / 차대번호</th>
-                             <th className="p-3 md:p-5">연식 / 연료</th>
-                             <th className="p-3 md:p-5 text-right">취득가액 / 총비용</th>
-                             <th className="p-3 md:p-5 text-center">관리</th>
-                         </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-200">
-                         {cars.map((car) => (
-                             <tr key={car.id} onClick={() => router.push(`/registration/${car.id}`)} className="group hover:bg-steel-50/30 transition-colors cursor-pointer">
-                                 <td className="p-3 md:p-5 pl-4 md:pl-8">
-                                     <div className="w-14 h-10 bg-gray-100 rounded border overflow-hidden">
-                                         {car.registration_image_url ?
-                                             (car.registration_image_url.endsWith('.pdf') ?
-                                                 <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-xs">PDF</div> :
-                                                 <img src={car.registration_image_url} className="w-full h-full object-cover" />
-                                             ) :
-                                             <div className="flex items-center justify-center h-full text-slate-600"><Icons.File /></div>
-                                         }
-                                     </div>
-                                 </td>
-                                 <td className="p-3 md:p-5">
-                                     <div className="font-black text-slate-800 text-lg">{car.number}</div>
-                                     <div className="text-slate-500 text-sm font-medium">
-                                         <span className="text-steel-600 font-bold mr-1">{car.brand}</span>
-                                         {car.model}
-                                     </div>
-                                 </td>
-                                 <td className="p-3 md:p-5">
-                                     <div className="text-slate-800 font-bold">{car.owner_name || '-'}</div>
-                                     <div className="text-xs text-slate-500 font-mono mt-1 tracking-tight bg-gray-50 inline-block px-1.5 py-0.5 rounded border border-black/5 select-all">
-                                         {car.vin || '-'}
-                                     </div>
-                                 </td>
-                                 <td className="p-3 md:p-5">
-                                     <div className="flex flex-wrap gap-1">
-                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.is_used ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{car.is_used ? '중고' : '신차'}</span>
-                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.is_commercial === false ? 'bg-teal-100 text-teal-700' : 'bg-steel-100 text-steel-600'}`}>{car.is_commercial === false ? '비영업' : '영업'}</span>
-                                         {car.ownership_type && car.ownership_type !== 'company' && (
-                                           <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.ownership_type === 'consignment' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{car.ownership_type === 'consignment' ? '지입' : '임차'}</span>
-                                         )}
-                                         <span className="bg-gray-100 text-slate-400 px-2 py-0.5 rounded text-xs font-bold">{car.year}년식</span>
-                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${car.fuel_type === '전기' ? 'bg-steel-100 text-steel-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type || '기타'}</span>
-                                     </div>
-                                     {car.is_used && car.purchase_mileage > 0 && (
-                                       <div className="text-[10px] text-slate-500 mt-1">구입시 {(car.purchase_mileage / 10000).toFixed(1)}만km</div>
-                                     )}
-                                 </td>
-                                 <td className="p-3 md:p-5 text-right">
-                                     <div className="font-bold text-slate-600">{f(car.purchase_price)}원</div>
-                                     {car.total_cost > 0 && car.total_cost !== car.purchase_price && (
-                                       <div className="text-xs font-bold text-emerald-600 mt-0.5">총 {f(car.total_cost)}원</div>
-                                     )}
-                                 </td>
-                                 <td className="p-3 md:p-5 text-center">
-                                     <button onClick={(e) => handleDelete(car.id, e)} className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Icons.Trash /></button>
-                                 </td>
-                             </tr>
-                         ))}
-                     </tbody>
-                 </table>
-             </div>
+       {/* 검색바 */}
+       <NeuSearchBar
+         value={searchTerm}
+         onChange={setSearchTerm}
+         placeholder="차량번호, 브랜드, 모델, 차대번호 검색..."
+         resultText={`검색결과 ${filteredCars.length}대`}
+       />
 
-             {/* Mobile Card View */}
-             <div style={{ display: 'none' }}>
-               {cars.map((car) => (
-                 <div key={car.id} className="p-4 flex items-center gap-3">
-                   <div className="w-12 h-10 bg-gray-100 rounded border overflow-hidden flex-shrink-0" onClick={() => router.push(`/registration/${car.id}`)}>
-                     {car.registration_image_url ?
-                       (car.registration_image_url.endsWith('.pdf') ?
-                         <div className="w-full h-full flex items-center justify-center bg-red-50 text-red-500 font-bold text-[10px]">PDF</div> :
-                         <img src={car.registration_image_url} className="w-full h-full object-cover" />
-                       ) :
-                       <div className="flex items-center justify-center h-full text-slate-600"><Icons.File /></div>
-                     }
-                   </div>
-                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/registration/${car.id}`)}>
-                     <div className="font-black text-slate-800">{car.number}</div>
-                     <div className="text-xs text-slate-500 truncate">
-                       <span className="text-steel-600 font-bold">{car.brand}</span> {car.model}
-                     </div>
-                     <div className="flex gap-1 mt-1">
-                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.is_used ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{car.is_used ? '중고' : '신차'}</span>
-                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.is_commercial === false ? 'bg-teal-100 text-teal-700' : 'bg-steel-100 text-steel-600'}`}>{car.is_commercial === false ? '비영업' : '영업'}</span>
-                       {car.ownership_type && car.ownership_type !== 'company' && (
-                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.ownership_type === 'consignment' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{car.ownership_type === 'consignment' ? '지입' : '임차'}</span>
-                       )}
-                       {car.year && <span className="bg-gray-100 text-slate-400 px-1.5 py-0.5 rounded text-[10px] font-bold">{car.year}년</span>}
-                       {car.fuel_type && <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${car.fuel_type === '전기' ? 'bg-steel-100 text-steel-600' : 'bg-green-100 text-green-600'}`}>{car.fuel_type}</span>}
-                     </div>
-                   </div>
-                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                     <span className="font-bold text-slate-600 text-sm">{f(car.purchase_price)}원</span>
-                     {car.total_cost > 0 && car.total_cost !== car.purchase_price && (
-                       <span className="text-[10px] font-bold text-emerald-600">총 {f(car.total_cost)}원</span>
-                     )}
-                     <button onClick={(e) => handleDelete(car.id, e)} className="p-1.5 text-slate-600 hover:text-red-500 rounded"><Icons.Trash /></button>
-                   </div>
-                 </div>
-               ))}
-             </div>
-           </>
-         )}
-       </div>
+       {/* 데이터 테이블 */}
+       <NeuDataTable
+         columns={columns}
+         data={filteredCars}
+         rowKey={(car) => car.id}
+         onRowClick={(car) => router.push(`/registration/${car.id}`)}
+         emptyIcon="📋"
+         emptyMessage={searchTerm ? '검색 결과가 없습니다.' : '등록된 차량이 없습니다.'}
+         mobileCard={mobileCard}
+       />
 
        {/* 결과 모달 */}
        {showResultModal && (

@@ -1,7 +1,11 @@
 'use client'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import DarkHeader from '../components/DarkHeader'
+import { useRouter } from 'next/navigation'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ─────────────────────────────────────────────
 // Auth helper (fetch-based API calls)
@@ -145,7 +149,6 @@ const EMPTY_FORM: Partial<Customer> = {
 // ─────────────────────────────────────────────
 function getInitial(name: string) {
   if (!name) return '?'
-  // (주), (합) 등 괄호 접두사 제거
   const clean = name.replace(/^\(.*?\)\s*/, '').trim()
   return (clean || name).substring(0, 1)
 }
@@ -174,6 +177,7 @@ function daysSince(d: string) {
 // 메인 컴포넌트
 // ─────────────────────────────────────────────
 export default function CustomerPage() {
+  const router = useRouter()
   const { company, role, adminSelectedCompanyId, user } = useApp()
 
   // 목록 상태
@@ -240,20 +244,17 @@ export default function CustomerPage() {
     try {
       const headers = await getAuthHeader()
 
-      // 계약 이력 (실제 contracts 테이블에서 조회)
-      // TODO: Create /api/contracts endpoint for this
-
       // 결제 이력
       const payRes = await fetch(`/api/customers/${customerId}/payments`, { headers })
       const payJson = await payRes.json()
       setPayments((payJson.data as Payment[]) || [])
 
-      // 메모/상담
+      // 메모 이력
       const noteRes = await fetch(`/api/customers/${customerId}/notes`, { headers })
       const noteJson = await noteRes.json()
       setNotes((noteJson.data as Note[]) || [])
 
-      // 세금계산서
+      // 세금계산서 이력
       const invRes = await fetch(`/api/customers/${customerId}/tax-invoices`, { headers })
       const invJson = await invRes.json()
       setTaxInvoices((invJson.data as TaxInvoice[]) || [])
@@ -262,76 +263,10 @@ export default function CustomerPage() {
     }
   }, [])
 
-  // ── 필터링 & 정렬 ──
-  const filteredCustomers = useMemo(() => {
-    let list = [...customers]
-    if (typeFilter !== '전체') list = list.filter(c => c.type === typeFilter)
-    if (gradeFilter) list = list.filter(c => c.grade === gradeFilter)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      list = list.filter(c =>
-        c.name?.toLowerCase().includes(q) ||
-        c.phone?.includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.business_number?.includes(q) ||
-        c.contact_person?.toLowerCase().includes(q)
-      )
-    }
-    if (sortBy === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    else if (sortBy === 'grade') {
-      const order = { 'VIP': 0, '우수': 1, '일반': 2, '주의': 3 }
-      list.sort((a, b) => (order[a.grade as keyof typeof order] ?? 2) - (order[b.grade as keyof typeof order] ?? 2))
-    }
-    return list
-  }, [customers, typeFilter, gradeFilter, searchQuery, sortBy])
-
-  // ── 통계 ──
-  const stats = useMemo(() => {
-    const total = customers.length
-    const personal = customers.filter(c => c.type === '개인').length
-    const corporate = customers.filter(c => c.type === '법인').length
-    const foreign = customers.filter(c => c.type === '외국인').length
-    const vip = customers.filter(c => c.grade === 'VIP').length
-    return { total, personal, corporate, foreign, vip }
-  }, [customers])
-
-  // ── DB 컬럼 감지 (존재하지 않는 컬럼 자동 제거) ──
-  const [dbColumns, setDbColumns] = useState<Set<string> | null>(null)
-
-  useEffect(() => {
-    // 기존 데이터에서 실제 DB 컬럼 파악
-    if (customers.length > 0) {
-      setDbColumns(new Set(Object.keys(customers[0])))
-    }
-  }, [customers])
-
-  const sanitizePayload = useCallback((raw: any) => {
-    if (!dbColumns || dbColumns.size === 0) {
-      // 컬럼 정보가 없으면 기본 컬럼만 보냄
-      const base = ['name', 'phone', 'email', 'type', 'memo']
-      const safe: any = {}
-      base.forEach(k => { if (k in raw) safe[k] = raw[k] })
-      return safe
-    }
-    const safe: any = {}
-    Object.keys(raw).forEach(k => {
-      if (dbColumns.has(k)) safe[k] = raw[k]
-    })
-    // id, created_at 은 insert시 제거
-    delete safe.id
-    delete safe.created_at
-    return safe
-  }, [dbColumns])
-
-  // ── 고객 저장 (신규) ──
+  // ── 고객 생성 ──
   const handleCreateCustomer = async () => {
     if (!newForm.name?.trim()) return alert('고객명은 필수입니다.')
-
-    const raw: any = { ...newForm }
-    Object.keys(raw).forEach(k => { if (raw[k] === '') raw[k] = null })
-    raw.name = newForm.name
-    const payload = sanitizePayload(raw)
-
+    const payload = sanitizePayload(newForm)
     try {
       const headers = await getAuthHeader()
       const res = await fetch('/api/customers', {
@@ -340,12 +275,12 @@ export default function CustomerPage() {
         body: JSON.stringify(payload)
       })
       const json = await res.json()
-      if (json.error) { alert('저장 실패: ' + json.error); return }
+      if (json.error) { alert('생성 실패: ' + json.error); return }
       setShowNewModal(false)
       setNewForm({ ...EMPTY_FORM })
       fetchCustomers()
     } catch (err) {
-      alert('저장 실패: ' + err)
+      alert('생성 실패: ' + err)
     }
   }
 
@@ -499,7 +434,6 @@ export default function CustomerPage() {
         },
       }).open()
     }
-    // 이미 로드된 경우
     if ((window as any).daum?.Postcode) {
       new (window as any).daum.Postcode({
         oncomplete: (data: any) => {
@@ -547,201 +481,192 @@ export default function CustomerPage() {
   // ─────────────────────────────────────────────
   // 렌더링: 입력 필드 헬퍼
   // ─────────────────────────────────────────────
-  const renderField = (label: string, key: string, form: any, setForm: (v: any) => void, opts?: { placeholder?: string; type?: string; disabled?: boolean; half?: boolean }) => (
-    <div className={opts?.half ? 'flex-1 min-w-0' : ''}>
+  const renderField = (label: string, key: string, form: any, setForm: (v: any) => void, opts?: any) => (
+    <div>
       <label className="text-[11px] font-bold text-slate-400 mb-1 block">{label}</label>
       <input
-        type={opts?.type || 'text'}
         className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-gray-50 disabled:text-slate-400"
-        placeholder={opts?.placeholder || ''}
         value={form[key] || ''}
         onChange={e => setForm({ ...form, [key]: e.target.value })}
         disabled={opts?.disabled}
+        placeholder={opts?.placeholder}
+        type={opts?.type || 'text'}
       />
     </div>
   )
 
-  // ─────────────────────────────────────────────
-  // 렌더링: 고객 등록/수정 폼 본문
-  // ─────────────────────────────────────────────
-  const renderCustomerForm = (form: any, setForm: (v: any) => void, disabled = false) => (
-    <div className="space-y-5">
-      {/* 기본정보 */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-          <span className="text-xs font-bold text-slate-700">기본 정보</span>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="text-[11px] font-bold text-slate-400 mb-1 block">고객 구분</label>
-            <div className="flex gap-2">
-              {(['개인', '법인', '외국인'] as const).map(t => (
-                <button key={t} onClick={() => !disabled && setForm({ ...form, type: t })}
-                  className={`flex-1 py-2 text-xs rounded-xl font-bold border transition-colors ${
-                    form.type === t ? 'bg-blue-900/40 text-blue-200 border-blue-600/40' : 'bg-gray-50 text-slate-400 border-black/[0.06] hover:border-blue-600/40'
-                  } ${disabled ? 'pointer-events-none' : ''}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-          {renderField('이름 / 상호명 *', 'name', form, setForm, { placeholder: form.type === '법인' ? '(주)회사명' : '홍길동', disabled })}
-          <div className="flex gap-3">
-            {renderField('연락처', 'phone', form, setForm, { placeholder: '010-0000-0000', disabled })}
-            {renderField('이메일', 'email', form, setForm, { placeholder: 'email@example.com', disabled })}
-          </div>
-          {form.type !== '법인' && renderAddressField('주소', 'address', 'address_detail', form, setForm, disabled)}
-          <div>
-            <label className="text-[11px] font-bold text-slate-400 mb-1 block">등급</label>
-            <div className="flex gap-2">
-              {GRADES.map(g => (
-                <button key={g} onClick={() => !disabled && setForm({ ...form, grade: g })}
-                  className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
-                    form.grade === g ? GRADE_COLORS[g] + ' border' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
-                  } ${disabled ? 'pointer-events-none' : ''}`}>
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 개인 / 외국인: 면허 정보 */}
-      {(form.type === '개인' || form.type === '외국인') && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold text-slate-700">면허 정보</span>
-          </div>
-          <div className="space-y-3">
-            {form.type === '개인' && (
-              <div className="flex gap-3">
-                {renderField('생년월일', 'birth_date', form, setForm, { placeholder: '19900101', disabled })}
-                <div className="flex-1 min-w-0">
-                  <label className="text-[11px] font-bold text-slate-400 mb-1 block">면허종류</label>
-                  <select
-                    className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 outline-none disabled:bg-gray-50 text-slate-600"
-                    value={form.license_type || ''}
-                    onChange={e => setForm({ ...form, license_type: e.target.value })}
-                    disabled={disabled}>
-                    <option value="">선택</option>
-                    {LICENSE_TYPES.map(lt => <option key={lt} value={lt}>{lt}</option>)}
-                  </select>
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3">
-              {renderField('면허번호', 'license_number', form, setForm, { placeholder: '12-34-567890-12', disabled })}
-              {renderField('면허만료일', 'license_expiry', form, setForm, { placeholder: '20280101', disabled })}
-            </div>
-            {form.type === '외국인' && (
-              <>
-                <div className="flex gap-3">
-                  {renderField('여권번호', 'passport_number', form, setForm, { placeholder: 'M12345678', disabled })}
-                  {renderField('국적', 'nationality', form, setForm, { placeholder: '미국', disabled })}
-                </div>
-                {renderField('국제면허번호', 'intl_license', form, setForm, { placeholder: '', disabled })}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 법인: 사업자 정보 */}
-      {form.type === '법인' && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-            <span className="text-xs font-bold text-slate-700">사업자 정보</span>
-          </div>
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              {renderField('사업자등록번호', 'business_number', form, setForm, { placeholder: '123-45-67890', disabled })}
-              {renderField('대표자명', 'ceo_name', form, setForm, { placeholder: '홍길동', disabled })}
-            </div>
-            <div className="flex gap-3">
-              {renderField('업태', 'business_type', form, setForm, { placeholder: '서비스업', disabled })}
-              {renderField('종목', 'business_category', form, setForm, { placeholder: '자동차 임대', disabled })}
-            </div>
-            {renderAddressField('사업장 주소', 'business_address', 'business_address_detail', form, setForm, disabled)}
-          </div>
-        </div>
-      )}
-
-      {/* 법인: 담당자 정보 */}
-      {form.type === '법인' && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-            <span className="text-xs font-bold text-slate-700">담당자 정보</span>
-          </div>
-          <div className="space-y-3">
-            {renderField('담당자명', 'contact_person', form, setForm, { placeholder: '김담당', disabled })}
-            <div className="flex gap-3">
-              {renderField('담당자 연락처', 'contact_phone', form, setForm, { placeholder: '010-0000-0000', disabled })}
-              {renderField('담당자 이메일', 'contact_email', form, setForm, { placeholder: 'contact@company.com', disabled })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 세금계산서 정보 (법인 + 개인사업자) */}
-      {(form.type === '법인' || form.type === '개인') && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="text-xs font-bold text-slate-700">세금계산서</span>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[11px] font-bold text-slate-400 mb-1 block">발행 유형</label>
-              <div className="flex gap-2">
-                {['전자세금계산서', '수기세금계산서', '미발행'].map(t => (
-                  <button key={t} onClick={() => !disabled && setForm({ ...form, tax_type: t })}
-                    className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
-                      form.tax_type === t ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
-                    } ${disabled ? 'pointer-events-none' : ''}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {form.tax_type !== '미발행' && (
-              <>
-                {renderField('계산서 수신 이메일', 'tax_email', form, setForm, { placeholder: 'tax@company.com', disabled })}
-                {form.type === '개인' && renderField('사업자등록번호', 'business_number', form, setForm, { placeholder: '123-45-67890 (개인사업자)', disabled })}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 메모 */}
-      <div>
-        <label className="text-[11px] font-bold text-slate-400 mb-1 block">메모</label>
-        <textarea
-          className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none disabled:bg-gray-50 text-slate-600"
-          placeholder="특이사항, 선호차종, 주의사항 등"
-          value={form.memo || ''}
-          onChange={e => setForm({ ...form, memo: e.target.value })}
-          disabled={disabled}
-        />
-      </div>
+  const renderSelectField = (label: string, key: string, options: string[], form: any, setForm: (v: any) => void, opts?: any) => (
+    <div>
+      <label className="text-[11px] font-bold text-slate-400 mb-1 block">{label}</label>
+      <select
+        className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors disabled:bg-gray-50 disabled:text-slate-400"
+        value={form[key] || ''}
+        onChange={e => setForm({ ...form, [key]: e.target.value })}
+        disabled={opts?.disabled}
+      >
+        <option value="">선택</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   )
 
   // ─────────────────────────────────────────────
-  // 메인 렌더링
+  // 필터링 및 정렬
   // ─────────────────────────────────────────────
+  const filteredCustomers = useMemo(() => {
+    let result = customers
+      .filter(c => {
+        const typeMatch = typeFilter === '전체' || c.type === typeFilter
+        const gradeMatch = !gradeFilter || c.grade === gradeFilter
+        const searchLower = searchQuery.toLowerCase()
+        const searchMatch = !searchQuery || [
+          c.name, c.phone, c.email, c.business_number,
+          c.contact_person, c.contact_phone, c.contact_email
+        ].some(f => (f || '').toLowerCase().includes(searchLower))
+        return typeMatch && gradeMatch && searchMatch
+      })
+
+    if (sortBy === 'name') result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    else if (sortBy === 'grade') result.sort((a, b) => {
+      const gradeOrder: Record<string, number> = { 'VIP': 0, '우수': 1, '일반': 2, '주의': 3 }
+      return (gradeOrder[a.grade] || 99) - (gradeOrder[b.grade] || 99)
+    })
+    else result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    return result
+  }, [customers, typeFilter, gradeFilter, searchQuery, sortBy])
+
+  // ──통계──
+  const stats = useMemo(() => ({
+    total: customers.length,
+    personal: customers.filter(c => c.type === '개인').length,
+    corporate: customers.filter(c => c.type === '법인').length,
+    foreign: customers.filter(c => c.type === '외국인').length,
+    vip: customers.filter(c => c.grade === 'VIP').length,
+  }), [customers])
+
+  // ── 페이로드 정제 ──
+  function sanitizePayload(obj: any): any {
+    const result: any = {}
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === 'tags' && Array.isArray(v)) result[k] = v.filter(t => t)
+      else if (v !== '' && v !== null && v !== undefined) result[k] = v
+    }
+    return result
+  }
+
+  // ── Stat Cards ──
+  const statItems: StatCardItem[] = [
+    { key: 'total', label: '전체', value: stats.total, icon: '👥', color: 'blue' },
+    { key: 'personal', label: '개인', value: stats.personal, icon: '👤', color: 'blue' },
+    { key: 'corporate', label: '법인', value: stats.corporate, icon: '🏢', color: 'green' },
+    { key: 'foreign', label: '외국인', value: stats.foreign, icon: '🌐', color: 'purple' },
+    { key: 'vip', label: 'VIP', value: stats.vip, icon: '⭐', color: 'amber' },
+  ]
+
+  // ── Filter Tabs ──
+  const filterTabs: FilterTab[] = [
+    { key: 'all', label: '모두', count: filteredCustomers.length },
+  ]
+
+  // ── 데이터 테이블 컬럼 ──
+  const columns: TableColumn<Customer>[] = [
+    {
+      key: 'name',
+      label: '고객명',
+      render: (c) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: `linear-gradient(135deg, #3b6eb5, #5a8fd4)`,
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: 13
+          }}>
+            {getInitial(c.name)}
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f2440' }}>{c.name}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+              <span className={`si-badge ${TYPE_COLORS[c.type]}`}>{c.type}</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      label: '연락처',
+      render: (c) => (
+        <div>
+          <div style={{ fontSize: 13, color: '#1e293b' }}>{formatPhone(c.phone)}</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{c.email}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'grade',
+      label: '등급',
+      align: 'center',
+      render: (c) => (
+        <span className={`si-badge ${GRADE_COLORS[c.grade]}`}>{c.grade}</span>
+      ),
+    },
+    {
+      key: 'unpaid',
+      label: '미수금',
+      align: 'right',
+      render: () => {
+        const unpaid = getUnpaidAmount()
+        return (
+          <span style={{ fontWeight: 700, fontSize: 13, color: unpaid > 0 ? '#dc2626' : '#1e293b' }}>
+            {formatMoney(unpaid)}원
+          </span>
+        )
+      },
+    },
+    {
+      key: 'date',
+      label: '등록일',
+      align: 'center',
+      render: (c) => (
+        <span style={{ fontSize: 12, color: '#64748b' }}>{c.created_at.split('T')[0]}</span>
+      ),
+    },
+  ]
+
+  // ── 모바일 카드 ──
+  const mobileCard: MobileCardConfig<Customer> = {
+    title: (c) => c.name,
+    subtitle: (c) => `${c.type} · ${formatPhone(c.phone)}`,
+    trailing: (c) => (
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#3b6eb5' }}>{c.grade}</div>
+        <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{c.created_at.split('T')[0]}</div>
+      </div>
+    ),
+    badges: (c) => (
+      <>
+        <span className={`si-badge ${GRADE_COLORS[c.grade]}`}>{c.grade}</span>
+        <span className={`si-badge ${TYPE_COLORS[c.type]}`}>{c.type}</span>
+      </>
+    ),
+  }
+
+  // ── Admin 회사 미선택 ──
   if (role === 'admin' && !adminSelectedCompanyId) {
     return (
       <div className="page-bg">
         <div className="max-w-7xl mx-auto py-10 px-4 md:px-6">
-          <div className="si-card p-12 md:p-20 text-center">
-            <span className="text-4xl block mb-3">🏢</span>
-            <p className="font-bold text-slate-600">좌측 상단에서 회사를 먼저 선택해주세요</p>
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            borderRadius: 16,
+            border: '1px solid rgba(0,0,0,0.06)',
+            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            padding: '48px 20px',
+            textAlign: 'center',
+          }}>
+            <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>🏢</span>
+            <p style={{ color: '#8aabc7', fontWeight: 600, fontSize: 14 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
           </div>
         </div>
       </div>
@@ -752,609 +677,665 @@ export default function CustomerPage() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* ── KPI 스탯 카드 ── */}
-      {!loading && customers.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-          {[
-            { label: '전체', value: stats.total, badge: 'glass-border-blue', icon: '👥', color: 'text-blue-400' },
-            { label: '개인', value: stats.personal, badge: 'glass-border-blue', icon: '👤', color: 'text-blue-400' },
-            { label: '법인', value: stats.corporate, badge: 'glass-border-green', icon: '🏢', color: 'text-emerald-400' },
-            { label: '외국인', value: stats.foreign, badge: 'glass-border-purple', icon: '🌐', color: 'text-violet-400' },
-            { label: 'VIP', value: stats.vip, badge: 'glass-border-amber', icon: '⭐', color: 'text-amber-400' },
-          ].map(s => (
-            <div key={s.label} className={`glass-3 ${s.badge} rounded-xl p-3 md:p-4 text-center`}>
-              <div className="text-base mb-1">{s.icon}</div>
-              <div className={`text-xl md:text-2xl font-black ${s.color}`}>{s.value}</div>
-              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+        {/* ── KPI 스탯 카드 ── */}
+        {!loading && customers.length > 0 && (
+          <NeuStatCards
+            items={statItems}
+            columns={5}
+          />
+        )}
 
-      {/* 검색 + 필터 */}
-      <div className="si-card p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-3">
-          {/* 검색 */}
-          <div className="flex-1">
-            <input
-              className="si-input text-sm"
-              placeholder="이름, 연락처, 이메일, 사업자번호로 검색..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-          {/* 유형 필터 */}
-          <div className="flex gap-1.5">
-            {CUSTOMER_TYPES.map(t => (
-              <button key={t} onClick={() => setTypeFilter(t)}
-                className={`si-tab ${typeFilter === t ? 'si-tab-active !border-b-0 !bg-gray-100' : ''} !px-4 !py-2.5 !rounded-lg !border-0`}>
-                {t}
-              </button>
-            ))}
-          </div>
-          {/* 등급 필터 */}
+        {/* ── 검색바 ── */}
+        <NeuSearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="이름, 연락처, 이메일, 사업자번호로 검색..."
+          resultText={`검색결과 ${filteredCustomers.length}명`}
+          actions={[{
+            label: '+ 신규 고객',
+            variant: 'primary',
+            onClick: () => {
+              setShowNewModal(true)
+              setNewForm({ ...EMPTY_FORM })
+            },
+          }]}
+          extra={
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              style={{
+                padding: '9px 12px',
+                fontSize: 13,
+                color: '#1e293b',
+                background: 'rgba(255,255,255,0.40)',
+                border: '1px solid rgba(0,0,0,0.05)',
+                borderRadius: 10,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="latest">최신순</option>
+              <option value="name">이름순</option>
+              <option value="grade">등급순</option>
+            </select>
+          }
+        />
+
+        {/* ── 필터 탭 ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {CUSTOMER_TYPES.map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              style={{
+                padding: '7px 14px',
+                fontSize: 12,
+                fontWeight: typeFilter === t ? 700 : 500,
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease',
+                ...(typeFilter === t ? {
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  color: '#fff',
+                  boxShadow: '2px 2px 6px rgba(140,170,210,0.22), -1px -1px 4px rgba(255,255,255,0.40)',
+                } : {
+                  background: 'transparent',
+                  color: '#64748b',
+                }),
+              }}
+            >
+              {t}
+            </button>
+          ))}
           <select
-            className="si-input !w-auto text-xs"
             value={gradeFilter}
-            onChange={e => setGradeFilter(e.target.value)}>
+            onChange={e => setGradeFilter(e.target.value)}
+            style={{
+              padding: '7px 14px',
+              fontSize: 12,
+              borderRadius: 8,
+              border: '1px solid rgba(0,0,0,0.05)',
+              background: 'rgba(255,255,255,0.40)',
+              cursor: 'pointer',
+            }}
+          >
             <option value="">등급 전체</option>
             {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
-          {/* 정렬 */}
-          <select
-            className="si-input !w-auto text-xs"
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}>
-            <option value="latest">최신순</option>
-            <option value="name">이름순</option>
-            <option value="grade">등급순</option>
-          </select>
-          <button
-            onClick={() => { setShowNewModal(true); setNewForm({ ...EMPTY_FORM }) }}
-            className="si-btn si-btn-primary text-xs whitespace-nowrap"
-          >
-            + 신규 고객
-          </button>
         </div>
-      </div>
 
-      {/* 메인 영역: 목록 + 상세 */}
-      <div className="flex gap-6">
-        {/* 고객 목록 */}
-        <div className={`${selectedCustomer ? 'w-[420px] flex-shrink-0' : 'w-full'} transition-all`}>
-          <div className="si-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-black/[0.06] flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-400">
-                {filteredCustomers.length}명 {typeFilter !== '전체' ? `(${typeFilter})` : ''}
-              </span>
-            </div>
+        {/* ── 데이터 테이블 ── */}
+        <NeuDataTable
+          columns={columns}
+          data={filteredCustomers}
+          rowKey={(c) => c.id}
+          onRowClick={handleSelectCustomer}
+          loading={loading}
+          emptyIcon="👥"
+          emptyMessage={searchQuery ? '검색 결과가 없습니다.' : '등록된 고객이 없습니다.'}
+          mobileCard={mobileCard}
+        />
 
-            {loading ? (
-              <div className="p-16 text-center text-slate-400">
-                <div className="animate-spin w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full mx-auto mb-3" />
-                로딩 중...
+        {/* ── 상세 모달 (고객 선택 시) ── */}
+        {selectedCustomer && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'flex-end', zIndex: 50,
+          }} onClick={() => setSelectedCustomer(null)}>
+            <div
+              style={{
+                width: '100%', maxWidth: 500, background: 'white',
+                borderRadius: '20px 20px 0 0', maxHeight: '90vh',
+                overflow: 'auto', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* 헤더 */}
+              <div style={{
+                padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                position: 'sticky', top: 0, background: '#fff', zIndex: 1,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: '#0f2440' }}>{selectedCustomer.name}</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    <span className={`si-badge ${TYPE_COLORS[selectedCustomer.type]}`}>{selectedCustomer.type}</span>
+                    <span className={`si-badge ${GRADE_COLORS[selectedCustomer.grade]} ml-1`}>{selectedCustomer.grade}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCustomer(null)}
+                  style={{
+                    background: 'transparent', border: 'none', fontSize: 20,
+                    cursor: 'pointer', color: '#64748b',
+                  }}
+                >
+                  ✕
+                </button>
               </div>
-            ) : filteredCustomers.length === 0 ? (
-              <div className="p-16 text-center text-slate-400">
-                <div className="text-4xl mb-3">📋</div>
-                {searchQuery ? '검색 결과가 없습니다.' : '등록된 고객이 없습니다.'}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-200 max-h-[calc(100vh-380px)] overflow-y-auto">
-                {filteredCustomers.map(cust => (
+
+              {/* 탭 ──*/}
+              <div style={{
+                display: 'flex', gap: 0, borderBottom: '1px solid rgba(0,0,0,0.06)',
+                padding: '0 20px', position: 'sticky', top: 56, background: '#fff', zIndex: 1,
+              }}>
+                {['info', 'payments', 'invoices', 'notes'].map(tab => (
                   <button
-                    key={cust.id}
-                    onClick={() => handleSelectCustomer(cust)}
-                    className={`w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-gray-50 transition-colors ${
-                      selectedCustomer?.id === cust.id ? 'bg-blue-900/20 border-l-[3px] border-l-blue-400' : ''
-                    }`}>
-                    {/* 아바타 */}
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-white text-sm flex-shrink-0 ${TYPE_COLORS[cust.type] || 'bg-slate-600'}`}>
-                      {getInitial(cust.name)}
-                    </div>
-                    {/* 정보 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold text-slate-800 text-sm truncate">{cust.name}</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${GRADE_COLORS[cust.grade] || GRADE_COLORS['일반']}`}>
-                          {cust.grade || '일반'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-400">
-                        <span>{cust.type}</span>
-                        {cust.phone && <span>{formatPhone(cust.phone)}</span>}
-                        {cust.type === '법인' && cust.business_number && (
-                          <span className="text-slate-500">{formatBizNo(cust.business_number)}</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* 우측 */}
-                    {!selectedCustomer && (
-                      <div className="text-right flex-shrink-0">
-                        {cust.type === '법인' && cust.tax_type && cust.tax_type !== '미발행' && (
-                          <span className="text-[10px] bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded font-bold">계산서</span>
-                        )}
-                        <p className="text-[10px] text-slate-500 mt-1">{daysSince(cust.created_at)}일 전</p>
-                      </div>
-                    )}
+                    key={tab}
+                    onClick={() => setDetailTab(tab as any)}
+                    style={{
+                      padding: '12px 16px', fontSize: 13, fontWeight: detailTab === tab ? 700 : 500,
+                      border: 'none', background: 'transparent', cursor: 'pointer',
+                      borderBottom: detailTab === tab ? '3px solid #3b6eb5' : 'none',
+                      color: detailTab === tab ? '#3b6eb5' : '#64748b',
+                    }}
+                  >
+                    {tab === 'info' ? '정보' : tab === 'payments' ? '결제' : tab === 'invoices' ? '계산서' : '메모'}
                   </button>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* 상세 패널 */}
-        {selectedCustomer && (
-          <div className="flex-1 min-w-0">
-            <div className="bg-white border border-black/[0.06] rounded-2xl overflow-hidden">
-              {/* 상세 헤더 */}
-              <div className="px-6 py-5 border-b border-black/[0.06]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-white text-lg ${TYPE_COLORS[selectedCustomer.type] || 'bg-slate-600'}`}>
-                      {getInitial(selectedCustomer.name)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-black text-slate-800">{selectedCustomer.name}</h2>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${GRADE_COLORS[selectedCustomer.grade] || GRADE_COLORS['일반']}`}>
-                          {selectedCustomer.grade || '일반'}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-50 text-slate-400">{selectedCustomer.type}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
-                        {selectedCustomer.phone && <span>{formatPhone(selectedCustomer.phone)}</span>}
-                        {selectedCustomer.email && <span>{selectedCustomer.email}</span>}
-                        {selectedCustomer.type === '법인' && selectedCustomer.business_number && (
-                          <span>사업자 {formatBizNo(selectedCustomer.business_number)}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <button onClick={() => setSelectedCustomer(null)} className="text-slate-500 hover:text-slate-600 text-xl">✕</button>
-                </div>
-
-                {/* 상세 탭 */}
-                <div className="flex gap-1.5">
-                  {([
-                    { key: 'info', label: '기본정보', icon: '📋' },
-                    { key: 'contracts', label: '계약이력', icon: '📑' },
-                    { key: 'payments', label: '결제/정산', icon: '💳' },
-                    { key: 'invoices', label: '세금계산서', icon: '🧾' },
-                    { key: 'notes', label: '상담메모', icon: '📝' },
-                  ] as const).map(tab => (
-                    <button key={tab.key} onClick={() => setDetailTab(tab.key)}
-                      className={`px-3 py-2 rounded-xl font-bold text-xs transition-colors ${
-                        detailTab === tab.key ? 'bg-blue-900/40 text-blue-200' : 'bg-gray-50 text-slate-400 hover:bg-gray-100'
-                      }`}>
-                      {tab.icon} {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 상세 내용 */}
-              <div className="p-6 max-h-[calc(100vh-420px)] overflow-y-auto">
-                {/* ── 기본정보 탭 ── */}
+              {/* 컨텐츠 */}
+              <div style={{ padding: 20 }}>
                 {detailTab === 'info' && (
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400">고객 상세 정보</span>
-                      <div className="flex gap-2">
-                        {isEditing ? (
-                          <>
-                            <button onClick={() => setIsEditing(false)}
-                              className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-gray-50">취소</button>
-                            <button onClick={handleUpdateCustomer}
-                              className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60">저장</button>
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={() => { setIsEditing(true); setEditForm({ ...selectedCustomer }) }}
-                              className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400 hover:bg-gray-50">수정</button>
-                            <button onClick={() => handleDeleteCustomer(selectedCustomer.id)}
-                              className="py-1.5 px-4 border border-red-900/40 rounded-xl text-xs font-bold text-red-400 hover:bg-red-900/20">삭제</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {renderCustomerForm(isEditing ? editForm : selectedCustomer, isEditing ? setEditForm : () => {}, !isEditing)}
-                  </div>
-                )}
-
-                {/* ── 계약이력 탭 ── */}
-                {detailTab === 'contracts' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400">계약 이력 ({contracts.length}건)</span>
-                    </div>
-                    {contracts.length === 0 ? (
-                      <div className="py-16 text-center text-slate-400">
-                        <div className="text-3xl mb-2">📑</div>
-                        계약 이력이 없습니다.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {contracts.map((c: any) => (
-                          <div
-                            key={c.id}
-                            className="border border-black/[0.06] rounded-xl p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                            onClick={() => window.open(`/contracts/${c.id}`, '_blank')}
+                    {!isEditing ? (
+                      <>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                          <button
+                            onClick={() => { setIsEditing(true); setEditForm({ ...selectedCustomer }) }}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              border: 'none', borderRadius: 8, cursor: 'pointer',
+                            }}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                  c.status === 'active' ? 'bg-emerald-900/30 text-emerald-400' :
-                                  c.status === 'draft' ? 'bg-gray-50 text-slate-400' :
-                                  'bg-blue-900/30 text-blue-400'
-                                }`}>
-                                  {c.status === 'active' ? '진행중' : c.status === 'draft' ? '임시저장' : c.status === 'completed' ? '완료' : c.status}
-                                </span>
-                                <span className="text-sm font-bold text-slate-700">
-                                  {c.car_name || c.vehicle_name || '차량 미지정'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">
-                                  {c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : ''}
-                                </span>
-                                <span className="text-[10px] text-blue-400 font-bold">상세 →</span>
-                              </div>
+                            수정
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomer(selectedCustomer.id)}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'rgba(239,68,68,0.15)', color: '#dc2626',
+                              border: 'none', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                        {/* 기본정보 */}
+                        <div style={{ marginBottom: 20 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 12, textTransform: 'uppercase' }}>
+                            기본 정보
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#8aabc7', fontWeight: 600 }}>고객명</div>
+                              <div style={{ fontSize: 13, color: '#1e293b', marginTop: 4, fontWeight: 600 }}>{selectedCustomer.name}</div>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-slate-500">
-                              {c.rental_period && <span>기간: {c.rental_period}개월</span>}
-                              {c.monthly_rental && <span>월 렌탈료: {formatMoney(c.monthly_rental)}원</span>}
-                              {c.quote_type && <span className="text-slate-400">{c.quote_type}</span>}
+                            <div>
+                              <div style={{ fontSize: 10, color: '#8aabc7', fontWeight: 600 }}>유형</div>
+                              <div style={{ fontSize: 13, color: '#1e293b', marginTop: 4, fontWeight: 600 }}>{selectedCustomer.type}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#8aabc7', fontWeight: 600 }}>연락처</div>
+                              <div style={{ fontSize: 13, color: '#1e293b', marginTop: 4 }}>{formatPhone(selectedCustomer.phone)}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#8aabc7', fontWeight: 600 }}>이메일</div>
+                              <div style={{ fontSize: 13, color: '#1e293b', marginTop: 4 }}>{selectedCustomer.email}</div>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <div style={{ marginBottom: 20 }}>
+                          {selectedCustomer.type === '개인' && (
+                            <>
+                              {renderField('고객명', 'name', editForm, setEditForm)}
+                              {renderField('생년월일', 'birth_date', editForm, setEditForm, { type: 'date' })}
+                              {renderField('면허번호', 'license_number', editForm, setEditForm)}
+                              {renderSelectField('면허종류', 'license_type', [...LICENSE_TYPES], editForm, setEditForm)}
+                              {renderField('면허만료일', 'license_expiry', editForm, setEditForm, { type: 'date' })}
+                              {renderAddressField('주소', 'address', 'address_detail', editForm, setEditForm, false)}
+                              {renderField('연락처', 'phone', editForm, setEditForm)}
+                              {renderField('이메일', 'email', editForm, setEditForm)}
+                              {renderSelectField('등급', 'grade', [...GRADES], editForm, setEditForm)}
+                            </>
+                          )}
+                          {selectedCustomer.type === '법인' && (
+                            <>
+                              {renderField('회사명', 'name', editForm, setEditForm)}
+                              {renderField('사업자등록번호', 'business_number', editForm, setEditForm, { placeholder: '123-45-67890' })}
+                              {renderField('사업종류', 'business_type', editForm, setEditForm)}
+                              {renderField('업종', 'business_category', editForm, setEditForm)}
+                              {renderField('대표자명', 'ceo_name', editForm, setEditForm)}
+                              {renderAddressField('사업장주소', 'business_address', 'business_address_detail', editForm, setEditForm, false)}
+                              {renderField('담당자', 'contact_person', editForm, setEditForm)}
+                              {renderField('담당자연락처', 'contact_phone', editForm, setEditForm)}
+                              {renderField('담당자이메일', 'contact_email', editForm, setEditForm)}
+                              {renderSelectField('등급', 'grade', [...GRADES], editForm, setEditForm)}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-400 mb-1 block">세금계산서 유형</label>
+                                <div className="flex gap-2">
+                                  {['전자세금계산서', '수기세금계산서', '미발행'].map(t => (
+                                    <button key={t} onClick={() => setEditForm({ ...editForm, tax_type: t })}
+                                      className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
+                                        editForm.tax_type === t ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
+                                      }`}>
+                                      {t}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              {editForm.tax_type !== '미발행' && (
+                                <>
+                                  {renderField('계산서 수신 이메일', 'tax_email', editForm, setEditForm)}
+                                </>
+                              )}
+                            </>
+                          )}
+                          {selectedCustomer.type === '외국인' && (
+                            <>
+                              {renderField('고객명', 'name', editForm, setEditForm)}
+                              {renderField('여권번호', 'passport_number', editForm, setEditForm)}
+                              {renderField('국적', 'nationality', editForm, setEditForm)}
+                              {renderField('국제운전면허', 'intl_license', editForm, setEditForm)}
+                              {renderField('연락처', 'phone', editForm, setEditForm)}
+                              {renderField('이메일', 'email', editForm, setEditForm)}
+                            </>
+                          )}
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-400 mb-1 block">메모</label>
+                            <textarea
+                              className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none"
+                              value={editForm.memo || ''}
+                              onChange={e => setEditForm({ ...editForm, memo: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={handleUpdateCustomer}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              border: 'none', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            저장
+                          </button>
+                          <button
+                            onClick={() => setIsEditing(false)}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            취소
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* ── 결제/정산 탭 ── */}
                 {detailTab === 'payments' && (
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-bold text-slate-400">결제 이력 ({payments.length}건)</span>
-                        {getUnpaidAmount() > 0 && (
-                          <span className="text-xs font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded">
-                            미수금 {formatMoney(getUnpaidAmount())}원
-                          </span>
-                        )}
-                      </div>
-                      <button onClick={() => setShowPaymentForm(!showPaymentForm)}
-                        className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60">
-                        + 결제 등록
-                      </button>
-                    </div>
-
-                    {/* 결제 등록 폼 */}
+                    <button
+                      onClick={() => setShowPaymentForm(!showPaymentForm)}
+                      style={{
+                        width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                        border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 12,
+                      }}
+                    >
+                      + 결제 기록 추가
+                    </button>
                     {showPaymentForm && (
-                      <div className="border border-blue-600/40 bg-blue-900/10 rounded-xl p-4 mb-4">
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">유형</label>
-                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              value={paymentForm.payment_type}
-                              onChange={e => setPaymentForm({ ...paymentForm, payment_type: e.target.value })}>
-                              <option value="charge">청구</option>
-                              <option value="payment">결제(수납)</option>
-                              <option value="refund">환불</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">결제수단</label>
-                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              value={paymentForm.payment_method}
-                              onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}>
-                              <option value="카드">카드</option>
-                              <option value="계좌이체">계좌이체</option>
-                              <option value="현금">현금</option>
-                              <option value="자동이체">자동이체</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">금액 (원)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              placeholder="0"
-                              value={paymentForm.amount}
-                              onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">상태</label>
-                            <select className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              value={paymentForm.status}
-                              onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}>
-                              <option value="미결제">미결제</option>
-                              <option value="결제완료">결제완료</option>
-                              <option value="부분결제">부분결제</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">결제기한</label>
-                            <input type="date" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              value={paymentForm.due_date}
-                              onChange={e => setPaymentForm({ ...paymentForm, due_date: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">설명</label>
-                            <input className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              placeholder="3월 렌탈료"
-                              value={paymentForm.description}
-                              onChange={e => setPaymentForm({ ...paymentForm, description: e.target.value })} />
-                          </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setShowPaymentForm(false)}
-                            className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
-                          <button onClick={handleAddPayment}
-                            className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60">저장</button>
+                      <div style={{ padding: 12, background: 'rgba(59,110,181,0.05)', borderRadius: 8, marginBottom: 12 }}>
+                        {renderField('금액', 'amount', paymentForm, setPaymentForm, { type: 'number' })}
+                        {renderSelectField('유형', 'payment_type', ['charge', 'refund'], paymentForm, setPaymentForm)}
+                        {renderSelectField('결제방법', 'payment_method', ['카드', '현금', '계좌이체', '기타'], paymentForm, setPaymentForm)}
+                        {renderField('설명', 'description', paymentForm, setPaymentForm)}
+                        {renderField('예정일', 'due_date', paymentForm, setPaymentForm, { type: 'date' })}
+                        {renderSelectField('상태', 'status', ['미결제', '부분결제', '결제완료', '환불'], paymentForm, setPaymentForm)}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={handleAddPayment}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              border: 'none', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            저장
+                          </button>
+                          <button
+                            onClick={() => setShowPaymentForm(false)}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            취소
+                          </button>
                         </div>
                       </div>
                     )}
-
-                    {/* 결제 목록 */}
-                    {payments.length === 0 ? (
-                      <div className="py-16 text-center text-slate-400">
-                        <div className="text-3xl mb-2">💳</div>
-                        결제 이력이 없습니다.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {payments.map(p => (
-                          <div key={p.id} className="border border-black/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-gray-50">
-                            <div className="flex items-center gap-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${PAYMENT_STATUS_COLORS[p.status] || 'bg-gray-50 text-slate-400'}`}>
-                                {p.status}
-                              </span>
-                              <div>
-                                <span className="text-sm font-bold text-slate-700">{p.description || (p.payment_type === 'charge' ? '청구' : p.payment_type === 'refund' ? '환불' : '결제')}</span>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
-                                  <span>{p.payment_method}</span>
-                                  {p.due_date && <span>기한: {p.due_date}</span>}
-                                  {p.paid_date && <span>결제일: {p.paid_date}</span>}
-                                </div>
-                              </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {payments.map(p => (
+                        <div key={p.id} style={{
+                          padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,
+                          border: '1px solid rgba(0,0,0,0.05)',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{formatMoney(p.amount)}원</div>
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{p.description}</div>
                             </div>
-                            <span className={`text-sm font-black ${p.payment_type === 'refund' ? 'text-blue-400' : p.status === '미결제' ? 'text-red-400' : 'text-slate-700'}`}>
-                              {p.payment_type === 'refund' ? '-' : ''}{formatMoney(p.amount)}원
-                            </span>
+                            <span className={`si-badge ${PAYMENT_STATUS_COLORS[p.status]}`}>{p.status}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          <div style={{ fontSize: 10, color: '#8aabc7' }}>
+                            {p.created_at.split('T')[0]} · {p.payment_method}
+                          </div>
+                        </div>
+                      ))}
+                      {payments.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 20, color: '#8aabc7', fontSize: 12 }}>
+                          결제 기록이 없습니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* ── 세금계산서 탭 ── */}
                 {detailTab === 'invoices' && (
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400">세금계산서 이력 ({taxInvoices.length}건)</span>
-                      <button onClick={() => setShowInvoiceForm(!showInvoiceForm)}
-                        className="py-1.5 px-4 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700">
-                        + 계산서 발행
-                      </button>
-                    </div>
-
-                    {/* 계산서 정보 요약 */}
-                    {(selectedCustomer.type === '법인' || selectedCustomer.business_number) && (
-                      <div className="bg-amber-900/10 border border-amber-700/40 rounded-xl p-4 mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          <span className="text-xs font-bold text-amber-400">세금계산서 발행 정보</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">사업자번호</span>
-                            <span className="font-bold text-slate-700">{formatBizNo(selectedCustomer.business_number) || '미등록'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">상호</span>
-                            <span className="font-bold text-slate-700">{selectedCustomer.name}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">대표자</span>
-                            <span className="font-bold text-slate-700">{selectedCustomer.ceo_name || '미등록'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">발행유형</span>
-                            <span className="font-bold text-slate-700">{selectedCustomer.tax_type || '미발행'}</span>
-                          </div>
-                          <div className="flex justify-between col-span-2">
-                            <span className="text-slate-500">수신 이메일</span>
-                            <span className="font-bold text-slate-700">{selectedCustomer.tax_email || selectedCustomer.email || '미등록'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 계산서 발행 폼 */}
+                    <button
+                      onClick={() => setShowInvoiceForm(!showInvoiceForm)}
+                      style={{
+                        width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                        border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 12,
+                      }}
+                    >
+                      + 세금계산서 추가
+                    </button>
                     {showInvoiceForm && (
-                      <div className="border border-amber-700/40 bg-amber-900/10 rounded-xl p-4 mb-4">
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">발행일</label>
-                            <input type="date" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              value={invoiceForm.issue_date}
-                              onChange={e => setInvoiceForm({ ...invoiceForm, issue_date: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">품목/적요</label>
-                            <input className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              placeholder="차량 임대료"
-                              value={invoiceForm.description}
-                              onChange={e => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">공급가액 (원)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              placeholder="0"
-                              value={invoiceForm.supply_amount}
-                              onChange={e => setInvoiceForm({ ...invoiceForm, supply_amount: e.target.value })} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 mb-1 block">세액 (미입력시 10%)</label>
-                            <input type="number" className="w-full px-3 py-2 border border-black/[0.06] rounded-lg text-xs text-slate-600"
-                              placeholder="자동계산"
-                              value={invoiceForm.tax_amount}
-                              onChange={e => setInvoiceForm({ ...invoiceForm, tax_amount: e.target.value })} />
-                          </div>
-                        </div>
-                        {invoiceForm.supply_amount && (
-                          <div className="bg-gray-50 border border-black/[0.06] rounded-lg px-3 py-2 mb-3 text-xs">
-                            <span className="text-slate-500">합계: </span>
-                            <span className="font-black text-slate-700">
-                              {formatMoney(
-                                Number(invoiceForm.supply_amount) +
-                                (invoiceForm.tax_amount ? Number(invoiceForm.tax_amount) : Math.round(Number(invoiceForm.supply_amount) * 0.1))
-                              )}원
-                            </span>
-                            <span className="text-slate-400 ml-2">
-                              (공급가 {formatMoney(Number(invoiceForm.supply_amount))} + 세액 {formatMoney(invoiceForm.tax_amount ? Number(invoiceForm.tax_amount) : Math.round(Number(invoiceForm.supply_amount) * 0.1))})
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setShowInvoiceForm(false)}
-                            className="py-1.5 px-4 border border-black/[0.06] rounded-xl text-xs font-bold text-slate-400">취소</button>
-                          <button onClick={handleAddInvoice}
-                            className="py-1.5 px-4 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700">발행</button>
+                      <div style={{ padding: 12, background: 'rgba(59,110,181,0.05)', borderRadius: 8, marginBottom: 12 }}>
+                        {renderField('발행일', 'issue_date', invoiceForm, setInvoiceForm, { type: 'date' })}
+                        {renderField('공급가액', 'supply_amount', invoiceForm, setInvoiceForm, { type: 'number' })}
+                        {renderField('세액', 'tax_amount', invoiceForm, setInvoiceForm, { type: 'number' })}
+                        {renderField('비고', 'description', invoiceForm, setInvoiceForm)}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={handleAddInvoice}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                              border: 'none', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            저장
+                          </button>
+                          <button
+                            onClick={() => setShowInvoiceForm(false)}
+                            style={{
+                              flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                              background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                              border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
+                            }}
+                          >
+                            취소
+                          </button>
                         </div>
                       </div>
                     )}
-
-                    {/* 계산서 목록 */}
-                    {taxInvoices.length === 0 ? (
-                      <div className="py-16 text-center text-slate-400">
-                        <div className="text-3xl mb-2">🧾</div>
-                        발행된 세금계산서가 없습니다.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {taxInvoices.map(inv => (
-                          <div key={inv.id} className="border border-black/[0.06] rounded-xl px-4 py-3 flex items-center justify-between hover:bg-gray-50">
-                            <div className="flex items-center gap-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                inv.status === '발행' ? 'bg-emerald-900/30 text-emerald-400' :
-                                inv.status === '취소' ? 'bg-red-900/30 text-red-400' : 'bg-amber-900/30 text-amber-400'
-                              }`}>{inv.status}</span>
-                              <div>
-                                <span className="text-sm font-bold text-slate-700">{inv.description || '세금계산서'}</span>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
-                                  <span>발행일: {inv.issue_date}</span>
-                                  {inv.sent_to_email && <span>→ {inv.sent_to_email}</span>}
-                                </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {taxInvoices.map(inv => (
+                        <div key={inv.id} style={{
+                          padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,
+                          border: '1px solid rgba(0,0,0,0.05)',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>
+                                {formatMoney(inv.total_amount)}원
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                공급가: {formatMoney(inv.supply_amount)}원 · 세액: {formatMoney(inv.tax_amount)}원
                               </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-sm font-black text-slate-700">{formatMoney(inv.total_amount)}원</span>
-                              <div className="text-[10px] text-slate-500">
-                                공급가 {formatMoney(inv.supply_amount)} / 세액 {formatMoney(inv.tax_amount)}
-                              </div>
-                            </div>
+                            <span className="si-badge si-badge-green">{inv.status}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          <div style={{ fontSize: 10, color: '#8aabc7' }}>
+                            {inv.issue_date} · {inv.sent_to_email}
+                          </div>
+                        </div>
+                      ))}
+                      {taxInvoices.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 20, color: '#8aabc7', fontSize: 12 }}>
+                          세금계산서가 없습니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* ── 상담메모 탭 ── */}
                 {detailTab === 'notes' && (
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-slate-400">상담 / 메모 ({notes.length}건)</span>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="메모 입력..."
+                          value={newNote}
+                          onChange={e => setNewNote(e.target.value)}
+                          style={{
+                            flex: 1, padding: '9px 12px', fontSize: 12,
+                            border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8,
+                            outline: 'none',
+                          }}
+                        />
+                        <select
+                          value={newNoteType}
+                          onChange={e => setNewNoteType(e.target.value)}
+                          style={{
+                            padding: '9px 12px', fontSize: 12,
+                            border: '1px solid rgba(0,0,0,0.05)', borderRadius: 8,
+                            background: '#fff', cursor: 'pointer',
+                          }}
+                        >
+                          {NOTE_TYPES.map(nt => <option key={nt} value={nt}>{nt}</option>)}
+                        </select>
+                      </div>
+                      <button
+                        onClick={handleAddNote}
+                        style={{
+                          width: '100%', padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                          border: 'none', borderRadius: 8, cursor: 'pointer',
+                        }}
+                      >
+                        추가
+                      </button>
                     </div>
-
-                    {/* 메모 입력 */}
-                    <div className="border border-black/[0.06] rounded-xl p-4 mb-4">
-                      <div className="flex gap-1.5 mb-3">
-                        {NOTE_TYPES.map(t => (
-                          <button key={t} onClick={() => setNewNoteType(t)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${
-                              newNoteType === t ? NOTE_TYPE_COLORS[t] : 'bg-gray-50 text-slate-500'
-                            }`}>
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      <textarea
-                        className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none text-slate-600"
-                        placeholder="상담 내용, 고객 요청사항, 특이사항 등을 기록하세요..."
-                        value={newNote}
-                        onChange={e => setNewNote(e.target.value)}
-                      />
-                      <div className="flex justify-end mt-2">
-                        <button onClick={handleAddNote}
-                          disabled={!newNote.trim()}
-                          className="py-1.5 px-4 bg-blue-900/40 text-blue-200 rounded-xl text-xs font-bold hover:bg-blue-900/60 disabled:opacity-40 disabled:cursor-not-allowed">
-                          메모 저장
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 메모 목록 */}
-                    {notes.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400">
-                        <div className="text-3xl mb-2">📝</div>
-                        등록된 메모가 없습니다.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {notes.map(n => (
-                          <div key={n.id} className="border border-black/[0.06] rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${NOTE_TYPE_COLORS[n.note_type] || NOTE_TYPE_COLORS['일반']}`}>
-                                  {n.note_type}
-                                </span>
-                                <span className="text-[10px] text-slate-500">{n.author_name}</span>
-                              </div>
-                              <span className="text-[10px] text-slate-400">
-                                {n.created_at ? new Date(n.created_at).toLocaleString('ko-KR') : ''}
-                              </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {notes.map(n => (
+                        <div key={n.id} style={{
+                          padding: 12, background: 'rgba(255,255,255,0.40)', borderRadius: 8,
+                          border: '1px solid rgba(0,0,0,0.05)',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{n.content}</div>
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{n.author_name}</div>
                             </div>
-                            <p className="text-sm text-slate-600 whitespace-pre-wrap">{n.content}</p>
+                            <span className={`si-badge ${NOTE_TYPE_COLORS[n.note_type]}`}>{n.note_type}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          <div style={{ fontSize: 10, color: '#8aabc7' }}>
+                            {n.created_at.split('T')[0]}
+                          </div>
+                        </div>
+                      ))}
+                      {notes.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 20, color: '#8aabc7', fontSize: 12 }}>
+                          메모가 없습니다.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* ── 신규 고객 등록 모달 ── */}
-      {showNewModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl mb-10 border border-black/[0.06]">
-            <div className="px-6 py-4 border-b border-black/[0.06] flex items-center justify-between">
-              <h2 className="font-black text-slate-800">신규 고객 등록</h2>
-              <button onClick={() => setShowNewModal(false)} className="text-slate-500 hover:text-slate-600 text-xl">✕</button>
-            </div>
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
-              {renderCustomerForm(newForm, setNewForm)}
-            </div>
-            <div className="px-6 py-4 border-t border-black/[0.06] flex justify-end gap-3">
-              <button onClick={() => setShowNewModal(false)}
-                className="py-2.5 px-5 border border-black/[0.06] rounded-xl font-bold text-sm text-slate-400 hover:bg-gray-50">취소</button>
-              <button onClick={handleCreateCustomer}
-                className="py-2.5 px-5 bg-blue-900/40 text-blue-200 rounded-xl font-bold text-sm hover:bg-blue-900/60">등록</button>
+        {/* ── 신규 고객 모달 ── */}
+        {showNewModal && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'flex-end', zIndex: 50,
+          }} onClick={() => setShowNewModal(false)}>
+            <div
+              style={{
+                width: '100%', maxWidth: 500, background: 'white',
+                borderRadius: '20px 20px 0 0', maxHeight: '90vh',
+                overflow: 'auto', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{
+                padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                position: 'sticky', top: 0, background: '#fff', zIndex: 1,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#0f2440' }}>신규 고객 등록</div>
+                <button
+                  onClick={() => setShowNewModal(false)}
+                  style={{
+                    background: 'transparent', border: 'none', fontSize: 20,
+                    cursor: 'pointer', color: '#64748b',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div style={{ padding: 20 }}>
+                {/* 고객 유형 선택 */}
+                <div style={{ marginBottom: 20 }}>
+                  <label className="text-[11px] font-bold text-slate-400 mb-2 block">고객 유형</label>
+                  <div className="flex gap-2">
+                    {['개인', '법인', '외국인'].map(t => (
+                      <button key={t} onClick={() => setNewForm({ ...EMPTY_FORM, type: t as any })}
+                        className={`flex-1 py-2 text-xs rounded-lg font-bold border transition-colors ${
+                          newForm.type === t ? 'bg-blue-900/30 text-blue-400 border-blue-700/40' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
+                        }`}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {newForm.type === '개인' && (
+                  <>
+                    {renderField('고객명', 'name', newForm, setNewForm)}
+                    {renderField('생년월일', 'birth_date', newForm, setNewForm, { type: 'date' })}
+                    {renderField('면허번호', 'license_number', newForm, setNewForm)}
+                    {renderSelectField('면허종류', 'license_type', [...LICENSE_TYPES], newForm, setNewForm)}
+                    {renderField('면허만료일', 'license_expiry', newForm, setNewForm, { type: 'date' })}
+                    {renderAddressField('주소', 'address', 'address_detail', newForm, setNewForm, false)}
+                    {renderField('연락처', 'phone', newForm, setNewForm)}
+                    {renderField('이메일', 'email', newForm, setNewForm)}
+                  </>
+                )}
+
+                {newForm.type === '법인' && (
+                  <>
+                    {renderField('회사명', 'name', newForm, setNewForm)}
+                    {renderField('사업자등록번호', 'business_number', newForm, setNewForm, { placeholder: '123-45-67890' })}
+                    {renderField('사업종류', 'business_type', newForm, setNewForm)}
+                    {renderField('업종', 'business_category', newForm, setNewForm)}
+                    {renderField('대표자명', 'ceo_name', newForm, setNewForm)}
+                    {renderAddressField('사업장주소', 'business_address', 'business_address_detail', newForm, setNewForm, false)}
+                    {renderField('담당자', 'contact_person', newForm, setNewForm)}
+                    {renderField('담당자연락처', 'contact_phone', newForm, setNewForm)}
+                    {renderField('담당자이메일', 'contact_email', newForm, setNewForm)}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 mb-1 block">세금계산서 유형</label>
+                      <div className="flex gap-2">
+                        {['전자세금계산서', '수기세금계산서', '미발행'].map(t => (
+                          <button key={t} onClick={() => setNewForm({ ...newForm, tax_type: t })}
+                            className={`flex-1 py-1.5 text-xs rounded-lg font-bold border transition-colors ${
+                              newForm.tax_type === t ? 'bg-amber-900/30 text-amber-400 border-amber-700/40' : 'bg-gray-50 text-slate-400 border-black/[0.06]'
+                            }`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {newForm.tax_type !== '미발행' && (
+                      <>
+                        {renderField('계산서 수신 이메일', 'tax_email', newForm, setNewForm)}
+                      </>
+                    )}
+                  </>
+                )}
+
+                {newForm.type === '외국인' && (
+                  <>
+                    {renderField('고객명', 'name', newForm, setNewForm)}
+                    {renderField('여권번호', 'passport_number', newForm, setNewForm)}
+                    {renderField('국적', 'nationality', newForm, setNewForm)}
+                    {renderField('국제운전면허', 'intl_license', newForm, setNewForm)}
+                    {renderField('연락처', 'phone', newForm, setNewForm)}
+                    {renderField('이메일', 'email', newForm, setNewForm)}
+                  </>
+                )}
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 mb-1 block">메모</label>
+                  <textarea
+                    className="w-full px-3 py-2.5 border border-black/[0.06] rounded-xl text-sm h-20 resize-none focus:border-blue-400 outline-none"
+                    value={newForm.memo || ''}
+                    onChange={e => setNewForm({ ...newForm, memo: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <button
+                    onClick={handleCreateCustomer}
+                    style={{
+                      flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                      background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                      border: 'none', borderRadius: 8, cursor: 'pointer',
+                    }}
+                  >
+                    등록
+                  </button>
+                  <button
+                    onClick={() => setShowNewModal(false)}
+                    style={{
+                      flex: 1, padding: '10px 14px', fontSize: 12, fontWeight: 600,
+                      background: 'rgba(255,255,255,0.60)', color: '#1e293b',
+                      border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, cursor: 'pointer',
+                    }}
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+      </div>
     </div>
   )
 }
