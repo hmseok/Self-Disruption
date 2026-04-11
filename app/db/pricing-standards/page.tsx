@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import dynamicImport from 'next/dynamic'
-import PageTitle from '../../components/PageTitle'
 
 // 탭 설정 — 각 탭에 설명 추가
 const tabs = [
@@ -50,7 +49,6 @@ export default function PricingStandardsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         {/* 헤더 */}
         <div className="bg-gray-50 border-b border-black/[0.06] sticky top-0 z-40 -mx-4 -mt-4 px-4 md:px-6 py-5 md:rounded-t-xl">

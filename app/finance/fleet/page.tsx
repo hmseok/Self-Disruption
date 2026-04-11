@@ -1,5 +1,4 @@
 'use client'
-import PageTitle from '../../components/PageTitle'
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
@@ -372,7 +371,6 @@ export default function FleetPnlPage() {
   return (
     <div className='page-bg'>
       <div className='max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6'>
-        <PageTitle />
 
         {/* Stats Section */}
         <DcStatStrip

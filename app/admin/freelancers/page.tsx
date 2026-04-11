@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
-import PageTitle from '../../components/PageTitle'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -256,7 +255,6 @@ export default function FreelancersPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-      <PageTitle />
 
       {/* Stats - Show only on payments tab */}
       {activeTab === 'payments' && (

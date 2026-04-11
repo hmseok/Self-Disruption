@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
-import PageTitle from '../../components/PageTitle'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -364,7 +363,6 @@ export default function IntakePage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         <div className="h-full flex flex-col" style={{ background: '#f8f9fb' }}>
           {/* ── Stage Pipeline ── */}

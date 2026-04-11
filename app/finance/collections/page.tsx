@@ -1,5 +1,4 @@
 'use client'
-import PageTitle from '../../components/PageTitle'
 import { auth } from '@/lib/auth-client'
 
 import { useState, useEffect } from 'react'
@@ -271,7 +270,6 @@ export default function CollectionsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 space-y-6">
-        <PageTitle />
 
         {/* Stat Cards */}
         <DcStatStrip stats={statCards} fullWidth />

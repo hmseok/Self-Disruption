@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-import PageTitle from '../components/PageTitle'
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -373,7 +372,6 @@ export default function ContractListMain() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         {/* ── KPI 스탯 스트립 ── */}
         {contracts.length > 0 && (

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import Link from 'next/link'
-import PageTitle from '../components/PageTitle'
 import DcStatStrip from '../components/DcStatStrip'
 import DcToolbar from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -526,7 +525,6 @@ export default function MaintenanceMainPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>

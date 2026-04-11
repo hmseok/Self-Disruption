@@ -1,5 +1,4 @@
 'use client'
-import PageTitle from '../components/PageTitle'
 import { useApp } from '../context/AppContext'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -206,7 +205,6 @@ const router = useRouter()
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         {/* Stat Cards */}
         <DcStatStrip stats={statCards} fullWidth />

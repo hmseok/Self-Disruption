@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth-client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../context/AppContext'
-import PageTitle from '../components/PageTitle'
 import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -589,7 +588,6 @@ const { company, role, adminSelectedCompanyId } = useApp()
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
        <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleBulkUpload} disabled={bulkProcessing} />
 

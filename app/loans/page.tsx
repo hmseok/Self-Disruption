@@ -2,7 +2,6 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import PageTitle from '../components/PageTitle'
 import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -394,7 +393,6 @@ export default function LoanListPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
         <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
         {/* DcStatStrip + Actions */}

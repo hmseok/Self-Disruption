@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
-import PageTitle from '../../components/PageTitle'
 import InviteModal from '../../components/InviteModal'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
@@ -515,7 +514,6 @@ export default function OrgManagementPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
       {/* Stats */}
       {activeCompanyId && (

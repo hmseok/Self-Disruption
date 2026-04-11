@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar from '../../components/DcToolbar'
-import PageTitle from '../../components/PageTitle'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -166,7 +165,6 @@ export default function CorporateCardsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-      <PageTitle />
 
       <DcStatStrip
         stats={[

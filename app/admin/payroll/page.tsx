@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar from '../../components/DcToolbar'
-import PageTitle from '../../components/PageTitle'
 import {
   calculatePayroll, reverseCalculatePayroll,
   annualToMonthly, hourlyToMonthly, dailyToMonthly,
@@ -656,7 +655,6 @@ export default function PayrollPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-      <PageTitle />
 
       {/* ── 탭 바 (DcToolbar) ── */}
       <DcToolbar

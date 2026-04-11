@@ -1,5 +1,4 @@
 'use client'
-import PageTitle from '../components/PageTitle'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
@@ -246,7 +245,6 @@ export default function ReportDashboard() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        <PageTitle />
 
         <div className="flex gap-2 mb-6">
           {[3, 6, 12].map(m => (
