@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
+import PageTitle from '../../components/PageTitle'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -253,13 +254,9 @@ export default function FreelancersPage() {
   ]
 
   return (
-    <div className="max-w-6xl mx-auto py-4 px-4 md:py-5 md:px-6 bg-slate-50 min-h-screen pb-32">
-
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">👷 프리랜서/용역 관리</h1>
-        <p className="text-slate-600 text-sm">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
-      </div>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <PageTitle />
 
       {/* Stats - Show only on payments tab */}
       {activeTab === 'payments' && (
@@ -561,6 +558,7 @@ export default function FreelancersPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

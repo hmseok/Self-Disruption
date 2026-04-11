@@ -2,6 +2,7 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import PageTitle from '../components/PageTitle'
 import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -690,6 +691,7 @@ export default function CustomerPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
 
         {/* ── KPI 스탯 바 ── */}
         {!loading && customers.length > 0 && (

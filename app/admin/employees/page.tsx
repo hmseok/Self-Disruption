@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import type { Position, Department } from '../../types/rbac'
+import PageTitle from '../../components/PageTitle'
 import InviteModal from '../../components/InviteModal'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../../components/DcToolbar'
@@ -448,7 +449,7 @@ export default function OrgManagementPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.8)' }}>
+      <div className="page-bg" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(0,0,0,0.06)', borderTopColor: '#60a5fa', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
@@ -514,12 +515,7 @@ export default function OrgManagementPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">👥 조직/권한 통합 관리</h1>
-        <p className="text-slate-600 text-sm">직원 관리 및 페이지 권한 설정</p>
-      </div>
+        <PageTitle />
 
       {/* Stats */}
       {activeCompanyId && (

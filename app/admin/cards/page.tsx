@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
+import PageTitle from '../../components/PageTitle'
 
 const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
 
@@ -162,29 +164,21 @@ export default function CorporateCardsPage() {
   const activeCards = cards.filter(c => c.is_active).length
 
   return (
-    <div className="max-w-6xl mx-auto py-4 px-4 md:py-5 md:px-6 bg-slate-50 min-h-screen pb-32">
-
-      {/* NeuStatCards */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">💳 법인카드 관리</h1>
-        <p className="text-slate-600 text-sm">법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
-      </div>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <PageTitle />
 
       <DcStatStrip
         stats={[
           { label: '등록 카드', value: cards.length },
+          { label: '활성 카드', value: activeCards },
           { label: '이번달 사용건수', value: totalMonthlyCount },
           { label: '총 사용액', value: totalMonthlyUsage, unit: '원' },
         ]}
-        fullWidth={true}
+        actions={[
+          { label: '카드 등록', onClick: () => { setForm(emptyForm); setEditingId(null); setShowForm(true) }, variant: 'primary', icon: '➕' },
+        ]}
       />
-
-      <div className="mb-6 flex justify-end">
-        <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-          className="px-4 py-2 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800 transition-colors flex items-center gap-1.5">
-          <span>➕</span>카드 등록
-        </button>
-      </div>
 
       {/* 카드 목록 - 카드형 UI */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -319,6 +313,7 @@ export default function CorporateCardsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

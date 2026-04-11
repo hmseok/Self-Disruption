@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
+import PageTitle from '../components/PageTitle'
 import DcStatStrip, { StatItem, ActionButton } from '../components/DcStatStrip'
 import DcToolbar from '../components/DcToolbar'
 import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
@@ -1137,16 +1138,19 @@ export default function OperationsMainPage() {
   // Main Render
   // ============================================
   return (
-    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🚚 출고/반납 관리</h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            배차 스케줄 관리 · 출고/반납 처리 · 단기대차 계약
-          </p>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🚚 출고/반납 관리</h2>
+            <p className="text-slate-500 mt-1 text-sm">
+              배차 스케줄 관리 · 출고/반납 처리 · 단기대차 계약
+            </p>
+          </div>
         </div>
-      </div>
 
       {/* KPI Cards - DcStatStrip */}
       {(viewMode !== 'dashboard' && operations.length > 0) && (
@@ -1218,6 +1222,7 @@ export default function OperationsMainPage() {
           onCreated={handleDispatchCreated}
         />
       )}
+      </div>
     </div>
   )
 }

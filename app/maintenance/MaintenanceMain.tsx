@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import Link from 'next/link'
+import PageTitle from '../components/PageTitle'
 import DcStatStrip from '../components/DcStatStrip'
 import DcToolbar from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
@@ -525,11 +526,12 @@ export default function MaintenanceMainPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🔧 정비/검사 관리</h1>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🔧 정비/검사 관리</h2>
             <p className="text-slate-500 mt-1 md:mt-2 text-sm">
               정비 기록: <span className="font-bold text-steel-600">{maintenanceRecords.length}</span>건 /
               검사 기록: <span className="font-bold text-steel-600">{inspectionRecords.length}</span>건

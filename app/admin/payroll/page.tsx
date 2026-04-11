@@ -5,6 +5,8 @@ import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import DcToolbar from '../../components/DcToolbar'
+import PageTitle from '../../components/PageTitle'
 import {
   calculatePayroll, reverseCalculatePayroll,
   annualToMonthly, hourlyToMonthly, dailyToMonthly,
@@ -624,10 +626,12 @@ export default function PayrollPage() {
   // ── 회사 미선택 ──
   if (!company) {
     return (
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 24px', minHeight: '100vh', background: C.gray50 }}>
-        <div style={{ ...sectionCard, padding: '80px 20px', textAlign: 'center' }}>
-          <p style={{ fontSize: 40, marginBottom: 12 }}>🏢</p>
-          <p style={{ fontWeight: 800, fontSize: 15, color: C.gray700 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
+      <div className="page-bg">
+        <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', padding: '48px 20px', textAlign: 'center' }}>
+            <p style={{ fontSize: 40, marginBottom: 12 }}>🏢</p>
+            <p style={{ fontWeight: 800, fontSize: 15, color: '#64748b' }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
+          </div>
         </div>
       </div>
     )
@@ -635,7 +639,7 @@ export default function PayrollPage() {
 
   if (loading && payslips.length === 0 && settings.length === 0) {
     return (
-      <div style={{ minHeight: '100vh', background: C.gray50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="page-bg" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: 32, height: 32, border: `3px solid ${C.gray200}`, borderTopColor: C.steel, borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
           <span style={{ fontSize: 13, color: C.gray400, fontWeight: 600 }}>불러오는 중...</span>
@@ -650,29 +654,19 @@ export default function PayrollPage() {
   const ledgerPages = Math.ceil(ledgerData.length / PER_PAGE)
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px 120px', minHeight: '100vh', background: C.gray50 }}>
-      {/* ── 헤더 ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, color: C.gray900, margin: 0, letterSpacing: -0.5 }}>급여 관리</h1>
-          <p style={{ fontSize: 13, color: C.gray400, marginTop: 4 }}>직원 급여 · 프리랜서 용역비 · 원천징수 · 식대 관리 통합</p>
-        </div>
-      </div>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <PageTitle />
 
-      {/* ── 탭 바 ── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 24, overflowX: 'auto', paddingBottom: 4 }}>
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            padding: '8px 16px', borderRadius: 20, fontSize: 13, fontWeight: 800,
-            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-            background: tab === t.key ? C.steel : '#fff', color: tab === t.key ? '#fff' : C.gray500,
-            boxShadow: tab === t.key ? '0 2px 8px rgba(45,95,168,0.25)' : `0 1px 2px rgba(0,0,0,0.05)`,
-            border: tab === t.key ? 'none' : `1px solid ${C.gray200}`,
-          }}>
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
-          </button>
-        ))}
-      </div>
+      {/* ── 탭 바 (DcToolbar) ── */}
+      <DcToolbar
+        search=""
+        onSearchChange={() => {}}
+        placeholder="급여 검색..."
+        filters={TABS.map(t => ({ key: t.key, label: t.label, count: t.count }))}
+        activeFilter={tab}
+        onFilterChange={(key) => setTab(key as Tab)}
+      />
 
       {/* ══════════ 탭1: 급여대장 (KPI + 필터 + 테이블 — 공유 컴포넌트 사용) ══════════ */}
       {tab === 'ledger' && (
@@ -1257,6 +1251,7 @@ export default function PayrollPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

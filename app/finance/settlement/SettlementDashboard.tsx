@@ -1,4 +1,5 @@
 'use client'
+import PageTitle from '../../components/PageTitle'
 import { auth } from '@/lib/auth-client'
 
 import { useApp } from '../../context/AppContext'
@@ -1981,6 +1982,7 @@ export default function SettlementDashboard() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
 
       {/* ═══ 통합 KPI 카드 ═══ */}
       <DcStatStrip

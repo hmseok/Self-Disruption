@@ -1,4 +1,5 @@
 'use client'
+import PageTitle from '../components/PageTitle'
 import { useApp } from '../context/AppContext'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
@@ -205,13 +206,7 @@ const router = useRouter()
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
-        {/* Page Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">💰 자금 장부</h1>
-            <p className="text-slate-400 text-sm mt-1">입출금 관리 및 자금 계획</p>
-          </div>
-        </div>
+        <PageTitle />
 
         {/* Stat Cards */}
         <DcStatStrip stats={statCards} fullWidth />

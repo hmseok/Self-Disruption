@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import PageTitle from '../components/PageTitle'
 import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
@@ -951,6 +952,8 @@ export default function QuoteListPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
+
         {/* ═══ Main Tab Bar (DcToolbar) ═══ */}
         <DcToolbar
           search=""

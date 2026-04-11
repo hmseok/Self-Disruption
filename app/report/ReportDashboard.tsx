@@ -1,4 +1,5 @@
 'use client'
+import PageTitle from '../components/PageTitle'
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
@@ -243,17 +244,11 @@ export default function ReportDashboard() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50 min-h-screen">
-      {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg style={{ width: 28, height: 28, color: 'rgba(59,130,246,0.9)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-            리포트 / 통계
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">{company?.name} 전체 운영 데이터를 한눈에 분석합니다.</p>
-        </div>
-        <div className="flex gap-2">
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
+
+        <div className="flex gap-2 mb-6">
           {[3, 6, 12].map(m => (
             <button
               key={m}
@@ -266,7 +261,6 @@ export default function ReportDashboard() {
             </button>
           ))}
         </div>
-      </div>
 
       {/* 탭 네비게이션 */}
       <DcToolbar
@@ -320,6 +314,7 @@ export default function ReportDashboard() {
           loans={loans}
         />
       )}
+      </div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 'use client'
+import PageTitle from '../../components/PageTitle'
 import { auth } from '@/lib/auth-client'
 
 import { useState, useEffect } from 'react'
@@ -270,13 +271,7 @@ export default function CollectionsPage() {
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 space-y-6">
-        {/* Page Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">💰 수금 관리</h1>
-            <p className="text-slate-400 text-sm mt-1">납부 현황 확인 및 수금 관리 · 안내 발송</p>
-          </div>
-        </div>
+        <PageTitle />
 
         {/* Stat Cards */}
         <DcStatStrip stats={statCards} fullWidth />

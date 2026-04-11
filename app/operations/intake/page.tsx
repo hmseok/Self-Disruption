@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
+import PageTitle from '../../components/PageTitle'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -361,9 +362,13 @@ export default function IntakePage() {
   if (!companyId) return <div className="p-8 text-center text-slate-500">회사 정보를 불러오는 중...</div>
 
   return (
-    <div className="h-full flex flex-col" style={{ background: '#f8f9fb' }}>
-      {/* ── Stage Pipeline ── */}
-      <div style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#fff', padding: '12px 20px', overflowX: 'auto' }}>
+    <div className="page-bg">
+      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+        <PageTitle />
+
+        <div className="h-full flex flex-col" style={{ background: '#f8f9fb' }}>
+          {/* ── Stage Pipeline ── */}
+          <div style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#fff', padding: '12px 20px', overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 'max-content' }}>
           <PipeBtn label={`전체 ${cafe24Records.length}`} active={stageFilter === 'all'} color="#374151" onClick={() => setStageFilter('all')} />
           <PipeBtn label={`신규접수 ${(stageCounts['accident_reported'] || 0) + (stageCounts['replacement_requested'] || 0)}`} active={stageFilter === 'new'} color="#ef4444" onClick={() => setStageFilter('new')} />
@@ -719,26 +724,28 @@ export default function IntakePage() {
         })()}
       </div>
 
-      {/* ── SMS Modal ── */}
-      {showSmsModal && smsTarget && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSmsModal(false)}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 400, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>문자 발송</h3>
-            <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{smsTarget.name} ({smsTarget.phone})</p>
-            <textarea value={smsMessage} onChange={e => setSmsMessage(e.target.value)} rows={4} placeholder="메시지..." style={{ width: '100%', padding: 10, fontSize: 13, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, resize: 'none', outline: 'none' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button onClick={() => setShowSmsModal(false)} style={{ padding: '8px 16px', fontSize: 13, background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>취소</button>
-              <button onClick={sendSms} disabled={smsSending || !smsMessage.trim()} style={{ padding: '8px 16px', fontSize: 13, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: smsSending ? 0.5 : 1 }}>{smsSending ? '발송중...' : '발송'}</button>
+          {/* ── SMS Modal ── */}
+          {showSmsModal && smsTarget && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSmsModal(false)}>
+              <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 400, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>문자 발송</h3>
+                <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>{smsTarget.name} ({smsTarget.phone})</p>
+                <textarea value={smsMessage} onChange={e => setSmsMessage(e.target.value)} rows={4} placeholder="메시지..." style={{ width: '100%', padding: 10, fontSize: 13, border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, resize: 'none', outline: 'none' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button onClick={() => setShowSmsModal(false)} style={{ padding: '8px 16px', fontSize: 13, background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>취소</button>
+                  <button onClick={sendSms} disabled={smsSending || !smsMessage.trim()} style={{ padding: '8px 16px', fontSize: 13, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: smsSending ? 0.5 : 1 }}>{smsSending ? '발송중...' : '발송'}</button>
+                </div>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>빠른 템플릿</div>
+                  {['배차 일정 확인 부탁드립니다.', '대차 차량 반납 안내드립니다.', '보험 청구 관련 연락드립니다.'].map((t, i) => (
+                    <button key={i} onClick={() => setSmsMessage(`안녕하세요, 셀프디스럽션입니다. ${t}`)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: 12, background: '#f9fafb', border: '1px solid rgba(0,0,0,0.04)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, color: '#374151' }}>{t}</button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>빠른 템플릿</div>
-              {['배차 일정 확인 부탁드립니다.', '대차 차량 반납 안내드립니다.', '보험 청구 관련 연락드립니다.'].map((t, i) => (
-                <button key={i} onClick={() => setSmsMessage(`안녕하세요, 셀프디스럽션입니다. ${t}`)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: 12, background: '#f9fafb', border: '1px solid rgba(0,0,0,0.04)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, color: '#374151' }}>{t}</button>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
