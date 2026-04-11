@@ -713,24 +713,27 @@ export default function FreelancersPage() {
           />
         )}
 
-        {/* ── 탭 (별도 유지) ── */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {TABS.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{
-                padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                background: activeTab === tab.key ? '#0f172a' : '#fff',
-                color: activeTab === tab.key ? '#fff' : '#6b7280',
-                border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',
-              }}>
-              {tab.icon} {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* ── 탭 (NeuFilterTabs 사용) ── */}
+        <NeuFilterTabs
+          tabs={[
+            { key: 'list', label: '📋 프리랜서 목록', count: freelancers.length },
+            { key: 'payments', label: '💰 지급 내역', count: 0 },
+          ]}
+          activeKey={activeTab}
+          onSelect={(key) => setActiveTab(key as 'list' | 'payments')}
+        />
 
         {/* ──── 탭1: 프리랜서 목록 (NeuSearchBar + NeuFilterTabs + NeuDataTable) ──── */}
         {activeTab === 'list' && (
           <>
+            {/* 검색바 (NeuSearchBar 사용) */}
+            <NeuSearchBar
+              value={listSearchTerm}
+              onChange={setListSearchTerm}
+              placeholder="이름, 연락처, 은행, 업종 검색..."
+              resultText={`검색결과 ${filteredFreelancers.length}명`}
+            />
+
             {/* 필터 탭 (NeuFilterTabs 사용) */}
             <NeuFilterTabs
               tabs={[
@@ -740,14 +743,6 @@ export default function FreelancersPage() {
               ]}
               activeKey={filter}
               onSelect={(key) => setFilter(key as 'all' | 'active' | 'inactive')}
-            />
-
-            {/* 검색바 (NeuSearchBar 사용) */}
-            <NeuSearchBar
-              value={listSearchTerm}
-              onChange={setListSearchTerm}
-              placeholder="이름, 연락처, 은행, 업종 검색..."
-              resultText={`검색결과 ${filteredFreelancers.length}명`}
             />
 
             {/* 데이터 테이블 (NeuDataTable 사용) */}

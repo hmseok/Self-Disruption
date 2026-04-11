@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -1981,64 +1982,89 @@ export default function SettlementDashboard() {
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-      {/* ═══ 컴팩트 요약바 ═══ */}
+      {/* ═══ 통합 KPI 카드 ═══ */}
+      <NeuStatCards
+        items={[
+          {
+            key: 'income',
+            label: '총 매출',
+            value: summary.income,
+            unit: '원',
+            icon: '📈',
+            color: 'blue',
+          },
+          {
+            key: 'expense',
+            label: '총 지출',
+            value: summary.expense,
+            unit: '원',
+            icon: '💸',
+            color: 'red',
+          },
+          {
+            key: 'profit',
+            label: '영업이익',
+            value: summary.profit,
+            unit: '원',
+            icon: summary.profit >= 0 ? '✅' : '⚠️',
+            color: summary.profit >= 0 ? 'green' : 'red',
+          },
+          {
+            key: 'pending-count',
+            label: '미정산',
+            value: settlementSummary.pendingCount,
+            unit: '건',
+            icon: '⏳',
+            color: 'amber',
+          },
+          {
+            key: 'pending-amount',
+            label: '미정산 금액',
+            value: settlementSummary.pendingAmount,
+            unit: '원',
+            icon: '💰',
+            color: 'amber',
+          },
+        ]}
+        columns={5}
+      />
+
+      {/* ═══ 필터 & 액션 버튼 ═══ */}
       <div style={{
-        background: '#1e3a5f', padding: '10px 20px',
-        display: 'flex', alignItems: 'center', gap: 14,
-        borderRadius: '12px 12px 0 0', flexWrap: 'wrap',
+        display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16,
+        justifyContent: 'flex-end',
       }}>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          총 매출 <b style={{ color: '#2563eb', fontSize: 14, fontWeight: 900 }}>{nf(summary.income)}원</b>
-        </span>
-        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          총 지출 <b style={{ color: '#f87171', fontSize: 14, fontWeight: 900 }}>{nf(summary.expense)}원</b>
-        </span>
-        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          영업이익 <b style={{ color: summary.profit >= 0 ? '#34d399' : '#f87171', fontSize: 14, fontWeight: 900 }}>{nfSign(summary.profit)}원</b>
-        </span>
-        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          미정산 <b style={{ color: '#fbbf24', fontSize: 14, fontWeight: 900 }}>{settlementSummary.pendingCount}건</b>
-        </span>
-        <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.25)' }} />
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-          미정산 금액 <b style={{ color: '#fbbf24', fontSize: 14, fontWeight: 900 }}>{nf(settlementSummary.pendingAmount)}원</b>
-        </span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input
-            type="month"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-            style={{
-              background: 'rgba(0,0,0,0.04)', color: '#334155',
-              border: '1px solid rgba(255,255,255,0.1)', padding: '6px 12px',
-              borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={() => router.push('/finance')}
-            style={{
-              background: 'rgba(0,0,0,0.04)', color: '#334155',
-              border: '1px solid rgba(255,255,255,0.1)', padding: '6px 12px',
-              borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            📚 자금 장부
-          </button>
-          <button
-            onClick={() => router.push('/finance/upload')}
-            style={{
-              background: '#60a5fa', color: '#fff', border: 'none',
-              padding: '6px 12px', borderRadius: 7, fontSize: 11,
-              fontWeight: 800, cursor: 'pointer',
-            }}
-          >
-            📂 엑셀 등록
-          </button>
-        </div>
+        <input
+          type="month"
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          style={{
+            background: 'rgba(255,255,255,0.72)', color: '#334155',
+            border: '1px solid rgba(100,116,139,0.12)', padding: '6px 12px',
+            borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            outline: 'none',
+          }}
+        />
+        <button
+          onClick={() => router.push('/finance')}
+          style={{
+            background: 'rgba(255,255,255,0.72)', color: '#334155',
+            border: '1px solid rgba(100,116,139,0.12)', padding: '6px 12px',
+            borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          📚 자금 장부
+        </button>
+        <button
+          onClick={() => router.push('/finance/upload')}
+          style={{
+            background: '#60a5fa', color: '#fff', border: 'none',
+            padding: '6px 12px', borderRadius: 7, fontSize: 11,
+            fontWeight: 800, cursor: 'pointer',
+          }}
+        >
+          📂 엑셀 등록
+        </button>
       </div>
 
       {/* ═══ 탭 네비게이션 ═══ */}

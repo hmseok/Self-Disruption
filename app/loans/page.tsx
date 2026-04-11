@@ -472,18 +472,19 @@ export default function LoanListPage() {
         </div>
       )}
 
-      {/* 필터 탭 + 검색 */}
-      <NeuFilterTabs
-        tabs={filterTabs}
-        activeKey={typeFilter}
-        onSelect={setTypeFilter}
-      />
-
+      {/* 검색 바 */}
       <NeuSearchBar
         value={searchTerm}
         onChange={setSearchTerm}
         placeholder="차량번호, 금융사 검색..."
         resultText={`검색결과 ${filteredLoans.length}건`}
+      />
+
+      {/* 필터 탭 */}
+      <NeuFilterTabs
+        tabs={filterTabs}
+        activeKey={typeFilter}
+        onSelect={setTypeFilter}
       />
 
       {/* 데이터 테이블 */}

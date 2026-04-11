@@ -569,99 +569,152 @@ export default function MaintenanceMainPage() {
           compact={false}
         />
 
-        {/* Maintenance Tab */}
+        {/* Search Bar - SHARED across all tabs */}
+        {mainTab === 'maintenance' && (
+          <NeuSearchBar
+            value={maintSearchQuery}
+            onChange={setMaintSearchQuery}
+            placeholder="🔍 차량번호, 정비소, 메모로 검색..."
+            resultText={`검색결과 ${filteredMaintenanceRecords.length}건`}
+            actions={[
+              {
+                label: '+ 신규 정비',
+                variant: 'primary',
+                onClick: openCreateMaintenanceModal,
+              },
+            ]}
+          />
+        )}
+
+        {mainTab === 'inspection' && (
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={openCreateInspectionModal}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              + 신규 검사
+            </button>
+          </div>
+        )}
+
+        {/* Filter Dropdowns - SHARED across all tabs */}
+        {mainTab === 'maintenance' && (
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            marginBottom: 12,
+            flexWrap: 'wrap',
+          }}>
+            <select
+              value={maintStatusFilter}
+              onChange={e => setMaintStatusFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.05)',
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'rgba(255,255,255,0.40)',
+                color: '#1e293b',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="all">상태: 전체</option>
+              {Object.entries(MAINT_STATUS).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={maintTypeFilter}
+              onChange={e => setMaintTypeFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.05)',
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'rgba(255,255,255,0.40)',
+                color: '#1e293b',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="all">유형: 전체</option>
+              {Object.entries(MAINT_TYPE).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val}
+                </option>
+              ))}
+            </select>
+            <select
+              value={maintVehicleFilter}
+              onChange={e => setMaintVehicleFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.05)',
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'rgba(255,255,255,0.40)',
+                color: '#1e293b',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="all">차량: 전체</option>
+              {cars.map(car => (
+                <option key={car.id} value={car.id}>
+                  {car.number}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {mainTab === 'inspection' && (
+          <div style={{ marginBottom: 12 }}>
+            <select
+              value={inspStatusFilter}
+              onChange={e => setInspStatusFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,0,0,0.05)',
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'rgba(255,255,255,0.40)',
+                color: '#1e293b',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="all">상태: 전체</option>
+              {Object.entries(INSP_STATUS).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Data Tables - SHARED rendering based on tab */}
         {mainTab === 'maintenance' && (
           <>
-            {/* Search Bar with Create Button */}
-            <NeuSearchBar
-              value={maintSearchQuery}
-              onChange={setMaintSearchQuery}
-              placeholder="🔍 차량번호, 정비소, 메모로 검색..."
-              resultText={`검색결과 ${filteredMaintenanceRecords.length}건`}
-              actions={[
-                {
-                  label: '+ 신규 정비',
-                  variant: 'primary',
-                  onClick: openCreateMaintenanceModal,
-                },
-              ]}
-            />
-
-            {/* Filter Dropdowns */}
-            <div style={{
-              display: 'flex',
-              gap: 12,
-              marginBottom: 12,
-              flexWrap: 'wrap',
-            }}>
-              <select
-                value={maintStatusFilter}
-                onChange={e => setMaintStatusFilter(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(0,0,0,0.05)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: 'rgba(255,255,255,0.40)',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="all">상태: 전체</option>
-                {Object.entries(MAINT_STATUS).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={maintTypeFilter}
-                onChange={e => setMaintTypeFilter(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(0,0,0,0.05)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: 'rgba(255,255,255,0.40)',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="all">유형: 전체</option>
-                {Object.entries(MAINT_TYPE).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={maintVehicleFilter}
-                onChange={e => setMaintVehicleFilter(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(0,0,0,0.05)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: 'rgba(255,255,255,0.40)',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="all">차량: 전체</option>
-                {cars.map(car => (
-                  <option key={car.id} value={car.id}>
-                    {car.number}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Data Table using NeuDataTable */}
             <NeuDataTable
               columns={[
@@ -797,53 +850,6 @@ export default function MaintenanceMainPage() {
         {/* Inspection Tab */}
         {mainTab === 'inspection' && (
           <>
-            {/* Create Button for Inspection */}
-            <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={openCreateInspectionModal}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                + 신규 검사
-              </button>
-            </div>
-
-            {/* Filter Dropdown */}
-            <div style={{ marginBottom: 12 }}>
-              <select
-                value={inspStatusFilter}
-                onChange={e => setInspStatusFilter(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 10,
-                  border: '1px solid rgba(0,0,0,0.05)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: 'rgba(255,255,255,0.40)',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="all">상태: 전체</option>
-                {Object.entries(INSP_STATUS).map(([key, val]) => (
-                  <option key={key} value={key}>
-                    {val.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {/* Data Table using NeuDataTable */}
             <NeuDataTable
               columns={[

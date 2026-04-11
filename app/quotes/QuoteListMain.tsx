@@ -951,71 +951,57 @@ export default function QuoteListPage() {
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
-        <style>{`@media (max-width: 767px) { .q-main-tabs { gap: 0 !important; } .q-main-tabs button { padding: 8px 10px !important; font-size: 12px !important; } .q-chip-wrap { gap: 4px !important; margin-bottom: 6px !important; } .q-chip-wrap button { padding: 4px 10px !important; font-size: 11px !important; } .q-sort-search { gap: 6px !important; } .q-sort-search input { font-size: 12px !important; padding: 6px 10px !important; } .q-new-btn { padding: 6px 10px !important; font-size: 11px !important; } .q-sort-label { display: none !important; } }`}</style>
-
-        {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid rgba(0,0,0,0.06)', flex: 1, overflow: 'auto' }}>
-            {([
-              { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
-              { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
-              { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', shortLabel: '요금표', count: null },
-            ]).map(t => (
-              <button
-                key={t.key}
-                onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setInvoiceStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
+        {/* ═══ Main Tab Bar (NeuFilterTabs) ═══ */}
+        <NeuFilterTabs
+          tabs={[
+            { key: 'long_term', label: '장기', count: mainTabCounts.long_term },
+            { key: 'short_term', label: '단기', count: mainTabCounts.short_term },
+            { key: 'lotte_rate', label: '요금표' },
+          ]}
+          activeKey={mainTab}
+          onSelect={(key) => {
+            setMainTab(key as MainTab)
+            setStatusFilter('all')
+            setShortStatusFilter('all')
+            setInvoiceStatusFilter('all')
+            setSearchTerm('')
+            setSortBy('latest')
+          }}
+          trailing={
+            (mainTab === 'long_term' || mainTab === 'short_term') ? (
+              <Link
+                href="/quotes/create"
                 style={{
-                  padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
-                  fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
-                  color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
-                  borderBottom: mainTab === t.key ? '2px solid #60a5fa' : '2px solid transparent',
-                  marginBottom: -2,
+                  padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
+                  borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                  textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
                 }}
               >
-                {t.label}
-                {t.count !== null && (
-                  <span style={{
-                    marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 8,
-                    background: mainTab === t.key ? 'rgba(96,165,250,0.15)' : 'rgba(148,163,184,0.2)',
-                    color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
-                  }}>{t.count}</span>
-                )}
-              </button>
-            ))}
-          </div>
-          {/* 장기 탭: 새 견적(장기) 버튼 */}
-          {mainTab === 'long_term' && (
-            <Link
-              href="/quotes/create"
-              className="q-new-btn"
-              style={{
-                padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-                borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-                marginLeft: 8, flexShrink: 0,
-                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-              }}
-            >
-              + 새 견적
-            </Link>
-          )}
-          {/* 단기 탭: 새 견적 */}
-          {mainTab === 'short_term' && (
-            <Link
-              href="/quotes/create"
-              className="q-new-btn"
-              style={{
-                padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-                borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-                marginLeft: 8, flexShrink: 0,
-                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-              }}
-            >
-              + 새 견적
-            </Link>
-          )}
-        </div>
+                + 새 견적
+              </Link>
+            ) : undefined
+          }
+        />
+
+        {/* ═══ Stat Cards ═══ */}
+        {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
+          <NeuStatCards
+            items={mainTab === 'long_term' ? [
+              { key: 'all', label: '전체', value: statusCounts.all, unit: '건', icon: '📋', color: 'blue' as const },
+              { key: 'draft', label: '작성중', value: statusCounts.draft, unit: '건', icon: '✏️', color: 'amber' as const },
+              { key: 'shared', label: '발송됨', value: statusCounts.shared, unit: '건', icon: '📤', color: 'blue' as const },
+              { key: 'signed', label: '서명완료', value: statusCounts.signed, unit: '건', icon: '✅', color: 'green' as const },
+              { key: 'contracted', label: '계약전환', value: statusCounts.contracted, unit: '건', icon: '📝', color: 'purple' as const },
+            ] : [
+              { key: 'all', label: '전체', value: invoiceStatusCounts.all, unit: '건', icon: '📋', color: 'blue' as const },
+              { key: 'draft', label: '임시저장', value: invoiceStatusCounts.draft, unit: '건', icon: '✏️', color: 'amber' as const },
+              { key: 'shared', label: '발송됨', value: invoiceStatusCounts.shared, unit: '건', icon: '📤', color: 'blue' as const },
+              { key: 'signed', label: '서명완료', value: invoiceStatusCounts.signed, unit: '건', icon: '✅', color: 'green' as const },
+            ]}
+            columns={mainTab === 'long_term' ? 5 : 4}
+          />
+        )}
 
         {/* ═══ 검색 + 정렬 (모든 탭에서 공통) ═══ */}
         {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (

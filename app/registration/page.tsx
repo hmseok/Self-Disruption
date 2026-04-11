@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext'
 import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
 import NeuSearchBar from '../components/NeuSearchBar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -95,6 +96,7 @@ const router = useRouter()
 const { company, role, adminSelectedCompanyId } = useApp()
   const [cars, setCars] = useState<RegistrationCar[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterType, setFilterType] = useState('all') // 필터 탭: all, electric, hybrid, gas, consignment
 
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, success: 0, fail: 0, skipped: 0 })
@@ -378,14 +380,41 @@ const { company, role, adminSelectedCompanyId } = useApp()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const recentCars = cars.filter(c => new Date(c.created_at) >= sevenDaysAgo)
 
-  // 필터링된 차량
+  // 필터링된 차량 (검색 + 필터 탭 조합)
   const searchLower = searchTerm.toLowerCase()
-  const filteredCars = cars.filter(car =>
-    (car.number || '').toLowerCase().includes(searchLower) ||
-    (car.brand || '').toLowerCase().includes(searchLower) ||
-    (car.model || '').toLowerCase().includes(searchLower) ||
-    (car.vin || '').toLowerCase().includes(searchLower)
-  )
+  const filteredCars = cars.filter(car => {
+    // 검색어 필터링
+    const matchesSearch = (car.number || '').toLowerCase().includes(searchLower) ||
+      (car.brand || '').toLowerCase().includes(searchLower) ||
+      (car.model || '').toLowerCase().includes(searchLower) ||
+      (car.vin || '').toLowerCase().includes(searchLower)
+
+    if (!matchesSearch) return false
+
+    // 필터 탭 필터링
+    switch (filterType) {
+      case 'electric':
+        return car.fuel_type === '전기'
+      case 'hybrid':
+        return (car.fuel_type || '').includes('하이브리드')
+      case 'gas':
+        return car.fuel_type && !['전기', '하이브리드'].some(f => (car.fuel_type || '').includes(f))
+      case 'consignment':
+        return car.ownership_type === 'consignment' || car.ownership_type === 'leased_in'
+      case 'all':
+      default:
+        return true
+    }
+  })
+
+  // 필터 탭 생성
+  const filterTabs: FilterTab[] = [
+    { key: 'all', label: '전체', count: cars.length },
+    { key: 'electric', label: '전기', count: stats.electric },
+    { key: 'hybrid', label: '하이브리드', count: stats.hybrid },
+    { key: 'gas', label: '휘발유/경유', count: cars.filter(c => c.fuel_type && !['전기', '하이브리드'].some(f => (c.fuel_type || '').includes(f))).length },
+    { key: 'consignment', label: '지입/임차', count: stats.consignment + stats.leasedIn },
+  ].filter(tab => tab.count > 0 || tab.key === 'all') // 0개 카테고리는 제외 (전체 제외)
 
   // NeuStatCards 데이터
   const statItems: StatCardItem[] = [
@@ -704,6 +733,13 @@ const { company, role, adminSelectedCompanyId } = useApp()
          onChange={setSearchTerm}
          placeholder="차량번호, 브랜드, 모델, 차대번호 검색..."
          resultText={`검색결과 ${filteredCars.length}대`}
+       />
+
+       {/* 필터 탭 */}
+       <NeuFilterTabs
+         tabs={filterTabs}
+         activeKey={filterType}
+         onSelect={setFilterType}
        />
 
        {/* 데이터 테이블 */}
