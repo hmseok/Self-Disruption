@@ -722,49 +722,30 @@ export default function CustomerPage() {
         />
 
         {/* ── 필터 탭 ── */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {CUSTOMER_TYPES.map(t => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
+        <NeuFilterTabs
+          tabs={CUSTOMER_TYPES.map(t => ({ key: t, label: t }))}
+          activeKey={typeFilter}
+          onSelect={setTypeFilter}
+          trailing={
+            <select
+              value={gradeFilter}
+              onChange={e => setGradeFilter(e.target.value)}
               style={{
-                padding: '7px 14px',
-                fontSize: 12,
-                fontWeight: typeFilter === t ? 700 : 500,
-                borderRadius: 8,
-                border: 'none',
+                padding: '9px 12px',
+                fontSize: 13,
+                color: '#1e293b',
+                background: 'rgba(255,255,255,0.40)',
+                border: '1px solid rgba(0,0,0,0.05)',
+                borderRadius: 10,
+                outline: 'none',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease',
-                ...(typeFilter === t ? {
-                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                  color: '#fff',
-                  boxShadow: '2px 2px 6px rgba(140,170,210,0.22), -1px -1px 4px rgba(255,255,255,0.40)',
-                } : {
-                  background: 'transparent',
-                  color: '#64748b',
-                }),
               }}
             >
-              {t}
-            </button>
-          ))}
-          <select
-            value={gradeFilter}
-            onChange={e => setGradeFilter(e.target.value)}
-            style={{
-              padding: '7px 14px',
-              fontSize: 12,
-              borderRadius: 8,
-              border: '1px solid rgba(0,0,0,0.05)',
-              background: 'rgba(255,255,255,0.40)',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="">등급 전체</option>
-            {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </div>
+              <option value="">등급 전체</option>
+              {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          }
+        />
 
         {/* ── 데이터 테이블 ── */}
         <NeuDataTable
