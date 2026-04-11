@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
+import NeuSearchBar from '../../components/NeuSearchBar'
+import NeuFilterTabs from '../../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../../components/NeuDataTable'
 import * as XLSX from 'xlsx'
+
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -25,13 +30,43 @@ const KOREAN_BANKS = [
 const TAX_TYPES = ['사업소득(3.3%)', '기타소득(8.8%)', '세금계산서', '원천징수 없음']
 const SERVICE_TYPES = ['탁송', '대리운전', '정비', '세차', '디자인', '개발', '법무/세무', '기타']
 
+type Freelancer = {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+  bank_name?: string
+  account_number?: string
+  account_holder?: string
+  reg_number?: string
+  tax_type?: string
+  service_type?: string
+  is_active: boolean
+  memo?: string
+  company_id?: string
+}
+
+type Payment = {
+  id: string
+  freelancer_id: string
+  payment_date: string
+  gross_amount: number
+  tax_rate: number
+  tax_amount: number
+  net_amount: number
+  description: string
+  status: string
+  paid_date?: string
+  freelancers?: Freelancer
+}
+
 export default function FreelancersPage() {
   const { company, role } = useApp()
   const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
-  const [freelancers, setFreelancers] = useState<any[]>([])
-  const [payments, setPayments] = useState<any[]>([])
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [activeTab, setActiveTab] = useState<'list' | 'payments'>('list')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -372,12 +407,12 @@ export default function FreelancersPage() {
     }
   }
 
-  const handleEdit = (f: any) => {
+  const handleEdit = (f: Freelancer) => {
     setForm({ name: f.name, phone: f.phone || '', email: f.email || '', bank_name: f.bank_name || 'KB국민은행', account_number: f.account_number || '', account_holder: f.account_holder || '', reg_number: f.reg_number || '', tax_type: f.tax_type || '사업소득(3.3%)', service_type: f.service_type || '기타', is_active: f.is_active, memo: f.memo || '' })
     setEditingId(f.id); setShowForm(true)
   }
 
-  const handleToggleActive = async (f: any) => {
+  const handleToggleActive = async (f: Freelancer) => {
     try {
       const headers = await getAuthHeader()
       const res = await fetch(`/api/freelancers/${f.id}`, { method: 'PATCH', headers, body: JSON.stringify({ is_active: !f.is_active }) })
@@ -393,7 +428,6 @@ export default function FreelancersPage() {
     const netAmount = gross - taxAmount
 
     const payload = {
-      
       freelancer_id: payForm.freelancer_id,
       payment_date: payForm.payment_date,
       gross_amount: gross,
@@ -419,7 +453,7 @@ export default function FreelancersPage() {
     }
   }
 
-  const handlePaymentConfirm = async (p: any) => {
+  const handlePaymentConfirm = async (p: Payment) => {
     if (!confirm(`${p.freelancers?.name}에게 ${Number(p.net_amount).toLocaleString()}원 지급 확정하시겠습니까?`)) return
 
     try {
@@ -521,478 +555,740 @@ export default function FreelancersPage() {
 
   if (!companyId && !loading) {
     return (
-      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-          <div style={{ textAlign: 'left' }}>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 프리랜서 관리</h1>
-            <p className="text-gray-500 text-sm mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+      <div className="page-bg">
+        <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+            <div style={{ textAlign: 'left' }}>
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">👥 프리랜서 관리</h1>
+              <p className="text-gray-500 text-sm mt-1">외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-20">
-          <p className="text-4xl mb-3">🏢</p>
-          <p className="font-semibold text-sm text-slate-500">좌측 상단에서 회사를 먼저 선택해주세요</p>
-          <p className="text-xs text-slate-400 mt-1">회사 선택 후 프리랜서 관리를 진행할 수 있습니다</p>
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            borderRadius: 16,
+            border: '1px solid rgba(0,0,0,0.06)',
+            boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+            padding: '48px 20px',
+            textAlign: 'center',
+          }}>
+            <span style={{ fontSize: 32, display: 'block', marginBottom: 12 }}>🏢</span>
+            <p style={{ color: '#8aabc7', fontWeight: 600, fontSize: 14 }}>좌측 상단에서 회사를 먼저 선택해주세요</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6">
 
-      {/* 헤더 — 보험 페이지 스타일 */}
-      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>👥 프리랜서 관리</h1>
-          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+        {/* ── 헤더 ── */}
+        <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0 }}>👥 프리랜서 관리</h1>
+            <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4 }}>외부 인력 관리 및 용역비 지급 · 원천징수 자동 계산 · 장부 자동 연동</p>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+            <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
+              className="flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors">
+              <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              <span>프리랜서 등록</span>
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-          <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-            className="flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm md:px-5 md:py-3 md:text-base rounded-xl font-bold hover:bg-steel-700 transition-colors">
-            <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            <span>프리랜서 등록</span>
-          </button>
-        </div>
-      </div>
 
-      {/* 드래그앤드롭 업로드 영역 */}
-      <div
-        onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-        style={{
-          border: isDragging ? '2px dashed #6366f1' : '2px dashed #d1d5db',
-          borderRadius: 16, padding: aiParsing ? '32px 20px' : '24px 20px', marginBottom: 24, textAlign: 'center',
-          background: isDragging ? 'linear-gradient(135deg, #eef2ff, #e0e7ff)' : aiParsing ? 'linear-gradient(135deg, #f0fdf4, #ecfdf5)' : '#fff',
-          transition: 'all 0.3s', cursor: 'pointer', position: 'relative',
-        }}>
-        {aiParsing ? (
-          <>
-            <div style={{ width: 32, height: 32, border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
-            <p style={{ fontWeight: 800, fontSize: 14, color: '#166534', margin: 0 }}>🤖 Gemini AI가 파일을 분석 중...</p>
-            <p style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>엑셀, 이미지, PDF 어떤 형식이든 자동으로 인식합니다</p>
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-          </>
-        ) : (
-          <>
-            <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>{isDragging ? '📥' : '📂'}</span>
-            <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? '#4338ca' : '#0f172a', margin: 0 }}>
-              {isDragging ? '여기에 놓으세요!' : '프리랜서 엑셀/이미지 파일을 드래그하여 일괄 등록'}
-            </p>
-            <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-              엑셀 · CSV · 이미지 · PDF 지원 · 여러 파일 동시 가능 · Gemini AI 자동 분석
-            </p>
-            <input ref={bulkFileRef} type="file" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg,.pdf"
-              multiple
-              onChange={handleBulkFile}
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-          </>
-        )}
-      </div>
-
-      {/* 일괄등록 로그 & 미리보기 */}
-      {(bulkLogs.length > 0 || bulkData.length > 0) && (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', marginBottom: 24 }}>
-          {bulkLogs.length > 0 && (
-            <div style={{ padding: '12px 20px', borderBottom: bulkData.length > 0 ? '1px solid #f1f5f9' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                {bulkLogs.map((log, i) => (
-                  <p key={i} style={{ fontSize: 12, color: '#475569', margin: '2px 0', fontWeight: 500 }}>{log}</p>
-                ))}
-              </div>
-              <button onClick={downloadTemplate}
-                style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                📋 양식 다운로드
-              </button>
-            </div>
-          )}
-          {bulkData.length > 0 && (
+        {/* ── 드래그앤드롭 업로드 영역 (별도 유지) ── */}
+        <div
+          onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
+          style={{
+            border: isDragging ? '2px dashed #6366f1' : '2px dashed #d1d5db',
+            borderRadius: 16, padding: aiParsing ? '32px 20px' : '24px 20px', marginBottom: 24, textAlign: 'center',
+            background: isDragging ? 'linear-gradient(135deg, #eef2ff, #e0e7ff)' : aiParsing ? 'linear-gradient(135deg, #f0fdf4, #ecfdf5)' : '#fff',
+            transition: 'all 0.3s', cursor: 'pointer', position: 'relative',
+          }}>
+          {aiParsing ? (
             <>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      {['상태','이름','연락처','은행','계좌번호','업종','세금유형','비고'].map(h => (
-                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bulkData.map((d, i) => (
-                      <tr key={i} style={{ borderTop: '1px solid #f1f5f9', opacity: d._status === 'duplicate' ? 0.4 : 1, background: d._status === 'saved' ? '#f0fdf4' : d._status === 'error' ? '#fef2f2' : '#fff' }}>
-                        <td style={{ padding: '8px 12px' }}>
-                          {d._status === 'ready' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#eff6ff', color: '#3b6eb5' }}>등록대기</span>}
-                          {d._status === 'duplicate' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fef3c7', color: '#d97706' }}>중복</span>}
-                          {d._status === 'saved' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#dcfce7', color: '#16a34a' }}>완료</span>}
-                          {d._status === 'error' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fee2e2', color: '#dc2626' }}>실패</span>}
-                        </td>
-                        <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{d.name}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.phone}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.bank_name}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{d.account_number}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.service_type}</td>
-                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.tax_type}</td>
-                        <td style={{ padding: '8px 12px', color: '#94a3b8', fontSize: 11 }}>{d._note}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
-                <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                  전체 {bulkData.length}명 · 등록 대기 <strong style={{ color: '#3b6eb5' }}>{bulkData.filter(d => d._status === 'ready').length}</strong>명 · 중복 제외 <strong style={{ color: '#d97706' }}>{bulkData.filter(d => d._status === 'duplicate').length}</strong>명
-                </p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => { setBulkData([]); setBulkLogs([]) }}
-                    style={{ background: '#f1f5f9', color: '#64748b', padding: '8px 14px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
-                    초기화
-                  </button>
-                  <button onClick={handleBulkSave} disabled={bulkProcessing || bulkData.filter(d => d._status === 'ready').length === 0}
-                    style={{ background: bulkProcessing ? '#94a3b8' : '#0f172a', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
-                    {bulkProcessing ? '⏳ 등록 중...' : `💾 ${bulkData.filter(d => d._status === 'ready').length}명 일괄 등록`}
-                  </button>
-                </div>
-              </div>
+              <div style={{ width: 32, height: 32, border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+              <p style={{ fontWeight: 800, fontSize: 14, color: '#166534', margin: 0 }}>🤖 Gemini AI가 파일을 분석 중...</p>
+              <p style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>엑셀, 이미지, PDF 어떤 형식이든 자동으로 인식합니다</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>{isDragging ? '📥' : '📂'}</span>
+              <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? '#4338ca' : '#0f172a', margin: 0 }}>
+                {isDragging ? '여기에 놓으세요!' : '프리랜서 엑셀/이미지 파일을 드래그하여 일괄 등록'}
+              </p>
+              <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                엑셀 · CSV · 이미지 · PDF 지원 · 여러 파일 동시 가능 · Gemini AI 자동 분석
+              </p>
+              <input ref={bulkFileRef} type="file" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg,.pdf"
+                multiple
+                onChange={handleBulkFile}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
             </>
           )}
         </div>
-      )}
 
-      {/* 통계 카드 — 보험 페이지 스타일 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
-        {[
-          { label: '전체 인원', value: freelancers.length, unit: '명', color: '#111827' },
-          { label: '활성', value: activeCount, unit: '명', color: '#16a34a', bg: '#f0fdf4' },
-          { label: '비활성', value: inactiveCount, unit: '명', color: '#dc2626', bg: '#fef2f2' },
-          { label: '사업소득(3.3%)', value: freelancers.filter(f => f.tax_type?.includes('3.3')).length, unit: '명', color: '#d97706', bg: '#fffbeb' },
-          { label: '기타소득(8.8%)', value: freelancers.filter(f => f.tax_type?.includes('8.8')).length, unit: '명', color: '#7c3aed', bg: '#f5f3ff' },
-        ].map(stat => (
-          <div key={stat.label} style={{ background: stat.bg || '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #e5e7eb' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: stat.color || '#6b7280', margin: 0, letterSpacing: '0.03em' }}>{stat.label}</p>
-            <p style={{ fontSize: 28, fontWeight: 900, color: stat.color, margin: '4px 0 0' }}>{stat.value}<span style={{ fontSize: 14, fontWeight: 500, color: '#9ca3af', marginLeft: 2 }}>{stat.unit}</span></p>
-          </div>
-        ))}
-      </div>
-
-      {/* 탭 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {TABS.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              background: activeTab === tab.key ? '#0f172a' : '#fff',
-              color: activeTab === tab.key ? '#fff' : '#6b7280',
-              border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',
-            }}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ──── 탭1: 프리랜서 목록 ──── */}
-      {activeTab === 'list' && (
-        <>
-          {/* 필터 + 검색 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            {(['all', 'active', 'inactive'] as const).map(f => (
-              <button key={f} onClick={() => setFilter(f)}
-                style={{
-                  padding: '7px 16px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  background: filter === f ? '#0f172a' : '#fff',
-                  color: filter === f ? '#fff' : '#6b7280',
-                  border: filter === f ? 'none' : '1px solid #e5e7eb',
-                }}>
-                {f === 'active' ? `활성 (${activeCount})` : f === 'all' ? `전체 (${freelancers.length})` : `비활성 (${inactiveCount})`}
-              </button>
-            ))}
-          </div>
-
-          {/* 검색바 */}
-          <div style={{ marginBottom: 16 }}>
-            <input
-              placeholder="이름, 연락처, 은행, 업종 검색..."
-              style={{ width: '100%', padding: '10px 16px', border: '1px solid #e5e7eb', borderRadius: 12, fontSize: 14, outline: 'none', background: '#fff' }}
-              value={listSearchTerm}
-              onChange={e => setListSearchTerm(e.target.value)}
-            />
-          </div>
-
-          {/* 테이블 — 보험 페이지 스타일 */}
-          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-            {filteredFreelancers.length === 0 ? (
-              <div style={{ padding: '60px 20px', textAlign: 'center', color: '#9ca3af' }}>
-                {freelancers.length === 0 ? '등록된 프리랜서가 없습니다.' : '해당 조건의 프리랜서가 없습니다.'}
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', textAlign: 'left', fontSize: 14, minWidth: 800, borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(249,250,251,0.5)', borderBottom: '1px solid #f3f4f6' }}>
-                      <th style={{ padding: '12px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>이름</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>연락처</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>업종</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>은행/계좌</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>세금유형</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>상태</th>
-                      <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>관리</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredFreelancers.map(f => (
-                      <tr key={f.id} style={{ borderTop: '1px solid #f3f4f6', cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,250,252,0.5)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                        <td style={{ padding: '12px 20px' }}>
-                          <span style={{ fontWeight: 900, fontSize: 16, color: '#111827' }}>{f.name}</span>
-                          {f.memo && <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{f.memo}</p>}
-                        </td>
-                        <td style={{ padding: '12px 16px', color: '#4b5563', fontFamily: 'monospace', fontSize: 13 }}>{f.phone || '-'}</td>
-                        <td style={{ padding: '12px 16px' }}>
-                          {f.service_type ? (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 8px', borderRadius: 6 }}>{f.service_type}</span>
-                          ) : '-'}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ fontWeight: 700, color: '#374151', fontSize: 13 }}>{f.bank_name}</span>
-                          <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace', fontSize: 11, fontWeight: 700, border: '1px solid #e5e7eb', marginLeft: 6 }}>{f.account_number || '-'}</span>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#4b5563', fontSize: 13 }}>{f.tax_type || '-'}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          {f.is_active ? (
-                            <span style={{ background: '#dcfce7', color: '#16a34a', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>활성</span>
-                          ) : (
-                            <span style={{ background: '#f3f4f6', color: '#9ca3af', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>비활성</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            <button onClick={() => handleEdit(f)}
-                              style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '4px 10px', borderRadius: 6, border: 'none', background: '#f3f4f6', cursor: 'pointer' }}>
-                              수정
-                            </button>
-                            <button onClick={() => handleToggleActive(f)}
-                              style={{ fontSize: 12, fontWeight: 600, color: f.is_active ? '#dc2626' : '#16a34a', padding: '4px 10px', borderRadius: 6, border: 'none', background: f.is_active ? '#fef2f2' : '#f0fdf4', cursor: 'pointer' }}>
-                              {f.is_active ? '비활성화' : '활성화'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* ── 일괄등록 로그 & 미리보기 (별도 유지) ── */}
+        {(bulkLogs.length > 0 || bulkData.length > 0) && (
+          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', marginBottom: 24 }}>
+            {bulkLogs.length > 0 && (
+              <div style={{ padding: '12px 20px', borderBottom: bulkData.length > 0 ? '1px solid #f1f5f9' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  {bulkLogs.map((log, i) => (
+                    <p key={i} style={{ fontSize: 12, color: '#475569', margin: '2px 0', fontWeight: 500 }}>{log}</p>
+                  ))}
+                </div>
+                <button onClick={downloadTemplate}
+                  style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  📋 양식 다운로드
+                </button>
               </div>
             )}
+            {bulkData.length > 0 && (
+              <>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        {['상태','이름','연락처','은행','계좌번호','업종','세금유형','비고'].map(h => (
+                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkData.map((d, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #f1f5f9', opacity: d._status === 'duplicate' ? 0.4 : 1, background: d._status === 'saved' ? '#f0fdf4' : d._status === 'error' ? '#fef2f2' : '#fff' }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            {d._status === 'ready' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#eff6ff', color: '#3b6eb5' }}>등록대기</span>}
+                            {d._status === 'duplicate' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fef3c7', color: '#d97706' }}>중복</span>}
+                            {d._status === 'saved' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#dcfce7', color: '#16a34a' }}>완료</span>}
+                            {d._status === 'error' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fee2e2', color: '#dc2626' }}>실패</span>}
+                          </td>
+                          <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{d.name}</td>
+                          <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.phone}</td>
+                          <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.bank_name}</td>
+                          <td style={{ padding: '8px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{d.account_number}</td>
+                          <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.service_type}</td>
+                          <td style={{ padding: '8px 12px', color: '#64748b' }}>{d.tax_type}</td>
+                          <td style={{ padding: '8px 12px', color: '#94a3b8', fontSize: 11 }}>{d._note}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+                    전체 {bulkData.length}명 · 등록 대기 <strong style={{ color: '#3b6eb5' }}>{bulkData.filter(d => d._status === 'ready').length}</strong>명 · 중복 제외 <strong style={{ color: '#d97706' }}>{bulkData.filter(d => d._status === 'duplicate').length}</strong>명
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setBulkData([]); setBulkLogs([]) }}
+                      style={{ background: '#f1f5f9', color: '#64748b', padding: '8px 14px', borderRadius: 10, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
+                      초기화
+                    </button>
+                    <button onClick={handleBulkSave} disabled={bulkProcessing || bulkData.filter(d => d._status === 'ready').length === 0}
+                      style={{ background: bulkProcessing ? '#94a3b8' : '#0f172a', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}>
+                      {bulkProcessing ? '⏳ 등록 중...' : `💾 ${bulkData.filter(d => d._status === 'ready').length}명 일괄 등록`}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </>
-      )}
+        )}
 
-      {/* ──── 탭2: 지급 내역 ──── */}
-      {activeTab === 'payments' && (
-        <div className="space-y-5">
-          {/* 월 요약 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: '총 지급 건수', value: payments.length, unit: '건', color: 'text-slate-900' },
-              { label: '총 지급액 (세전)', value: formatMoney(totalGross), unit: '원', color: 'text-slate-900' },
-              { label: '원천징수세', value: formatMoney(totalTax), unit: '원', color: 'text-red-500' },
-              { label: '실지급 총액', value: formatMoney(totalNet), unit: '원', color: 'text-emerald-600' },
-            ].map(stat => (
-              <div key={stat.label} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{stat.label}</p>
-                <p className={`text-lg font-bold ${stat.color}`}>{stat.value}<span className="text-xs font-normal text-slate-400 ml-0.5">{stat.unit}</span></p>
-              </div>
-            ))}
-          </div>
+        {/* ── KPI 스탯 카드 (NeuStatCards 사용) ── */}
+        {freelancers.length > 0 && (
+          <NeuStatCards
+            items={[
+              { key: 'all', label: '전체 인원', value: freelancers.length, unit: '명', icon: '👥', color: 'blue' },
+              { key: 'active', label: '활성', value: activeCount, unit: '명', icon: '✅', color: 'green' },
+              { key: 'inactive', label: '비활성', value: inactiveCount, unit: '명', icon: '⏸', color: 'red' },
+              { key: 'tax33', label: '3.3% 과세', value: freelancers.filter(f => f.tax_type?.includes('3.3')).length, unit: '명', icon: '📊', color: 'amber' },
+              { key: 'tax88', label: '8.8% 과세', value: freelancers.filter(f => f.tax_type?.includes('8.8')).length, unit: '명', icon: '📈', color: 'purple' },
+            ]}
+            columns={5}
+          />
+        )}
 
-          <div className="flex justify-between items-center">
-            <input type="month" value={paymentMonth} onChange={e => setPaymentMonth(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" />
-            <button onClick={() => setShowPaymentForm(true)}
-              className="px-4 py-2 bg-steel-600 text-white rounded-lg font-semibold text-sm hover:bg-steel-700 transition-all active:scale-[0.98] shadow-lg shadow-steel-600/10">
-              지급 등록
+        {/* ── 탭 (별도 유지) ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {TABS.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '8px 20px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                background: activeTab === tab.key ? '#0f172a' : '#fff',
+                color: activeTab === tab.key ? '#fff' : '#6b7280',
+                border: activeTab === tab.key ? 'none' : '1px solid #e5e7eb',
+              }}>
+              {tab.icon} {tab.label}
             </button>
-          </div>
+          ))}
+        </div>
 
-          <section style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-            {payments.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-100">
-                      <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">프리랜서</th>
-                      <th className="p-3.5 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">지급일</th>
-                      <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">세전 금액</th>
-                      <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">원천세</th>
-                      <th className="p-3.5 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">실지급액</th>
-                      <th className="p-3.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">상태</th>
-                      <th className="p-3.5 text-center text-[11px] font-semibold text-slate-400 uppercase tracking-wider">액션</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {payments.map(p => (
-                      <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="p-3.5">
-                          <p className="font-semibold text-slate-700">{p.freelancers?.name || '-'}</p>
-                          {p.description && <p className="text-xs text-slate-400 mt-0.5">{p.description}</p>}
-                        </td>
-                        <td className="p-3.5 text-slate-500">{p.payment_date}</td>
-                        <td className="p-3.5 text-right font-semibold text-slate-700">{formatMoney(p.gross_amount)}원</td>
-                        <td className="p-3.5 text-right text-red-500">{formatMoney(p.tax_amount)}원</td>
-                        <td className="p-3.5 text-right font-bold text-emerald-600">{formatMoney(p.net_amount)}원</td>
-                        <td className="p-3.5 text-center">
-                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                            p.status === 'paid' ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200' :
-                            p.status === 'cancelled' ? 'bg-red-50 text-red-500 ring-1 ring-red-200' :
-                            'bg-amber-50 text-amber-600 ring-1 ring-amber-200'
-                          }`}>
-                            {p.status === 'paid' ? '지급완료' : p.status === 'cancelled' ? '취소' : '대기'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-center">
-                          {p.status === 'pending' && (
-                            <button onClick={() => handlePaymentConfirm(p)}
-                              className="text-xs font-semibold text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
-                              지급 확정
-                            </button>
-                          )}
-                          {p.status === 'paid' && (
-                            <span className="text-xs text-slate-400">장부 반영됨</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <svg className="w-12 h-12 text-slate-700 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-                <p className="font-semibold text-sm text-slate-500">해당 월 지급 내역이 없습니다</p>
-                <p className="text-xs text-slate-400 mt-1">지급 등록 후 확정하면 장부에 자동 반영됩니다</p>
+        {/* ──── 탭1: 프리랜서 목록 (NeuSearchBar + NeuFilterTabs + NeuDataTable) ──── */}
+        {activeTab === 'list' && (
+          <>
+            {/* 필터 탭 (NeuFilterTabs 사용) */}
+            <NeuFilterTabs
+              tabs={[
+                { key: 'all', label: '전체', count: freelancers.length },
+                { key: 'active', label: '활성', count: activeCount },
+                { key: 'inactive', label: '비활성', count: inactiveCount },
+              ]}
+              activeKey={filter}
+              onSelect={(key) => setFilter(key as 'all' | 'active' | 'inactive')}
+            />
+
+            {/* 검색바 (NeuSearchBar 사용) */}
+            <NeuSearchBar
+              value={listSearchTerm}
+              onChange={setListSearchTerm}
+              placeholder="이름, 연락처, 은행, 업종 검색..."
+              resultText={`검색결과 ${filteredFreelancers.length}명`}
+            />
+
+            {/* 데이터 테이블 (NeuDataTable 사용) */}
+            <NeuDataTable<Freelancer>
+              columns={[
+                {
+                  key: 'name',
+                  label: '이름',
+                  render: (f) => (
+                    <div>
+                      <span style={{ fontWeight: 900, fontSize: 16, color: '#0f2440' }}>{f.name}</span>
+                      {f.memo && <p style={{ fontSize: 11, color: '#8aabc7', marginTop: 2 }}>{f.memo}</p>}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'phone',
+                  label: '연락처',
+                  render: (f) => <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#4b5563' }}>{f.phone || '-'}</span>,
+                },
+                {
+                  key: 'service_type',
+                  label: '업종',
+                  render: (f) => (
+                    f.service_type ? (
+                      <span className="si-badge si-badge-blue">{f.service_type}</span>
+                    ) : <span style={{ color: '#9ca3af' }}>-</span>
+                  ),
+                },
+                {
+                  key: 'bank',
+                  label: '은행/계좌',
+                  render: (f) => (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{f.bank_name || '-'}</div>
+                      <div style={{ fontSize: 11, color: '#8aabc7', marginTop: 2, fontFamily: 'monospace' }}>{f.account_number || '-'}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'tax_type',
+                  label: '세금유형',
+                  render: (f) => (
+                    f.tax_type ? (
+                      <span className={`si-badge ${f.tax_type.includes('3.3') ? 'si-badge-amber' : f.tax_type.includes('8.8') ? 'si-badge-red' : 'si-badge-slate'}`}>
+                        {f.tax_type}
+                      </span>
+                    ) : <span style={{ color: '#9ca3af' }}>-</span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: '상태',
+                  align: 'center',
+                  render: (f) => (
+                    <span className={`si-badge ${f.is_active ? 'si-badge-green' : 'si-badge-red'}`}>
+                      {f.is_active ? '활성' : '비활성'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  label: '관리',
+                  align: 'center',
+                  render: (f) => (
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                      <button
+                        onClick={() => handleEdit(f)}
+                        style={{
+                          background: '#e0e7ff',
+                          color: '#3b6eb5',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={() => handleToggleActive(f)}
+                        style={{
+                          background: f.is_active ? '#fee2e2' : '#dcfce7',
+                          color: f.is_active ? '#dc2626' : '#16a34a',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {f.is_active ? '비활성' : '활성'}
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={filteredFreelancers}
+              rowKey={(f) => f.id}
+              loading={loading}
+              emptyIcon="👥"
+              emptyMessage={listSearchTerm ? '검색 결과가 없습니다.' : '등록된 프리랜서가 없습니다.'}
+              mobileCard={{
+                title: (f) => f.name,
+                subtitle: (f) => f.service_type ? `${f.service_type} · ${f.phone || '연락처 없음'}` : f.phone || '연락처 없음',
+                trailing: (f) => (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#3b6eb5' }}>{f.bank_name || '-'}</div>
+                    <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{f.account_number || '-'}</div>
+                  </div>
+                ),
+                badges: (f) => (
+                  <>
+                    <span className={`si-badge ${f.is_active ? 'si-badge-green' : 'si-badge-red'}`}>
+                      {f.is_active ? '활성' : '비활성'}
+                    </span>
+                    {f.service_type && <span className="si-badge si-badge-blue">{f.service_type}</span>}
+                    {f.tax_type && <span className={`si-badge ${f.tax_type.includes('3.3') ? 'si-badge-amber' : 'si-badge-red'}`}>{f.tax_type}</span>}
+                  </>
+                ),
+              }}
+            />
+          </>
+        )}
+
+        {/* ──── 탭2: 지급 내역 ──── */}
+        {activeTab === 'payments' && (
+          <>
+            {/* 지급 내역 검색 및 필터 */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="month"
+                value={paymentMonth}
+                onChange={(e) => setPaymentMonth(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => { setPayForm(emptyPaymentForm); setShowPaymentForm(true) }}
+                className="flex items-center gap-2 bg-steel-600 text-white px-3 py-2 text-sm rounded-lg font-bold hover:bg-steel-700"
+              >
+                <svg style={{ width: 14, height: 14 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                지급 등록
+              </button>
+            </div>
+
+            {/* 지급 통계 */}
+            {payments.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+                <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '16px 20px', border: '1px solid #dcfce7' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', margin: 0, letterSpacing: '0.03em' }}>지급 총액</p>
+                  <p style={{ fontSize: 24, fontWeight: 900, color: '#16a34a', margin: '4px 0 0' }}>{formatMoney(totalGross)}원</p>
+                </div>
+                <div style={{ background: '#fee2e2', borderRadius: 12, padding: '16px 20px', border: '1px solid #fecaca' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', margin: 0, letterSpacing: '0.03em' }}>세금</p>
+                  <p style={{ fontSize: 24, fontWeight: 900, color: '#dc2626', margin: '4px 0 0' }}>{formatMoney(totalTax)}원</p>
+                </div>
+                <div style={{ background: '#eff6ff', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#3b6eb5', margin: 0, letterSpacing: '0.03em' }}>순액</p>
+                  <p style={{ fontSize: 24, fontWeight: 900, color: '#3b6eb5', margin: '4px 0 0' }}>{formatMoney(totalNet)}원</p>
+                </div>
+                <div style={{ background: '#ecfdf5', borderRadius: 12, padding: '16px 20px', border: '1px solid #a7f3d0' }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#059669', margin: 0, letterSpacing: '0.03em' }}>지급 완료</p>
+                  <p style={{ fontSize: 24, fontWeight: 900, color: '#059669', margin: '4px 0 0' }}>{paidCount}건</p>
+                </div>
               </div>
             )}
-          </section>
-        </div>
-      )}
 
-      {/* ──── 프리랜서 등록/수정 모달 ──── */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="font-bold text-base text-slate-900">{editingId ? '프리랜서 수정' : '프리랜서 등록'}</h3>
+            {/* 지급 내역 테이블 (별도 유지 — 복잡한 구조) */}
+            <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+              {payments.length === 0 ? (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#9ca3af' }}>
+                  선택된 기간에 지급 내역이 없습니다.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', textAlign: 'left', fontSize: 14, minWidth: 900, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(249,250,251,0.5)', borderBottom: '1px solid #f3f4f6' }}>
+                        <th style={{ padding: '12px 20px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>프리랜서</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>지급액</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>세율</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>세금</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>순액</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>상태</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>관리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p, i) => (
+                        <tr key={p.id} style={{ borderTop: '1px solid #f3f4f6' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,250,252,0.5)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                          <td style={{ padding: '12px 20px' }}>
+                            <span style={{ fontWeight: 900, fontSize: 16, color: '#111827' }}>{p.freelancers?.name || '(삭제됨)'}</span>
+                            {p.description && <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{p.description}</p>}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{formatMoney(Number(p.gross_amount))}원</td>
+                          <td style={{ padding: '12px 16px', color: '#4b5563' }}>{Number(p.tax_rate)}%</td>
+                          <td style={{ padding: '12px 16px', color: '#4b5563', fontWeight: 600 }}>{formatMoney(Number(p.tax_amount))}원</td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: 15, color: '#3b6eb5' }}>{formatMoney(Number(p.net_amount))}원</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <span className={`si-badge ${p.status === 'paid' ? 'si-badge-green' : 'si-badge-amber'}`}>
+                              {p.status === 'paid' ? '지급완료' : '대기중'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            {p.status !== 'paid' && (
+                              <button
+                                onClick={() => handlePaymentConfirm(p)}
+                                style={{
+                                  background: '#16a34a',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '4px 12px',
+                                  cursor: 'pointer',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                확정
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">이름 <span className="text-red-400">*</span></label>
-                  <input className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">연락처</label>
-                  <input className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.phone} onChange={e => setForm({ ...form, phone: formatPhone(e.target.value) })} maxLength={13} placeholder="010-0000-0000" />
-                </div>
-              </div>
+          </>
+        )}
+
+      </div>
+
+      {/* ──── 모달: 프리랜서 등록/수정 (별도 유지) ──── */}
+      {showForm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', zIndex: 50,
+        }} onClick={() => setShowForm(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', width: '100%', maxWidth: 600, borderRadius: '24px 24px 0 0', padding: '32px 24px 28px', maxHeight: '90vh', overflowY: 'auto',
+            }}>
+            <h2 style={{ fontSize: 20, fontWeight: 900, margin: '0 0 20px', color: '#111827' }}>
+              {editingId ? '프리랜서 수정' : '프리랜서 등록'}
+            </h2>
+
+            <div style={{ display: 'grid', gap: 16 }}>
+              {/* 기본정보 */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">이메일</label>
-                <input type="email" className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>이름 *</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="홍길동"
+                  style={{
+                    width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                  }}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">원천징수 유형</label>
-                  <select className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.tax_type} onChange={e => setForm({ ...form, tax_type: e.target.value })}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>연락처</label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                    placeholder="010-1234-5678"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>이메일</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="email@example.com"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 은행정보 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>은행</label>
+                  <select
+                    value={form.bank_name}
+                    onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  >
+                    {KOREAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>계좌번호</label>
+                  <input
+                    type="text"
+                    value={form.account_number}
+                    onChange={(e) => setForm({ ...form, account_number: e.target.value.replace(/[^0-9\-]/g, '') })}
+                    placeholder="123-456-789012"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff', fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>예금주</label>
+                  <input
+                    type="text"
+                    value={form.account_holder}
+                    onChange={(e) => setForm({ ...form, account_holder: e.target.value })}
+                    placeholder="홍길동"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>주민/사업자번호</label>
+                  <input
+                    type="text"
+                    value={form.reg_number}
+                    onChange={(e) => setForm({ ...form, reg_number: e.target.value.replace(/[^0-9\-]/g, '') })}
+                    placeholder="123456-1234567"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff', fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 세금/용역 정보 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>세금 유형</label>
+                  <select
+                    value={form.tax_type}
+                    onChange={(e) => setForm({ ...form, tax_type: e.target.value })}
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  >
                     {TAX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">서비스 유형</label>
-                  <select className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.service_type} onChange={e => setForm({ ...form, service_type: e.target.value })}>
-                    {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>업종</label>
+                  <select
+                    value={form.service_type}
+                    onChange={(e) => setForm({ ...form, service_type: e.target.value })}
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  >
+                    {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">사업자/주민등록번호</label>
-                <input className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" value={form.reg_number} onChange={e => setForm({ ...form, reg_number: e.target.value })} placeholder="000-00-00000" />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>메모</label>
+                <textarea
+                  value={form.memo}
+                  onChange={(e) => setForm({ ...form, memo: e.target.value })}
+                  placeholder="추가 메모..."
+                  style={{
+                    width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff', minHeight: 80, resize: 'vertical'
+                  }}
+                />
               </div>
-              <div className="bg-slate-50 p-5 rounded-xl border border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 mb-3">계좌 정보</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <select className="border border-slate-200 p-3 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })}>
-                    {KOREAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                  <input className="border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={form.account_number} onChange={e => setForm({ ...form, account_number: e.target.value })} placeholder="계좌번호" />
-                  <input className="border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={form.account_holder} onChange={e => setForm({ ...form, account_holder: e.target.value })} placeholder="예금주" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">메모</label>
-                <textarea className="w-full border border-slate-200 p-3 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all" rows={2} value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} />
-              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>활성 상태</span>
+              </label>
             </div>
-            <div className="p-6 border-t border-slate-100 flex gap-3">
-              <button onClick={() => { setShowForm(false); setEditingId(null) }} className="flex-1 py-3 bg-slate-100 rounded-xl font-semibold text-sm text-slate-600 hover:bg-slate-200 transition-colors">취소</button>
-              <button onClick={handleSave} className="flex-[2] py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all active:scale-[0.99] shadow-lg shadow-steel-600/10">{editingId ? '수정 완료' : '등록 완료'}</button>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{
+                  flex: 1, padding: '12px 20px', border: '1px solid #e5e7eb', borderRadius: 10, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#6b7280'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSave}
+                style={{
+                  flex: 1, padding: '12px 20px', borderRadius: 10, background: '#0f172a', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14
+                }}
+              >
+                저장
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ──── 지급 등록 모달 ──── */}
+      {/* ──── 모달: 지급 등록 (별도 유지) ──── */}
       {showPaymentForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="font-bold text-base text-slate-900">용역비 지급 등록</h3>
-              <p className="text-xs text-slate-400 mt-0.5">지급 확정 시 장부에 자동 반영됩니다</p>
-            </div>
-            <div className="p-6 space-y-4">
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'flex-end', zIndex: 50,
+        }} onClick={() => setShowPaymentForm(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', width: '100%', maxWidth: 600, borderRadius: '24px 24px 0 0', padding: '32px 24px 28px', maxHeight: '90vh', overflowY: 'auto',
+            }}>
+            <h2 style={{ fontSize: 20, fontWeight: 900, margin: '0 0 20px', color: '#111827' }}>지급 등록</h2>
+
+            <div style={{ display: 'grid', gap: 16 }}>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">프리랜서 <span className="text-red-400">*</span></label>
-                <select className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={payForm.freelancer_id} onChange={e => {
-                  const selected = freelancers.find(f => f.id === e.target.value)
-                  setPayForm({
-                    ...payForm,
-                    freelancer_id: e.target.value,
-                    tax_rate: selected?.tax_type === '기타소득(8.8%)' ? 8.8 : selected?.tax_type === '사업소득(3.3%)' ? 3.3 : 0
-                  })
-                }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>프리랜서 선택 *</label>
+                <select
+                  value={payForm.freelancer_id}
+                  onChange={(e) => setPayForm({ ...payForm, freelancer_id: e.target.value })}
+                  style={{
+                    width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                  }}
+                >
                   <option value="">선택하세요</option>
-                  {freelancers.filter(f => f.is_active).map(f => <option key={f.id} value={f.id}>{f.name} ({f.service_type})</option>)}
+                  {freelancers.filter(f => f.is_active).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">지급일</label>
-                  <input type="date" className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={payForm.payment_date} onChange={e => setPayForm({ ...payForm, payment_date: e.target.value })} />
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>지급일</label>
+                  <input
+                    type="date"
+                    value={payForm.payment_date}
+                    onChange={(e) => setPayForm({ ...payForm, payment_date: e.target.value })}
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">세율(%)</label>
-                  <input type="number" step="0.1" className="w-full border border-slate-200 p-3 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={payForm.tax_rate} onChange={e => setPayForm({ ...payForm, tax_rate: e.target.value })} />
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>세율 (%)</label>
+                  <input
+                    type="number"
+                    value={payForm.tax_rate}
+                    onChange={(e) => setPayForm({ ...payForm, tax_rate: Number(e.target.value) })}
+                    step="0.1"
+                    style={{
+                      width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
                 </div>
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">세전 금액 <span className="text-red-400">*</span></label>
-                <div className="relative">
-                  <input type="text" className="w-full border-2 border-slate-200 p-3.5 pr-10 rounded-xl text-right font-bold text-lg focus:border-slate-400 focus:ring-0 outline-none transition-all"
-                    value={payForm.gross_amount ? Number(payForm.gross_amount).toLocaleString() : ''}
-                    onChange={e => setPayForm({ ...payForm, gross_amount: e.target.value.replace(/,/g, '') })}
-                    placeholder="0" />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">원</span>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>지급액 (세전) *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number"
+                    value={payForm.gross_amount}
+                    onChange={(e) => setPayForm({ ...payForm, gross_amount: e.target.value })}
+                    placeholder="0"
+                    style={{
+                      flex: 1, padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff'
+                    }}
+                  />
+                  <span style={{ fontWeight: 700, color: '#1e293b' }}>원</span>
                 </div>
-                {payForm.gross_amount && (
-                  <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
-                    <div className="flex justify-between"><span className="text-slate-500">원천징수세 ({payForm.tax_rate}%)</span><span className="font-semibold text-red-500">-{Math.round(Number(payForm.gross_amount) * Number(payForm.tax_rate) / 100).toLocaleString()}원</span></div>
-                    <div className="flex justify-between border-t border-slate-200 pt-1"><span className="text-slate-700 font-semibold">실지급액</span><span className="font-bold text-emerald-600">{Math.round(Number(payForm.gross_amount) * (1 - Number(payForm.tax_rate) / 100)).toLocaleString()}원</span></div>
+              </div>
+
+              {payForm.gross_amount && (
+                <div style={{ background: '#f0fdf4', borderRadius: 12, padding: 16, border: '1px solid #dcfce7' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+                    <span>세금 ({payForm.tax_rate}%):</span>
+                    <span style={{ fontWeight: 700 }}>{formatMoney(Math.round(Number(payForm.gross_amount) * Number(payForm.tax_rate) / 100))}원</span>
                   </div>
-                )}
-              </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid #d1fae5', paddingTop: 8 }}>
+                    <span style={{ fontWeight: 700 }}>순액:</span>
+                    <span style={{ fontWeight: 900, fontSize: 15, color: '#16a34a' }}>{formatMoney(Number(payForm.gross_amount) - Math.round(Number(payForm.gross_amount) * Number(payForm.tax_rate) / 100))}원</span>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">설명</label>
-                <input className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={payForm.description} onChange={e => setPayForm({ ...payForm, description: e.target.value })} placeholder="작업 내용" />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>설명</label>
+                <textarea
+                  value={payForm.description}
+                  onChange={(e) => setPayForm({ ...payForm, description: e.target.value })}
+                  placeholder="지급 사유 등..."
+                  style={{
+                    width: '100%', padding: '10px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, outline: 'none', background: '#fff', minHeight: 60, resize: 'vertical'
+                  }}
+                />
               </div>
             </div>
-            <div className="p-6 border-t border-slate-100 flex gap-3">
-              <button onClick={() => setShowPaymentForm(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-semibold text-sm text-slate-600 hover:bg-slate-200 transition-colors">취소</button>
-              <button onClick={handlePaymentSave} className="flex-[2] py-3 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all active:scale-[0.99] shadow-lg shadow-steel-600/10">등록</button>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button
+                onClick={() => setShowPaymentForm(false)}
+                style={{
+                  flex: 1, padding: '12px 20px', border: '1px solid #e5e7eb', borderRadius: 10, background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#6b7280'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handlePaymentSave}
+                style={{
+                  flex: 1, padding: '12px 20px', borderRadius: 10, background: '#0f172a', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14
+                }}
+              >
+                등록
+              </button>
             </div>
           </div>
         </div>

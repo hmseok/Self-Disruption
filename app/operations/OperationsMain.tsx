@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 import CalendarView from './CalendarView'
 import DispatchModal from './DispatchModal'
 
@@ -538,242 +542,249 @@ export default function OperationsMainPage() {
   }
 
   // ============================================
-  // List View
+  // List View - NeuDataTable
   // ============================================
-  const renderListView = () => (
-    <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
-      {/* List Filters */}
-      <div className="flex items-center gap-2 p-3 border-b border-black/5 overflow-x-auto">
-        {[
-          { key: 'today', label: '오늘' },
-          { key: 'week', label: '이번주' },
-          { key: 'all', label: '전체' },
-        ].map(f => (
-          <button key={f.key} onClick={() => setListFilter(f.key as any)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${listFilter === f.key ? 'bg-steel-600 text-white' : 'bg-gray-100 text-slate-400 hover:bg-gray-100'}`}>
-            {f.label}
-          </button>
-        ))}
-        <div className="w-px h-5 bg-gray-100 mx-1" />
-        {['all', 'scheduled', 'preparing', 'inspecting', 'in_transit', 'completed'].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-[#2a3447] text-white' : 'bg-gray-50 text-slate-500 hover:bg-gray-100'}`}>
-            {s === 'all' ? '전체' : OP_STATUS[s]?.label}
-          </button>
-        ))}
-        <div className="w-px h-5 bg-gray-100 mx-1" />
-        {[
-          { key: 'all', label: '전체배차' },
-          { key: 'regular', label: '일반' },
-          { key: 'insurance', label: '보험배차' },
-          { key: 'maintenance', label: '정비대차' },
-        ].map(f => (
-          <button key={f.key} onClick={() => setDispatchFilter(f.key as any)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${dispatchFilter === f.key ? 'bg-teal-600 text-white' : 'bg-gray-50 text-slate-500 hover:bg-gray-100'}`}>
-            {f.label}
-          </button>
-        ))}
+  const renderListView = () => {
+    // NeuDataTable columns
+    const columns: TableColumn<Operation>[] = [
+      {
+        key: 'date',
+        label: '일정',
+        render: (op) => (
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 13, color: '#0f2440' }}>{op.scheduled_date}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{op.scheduled_time}</div>
+          </div>
+        ),
+      },
+      {
+        key: 'type',
+        label: '유형',
+        render: (op) => (
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+            {op.operation_type === 'delivery' ? '출고' : '반납'}
+          </span>
+        ),
+      },
+      {
+        key: 'category',
+        label: '배차구분',
+        render: (op) => {
+          const cat = op.dispatch_category || 'regular'
+          const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
+          return (
+            <div>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>
+                {catInfo.label}
+              </span>
+              {['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat) && op.fault_ratio != null && (
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>과실 {op.fault_ratio}%</div>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        key: 'car',
+        label: '차량',
+        render: (op) => {
+          const car = getCar(op.car_id)
+          return (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car?.number || '-'}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{car?.brand} {car?.model}</div>
+            </div>
+          )
+        },
+      },
+      {
+        key: 'customer',
+        label: '고객',
+        render: (op) => {
+          const cust = getCustomer(op.customer_id)
+          return (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{cust?.name || '-'}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{cust?.phone || ''}</div>
+            </div>
+          )
+        },
+      },
+      {
+        key: 'location',
+        label: '장소',
+        render: (op) => (
+          <div>
+            <div style={{ color: '#1e293b', fontSize: 13 }}>{op.location || '-'}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {op.location_address}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'status',
+        label: '상태',
+        render: (op) => (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${OP_STATUS[op.status]?.color}`}>
+            {OP_STATUS[op.status]?.icon} {OP_STATUS[op.status]?.label}
+          </span>
+        ),
+      },
+      {
+        key: 'insurance',
+        label: '보험/정산',
+        render: (op) => {
+          const cat = op.dispatch_category || 'regular'
+          const isInsuranceOp = ['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat)
+          const billingInfo = op.insurance_billing_status ? BILLING_STATUS[op.insurance_billing_status] : null
+          return (
+            <div>
+              {isInsuranceOp ? (
+                <>
+                  {billingInfo && billingInfo.label !== '-' && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${billingInfo.color}`}>
+                      {billingInfo.label}
+                    </span>
+                  )}
+                  {op.insurance_company_billing && (
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {op.insurance_company_billing}
+                    </div>
+                  )}
+                  {(op.insurance_billed_amount || 0) > 0 && (
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                      {Number(op.insurance_billed_amount).toLocaleString()}원
+                    </div>
+                  )}
+                </>
+              ) : cat === 'maintenance' ? (
+                <span style={{ fontSize: 10, color: '#64748b' }}>{op.repair_shop_name || '-'}</span>
+              ) : (
+                <span style={{ fontSize: 10, color: '#64748b' }}>{op.handler_name || '-'}</span>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        key: 'actions',
+        label: '액션',
+        align: 'center',
+        render: (op) => (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => openEditModal(op)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                background: 'rgba(255,255,255,0.60)',
+                color: '#1e293b',
+                border: '1px solid rgba(0,0,0,0.06)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              수정
+            </button>
+            {renderStatusButtons(op)}
+          </div>
+        ),
+      },
+    ]
+
+    // Mobile card config
+    const mobileCard: MobileCardConfig<Operation> = {
+      title: (op) => {
+        const car = getCar(op.car_id)
+        return car?.number || '-'
+      },
+      subtitle: (op) => {
+        const car = getCar(op.car_id)
+        return `${car?.brand} ${car?.model} · ${op.scheduled_date}`
+      },
+      trailing: (op) => {
+        const statusInfo = OP_STATUS[op.status]
+        return (
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: statusInfo?.color.includes('green') ? '#16a34a' : '#dc2626' }}>
+              {statusInfo?.label}
+            </div>
+            <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{op.scheduled_time}</div>
+          </div>
+        )
+      },
+      badges: (op) => {
+        const cat = op.dispatch_category || 'regular'
+        const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
+        return (
+          <>
+            <span className={`si-badge ${op.operation_type === 'delivery' ? 'si-badge-blue' : 'si-badge-amber'}`}>
+              {op.operation_type === 'delivery' ? '출고' : '반납'}
+            </span>
+            <span className={`si-badge ${catInfo.bg}`}>{catInfo.label}</span>
+          </>
+        )
+      },
+    }
+
+    return (
+      <div>
+        {/* List View Filter Tabs */}
+        <NeuFilterTabs
+          tabs={[
+            { key: 'today', label: '오늘' },
+            { key: 'week', label: '이번주' },
+            { key: 'all', label: '전체' },
+          ]}
+          activeKey={listFilter}
+          onSelect={(k) => setListFilter(k as any)}
+          compact={true}
+        />
+
+        {/* Status + Dispatch Filter Tabs */}
+        <div style={{ marginBottom: 12 }}>
+          <NeuFilterTabs
+            tabs={['all', 'scheduled', 'preparing', 'inspecting', 'in_transit', 'completed'].map(s => ({
+              key: s,
+              label: s === 'all' ? '전체' : OP_STATUS[s]?.label || s,
+            }))}
+            activeKey={statusFilter}
+            onSelect={setStatusFilter}
+            compact={true}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <NeuFilterTabs
+            tabs={[
+              { key: 'all', label: '전체배차' },
+              { key: 'regular', label: '일반' },
+              { key: 'insurance', label: '보험배차' },
+              { key: 'maintenance', label: '정비대차' },
+            ]}
+            activeKey={dispatchFilter}
+            onSelect={(k) => setDispatchFilter(k as any)}
+            compact={true}
+          />
+        </div>
+
+        {/* Data Table */}
+        <NeuDataTable
+          columns={columns}
+          data={filteredOperations}
+          rowKey={(op) => op.id}
+          onRowClick={(op) => openEditModal(op)}
+          loading={loading}
+          emptyIcon="📋"
+          emptyMessage={searchQuery ? '검색 결과가 없습니다.' : '해당 조건에 맞는 배차가 없습니다.'}
+          mobileCard={mobileCard}
+        />
       </div>
-
-      {loading ? (
-        <div className="p-20 text-center text-slate-500 flex flex-col items-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
-          데이터를 불러오는 중...
-        </div>
-      ) : filteredOperations.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 text-sm">
-          {searchQuery ? '검색 결과가 없습니다.' : '해당 조건에 맞는 배차가 없습니다.'}
-        </div>
-      ) : (
-        <>
-          {/* Desktop Table */}
-          <div style={{ overflowX: 'auto' }} className="hidden md:block">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
-                <tr>
-                  <th className="p-3">일정</th>
-                  <th className="p-3">유형</th>
-                  <th className="p-3">배차구분</th>
-                  <th className="p-3">차량</th>
-                  <th className="p-3">고객</th>
-                  <th className="p-3">장소</th>
-                  <th className="p-3">상태</th>
-                  <th className="p-3">보험/정산</th>
-                  <th className="p-3 text-center">액션</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredOperations.map(op => {
-                  const car = getCar(op.car_id)
-                  const cust = getCustomer(op.customer_id)
-                  const cat = op.dispatch_category || 'regular'
-                  const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
-                  const isInsuranceOp = ['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat)
-                  const billingInfo = op.insurance_billing_status ? BILLING_STATUS[op.insurance_billing_status] : null
-                  return (
-                    <tr key={op.id} className="hover:bg-steel-50/50 transition-colors">
-                      <td className="p-3 text-sm">
-                        <div className="font-bold text-slate-800">{op.scheduled_date}</div>
-                        <div className="text-xs text-slate-500">{op.scheduled_time}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {op.operation_type === 'delivery' ? '출고' : '반납'}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>
-                          {catInfo.label}
-                        </span>
-                        {isInsuranceOp && op.fault_ratio != null && (
-                          <div className="text-[10px] text-slate-500 mt-0.5">과실 {op.fault_ratio}%</div>
-                        )}
-                      </td>
-                      <td className="p-3 text-sm">
-                        <div className="font-bold text-slate-700">{car?.number || '-'}</div>
-                        <div className="text-xs text-slate-500">{car?.brand} {car?.model}</div>
-                      </td>
-                      <td className="p-3 text-sm">
-                        <div className="font-bold text-slate-700">{cust?.name || '-'}</div>
-                        <div className="text-xs text-slate-500">{cust?.phone || ''}</div>
-                      </td>
-                      <td className="p-3 text-sm">
-                        <div className="text-slate-600">{op.location || '-'}</div>
-                        <div className="text-xs text-slate-500 truncate max-w-[150px]">{op.location_address}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${OP_STATUS[op.status]?.color}`}>
-                          {OP_STATUS[op.status]?.icon} {OP_STATUS[op.status]?.label}
-                        </span>
-                      </td>
-                      <td className="p-3 text-sm">
-                        {isInsuranceOp ? (
-                          <div>
-                            {billingInfo && billingInfo.label !== '-' && (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${billingInfo.color}`}>
-                                {billingInfo.label}
-                              </span>
-                            )}
-                            {op.insurance_company_billing && (
-                              <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[100px]">{op.insurance_company_billing}</div>
-                            )}
-                            {(op.insurance_billed_amount || 0) > 0 && (
-                              <div className="text-[10px] text-slate-500 mt-0.5">
-                                {Number(op.insurance_billed_amount).toLocaleString()}원
-                              </div>
-                            )}
-                          </div>
-                        ) : cat === 'maintenance' ? (
-                          <span className="text-[10px] text-slate-500">{op.repair_shop_name || '-'}</span>
-                        ) : (
-                          <span className="text-[10px] text-slate-500">{op.handler_name || '-'}</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex gap-1.5 justify-center flex-wrap">
-                          <button onClick={() => openEditModal(op)} className="px-2 py-1 rounded-lg text-xs font-bold bg-gray-100 text-slate-400 hover:bg-gray-100">수정</button>
-                          {renderStatusButtons(op)}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-3">
-            {filteredOperations.map(op => {
-              const car = getCar(op.car_id)
-              const cust = getCustomer(op.customer_id)
-              const cat = op.dispatch_category || 'regular'
-              const catInfo = DISPATCH_CATEGORY[cat] || DISPATCH_CATEGORY.regular
-              const isInsuranceOp = ['insurance_victim', 'insurance_at_fault', 'insurance_own'].includes(cat)
-              const billingInfo = op.insurance_billing_status ? BILLING_STATUS[op.insurance_billing_status] : null
-              return (
-                <div
-                  key={op.id}
-                  onClick={() => openEditModal(op)}
-                  className="bg-white border border-black/[0.06] rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer"
-                >
-                  {/* Date and Type */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
-                      <div className="font-bold text-slate-800 text-sm">{op.scheduled_date}</div>
-                      <div className="text-xs text-slate-500">{op.scheduled_time}</div>
-                    </div>
-                    <div className="flex flex-col gap-2 items-end">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${op.operation_type === 'delivery' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {op.operation_type === 'delivery' ? '출고' : '반납'}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${catInfo.bg} ${catInfo.color}`}>
-                        {catInfo.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Car Info */}
-                  <div className="border-t border-black/5 pt-3">
-                    <div className="font-bold text-slate-700 text-sm">{car?.number || '-'}</div>
-                    <div className="text-xs text-slate-500">{car?.brand} {car?.model}</div>
-                  </div>
-
-                  {/* Customer and Driver */}
-                  <div className="border-t border-black/5 pt-3">
-                    <div className="text-xs text-slate-500 font-semibold mb-1">고객</div>
-                    <div className="font-bold text-slate-700 text-sm">{cust?.name || '-'}</div>
-                    <div className="text-xs text-slate-500">{cust?.phone || ''}</div>
-                  </div>
-
-                  {/* Location */}
-                  <div className="border-t border-black/5 pt-3">
-                    <div className="text-xs text-slate-500 font-semibold mb-1">장소</div>
-                    <div className="text-slate-600 text-sm">{op.location || '-'}</div>
-                    <div className="text-xs text-slate-500 truncate">{op.location_address}</div>
-                  </div>
-
-                  {/* Status and Billing */}
-                  <div className="border-t border-black/5 pt-3 flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="text-xs text-slate-500 font-semibold mb-1">상태</div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-block ${OP_STATUS[op.status]?.color}`}>
-                        {OP_STATUS[op.status]?.icon} {OP_STATUS[op.status]?.label}
-                      </span>
-                    </div>
-                    {isInsuranceOp && (
-                      <div className="flex-1 text-right">
-                        <div className="text-xs text-slate-500 font-semibold mb-1">보험/정산</div>
-                        {billingInfo && billingInfo.label !== '-' && (
-                          <div className={`text-[10px] font-bold inline-block ${billingInfo.color}`}>
-                            {billingInfo.label}
-                          </div>
-                        )}
-                        {op.insurance_company_billing && (
-                          <div className="text-[10px] text-slate-500 truncate">{op.insurance_company_billing}</div>
-                        )}
-                        {(op.insurance_billed_amount || 0) > 0 && (
-                          <div className="text-[10px] text-slate-500">
-                            {Number(op.insurance_billed_amount).toLocaleString()}원
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="border-t border-black/5 pt-3 flex gap-2 flex-wrap">
-                    <button onClick={(e) => { e.stopPropagation(); openEditModal(op); }} className="flex-1 px-2 py-2 rounded-lg text-xs font-bold bg-gray-100 text-slate-400 hover:bg-gray-100">수정</button>
-                    {renderStatusButtons(op)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  )
+    )
+  }
 
   // ============================================
   // Dashboard View
@@ -1134,63 +1145,53 @@ export default function OperationsMainPage() {
             배차 스케줄 관리 · 출고/반납 처리 · 단기대차 계약
           </p>
         </div>
-        <div className="flex gap-2 items-center">
-          <input type="text" placeholder="🔍 차량번호, 고객명 검색..."
-            className="px-3 py-2.5 border border-black/10 rounded-xl flex-1 md:flex-none md:min-w-[220px] focus:outline-none focus:border-steel-500 shadow-sm text-sm"
-            value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-          <button onClick={() => { setEditingOp(null); setShowDispatchModal(true) }}
-            className="px-4 py-2.5 bg-steel-600 text-white rounded-xl font-bold text-sm hover:bg-steel-700 transition-all flex items-center gap-1.5 shadow-lg shadow-steel-600/10 whitespace-nowrap">
-            + 새 배차
-          </button>
-        </div>
       </div>
 
-      {/* KPI Cards - 대시보드 외 뷰에서만 표시 */}
-      <div className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5 ${viewMode === 'dashboard' ? 'hidden' : ''}`}>
-        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-          <p className="text-[11px] text-slate-500 font-bold">오늘 출고</p>
-          <p className="text-xl font-black text-blue-600 mt-1">{stats.todayDeliveries}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-          <p className="text-[11px] text-slate-500 font-bold">오늘 반납</p>
-          <p className="text-xl font-black text-amber-600 mt-1">{stats.todayReturns}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-          <p className="text-[11px] text-slate-500 font-bold">현재 진행중</p>
-          <p className="text-xl font-black text-slate-800 mt-1">{stats.inProgress}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-          <p className="text-[11px] text-slate-500 font-bold">이번주 예정</p>
-          <p className="text-xl font-black text-slate-800 mt-1">{stats.weekScheduled}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-purple-200 shadow-sm">
-          <p className="text-[11px] text-purple-500 font-bold">단기대차 진행</p>
-          <p className="text-xl font-black text-purple-600 mt-1">{stats.shortTermActive}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-teal-200 shadow-sm">
-          <p className="text-[11px] text-teal-600 font-bold">보험배차 진행</p>
-          <p className="text-xl font-black text-teal-600 mt-1">{stats.insuranceActive}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-        <div className="bg-white p-3 rounded-xl border border-yellow-200 shadow-sm">
-          <p className="text-[11px] text-yellow-600 font-bold">보험청구 대기</p>
-          <p className="text-xl font-black text-yellow-600 mt-1">{stats.insurancePendingBilling}<span className="text-sm text-slate-500 ml-0.5">건</span></p>
-        </div>
-      </div>
+      {/* KPI Cards - NeuStatCards */}
+      {(viewMode !== 'dashboard' && operations.length > 0) && (
+        <NeuStatCards
+          items={[
+            { key: 'todayDeliveries', label: '오늘 출고', value: stats.todayDeliveries, unit: '건', icon: '🚚', color: 'blue' },
+            { key: 'todayReturns', label: '오늘 반납', value: stats.todayReturns, unit: '건', icon: '🔙', color: 'amber' },
+            { key: 'inProgress', label: '현재 진행중', value: stats.inProgress, unit: '건', icon: '⚡', color: 'slate' },
+            { key: 'weekScheduled', label: '이번주 예정', value: stats.weekScheduled, unit: '건', icon: '📅', color: 'slate' },
+            { key: 'shortTermActive', label: '단기대차 진행', value: stats.shortTermActive, unit: '건', icon: '📋', color: 'purple' },
+            { key: 'insuranceActive', label: '보험배차 진행', value: stats.insuranceActive, unit: '건', icon: '🛡️', color: 'blue' },
+            { key: 'insurancePendingBilling', label: '보험청구 대기', value: stats.insurancePendingBilling, unit: '건', icon: '⏳', color: 'amber' },
+          ]}
+          columns={7}
+        />
+      )}
 
-      {/* View Mode Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
-        {[
-          { key: 'dashboard', label: '🏠 대시보드', },
-          { key: 'list', label: '📋 리스트', },
-          { key: 'timeline', label: '📊 타임라인', },
-          { key: 'calendar', label: '📅 캘린더', },
-        ].map(v => (
-          <button key={v.key} onClick={() => setViewMode(v.key as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === v.key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}>
-            {v.label}
-          </button>
-        ))}
-      </div>
+      {/* Search Bar + New Dispatch Button */}
+      <NeuSearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="🔍 차량번호, 고객명 검색..."
+        resultText={`검색결과 ${filteredOperations.length}건`}
+        actions={[
+          {
+            label: '+ 새 배차',
+            variant: 'primary',
+            onClick: () => {
+              setEditingOp(null)
+              setShowDispatchModal(true)
+            },
+          },
+        ]}
+      />
+
+      {/* View Mode Tabs - NeuFilterTabs */}
+      <NeuFilterTabs
+        tabs={[
+          { key: 'dashboard', label: '🏠 대시보드' },
+          { key: 'list', label: '📋 리스트' },
+          { key: 'timeline', label: '📊 타임라인' },
+          { key: 'calendar', label: '📅 캘린더' },
+        ]}
+        activeKey={viewMode}
+        onSelect={(k) => setViewMode(k as any)}
+      />
 
       {/* View Content */}
       {viewMode === 'dashboard' && renderDashboard()}

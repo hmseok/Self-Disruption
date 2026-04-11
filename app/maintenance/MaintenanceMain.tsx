@@ -3,6 +3,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import Link from 'next/link'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -395,7 +399,7 @@ export default function MaintenanceMainPage() {
     try {
       const payload = {
         ...maintenanceFormData,
-        
+
         status: editingMaintenance ? editingMaintenance.status : 'requested',
         created_by: editingMaintenance ? editingMaintenance.created_by : user.id,
       }
@@ -469,7 +473,7 @@ export default function MaintenanceMainPage() {
     try {
       const payload = {
         ...inspectionFormData,
-        
+
         status: editingInspection ? editingInspection.status : 'scheduled',
         created_by: editingInspection ? editingInspection.created_by : user.id,
       }
@@ -520,969 +524,653 @@ export default function MaintenanceMainPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 min-h-screen bg-gray-50 animate-fade-in">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
-        <div style={{ textAlign: 'left' }}>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🔧 정비/검사 관리</h1>
-          <p className="text-slate-500 mt-1 md:mt-2 text-sm">
-            정비 기록: <span className="font-bold text-steel-600">{maintenanceRecords.length}</span>건 /
-            검사 기록: <span className="font-bold text-steel-600">{inspectionRecords.length}</span>건
-          </p>
-        </div>
+    <div className="page-bg">
+      <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
 
-        <Link
-          href="/cars"
-          className="px-4 md:px-6 py-2.5 md:py-3 border border-black/10 rounded-xl font-bold text-slate-600 hover:bg-gray-50 text-center text-sm"
-        >
-          목록으로
-        </Link>
-      </div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
+          <div style={{ textAlign: 'left' }}>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">🔧 정비/검사 관리</h1>
+            <p className="text-slate-500 mt-1 md:mt-2 text-sm">
+              정비 기록: <span className="font-bold text-steel-600">{maintenanceRecords.length}</span>건 /
+              검사 기록: <span className="font-bold text-steel-600">{inspectionRecords.length}</span>건
+            </p>
+          </div>
 
-      {/* KPI Cards */}
-      {(maintenanceRecords.length > 0 || inspectionRecords.length > 0) && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-            <p className="text-xs text-slate-500 font-bold">정비 대기</p>
-            <p className="text-xl font-black text-slate-800 mt-1">
-              {stats.maintPending}
-              <span className="text-sm text-slate-500 ml-0.5">건</span>
-            </p>
-          </div>
-          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-            <p className="text-xs text-slate-500 font-bold">정비 진행</p>
-            <p className="text-xl font-black text-slate-800 mt-1">
-              {stats.maintInProgress}
-              <span className="text-sm text-slate-500 ml-0.5">건</span>
-            </p>
-          </div>
-          <div className="bg-white p-3 rounded-xl border border-black/[0.06] shadow-sm">
-            <p className="text-xs text-slate-500 font-bold">검사 예정</p>
-            <p className="text-xl font-black text-slate-800 mt-1">
-              {stats.inspUpcoming}
-              <span className="text-sm text-slate-500 ml-0.5">건</span>
-            </p>
-          </div>
-          <div className={`${stats.inspOverdue > 0 ? 'bg-red-500/10' : 'bg-white'} p-3 rounded-xl border ${stats.inspOverdue > 0 ? 'border-red-500/20' : 'border-black/[0.06]'} shadow-sm`}>
-            <p className={`text-xs font-bold ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-slate-500'}`}>만기 초과</p>
-            <p className={`text-xl font-black mt-1 ${stats.inspOverdue > 0 ? 'text-red-600' : 'text-slate-800'}`}>
-              {stats.inspOverdue}
-              <span className="text-sm ml-0.5">건</span>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex border-b border-black/[0.06] mb-4 overflow-x-auto gap-2">
-        {[
-          { key: 'maintenance', label: '정비 이력' },
-          { key: 'inspection', label: '법정 검사' },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setMainTab(t.key as any)}
-            className={`px-3 md:px-6 py-2.5 md:py-3 font-bold text-xs md:text-sm border-b-2 transition-colors whitespace-nowrap ${
-              mainTab === t.key
-                ? 'border-steel-600 text-steel-600'
-                : 'border-transparent text-slate-500 hover:text-slate-400'
-            }`}
+          <Link
+            href="/cars"
+            className="px-4 md:px-6 py-2.5 md:py-3 border border-black/10 rounded-xl font-bold text-slate-600 hover:bg-gray-50 text-center text-sm"
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
+            목록으로
+          </Link>
+        </div>
 
-      {/* Maintenance Tab */}
-      {mainTab === 'maintenance' && (
-        <>
-          {/* Search and Create */}
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-3 md:gap-4">
-            <input
-              type="text"
-              placeholder="🔍 차량번호, 정비소, 메모로 검색..."
-              className="px-3 md:px-4 py-2.5 md:py-3 border border-black/10 rounded-xl flex-1 focus:outline-none focus:border-steel-500 shadow-sm text-sm bg-gray-50 text-slate-800"
+        {/* KPI Cards using NeuStatCards */}
+        {(maintenanceRecords.length > 0 || inspectionRecords.length > 0) && (
+          <NeuStatCards
+            items={[
+              { key: 'maintPending', label: '정비 대기', value: stats.maintPending, unit: '건', icon: '⏳', color: 'blue' },
+              { key: 'maintInProgress', label: '정비 진행', value: stats.maintInProgress, unit: '건', icon: '🔧', color: 'amber' },
+              { key: 'inspUpcoming', label: '검사 예정', value: stats.inspUpcoming, unit: '건', icon: '📋', color: 'slate' },
+              { key: 'inspOverdue', label: '만기 초과', value: stats.inspOverdue, unit: '건', icon: stats.inspOverdue > 0 ? '⚠️' : '✅', color: stats.inspOverdue > 0 ? 'red' : 'green' },
+            ]}
+            columns={4}
+          />
+        )}
+
+        {/* Tab Navigation using NeuFilterTabs */}
+        <NeuFilterTabs
+          tabs={[
+            { key: 'maintenance', label: '정비 이력', count: maintenanceRecords.length },
+            { key: 'inspection', label: '법정 검사', count: inspectionRecords.length },
+          ]}
+          activeKey={mainTab}
+          onSelect={(key) => setMainTab(key as any)}
+          compact={false}
+        />
+
+        {/* Maintenance Tab */}
+        {mainTab === 'maintenance' && (
+          <>
+            {/* Search Bar with Create Button */}
+            <NeuSearchBar
               value={maintSearchQuery}
-              onChange={e => setMaintSearchQuery(e.target.value)}
+              onChange={setMaintSearchQuery}
+              placeholder="🔍 차량번호, 정비소, 메모로 검색..."
+              resultText={`검색결과 ${filteredMaintenanceRecords.length}건`}
+              actions={[
+                {
+                  label: '+ 신규 정비',
+                  variant: 'primary',
+                  onClick: openCreateMaintenanceModal,
+                },
+              ]}
             />
-            <button
-              onClick={openCreateMaintenanceModal}
-              className="bg-steel-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-center whitespace-nowrap text-sm flex-shrink-0"
-            >
-              + 신규 정비
-            </button>
-          </div>
 
-          {/* Filters */}
-          <div className="mb-4 flex flex-col md:flex-row gap-3">
-            <select
-              value={maintStatusFilter}
-              onChange={e => setMaintStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
-            >
-              <option value="all">상태: 전체</option>
-              {Object.entries(MAINT_STATUS).map(([key, val]) => (
-                <option key={key} value={key}>
-                  {val.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={maintTypeFilter}
-              onChange={e => setMaintTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
-            >
-              <option value="all">유형: 전체</option>
-              {Object.entries(MAINT_TYPE).map(([key, val]) => (
-                <option key={key} value={key}>
-                  {val}
-                </option>
-              ))}
-            </select>
-            <select
-              value={maintVehicleFilter}
-              onChange={e => setMaintVehicleFilter(e.target.value)}
-              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 flex-1 md:flex-none bg-gray-50 text-slate-800"
-            >
-              <option value="all">차량: 전체</option>
-              {cars.map(car => (
-                <option key={car.id} value={car.id}>
-                  {car.number}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Filter Dropdowns */}
+            <div style={{
+              display: 'flex',
+              gap: 12,
+              marginBottom: 12,
+              flexWrap: 'wrap',
+            }}>
+              <select
+                value={maintStatusFilter}
+                onChange={e => setMaintStatusFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.40)',
+                  color: '#1e293b',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">상태: 전체</option>
+                {Object.entries(MAINT_STATUS).map(([key, val]) => (
+                  <option key={key} value={key}>
+                    {val.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={maintTypeFilter}
+                onChange={e => setMaintTypeFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.40)',
+                  color: '#1e293b',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">유형: 전체</option>
+                {Object.entries(MAINT_TYPE).map(([key, val]) => (
+                  <option key={key} value={key}>
+                    {val}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={maintVehicleFilter}
+                onChange={e => setMaintVehicleFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.40)',
+                  color: '#1e293b',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">차량: 전체</option>
+                {cars.map(car => (
+                  <option key={car.id} value={car.id}>
+                    {car.number}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
-            {loading ? (
-              <div className="p-20 text-center text-slate-500 flex flex-col items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
-                정비 데이터를 불러오는 중...
-              </div>
-            ) : filteredMaintenanceRecords.length === 0 ? (
-              <div className="p-12 md:p-20 text-center text-slate-500 text-sm">
-                {maintSearchQuery || maintStatusFilter !== 'all' || maintTypeFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 정비 기록이 없습니다.'}
-              </div>
-            ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-100 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
-                      <tr>
-                        <th className="p-4">요청일</th>
-                        <th className="p-4">차량</th>
-                        <th className="p-4">유형</th>
-                        <th className="p-4">정비소</th>
-                        <th className="p-4">예상비용</th>
-                        <th className="p-4">상태</th>
-                        <th className="p-4 text-center">액션</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredMaintenanceRecords.map(maint => (
-                        <tr key={maint.id} className="hover:bg-gray-50 transition-colors group">
-                          <td className="p-4 font-bold text-slate-800 text-sm">{maint.requested_date}</td>
-                          <td className="p-4 text-sm">
-                            <div className="font-bold text-slate-700">{getCar(maint.car_id)?.number}</div>
-                            <div className="text-xs text-slate-400">
-                              {getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}
-                            </div>
-                          </td>
-                          <td className="p-4 text-sm">
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
-                              {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
-                            </span>
-                          </td>
-                          <td className="p-4 text-sm">
-                            <div className="font-bold text-slate-700">{maint.shop_name}</div>
-                            <div className="text-xs text-slate-400">{maint.shop_phone}</div>
-                          </td>
-                          <td className="p-4 text-sm font-bold text-slate-800">
-                            {maint.estimated_cost?.toLocaleString()}원
-                          </td>
-                          <td className="p-4 text-sm">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${MAINT_STATUS[maint.status]?.color}`}>
-                              {MAINT_STATUS[maint.status]?.label}
-                            </span>
-                          </td>
-                          <td className="p-4 text-center">
-                            <div className="flex gap-2 justify-center flex-wrap">
-                              <button
-                                onClick={() => openEditMaintenanceModal(maint)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              >
-                                수정
-                              </button>
-                              {maint.status === 'requested' && (
-                                <button
-                                  onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
-                                >
-                                  승인
-                                </button>
-                              )}
-                              {maint.status === 'approved' && (
-                                <button
-                                  onClick={() => handleMaintenanceStatusChange(maint.id, 'in_shop')}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                >
-                                  입고
-                                </button>
-                              )}
-                              {maint.status === 'in_shop' && (
-                                <button
-                                  onClick={() => handleMaintenanceStatusChange(maint.id, 'completed')}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
-                                >
-                                  출고완료
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden" style={{ padding: '8px 12px' }}>
-                  {filteredMaintenanceRecords.map(maint => (
-                    <div key={maint.id} style={{ padding: '14px 16px', borderBottom: 'rgba(0,0,0,0.04)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${MAINT_STATUS[maint.status]?.color}`}>
-                            {MAINT_STATUS[maint.status]?.label}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
-                            {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)' }}>{maint.requested_date}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 15, marginBottom: 2 }}>{getCar(maint.car_id)?.number || '-'}</div>
-                          <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{getCar(maint.car_id)?.brand} {getCar(maint.car_id)?.model}</div>
-                          <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{maint.shop_name} {maint.shop_phone ? `· ${maint.shop_phone}` : ''}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                          <span style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 14 }}>{maint.estimated_cost?.toLocaleString()}원</span>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            <button onClick={() => openEditMaintenanceModal(maint)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
-                            {maint.status === 'requested' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">승인</button>}
-                            {maint.status === 'approved' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'in_shop')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-700">입고</button>}
-                            {maint.status === 'in_shop' && <button onClick={() => handleMaintenanceStatusChange(maint.id, 'completed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">출고완료</button>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Inspection Tab */}
-      {mainTab === 'inspection' && (
-        <>
-          {/* Create Button */}
-          <div className="mb-4 flex justify-end">
-            <button
-              onClick={openCreateInspectionModal}
-              className="bg-steel-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:bg-steel-700 shadow-lg text-center whitespace-nowrap text-sm"
-            >
-              + 신규 검사
-            </button>
-          </div>
-
-          {/* Status Filter */}
-          <div className="mb-4">
-            <select
-              value={inspStatusFilter}
-              onChange={e => setInspStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-black/10 rounded-lg text-xs font-bold focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-            >
-              <option value="all">상태: 전체</option>
-              {Object.entries(INSP_STATUS).map(([key, val]) => (
-                <option key={key} value={key}>
-                  {val.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Table */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
-            {loading ? (
-              <div className="p-20 text-center text-slate-500 flex flex-col items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-steel-600 mb-2"></div>
-                검사 데이터를 불러오는 중...
-              </div>
-            ) : filteredInspectionRecords.length === 0 ? (
-              <div className="p-12 md:p-20 text-center text-slate-500 text-sm">
-                {inspStatusFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 검사 기록이 없습니다.'}
-              </div>
-            ) : (
-              <>
-                {/* Desktop Table */}
-                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-100 text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-black/5">
-                      <tr>
-                        <th className="p-4">만기일</th>
-                        <th className="p-4">차량</th>
-                        <th className="p-4">검사유형</th>
-                        <th className="p-4">상태</th>
-                        <th className="p-4">D-day</th>
-                        <th className="p-4">검사소</th>
-                        <th className="p-4 text-center">액션</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredInspectionRecords.map(insp => {
-                        const daysLeft = getDDay(insp.due_date)
-                        return (
-                          <tr key={insp.id} className="hover:bg-gray-50 transition-colors group">
-                            <td className="p-4 font-bold text-slate-800 text-sm">{insp.due_date}</td>
-                            <td className="p-4 text-sm">
-                              <div className="font-bold text-slate-700">{getCar(insp.car_id)?.number}</div>
-                              <div className="text-xs text-slate-400">
-                                {getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}
-                              </div>
-                            </td>
-                            <td className="p-4 text-sm">
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                                {INSP_TYPE[insp.inspection_type] || insp.inspection_type}
-                              </span>
-                            </td>
-                            <td className="p-4 text-sm">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${INSP_STATUS[insp.status]?.color}`}>
-                                {INSP_STATUS[insp.status]?.label}
-                              </span>
-                            </td>
-                            <td className={`p-4 text-sm ${getDDayColor(daysLeft)}`}>
-                              {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
-                            </td>
-                            <td className="p-4 text-sm">
-                              <div className="font-bold text-slate-700">{insp.center_name}</div>
-                              <div className="text-xs text-slate-400">{insp.center_address}</div>
-                            </td>
-                            <td className="p-4 text-center">
-                              <div className="flex gap-2 justify-center flex-wrap">
-                                <button
-                                  onClick={() => openEditInspectionModal(insp)}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                >
-                                  수정
-                                </button>
-                                {insp.status === 'scheduled' && (
-                                  <button
-                                    onClick={() => handleInspectionStatusChange(insp.id, 'in_progress')}
-                                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                  >
-                                    진행
-                                  </button>
-                                )}
-                                {insp.status === 'in_progress' && (
-                                  <>
-                                    <button
-                                      onClick={() => handleInspectionStatusChange(insp.id, 'passed')}
-                                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
-                                    >
-                                      합격
-                                    </button>
-                                    <button
-                                      onClick={() => handleInspectionStatusChange(insp.id, 'failed')}
-                                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200"
-                                    >
-                                      불합격
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden" style={{ padding: '8px 12px' }}>
-                  {filteredInspectionRecords.map(insp => {
-                    const daysLeft = getDDay(insp.due_date)
+            {/* Data Table using NeuDataTable */}
+            <NeuDataTable
+              columns={[
+                {
+                  key: 'requested_date',
+                  label: '요청일',
+                  width: '80px',
+                  render: (maint: MaintenanceRecord) => (
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{maint.requested_date}</span>
+                  ),
+                },
+                {
+                  key: 'car',
+                  label: '차량',
+                  render: (maint: MaintenanceRecord) => {
+                    const car = getCar(maint.car_id)
                     return (
-                      <div key={insp.id} style={{ padding: '14px 16px', borderBottom: 'rgba(0,0,0,0.04)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${INSP_STATUS[insp.status]?.color}`}>
-                              {INSP_STATUS[insp.status]?.label}
-                            </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
-                              {INSP_TYPE[insp.inspection_type] || insp.inspection_type}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)' }}>{insp.due_date}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getDDayColor(daysLeft)}`} style={{ backgroundColor: daysLeft < 0 ? '#fee2e2' : '#fef3c7', color: daysLeft < 0 ? '#991b1b' : '#92400e' }}>
-                              {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 900, color: 'rgba(226,232,240,0.9)', fontSize: 15, marginBottom: 2 }}>{getCar(insp.car_id)?.number || '-'}</div>
-                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{getCar(insp.car_id)?.brand} {getCar(insp.car_id)?.model}</div>
-                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{insp.center_name}</div>
-                            <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.6)' }}>{insp.center_address}</div>
-                          </div>
-                          <div style={{ display: 'flex', gap: 4, marginLeft: 12, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
-                            <button onClick={() => openEditInspectionModal(insp)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">수정</button>
-                            {insp.status === 'scheduled' && <button onClick={() => handleInspectionStatusChange(insp.id, 'in_progress')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-700">진행</button>}
-                            {insp.status === 'in_progress' && (
-                              <>
-                                <button onClick={() => handleInspectionStatusChange(insp.id, 'passed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-100 text-green-700">합격</button>
-                                <button onClick={() => handleInspectionStatusChange(insp.id, 'failed')} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-100 text-red-700">불합격</button>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car?.number || '-'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{car?.brand} {car?.model}</div>
                       </div>
                     )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
+                  },
+                },
+                {
+                  key: 'maintenance_type',
+                  label: '유형',
+                  render: (maint: MaintenanceRecord) => (
+                    <span className="si-badge si-badge-purple" style={{ fontSize: 11 }}>
+                      {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'shop_name',
+                  label: '정비소',
+                  render: (maint: MaintenanceRecord) => (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{maint.shop_name}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{maint.shop_phone}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'estimated_cost',
+                  label: '예상비용',
+                  align: 'right',
+                  render: (maint: MaintenanceRecord) => (
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+                      {Number(maint.estimated_cost || 0).toLocaleString()}원
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: '상태',
+                  render: (maint: MaintenanceRecord) => (
+                    <span className={`si-badge ${MAINT_STATUS[maint.status]?.color}`} style={{ fontSize: 11 }}>
+                      {MAINT_STATUS[maint.status]?.label}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  label: '액션',
+                  align: 'center',
+                  hideOnMobile: true,
+                  render: (maint: MaintenanceRecord) => (
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => openEditMaintenanceModal(maint)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        수정
+                      </button>
+                      {maint.status === 'requested' && (
+                        <button
+                          onClick={() => handleMaintenanceStatusChange(maint.id, 'approved')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
+                        >
+                          승인
+                        </button>
+                      )}
+                      {maint.status === 'approved' && (
+                        <button
+                          onClick={() => handleMaintenanceStatusChange(maint.id, 'in_shop')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
+                        >
+                          입고
+                        </button>
+                      )}
+                      {maint.status === 'in_shop' && (
+                        <button
+                          onClick={() => handleMaintenanceStatusChange(maint.id, 'completed')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
+                        >
+                          출고완료
+                        </button>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+              data={filteredMaintenanceRecords}
+              rowKey={(maint) => maint.id}
+              loading={loading}
+              emptyIcon="📋"
+              emptyMessage={maintSearchQuery || maintStatusFilter !== 'all' || maintTypeFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 정비 기록이 없습니다.'}
+              mobileCard={{
+                title: (maint: MaintenanceRecord) => getCar(maint.car_id)?.number || '-',
+                subtitle: (maint: MaintenanceRecord) => `${getCar(maint.car_id)?.brand} ${getCar(maint.car_id)?.model} · ${maint.shop_name}`,
+                trailing: (maint: MaintenanceRecord) => (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{Number(maint.estimated_cost || 0).toLocaleString()}원</div>
+                    <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>{maint.requested_date}</div>
+                  </div>
+                ),
+                badges: (maint: MaintenanceRecord) => (
+                  <>
+                    <span className={`si-badge ${MAINT_STATUS[maint.status]?.color}`} style={{ fontSize: 10 }}>
+                      {MAINT_STATUS[maint.status]?.label}
+                    </span>
+                    <span className="si-badge si-badge-purple" style={{ fontSize: 10 }}>
+                      {MAINT_TYPE[maint.maintenance_type] || maint.maintenance_type}
+                    </span>
+                  </>
+                ),
+              }}
+            />
+          </>
+        )}
 
-      {/* Maintenance Modal */}
-      {showMaintenanceModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800">
-                {editingMaintenance ? '정비 기록 수정' : '새 정비 기록 생성'}
-              </h2>
+        {/* Inspection Tab */}
+        {mainTab === 'inspection' && (
+          <>
+            {/* Create Button for Inspection */}
+            <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setShowMaintenanceModal(false)}
-                className="text-slate-500 hover:text-slate-400 text-2xl"
+                onClick={openCreateInspectionModal}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  whiteSpace: 'nowrap',
+                }}
               >
-                ×
+                + 신규 검사
               </button>
             </div>
 
-            <div className="p-4 md:p-6 space-y-4">
-              {/* Car */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
-                <select
-                  value={maintenanceFormData.car_id}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, car_id: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                >
-                  <option value="">차량 선택</option>
-                  {cars.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.number} - {c.brand} {c.model}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Filter Dropdown */}
+            <div style={{ marginBottom: 12 }}>
+              <select
+                value={inspStatusFilter}
+                onChange={e => setInspStatusFilter(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: 'rgba(255,255,255,0.40)',
+                  color: '#1e293b',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">상태: 전체</option>
+                {Object.entries(INSP_STATUS).map(([key, val]) => (
+                  <option key={key} value={key}>
+                    {val.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              {/* Maintenance Type */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">정비 유형</label>
-                <select
-                  value={maintenanceFormData.maintenance_type}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, maintenance_type: e.target.value as any })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                >
-                  {Object.entries(MAINT_TYPE).map(([key, val]) => (
-                    <option key={key} value={key}>
-                      {val}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">요청일</label>
-                  <input
-                    type="date"
-                    value={maintenanceFormData.requested_date}
-                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, requested_date: e.target.value })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">예정일</label>
-                  <input
-                    type="date"
-                    value={maintenanceFormData.scheduled_date}
-                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, scheduled_date: e.target.value })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Shop Info */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">정비소 정보</label>
-                <input
-                  type="text"
-                  placeholder="정비소 이름"
-                  value={maintenanceFormData.shop_name}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_name: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
-                />
-                <input
-                  type="tel"
-                  placeholder="전화번호"
-                  value={maintenanceFormData.shop_phone}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_phone: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
-                />
-                <input
-                  type="text"
-                  placeholder="주소"
-                  value={maintenanceFormData.shop_address}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_address: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                />
-              </div>
-
-              {/* Mileage */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">주행거리 (km)</label>
-                <input
-                  type="number"
-                  value={maintenanceFormData.mileage}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, mileage: parseInt(e.target.value) || 0 })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                />
-              </div>
-
-              {/* Maintenance Items */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">정비 항목</label>
-                <div className="space-y-3">
-                  {maintenanceFormData.maintenance_items.map((item, idx) => (
-                    <div key={idx} className="border border-black/10 rounded-lg p-3 space-y-2 bg-gray-50">
-                      <input
-                        type="text"
-                        placeholder="항목명"
-                        value={item.item}
-                        onChange={e => {
-                          const newItems = [...maintenanceFormData.maintenance_items]
-                          newItems[idx].item = e.target.value
-                          setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                        }}
-                        className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm bg-gray-50 text-slate-800"
-                      />
-                      <div className="grid grid-cols-5 gap-2">
-                        <input
-                          type="number"
-                          placeholder="수량"
-                          value={item.quantity}
-                          onChange={e => {
-                            const newItems = [...maintenanceFormData.maintenance_items]
-                            newItems[idx].quantity = parseInt(e.target.value) || 1
-                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                          }}
-                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
-                        />
-                        <input
-                          type="number"
-                          placeholder="단가"
-                          value={item.unit_price}
-                          onChange={e => {
-                            const newItems = [...maintenanceFormData.maintenance_items]
-                            newItems[idx].unit_price = parseInt(e.target.value) || 0
-                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                          }}
-                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
-                        />
-                        <input
-                          type="number"
-                          placeholder="부품비"
-                          value={item.parts_cost}
-                          onChange={e => {
-                            const newItems = [...maintenanceFormData.maintenance_items]
-                            newItems[idx].parts_cost = parseInt(e.target.value) || 0
-                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                          }}
-                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
-                        />
-                        <input
-                          type="number"
-                          placeholder="공임비"
-                          value={item.labor_cost}
-                          onChange={e => {
-                            const newItems = [...maintenanceFormData.maintenance_items]
-                            newItems[idx].labor_cost = parseInt(e.target.value) || 0
-                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                          }}
-                          className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
-                        />
+            {/* Data Table using NeuDataTable */}
+            <NeuDataTable
+              columns={[
+                {
+                  key: 'due_date',
+                  label: '만기일',
+                  width: '80px',
+                  render: (insp: InspectionRecord) => (
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{insp.due_date}</span>
+                  ),
+                },
+                {
+                  key: 'car',
+                  label: '차량',
+                  render: (insp: InspectionRecord) => {
+                    const car = getCar(insp.car_id)
+                    return (
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{car?.number || '-'}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{car?.brand} {car?.model}</div>
+                      </div>
+                    )
+                  },
+                },
+                {
+                  key: 'inspection_type',
+                  label: '검사유형',
+                  render: (insp: InspectionRecord) => (
+                    <span className="si-badge si-badge-blue" style={{ fontSize: 11 }}>
+                      {INSP_TYPE[insp.inspection_type] || insp.inspection_type}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: '상태',
+                  render: (insp: InspectionRecord) => (
+                    <span className={`si-badge ${INSP_STATUS[insp.status]?.color}`} style={{ fontSize: 11 }}>
+                      {INSP_STATUS[insp.status]?.label}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'd_day',
+                  label: 'D-day',
+                  align: 'center',
+                  render: (insp: InspectionRecord) => {
+                    const daysLeft = getDDay(insp.due_date)
+                    return (
+                      <span className={getDDayColor(daysLeft)}>
+                        {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'center_name',
+                  label: '검사소',
+                  render: (insp: InspectionRecord) => (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{insp.center_name}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{insp.center_address}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  label: '액션',
+                  align: 'center',
+                  hideOnMobile: true,
+                  render: (insp: InspectionRecord) => (
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => openEditInspectionModal(insp)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        수정
+                      </button>
+                      {insp.status === 'scheduled' && (
                         <button
-                          onClick={() => {
-                            const newItems = maintenanceFormData.maintenance_items.filter((_, i) => i !== idx)
-                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                          }}
-                          className="text-red-600 font-bold text-sm hover:text-red-700"
+                          onClick={() => handleInspectionStatusChange(insp.id, 'in_progress')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
                         >
-                          삭제
+                          진행
                         </button>
+                      )}
+                      {insp.status === 'in_progress' && (
+                        <>
+                          <button
+                            onClick={() => handleInspectionStatusChange(insp.id, 'passed')}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200"
+                          >
+                            합격
+                          </button>
+                          <button
+                            onClick={() => handleInspectionStatusChange(insp.id, 'failed')}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200"
+                          >
+                            불합격
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+              data={filteredInspectionRecords}
+              rowKey={(insp) => insp.id}
+              loading={loading}
+              emptyIcon="📋"
+              emptyMessage={inspStatusFilter !== 'all' ? '검색 결과가 없습니다.' : '등록된 검사 기록이 없습니다.'}
+              mobileCard={{
+                title: (insp: InspectionRecord) => getCar(insp.car_id)?.number || '-',
+                subtitle: (insp: InspectionRecord) => `${getCar(insp.car_id)?.brand} ${getCar(insp.car_id)?.model} · ${insp.center_name}`,
+                trailing: (insp: InspectionRecord) => {
+                  const daysLeft = getDDay(insp.due_date)
+                  return (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 900, fontSize: 13, color: '#3b6eb5' }}>{insp.due_date}</div>
+                      <div style={{ fontSize: 10, color: '#8aabc7', marginTop: 2 }}>
+                        {daysLeft < 0 ? `D+${Math.abs(daysLeft)}` : `D-${daysLeft}`}
                       </div>
                     </div>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const newItems = [...maintenanceFormData.maintenance_items, { item: '', quantity: 1, unit_price: 0, parts_cost: 0, labor_cost: 0 }]
-                      setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
-                    }}
-                    className="text-steel-600 font-bold text-sm hover:text-steel-700"
-                  >
-                    + 항목 추가
-                  </button>
-                </div>
-              </div>
+                  )
+                },
+                badges: (insp: InspectionRecord) => (
+                  <>
+                    <span className={`si-badge ${INSP_STATUS[insp.status]?.color}`} style={{ fontSize: 10 }}>
+                      {INSP_STATUS[insp.status]?.label}
+                    </span>
+                    <span className="si-badge si-badge-blue" style={{ fontSize: 10 }}>
+                      {INSP_TYPE[insp.inspection_type] || insp.inspection_type}
+                    </span>
+                  </>
+                ),
+              }}
+            />
+          </>
+        )}
 
-              {/* Costs */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">예상 비용</label>
-                  <input
-                    type="number"
-                    value={maintenanceFormData.estimated_cost}
-                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, estimated_cost: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">실제 비용</label>
-                  <input
-                    type="number"
-                    value={maintenanceFormData.actual_cost || ''}
-                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, actual_cost: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Cost Responsibility */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">비용 부담</label>
-                <div className="space-y-2">
-                  {(['company', 'customer', 'insurance', 'warranty', 'shared'] as const).map(option => (
-                    <label key={option} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="cost_responsibility"
-                        value={option}
-                        checked={maintenanceFormData.cost_responsibility === option}
-                        onChange={() => setMaintenanceFormData({ ...maintenanceFormData, cost_responsibility: option })}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                      <span className="text-slate-600">
-                        {option === 'company' ? '회사' : option === 'customer' ? '고객' : option === 'insurance' ? '보험' : option === 'warranty' ? '보증' : '공동'}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Customer Share Amount */}
-              {maintenanceFormData.cost_responsibility === 'shared' && (
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">고객 부담금</label>
-                  <input
-                    type="number"
-                    value={maintenanceFormData.customer_share_amount || ''}
-                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, customer_share_amount: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-              )}
-
-              {/* Replacement Car */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">대차 차량 (선택)</label>
-                <select
-                  value={maintenanceFormData.replacement_car_id}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_car_id: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+        {/* Maintenance Modal */}
+        {showMaintenanceModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800">
+                  {editingMaintenance ? '정비 기록 수정' : '새 정비 기록 생성'}
+                </h2>
+                <button
+                  onClick={() => setShowMaintenanceModal(false)}
+                  className="text-slate-500 hover:text-slate-400 text-2xl"
                 >
-                  <option value="">대차 차량 없음</option>
-                  {cars.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.number} - {c.brand} {c.model}
-                    </option>
-                  ))}
-                </select>
+                  ×
+                </button>
               </div>
 
-              {/* Replacement Dates */}
-              {maintenanceFormData.replacement_car_id && (
+              <div className="p-4 md:p-6 space-y-4">
+                {/* Car */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
+                  <select
+                    value={maintenanceFormData.car_id}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, car_id: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  >
+                    <option value="">차량 선택</option>
+                    {cars.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.number} - {c.brand} {c.model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Maintenance Type */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">정비 유형</label>
+                  <select
+                    value={maintenanceFormData.maintenance_type}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, maintenance_type: e.target.value as any })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  >
+                    {Object.entries(MAINT_TYPE).map(([key, val]) => (
+                      <option key={key} value={key}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-bold text-slate-600 mb-2">대차 시작일</label>
+                    <label className="block font-bold text-slate-600 mb-2">요청일</label>
                     <input
                       type="date"
-                      value={maintenanceFormData.replacement_start_date}
-                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_start_date: e.target.value })}
+                      value={maintenanceFormData.requested_date}
+                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, requested_date: e.target.value })}
                       className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-600 mb-2">대차 종료일</label>
+                    <label className="block font-bold text-slate-600 mb-2">예정일</label>
                     <input
                       type="date"
-                      value={maintenanceFormData.replacement_end_date}
-                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_end_date: e.target.value })}
+                      value={maintenanceFormData.scheduled_date}
+                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, scheduled_date: e.target.value })}
                       className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                     />
                   </div>
                 </div>
-              )}
 
-              {/* Notes */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">메모</label>
-                <textarea
-                  value={maintenanceFormData.notes}
-                  onChange={e => setMaintenanceFormData({ ...maintenanceFormData, notes: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
-              <button
-                onClick={() => setShowMaintenanceModal(false)}
-                className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleSaveMaintenance}
-                disabled={savingMaintenance}
-                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
-              >
-                {savingMaintenance ? '저장중...' : '저장'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Inspection Modal */}
-      {showInspectionModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800">
-                {editingInspection ? '검사 기록 수정' : '새 검사 기록 생성'}
-              </h2>
-              <button
-                onClick={() => setShowInspectionModal(false)}
-                className="text-slate-500 hover:text-slate-400 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="p-4 md:p-6 space-y-4">
-              {/* Car */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
-                <select
-                  value={inspectionFormData.car_id}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, car_id: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                >
-                  <option value="">차량 선택</option>
-                  {cars.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.number} - {c.brand} {c.model}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Inspection Type */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">검사 유형</label>
-                <select
-                  value={inspectionFormData.inspection_type}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_type: e.target.value as any })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                >
-                  {Object.entries(INSP_TYPE).map(([key, val]) => (
-                    <option key={key} value={key}>
-                      {val}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
+                {/* Shop Info */}
                 <div>
-                  <label className="block font-bold text-slate-600 mb-2">만기일</label>
+                  <label className="block font-bold text-slate-600 mb-2">정비소 정보</label>
                   <input
-                    type="date"
-                    value={inspectionFormData.due_date}
-                    onChange={e => setInspectionFormData({ ...inspectionFormData, due_date: e.target.value })}
+                    type="text"
+                    placeholder="정비소 이름"
+                    value={maintenanceFormData.shop_name}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_name: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="전화번호"
+                    value={maintenanceFormData.shop_phone}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_phone: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
+                  />
+                  <input
+                    type="text"
+                    placeholder="주소"
+                    value={maintenanceFormData.shop_address}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, shop_address: e.target.value })}
                     className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">예정일</label>
-                  <input
-                    type="date"
-                    value={inspectionFormData.scheduled_date}
-                    onChange={e => setInspectionFormData({ ...inspectionFormData, scheduled_date: e.target.value })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-              </div>
 
-              {/* Center Info */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">검사소</label>
-                <input
-                  type="text"
-                  placeholder="검사소명"
-                  value={inspectionFormData.center_name}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, center_name: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
-                />
-                <input
-                  type="text"
-                  placeholder="주소"
-                  value={inspectionFormData.center_address}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, center_address: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                />
-              </div>
-
-              {/* Costs */}
-              <div className="grid grid-cols-3 gap-4">
+                {/* Mileage */}
                 <div>
-                  <label className="block font-bold text-slate-600 mb-2">검사비</label>
+                  <label className="block font-bold text-slate-600 mb-2">주행거리 (km)</label>
                   <input
                     type="number"
-                    value={inspectionFormData.inspection_cost}
-                    onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_cost: parseInt(e.target.value) || 0 })}
+                    value={maintenanceFormData.mileage}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, mileage: parseInt(e.target.value) || 0 })}
                     className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">대행비</label>
-                  <input
-                    type="number"
-                    value={inspectionFormData.agency_fee || ''}
-                    onChange={e => setInspectionFormData({ ...inspectionFormData, agency_fee: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-600 mb-2">과태료</label>
-                  <input
-                    type="number"
-                    value={inspectionFormData.fine || ''}
-                    onChange={e => setInspectionFormData({ ...inspectionFormData, fine: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                  />
-                </div>
-              </div>
 
-              {/* Result */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">검사 결과</label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="result"
-                      value="passed"
-                      checked={inspectionFormData.result === 'passed'}
-                      onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'passed' })}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-slate-600">합격</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="result"
-                      value="failed"
-                      checked={inspectionFormData.result === 'failed'}
-                      onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'failed' })}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-slate-600">불합격</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Fail Items */}
-              {inspectionFormData.result === 'failed' && (
+                {/* Maintenance Items */}
                 <div>
-                  <label className="block font-bold text-slate-600 mb-2">불합격 항목</label>
+                  <label className="block font-bold text-slate-600 mb-2">정비 항목</label>
                   <div className="space-y-3">
-                    {inspectionFormData.fail_items.map((item, idx) => (
+                    {maintenanceFormData.maintenance_items.map((item, idx) => (
                       <div key={idx} className="border border-black/10 rounded-lg p-3 space-y-2 bg-gray-50">
                         <input
                           type="text"
-                          placeholder="항목"
+                          placeholder="항목명"
                           value={item.item}
                           onChange={e => {
-                            const newItems = [...inspectionFormData.fail_items]
+                            const newItems = [...maintenanceFormData.maintenance_items]
                             newItems[idx].item = e.target.value
-                            setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                            setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                           }}
                           className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm bg-gray-50 text-slate-800"
                         />
-                        <textarea
-                          placeholder="설명"
-                          value={item.description}
-                          onChange={e => {
-                            const newItems = [...inspectionFormData.fail_items]
-                            newItems[idx].description = e.target.value
-                            setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
-                          }}
-                          className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm resize-none bg-gray-50 text-slate-800"
-                          rows={2}
-                        />
-                        <button
-                          onClick={() => {
-                            const newItems = inspectionFormData.fail_items.filter((_, i) => i !== idx)
-                            setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
-                          }}
-                          className="text-red-600 font-bold text-sm hover:text-red-700"
-                        >
-                          삭제
-                        </button>
+                        <div className="grid grid-cols-5 gap-2">
+                          <input
+                            type="number"
+                            placeholder="수량"
+                            value={item.quantity}
+                            onChange={e => {
+                              const newItems = [...maintenanceFormData.maintenance_items]
+                              newItems[idx].quantity = parseInt(e.target.value) || 1
+                              setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
+                            }}
+                            className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
+                          />
+                          <input
+                            type="number"
+                            placeholder="단가"
+                            value={item.unit_price}
+                            onChange={e => {
+                              const newItems = [...maintenanceFormData.maintenance_items]
+                              newItems[idx].unit_price = parseInt(e.target.value) || 0
+                              setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
+                            }}
+                            className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
+                          />
+                          <input
+                            type="number"
+                            placeholder="부품비"
+                            value={item.parts_cost}
+                            onChange={e => {
+                              const newItems = [...maintenanceFormData.maintenance_items]
+                              newItems[idx].parts_cost = parseInt(e.target.value) || 0
+                              setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
+                            }}
+                            className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
+                          />
+                          <input
+                            type="number"
+                            placeholder="공임비"
+                            value={item.labor_cost}
+                            onChange={e => {
+                              const newItems = [...maintenanceFormData.maintenance_items]
+                              newItems[idx].labor_cost = parseInt(e.target.value) || 0
+                              setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
+                            }}
+                            className="border border-black/10 rounded-lg px-2 py-2 focus:outline-none focus:border-steel-500 text-xs bg-gray-50 text-slate-800"
+                          />
+                          <button
+                            onClick={() => {
+                              const newItems = maintenanceFormData.maintenance_items.filter((_, i) => i !== idx)
+                              setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
+                            }}
+                            className="text-red-600 font-bold text-sm hover:text-red-700"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
                     ))}
                     <button
                       onClick={() => {
-                        const newItems = [...inspectionFormData.fail_items, { item: '', description: '' }]
-                        setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                        const newItems = [...maintenanceFormData.maintenance_items, { item: '', quantity: 1, unit_price: 0, parts_cost: 0, labor_cost: 0 }]
+                        setMaintenanceFormData({ ...maintenanceFormData, maintenance_items: newItems })
                       }}
                       className="text-steel-600 font-bold text-sm hover:text-steel-700"
                     >
@@ -1490,50 +1178,384 @@ export default function MaintenanceMainPage() {
                     </button>
                   </div>
                 </div>
-              )}
 
-              {/* Next Due Date */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">다음 만기일</label>
-                <input
-                  type="date"
-                  value={inspectionFormData.next_due_date}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, next_due_date: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
-                />
+                {/* Costs */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">예상 비용</label>
+                    <input
+                      type="number"
+                      value={maintenanceFormData.estimated_cost}
+                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, estimated_cost: parseInt(e.target.value) || 0 })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">실제 비용</label>
+                    <input
+                      type="number"
+                      value={maintenanceFormData.actual_cost || ''}
+                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, actual_cost: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Cost Responsibility */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">비용 부담</label>
+                  <div className="space-y-2">
+                    {(['company', 'customer', 'insurance', 'warranty', 'shared'] as const).map(option => (
+                      <label key={option} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="cost_responsibility"
+                          value={option}
+                          checked={maintenanceFormData.cost_responsibility === option}
+                          onChange={() => setMaintenanceFormData({ ...maintenanceFormData, cost_responsibility: option })}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-slate-600">
+                          {option === 'company' ? '회사' : option === 'customer' ? '고객' : option === 'insurance' ? '보험' : option === 'warranty' ? '보증' : '공동'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Customer Share Amount */}
+                {maintenanceFormData.cost_responsibility === 'shared' && (
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">고객 부담금</label>
+                    <input
+                      type="number"
+                      value={maintenanceFormData.customer_share_amount || ''}
+                      onChange={e => setMaintenanceFormData({ ...maintenanceFormData, customer_share_amount: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                )}
+
+                {/* Replacement Car */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">대차 차량 (선택)</label>
+                  <select
+                    value={maintenanceFormData.replacement_car_id}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_car_id: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  >
+                    <option value="">대차 차량 없음</option>
+                    {cars.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.number} - {c.brand} {c.model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Replacement Dates */}
+                {maintenanceFormData.replacement_car_id && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-2">대차 시작일</label>
+                      <input
+                        type="date"
+                        value={maintenanceFormData.replacement_start_date}
+                        onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_start_date: e.target.value })}
+                        className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-2">대차 종료일</label>
+                      <input
+                        type="date"
+                        value={maintenanceFormData.replacement_end_date}
+                        onChange={e => setMaintenanceFormData({ ...maintenanceFormData, replacement_end_date: e.target.value })}
+                        className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">메모</label>
+                  <textarea
+                    value={maintenanceFormData.notes}
+                    onChange={e => setMaintenanceFormData({ ...maintenanceFormData, notes: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
+                    rows={3}
+                  />
+                </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block font-bold text-slate-600 mb-2">메모</label>
-                <textarea
-                  value={inspectionFormData.notes}
-                  onChange={e => setInspectionFormData({ ...inspectionFormData, notes: e.target.value })}
-                  className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
-                  rows={3}
-                />
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowMaintenanceModal(false)}
+                  className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveMaintenance}
+                  disabled={savingMaintenance}
+                  className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
+                >
+                  {savingMaintenance ? '저장중...' : '저장'}
+                </button>
               </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
-              <button
-                onClick={() => setShowInspectionModal(false)}
-                className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleSaveInspection}
-                disabled={savingInspection}
-                className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
-              >
-                {savingInspection ? '저장중...' : '저장'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Inspection Modal */}
+        {showInspectionModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-black/[0.06] p-4 md:p-6 flex justify-between items-center">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800">
+                  {editingInspection ? '검사 기록 수정' : '새 검사 기록 생성'}
+                </h2>
+                <button
+                  onClick={() => setShowInspectionModal(false)}
+                  className="text-slate-500 hover:text-slate-400 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="p-4 md:p-6 space-y-4">
+                {/* Car */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">차량 선택</label>
+                  <select
+                    value={inspectionFormData.car_id}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, car_id: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  >
+                    <option value="">차량 선택</option>
+                    {cars.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.number} - {c.brand} {c.model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Inspection Type */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">검사 유형</label>
+                  <select
+                    value={inspectionFormData.inspection_type}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_type: e.target.value as any })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  >
+                    {Object.entries(INSP_TYPE).map(([key, val]) => (
+                      <option key={key} value={key}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">만기일</label>
+                    <input
+                      type="date"
+                      value={inspectionFormData.due_date}
+                      onChange={e => setInspectionFormData({ ...inspectionFormData, due_date: e.target.value })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">예정일</label>
+                    <input
+                      type="date"
+                      value={inspectionFormData.scheduled_date}
+                      onChange={e => setInspectionFormData({ ...inspectionFormData, scheduled_date: e.target.value })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Center Info */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">검사소</label>
+                  <input
+                    type="text"
+                    placeholder="검사소명"
+                    value={inspectionFormData.center_name}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, center_name: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 mb-2 bg-gray-50 text-slate-800"
+                  />
+                  <input
+                    type="text"
+                    placeholder="주소"
+                    value={inspectionFormData.center_address}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, center_address: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  />
+                </div>
+
+                {/* Costs */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">검사비</label>
+                    <input
+                      type="number"
+                      value={inspectionFormData.inspection_cost}
+                      onChange={e => setInspectionFormData({ ...inspectionFormData, inspection_cost: parseInt(e.target.value) || 0 })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">대행비</label>
+                    <input
+                      type="number"
+                      value={inspectionFormData.agency_fee || ''}
+                      onChange={e => setInspectionFormData({ ...inspectionFormData, agency_fee: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">과태료</label>
+                    <input
+                      type="number"
+                      value={inspectionFormData.fine || ''}
+                      onChange={e => setInspectionFormData({ ...inspectionFormData, fine: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Result */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">검사 결과</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="result"
+                        value="passed"
+                        checked={inspectionFormData.result === 'passed'}
+                        onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'passed' })}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-slate-600">합격</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="result"
+                        value="failed"
+                        checked={inspectionFormData.result === 'failed'}
+                        onChange={() => setInspectionFormData({ ...inspectionFormData, result: 'failed' })}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-slate-600">불합격</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Fail Items */}
+                {inspectionFormData.result === 'failed' && (
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-2">불합격 항목</label>
+                    <div className="space-y-3">
+                      {inspectionFormData.fail_items.map((item, idx) => (
+                        <div key={idx} className="border border-black/10 rounded-lg p-3 space-y-2 bg-gray-50">
+                          <input
+                            type="text"
+                            placeholder="항목"
+                            value={item.item}
+                            onChange={e => {
+                              const newItems = [...inspectionFormData.fail_items]
+                              newItems[idx].item = e.target.value
+                              setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                            }}
+                            className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm bg-gray-50 text-slate-800"
+                          />
+                          <textarea
+                            placeholder="설명"
+                            value={item.description}
+                            onChange={e => {
+                              const newItems = [...inspectionFormData.fail_items]
+                              newItems[idx].description = e.target.value
+                              setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                            }}
+                            className="w-full border border-black/10 rounded-lg px-3 py-2 focus:outline-none focus:border-steel-500 text-sm resize-none bg-gray-50 text-slate-800"
+                            rows={2}
+                          />
+                          <button
+                            onClick={() => {
+                              const newItems = inspectionFormData.fail_items.filter((_, i) => i !== idx)
+                              setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                            }}
+                            className="text-red-600 font-bold text-sm hover:text-red-700"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const newItems = [...inspectionFormData.fail_items, { item: '', description: '' }]
+                          setInspectionFormData({ ...inspectionFormData, fail_items: newItems })
+                        }}
+                        className="text-steel-600 font-bold text-sm hover:text-steel-700"
+                      >
+                        + 항목 추가
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Next Due Date */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">다음 만기일</label>
+                  <input
+                    type="date"
+                    value={inspectionFormData.next_due_date}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, next_due_date: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 bg-gray-50 text-slate-800"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block font-bold text-slate-600 mb-2">메모</label>
+                  <textarea
+                    value={inspectionFormData.notes}
+                    onChange={e => setInspectionFormData({ ...inspectionFormData, notes: e.target.value })}
+                    className="w-full border border-black/10 rounded-lg px-3 py-2.5 focus:outline-none focus:border-steel-500 resize-none bg-gray-50 text-slate-800"
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-white border-t border-black/[0.06] p-4 md:p-6 flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowInspectionModal(false)}
+                  className="px-6 py-2.5 rounded-lg font-bold border border-black/10 text-slate-600 hover:bg-gray-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveInspection}
+                  disabled={savingInspection}
+                  className="px-6 py-2.5 rounded-lg font-bold bg-steel-600 text-white hover:bg-steel-700 disabled:bg-slate-600"
+                >
+                  {savingInspection ? '저장중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

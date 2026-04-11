@@ -2,6 +2,10 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -15,11 +19,28 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   }
 }
 
+type Loan = {
+  id: string
+  car_id: string
+  finance_name: string
+  type: string
+  total_amount: number
+  monthly_payment: number
+  months: number
+  end_date: string | null
+  interest_rate: number
+  cars?: {
+    number: string
+    brand: string
+    model: string
+  }
+}
+
 export default function LoanListPage() {
   const { company, role, adminSelectedCompanyId } = useApp()
   const effectiveCompanyId = role === 'admin' ? adminSelectedCompanyId : company?.id
   const router = useRouter()
-  const [loans, setLoans] = useState<any[]>([])
+  const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -228,33 +249,153 @@ export default function LoanListPage() {
     )
   }
 
+  // ─── NeuStatCards 데이터 ───
+  const statItems: StatCardItem[] = [
+    { key: 'totalDebt', label: '총 대출 잔액', value: totalDebt, unit: '원', format: true, color: 'blue' },
+    { key: 'monthlyOut', label: '월 고정 지출', value: monthlyOut, unit: '원', format: true, color: 'red' },
+    { key: 'contracts', label: '계약 건수', value: loans.length, unit: '건', format: false, color: 'blue' },
+    { key: 'expiring', label: '만기 임박 (90일)', value: expiringCount, unit: '건', format: false, color: expiringCount > 0 ? 'amber' : 'slate' },
+    { key: 'avgRate', label: '평균 이자율', value: avgRate, unit: '%', format: false, color: 'blue' },
+  ]
+
+  // ─── NeuFilterTabs 데이터 ───
+  const filterTabs: FilterTab[] = [
+    { key: 'all', label: '전체', count: typeStats['all'] },
+    { key: '할부', label: '할부', count: typeStats['할부'] },
+    { key: '리스', label: '리스', count: typeStats['리스'] },
+    { key: '렌트', label: '렌트', count: typeStats['렌트'] },
+    { key: '담보대출', label: '담보대출', count: typeStats['담보대출'] },
+  ]
+
+  // ─── NeuDataTable 컬럼 ───
+  const columns: TableColumn<Loan>[] = [
+    {
+      key: 'number',
+      label: '대상 차량',
+      render: (loan) => (
+        <div>
+          <div style={{ fontWeight: 900, fontSize: 15, color: '#0f2440' }}>{loan.cars?.number || '차량 정보 없음'}</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{loan.cars?.brand} {loan.cars?.model}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'finance',
+      label: '금융사/구분',
+      render: (loan) => (
+        <div>
+          <span style={{ fontWeight: 700, color: '#1e293b' }}>{loan.finance_name}</span>
+          <span className="si-badge si-badge-slate" style={{ marginLeft: 8, fontSize: 11 }}>{loan.type}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'total_amount',
+      label: '대출 원금',
+      align: 'right',
+      render: (loan) => (
+        <span style={{ fontWeight: 600, color: '#1e293b' }}>{f(Number(loan.total_amount))}원</span>
+      ),
+    },
+    {
+      key: 'monthly_payment',
+      label: '월 납입금',
+      align: 'right',
+      render: (loan) => (
+        <span style={{ fontWeight: 900, color: '#dc2626' }}>{f(Number(loan.monthly_payment))}원</span>
+      ),
+    },
+    {
+      key: 'end_date',
+      label: '기간/만기',
+      render: (loan) => {
+        const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+        return (
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{loan.months}개월</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <span style={{ fontSize: 11, color: '#64748b' }}>{loan.end_date || '-'}</span>
+              {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
+                <span className={`si-badge ${daysLeft <= 30 ? 'si-badge-red' : daysLeft <= 60 ? 'si-badge-amber' : 'si-badge-yellow'}`} style={{ fontSize: 10 }}>
+                  D-{daysLeft}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      key: 'actions',
+      label: '관리',
+      align: 'center',
+      width: 60,
+      render: (loan) => (
+        <button
+          onClick={(e) => handleDelete(e, loan.id)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 8,
+            borderRadius: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent'
+          }}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#cbd5e1' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      ),
+    },
+  ]
+
+  // ─── 모바일 카드 설정 ───
+  const mobileCard: MobileCardConfig<Loan> = {
+    title: (loan) => loan.cars?.number || '차량 정보 없음',
+    subtitle: (loan) => {
+      const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+      return `${loan.finance_name} · ${loan.months}개월`
+    },
+    trailing: (loan) => (
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontWeight: 900, fontSize: 15, color: '#dc2626' }}>{f(Number(loan.monthly_payment))}원</div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>/월</div>
+      </div>
+    ),
+    badges: (loan) => {
+      const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+      return (
+        <>
+          <span className="si-badge si-badge-slate">{loan.type}</span>
+          {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
+            <span className={`si-badge ${daysLeft <= 30 ? 'si-badge-red' : daysLeft <= 60 ? 'si-badge-amber' : 'si-badge-yellow'}`}>
+              D-{daysLeft}
+            </span>
+          )}
+        </>
+      )
+    },
+  }
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 md:py-10 md:px-6 bg-gray-50 min-h-screen animate-fade-in">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp,application/pdf,.pdf" className="hidden" onChange={handleFileSelect} />
 
       {/* KPI 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-sm">
-          <p className="text-xs text-slate-400 font-bold">총 대출 잔액</p>
-          <p className="text-xl font-black text-slate-800 mt-1">{f(totalDebt)}<span className="text-xs text-slate-400 font-bold ml-0.5">원</span></p>
-        </div>
-        <div className="bg-red-900/20 rounded-2xl border border-red-700/30 p-4">
-          <p className="text-xs text-red-400 font-bold">월 고정 지출</p>
-          <p className="text-xl font-black text-red-300 mt-1">{f(monthlyOut)}<span className="text-xs font-bold ml-0.5">원</span></p>
-        </div>
-        <div className="bg-white rounded-2xl border border-black/[0.06] p-4 shadow-sm">
-          <p className="text-xs text-slate-400 font-bold">계약 건수</p>
-          <p className="text-xl font-black text-slate-800 mt-1">{loans.length}<span className="text-xs text-slate-400 font-bold ml-0.5">건</span></p>
-        </div>
-        <div className={`rounded-2xl border p-4 ${expiringCount > 0 ? 'bg-amber-900/20 border-amber-700/30' : 'bg-white border-black/[0.06] shadow-sm'}`}>
-          <p className={`text-xs font-bold ${expiringCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>만기 임박 (90일)</p>
-          <p className={`text-xl font-black mt-1 ${expiringCount > 0 ? 'text-amber-300' : 'text-slate-800'}`}>{expiringCount}<span className="text-xs font-bold ml-0.5">건</span></p>
-        </div>
-        <div className="bg-blue-900/20 rounded-2xl border border-blue-700/30 p-4">
-          <p className="text-xs text-blue-400 font-bold">평균 이자율</p>
-          <p className="text-xl font-black text-blue-300 mt-1">{avgRate}<span className="text-xs font-bold ml-0.5">%</span></p>
-        </div>
-      </div>
+      <NeuStatCards
+        items={statItems}
+        columns={5}
+      />
 
       {/* 액션 버튼 + 드래그 영역 */}
       <div className="flex gap-3 mb-6">
@@ -331,135 +472,31 @@ export default function LoanListPage() {
         </div>
       )}
 
-      {/* 타입 필터 + 검색 */}
-      <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {['all', '할부', '리스', '렌트', '담보대출'].map(type => (
-            <button
-              key={type}
-              onClick={() => setTypeFilter(type)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
-                typeFilter === type
-                  ? 'bg-steel-600 text-white shadow'
-                  : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              {type === 'all' ? '전체' : type} ({typeStats[type] || 0})
-            </button>
-          ))}
-        </div>
-        <input
-          type="text"
-          placeholder="차량번호, 금융사 검색..."
-          className="px-4 py-2 border border-gray-200 rounded-xl text-sm flex-1 focus:outline-none focus:border-steel-500 bg-white shadow-sm"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-      </div>
+      {/* 필터 탭 + 검색 */}
+      <NeuFilterTabs
+        tabs={filterTabs}
+        activeKey={typeFilter}
+        onSelect={setTypeFilter}
+      />
 
-      {/* 리스트 */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin w-8 h-8 border-3 border-gray-300 border-t-steel-600 rounded-full mx-auto mb-3"></div>
-              <p className="text-gray-400 text-sm font-medium">데이터 로딩 중...</p>
-            </div>
-          </div>
-        ) : filteredLoans.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="text-4xl mb-3">🏦</div>
-            <p className="font-bold text-gray-500">{loans.length === 0 ? '등록된 금융 정보가 없습니다' : '해당 조건의 금융 정보가 없습니다'}</p>
-            <p className="text-xs text-gray-400 mt-1">견적서를 업로드하거나 직접 등록해주세요</p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-              <table className="w-full text-left min-w-[700px]">
-                <thead className="bg-gray-50 border-b border-gray-100 text-gray-400 text-xs uppercase tracking-wider font-bold">
-                  <tr>
-                    <th className="p-4 pl-6">대상 차량</th>
-                    <th className="p-4">금융사/구분</th>
-                    <th className="p-4 text-right">대출 원금</th>
-                    <th className="p-4 text-right">월 납입금</th>
-                    <th className="p-4">기간/만기</th>
-                    <th className="p-4 text-center w-16">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredLoans.map((loan) => {
-                    const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
-                    return (
-                      <tr key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)} className="hover:bg-steel-50/30 transition-colors cursor-pointer">
-                        <td className="p-4 pl-6">
-                          <div className="font-bold text-gray-900">{loan.cars?.number || '차량 정보 없음'}</div>
-                          <div className="text-xs text-gray-400">{loan.cars?.brand} {loan.cars?.model}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className="font-bold text-gray-800">{loan.finance_name}</span>
-                          <span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{loan.type}</span>
-                        </td>
-                        <td className="p-4 font-medium text-right text-gray-600">{f(loan.total_amount)}원</td>
-                        <td className="p-4 font-bold text-red-500 text-right">{f(loan.monthly_payment)}원</td>
-                        <td className="p-4 text-sm">
-                          <div className="font-bold text-gray-700">{loan.months}개월</div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-400">{loan.end_date || '-'}</span>
-                            {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${daysLeft <= 30 ? 'bg-red-100 text-red-600' : daysLeft <= 60 ? 'bg-orange-100 text-orange-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                                D-{daysLeft}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <button onClick={(e) => handleDelete(e, loan.id)} className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+      <NeuSearchBar
+        value={searchTerm}
+        onChange={setSearchTerm}
+        placeholder="차량번호, 금융사 검색..."
+        resultText={`검색결과 ${filteredLoans.length}건`}
+      />
 
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-gray-50">
-              {filteredLoans.map((loan) => {
-                const daysLeft = loan.end_date ? Math.ceil((new Date(loan.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
-                return (
-                  <div key={loan.id} onClick={() => router.push(`/loans/${loan.id}`)}
-                    className="px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">{loan.type}</span>
-                        {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${daysLeft <= 30 ? 'bg-red-100 text-red-600' : daysLeft <= 60 ? 'bg-orange-100 text-orange-600' : 'bg-yellow-100 text-yellow-700'}`}>
-                            D-{daysLeft}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-400">{loan.end_date || '-'}</span>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-black text-gray-900 text-[15px] mb-0.5">{loan.cars?.number || '차량 정보 없음'}</div>
-                        <div className="text-xs text-gray-500">{loan.finance_name} · {loan.months}개월</div>
-                      </div>
-                      <div className="text-right shrink-0 ml-3">
-                        <span className="font-black text-red-600 text-[15px]">{f(loan.monthly_payment)}원</span>
-                        <div className="text-[10px] text-gray-400">/월</div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
-      </div>
+      {/* 데이터 테이블 */}
+      <NeuDataTable
+        columns={columns}
+        data={filteredLoans}
+        rowKey={(loan) => loan.id}
+        onRowClick={(loan) => router.push(`/loans/${loan.id}`)}
+        loading={loading}
+        emptyIcon="🏦"
+        emptyMessage={loans.length === 0 ? '등록된 금융 정보가 없습니다' : '해당 조건의 금융 정보가 없습니다'}
+        mobileCard={mobileCard}
+      />
 
       {/* 차량 선택 모달 (OCR 후) */}
       {carSelectModal && (

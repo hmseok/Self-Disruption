@@ -2,6 +2,8 @@
 import { useApp } from '../context/AppContext'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -267,21 +269,12 @@ export default function ReportDashboard() {
       </div>
 
       {/* 탭 네비게이션 */}
-      <div className="flex gap-1 overflow-x-auto pb-1 mb-6 border-b border-black/[0.06]">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-3 text-sm font-bold transition-all whitespace-nowrap border-b-2 ${
-              activeTab === tab.key
-                ? 'border-steel-600 text-steel-600'
-                : 'border-transparent text-slate-500 hover:text-slate-400'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <NeuFilterTabs
+        tabs={tabs as FilterTab[]}
+        activeKey={activeTab}
+        onSelect={setActiveTab}
+        compact={false}
+      />
 
       {/* 탭 컨텐츠 */}
       {activeTab === 'overview' && (
@@ -434,13 +427,16 @@ function OverviewTab({ totalIncome, totalExpense, netProfit, profitRate, carStat
       </div>
 
       {/* 운영 현황 KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-        <KPICard label="보유 차량" value={String(carStats.total)} unit="대" color="gray" sub={`가동률 ${carStats.utilizationRate.toFixed(0)}%`} />
-        <KPICard label="대여 중" value={String(carStats.rented)} unit="대" color="green" />
-        <KPICard label="월 고정 지출" value={formatSimpleMoney(monthlyFixedCost)} unit="원" color="red" sub="지입+투자이자+대출" />
-        <KPICard label="총 투자 유치" value={formatSimpleMoney(partnerStats.investPrincipal)} unit="원" color="steel" />
-        <KPICard label="총 대출 잔액" value={formatSimpleMoney(partnerStats.loanTotal)} unit="원" color="amber" />
-      </div>
+      <NeuStatCards
+        items={[
+          { key: 'cars', label: '보유 차량', value: carStats.total, unit: '대', color: 'slate', icon: '🚗', subtitle: `가동률 ${carStats.utilizationRate.toFixed(0)}%` },
+          { key: 'rented', label: '대여 중', value: carStats.rented, unit: '대', color: 'green', icon: '🚙' },
+          { key: 'fixed', label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원', color: 'red', icon: '💸', format: false, subtitle: '지입+투자이자+대출' },
+          { key: 'invest', label: '총 투자 유치', value: formatSimpleMoney(partnerStats.investPrincipal), unit: '원', color: 'blue', icon: '💰', format: false },
+          { key: 'loan', label: '총 대출 잔액', value: formatSimpleMoney(partnerStats.loanTotal), unit: '원', color: 'amber', icon: '🏦', format: false },
+        ] as StatCardItem[]}
+        columns={5}
+      />
 
       {/* 월별 수입/지출 트렌드 */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
@@ -505,12 +501,15 @@ function RevenueTab({ totalIncome, monthlyData, incomeByCat, transactions }: any
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <KPICard label="총 매출" value={formatSimpleMoney(totalIncome)} unit="원" color="green" />
-        <KPICard label="월 평균 매출" value={formatSimpleMoney(avgMonthlyIncome)} unit="원" color="steel" />
-        <KPICard label="최고 매출 월" value={maxMonth?.label || '-'} color="blue" sub={maxMonth ? formatSimpleMoney(maxMonth.income) + '원' : ''} />
-        <KPICard label="수입 카테고리" value={String(incomeByCat.length)} unit="개" color="gray" />
-      </div>
+      <NeuStatCards
+        items={[
+          { key: 'total', label: '총 매출', value: formatSimpleMoney(totalIncome), unit: '원', color: 'green', icon: '📈', format: false },
+          { key: 'avg', label: '월 평균 매출', value: formatSimpleMoney(avgMonthlyIncome), unit: '원', color: 'blue', icon: '📊', format: false },
+          { key: 'max', label: '최고 매출 월', value: maxMonth?.label || '-', color: 'slate', icon: '⭐', format: false, subtitle: maxMonth ? formatSimpleMoney(maxMonth.income) + '원' : '' },
+          { key: 'cats', label: '수입 카테고리', value: incomeByCat.length, unit: '개', color: 'purple', icon: '🏷️' },
+        ] as StatCardItem[]}
+        columns={4}
+      />
 
       {/* 월별 매출 추이 */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
@@ -569,12 +568,15 @@ function ExpenseTab({ totalExpense, monthlyData, expenseByCat, monthlyFixedCost,
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <KPICard label="총 비용" value={formatSimpleMoney(totalExpense)} unit="원" color="red" />
-        <KPICard label="월 고정 지출" value={formatSimpleMoney(monthlyFixedCost)} unit="원" color="amber" sub="파트너 정산 합계" />
-        <KPICard label="대출 월 납입" value={formatSimpleMoney(partnerStats.loanMonthly)} unit="원" color="steel" />
-        <KPICard label="투자자 이자" value={formatSimpleMoney(partnerStats.investMonthlyInterest)} unit="원" color="blue" sub="월 예상 이자" />
-      </div>
+      <NeuStatCards
+        items={[
+          { key: 'total', label: '총 비용', value: formatSimpleMoney(totalExpense), unit: '원', color: 'red', icon: '📉', format: false },
+          { key: 'fixed', label: '월 고정 지출', value: formatSimpleMoney(monthlyFixedCost), unit: '원', color: 'amber', icon: '💸', format: false, subtitle: '파트너 정산 합계' },
+          { key: 'loan', label: '대출 월 납입', value: formatSimpleMoney(partnerStats.loanMonthly), unit: '원', color: 'blue', icon: '🏦', format: false },
+          { key: 'interest', label: '투자자 이자', value: formatSimpleMoney(partnerStats.investMonthlyInterest), unit: '원', color: 'purple', icon: '💰', format: false, subtitle: '월 예상 이자' },
+        ] as StatCardItem[]}
+        columns={4}
+      />
 
       {/* 월별 지출 추이 */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
@@ -671,13 +673,16 @@ function FleetTab({ carStats, cars }: { carStats: any; cars: Car[] }) {
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-        <KPICard label="전체 차량" value={String(carStats.total)} unit="대" color="gray" />
-        <KPICard label="대여 중" value={String(carStats.rented)} unit="대" color="green" />
-        <KPICard label="대기 중" value={String(carStats.available)} unit="대" color="blue" />
-        <KPICard label="정비/사고" value={String(carStats.maintenance)} unit="대" color="amber" />
-        <KPICard label="총 자산가치" value={formatSimpleMoney(carStats.totalValue)} unit="원" color="steel" />
-      </div>
+      <NeuStatCards
+        items={[
+          { key: 'total', label: '전체 차량', value: carStats.total, unit: '대', color: 'slate', icon: '🚗' },
+          { key: 'rented', label: '대여 중', value: carStats.rented, unit: '대', color: 'green', icon: '🚙' },
+          { key: 'available', label: '대기 중', value: carStats.available, unit: '대', color: 'blue', icon: '🅿️' },
+          { key: 'maintenance', label: '정비/사고', value: carStats.maintenance, unit: '대', color: 'amber', icon: '🔧' },
+          { key: 'value', label: '총 자산가치', value: formatSimpleMoney(carStats.totalValue), unit: '원', color: 'purple', icon: '💎', format: false },
+        ] as StatCardItem[]}
+        columns={5}
+      />
 
       {/* 가동률 게이지 */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">
@@ -766,12 +771,15 @@ function PartnerTab({ partnerStats, jiipContracts, investments, loans }: {
   return (
     <div className="space-y-6">
       {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <KPICard label="총 자금 조달" value={formatSimpleMoney(totalObligation)} unit="원" color="gray" sub="투자+대출 합계" />
-        <KPICard label="월 정산 합계" value={formatSimpleMoney(partnerStats.jiipMonthly + partnerStats.investMonthlyInterest + partnerStats.loanMonthly)} unit="원" color="red" />
-        <KPICard label="활성 파트너" value={String(partnerStats.jiipCount + partnerStats.investCount)} unit="건" color="green" sub="지입+투자" />
-        <KPICard label="대출 건수" value={String(partnerStats.loanCount)} unit="건" color="amber" />
-      </div>
+      <NeuStatCards
+        items={[
+          { key: 'total', label: '총 자금 조달', value: formatSimpleMoney(totalObligation), unit: '원', color: 'slate', icon: '💰', format: false, subtitle: '투자+대출 합계' },
+          { key: 'settlement', label: '월 정산 합계', value: formatSimpleMoney(partnerStats.jiipMonthly + partnerStats.investMonthlyInterest + partnerStats.loanMonthly), unit: '원', color: 'red', icon: '💸', format: false },
+          { key: 'partners', label: '활성 파트너', value: partnerStats.jiipCount + partnerStats.investCount, unit: '건', color: 'green', icon: '🤝', subtitle: '지입+투자' },
+          { key: 'loans', label: '대출 건수', value: partnerStats.loanCount, unit: '건', color: 'amber', icon: '🏦' },
+        ] as StatCardItem[]}
+        columns={4}
+      />
 
       {/* 지입 현황 */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5 md:p-6">

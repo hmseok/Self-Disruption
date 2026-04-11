@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -377,35 +378,14 @@ export default function DashboardPage() {
         <div className="flex-1 min-w-0 space-y-5">
 
           {/* 핵심 KPI 4개 미니카드 */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {showCars && (
-              <div className="glass-3 rounded-xl p-3.5 border border-blue-500/20" style={{ boxShadow: '0 0 15px rgba(59,130,246,0.08)' }}>
-                <span className="text-[10px] font-bold text-blue-600 uppercase">보유</span>
-                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : stats.totalCars}<span className="text-slate-500 text-xs ml-0.5">대</span></p>
-              </div>
-            )}
-            {showCustomers && (
-              <div className="glass-3 rounded-xl p-3.5 border border-emerald-500/20" style={{ boxShadow: '0 0 15px rgba(52,211,153,0.08)' }}>
-                <span className="text-[10px] font-bold text-emerald-400 uppercase">고객</span>
-                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : stats.totalCustomers}<span className="text-slate-500 text-xs ml-0.5">명</span></p>
-              </div>
-            )}
-            {showInvest && (
-              <div className="glass-3 rounded-xl p-3.5 border border-sky-500/20" style={{ boxShadow: '0 0 15px rgba(56,189,248,0.08)' }}>
-                <span className="text-[10px] font-bold text-sky-400 uppercase">투자</span>
-                <p className="text-xl font-black text-slate-800 mt-0.5">{loading ? '-' : formatMoney(stats.totalInvestAmount)}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">일반 {stats.activeInvestments} · 지입 {stats.jiipContracts}</p>
-              </div>
-            )}
-            {showFinance && (
-              <div className="glass-3 rounded-xl p-3.5 border border-amber-500/20" style={{ boxShadow: '0 0 15px rgba(251,191,36,0.08)' }}>
-                <span className="text-[10px] font-bold text-amber-400 uppercase">순수익</span>
-                <p className={`text-xl font-black mt-0.5 ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {loading ? '-' : formatMoney(stats.netProfit)}
-                </p>
-              </div>
-            )}
-          </div>
+          {(() => {
+            const items: StatCardItem[] = []
+            if (showCars) items.push({ key: 'cars', label: '보유', value: loading ? '-' : stats.totalCars, unit: '대', color: 'blue', icon: '🚗', format: false })
+            if (showCustomers) items.push({ key: 'customers', label: '고객', value: loading ? '-' : stats.totalCustomers, unit: '명', color: 'green', icon: '👥', format: false })
+            if (showInvest) items.push({ key: 'invest', label: '투자', value: loading ? '-' : formatMoney(stats.totalInvestAmount), color: 'slate', icon: '💰', format: false, subtitle: `일반 ${stats.activeInvestments} · 지입 ${stats.jiipContracts}` })
+            if (showFinance) items.push({ key: 'profit', label: '순수익', value: loading ? '-' : formatMoney(stats.netProfit), color: stats.netProfit >= 0 ? 'green' : 'red', icon: '📈', format: false })
+            return items.length > 0 ? <NeuStatCards items={items} columns={items.length as any} /> : null
+          })()}
 
           {/* 오늘의 운영 현황 */}
           {showCars && !loading && (opsStats.todayDeliveries.length > 0 || opsStats.todayReturns.length > 0) && (

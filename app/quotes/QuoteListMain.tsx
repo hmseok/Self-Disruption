@@ -6,6 +6,10 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
+import NeuStatCards, { StatCardItem } from '../components/NeuStatCards'
+import NeuSearchBar from '../components/NeuSearchBar'
+import NeuFilterTabs, { FilterTab } from '../components/NeuFilterTabs'
+import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 // ============================================================================
 // AUTH HELPER
@@ -30,6 +34,25 @@ type StatusFilter = 'all' | 'draft' | 'shared' | 'signed' | 'contracted' | 'arch
 type ShortStatusFilter = 'all' | 'draft' | 'sent' | 'accepted' | 'contracted' | 'cancelled'
 type InvoiceStatusFilter = 'all' | 'draft' | 'shared' | 'signed'
 type SortOption = 'latest' | 'customer' | 'expiry' | 'rent'
+
+type Quote = {
+  id: string
+  customer_name: string
+  quote_number?: string
+  status: string
+  start_date?: string
+  end_date?: string
+  rent_fee: number
+  deposit: number
+  shared_at?: string
+  signed_at?: string
+  created_at: string
+  car?: any
+  contract?: any
+  customer?: any
+  rental_type?: string
+  memo?: string
+}
 
 // ============================================================================
 // QUOTE STATUS BADGE (장기 — 계약관리 스타일 통일)
@@ -308,79 +331,6 @@ function RowActions({
 }
 
 // ============================================================================
-// NEW QUOTE DROPDOWN BUTTON
-// ============================================================================
-function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [open])
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-          borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
-          boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-        }}
-      >
-        + 새 견적
-      </button>
-      {open && (
-        <div style={{
-          position: 'absolute', right: 0, top: '100%', marginTop: 8,
-          background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '0 8px 24px rgba(140,170,210,0.15)', zIndex: 50, minWidth: 200, overflow: 'hidden',
-        }}>
-          <Link
-            href="/quotes/create"
-            onClick={() => setOpen(false)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
-              textDecoration: 'none', borderBottom: '1px solid rgba(0,0,0,0.06)', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span style={{ fontSize: 14 }}>📋</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>장기렌트 견적</div>
-              <div style={{ fontSize: 11, color: '#334155' }}>렌탈료 산출 · 견적서 작성</div>
-            </div>
-          </Link>
-          <Link
-            href="/quotes/create"
-            onClick={() => setOpen(false)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
-              textDecoration: 'none', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span style={{ fontSize: 14 }}>⏱️</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>단기렌트 견적</div>
-              <div style={{ fontSize: 11, color: '#334155' }}>빠른 계산기 · 청구서 작성</div>
-            </div>
-          </Link>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 export default function QuoteListPage() {
@@ -400,7 +350,6 @@ export default function QuoteListPage() {
     const tab = searchParams.get('tab') as MainTab
     if (tab && ['long_term', 'short_term', 'lotte_rate'].includes(tab)) {
       setMainTab(tab)
-      // 첫 로드 이후 탭 전환 시 refetch
       if (refetchRef.current > 0 && fetchDataRef.current) {
         setLoading(true)
         fetchDataRef.current()
@@ -408,6 +357,7 @@ export default function QuoteListPage() {
       refetchRef.current++
     }
   }, [searchParams])
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [shortStatusFilter, setShortStatusFilter] = useState<ShortStatusFilter>('all')
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>('all')
@@ -416,9 +366,6 @@ export default function QuoteListPage() {
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // (계산기는 /quotes/create 페이지로 통합됨)
-
-  // ── 회사 도장 (companyId 선언 후 useEffect는 아래에) ──
   const [companyStamp, setCompanyStamp] = useState('')
 
   // ── 청구서(단기렌트 계약서) State ──
@@ -427,14 +374,11 @@ export default function QuoteListPage() {
   const [qSaving, setQSaving] = useState(false)
   const [invManualAmount, setInvManualAmount] = useState(0)
   const [inv, setInv] = useState({
-    // 임차인 정보
     tenant_name: '', tenant_phone: '', tenant_birth: '', tenant_address: '',
     license_number: '', license_type: '1종보통',
-    // 대차 정보
     rental_car: '', rental_plate: '', fuel_type: '전기',
     rental_start: '', return_datetime: '',
     fuel_out: '1', fuel_in: '1',
-    // 메모
     memo: '',
   })
   const setField = (k: keyof typeof inv, v: string) => setInv(p => ({ ...p, [k]: v }))
@@ -612,7 +556,7 @@ export default function QuoteListPage() {
   const longTermQuotes = quotes.filter(q => !isInvoice(q))
   const shortTermQuotes = shortQuotes
 
-  // Long-term status counts (새 상태 기준)
+  // Long-term status counts
   const statusCounts: Record<StatusFilter, number> = {
     all: longTermQuotes.filter(q => q.status !== 'archived').length,
     draft: longTermQuotes.filter(q => !q.contract && !q.shared_at && !q.signed_at && q.status !== 'archived').length,
@@ -692,7 +636,7 @@ export default function QuoteListPage() {
         case 'customer': return (a.customer_name || '').localeCompare(b.customer_name || '')
         case 'expiry': return (a.end_date || '').localeCompare(b.end_date || '')
         case 'rent': return (b.rent_fee || 0) - (a.rent_fee || 0)
-        default: return 0 // latest — already sorted by id desc from DB
+        default: return 0
       }
     })
     return result
@@ -865,7 +809,7 @@ export default function QuoteListPage() {
       if (editingQuoteId) {
         // ── 수정 모드: 기존 청구서 업데이트 ──
         const updatePayload: Record<string, any> = { ...basePayload }
-        delete updatePayload.status // 상태는 유지
+        delete updatePayload.status
         const res = await fetch(`/api/quotes/${editingQuoteId}`, {
           method: 'PATCH',
           headers: { ...headers, 'Content-Type': 'application/json' },
@@ -888,7 +832,6 @@ export default function QuoteListPage() {
         }
 
         if (error) throw error
-        // 리스트 갱신
         setQuotes(prev => prev.map(q => q.id === editingQuoteId ? { ...q, ...data } : q))
       } else {
         // ── 새 청구서 생성 ──
@@ -931,7 +874,6 @@ export default function QuoteListPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               quote_id: data.id,
-              // 회사/담당자
               company_name: '주식회사에프엠아이',
               company_phone: '01033599559',
               company_address: '경기 연천군 왕징면 백동로236번길 190 3동1호',
@@ -939,25 +881,21 @@ export default function QuoteListPage() {
               company_stamp: companyStamp,
               staff_name: user?.email?.split('@')[0] || '',
               staff_phone: '',
-              // 임차인
               tenant_name: inv.tenant_name.trim(),
               tenant_phone: inv.tenant_phone.trim(),
               tenant_birth: inv.tenant_birth,
               tenant_address: inv.tenant_address,
               license_number: inv.license_number,
               license_type: inv.license_type,
-              // 대차
               rental_car: carInfo,
               rental_plate: inv.rental_plate,
               fuel_type: inv.fuel_type,
               rental_start: inv.rental_start.replace('T', ' ').replace(/-/g, '/'),
               fuel_out: `${inv.fuel_out}%`,
               fuel_in: `${inv.fuel_in}%`,
-              // 요금
               return_datetime: inv.return_datetime.replace('T', ' ').replace(/-/g, '/'),
               rental_hours: periodDesc || '배차중',
               total_fee: f(totalAmount),
-              // 메모
               memo: inv.memo || '',
             }),
           })
@@ -985,7 +923,6 @@ export default function QuoteListPage() {
       })
       setInvManualAmount(0)
       setEditingQuoteId(null)
-      if (!download) { /* 문자발송 버튼에서 호출 시 alert 생략 — 호출부에서 처리 */ }
       return data
     } catch (err: any) {
       alert(`저장 실패: ${err?.message || JSON.stringify(err)}`)
@@ -1014,550 +951,547 @@ export default function QuoteListPage() {
   return (
     <div className="page-bg">
       <div className="max-w-7xl mx-auto py-6 px-4 md:py-8 md:px-6">
-      <style>{`@media (max-width: 767px) { .q-main-tabs { gap: 0 !important; } .q-main-tabs button { padding: 8px 10px !important; font-size: 12px !important; } .q-chip-wrap { gap: 4px !important; margin-bottom: 6px !important; } .q-chip-wrap button { padding: 4px 10px !important; font-size: 11px !important; } .q-sort-search { gap: 6px !important; } .q-sort-search input { font-size: 12px !important; padding: 6px 10px !important; } .q-new-btn { padding: 6px 10px !important; font-size: 11px !important; } .q-sort-label { display: none !important; } }`}</style>
+        <style>{`@media (max-width: 767px) { .q-main-tabs { gap: 0 !important; } .q-main-tabs button { padding: 8px 10px !important; font-size: 12px !important; } .q-chip-wrap { gap: 4px !important; margin-bottom: 6px !important; } .q-chip-wrap button { padding: 4px 10px !important; font-size: 11px !important; } .q-sort-search { gap: 6px !important; } .q-sort-search input { font-size: 12px !important; padding: 6px 10px !important; } .q-new-btn { padding: 6px 10px !important; font-size: 11px !important; } .q-sort-label { display: none !important; } }`}</style>
 
-      {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid rgba(0,0,0,0.06)', flex: 1, overflow: 'auto' }}>
-          {([
-            { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
-            { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
-            { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', shortLabel: '요금표', count: null },
-          ]).map(t => (
-            <button
-              key={t.key}
-              onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setInvoiceStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
-              style={{
-                padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
-                fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
-                color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
-                borderBottom: mainTab === t.key ? '2px solid #60a5fa' : '2px solid transparent',
-                marginBottom: -2,
-              }}
-            >
-              {t.label}
-              {t.count !== null && (
-                <span style={{
-                  marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 8,
-                  background: mainTab === t.key ? 'rgba(96,165,250,0.15)' : 'rgba(148,163,184,0.2)',
-                  color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
-                }}>{t.count}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* 장기 탭: 새 견적(장기) 버튼 */}
-        {mainTab === 'long_term' && (
-          <Link
-            href="/quotes/create"
-            className="q-new-btn"
-            style={{
-              padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-              borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-              marginLeft: 8, flexShrink: 0,
-              boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-            }}
-          >
-            + 새 견적
-          </Link>
-        )}
-        {/* 단기 탭: 새 견적 */}
-        {mainTab === 'short_term' && (
-          <Link
-            href="/quotes/create"
-            className="q-new-btn"
-            style={{
-              padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-              borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-              textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-              marginLeft: 8, flexShrink: 0,
-              boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-            }}
-          >
-            + 새 견적
-          </Link>
-        )}
-      </div>
-
-      {/* ═══ 칩 필터 + 정렬 + 검색 (계약관리 동일 스타일) ═══ */}
-      {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
-        <div style={{ marginBottom: 12 }}>
-          {/* 칩 필터 */}
-          <div className="q-chip-wrap" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {(mainTab === 'long_term'
-              ? [
-                  { id: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
-                  { id: 'draft' as StatusFilter, label: '작성중', count: statusCounts.draft },
-                  { id: 'shared' as StatusFilter, label: '발송됨', count: statusCounts.shared },
-                  { id: 'signed' as StatusFilter, label: '서명완료', count: statusCounts.signed },
-                  { id: 'contracted' as StatusFilter, label: '계약전환', count: statusCounts.contracted },
-                  { id: 'archived' as StatusFilter, label: '보관', count: statusCounts.archived },
-                ]
-              : [
-                  { id: 'all' as InvoiceStatusFilter, label: '전체', count: invoiceStatusCounts.all },
-                  { id: 'draft' as InvoiceStatusFilter, label: '임시저장', count: invoiceStatusCounts.draft },
-                  { id: 'shared' as InvoiceStatusFilter, label: '발송됨', count: invoiceStatusCounts.shared },
-                  { id: 'signed' as InvoiceStatusFilter, label: '서명완료', count: invoiceStatusCounts.signed },
-                ]
-            ).map(chip => {
-              const isActive = mainTab === 'long_term' ? statusFilter === chip.id : invoiceStatusFilter === chip.id
-              const onClick = () => {
-                if (mainTab === 'long_term') setStatusFilter(chip.id as StatusFilter)
-                else setInvoiceStatusFilter(chip.id as InvoiceStatusFilter)
-              }
-              return (
-                <button
-                  key={chip.id}
-                  onClick={onClick}
-                  style={{
-                    padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
-                    cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                    background: isActive ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.04)',
-                    color: isActive ? '#60a5fa' : '#64748b',
-                  }}
-                >
-                  {isActive && '● '}{chip.label}
-                  <span style={{
-                    marginLeft: 6, fontSize: 11, fontWeight: 700,
-                    background: isActive ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.1)',
-                    color: isActive ? '#60a5fa' : '#64748b',
-                    padding: '1px 7px', borderRadius: 10,
-                  }}>{chip.count}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* 정렬 + 검색 */}
-          <div className="q-sort-search" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span className="q-sort-label" style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as SortOption)}
+        {/* ═══ 통합 탭 (언더라인 스타일) ═══ */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <div className="q-main-tabs" style={{ display: 'flex', gap: 0, borderBottom: '2px solid rgba(0,0,0,0.06)', flex: 1, overflow: 'auto' }}>
+            {([
+              { key: 'long_term' as MainTab, label: '장기', count: mainTabCounts.long_term },
+              { key: 'short_term' as MainTab, label: '단기', count: mainTabCounts.short_term },
+              { key: 'lotte_rate' as MainTab, label: '롯데렌터카요금표', shortLabel: '요금표', count: null },
+            ]).map(t => (
+              <button
+                key={t.key}
+                onClick={() => { setMainTab(t.key); setStatusFilter('all'); setShortStatusFilter('all'); setInvoiceStatusFilter('all'); setSearchTerm(''); setSortBy('latest') }}
                 style={{
-                  padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
-                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
-                  boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
+                  padding: '10px 20px', border: 'none', cursor: 'pointer', background: 'transparent',
+                  fontSize: 14, fontWeight: 700, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
+                  borderBottom: mainTab === t.key ? '2px solid #60a5fa' : '2px solid transparent',
+                  marginBottom: -2,
                 }}
               >
-                <option value="latest">최신순</option>
-                <option value="customer">고객명순</option>
-                <option value="expiry">만료일순</option>
-                <option value="rent">렌트료순</option>
-              </select>
-            </div>
-            <input
-              type="text"
-              placeholder="🔍 고객명, 차량번호, 브랜드 검색..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{
-                flex: 1, padding: '7px 14px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
-                fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
-                boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
-              }}
-            />
+                {t.label}
+                {t.count !== null && (
+                  <span style={{
+                    marginLeft: 4, fontSize: 11, padding: '1px 6px', borderRadius: 8,
+                    background: mainTab === t.key ? 'rgba(96,165,250,0.15)' : 'rgba(148,163,184,0.2)',
+                    color: mainTab === t.key ? '#60a5fa' : '#94a3b8',
+                  }}>{t.count}</span>
+                )}
+              </button>
+            ))}
           </div>
+          {/* 장기 탭: 새 견적(장기) 버튼 */}
+          {mainTab === 'long_term' && (
+            <Link
+              href="/quotes/create"
+              className="q-new-btn"
+              style={{
+                padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
+                borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                marginLeft: 8, flexShrink: 0,
+                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+              }}
+            >
+              + 새 견적
+            </Link>
+          )}
+          {/* 단기 탭: 새 견적 */}
+          {mainTab === 'short_term' && (
+            <Link
+              href="/quotes/create"
+              className="q-new-btn"
+              style={{
+                padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
+                borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                marginLeft: 8, flexShrink: 0,
+                boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+              }}
+            >
+              + 새 견적
+            </Link>
+          )}
         </div>
-      )}
 
-      {/* ═══ TAB: 단기 리스트 (구 청구서) ═══ */}
-      {mainTab === 'short_term' && (() => {
-        const openInvoice = (q: any) => {
-          const detail = q.quote_detail || {}
-          const parsed = parseInvoiceMemo(q.memo || '')
-          setEditingQuoteId(q.id)
-          setInv({
-            tenant_name: detail.tenant_name || q.customer_name || '',
-            tenant_phone: detail.tenant_phone || '',
-            tenant_birth: detail.tenant_birth || '',
-            tenant_address: detail.tenant_address || '',
-            license_number: detail.license_number || '',
-            license_type: detail.license_type || '1종보통',
-            rental_car: detail.rental_car || parsed.car || '',
-            rental_plate: detail.rental_plate || '',
-            fuel_type: detail.fuel_type || '전기',
-            rental_start: detail.rental_start || '',
-            return_datetime: detail.return_datetime || '',
-            fuel_out: detail.fuel_out || '1',
-            fuel_in: detail.fuel_in || '1',
-            memo: detail.memo || '',
-          })
-          setInvManualAmount(detail.total_amount || q.rent_fee || 0)
-          setInvoiceOpen(true)
-        }
-        const getBadge = (q: any) => q.signed_at
-          ? { label: '서명완료', bg: 'rgba(52,211,153,0.2)', color: '#34d399' }
-          : q.shared_at
-          ? { label: '발송됨', bg: 'rgba(96,165,250,0.2)', color: '#2563eb' }
-          : { label: '임시저장', bg: 'rgba(251,191,36,0.2)', color: '#fbbf24' }
-
-        return (
-        <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.06)' }}>
-          {filteredInvoiceQuotes.length === 0 ? (
-            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-              {invoiceQuotes.length === 0 ? '단기렌트 청구서가 없습니다.' : '해당 조건의 청구서가 없습니다.'}
+        {/* ═══ 칩 필터 + 정렬 + 검색 (계약관리 동일 스타일) ═══ */}
+        {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
+          <div style={{ marginBottom: 12 }}>
+            {/* 칩 필터 */}
+            <div className="q-chip-wrap" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {(mainTab === 'long_term'
+                ? [
+                    { id: 'all' as StatusFilter, label: '전체', count: statusCounts.all },
+                    { id: 'draft' as StatusFilter, label: '작성중', count: statusCounts.draft },
+                    { id: 'shared' as StatusFilter, label: '발송됨', count: statusCounts.shared },
+                    { id: 'signed' as StatusFilter, label: '서명완료', count: statusCounts.signed },
+                    { id: 'contracted' as StatusFilter, label: '계약전환', count: statusCounts.contracted },
+                    { id: 'archived' as StatusFilter, label: '보관', count: statusCounts.archived },
+                  ]
+                : [
+                    { id: 'all' as InvoiceStatusFilter, label: '전체', count: invoiceStatusCounts.all },
+                    { id: 'draft' as InvoiceStatusFilter, label: '임시저장', count: invoiceStatusCounts.draft },
+                    { id: 'shared' as InvoiceStatusFilter, label: '발송됨', count: invoiceStatusCounts.shared },
+                    { id: 'signed' as InvoiceStatusFilter, label: '서명완료', count: invoiceStatusCounts.signed },
+                  ]
+              ).map(chip => {
+                const isActive = mainTab === 'long_term' ? statusFilter === chip.id : invoiceStatusFilter === chip.id
+                const onClick = () => {
+                  if (mainTab === 'long_term') setStatusFilter(chip.id as StatusFilter)
+                  else setInvoiceStatusFilter(chip.id as InvoiceStatusFilter)
+                }
+                return (
+                  <button
+                    key={chip.id}
+                    onClick={onClick}
+                    style={{
+                      padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                      background: isActive ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.04)',
+                      color: isActive ? '#60a5fa' : '#64748b',
+                    }}
+                  >
+                    {isActive && '● '}{chip.label}
+                    <span style={{
+                      marginLeft: 6, fontSize: 11, fontWeight: 700,
+                      background: isActive ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.1)',
+                      color: isActive ? '#60a5fa' : '#64748b',
+                      padding: '1px 7px', borderRadius: 10,
+                    }}>{chip.count}</span>
+                  </button>
+                )
+              })}
             </div>
-          ) : (<>
-            {/* 데스크톱: 테이블 */}
-            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-              <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>임차인</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대여기간</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoiceQuotes.map((q: any, idx: number) => {
+
+            {/* 정렬 + 검색 */}
+            <div className="q-sort-search" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <span className="q-sort-label" style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as SortOption)}
+                  style={{
+                    padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
+                    fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
+                    boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
+                  }}
+                >
+                  <option value="latest">최신순</option>
+                  <option value="customer">고객명순</option>
+                  <option value="expiry">만료일순</option>
+                  <option value="rent">렌트료순</option>
+                </select>
+              </div>
+              <input
+                type="text"
+                placeholder="🔍 고객명, 차량번호, 브랜드 검색..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{
+                  flex: 1, padding: '7px 14px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
+                  fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
+                  boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ═══ TAB: 단기 리스트 (구 청구서) ═══ */}
+        {mainTab === 'short_term' && (() => {
+          const openInvoice = (q: any) => {
+            const detail = q.quote_detail || {}
+            const parsed = parseInvoiceMemo(q.memo || '')
+            setEditingQuoteId(q.id)
+            setInv({
+              tenant_name: detail.tenant_name || q.customer_name || '',
+              tenant_phone: detail.tenant_phone || '',
+              tenant_birth: detail.tenant_birth || '',
+              tenant_address: detail.tenant_address || '',
+              license_number: detail.license_number || '',
+              license_type: detail.license_type || '1종보통',
+              rental_car: detail.rental_car || parsed.car || '',
+              rental_plate: detail.rental_plate || '',
+              fuel_type: detail.fuel_type || '전기',
+              rental_start: detail.rental_start || '',
+              return_datetime: detail.return_datetime || '',
+              fuel_out: detail.fuel_out || '1',
+              fuel_in: detail.fuel_in || '1',
+              memo: detail.memo || '',
+            })
+            setInvManualAmount(detail.total_amount || q.rent_fee || 0)
+            setInvoiceOpen(true)
+          }
+          const getBadge = (q: any) => q.signed_at
+            ? { label: '서명완료', bg: 'rgba(52,211,153,0.2)', color: '#34d399' }
+            : q.shared_at
+            ? { label: '발송됨', bg: 'rgba(96,165,250,0.2)', color: '#2563eb' }
+            : { label: '임시저장', bg: 'rgba(251,191,36,0.2)', color: '#fbbf24' }
+
+          return (
+            <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.06)' }}>
+              {filteredInvoiceQuotes.length === 0 ? (
+                <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+                  {invoiceQuotes.length === 0 ? '단기렌트 청구서가 없습니다.' : '해당 조건의 청구서가 없습니다.'}
+                </div>
+              ) : (<>
+                {/* 데스크톱: 테이블 */}
+                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+                  <table className="w-full text-left text-sm" style={{ minWidth: 700 }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                        <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>임차인</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차종</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>대여기간</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>금액</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInvoiceQuotes.map((q: any, idx: number) => {
+                        const parsed = parseInvoiceMemo(q.memo || '')
+                        const badge = getBadge(q)
+                        return (
+                          <tr key={q.id} onClick={() => openInvoice(q)}
+                            style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none', transition: 'background 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
+                              <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                            </td>
+                            <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{q.customer_name || '(미입력)'}</td>
+                            <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.car || '-'}</td>
+                            <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.period || '-'}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <span style={{ fontWeight: 900, color: '#2563eb' }}>{f(q.rent_fee || 0)}원</span>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(q.created_at)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* 모바일: 카드형 */}
+                <div className="md:hidden">
+                  {filteredInvoiceQuotes.map((q: any) => {
                     const parsed = parseInvoiceMemo(q.memo || '')
                     const badge = getBadge(q)
                     return (
-                      <tr key={q.id} onClick={() => openInvoice(q)}
-                        style={{ cursor: 'pointer', borderBottom: idx < filteredInvoiceQuotes.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none', transition: 'background 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
-                          <span style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{q.customer_name || '(미입력)'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.car || '-'}</td>
-                        <td style={{ padding: '12px 16px', fontSize: 12, color: '#94a3b8' }}>{parsed.period || '-'}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                          <span style={{ fontWeight: 900, color: '#2563eb' }}>{f(q.rent_fee || 0)}원</span>
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(q.created_at)}</td>
-                      </tr>
+                      <div key={q.id} onClick={() => openInvoice(q)}
+                        style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, flexShrink: 0 }}>{badge.label}</span>
+                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
+                          </div>
+                          <span style={{ fontWeight: 900, color: '#2563eb', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
+                        </div>
+                      </div>
                     )
                   })}
-                </tbody>
-              </table>
+                </div>
+              </>)}
             </div>
-            {/* 모바일: 카드형 */}
-            <div className="md:hidden">
-              {filteredInvoiceQuotes.map((q: any) => {
-                const parsed = parseInvoiceMemo(q.memo || '')
-                const badge = getBadge(q)
-                return (
-                  <div key={q.id} onClick={() => openInvoice(q)}
-                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                        <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, flexShrink: 0 }}>{badge.label}</span>
-                        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_name || '(미입력)'}</span>
-                        <span style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{parsed.car || '-'} · {parsed.period || '-'}</span>
-                      </div>
-                      <span style={{ fontWeight: 900, color: '#2563eb', fontSize: 14, flexShrink: 0, marginLeft: 8 }}>{f(q.rent_fee || 0)}원</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>)}
-        </div>
-        )
-      })()}
+          )
+        })()}
 
-      {/* ═══ TAB: 롯데렌터카요금표 ═══ */}
-      {mainTab === 'lotte_rate' && (
-        <ShortTermReplacementBuilder />
-      )}
+        {/* ═══ TAB: 롯데렌터카요금표 ═══ */}
+        {mainTab === 'lotte_rate' && (
+          <ShortTermReplacementBuilder />
+        )}
 
-      {/* ═══ TAB: 장기 견적 목록 ═══ */}
-      {mainTab === 'long_term' && (
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.06)' }}>
-        {loading ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
-        ) : (
-          displayedQuotes.length === 0 ? (
-            <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-              {quotes.length === 0 ? '발행된 견적서가 없습니다.' : '해당 조건의 견적서가 없습니다.'}
-            </div>
-          ) : (<>
-            {/* 데스크톱: 테이블 */}
-            <div className="hidden md:block" style={{ overflowX: 'auto' }}>
-              <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                    <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적기간</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>발송일</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
-                    <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', width: 50 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedQuotes.map((quote, idx) => (
-                    <tr
-                      key={quote.id}
-                      onClick={() => router.push(`/quotes/${quote.id}`)}
-                      style={{
-                        cursor: 'pointer', transition: 'background 0.15s',
-                        borderBottom: idx < displayedQuotes.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <QuoteStatusBadge quote={quote} />
-                          {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) && (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{quote.customer_name}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(251,191,36,0.4)', flexShrink: 0 }}>
-                              <span style={{ fontSize: 16 }}>✍️</span>
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{parseInvoiceMemo(quote.memo).car}</div>
-                              <div style={{ fontSize: 11, color: '#fbbf24' }}>청구서</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(148,163,184,0.2)', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', flexShrink: 0 }}>
-                              {quote.car?.image_url ? (
-                                <img src={quote.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <span style={{ fontSize: 9, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
+        {/* ═══ TAB: 장기 견적 목록 ═══ */}
+        {mainTab === 'long_term' && (
+          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.06)' }}>
+            {loading ? (
+              <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
+            ) : (
+              displayedQuotes.length === 0 ? (
+                <div style={{ padding: '80px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+                  {quotes.length === 0 ? '발행된 견적서가 없습니다.' : '해당 조건의 견적서가 없습니다.'}
+                </div>
+              ) : (<>
+                {/* 데스크톱: 테이블 */}
+                <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+                  <table className="w-full text-left text-sm" style={{ minWidth: 800 }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                        <th style={{ padding: '12px 16px', paddingLeft: 24, fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>상태</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>고객명</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>차량</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>견적기간</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>보증금</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>월 렌트료</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>발송일</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>작성일</th>
+                        <th style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center', width: 50 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedQuotes.map((quote, idx) => (
+                        <tr
+                          key={quote.id}
+                          onClick={() => router.push(`/quotes/${quote.id}`)}
+                          style={{
+                            cursor: 'pointer', transition: 'background 0.15s',
+                            borderBottom: idx < displayedQuotes.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(96,165,250,0.05)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <td style={{ padding: '12px 16px', paddingLeft: 24 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <QuoteStatusBadge quote={quote} />
+                              {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) && (
+                                <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>
                               )}
                             </div>
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{quote.car?.number || '-'}</div>
-                              <div style={{ fontSize: 11, color: '#94a3b8' }}>{quote.car?.brand} {quote.car?.model}</div>
-                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#1e293b' }}>{quote.customer_name}</td>
+                          <td style={{ padding: '12px 16px' }}>
+                            {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(251,191,36,0.4)', flexShrink: 0 }}>
+                                  <span style={{ fontSize: 16 }}>✍️</span>
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{parseInvoiceMemo(quote.memo).car}</div>
+                                  <div style={{ fontSize: 11, color: '#fbbf24' }}>청구서</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(148,163,184,0.2)', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', flexShrink: 0 }}>
+                                  {quote.car?.image_url ? (
+                                    <img src={quote.car.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <span style={{ fontSize: 9, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>No Img</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>{quote.car?.number || '-'}</div>
+                                  <div style={{ fontSize: 11, color: '#94a3b8' }}>{quote.car?.brand} {quote.car?.model}</div>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#334155', fontSize: 13 }}>
+                            {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]'))
+                              ? parseInvoiceMemo(quote.memo).period
+                              : `${formatDate(quote.start_date)} ~ ${formatDate(quote.end_date)}`
+                            }
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#94a3b8', fontSize: 13 }}>{f(quote.deposit)}원</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <span style={{ fontWeight: 900, color: '#2563eb' }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
+                            <div style={{ fontSize: 10, color: '#94a3b8' }}>{(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? '/총액 (VAT포함)' : '/월 (VAT포함)'}</div>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+                            {quote.shared_at ? formatDate(quote.shared_at) : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(quote.created_at)}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                            <RowActions quote={quote} onEdit={handleEdit} onArchive={handleArchive} onDelete={handleDelete} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* 모바일: 카드형 */}
+                <div className="md:hidden">
+                  {displayedQuotes.map((quote) => {
+                    const isInv = quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')
+                    const parsed = isInv ? parseInvoiceMemo(quote.memo) : null
+                    return (
+                      <div key={quote.id} onClick={() => router.push(`/quotes/${quote.id}`)}
+                        style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <QuoteStatusBadge quote={quote} />
+                            {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>}
+                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13 }}>{quote.customer_name || '(미입력)'}</span>
                           </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#334155', fontSize: 13 }}>
-                        {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]'))
-                          ? parseInvoiceMemo(quote.memo).period
-                          : `${formatDate(quote.start_date)} ~ ${formatDate(quote.end_date)}`
-                        }
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#94a3b8', fontSize: 13 }}>{f(quote.deposit)}원</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <span style={{ fontWeight: 900, color: '#2563eb' }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
-                        <div style={{ fontSize: 10, color: '#94a3b8' }}>{(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) ? '/총액 (VAT포함)' : '/월 (VAT포함)'}</div>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
-                        {quote.shared_at ? formatDate(quote.shared_at) : '-'}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>{formatDate(quote.created_at)}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                        <RowActions quote={quote} onEdit={handleEdit} onArchive={handleArchive} onDelete={handleDelete} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* 모바일: 카드형 */}
-            <div className="md:hidden">
-              {displayedQuotes.map((quote) => {
-                const isInv = quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')
-                const parsed = isInv ? parseInvoiceMemo(quote.memo) : null
-                return (
-                  <div key={quote.id} onClick={() => router.push(`/quotes/${quote.id}`)}
-                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <QuoteStatusBadge quote={quote} />
-                        {isInv && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>청구</span>}
-                        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 13 }}>{quote.customer_name || '(미입력)'}</span>
+                          <span style={{ fontWeight: 900, color: '#2563eb', fontSize: 14, flexShrink: 0 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 2 }}>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                            {isInv
+                              ? `${parsed?.car || '-'} · ${parsed?.period || '-'}`
+                              : `${quote.car?.brand || ''} ${quote.car?.model || ''} ${quote.car?.number ? `(${quote.car.number})` : ''}`
+                            }
+                          </span>
+                          <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
+                            {isInv ? '' : `${formatDate(quote.start_date)}~${formatDate(quote.end_date)}`}
+                            {' '}{formatDate(quote.created_at)}
+                          </span>
+                        </div>
                       </div>
-                      <span style={{ fontWeight: 900, color: '#2563eb', fontSize: 14, flexShrink: 0 }}>{f(Math.round((quote.rent_fee || 0) * 1.1))}원</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 2 }}>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                        {isInv
-                          ? `${parsed?.car || '-'} · ${parsed?.period || '-'}`
-                          : `${quote.car?.brand || ''} ${quote.car?.model || ''} ${quote.car?.number ? `(${quote.car.number})` : ''}`
-                        }
-                      </span>
-                      <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
-                        {isInv ? '' : `${formatDate(quote.start_date)}~${formatDate(quote.end_date)}`}
-                        {' '}{formatDate(quote.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>)
-        )}
-      </div>
-      )}
-
-      {/* ═══ 청구서 작성 모달 ═══ */}
-      {invoiceOpen && (() => {
-        const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }
-        const lS = { fontSize: 10, fontWeight: 700 as const, color: '#94a3b8', display: 'block', marginBottom: 2 }
-        return (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div
-            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-            onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
-          />
-          <div style={{
-            position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
-            width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            animation: 'fadeInUp 0.2s ease-out',
-          }}>
-            <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#2563eb' }}>📄 {editingQuoteId ? '청구서 수정' : '청구서 작성'}</div>
-              <button onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>✕</button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>임차인 정보</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div><label style={lS}>임차인 *</label><input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} /></div>
-                  <div><label style={lS}>연락처</label><input value={inv.tenant_phone} onChange={e => setField('tenant_phone', fmtPhone(e.target.value))} placeholder="010-0000-0000" style={iS} inputMode="tel" /></div>
-                  <div><label style={lS}>생년월일</label><input value={inv.tenant_birth} onChange={e => setField('tenant_birth', fmtBirth(e.target.value))} placeholder="900101-1******" style={iS} /></div>
-                  <div>
-                    <label style={lS}>주소</label>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: 'rgba(0,0,0,0.04)' }} onClick={openAddressSearch} />
-                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(0,0,0,0.04)', fontSize: 11, fontWeight: 700, color: '#334155', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
-                    </div>
-                  </div>
-                  <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
-                  <div><label style={lS}>면허구분</label><select value={inv.license_type} onChange={e => setField('license_type', e.target.value)} style={iS}><option>1종보통</option><option>2종보통</option><option>1종대형</option></select></div>
+                    )
+                  })}
                 </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>대차 정보</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div><label style={lS}>차종</label><input value={inv.rental_car} onChange={e => setField('rental_car', e.target.value)} placeholder="차종" style={iS} /></div>
-                  <div><label style={lS}>차량번호</label><input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} /></div>
-                  <div><label style={lS}>유종</label><select value={inv.fuel_type} onChange={e => setField('fuel_type', e.target.value)} style={iS}><option>전기</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option></select></div>
-                  <div><label style={lS}>대여일시</label><input type="datetime-local" value={inv.rental_start} onChange={e => setField('rental_start', e.target.value)} style={iS} /></div>
-                  <div><label style={lS}>반납예정일</label><input type="datetime-local" value={inv.return_datetime} onChange={e => setField('return_datetime', e.target.value)} style={iS} /></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    <div>
-                      <label style={lS}>배차 유류</label>
-                      <div style={{ position: 'relative' }}>
-                        <input type="number" min={0} max={100} value={inv.fuel_out} onChange={e => setField('fuel_out', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
-                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label style={lS}>반납 유류</label>
-                      <div style={{ position: 'relative' }}>
-                        <input type="number" min={0} max={100} value={inv.fuel_in} onChange={e => setField('fuel_in', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
-                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>기타 / 저장</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div><label style={lS}>메모</label><textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항" rows={3} style={{ ...iS, resize: 'vertical' }} /></div>
-                  <div><label style={lS}>금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#2563eb', textAlign: 'right' }} /></div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 16, marginTop: 20 }}>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', lineHeight: '32px' }}>발송:</span>
-                <button
-                  onClick={async () => {
-                    if (!inv.tenant_name.trim()) return alert('임차인 이름을 입력해주세요.')
-                    if (!inv.tenant_phone.trim()) return alert('연락처를 입력해주세요.')
-                    const phone = inv.tenant_phone.replace(/-/g, '')
-                    const carInfo = inv.rental_car || '대차'
-                    const amount = f(invManualAmount)
-                    try {
-                      // 1) 저장
-                      const saved = await handleInvoiceSave(false, invManualAmount)
-                      if (!saved) return
-                      const quoteId = (saved as any)?.id
-                      if (!quoteId) return alert('저장 실패')
-                      // 2) 토큰 생성
-                      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
-                      if (!token) return alert('로그인이 필요합니다.')
-                      const shareRes = await fetch(`/api/quotes/${quoteId}/share`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ expiryDays: 7 }),
-                      })
-                      const shareData = await shareRes.json()
-                      if (!shareData.shareUrl) return alert('링크 생성 실패')
-                      // 3) SMS 발송 (링크 포함)
-                      const msg = `[에프엠아이 렌터카]\n${inv.tenant_name}님 청구서\n차종: ${carInfo}\n금액: ${amount}원\n\n확인 및 서명:\n${shareData.shareUrl}`
-                      const smsRes = await fetch('/api/send-sms', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ phone, message: msg, title: '청구서 안내', recipientName: inv.tenant_name, relatedId: quoteId }),
-                      })
-                      const smsResult = await smsRes.json()
-                      if (smsResult.success) {
-                        alert('청구서가 저장되고 문자가 발송되었습니다.')
-                        setInvoiceOpen(false)
-                      } else {
-                        alert(`저장 완료, 문자 발송 실패: ${smsResult.error || '알 수 없는 오류'}`)
-                      }
-                    } catch (err: any) {
-                      alert(`오류: ${err.message}`)
-                    }
-                  }}
-                  style={{ padding: '6px 14px', border: '1px solid #3b6eb5', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)' }}
-                >📱 저장 + 문자발송</button>
-                <button
-                  onClick={() => {
-                    const carInfo = inv.rental_car || '대차'
-                    const amount = f(invManualAmount)
-                    const subject = `[에프엠아이 렌터카] ${inv.tenant_name}님 청구서`
-                    const body = `안녕하세요, ${inv.tenant_name}님.\n\n에프엠아이 렌터카 청구서입니다.\n\n■ 차종: ${carInfo}\n■ 금액: ${amount}원\n${inv.rental_start ? `■ 대여일시: ${inv.rental_start.replace('T', ' ')}` : ''}\n${inv.return_datetime ? `■ 반납예정: ${inv.return_datetime.replace('T', ' ')}` : ''}\n\n감사합니다.\n주식회사에프엠아이`
-                    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
-                  }}
-                  style={{ padding: '6px 14px', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 8, background: 'rgba(96,165,250,0.1)', fontSize: 12, fontWeight: 700, color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                >📧 이메일</button>
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'transparent', color: '#94a3b8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
-                <button
-                  onClick={() => { handleInvoiceSave(false, invManualAmount); setInvoiceOpen(false) }}
-                  disabled={qSaving}
-                  style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.04)', color: '#334155', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
-                >{qSaving ? '저장 중...' : '저장'}</button>
-                <button
-                  onClick={() => { handleInvoiceSave(true, invManualAmount); setInvoiceOpen(false) }}
-                  disabled={qSaving}
-                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)', opacity: qSaving ? 0.5 : 1 }}
-                >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
-              </div>
-            </div>
+              </>)
+            )}
           </div>
-        </div>
-        )
-      })()}
-    </div>
+        )}
+
+        {/* ═══ 청구서 작성 모달 ═══ */}
+        {invoiceOpen && (() => {
+          const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }
+          const lS = { fontSize: 10, fontWeight: 700 as const, color: '#94a3b8', display: 'block', marginBottom: 2 }
+          return (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div
+                style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+                onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
+              />
+              <div style={{
+                position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
+                width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                animation: 'fadeInUp 0.2s ease-out',
+              }}>
+                <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: '#2563eb' }}>📄 {editingQuoteId ? '청구서 수정' : '청구서 작성'}</div>
+                  <button onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>✕</button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>임차인 정보</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div><label style={lS}>임차인 *</label><input value={inv.tenant_name} onChange={e => setField('tenant_name', e.target.value)} placeholder="홍길동" style={iS} /></div>
+                      <div><label style={lS}>연락처</label><input value={inv.tenant_phone} onChange={e => setField('tenant_phone', fmtPhone(e.target.value))} placeholder="010-0000-0000" style={iS} inputMode="tel" /></div>
+                      <div><label style={lS}>생년월일</label><input value={inv.tenant_birth} onChange={e => setField('tenant_birth', fmtBirth(e.target.value))} placeholder="900101-1******" style={iS} /></div>
+                      <div>
+                        <label style={lS}>주소</label>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: 'rgba(0,0,0,0.04)' }} onClick={openAddressSearch} />
+                          <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(0,0,0,0.04)', fontSize: 11, fontWeight: 700, color: '#334155', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                        </div>
+                      </div>
+                      <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
+                      <div><label style={lS}>면허구분</label><select value={inv.license_type} onChange={e => setField('license_type', e.target.value)} style={iS}><option>1종보통</option><option>2종보통</option><option>1종대형</option></select></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>대차 정보</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div><label style={lS}>차종</label><input value={inv.rental_car} onChange={e => setField('rental_car', e.target.value)} placeholder="차종" style={iS} /></div>
+                      <div><label style={lS}>차량번호</label><input value={inv.rental_plate} onChange={e => setField('rental_plate', e.target.value)} placeholder="00하0000" style={iS} /></div>
+                      <div><label style={lS}>유종</label><select value={inv.fuel_type} onChange={e => setField('fuel_type', e.target.value)} style={iS}><option>전기</option><option>가솔린</option><option>디젤</option><option>LPG</option><option>하이브리드</option></select></div>
+                      <div><label style={lS}>대여일시</label><input type="datetime-local" value={inv.rental_start} onChange={e => setField('rental_start', e.target.value)} style={iS} /></div>
+                      <div><label style={lS}>반납예정일</label><input type="datetime-local" value={inv.return_datetime} onChange={e => setField('return_datetime', e.target.value)} style={iS} /></div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <div>
+                          <label style={lS}>배차 유류</label>
+                          <div style={{ position: 'relative' }}>
+                            <input type="number" min={0} max={100} value={inv.fuel_out} onChange={e => setField('fuel_out', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
+                            <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={lS}>반납 유류</label>
+                          <div style={{ position: 'relative' }}>
+                            <input type="number" min={0} max={100} value={inv.fuel_in} onChange={e => setField('fuel_in', e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ ...iS, paddingRight: 24 }} inputMode="numeric" />
+                            <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8', pointerEvents: 'none' }}>%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', marginBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>기타 / 저장</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div><label style={lS}>메모</label><textarea value={inv.memo} onChange={e => setField('memo', e.target.value)} placeholder="기타 계약사항" rows={3} style={{ ...iS, resize: 'vertical' }} /></div>
+                      <div><label style={lS}>금액 (원)</label><input type="number" value={invManualAmount} onChange={e => setInvManualAmount(Number(e.target.value))} style={{ ...iS, fontSize: 14, fontWeight: 900, color: '#2563eb', textAlign: 'right' }} /></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 16, marginTop: 20 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', lineHeight: '32px' }}>발송:</span>
+                    <button
+                      onClick={async () => {
+                        if (!inv.tenant_name.trim()) return alert('임차인 이름을 입력해주세요.')
+                        if (!inv.tenant_phone.trim()) return alert('연락처를 입력해주세요.')
+                        const phone = inv.tenant_phone.replace(/-/g, '')
+                        const carInfo = inv.rental_car || '대차'
+                        const amount = f(invManualAmount)
+                        try {
+                          const saved = await handleInvoiceSave(false, invManualAmount)
+                          if (!saved) return
+                          const quoteId = (saved as any)?.id
+                          if (!quoteId) return alert('저장 실패')
+                          const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+                          if (!token) return alert('로그인이 필요합니다.')
+                          const shareRes = await fetch(`/api/quotes/${quoteId}/share`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ expiryDays: 7 }),
+                          })
+                          const shareData = await shareRes.json()
+                          if (!shareData.shareUrl) return alert('링크 생성 실패')
+                          const msg = `[에프엠아이 렌터카]\n${inv.tenant_name}님 청구서\n차종: ${carInfo}\n금액: ${amount}원\n\n확인 및 서명:\n${shareData.shareUrl}`
+                          const smsRes = await fetch('/api/send-sms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ phone, message: msg, title: '청구서 안내', recipientName: inv.tenant_name, relatedId: quoteId }),
+                          })
+                          const smsResult = await smsRes.json()
+                          if (smsResult.success) {
+                            alert('청구서가 저장되고 문자가 발송되었습니다.')
+                            setInvoiceOpen(false)
+                          } else {
+                            alert(`저장 완료, 문자 발송 실패: ${smsResult.error || '알 수 없는 오류'}`)
+                          }
+                        } catch (err: any) {
+                          alert(`오류: ${err.message}`)
+                        }
+                      }}
+                      style={{ padding: '6px 14px', border: '1px solid #3b6eb5', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)' }}
+                    >📱 저장 + 문자발송</button>
+                    <button
+                      onClick={() => {
+                        const carInfo = inv.rental_car || '대차'
+                        const amount = f(invManualAmount)
+                        const subject = `[에프엠아이 렌터카] ${inv.tenant_name}님 청구서`
+                        const body = `안녕하세요, ${inv.tenant_name}님.\n\n에프엠아이 렌터카 청구서입니다.\n\n■ 차종: ${carInfo}\n■ 금액: ${amount}원\n${inv.rental_start ? `■ 대여일시: ${inv.rental_start.replace('T', ' ')}` : ''}\n${inv.return_datetime ? `■ 반납예정: ${inv.return_datetime.replace('T', ' ')}` : ''}\n\n감사합니다.\n주식회사에프엠아이`
+                        window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
+                      }}
+                      style={{ padding: '6px 14px', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 8, background: 'rgba(96,165,250,0.1)', fontSize: 12, fontWeight: 700, color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    >📧 이메일</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setInvoiceOpen(false)} style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'transparent', color: '#94a3b8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                    <button
+                      onClick={() => { handleInvoiceSave(false, invManualAmount); setInvoiceOpen(false) }}
+                      disabled={qSaving}
+                      style={{ padding: '10px 20px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.04)', color: '#334155', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: qSaving ? 0.5 : 1 }}
+                    >{qSaving ? '저장 중...' : '저장'}</button>
+                    <button
+                      onClick={() => { handleInvoiceSave(true, invManualAmount); setInvoiceOpen(false) }}
+                      disabled={qSaving}
+                      style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)', opacity: qSaving ? 0.5 : 1 }}
+                    >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+      </div>
     </div>
   )
 }

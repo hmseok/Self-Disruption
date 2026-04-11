@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import DarkHeader from '../../components/DarkHeader'
+import NeuStatCards, { StatCardItem } from '../../components/NeuStatCards'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -425,28 +426,16 @@ export default function FleetPnlPage() {
         </div>
 
         {/* 요약 통계 */}
-        <div className='grid grid-cols-2 md:grid-cols-5 gap-4 mb-6'>
-          <div className='bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl p-4 border border-blue-400/30'>
-            <div className='text-xs text-blue-300 mb-1'>총 매출</div>
-            <div className='text-xl font-bold text-blue-100'>{fMan(totals.revenue)}</div>
-          </div>
-          <div className='bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-xl p-4 border border-red-400/30'>
-            <div className='text-xs text-red-300 mb-1'>총 비용</div>
-            <div className='text-xl font-bold text-red-100'>{fMan(totals.expense)}</div>
-          </div>
-          <div className='bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-xl p-4 border border-yellow-400/30'>
-            <div className='text-xs text-yellow-300 mb-1'>영업이익</div>
-            <div className='text-xl font-bold text-yellow-100'>{fMan(totals.operatingProfit)}</div>
-          </div>
-          <div className='bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-xl p-4 border border-purple-400/30'>
-            <div className='text-xs text-purple-300 mb-1'>정산액</div>
-            <div className='text-xl font-bold text-purple-100'>{fMan(totals.settlement)}</div>
-          </div>
-          <div className='bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-xl p-4 border border-green-400/30'>
-            <div className='text-xs text-green-300 mb-1'>순이익</div>
-            <div className='text-xl font-bold text-green-100'>{fMan(totals.netProfit)}</div>
-          </div>
-        </div>
+        <NeuStatCards
+          items={[
+            { key: 'revenue', label: '총 매출', value: totals.revenue, unit: '원', format: true, color: 'blue', icon: '💰' },
+            { key: 'expense', label: '총 비용', value: totals.expense, unit: '원', format: true, color: 'red', icon: '📉' },
+            { key: 'operating', label: '영업이익', value: totals.operatingProfit, unit: '원', format: true, color: 'amber', icon: '📊' },
+            { key: 'settlement', label: '정산액', value: totals.settlement, unit: '원', format: true, color: 'purple', icon: '💵' },
+            { key: 'net', label: '순이익', value: totals.netProfit, unit: '원', format: true, color: totals.netProfit >= 0 ? 'green' : 'red', icon: '✓' },
+          ] as StatCardItem[]}
+          columns={5}
+        />
 
         {/* 테이블 */}
         <div className='bg-gray-100 backdrop-blur-xl rounded-xl border border-white/[0.1] overflow-hidden'>
