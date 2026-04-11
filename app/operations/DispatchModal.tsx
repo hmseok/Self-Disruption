@@ -292,7 +292,7 @@ export default function DispatchModal({
           const contract = contracts.find(c => c.id === form.contract_id)
           const customer = customers.find(c => String(c.id) === String(form.customer_id))
           const title = `${form.operation_type === 'delivery' ? '출고' : '반납'} - ${customer?.name || contract?.customer_name || '미정'}`
-          await fetch('/api/vehicle-schedules', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ car_id: Number(form.car_id), schedule_type: form.operation_type === 'delivery' ? 'delivery' : 'return', start_date: form.scheduled_date, end_date: form.scheduled_date, title, color: '#3b82f6', operation_id: inserted[0].id, contract_id: form.contract_id, created_by: userId }) })
+          await fetch('/api/vehicle-schedules', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ car_id: Number(form.car_id), schedule_type: form.operation_type === 'delivery' ? 'delivery' : 'return', start_date: form.scheduled_date, end_date: form.scheduled_date, title, color: '#3b6eb5', operation_id: inserted[0].id, contract_id: form.contract_id, created_by: userId }) })
         }
       }
       onCreated()

@@ -547,7 +547,7 @@ export default function OrgManagementPage() {
             </div>
             <div style={{ flex: 1, background: 'rgba(59,130,246,0.1)', borderRadius: 12, padding: '16px 20px', border: '1px solid #bfdbfe', cursor: 'pointer' }} onClick={() => setActiveTab('permissions')}>
               <p style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', margin: 0 }}>권한 설정 대상</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: '#3b82f6', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>명</span></p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: '#3b6eb5', margin: '4px 0 0' }}>{assignableEmployees.length}<span style={{ fontSize: 14, fontWeight: 500, color: '#2563eb', marginLeft: 2 }}>명</span></p>
             </div>
           </div>
 
@@ -616,7 +616,7 @@ export default function OrgManagementPage() {
                           onChange={e => setNewPositionLevel(Number(e.target.value))}
                           style={{ width: '100%', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                       </div>
-                      <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
+                      <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b6eb5', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.8)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -648,7 +648,7 @@ export default function OrgManagementPage() {
                         <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)}
                           style={{ width: '100%', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: '8px 12px', fontSize: 13, outline: 'none' }} placeholder="예: 영업팀" />
                       </div>
-                      <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
+                      <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b6eb5', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.8)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -790,14 +790,14 @@ export default function OrgManagementPage() {
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
                                 borderBottom: '1px solid rgba(0,0,0,0.04)',
-                                borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                                borderLeft: isSelected ? '3px solid #3b6eb5' : '3px solid transparent',
                                 background: isSelected ? '#eef3fb' : 'transparent',
                               }}
                             >
                               <div style={{
                                 width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 color: '#fff', fontWeight: 900, fontSize: 12, flexShrink: 0,
-                                background: isSelected ? '#3b82f6' : '#94a3b8'
+                                background: isSelected ? '#3b6eb5' : '#94a3b8'
                               }}>
                                 {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                               </div>
@@ -855,7 +855,7 @@ export default function OrgManagementPage() {
                             <div style={{ padding: 16, borderBottom: '1px solid rgba(0,0,0,0.04)', flexShrink: 0, background: '#fafbfc' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                  <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, background: '#3b82f6', flexShrink: 0 }}>
+                                  <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, background: '#3b6eb5', flexShrink: 0 }}>
                                     {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
                                   </div>
                                   <div>
@@ -874,7 +874,7 @@ export default function OrgManagementPage() {
                                 </div>
                                 <button onClick={() => saveUserPerms(emp.id)}
                                   disabled={savingPermsFor === emp.id}
-                                  style={{ padding: '8px 20px', background: savingPermsFor === emp.id ? '#64748b' : '#3b82f6', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPermsFor === emp.id ? 'not-allowed' : 'pointer' }}>
+                                  style={{ padding: '8px 20px', background: savingPermsFor === emp.id ? '#64748b' : '#3b6eb5', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingPermsFor === emp.id ? 'not-allowed' : 'pointer' }}>
                                   {savingPermsFor === emp.id ? '저장 중...' : '저장'}
                                 </button>
                               </div>
@@ -1067,7 +1067,7 @@ export default function OrgManagementPage() {
                 취소
               </button>
               <button onClick={saveEdit} disabled={savingEdit}
-                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#64748b' : '#3b82f6', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', background: savingEdit ? '#64748b' : '#3b6eb5', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
                 {savingEdit ? '저장 중...' : '저장'}
               </button>
             </div>

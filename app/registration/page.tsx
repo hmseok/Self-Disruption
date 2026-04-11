@@ -435,7 +435,7 @@ const { company, role, adminSelectedCompanyId } = useApp()
              <p style={{ fontSize: 24, fontWeight: 900, color: '#b45309', marginTop: 4, whiteSpace: 'nowrap' as const }}>{recentCars.length}<span style={{ fontSize: 14, color: '#f59e0b', marginLeft: 2 }}>대</span></p>
            </div>
            <div style={{ flex: 1, background: '#eff6ff', padding: 16, borderRadius: 12, border: '1px solid #bfdbfe', minWidth: 0 }}>
-             <p style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, whiteSpace: 'nowrap' as const }}>총 취득가액</p>
+             <p style={{ fontSize: 12, color: '#3b6eb5', fontWeight: 700, whiteSpace: 'nowrap' as const }}>총 취득가액</p>
              <p style={{ fontSize: 20, fontWeight: 900, color: '#1d4ed8', marginTop: 4, whiteSpace: 'nowrap' as const }}>{f(stats.totalValue)}<span style={{ fontSize: 14, color: '#93c5fd', marginLeft: 2 }}>원</span></p>
              {stats.totalCost > stats.totalValue && (
                <p style={{ fontSize: 10, color: '#059669', fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' as const }}>실투자 {f(stats.totalCost)}원</p>

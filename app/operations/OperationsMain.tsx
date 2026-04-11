@@ -116,13 +116,13 @@ const OP_STATUS: Record<string, { label: string; color: string; icon: string }> 
 }
 
 const SCHEDULE_COLORS: Record<string, string> = {
-  long_term: '#3b82f6',          // blue
+  long_term: '#3b6eb5',          // blue
   short_term: '#8b5cf6',         // purple
   replacement: '#f59e0b',        // amber
   insurance_replacement: '#14b8a6', // teal — 보험대차
   maintenance: '#ef4444',        // red
-  rental: '#3b82f6',
-  delivery: '#3b82f6',
+  rental: '#3b6eb5',
+  delivery: '#3b6eb5',
   reserved: '#6b7280',
   accident_repair: '#ef4444',    // red — 사고수리
 }
@@ -509,7 +509,7 @@ export default function OperationsMainPage() {
                         {cellSchedules.map(sched => {
                           const isStart = date === sched.start_date
                           const isEnd = date === sched.end_date
-                          const color = sched.color || SCHEDULE_COLORS[sched.schedule_type] || '#3b82f6'
+                          const color = sched.color || SCHEDULE_COLORS[sched.schedule_type] || '#3b6eb5'
                           return (
                             <div
                               key={sched.id}

@@ -55,10 +55,10 @@ const DISPLAY_CATEGORIES = [
 
 const CATEGORY_COLORS: Record<string, string> = {
   // 회계 기준
-  '매출(영업수익)': '#3b82f6', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
+  '매출(영업수익)': '#3b6eb5', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
   '영업비용-인건비': '#10b981', '영업비용-관리': '#ec4899', '세금/공과': '#ef4444', '기타': '#94a3b8',
   // 용도별
-  '💰 돈 들어오는 것': '#3b82f6', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
+  '💰 돈 들어오는 것': '#3b6eb5', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
   '👨‍💼 급여/인건비': '#10b981', '🏢 사무실/운영비': '#8b5cf6', '🍽️ 식비/접대/출장': '#ec4899',
   '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
 }
@@ -484,7 +484,7 @@ export default function ClassificationReviewPage() {
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>AI 분류 검토</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#1e293b', margin: 0 }}>AI 분류 검토</h1>
           <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>AI가 분류한 거래를 카테고리별로 검토하고 확정합니다</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -498,7 +498,7 @@ export default function ClassificationReviewPage() {
           </button>
           {filter === 'pending' && items.length > 0 && (
             <button onClick={handleAutoConfirmAll}
-              style={{ background: '#0f172a', color: '#fff', padding: '8px 14px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer' }}>
+              style={{ background: '#3b6eb5', color: '#fff', padding: '8px 14px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer' }}>
               ✅ 전체 확정
             </button>
           )}
@@ -516,7 +516,7 @@ export default function ClassificationReviewPage() {
         {[
           { label: '검토 대기', value: stats.pending, color: '#f59e0b', icon: '⏳' },
           { label: '확정 완료', value: stats.confirmed, color: '#10b981', icon: '✅' },
-          { label: '현재 조회', value: total, color: '#0f172a', icon: '📋' },
+          { label: '현재 조회', value: total, color: '#1e293b', icon: '📋' },
           { label: '카테고리', value: groupedItems.length, color: '#6366f1', icon: '🏷️' },
         ].map((s, i) => (
           <div key={i} style={{ background: '#fff', borderRadius: 16, padding: '14px 16px', border: '1px solid #e2e8f0' }}>
@@ -540,7 +540,7 @@ export default function ClassificationReviewPage() {
           ].map(tab => (
             <button key={tab.key} onClick={() => { setFilter(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()) }}
               style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer',
-                background: filter === tab.key ? '#0f172a' : 'transparent', color: filter === tab.key ? '#fff' : '#94a3b8' }}>
+                background: filter === tab.key ? '#3b6eb5' : 'transparent', color: filter === tab.key ? '#fff' : '#94a3b8' }}>
               {tab.label}
             </button>
           ))}
@@ -555,7 +555,7 @@ export default function ClassificationReviewPage() {
             <button key={m.key} onClick={() => { setCategoryMode(m.key); setExpandedGroups(new Set()) }}
               style={{
                 padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
-                background: categoryMode === m.key ? '#0f172a' : 'transparent',
+                background: categoryMode === m.key ? '#3b6eb5' : 'transparent',
                 color: categoryMode === m.key ? '#fff' : '#94a3b8',
                 transition: 'all 0.15s',
               }}>
@@ -574,7 +574,7 @@ export default function ClassificationReviewPage() {
               checked={items.length > 0 && selectedIds.size === items.length}
               ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < items.length }}
               onChange={toggleSelectAll}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
             />
             {selectedIds.size > 0 ? `${selectedIds.size}건 선택됨` : `전체 선택 (${items.length})`}
           </label>
@@ -647,7 +647,7 @@ export default function ClassificationReviewPage() {
                     }}
                     onChange={(e) => { e.stopPropagation(); toggleSelectGroup(group.items) }}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5', flexShrink: 0 }}
                   />
 
                   {/* 카테고리 색상 바 */}
@@ -657,14 +657,14 @@ export default function ClassificationReviewPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                     {!isDisplayMode && <span style={{ fontSize: 20 }}>{icon}</span>}
                     <div>
-                      <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
+                      <p style={{ fontWeight: 800, fontSize: 14, color: '#1e293b', margin: 0 }}>{category}</p>
                       {!isDisplayMode && <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{groupName}</p>}
                     </div>
                   </div>
 
                   {/* 건수 + 금액 */}
                   <div style={{ textAlign: 'right', marginRight: 12 }}>
-                    <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#3b82f6' : '#ef4444', margin: 0 }}>
+                    <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#5a8fd4' : '#ef4444', margin: 0 }}>
                       {nf(group.totalAmount)}원
                     </p>
                     <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{group.items.length}건</p>
@@ -704,14 +704,14 @@ export default function ClassificationReviewPage() {
                             type="checkbox"
                             checked={selectedIds.has(item.id)}
                             onChange={() => toggleSelect(item.id)}
-                            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#3b6eb5', flexShrink: 0 }}
                           />
                           {/* 날짜 */}
                           <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, width: 80, flexShrink: 0 }}>{src.transaction_date}</span>
 
                           {/* 입출금 */}
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
-                            background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b82f6' : '#ef4444' }}>
+                            background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b6eb5' : '#ef4444' }}>
                             {src.type === 'income' ? '입금' : '출금'}
                           </span>
 
@@ -728,7 +728,7 @@ export default function ClassificationReviewPage() {
                           )}
 
                           {/* 거래처 */}
-                          <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {src.client_name || '(미상)'}
                           </span>
 
@@ -745,7 +745,7 @@ export default function ClassificationReviewPage() {
                           )}
 
                           {/* 금액 */}
-                          <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#3b82f6' : '#0f172a', textAlign: 'right', width: 100, flexShrink: 0 }}>
+                          <span style={{ fontWeight: 800, fontSize: 13, color: src.type === 'income' ? '#5a8fd4' : '#1e293b', textAlign: 'right', width: 100, flexShrink: 0 }}>
                             {src.type === 'income' ? '+' : ''}{nf(src.amount)}
                           </span>
 
@@ -753,7 +753,7 @@ export default function ClassificationReviewPage() {
                           {!isConfirmed && filter === 'pending' && (
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                               <button onClick={() => handleConfirm(item)}
-                                style={{ background: '#0f172a', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
+                                style={{ background: '#3b6eb5', color: '#fff', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10, border: 'none', cursor: 'pointer' }}>
                                 확정
                               </button>
                               <select defaultValue="" onChange={e => { if (e.target.value) handleConfirm(item, { category: e.target.value }) }}
@@ -810,17 +810,17 @@ export default function ClassificationReviewPage() {
         return (
         <div style={{
           position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          background: '#0f172a', color: '#fff', borderRadius: 16,
+          background: 'rgba(255,255,255,0.72)', color: '#1e293b', borderRadius: 16,
           padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 16,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 400,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.06)', zIndex: 50, minWidth: 400,
         }}>
           <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
             {selectedIds.size}건 선택
           </span>
-          <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
             합계 {nf(totalAmount)}원
           </span>
-          <div style={{ width: 1, height: 20, background: '#334155' }} />
+          <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.06)' }} />
           {filter === 'pending' && (
             <>
               <button onClick={handleBulkConfirmSelected} disabled={bulkProcessing}
@@ -829,7 +829,7 @@ export default function ClassificationReviewPage() {
               </button>
               <div style={{ position: 'relative' }}>
                 <button onClick={() => setShowBulkCategoryPicker(!showBulkCategoryPicker)} disabled={bulkProcessing}
-                  style={{ background: '#3b82f6', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ background: '#3b6eb5', color: '#fff', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
                   {bulkProcessing ? '처리 중...' : '📋 일괄분류'}
                 </button>
                 {showBulkCategoryPicker && (
@@ -839,7 +839,7 @@ export default function ClassificationReviewPage() {
                     boxShadow: '0 8px 32px rgba(0,0,0,0.2)', border: '1px solid #e2e8f0',
                     width: 360, maxHeight: 420, overflowY: 'auto', zIndex: 60,
                   }} onClick={e => e.stopPropagation()}>
-                    <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span>분류 선택</span>
                       <label style={{ fontSize: 11, fontWeight: 500, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
                         <input type="checkbox" defaultChecked style={{ width: 14, height: 14 }} id="bulk-learn-check" />
@@ -873,7 +873,7 @@ export default function ClassificationReviewPage() {
                               style={{
                                 display: 'block', width: '100%', textAlign: 'left',
                                 padding: '6px 10px', borderRadius: 8, border: 'none',
-                                background: 'transparent', cursor: 'pointer', fontSize: 12, color: '#1e293b',
+                                background: 'transparent', cursor: 'pointer', fontSize: 12, color: '#334155',
                               }}
                               onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -891,7 +891,7 @@ export default function ClassificationReviewPage() {
           )}
           {filter === 'confirmed' && (
             <button onClick={handleBulkRevertSelected} disabled={bulkProcessing}
-              style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+              style={{ background: '#fbbf24', color: '#1e293b', padding: '8px 16px', borderRadius: 10, fontWeight: 800, fontSize: 12, border: 'none', cursor: bulkProcessing ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
               {bulkProcessing ? '처리 중...' : '↩ 선택 되돌리기'}
             </button>
           )}

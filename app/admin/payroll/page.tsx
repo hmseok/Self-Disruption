@@ -50,7 +50,7 @@ const n = (v: number) => Number(v || 0).toLocaleString()
 
 // ── 디자인 토큰 ──
 const C = {
-  steel: '#2d5fa8', steelDark: '#1e4d8c', steelLight: '#eff6ff', steelBorder: '#bfdbfe',
+  steel: '#3b6eb5', steelDark: '#1e4d8c', steelLight: '#eff6ff', steelBorder: '#bfdbfe',
   green: '#059669', greenLight: '#f0fdf4', greenBorder: '#bbf7d0',
   red: '#dc2626', redLight: '#fef2f2', redBorder: '#fecaca',
   amber: '#d97706', amberLight: '#fffbeb', amberBorder: '#fde68a',

@@ -56,3 +56,7 @@ google-services.json
 
 # 마이그레이션 스크립트 (DB 비밀번호 포함 — 절대 커밋 금지)
 scripts/migrate/01_pgloader.load
+
+# 디자인 시안/프리뷰 (배포 불필요 — 로컬 검토용)
+design-*.html
+UI-Pattern-Analysis.xlsx

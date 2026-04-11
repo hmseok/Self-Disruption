@@ -475,14 +475,14 @@ export default function ShortTermCalcPage() {
           </div>
 
           {/* 결과 카드 */}
-          <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 10, padding: 18, textAlign: 'center' }}>
+          <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', borderRadius: 10, padding: 18, textAlign: 'center' }}>
             {calcSelected ? (
               <>
-                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>
+                <div style={{ fontSize: 11, color: '#475569', marginBottom: 2 }}>
                   {calcSelected.cat} · {calcSelected.name} · {calcDays > 0 ? `${calcDays}일` : ''}{calcHours > 0 ? ` ${calcHours}시간` : ''}
                 </div>
-                <div style={{ fontSize: 34, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
-                  {f(calcResult)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
+                <div style={{ fontSize: 34, fontWeight: 900, color: '#1e293b', letterSpacing: -1 }}>
+                  {f(calcResult)}<span style={{ fontSize: 14, color: '#64748b', marginLeft: 2 }}>원</span>
                 </div>
                 {calcDays > 0 && (
                   <div style={{ fontSize: 12, color: '#2563eb', marginTop: 2 }}>
@@ -496,10 +496,10 @@ export default function ShortTermCalcPage() {
                   {calcDelivery > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>탁송 {calcDelivery}만</span>}
                 </div>
                 {/* 상세 내역 */}
-                <div style={{ borderTop: '1px solid #334155', paddingTop: 10, marginTop: 10, textAlign: 'left' }}>
+                <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10, marginTop: 10, textAlign: 'left' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                    <span style={{ color: '#94a3b8' }}>렌트비 (할인 {calcDiscount}%)</span>
-                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(calcRentOnly)}원</span>
+                    <span style={{ color: '#64748b' }}>렌트비 (할인 {calcDiscount}%)</span>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>{f(calcRentOnly)}원</span>
                   </div>
                   {calcFaultActive && (
                     <>
@@ -513,16 +513,16 @@ export default function ShortTermCalcPage() {
                           <span style={{ color: '#4ade80', fontWeight: 600 }}>-{f(calcSupportAmount)}원</span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, borderTop: '1px solid #334155', paddingTop: 4, marginTop: 2 }}>
-                        <span style={{ color: '#fff', fontWeight: 900 }}>실부담금</span>
-                        <span style={{ color: '#fff', fontWeight: 900 }}>{f(calcFinalRent)}원</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 4, marginTop: 2 }}>
+                        <span style={{ color: '#1e293b', fontWeight: 900 }}>실부담금</span>
+                        <span style={{ color: '#1e293b', fontWeight: 900 }}>{f(calcFinalRent)}원</span>
                       </div>
                     </>
                   )}
                   {calcDelivery > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                      <span style={{ color: '#94a3b8' }}>탁송비</span>
-                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(calcDelivery * 10000)}원</span>
+                      <span style={{ color: '#64748b' }}>탁송비</span>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>{f(calcDelivery * 10000)}원</span>
                     </div>
                   )}
                 </div>
@@ -538,7 +538,7 @@ export default function ShortTermCalcPage() {
               onClick={() => setInvoiceOpen(true)}
               style={{
                 marginTop: 12, width: '100%', padding: '14px', border: 'none', borderRadius: 10,
-                background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff',
+                background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
                 fontWeight: 800, fontSize: 15, cursor: 'pointer',
                 boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
                 transition: 'all 0.2s',
@@ -575,9 +575,9 @@ export default function ShortTermCalcPage() {
               <button onClick={() => setInvoiceOpen(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#9ca3af', lineHeight: 1 }}>✕</button>
             </div>
             {calcSelected && (
-              <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ color: '#94a3b8', fontSize: 12 }}>{calcSelected.cat} · {calcSelected.name} · {calcDays > 0 ? `${calcDays}일` : ''}{calcHours > 0 ? ` ${calcHours}시간` : ''}</div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#fff' }}>{f(calcResult)}<span style={{ fontSize: 12, color: '#475569', marginLeft: 2 }}>원</span></div>
+              <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: '#475569', fontSize: 12 }}>{calcSelected.cat} · {calcSelected.name} · {calcDays > 0 ? `${calcDays}일` : ''}{calcHours > 0 ? ` ${calcHours}시간` : ''}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#1e293b' }}>{f(calcResult)}<span style={{ fontSize: 12, color: '#64748b', marginLeft: 2 }}>원</span></div>
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
@@ -696,7 +696,7 @@ export default function ShortTermCalcPage() {
                 <button
                   onClick={() => { handleInvoiceSave(true, calcSelected ? calcResult : invManualAmount); setInvoiceOpen(false) }}
                   disabled={qSaving}
-                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 14px rgba(45,95,168,0.3)', opacity: qSaving ? 0.5 : 1 }}
+                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)', opacity: qSaving ? 0.5 : 1 }}
                 >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
               </div>
             </div>

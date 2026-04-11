@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 
-const BRAND_COLOR = '#2d5fa8'
+const BRAND_COLOR = '#3b6eb5'
 
 type TransactionDetail = {
   date: string

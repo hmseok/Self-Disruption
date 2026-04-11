@@ -1,9 +1,8 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+// IBM Plex Sans KR — CDN으로 로드 (빌드 시 Google Fonts 접근 불가 대비)
 import ConditionalLayout from '@/app/components/auth/ConditionalLayout'
 
-const inter = Inter({ subsets: ['latin'] })
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -35,9 +34,12 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         {/* 모바일 CSS 로딩 실패 대비 — 최소한의 레이아웃 보장 인라인 스타일 */}
         <style dangerouslySetInnerHTML={{ __html: `
-          html,body{margin:0;padding:0;height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+          html,body{margin:0;padding:0;height:100%;font-family:'IBM Plex Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
           body{background:#f9fafb;color:#171717}
           *,*::before,*::after{box-sizing:border-box}
           .hidden{display:none}
@@ -51,7 +53,7 @@ export default function RootLayout({
           input,select,textarea{font-size:16px}
         `}} />
       </head>
-      <body className={inter.className}>
+      <body>
         <ConditionalLayout>
           {children}
         </ConditionalLayout>

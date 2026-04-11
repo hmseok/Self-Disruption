@@ -606,11 +606,11 @@ export default function ReceiptsPage() {
               style={{ width: 90, padding: '6px 4px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, textAlign: 'right', fontWeight: 700 }} />
           </td>
           <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-            {item.receipt_url && <a href={item.receipt_url} target="_blank" rel="noopener" style={{ color: '#2563eb', fontSize: 11 }}>📎</a>}
+            {item.receipt_url && <a href={item.receipt_url} target="_blank" rel="noopener" style={{ color: '#3b6eb5', fontSize: 11 }}>📎</a>}
           </td>
           <td style={{ padding: '6px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>
             <button onClick={saveEdit}
-              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 2 }}>
+              style={{ background: '#3b6eb5', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 2 }}>
               저장
             </button>
             <button onClick={() => setEditingId(null)}
@@ -647,7 +647,7 @@ export default function ReceiptsPage() {
               type="checkbox"
               checked={selectedIds.has(item.id)}
               onChange={() => toggleSelect(item.id!)}
-              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
             />
           )}
         </td>
@@ -658,7 +658,7 @@ export default function ReceiptsPage() {
             <span style={{
               display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
               background: item.category === '접대' ? '#fef3c7' : item.category.includes('주유') ? '#dbeafe' : item.category === '충전' ? '#dcfce7' : '#f1f5f9',
-              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#2563eb' : item.category === '충전' ? '#16a34a' : '#475569',
+              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#3b6eb5' : item.category === '충전' ? '#16a34a' : '#475569',
             }}>{item.category}</span>
           ) : (
             <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>
@@ -669,7 +669,7 @@ export default function ReceiptsPage() {
             {item.merchant || <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>미입력</span>}
           </div>
           {item.memo && (
-            <div style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
               📝 {item.memo}
             </div>
           )}
@@ -681,7 +681,7 @@ export default function ReceiptsPage() {
         </td>
         <td style={{ padding: '10px 8px', textAlign: 'center' }}>
           {item.receipt_url ? (
-            <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: '#2563eb', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📎 보기</a>
+            <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: '#3b6eb5', fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>📎 보기</a>
           ) : '-'}
         </td>
         <td style={{ padding: '10px 4px', textAlign: 'center' }}>
@@ -739,7 +739,7 @@ export default function ReceiptsPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={saveEdit}
-              style={{ flex: 1, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              style={{ flex: 1, background: '#3b6eb5', color: '#fff', border: 'none', borderRadius: 6, padding: '8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               저장
             </button>
             <button onClick={() => setEditingId(null)}
@@ -768,7 +768,7 @@ export default function ReceiptsPage() {
             <span style={{
               display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
               background: item.category === '접대' ? '#fef3c7' : item.category.includes('주유') ? '#dbeafe' : item.category === '충전' ? '#dcfce7' : '#f1f5f9',
-              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#2563eb' : item.category === '충전' ? '#16a34a' : '#475569',
+              color: item.category === '접대' ? '#d97706' : item.category.includes('주유') ? '#3b6eb5' : item.category === '충전' ? '#16a34a' : '#475569',
             }}>{item.category}</span>
           ) : (
             <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>미입력</span>
@@ -788,7 +788,7 @@ export default function ReceiptsPage() {
 
         {/* 메모 */}
         {item.memo && (
-          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, fontStyle: 'italic', wordBreak: 'break-word' }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6, fontStyle: 'italic', wordBreak: 'break-word' }}>
             📝 {item.memo}
           </div>
         )}
@@ -801,7 +801,7 @@ export default function ReceiptsPage() {
           <div style={{ display: 'flex', gap: 4 }}>
             {item.receipt_url && (
               <a href={item.receipt_url} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{
-                color: '#2563eb', fontSize: 11, fontWeight: 600, textDecoration: 'none', padding: '4px 6px'
+                color: '#3b6eb5', fontSize: 11, fontWeight: 600, textDecoration: 'none', padding: '4px 6px'
               }}>📎</a>
             )}
             <button onClick={(e) => { e.stopPropagation(); if (item.id) handleDelete(item.id) }}
@@ -820,7 +820,7 @@ export default function ReceiptsPage() {
         <div>
           <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>법인카드 사용내역</h1>
           <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-            영수증을 올리면 <strong style={{ color: '#2563eb' }}>Gemini AI</strong>가 자동 분석합니다
+            영수증을 올리면 <strong style={{ color: '#3b6eb5' }}>Gemini AI</strong>가 자동 분석합니다
           </p>
         </div>
         <button
@@ -834,7 +834,7 @@ export default function ReceiptsPage() {
       {/* ── 드롭존 ── */}
       <div
         style={{
-          border: isDragOver ? '2px solid #2563eb' : '2px dashed #cbd5e1',
+          border: isDragOver ? '2px solid #3b6eb5' : '2px dashed #cbd5e1',
           borderRadius: 16, padding: isProcessing ? '12px 16px' : isMobile ? '20px 16px' : '28px 20px',
           textAlign: 'center', marginBottom: 20,
           background: isDragOver ? '#eff6ff' : '#fafbfc',
@@ -854,7 +854,7 @@ export default function ReceiptsPage() {
               {uploadQueue.map((q, i) => (
                 <div key={i} style={{
                   width: 56, height: 56, borderRadius: 10, overflow: 'hidden', position: 'relative',
-                  border: q.status === 'uploading' ? '2px solid #2563eb' : q.status === 'done' ? '2px solid #22c55e' : q.status === 'error' ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                  border: q.status === 'uploading' ? '2px solid #3b6eb5' : q.status === 'done' ? '2px solid #22c55e' : q.status === 'error' ? '2px solid #ef4444' : '2px solid #e2e8f0',
                   opacity: q.status === 'pending' ? 0.4 : 1,
                 }}>
                   <img src={q.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -882,17 +882,17 @@ export default function ReceiptsPage() {
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: 13, color: '#2563eb', fontWeight: 700 }}>
+            <p style={{ fontSize: 13, color: '#3b6eb5', fontWeight: 700 }}>
               {uploadQueue.filter(q => q.status === 'done').length} / {uploadQueue.length} AI 분석 완료
             </p>
             {isProcessing && (
-              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Gemini AI가 영수증을 분석하고 있습니다...</p>
+              <p style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Gemini AI가 영수증을 분석하고 있습니다...</p>
             )}
           </div>
         ) : isDragOver ? (
           <div>
             <div style={{ fontSize: 44, marginBottom: 6 }}>🤖</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: '#2563eb' }}>여기에 놓으면 AI가 자동 분석합니다</p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#3b6eb5' }}>여기에 놓으면 AI가 자동 분석합니다</p>
           </div>
         ) : (
           <div>
@@ -900,7 +900,7 @@ export default function ReceiptsPage() {
             <p style={{ fontSize: isMobile ? 13 : 15, fontWeight: 700, color: '#334155', wordBreak: 'keep-all' }}>
               {isMobile ? '영수증 이미지를 클릭하여 업로드' : '영수증 이미지를 여기에 드래그하거나 클릭'}
             </p>
-            <p style={{ fontSize: isMobile ? 11 : 12, color: '#94a3b8', marginTop: 4, wordBreak: 'keep-all' }}>
+            <p style={{ fontSize: isMobile ? 11 : 12, color: '#64748b', marginTop: 4, wordBreak: 'keep-all' }}>
               여러 장 동시 가능 · <span style={{ color: '#4285f4', fontWeight: 600 }}>Gemini AI</span> 자동 분석
             </p>
           </div>
@@ -937,10 +937,10 @@ export default function ReceiptsPage() {
                 onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
                 onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
               />
-              <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
+              <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#64748b', pointerEvents: 'none' }}>🔍</span>
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
               )}
             </div>
           </div>
@@ -970,10 +970,10 @@ export default function ReceiptsPage() {
                 onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
                 onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
               />
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#64748b', pointerEvents: 'none' }}>🔍</span>
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
               )}
             </div>
           </>
@@ -1012,9 +1012,9 @@ export default function ReceiptsPage() {
         return (
           <div style={{
             position: 'fixed', bottom: isMobile ? 0 : 24, left: isMobile ? 0 : '50%', right: isMobile ? 0 : 'auto', transform: isMobile ? 'none' : 'translateX(-50%)',
-            background: '#0f172a', color: '#fff', borderRadius: isMobile ? '16px 16px 0 0' : 16,
+            background: 'rgba(255,255,255,0.72)', color: '#1e293b', borderRadius: isMobile ? '16px 16px 0 0' : 16,
             padding: isMobile ? '12px 16px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 50, flexWrap: isMobile ? 'wrap' : 'nowrap',
+            border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', zIndex: 50, flexWrap: isMobile ? 'wrap' : 'nowrap',
             width: isMobile ? '100%' : 'auto', boxSizing: 'border-box',
           }}>
             {/* 선택 카운트 + 합계 (첫 줄) */}
@@ -1022,17 +1022,17 @@ export default function ReceiptsPage() {
               <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
                 {selectedIds.size}건
               </span>
-              <span style={{ color: '#94a3b8', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {fmt(total)}원
               </span>
             </div>
 
-            {isMobile && <div style={{ width: '100%', height: 1, background: '#334155' }} />}
-            {!isMobile && <div style={{ width: 1, height: 24, background: '#334155' }} />}
+            {isMobile && <div style={{ width: '100%', height: 1, background: 'rgba(0,0,0,0.06)' }} />}
+            {!isMobile && <div style={{ width: 1, height: 24, background: 'rgba(0,0,0,0.06)' }} />}
 
             {/* 구분 선택 (항상 표시) */}
             <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)}
-              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, fontWeight: 600, flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 'auto' }}>
+              style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, fontWeight: 600, flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 'auto', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}>
               <option value="">구분</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -1044,13 +1044,13 @@ export default function ReceiptsPage() {
                   value={bulkItemName}
                   onChange={e => setBulkItemName(e.target.value)}
                   placeholder="품명"
-                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 80, outline: 'none' }}
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 80, outline: 'none', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}
                 />
                 <input
                   value={bulkCustomerTeam}
                   onChange={e => setBulkCustomerTeam(e.target.value)}
                   placeholder="고객명/팀원"
-                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#1e293b', color: '#fff', fontSize: 12, width: 100, outline: 'none' }}
+                  style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)', color: '#1e293b', fontSize: 12, width: 100, outline: 'none', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }}
                 />
               </>
             )}
@@ -1086,7 +1086,7 @@ export default function ReceiptsPage() {
                 삭제
               </button>
               <button onClick={() => { setSelectedIds(new Set()); setBulkCategory(''); setBulkItemName(''); setBulkCustomerTeam('') }}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>
                 ✕
               </button>
             </div>
@@ -1098,9 +1098,9 @@ export default function ReceiptsPage() {
       {isMobile ? (
         <div style={{ paddingBottom: selectedIds.size > 0 ? 100 : 0 }}>
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>로딩 중...</div>
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>로딩 중...</div>
           ) : allDisplayItems.length === 0 ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ padding: 60, textAlign: 'center', color: '#64748b' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>
@@ -1144,7 +1144,7 @@ export default function ReceiptsPage() {
                       type="checkbox"
                       checked={allDisplayItems.filter(i => i.id).length > 0 && allDisplayItems.filter(i => i.id).every(i => selectedIds.has(i.id!))}
                       onChange={toggleSelectAll}
-                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#2563eb' }}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3b6eb5' }}
                     />
                   </th>
                   {['날짜', '카드번호', '구분', '사용처', '품명', '고객명/팀원'].map(h => (
@@ -1157,9 +1157,9 @@ export default function ReceiptsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>로딩 중...</td></tr>
+                  <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>로딩 중...</td></tr>
                 ) : allDisplayItems.length === 0 ? (
-                  <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+                  <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: '#64748b' }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
                     <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>

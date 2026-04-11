@@ -2,8 +2,8 @@
 import { usePathname } from 'next/navigation'
 
 // ═══════════════════════════════════════════════════════════════
-// Dark Glass Morphism — 페이지 타이틀 컴포넌트
-// 글로우 도트 + 1행 브레드크럼 + 그라데이션 라인
+// PageTitle — Neumorphism (Style E) 페이지 타이틀 컴포넌트
+// 블루 도트 + 1행 브레드크럼 + 뉴모피즘 디바이더
 // ═══════════════════════════════════════════════════════════════
 
 // 경로 → 비즈니스 그룹 매핑 (v2 — ClientLayout 3그룹과 동기화)
@@ -119,29 +119,31 @@ export default function PageTitle({ dynamicMenuName }: PageTitleProps) {
         gap: 10,
         padding: '12px 20px',
       }}>
-        {/* 블루 도트 */}
+        {/* 블루 도트 — 뉴모피즘 레이즈드 */}
         <div style={{
           width: 8,
           height: 8,
           borderRadius: '50%',
-          background: '#3b82f6',
+          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
           flexShrink: 0,
-          boxShadow: '0 0 6px rgba(59,130,246,0.3)',
+          boxShadow: '2px 2px 4px rgba(140,170,210,0.19), -1px -1px 3px rgba(255,255,255,0.47)',
         }} />
         {/* 섹션 라벨 */}
         {sectionLabel && (
           <>
-            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sectionLabel}</span>
-            <span style={{ color: '#334155', fontSize: 11 }}>&rsaquo;</span>
+            <span style={{ fontSize: 11, color: '#8aabc7', fontWeight: 500 }}>{sectionLabel}</span>
+            <span style={{ color: '#64748b', fontSize: 11 }}>&rsaquo;</span>
           </>
         )}
         {/* 페이지 이름 */}
-        <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{pageName}</span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#0f2440' }}>{pageName}</span>
       </div>
-      {/* 그라데이션 라인 */}
+      {/* 뉴모피즘 인셋 디바이더 */}
       <div style={{
         height: 1,
-        background: 'linear-gradient(90deg, rgba(59,130,246,0.4), rgba(139,92,246,0.2), transparent)',
+        margin: '0 20px',
+        background: 'linear-gradient(90deg, rgba(59,110,181,0.25), rgba(140,170,210,0.10), transparent)',
+        boxShadow: '0 1px 0 rgba(255,255,255,0.47)',
       }} />
     </div>
   )

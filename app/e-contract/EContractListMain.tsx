@@ -174,7 +174,7 @@ export default function EContractListMain() {
               onClick={() => router.push('/e-contract/create')}
               style={{
                 marginLeft: 'auto', padding: '8px 16px', borderRadius: 8, border: 'none',
-                fontSize: 13, fontWeight: 700, background: '#2d5fa8', color: '#fff',
+                fontSize: 13, fontWeight: 700, background: '#3b6eb5', color: '#fff',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,1)')}

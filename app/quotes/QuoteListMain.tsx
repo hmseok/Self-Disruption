@@ -237,7 +237,7 @@ function RowActions({
         ⋯
       </button>
       {open && (
-        <div style={{ position: 'fixed', top: pos.top, right: pos.right, background: '#1f2937', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 130 }}>
+        <div style={{ position: 'fixed', top: pos.top, right: pos.right, background: 'rgba(255,255,255,0.72)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', zIndex: 50, minWidth: 130 }}>
           {(quote.rental_type === '청구서' || quote.memo?.startsWith('[청구서]')) && (
             <button
               onClick={async (e) => {
@@ -328,9 +328,10 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
       <button
         onClick={() => setOpen(!open)}
         style={{
-          padding: '7px 16px', background: '#2d5fa8', color: '#fff', border: 'none',
+          padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
           borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+          boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
         }}
       >
         + 새 견적
@@ -338,8 +339,8 @@ function NewQuoteButton({ mainTab }: { mainTab: MainTab }) {
       {open && (
         <div style={{
           position: 'absolute', right: 0, top: '100%', marginTop: 8,
-          background: '#1f2937', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 50, minWidth: 200, overflow: 'hidden',
+          background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 8px 24px rgba(140,170,210,0.15)', zIndex: 50, minWidth: 200, overflow: 'hidden',
         }}>
           <Link
             href="/quotes/create"
@@ -1051,10 +1052,11 @@ export default function QuoteListPage() {
             href="/quotes/create"
             className="q-new-btn"
             style={{
-              padding: '7px 16px', background: '#2d5fa8', color: '#fff', border: 'none',
+              padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
               borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
               textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
               marginLeft: 8, flexShrink: 0,
+              boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
             }}
           >
             + 새 견적
@@ -1066,10 +1068,11 @@ export default function QuoteListPage() {
             href="/quotes/create"
             className="q-new-btn"
             style={{
-              padding: '7px 14px', background: '#2d5fa8', color: '#fff', border: 'none',
+              padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
               borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
               textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
               marginLeft: 8, flexShrink: 0,
+              boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
             }}
           >
             + 새 견적
@@ -1135,7 +1138,8 @@ export default function QuoteListPage() {
                 onChange={e => setSortBy(e.target.value as SortOption)}
                 style={{
                   padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
-                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: '#1f2937', color: '#1e293b',
+                  fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
+                  boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
                 }}
               >
                 <option value="latest">최신순</option>
@@ -1151,7 +1155,8 @@ export default function QuoteListPage() {
               onChange={e => setSearchTerm(e.target.value)}
               style={{
                 flex: 1, padding: '7px 14px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8,
-                fontSize: 13, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', background: '#1f2937', color: '#1e293b',
+                fontSize: 13, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b',
+                boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)',
               }}
             />
           </div>
@@ -1404,7 +1409,7 @@ export default function QuoteListPage() {
 
       {/* ═══ 청구서 작성 모달 ═══ */}
       {invoiceOpen && (() => {
-        const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none', background: '#1f2937', color: '#1e293b' }
+        const iS = { width: '100%', padding: '8px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' as const, outline: 'none', background: 'rgba(255,255,255,0.40)', color: '#1e293b', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12), inset -2px -2px 4px rgba(255,255,255,0.35)' }
         const lS = { fontSize: 10, fontWeight: 700 as const, color: '#94a3b8', display: 'block', marginBottom: 2 }
         return (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1521,7 +1526,7 @@ export default function QuoteListPage() {
                       alert(`오류: ${err.message}`)
                     }
                   }}
-                  style={{ padding: '6px 14px', border: '1px solid #2d5fa8', borderRadius: 8, background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ padding: '6px 14px', border: '1px solid #3b6eb5', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)' }}
                 >📱 저장 + 문자발송</button>
                 <button
                   onClick={() => {
@@ -1544,7 +1549,7 @@ export default function QuoteListPage() {
                 <button
                   onClick={() => { handleInvoiceSave(true, invManualAmount); setInvoiceOpen(false) }}
                   disabled={qSaving}
-                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #2d5fa8, #1e40af)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 14px rgba(45,95,168,0.3)', opacity: qSaving ? 0.5 : 1 }}
+                  style={{ padding: '10px 24px', border: 'none', borderRadius: 8, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)', opacity: qSaving ? 0.5 : 1 }}
                 >{qSaving ? '처리 중...' : '저장 + PDF 다운로드'}</button>
               </div>
             </div>

@@ -766,14 +766,14 @@ export default function QuoteDetailPage() {
           <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
 
             {/* 헤더 */}
-            <div style={{ background: 'linear-gradient(135deg, #1e3a5f, rgba(59,130,246,0.9))' }} className="text-white px-6 py-4 rounded-t-2xl">
+            <div style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#1e293b' }} className="px-6 py-4 rounded-t-2xl">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">단기렌트 청구서</h1>
-                  <p className="text-blue-200 text-xs mt-0.5">SHORT-TERM RENTAL INVOICE</p>
+                  <p className="text-slate-500 text-xs mt-0.5">SHORT-TERM RENTAL INVOICE</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-blue-200 text-xs">작성일</p>
+                  <p className="text-slate-500 text-xs">작성일</p>
                   <p className="font-bold">{fDate(quote.created_at)}</p>
                 </div>
               </div>
@@ -816,19 +816,19 @@ export default function QuoteDetailPage() {
               {/* 요금 안내 */}
               <div>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">요금 안내</p>
-                <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)' }} className="rounded-xl p-5 text-white">
+                <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)' }} className="rounded-xl p-5">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-slate-500 text-sm">공급가</span>
-                    <span className="text-slate-400 font-bold">{f(rentTotal)}원</span>
+                    <span className="text-slate-600 font-bold">{f(rentTotal)}원</span>
                   </div>
-                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-700">
+                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-300">
                     <span className="text-slate-500 text-sm">VAT (10%)</span>
-                    <span className="text-slate-400 font-bold">{f(rentVat)}원</span>
+                    <span className="text-slate-600 font-bold">{f(rentVat)}원</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-white font-black text-lg">총 청구금액</span>
+                    <span className="text-slate-900 font-black text-lg">총 청구금액</span>
                     <div className="text-right">
-                      <span className="text-3xl font-black text-white">{f(rentWithVat)}</span>
+                      <span className="text-3xl font-black text-slate-900">{f(rentWithVat)}</span>
                       <span className="text-slate-500 ml-1">원</span>
                     </div>
                   </div>
@@ -1036,7 +1036,7 @@ export default function QuoteDetailPage() {
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ fontSize: 22, fontWeight: 900, color: '#1d4ed8', letterSpacing: '-0.5px' }}>{f(rentWithVAT)}<span style={{ fontSize: 12, fontWeight: 600 }}>원</span></span>
                         <br/>
-                        <span style={{ fontSize: 10, color: '#93c5fd' }}>공급가 {f(rentFee)} + VAT {f(rentVAT)}</span>
+                        <span style={{ fontSize: 10, color: '#64748b' }}>공급가 {f(rentFee)} + VAT {f(rentVAT)}</span>
                       </td>
                     </tr>
                     {contractType === 'buyout' && (

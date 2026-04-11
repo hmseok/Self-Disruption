@@ -463,7 +463,7 @@ export default function InsuranceTab() {
                         onClick={() => setExpandedGroup(isExpanded ? null : g.id)}
                         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-steel-800/50 transition-colors text-left"
                       >
-                        <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: g.color || '#3b82f6' }} />
+                        <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: g.color || '#3b6eb5' }} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-base font-bold text-white">{g.group_name}</span>
@@ -619,7 +619,7 @@ export default function InsuranceTab() {
                       <div className="flex-1 h-7 bg-steel-800 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full flex items-center justify-end px-3 text-sm font-bold text-white transition-all"
-                          style={{ width: `${barW}%`, backgroundColor: g.color || '#3b82f6' }}
+                          style={{ width: `${barW}%`, backgroundColor: g.color || '#3b6eb5' }}
                         >
                           {rate.toFixed(2)}%
                         </div>

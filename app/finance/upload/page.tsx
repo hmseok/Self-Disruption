@@ -56,10 +56,10 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   // 회계 기준
-  '매출(영업수익)': '#3b82f6', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
+  '매출(영업수익)': '#3b6eb5', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
   '영업비용-인건비': '#10b981', '영업비용-관리': '#ec4899', '세금/공과': '#ef4444', '영업비용-금융2': '#a855f7', '기타': '#94a3b8',
   // 용도별
-  '💰 돈 들어오는 것': '#3b82f6', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
+  '💰 돈 들어오는 것': '#3b6eb5', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
   '👨‍💼 급여/인건비': '#10b981', '🏢 사무실/운영비': '#8b5cf6', '🍽️ 식비/접대/출장': '#ec4899',
   '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
 }
@@ -3510,7 +3510,7 @@ function UploadContent() {
     }
     if (type === 'car') {
       const car = cars.find(cc => String(cc.id) === sid)
-      return { icon: '🚗', label: car?.number || '차량', detail: `차량${car?.model ? ' · ' + (car.brand || '') + ' ' + car.model : ''}`, color: '#3b82f6' }
+      return { icon: '🚗', label: car?.number || '차량', detail: `차량${car?.model ? ' · ' + (car.brand || '') + ' ' + car.model : ''}`, color: '#3b6eb5' }
     }
     if (type === 'loan') {
       const l = loans.find(ll => String(ll.id) === sid)
@@ -3575,7 +3575,7 @@ function UploadContent() {
         value: `car_${c.id}`,
         label: c.number || '차량',
         sub: `${c.brand || ''} ${c.model || ''}`.trim() || '-',
-        color: '#3b82f6',
+        color: '#3b6eb5',
       }))})
       // 렌터카 보증금용: 회사 소유 차량(지입/임차 제외)만 표시
       const rentalCars = cars.filter(c => !c.ownership_type || c.ownership_type === 'company')
@@ -3584,7 +3584,7 @@ function UploadContent() {
           value: `car_${c.id}`,
           label: c.number || '차량',
           sub: `${c.brand || ''} ${c.model || ''}`.trim() || '-',
-          color: '#3b82f6',
+          color: '#3b6eb5',
         }))})
       }
     }
@@ -3710,8 +3710,8 @@ function UploadContent() {
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1.5rem' }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <svg style={{ width: 24, height: 24, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#334155', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg style={{ width: 24, height: 24, color: '#3b6eb5' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
               카드/통장 관리
             </h1>
             <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>엑셀·영수증·PDF를 AI로 자동 분류하여 장부에 반영합니다</p>
@@ -3734,7 +3734,7 @@ function UploadContent() {
       style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
 
       {/* ═══ 탭바 카드 (PageTitle은 레이아웃에서 자동 제공) ═══ */}
-      <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '0 2px 16px rgba(45,95,168,0.08)', background: '#fff' }}>
+      <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 16, boxShadow: '4px 4px 12px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.6)', background: '#fff' }}>
 
         {/* ═══ 탭 바 (2탭: 분류 관리 + 확정완료) ═══ */}
         <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderBottom: '2px solid #e2e8f0', padding: '0 4px' }}>
@@ -3751,9 +3751,9 @@ function UploadContent() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px',
               fontSize: 12, fontWeight: 700,
-              color: isDragging ? '#2d5fa8' : '#64748b',
+              color: isDragging ? '#3b6eb5' : '#64748b',
               background: isDragging ? '#eff6ff' : '#fafbfc',
-              border: isDragging ? '1.5px dashed #2d5fa8' : '1.5px dashed #cbd5e1',
+              border: isDragging ? '1.5px dashed #3b6eb5' : '1.5px dashed #cbd5e1',
               borderRadius: 8,
               transition: 'all 0.2s',
             }}>
@@ -3771,10 +3771,10 @@ function UploadContent() {
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setExpandedGroups(new Set()); setSelectedIds(new Set()); setSourceFilter('all') }}
               style={{
                 padding: '10px 18px', border: 'none', cursor: 'pointer',
-                borderBottom: activeTab === tab.key ? '3px solid #2d5fa8' : '3px solid transparent',
+                borderBottom: activeTab === tab.key ? '3px solid #3b6eb5' : '3px solid transparent',
                 background: activeTab === tab.key ? '#fff' : 'transparent',
                 fontSize: 12, fontWeight: activeTab === tab.key ? 800 : 600,
-                color: activeTab === tab.key ? '#0f172a' : '#94a3b8',
+                color: activeTab === tab.key ? '#334155' : '#94a3b8',
                 display: 'flex', alignItems: 'center', gap: 4,
               }}>
               {tab.label}
@@ -3820,7 +3820,7 @@ function UploadContent() {
                 <button onClick={handleAiReclassify} disabled={aiClassifying}
                   style={{
                     padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                    color: '#fff', background: '#2d5fa8', border: 'none',
+                    color: '#fff', background: '#3b6eb5', border: 'none',
                     cursor: aiClassifying ? 'not-allowed' : 'pointer',
                     opacity: aiClassifying ? 0.5 : 1,
                     boxShadow: '0 1px 4px rgba(45,95,168,0.3)',
@@ -3879,8 +3879,8 @@ function UploadContent() {
                   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px',
                   background: sourceFilter === chip.key ? '#eff6ff' : '#f1f5f9',
                   borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                  border: sourceFilter === chip.key ? '1.5px solid #2d5fa8' : '1.5px solid transparent',
-                  color: chip.isRed ? '#dc2626' : (sourceFilter === chip.key ? '#2d5fa8' : '#475569'),
+                  border: sourceFilter === chip.key ? '1.5px solid #3b6eb5' : '1.5px solid transparent',
+                  color: chip.isRed ? '#dc2626' : (sourceFilter === chip.key ? '#3b6eb5' : '#475569'),
                   transition: 'all 0.15s',
                 }}>
                 {chip.label} <span style={{ fontWeight: 900 }}>{chip.count}</span>
@@ -4051,7 +4051,7 @@ function UploadContent() {
                   onChange={(e) => handleChange(e.target.value)}
                   style={{
                     padding: '6px 28px 6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800,
-                    border: '1.5px solid #2d5fa8', color: '#0f172a', background: '#fff', cursor: 'pointer',
+                    border: '1.5px solid #3b6eb5', color: '#334155', background: '#fff', cursor: 'pointer',
                     appearance: 'none',
                     backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%232d5fa8\' stroke-width=\'3\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")',
                     backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
@@ -4070,10 +4070,10 @@ function UploadContent() {
                 onChange={e => setSearchTerm(e.target.value)}
                 style={{
                   padding: '6px 12px 6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  border: '1.5px solid #e2e8f0', background: '#fff', color: '#0f172a',
+                  border: '1.5px solid #e2e8f0', background: '#fff', color: '#334155',
                   outline: 'none', width: 180, transition: 'border-color 0.15s',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#2d5fa8' }}
+                onFocus={e => { e.currentTarget.style.borderColor = '#3b6eb5' }}
                 onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0' }}
               />
               {searchTerm && (
@@ -4094,9 +4094,9 @@ function UploadContent() {
       {isDragging && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
-          background: 'linear-gradient(135deg, #2d5fa8, #1e40af)',
+          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
           padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 20px rgba(140,170,210,0.25)',
           pointerEvents: 'none',
         }}>
           <span style={{ fontSize: 24 }}>📥</span>
@@ -4196,7 +4196,7 @@ function UploadContent() {
               {/* 슬림 헤더: 분석 결과 + 저장/취소만 */}
               <div style={{ padding: '8px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 800, fontSize: 12, color: '#0f172a' }}>
+                  <span style={{ fontWeight: 800, fontSize: 12, color: '#334155' }}>
                     분석 결과 {filteredResults.length}건
                   </span>
                   {duplicateSkipCount > 0 && (
@@ -4248,10 +4248,10 @@ function UploadContent() {
                       alert('적용할 거래처 패턴이 없습니다.\n(같은 거래처명으로 이미 분류된 항목이 필요합니다)')
                     }
                   }}
-                    style={{ background: '#f0f9ff', color: '#2d5fa8', padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: '1px solid #93c5fd', cursor: 'pointer' }}>
+                    style={{ background: '#f0f9ff', color: '#3b6eb5', padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: '1px solid #93c5fd', cursor: 'pointer' }}>
                     🧠 거래처 학습
                   </button>
-                  <button onClick={handleBulkSave} style={{ background: '#2d5fa8', color: '#fff', padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>💾 확정 저장 {uploadConfirmedIds.size > 0 ? `(${uploadConfirmedIds.size}건)` : ''}</button>
+                  <button onClick={handleBulkSave} style={{ background: '#3b6eb5', color: '#fff', padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>💾 확정 저장 {uploadConfirmedIds.size > 0 ? `(${uploadConfirmedIds.size}건)` : ''}</button>
                 </div>
               </div>
 
@@ -4262,7 +4262,7 @@ function UploadContent() {
                     <div key={cardNum} style={{ borderBottom: '2px solid #e5e7eb' }}>
                       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
                         onClick={() => toggleGroup(cardNum)}>
-                        <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#2d5fa8', flexShrink: 0 }}
+                        <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#3b6eb5', flexShrink: 0 }}
                           checked={group.items.every((i: any) => uploadSelectedIds.has(i.id))}
                           onClick={e => e.stopPropagation()}
                           onChange={e => {
@@ -4274,18 +4274,18 @@ function UploadContent() {
                               return next
                             })
                           }} />
-                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.isBank ? '#2d5fa8' : group.cardInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
+                        <div style={{ width: 4, height: 32, borderRadius: 4, background: group.isBank ? '#3b6eb5' : group.cardInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
                         <span style={{ fontSize: 16 }}>{group.isBank ? '🏦' : '💳'}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: '#334155', margin: 0 }}>
                             {group.isBank ? '통장/이체 거래' : group.cardInfo ? `${group.cardInfo.card_company} ****${(group.cardInfo.card_number || '').slice(-4)}` : cardNum}
                           </p>
                           {group.isBank && (
-                            <p style={{ fontSize: 13, color: '#2d5fa8', margin: 0, marginTop: 1 }}>계좌이체, 자동이체, CMS 등 통장 거래 내역</p>
+                            <p style={{ fontSize: 13, color: '#3b6eb5', margin: 0, marginTop: 1 }}>계좌이체, 자동이체, CMS 등 통장 거래 내역</p>
                           )}
                           {!group.isBank && group.cardInfo && (
                             <p style={{ fontSize: 13, color: '#64748b', margin: 0, marginTop: 1 }}>
-                              사용자: <b style={{ color: '#0f172a' }}>{getCardDisplayName(group.cardInfo)}</b>
+                              사용자: <b style={{ color: '#334155' }}>{getCardDisplayName(group.cardInfo)}</b>
                               {group.cardInfo.assigned_employee_id ? (() => {
                                 const emp = employees.find((e: any) => e.id === group.cardInfo.assigned_employee_id)
                                 const empName = emp?.name || emp?.employee_name
@@ -4350,11 +4350,11 @@ function UploadContent() {
                                     {isItemConfirmed ? (
                                       <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                     ) : (
-                                      <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                                      <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                                     )}
                                   </td>
                                   <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
-                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#334155' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13 }}>
                                     <div>{item.description}</div>
                                     <input
@@ -4383,19 +4383,19 @@ function UploadContent() {
                                               <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                               <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                                 <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                               </div>
                                             </>)}
                                             <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
                                           </div>
                                           {isOpen && catPopoverPos && (<>
                                             <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                               {catPopoverStep === 'group' ? (<>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                 {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                   <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                     onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
                                                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />{g.group}
@@ -4403,7 +4403,7 @@ function UploadContent() {
                                                 ))}
                                               </>) : (<>
                                                 <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                   ② 세부항목
                                                 </div>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null) }}
@@ -4412,11 +4412,11 @@ function UploadContent() {
                                                 </button>
                                                 {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(c => c.group === catPopoverGroup)?.items || [])].map(c => (
                                                   <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null) }}
-                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                     onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
                                                     <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>{c}
-                                                    {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 13 }}>✓</span>}
+                                                    {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
                                                   </button>
                                                 ))}
                                               </>)}
@@ -4448,7 +4448,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -4493,7 +4493,7 @@ function UploadContent() {
                           {cardHasMore && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: cardLimit + GROUP_PAGE_SIZE })) }}
-                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
+                                style={{ background: '#3b6eb5', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                 더보기 ({cardLimit}/{group.items.length}건)
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cardNum]: group.items.length })) }}
@@ -4525,7 +4525,7 @@ function UploadContent() {
                       <div key={cat} style={{ borderBottom: '2px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
                           onClick={() => toggleGroup(cat)}>
-                          <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#2d5fa8', flexShrink: 0 }}
+                          <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#3b6eb5', flexShrink: 0 }}
                             checked={group.items.length > 0 && group.items.every((i: any) => uploadSelectedIds.has(i.id))}
                             onClick={e => e.stopPropagation()}
                             onChange={e => {
@@ -4540,7 +4540,7 @@ function UploadContent() {
                           <div style={{ width: 4, height: 32, borderRadius: 4, background: groupColor, flexShrink: 0 }} />
                           {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
                           <div style={{ flex: 1 }}>
-                            <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{cat}</p>
+                            <p style={{ fontWeight: 800, fontSize: 13, color: '#334155', margin: 0 }}>{cat}</p>
                             {groupName && <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, marginTop: 1 }}>{groupName}</p>}
                             {isDisplayMode && subGroups && (
                               <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, marginTop: 1 }}>
@@ -4582,11 +4582,11 @@ function UploadContent() {
                                 {isItemConfirmed ? (
                                   <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                 ) : (
-                                  <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                                  <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                                 )}
                               </td>
                               <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
-                              <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                              <td style={{ padding: '8px 12px', fontWeight: 700, color: '#334155' }}>{item.client_name}</td>
                               <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
                                 <input type="text" placeholder="메모..." value={item.memo || ''} onChange={e => handleUpdateItem(item.id, 'memo', e.target.value, item)} onClick={e => e.stopPropagation()} style={{ width: '100%', border: 'none', borderBottom: '1px dashed #cbd5e1', background: 'transparent', fontSize: 12, color: '#6366f1', padding: '2px 0', marginTop: 2, outline: 'none', fontWeight: 500 }} />
@@ -4616,7 +4616,7 @@ function UploadContent() {
                                             <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                             <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                               <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                              <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                              <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                             </div>
                                           </>
                                         )}
@@ -4625,13 +4625,13 @@ function UploadContent() {
                                       {isOpen && catPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                          <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                             {catPopoverStep === 'group' ? (
                                               <>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                 {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                   <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                     onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}
                                                   >
@@ -4647,7 +4647,7 @@ function UploadContent() {
                                             ) : (
                                               <>
                                                 <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                   ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                                 </div>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
@@ -4656,7 +4656,7 @@ function UploadContent() {
                                                 </button>
                                                 {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
                                                   <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                     onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}
                                                   >
@@ -4695,7 +4695,7 @@ function UploadContent() {
                                       {isOpen && relPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                             <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                               <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                             </button>
@@ -4747,8 +4747,8 @@ function UploadContent() {
                                 return (
                                   <div key={sgName}>
                                     {/* Sticky sub-group header - div outside table for proper sticky behavior */}
-                                    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: '#f0f4ff', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderBottom: '1px solid #e2e8f0' }}>
-                                      <input type="checkbox" style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8', marginLeft: 8 }}
+                                    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: '#f0f4ff', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '2px 2px 6px rgba(140,170,210,0.08), -2px -2px 6px rgba(255,255,255,0.5)', borderBottom: '1px solid #e2e8f0' }}>
+                                      <input type="checkbox" style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5', marginLeft: 8 }}
                                         checked={sgItemIds.length > 0 && sgItemIds.every((id: number) => uploadSelectedIds.has(id))}
                                         onClick={e => e.stopPropagation()}
                                         onChange={e => {
@@ -4829,7 +4829,7 @@ function UploadContent() {
                             {catHasMore && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: catLimit + GROUP_PAGE_SIZE })) }}
-                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
+                                  style={{ background: '#3b6eb5', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                   더보기 ({catLimit}/{sortedItems.length}건)
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [cat]: sortedItems.length })) }}
@@ -4865,12 +4865,12 @@ function UploadContent() {
                           }}
                           onChange={(e) => { e.stopPropagation(); toggleSelectGroup(group.items) }}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#334155', flexShrink: 0 }}
                         />
                         <div style={{ width: 4, height: 32, borderRadius: 4, background: group.carInfo ? '#f59e0b' : '#94a3b8', flexShrink: 0 }} />
                         <span style={{ fontSize: 16 }}>{label.startsWith('🚛') ? '🚛' : '🏢'}</span>
                         <div style={{ flex: 1 }}>
-                          <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{label}</p>
+                          <p style={{ fontWeight: 800, fontSize: 13, color: '#334155', margin: 0 }}>{label}</p>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
@@ -4917,11 +4917,11 @@ function UploadContent() {
                                     {isItemConfirmed ? (
                                       <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                     ) : (
-                                      <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                                      <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                                     )}
                                   </td>
                                   <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
-                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#334155' }}>{item.client_name}</td>
                                   <td style={{ padding: '8px 12px', color: '#475569', fontWeight: 600, fontSize: 13, maxWidth: 180 }}>
                                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
                                     <input type="text" placeholder="메모..." value={item.memo || ''} onChange={e => handleUpdateItem(item.id, 'memo', e.target.value, item)} onClick={e => e.stopPropagation()} style={{ width: '100%', border: 'none', borderBottom: '1px dashed #cbd5e1', background: 'transparent', fontSize: 12, color: '#6366f1', padding: '2px 0', marginTop: 2, outline: 'none', fontWeight: 500 }} />
@@ -4945,7 +4945,7 @@ function UploadContent() {
                                                 <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                                 <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                                   <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                                 </div>
                                               </>
                                             )}
@@ -4954,13 +4954,13 @@ function UploadContent() {
                                           {isCatOpen && catPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                                 {catPopoverStep === 'group' ? (
                                                   <>
                                                     <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                     {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                       <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                        style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                        style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                         onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                         onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
                                                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
@@ -4975,7 +4975,7 @@ function UploadContent() {
                                                 ) : (
                                                   <>
                                                     <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                      <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                      <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                       ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                                     </div>
                                                     <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
@@ -4984,7 +4984,7 @@ function UploadContent() {
                                                     </button>
                                                     {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
                                                       <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                        style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                        style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                         onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                         onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
                                                         <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
@@ -5022,7 +5022,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -5067,7 +5067,7 @@ function UploadContent() {
                           {vHasMore && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 16px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: vLimit + GROUP_PAGE_SIZE })) }}
-                                style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
+                                style={{ background: '#3b6eb5', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                 더보기 ({vLimit}/{group.items.length}건)
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: group.items.length })) }}
@@ -5172,7 +5172,7 @@ function UploadContent() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
-                    조회 <span style={{ fontWeight: 800, color: '#0f172a' }}>{uploadSummaryTotals.count.toLocaleString()}</span>건
+                    조회 <span style={{ fontWeight: 800, color: '#334155' }}>{uploadSummaryTotals.count.toLocaleString()}</span>건
                   </span>
                   <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
                   <span style={{ fontSize: 13, color: '#2563eb', fontWeight: 700 }}>
@@ -5207,7 +5207,7 @@ function UploadContent() {
                       <div key={label} style={{ borderBottom: '2px solid #e5e7eb' }}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', background: '#f8fafc', gap: 10, cursor: 'pointer' }}
                           onClick={() => toggleGroup(label)}>
-                          <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#2d5fa8', flexShrink: 0 }}
+                          <input type="checkbox" style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#3b6eb5', flexShrink: 0 }}
                             checked={group.items.length > 0 && group.items.every((i: any) => uploadSelectedIds.has(i.id))}
                             onClick={e => e.stopPropagation()}
                             onChange={e => {
@@ -5219,9 +5219,9 @@ function UploadContent() {
                                 return next
                               })
                             }} />
-                          <div style={{ width: 4, height: 32, borderRadius: 4, background: group.type === 'income' ? '#16a34a' : '#2d5fa8', flexShrink: 0 }} />
+                          <div style={{ width: 4, height: 32, borderRadius: 4, background: group.type === 'income' ? '#16a34a' : '#3b6eb5', flexShrink: 0 }} />
                           <div style={{ flex: 1 }}>
-                            <p style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', margin: 0 }}>{label}</p>
+                            <p style={{ fontWeight: 800, fontSize: 13, color: '#334155', margin: 0 }}>{label}</p>
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontWeight: 800, fontSize: 14, color: group.type === 'income' ? '#16a34a' : '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
@@ -5268,11 +5268,11 @@ function UploadContent() {
                                       {isItemConfirmed ? (
                                         <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                                       ) : (
-                                        <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                                        <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                                       )}
                                     </td>
                                     <td style={{ padding: '8px 8px', color: '#6b7280', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
-                                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0f172a' }}>{item.client_name}</td>
+                                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#334155' }}>{item.client_name}</td>
                                     <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 13, maxWidth: 180 }}>
                                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
                                       <input type="text" placeholder="메모..." value={item.memo || ''} onChange={e => handleUpdateItem(item.id, 'memo', e.target.value, item)} onClick={e => e.stopPropagation()} style={{ width: '100%', border: 'none', borderBottom: '1px dashed #cbd5e1', background: 'transparent', fontSize: 12, color: '#6366f1', padding: '2px 0', marginTop: 2, outline: 'none', fontWeight: 500 }} />
@@ -5296,7 +5296,7 @@ function UploadContent() {
                                                   <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                                   <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                                     <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                                   </div>
                                                 </>
                                               )}
@@ -5305,13 +5305,13 @@ function UploadContent() {
                                             {isCatOpen && catPopoverPos && (
                                               <>
                                                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                                <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                                   {catPopoverStep === 'group' ? (
                                                     <>
                                                       <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                       {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                         <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                          style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                          style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                           onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                           onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
                                                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
@@ -5326,7 +5326,7 @@ function UploadContent() {
                                                   ) : (
                                                     <>
                                                       <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                        <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                         ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                                       </div>
                                                       <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
@@ -5335,7 +5335,7 @@ function UploadContent() {
                                                       </button>
                                                       {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
                                                         <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                          style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                          style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                           onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                           onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
                                                           <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
@@ -5374,7 +5374,7 @@ function UploadContent() {
                                             {isRelOpen && relPopoverPos && (
                                               <>
                                                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                   <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                     <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                   </button>
@@ -5416,7 +5416,7 @@ function UploadContent() {
                             {gHasMore && (
                               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e5e7eb' }}>
                                 <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [label]: gLimit + GROUP_PAGE_SIZE })) }}
-                                  style={{ background: '#2d5fa8', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
+                                  style={{ background: '#3b6eb5', color: '#fff', padding: '6px 16px', borderRadius: 6, fontWeight: 700, fontSize: 13, border: 'none', cursor: 'pointer' }}>
                                   더보기 ({gLimit}/{group.items.length}건)
                                 </button>
                               </div>
@@ -5450,7 +5450,7 @@ function UploadContent() {
                         <th style={{ padding: '6px 4px', textAlign: 'center' }}>
                           <input type="checkbox" checked={filteredResults.length > 0 && uploadSelectedIds.size === filteredResults.length}
                             ref={(el) => { if (el) el.indeterminate = uploadSelectedIds.size > 0 && uploadSelectedIds.size < filteredResults.length }}
-                            onChange={toggleUploadSelectAll} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                            onChange={toggleUploadSelectAll} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                         </th>
                         <th style={{ padding: '6px 8px', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('date')}>날짜{sortIndicator('date')}</th>
                         <th style={{ padding: '6px 6px' }}>결제</th>
@@ -5472,7 +5472,7 @@ function UploadContent() {
                               {uploadConfirmedIds.has(item.id) ? (
                                 <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
                               ) : (
-                                <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#2d5fa8' }} />
+                                <input type="checkbox" checked={uploadSelectedIds.has(item.id)} onChange={() => toggleUploadSelect(item.id)} style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#3b6eb5' }} />
                               )}
                             </td>
                             <td style={{ padding: '4px 6px', fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11, color: '#94a3b8' }}>{dt.time}</span></>}</>})()}</td>
@@ -5482,7 +5482,7 @@ function UploadContent() {
                                   💳 {item.card_number ? item.card_number.slice(-4) : '카드'}
                                 </span>
                               ) : (
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#1e40af' : '#991b1b', whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: item.type === 'income' ? '#dbeafe' : '#fee2e2', color: item.type === 'income' ? '#5a8fd4' : '#991b1b', whiteSpace: 'nowrap' }}>
                                   {item.type === 'income' ? '🔵 입금' : '🔴 출금'}
                                 </span>
                               )}
@@ -5513,7 +5513,7 @@ function UploadContent() {
                                           <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
                                           <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                                             <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
                                           </div>
                                         </>
                                       )}
@@ -5522,13 +5522,13 @@ function UploadContent() {
                                     {isOpen && catPopoverPos && (
                                       <>
                                         <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                               {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
                                                 <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                   onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}
                                                 >
@@ -5544,7 +5544,7 @@ function UploadContent() {
                                           ) : (
                                             <>
                                               <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                 ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                               </div>
                                               <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
@@ -5553,13 +5553,13 @@ function UploadContent() {
                                               </button>
                                               {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
                                                 <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                   onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}
                                                 >
                                                   <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
                                                   {c}
-                                                  {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#2d5fa8', fontSize: 13 }}>✓</span>}
+                                                  {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
                                                 </button>
                                               ))}
                                             </>
@@ -5577,7 +5577,7 @@ function UploadContent() {
                                   {cardInfo.holder} ({cardInfo.last4})
                                 </span>
                               ) : (item as any).matched_employee_name ? (
-                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#5a8fd4', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>
                                   {(item as any).matched_employee_name}
                                 </span>
                               ) : (item.payment_method === '카드' || item.payment_method === 'Card') ? (
@@ -5617,7 +5617,7 @@ function UploadContent() {
                                         <div style={{
                                           position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99,
                                           background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
-                                          boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 240, maxWidth: 320, maxHeight: 320, overflowY: 'auto',
+                                          boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: 320, overflowY: 'auto',
                                         }}>
                                           <button
                                             onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }}
@@ -5687,8 +5687,8 @@ function UploadContent() {
               {uploadSelectedIds.size > 0 && (
                 <div style={{
                   position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-                  background: '#0f172a', color: '#fff', borderRadius: 14,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 50, maxWidth: '90vw',
+                  background: '#334155', color: '#fff', borderRadius: 14,
+                  boxShadow: '8px 8px 20px rgba(140,170,210,0.2), -8px -8px 20px rgba(255,255,255,0.6)', zIndex: 50, maxWidth: '90vw',
                   transition: 'all 0.2s ease',
                 }}>
                   {/* ── 선택 목록 펼침 영역 (토글) ── */}
@@ -5710,7 +5710,7 @@ function UploadContent() {
                               style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 15, padding: 0, lineHeight: 1 }}
                               onMouseEnter={e => e.currentTarget.style.color = '#f87171'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>×</button>
                             <span style={{ color: '#94a3b8', minWidth: 130, fontSize: 12, lineHeight: 1.4 }}>{(() => { const dt = formatDatetime(item.transaction_date || item.source_data?.transaction_date); return <>{dt.date}{dt.time && <><br/><span style={{ fontSize: 11 }}>{dt.time}</span></>}</>})()}</span>
-                            <span style={{ color: '#1e293b', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, fontSize: 13 }}>{item.client_name}</span>
+                            <span style={{ color: '#64748b', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, fontSize: 13 }}>{item.client_name}</span>
                             <span style={{ color: item.type === 'income' ? '#60a5fa' : '#f87171', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 13 }}>
                               {item.type === 'income' ? '+' : '-'}{Math.abs(item.amount).toLocaleString()}
                             </span>
@@ -5724,7 +5724,7 @@ function UploadContent() {
                   {uploadSelectedIds.size > 1 && (
                     <button onClick={() => setFloatingBarExpanded(prev => !prev)}
                       style={{ background: 'none', border: '1px solid #475569', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', padding: '3px 8px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#e2e8f0' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#64748b'; e.currentTarget.style.color = '#e2e8f0' }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#94a3b8' }}>
                       {floatingBarExpanded ? '▼ 접기' : '▲ 목록'}
                     </button>
@@ -5847,7 +5847,7 @@ function UploadContent() {
                     ✅ 분류확정
                   </button>
                   <button onClick={() => { setBulkClassifyOpen(true); setBulkGroup(''); setBulkItem(''); setBulkRelated(''); setSplitRows([]); setPerItemMode(false); setPerItemRelated({}) }}
-                    style={{ background: '#2d5fa8', color: '#fff', padding: '9px 18px', borderRadius: 8, fontWeight: 800, fontSize: 13, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    style={{ background: '#3b6eb5', color: '#fff', padding: '9px 18px', borderRadius: 8, fontWeight: 800, fontSize: 13, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     📋 일괄분류
                   </button>
                   <button onClick={async () => {
@@ -5906,12 +5906,12 @@ function UploadContent() {
                 const bulkGroupColor = bulkGroup ? (CATEGORY_COLORS[bulkGroup] || '#94a3b8') : ''
                 return (
                   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setBulkClassifyOpen(false)}>
-                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '10px 10px 30px rgba(140,170,210,0.22), -10px -10px 30px rgba(255,255,255,0.7)' }} onClick={e => e.stopPropagation()}>
                       {/* 헤더 */}
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>📋 일괄 분류</h3>
-                          <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0' }}>선택된 <b style={{ color: '#2d5fa8' }}>{selCount}건</b> · 합계 <b>{selTotal.toLocaleString()}원</b>{selForeignText && <span style={{ color: '#f59e0b', fontWeight: 700, marginLeft: 4 }}>({selForeignText})</span>}</p>
+                          <p style={{ fontSize: 13, color: '#64748b', margin: '2px 0 0' }}>선택된 <b style={{ color: '#3b6eb5' }}>{selCount}건</b> · 합계 <b>{selTotal.toLocaleString()}원</b>{selForeignText && <span style={{ color: '#f59e0b', fontWeight: 700, marginLeft: 4 }}>({selForeignText})</span>}</p>
                         </div>
                         <button onClick={() => setBulkClassifyOpen(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: '#94a3b8', cursor: 'pointer' }}>✕</button>
                       </div>
@@ -5926,8 +5926,8 @@ function UploadContent() {
                             <button key={qp.label} onClick={() => { setBulkGroup(qp.group); setBulkItem(qp.item) }}
                               style={{
                                 padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                                border: bulkGroup === qp.group && bulkItem === qp.item ? '1px solid #2d5fa8' : '1px solid #e2e8f0',
-                                background: bulkGroup === qp.group && bulkItem === qp.item ? '#2d5fa8' : '#fff',
+                                border: bulkGroup === qp.group && bulkItem === qp.item ? '1px solid #3b6eb5' : '1px solid #e2e8f0',
+                                background: bulkGroup === qp.group && bulkItem === qp.item ? '#3b6eb5' : '#fff',
                                 color: bulkGroup === qp.group && bulkItem === qp.item ? '#fff' : '#374151',
                                 cursor: 'pointer', transition: 'all 0.15s',
                               }}>
@@ -5945,7 +5945,7 @@ function UploadContent() {
                             <div style={{ display: 'flex', gap: 6 }}>
                               <input type="text" value={customGroupText} onChange={e => setCustomGroupText(e.target.value)}
                                 placeholder="새 중그룹명 입력..." autoFocus
-                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #2d5fa8', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#1e293b', outline: 'none', background: '#fff' }}
+                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #3b6eb5', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#64748b', outline: 'none', background: '#fff' }}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter' && customGroupText.trim()) {
                                     const newGroup = customGroupText.trim()
@@ -5972,7 +5972,7 @@ function UploadContent() {
                                 setCustomGroupInput(false)
                                 setCustomGroupText('')
                               }}
-                                style={{ padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#2d5fa8', color: '#fff', whiteSpace: 'nowrap' }}>
+                                style={{ padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#3b6eb5', color: '#fff', whiteSpace: 'nowrap' }}>
                                 확인
                               </button>
                               <button onClick={() => { setCustomGroupInput(false); setCustomGroupText('') }}
@@ -5983,7 +5983,7 @@ function UploadContent() {
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <select value={bulkGroup} onChange={e => { setBulkGroup(e.target.value); setBulkItem(''); setCustomItemInput(false) }}
-                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#1e293b', outline: 'none', background: '#fff' }}>
+                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#64748b', outline: 'none', background: '#fff' }}>
                                 <option value="">선택하세요...</option>
                                 {(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).map(g => (
                                   <option key={g.group} value={g.group}>{g.group}</option>
@@ -5993,7 +5993,7 @@ function UploadContent() {
                                 ))}
                               </select>
                               <button onClick={() => setCustomGroupInput(true)}
-                                style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
+                                style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #3b6eb5', cursor: 'pointer', background: '#eff6ff', color: '#3b6eb5', whiteSpace: 'nowrap' }}>
                                 + 추가
                               </button>
                             </div>
@@ -6005,7 +6005,7 @@ function UploadContent() {
                             <div style={{ display: 'flex', gap: 6 }}>
                               <input type="text" value={customItemText} onChange={e => setCustomItemText(e.target.value)}
                                 placeholder="새 세부항목명 입력..." autoFocus
-                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #2d5fa8', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#1e293b', outline: 'none', background: '#fff' }}
+                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #3b6eb5', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#64748b', outline: 'none', background: '#fff' }}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter' && customItemText.trim()) {
                                     const newItem = customItemText.trim()
@@ -6024,7 +6024,7 @@ function UploadContent() {
                                 setCustomItemInput(false)
                                 setCustomItemText('')
                               }}
-                                style={{ padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#2d5fa8', color: '#fff', whiteSpace: 'nowrap' }}>
+                                style={{ padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#3b6eb5', color: '#fff', whiteSpace: 'nowrap' }}>
                                 확인
                               </button>
                               <button onClick={() => { setCustomItemInput(false); setCustomItemText('') }}
@@ -6035,7 +6035,7 @@ function UploadContent() {
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <select value={bulkItem} onChange={e => setBulkItem(e.target.value)} disabled={!bulkGroup}
-                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkItem ? '#1e293b' : '#94a3b8', outline: 'none', background: '#fff', opacity: bulkGroup ? 1 : 0.5 }}>
+                                style={{ flex: 1, padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkItem ? '#64748b' : '#94a3b8', outline: 'none', background: '#fff', opacity: bulkGroup ? 1 : 0.5 }}>
                                 <option value="">미지정 (중그룹만)</option>
                                 {bulkSubItems.map(c => <option key={c} value={c}>{c}</option>)}
                                 {customCategories.find(c => c.group === bulkGroup)?.items.map(ci => (
@@ -6050,7 +6050,7 @@ function UploadContent() {
                                   }
                                   setCustomItemInput(true)
                                 }}
-                                  style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #2d5fa8', cursor: 'pointer', background: '#eff6ff', color: '#2d5fa8', whiteSpace: 'nowrap' }}>
+                                  style={{ padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: '1px solid #3b6eb5', cursor: 'pointer', background: '#eff6ff', color: '#3b6eb5', whiteSpace: 'nowrap' }}>
                                   + 추가
                                 </button>
                               )}
@@ -6072,7 +6072,7 @@ function UploadContent() {
                           </div>
                           {!perItemMode ? (
                             <select value={bulkRelated} onChange={e => setBulkRelated(e.target.value)}
-                              style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkRelated ? '#1e293b' : '#94a3b8', outline: 'none', background: '#fff' }}>
+                              style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: bulkRelated ? '#64748b' : '#94a3b8', outline: 'none', background: '#fff' }}>
                               <option value="">연결 안함</option>
                               {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(grp => (
                                 <optgroup key={grp.group} label={`${grp.icon} ${grp.group}`}>
@@ -6100,7 +6100,7 @@ function UploadContent() {
                                     <select value={perItemRelated[item.id] || ''}
                                       onChange={e => setPerItemRelated(prev => ({ ...prev, [item.id]: e.target.value }))}
                                       style={{ width: '100%', padding: '5px 8px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                                        color: perItemRelated[item.id] ? '#1e293b' : '#94a3b8', background: '#fff', boxSizing: 'border-box' }}>
+                                        color: perItemRelated[item.id] ? '#64748b' : '#94a3b8', background: '#fff', boxSizing: 'border-box' }}>
                                       <option value="">🔗 연결 선택</option>
                                       {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(bulkItem || bulkGroup); return !_ag || _ag.includes(rg.group) }).map(grp => (
                                         <optgroup key={grp.group} label={`${grp.icon} ${grp.group}`}>
@@ -6255,17 +6255,17 @@ function UploadContent() {
                       {/* 미리보기 */}
                       {bulkGroup && (
                         <div style={{ padding: '10px 20px', background: '#f0f9ff', borderTop: '1px solid #e2e8f0' }}>
-                          <p style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', marginBottom: 4 }}>미리보기</p>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: '#5a8fd4', marginBottom: 4 }}>미리보기</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 700, background: `${bulkGroupColor}20`, color: bulkGroupColor }}>{bulkGroup.split(' ')[0]} {bulkGroup.replace(/^[^\s]+\s/, '').substring(0, 6)}</span>
                             {bulkItem && <><span style={{ color: '#d1d5db' }}>›</span><span style={{ fontSize: 12, fontWeight: 700 }}>{bulkItem}</span></>}
                             {perItemMode ? (
                               Object.keys(perItemRelated).length > 0 && (
-                                <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>개별연결 {Object.values(perItemRelated).filter(Boolean).length}건</span></>
+                                <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#5a8fd4' }}>개별연결 {Object.values(perItemRelated).filter(Boolean).length}건</span></>
                               )
                             ) : bulkRelated ? (() => {
                               const ro = relatedOptions.flatMap(g => g.items).find(o => o.value === bulkRelated)
-                              return ro ? <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#dbeafe', color: '#1e40af' }}>{ro.label}</span></> : null
+                              return ro ? <><span style={{ color: '#d1d5db' }}>›</span><span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 13, fontWeight: 700, background: '#dbeafe', color: '#5a8fd4' }}>{ro.label}</span></> : null
                             })() : null}
                           </div>
                         </div>
@@ -6324,7 +6324,7 @@ function UploadContent() {
                           setUploadSelectedIds(new Set())
                           setBulkClassifyOpen(false)
                         }}
-                          style={{ padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: bulkGroup ? '#2d5fa8' : '#94a3b8', color: '#fff', opacity: bulkGroup ? 1 : 0.5 }}>
+                          style={{ padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: bulkGroup ? '#3b6eb5' : '#94a3b8', color: '#fff', opacity: bulkGroup ? 1 : 0.5 }}>
                           {splitRows.length > 0 ? `✂️ 분할 + 분류 (${splitRows.length}건)` : `✅ ${selCount}건 일괄 분류`}
                         </button>
                       </div>
@@ -6349,9 +6349,9 @@ function UploadContent() {
                   checked={sourceFilteredItems.length > 0 && selectedIds.size === sourceFilteredItems.length}
                   ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sourceFilteredItems.length }}
                   onChange={(e) => toggleSelectAll(e.target.checked)}
-                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a' }}
+                  style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#334155' }}
                 />
-                <span style={{ fontSize: 12, fontWeight: 700, color: selectedIds.size > 0 ? '#0f172a' : '#94a3b8' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: selectedIds.size > 0 ? '#334155' : '#94a3b8' }}>
                   {selectedIds.size > 0 ? `${selectedIds.size}건 선택됨` : `전체 선택`}
                 </span>
               </label>
@@ -6420,7 +6420,7 @@ function UploadContent() {
                         }}
                         onChange={(e) => { e.stopPropagation(); toggleSelectGroup(group.items) }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#0f172a', flexShrink: 0 }}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#334155', flexShrink: 0 }}
                       />
 
                       {/* Color Bar */}
@@ -6430,7 +6430,7 @@ function UploadContent() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                         {!isDisplayCat && <span style={{ fontSize: 20 }}>{icon}</span>}
                         <div>
-                          <p style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', margin: 0 }}>{category}</p>
+                          <p style={{ fontWeight: 800, fontSize: 14, color: '#334155', margin: 0 }}>{category}</p>
                           {!hasSubGroups && !isDisplayCat && <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 1, margin: 0 }}>{groupName}</p>}
                           {hasSubGroups && group.subGroups && (
                             <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 1, margin: 0 }}>
@@ -6442,7 +6442,7 @@ function UploadContent() {
 
                       {/* Count & Amount */}
                       <div style={{ textAlign: 'right', marginRight: 12 }}>
-                        <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#3b82f6' : '#ef4444', margin: 0 }}>
+                        <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#3b6eb5' : '#ef4444', margin: 0 }}>
                           {nf(group.totalAmount)}원
                         </p>
                         {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
@@ -6552,7 +6552,7 @@ function UploadContent() {
 
                               {/* Type */}
                               <span style={{ fontSize: 13, fontWeight: 700, padding: '2px 6px', borderRadius: 4, flexShrink: 0,
-                                background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b82f6' : '#ef4444' }}>
+                                background: src.type === 'income' ? '#eff6ff' : '#fef2f2', color: src.type === 'income' ? '#3b6eb5' : '#ef4444' }}>
                                 {src.type === 'income' ? '입금' : '출금'}
                               </span>
 
@@ -6562,7 +6562,7 @@ function UploadContent() {
                               </span>
 
                               {/* Client */}
-                              <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: '#334155', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {src.client_name || '(미상)'}
                               </span>
 
@@ -6602,13 +6602,13 @@ function UploadContent() {
                                     {isCatOpen && catPopoverPos && (
                                       <>
                                         <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 8px 25px rgba(0,0,0,0.15)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                               {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map((i: string) => ({ label: i })) }))].map(g => (
                                                 <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
                                                   onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
                                                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
@@ -6623,7 +6623,7 @@ function UploadContent() {
                                           ) : (
                                             <>
                                               <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2d5fa8', padding: 0 }}>←</button>
+                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
                                                 ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
                                               </div>
                                               <button onClick={() => { handleChangeCategory(item, catPopoverGroup); setOpenCategoryId(null); setCatPopoverPos(null) }}
@@ -6632,7 +6632,7 @@ function UploadContent() {
                                               </button>
                                               {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
                                                 <button key={c} onClick={() => { handleChangeCategory(item, c); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #2d5fa8' : '3px solid transparent' }}
+                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
                                                   onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
                                                   <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
@@ -6686,7 +6686,7 @@ function UploadContent() {
                                     {linkPopoverId === item.id && linkPopoverPosFixed && (
                                       <div data-link-popover onClick={(e) => e.stopPropagation()} style={{
                                         position: 'fixed', top: linkPopoverPosFixed.top, right: linkPopoverPosFixed.right, width: 280,
-                                        background: '#fff', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+                                        background: '#fff', borderRadius: 14, boxShadow: '8px 8px 24px rgba(140,170,210,0.18), -8px -8px 24px rgba(255,255,255,0.65)',
                                         border: '1px solid #e2e8f0', zIndex: 60, overflow: 'hidden',
                                       }}>
                                         <input
@@ -6701,8 +6701,8 @@ function UploadContent() {
                                               style={{
                                                 flex: '0 0 auto', padding: '8px 6px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                                                 background: linkPopoverTab === t.key ? '#fff' : '#f8fafc',
-                                                color: linkPopoverTab === t.key ? '#0f172a' : '#94a3b8',
-                                                borderBottom: linkPopoverTab === t.key ? '2px solid #0f172a' : '2px solid transparent',
+                                                color: linkPopoverTab === t.key ? '#334155' : '#94a3b8',
+                                                borderBottom: linkPopoverTab === t.key ? '2px solid #334155' : '2px solid transparent',
                                               }}>{t.label}</button>
                                           ))}
                                         </div>
@@ -6820,7 +6820,7 @@ function UploadContent() {
                                   <button onClick={() => handleConfirm(item)}
                                     disabled={isUnclassified}
                                     style={{
-                                      background: isUnclassified ? '#f1f5f9' : '#0f172a',
+                                      background: isUnclassified ? '#f1f5f9' : '#334155',
                                       color: isUnclassified ? '#94a3b8' : '#fff',
                                       padding: '4px 10px', borderRadius: 6, fontWeight: 700, fontSize: 12,
                                       border: 'none', cursor: isUnclassified ? 'not-allowed' : 'pointer',
@@ -6860,7 +6860,7 @@ function UploadContent() {
                         {hasMore && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', gap: 8, borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
                             <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: limit + GROUP_PAGE_SIZE })) }}
-                              style={{ background: '#2d5fa8', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
+                              style={{ background: '#3b6eb5', color: '#fff', padding: '8px 20px', borderRadius: 8, fontWeight: 700, fontSize: 12, border: 'none', cursor: 'pointer' }}>
                               더보기 ({limit}/{sortedItems.length}건)
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); setGroupItemLimits(prev => ({ ...prev, [category]: sortedItems.length })) }}
@@ -6885,7 +6885,7 @@ function UploadContent() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
-                  조회 <span style={{ fontWeight: 800, color: '#0f172a' }}>{summaryTotals.count.toLocaleString()}</span>건
+                  조회 <span style={{ fontWeight: 800, color: '#334155' }}>{summaryTotals.count.toLocaleString()}</span>건
                 </span>
                 <div style={{ width: 1, height: 14, background: '#e2e8f0' }} />
                 <span style={{ fontSize: 13, color: '#2563eb', fontWeight: 700 }}>
@@ -6921,9 +6921,9 @@ function UploadContent() {
           {selectedIds.size > 0 && (
             <div style={{
               position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-              background: '#0f172a', color: '#fff', borderRadius: 14,
+              background: '#334155', color: '#fff', borderRadius: 14,
               padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.25)', zIndex: 50,
+              boxShadow: '8px 8px 20px rgba(140,170,210,0.2), -8px -8px 20px rgba(255,255,255,0.6)', zIndex: 50,
             }}>
               <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>
                 {selectionTotals.count}건 선택
@@ -6962,7 +6962,7 @@ function UploadContent() {
                   setSelectedIds(new Set())
                   fetchReviewItems()
                 }}
-                  style={{ background: '#fbbf24', color: '#0f172a', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ background: '#fbbf24', color: '#334155', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   되돌리기
                 </button>
               )}
@@ -6990,12 +6990,12 @@ function UploadContent() {
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
               <div style={{
                 position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 600, maxHeight: '80vh',
-                display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(140,170,210,0.25)',
               }} onClick={e => e.stopPropagation()}>
                 {/* 모달 헤더 */}
                 <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#334155' }}>
                       🔗 {selectedIds.size}건 일괄 연결
                     </h3>
                     <button onClick={() => { setLinkModalOpen(false); setLinkModalSelectedId(null) }}
@@ -7057,7 +7057,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === c.id ? '0 2px 8px rgba(180,83,9,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>💳</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{c.card_company || '카드'} ****{(c.card_number || '').slice(-4)}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{c.card_company || '카드'} ****{(c.card_number || '').slice(-4)}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{c.holder_name || c.card_alias || '공용'}</div>
                       </div>
                     ))}
@@ -7070,7 +7070,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === c.id ? '0 2px 8px rgba(79,70,229,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🚗</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{c.number || '번호없음'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{c.number || '번호없음'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{[c.brand, c.model].filter(Boolean).join(' ') || '-'}</div>
                       </div>
                     ))}
@@ -7083,7 +7083,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === j.id ? '0 2px 8px rgba(124,58,237,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🚛</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{j.investor_name || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{j.investor_name || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{(() => { const jc = j.car_id ? cars.find((cc: any) => String(cc.id) === String(j.car_id)) : null; return jc ? `${jc.number || '-'} ${(jc.brand || '') + ' ' + (jc.model || '')}`.trim() : '-'; })()}</div>
                       </div>
                     ))}
@@ -7096,7 +7096,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === inv.id ? '0 2px 8px rgba(22,163,74,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>💰</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{inv.investor_name || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{inv.investor_name || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{inv.investment_type || '-'}</div>
                       </div>
                     ))}
@@ -7109,7 +7109,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === l.id ? '0 2px 8px rgba(220,38,38,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🏦</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{l.finance_name || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{l.finance_name || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{l.loan_type || '-'}</div>
                       </div>
                     ))}
@@ -7122,7 +7122,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === ins.id ? '0 2px 8px rgba(8,145,178,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>🛡️</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ins.company || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{ins.company || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{ins.policy_type || ins.product_name || '-'}</div>
                       </div>
                     ))}
@@ -7135,7 +7135,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === emp.id ? '0 2px 8px rgba(16,185,129,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>👨‍💼</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{emp.employee_name || emp.name || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{emp.employee_name || emp.name || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{emp.phone || emp.email || '-'}</div>
                       </div>
                     ))}
@@ -7148,7 +7148,7 @@ function UploadContent() {
                           boxShadow: linkModalSelectedId === ct.id ? '0 2px 8px rgba(124,58,237,0.15)' : 'none',
                         }}>
                         <div style={{ fontSize: 20, marginBottom: 6 }}>📋</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{ct.customer_name || '미지정'}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 2 }}>{ct.customer_name || '미지정'}</div>
                         <div style={{ fontSize: 13, color: '#64748b' }}>{ct.car_number || '-'}</div>
                       </div>
                     ))}
@@ -7206,24 +7206,24 @@ function UploadContent() {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
           <div style={{
             position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 420,
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(140,170,210,0.25)', overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '24px 24px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🗑️</div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>삭제 확인</h3>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#334155' }}>삭제 확인</h3>
                   <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>휴지통으로 이동 (복원 가능)</p>
                 </div>
               </div>
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: '#64748b' }}>상태</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deleteModal.statusLabel}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{deleteModal.statusLabel}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: '#64748b' }}>필터</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{deleteModal.filterLabel}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{deleteModal.filterLabel}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, color: '#64748b' }}>삭제 건수</span>
@@ -7231,7 +7231,7 @@ function UploadContent() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, color: '#64748b' }}>합계 금액</span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{deleteModal.totalAmount.toLocaleString()}원</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{deleteModal.totalAmount.toLocaleString()}원</span>
                 </div>
               </div>
             </div>
@@ -7257,14 +7257,14 @@ function UploadContent() {
           <div style={{
             position: 'relative', background: '#fff', borderRadius: 16, width: '95%', maxWidth: 680,
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(140,170,210,0.25)', overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
             {/* 헤더 */}
             <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>⚠️</div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>중복 거래 발견</h3>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#334155' }}>중복 거래 발견</h3>
                   <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>총 {dupModal.totalCount.toLocaleString()}건의 중복이 감지되었습니다</p>
                 </div>
               </div>
@@ -7275,7 +7275,7 @@ function UploadContent() {
                 <div key={si} style={{ marginBottom: si < dupModal.sections.length - 1 ? 16 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span style={{ fontSize: 16 }}>{sec.icon}</span>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{sec.title}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#334155' }}>{sec.title}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', background: '#fef2f2', padding: '2px 8px', borderRadius: 10 }}>{sec.count}건</span>
                   </div>
 
@@ -7290,7 +7290,7 @@ function UploadContent() {
                         const nameDiffCount = allCross.filter(cd => cd.similarReasons.some(r => r.includes('거래처'))).length
                         const descDiffCount = allCross.filter(cd => cd.similarReasons.some(r => r.includes('적요'))).length
                         const filters: { key: typeof dupModal.dupViewFilter; label: string; count: number; color: string; bg: string }[] = [
-                          { key: 'all', label: '전체', count: allCross.length, color: '#0f172a', bg: '#f1f5f9' },
+                          { key: 'all', label: '전체', count: allCross.length, color: '#334155', bg: '#f1f5f9' },
                           { key: 'exact', label: '정확일치', count: exactCount, color: '#166534', bg: '#dcfce7' },
                           { key: 'time_diff', label: '시간 다름', count: timeDiffCount, color: '#991b1b', bg: '#fee2e2' },
                           { key: 'name_diff', label: '거래처 유사', count: nameDiffCount, color: '#92400e', bg: '#fef3c7' },
@@ -7720,7 +7720,7 @@ function UploadContent() {
                 return (
                   <div style={{ margin: '0 0 10px', fontSize: 11, color: '#64748b', lineHeight: 1.6, background: '#f0f9ff', padding: '10px 12px', borderRadius: 8, border: '1px solid #bae6fd' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, color: '#0f172a' }}>처리 대상:</span>
+                      <span style={{ fontWeight: 800, color: '#334155' }}>처리 대상:</span>
                       {allExact.length > 0 && (
                         <span style={{ background: excludedExactCount > 0 ? '#fef3c7' : '#dcfce7', color: excludedExactCount > 0 ? '#92400e' : '#166534', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
                           정확일치 {activeExact}/{allExact.length}건{excludedExactCount > 0 ? ' 선택' : ''}

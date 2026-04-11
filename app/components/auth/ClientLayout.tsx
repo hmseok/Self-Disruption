@@ -153,13 +153,15 @@ function MenuItem({ item, pathname, accent, allPaths }: { item: { name: string; 
       href={item.path}
       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
         isActive
-          ? accent
-            ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20'
-            : 'bg-blue-500/15 text-blue-300 border border-blue-500/20 shadow-sm shadow-blue-500/10'
-          : accent
-            ? 'text-slate-500 hover:bg-gray-50 hover:text-slate-600 border border-transparent'
-            : 'text-slate-400 hover:bg-gray-50 hover:text-slate-700 border border-transparent'
+          ? 'text-white border border-transparent'
+          : 'text-slate-600 hover:text-slate-800 border border-transparent'
       }`}
+      style={isActive ? {
+        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+        boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+      } : {}}
+      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.03)' }}
+      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
     >
       <Icon />
       <span>{item.name}</span>
@@ -267,7 +269,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   // 로딩 중 → 깔끔한 스플래시 (빈 레이아웃 깨짐 방지)
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#f0f4f8' }}>
+      <div className="flex items-center justify-center" style={{ height: '100dvh', background: '#f2f1ef' }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto" />
           <p className="mt-3 text-sm text-slate-500 font-medium">로딩 중...</p>
@@ -297,24 +299,24 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
   const showSettings = role === 'admin'
 
   return (
-    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f0f4f8', overflowX: 'hidden', overflowY: 'hidden' }}>
+    <div className="print:!h-auto print:!overflow-visible print:!block" style={{ display: 'flex', height: '100dvh', background: '#f2f1ef', overflowX: 'hidden', overflowY: 'hidden' }}>
       {/* 모바일 상단 고정 바 — 햄버거 + 업체선택 */}
       {!isSidebarOpen && (
-        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(15,23,41,0.95)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden safe-top" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 12px rgba(140,170,210,0.15)' }}>
           <div className="flex items-center gap-3 px-4 py-2.5" style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top))' }}>
             {/* 햄버거 */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="text-white p-1.5 rounded-lg hover:bg-steel-800 transition-colors flex-shrink-0"
+              className="text-slate-600 p-1.5 rounded-lg hover:bg-black/5 transition-colors flex-shrink-0"
             >
               <Icons.Menu />
             </button>
 
             {/* 로고 */}
-            <span className="text-sm font-bold text-white tracking-tight flex-shrink-0">FMI ERP</span>
+            <span className="text-sm font-bold tracking-tight flex-shrink-0" style={{ color: '#3b6eb5' }}>FMI ERP</span>
 
             {/* FMI 단일회사 표시 */}
-            <span className="ml-auto text-xs text-sky-300 font-medium truncate">주식회사 에프엠아이</span>
+            <span className="ml-auto text-xs font-medium truncate" style={{ color: '#64748b' }}>주식회사 에프엠아이</span>
           </div>
         </div>
       )}
@@ -326,37 +328,37 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       />
 
       {/* 사이드바 */}
-      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 text-white transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`} style={{ background: 'rgba(11,17,32,0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+      <aside className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} w-60 transition-transform duration-300 overflow-hidden flex flex-col fixed h-full z-20 lg:translate-x-0`} style={{ background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.30)', boxShadow: '4px 0 12px rgba(140,170,210,0.12)', color: '#1e293b' }}>
         <div className="w-60 flex flex-col h-full">
 
           {/* 로고 */}
-          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <span className="tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')} style={{ fontSize: 18, fontWeight: 900, background: 'linear-gradient(135deg, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+            <span className="tracking-tight cursor-pointer" onClick={() => router.push('/dashboard')} style={{ fontSize: 18, fontWeight: 900, background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               FMI ERP
             </span>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-500 hover:text-white lg:hidden">
+            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-700 lg:hidden">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
 
           {/* 워크스페이스 */}
           <div className="px-3 py-3">
-            <div className="rounded-lg px-3 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="rounded-lg px-3 py-3" style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: 'inset 2px 2px 6px rgba(140,170,210,0.08), inset -2px -2px 6px rgba(255,255,255,0.25)' }}>
               {/* 회사명 + 플랜 뱃지 */}
               <div className="flex items-center justify-between gap-2">
-                <div className="text-white font-bold text-sm truncate">주식회사 에프엠아이</div>
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-sky-600 text-white flex-shrink-0">FMI</span>
+                <div className="font-bold text-sm truncate" style={{ color: '#0f2440' }}>주식회사 에프엠아이</div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)' }}>FMI</span>
               </div>
               {/* 역할 + 직급 */}
               <div className="mt-2 flex gap-1 flex-wrap">
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                  role === 'admin' ? 'bg-blue-500/15 text-blue-400' :
-                  'bg-gray-50 text-slate-400'
-                }`} style={{ border: role === 'admin' ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
+                  role === 'admin' ? 'text-blue-700' :
+                  'text-slate-500'
+                }`} style={{ background: role === 'admin' ? '#dbeafe' : '#f1f5f9', border: role === 'admin' ? '1px solid rgba(59,130,246,0.15)' : '1px solid rgba(0,0,0,0.06)' }}>
                   {role === 'admin' ? '관리자' : '직원'}
                 </span>
                 {position && (
-                  <span className="text-[9px] text-emerald-400 px-1.5 py-0.5 rounded font-bold" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ color: '#166534', background: '#d1fae5', border: '1px solid rgba(34,197,94,0.15)' }}>
                     {position.name}
                   </span>
                 )}
@@ -375,9 +377,13 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 href="/dashboard"
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
                   pathname === '/dashboard'
-                    ? 'bg-blue-500/15 text-blue-300 border border-blue-500/20 shadow-sm shadow-blue-500/10'
-                    : 'text-slate-400 hover:bg-gray-50 hover:text-slate-700 border border-transparent'
+                    ? 'text-white border border-transparent'
+                    : 'text-slate-600 hover:text-slate-800 border border-transparent'
                 }`}
+                style={pathname === '/dashboard' ? {
+                  background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                } : {}}
               >
                 <Icons.Home />
                 대시보드
@@ -412,7 +418,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
             {/* 구분선 + 관리 영역 */}
             {showSettings && (
-              <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                 <div className="mb-3">
                   <div className="px-3 mb-1">
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">설정</span>
@@ -429,16 +435,16 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* 유저 정보 */}
-          <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="p-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3))', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white" style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', boxShadow: '2px 2px 6px rgba(140,170,210,0.19)' }}>
                 {user?.email?.[0]?.toUpperCase()}
               </div>
               <div className="overflow-hidden flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-slate-400">{user?.email}</p>
+                <p className="text-xs font-medium truncate" style={{ color: '#475569' }}>{user?.email}</p>
                 <button
                   onClick={() => auth.signOut().then(() => router.push('/'))}
-                  className="text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                  className="text-[10px] text-slate-500 hover:text-red-500 transition-colors"
                 >
                   로그아웃
                 </button>

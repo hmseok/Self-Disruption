@@ -62,7 +62,7 @@ const STAGE_MAP: Record<string, { label: string; color: string }> = {
   accident_reported: { label: '사고접수', color: '#ef4444' },
   replacement_requested: { label: '대차요청', color: '#f97316' },
   customer_contacted: { label: '고객통화', color: '#eab308' },
-  dispatch_preparing: { label: '배차준비', color: '#3b82f6' },
+  dispatch_preparing: { label: '배차준비', color: '#3b6eb5' },
   dispatched: { label: '배차완료', color: '#6366f1' },
   in_transit_delivery: { label: '탁송', color: '#06b6d4' },
   in_repair: { label: '공장입고', color: '#a855f7' },

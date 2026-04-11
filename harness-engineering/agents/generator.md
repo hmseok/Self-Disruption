@@ -207,6 +207,18 @@ Before committing, review your own code:
 [ ] Responsive: tested on mobile/tablet sizes?
 ```
 
+### Step 7.5: .gitignore 즉시 적용 (배포 불필요 파일)
+```
+배포 불필요한 파일 생성 시 (디자인 시안, 분석 보고서, 프리뷰 HTML 등):
+  1. 파일 생성 즉시 .gitignore에 패턴 추가
+  2. 이미 트래킹 중이면: git rm --cached <파일>
+  3. 패턴 규칙:
+     - 디자인 프리뷰: design-*.html
+     - 분석 보고서: *-Analysis.xlsx
+     - 임시 테스트: tmp-*, test-preview-*
+  4. .gitignore 변경은 다음 커밋에 포함
+```
+
 ### Step 8: Git Staging & Commit
 ```
 1. Review all changes: git diff

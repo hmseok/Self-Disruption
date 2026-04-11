@@ -152,14 +152,14 @@ export default function ExecuteTab({
               padding: '12px 16px', fontSize: 13, fontWeight: activeSubTab === tab.key ? 800 : 600,
               color: activeSubTab === tab.key ? '#0f172a' : '#94a3b8',
               cursor: 'pointer', background: 'none', border: 'none',
-              borderBottom: `2px solid ${activeSubTab === tab.key ? '#2d5fa8' : 'transparent'}`,
+              borderBottom: `2px solid ${activeSubTab === tab.key ? '#3b6eb5' : 'transparent'}`,
               marginBottom: -1, display: 'flex', alignItems: 'center', gap: 5,
             }}>
             {tab.label}
             <span style={{
               padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700,
               background: activeSubTab === tab.key
-                ? (tab.key === 'history' ? '#16a34a' : '#2d5fa8')
+                ? (tab.key === 'history' ? '#16a34a' : '#3b6eb5')
                 : '#e2e8f0',
               color: activeSubTab === tab.key ? '#fff' : '#64748b',
             }}>{tab.count}</span>
@@ -178,7 +178,7 @@ export default function ExecuteTab({
             </div>
           ))}
           <button onClick={() => setShowSettings(!showSettings)}
-            style={{ background: showSettings ? '#2d5fa8' : '#f1f5f9', color: showSettings ? '#fff' : '#64748b', border: 'none', padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            style={{ background: showSettings ? '#3b6eb5' : '#f1f5f9', color: showSettings ? '#fff' : '#64748b', border: 'none', padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             설정
           </button>
         </div>
@@ -228,7 +228,7 @@ export default function ExecuteTab({
                     padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                     cursor: 'pointer', whiteSpace: 'nowrap',
                     background: on ? '#eef2ff' : 'transparent',
-                    color: on ? '#2d5fa8' : '#94a3b8',
+                    color: on ? '#3b6eb5' : '#94a3b8',
                     border: on ? '1px solid #c7d2fe' : '1px solid transparent',
                   }}>
                   {chip.label}
@@ -255,7 +255,7 @@ export default function ExecuteTab({
               style={{
                 padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: 800,
                 cursor: selectedIds.size > 0 ? 'pointer' : 'default',
-                background: selectedIds.size > 0 ? '#2d5fa8' : '#e5e7eb',
+                background: selectedIds.size > 0 ? '#3b6eb5' : '#e5e7eb',
                 color: selectedIds.size > 0 ? '#fff' : '#9ca3af',
                 border: 'none', opacity: sendingNotify ? 0.5 : 1,
               }}>

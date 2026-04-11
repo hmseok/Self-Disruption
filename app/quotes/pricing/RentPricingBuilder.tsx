@@ -3651,7 +3651,7 @@ export default function RentPricingBuilder() {
             </Link>
             {selectedCar && calculations && (
               <button onClick={handleSaveWorksheet} disabled={saving}
-                style={{ padding: '8px 16px', fontSize: 13, background: '#2d5fa8', color: '#fff', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
+                style={{ padding: '8px 16px', fontSize: 13, background: '#3b6eb5', color: '#fff', borderRadius: 10, fontWeight: 700, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
                 {saving ? '저장 중...' : '워크시트 저장'}
               </button>
             )}
@@ -3911,7 +3911,7 @@ export default function RentPricingBuilder() {
       {/* ===== 등록차량 선택 (보험/가입 페이지 디자인 기준) ===== */}
       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.06)', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2d5fa8' }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5' }} />
           <h3 style={{ fontWeight: 900, color: '#1f2937', fontSize: 14, margin: 0 }}>🚗 등록차량 선택</h3>
         </div>
 

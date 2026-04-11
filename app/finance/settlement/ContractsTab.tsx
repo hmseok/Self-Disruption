@@ -291,13 +291,13 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
               padding: '12px 16px', fontSize: 13, fontWeight: activeSubTab === tab.key ? 800 : 600,
               color: activeSubTab === tab.key ? '#0f172a' : '#94a3b8',
               cursor: 'pointer', background: 'none', border: 'none',
-              borderBottom: `2px solid ${activeSubTab === tab.key ? '#2d5fa8' : 'transparent'}`,
+              borderBottom: `2px solid ${activeSubTab === tab.key ? '#3b6eb5' : 'transparent'}`,
               marginBottom: -1, display: 'flex', alignItems: 'center', gap: 5,
             }}>
             {tab.label}
             <span style={{
               padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-              background: activeSubTab === tab.key ? '#2d5fa8' : '#e2e8f0',
+              background: activeSubTab === tab.key ? '#3b6eb5' : '#e2e8f0',
               color: activeSubTab === tab.key ? '#fff' : '#64748b',
             }}>{tab.count}</span>
           </button>
@@ -306,7 +306,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
           {[
             { label: '계약', value: `${totalContracts}`, sub: `운용 ${activeCount}` },
             { label: '총 투자금', value: fm(totalInvestAmount), color: '#111827' },
-            { label: '월 지급', value: fm(monthlyTotal), color: '#2d5fa8' },
+            { label: '월 지급', value: fm(monthlyTotal), color: '#3b6eb5' },
           ].map(s => (
             <div key={s.label} style={{ textAlign: 'center', padding: '6px 0' }}>
               <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, lineHeight: 1 }}>{s.label}</div>
@@ -315,7 +315,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
             </div>
           ))}
           <button onClick={() => router.push(activeSubTab === 'jiip' ? '/jiip/new' : '/invest/general/new')}
-            style={{ background: '#2d5fa8', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>
+            style={{ background: '#3b6eb5', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>
             + 신규 등록
           </button>
         </div>
@@ -332,7 +332,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                 padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                 cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3,
                 background: on ? (cc ? `${cc}15` : '#eef2ff') : 'transparent',
-                color: on ? (cc || '#2d5fa8') : '#94a3b8',
+                color: on ? (cc || '#3b6eb5') : '#94a3b8',
                 border: on ? `1px solid ${cc ? `${cc}40` : '#c7d2fe'}` : '1px solid transparent',
               }}>
               {chip.label} <b>{chip.count}</b>
@@ -384,7 +384,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                   <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>{groupKey}</span>
                   <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{group.items.length}건</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>·</span>
-                  <span style={{ fontSize: 12, color: '#2d5fa8', fontWeight: 700 }}>{fm(group.totalAmount)}원</span>
+                  <span style={{ fontSize: 12, color: '#3b6eb5', fontWeight: 700 }}>{fm(group.totalAmount)}원</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>·</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>월 {fm(
                     activeSubTab === 'jiip'
@@ -427,7 +427,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                         {/* 투자금 */}
                         <div style={{ width: 120, flexShrink: 0, textAlign: 'right' }}>
                           <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>{f(item.invest_amount)}</div>
-                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#2d5fa8', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>배분 {item.share_ratio}%</span>
+                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#3b6eb5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>배분 {item.share_ratio}%</span>
                         </div>
                         {/* 월 관리비 */}
                         <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
@@ -472,7 +472,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                         {/* 투자원금 */}
                         <div style={{ width: 130, flexShrink: 0, textAlign: 'right' }}>
                           <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>{f(item.invest_amount)}</div>
-                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#2d5fa8', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>연 {N(item.interest_rate).toFixed(1)}%</span>
+                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#3b6eb5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>연 {N(item.interest_rate).toFixed(1)}%</span>
                         </div>
                         {/* 월 이자(세후) */}
                         <div style={{ width: 120, flexShrink: 0, textAlign: 'right' }}>
@@ -532,7 +532,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
           <span>조회 <b style={{ color: '#111827' }}>{filteredList.length}건</b></span>
           <span>총 투자금 <b style={{ color: '#111827' }}>{fm(summaryStats.income)}</b></span>
           <span>월 지급 <b style={{ color: '#111827' }}>{fm(summaryStats.expense)}</b></span>
-          <span>누적 지급 <b style={{ color: '#2d5fa8' }}>{fm(summaryStats.totalPaid)}</b></span>
+          <span>누적 지급 <b style={{ color: '#3b6eb5' }}>{fm(summaryStats.totalPaid)}</b></span>
           <span>{activeSubTab === 'jiip' ? '평균 배분율' : '평균 이자율'} <b>{summaryStats.avgRate}%</b></span>
         </div>
       )}

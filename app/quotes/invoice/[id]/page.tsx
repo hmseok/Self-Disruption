@@ -277,7 +277,7 @@ export default function InvoiceDetailPage() {
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 48, height: 48, border: '4px solid #2d5fa8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+        <div style={{ width: 48, height: 48, border: '4px solid #3b6eb5', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
         <p style={{ color: '#9ca3af', fontWeight: 700 }}>청구서 불러오는 중...</p>
       </div>
     </div>
@@ -288,7 +288,7 @@ export default function InvoiceDetailPage() {
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
         <p style={{ fontWeight: 700, color: '#374151' }}>청구서를 찾을 수 없습니다</p>
-        <Link href="/quotes" style={{ color: '#2d5fa8', fontSize: 13, fontWeight: 700, marginTop: 8, display: 'inline-block' }}>← 목록으로</Link>
+        <Link href="/quotes" style={{ color: '#3b6eb5', fontSize: 13, fontWeight: 700, marginTop: 8, display: 'inline-block' }}>← 목록으로</Link>
       </div>
     </div>
   )
@@ -312,7 +312,7 @@ export default function InvoiceDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Link href="/quotes" style={{ color: '#6b7280', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>← 견적관리</Link>
             <span style={{ color: '#d1d5db' }}>/</span>
-            <span style={{ color: '#2d5fa8', fontWeight: 800, fontSize: 14 }}>청구서 상세</span>
+            <span style={{ color: '#3b6eb5', fontWeight: 800, fontSize: 14 }}>청구서 상세</span>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={() => window.print()} style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: 10, background: '#fff', fontSize: 12, fontWeight: 700, color: '#374151', cursor: 'pointer' }}>🖨️ 인쇄</button>
@@ -320,7 +320,7 @@ export default function InvoiceDetailPage() {
               onClick={handleShare}
               style={{
                 padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none',
-                background: shareStatus === 'signed' ? '#dcfce7' : shareStatus === 'shared' ? '#dbeafe' : 'linear-gradient(135deg, #2d5fa8, #1e40af)',
+                background: shareStatus === 'signed' ? '#dcfce7' : shareStatus === 'shared' ? '#dbeafe' : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
                 color: shareStatus === 'signed' ? '#16a34a' : shareStatus === 'shared' ? '#2563eb' : '#fff',
               }}
             >
@@ -338,18 +338,18 @@ export default function InvoiceDetailPage() {
         <div ref={printRef} style={{ background: '#fff', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
 
           {/* ── 헤더 ── */}
-          <div style={{ background: 'linear-gradient(135deg, #1e3a5f, #2d5fa8)', color: '#fff', padding: '24px 32px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', color: '#1e293b', padding: '24px 32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: '-0.5px' }}>단기렌트 청구서</h1>
-                <p style={{ color: '#93c5fd', fontSize: 11, marginTop: 2 }}>SHORT-TERM RENTAL INVOICE</p>
+                <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>SHORT-TERM RENTAL INVOICE</p>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.icon} {statusBadge.label}</span>
                 </div>
-                <p style={{ color: '#93c5fd', fontSize: 11, marginTop: 6 }}>No. {String(quote.id).slice(0, 8).toUpperCase()}</p>
-                <p style={{ color: '#bfdbfe', fontSize: 11 }}>작성일 {fDate(quote.created_at)}</p>
+                <p style={{ color: '#64748b', fontSize: 11, marginTop: 6 }}>No. {String(quote.id).slice(0, 8).toUpperCase()}</p>
+                <p style={{ color: '#64748b', fontSize: 11 }}>작성일 {fDate(quote.created_at)}</p>
               </div>
             </div>
           </div>
@@ -379,20 +379,20 @@ export default function InvoiceDetailPage() {
             {/* ── 요금 안내 ── */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>요금 안내</div>
-              <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 16, padding: '24px 28px', color: '#fff' }}>
+              <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', borderRadius: 16, padding: '24px 28px', color: '#1e293b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <span style={{ color: '#94a3b8', fontSize: 14 }}>공급가</span>
-                  <span style={{ color: '#cbd5e1', fontWeight: 700, fontSize: 16 }}>{f(rentTotal)}원</span>
+                  <span style={{ color: '#64748b', fontSize: 14 }}>공급가</span>
+                  <span style={{ color: '#64748b', fontWeight: 700, fontSize: 16 }}>{f(rentTotal)}원</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #334155' }}>
-                  <span style={{ color: '#94a3b8', fontSize: 14 }}>VAT (10%)</span>
-                  <span style={{ color: '#cbd5e1', fontWeight: 700, fontSize: 16 }}>{f(rentVat)}원</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #e0e7ff' }}>
+                  <span style={{ color: '#64748b', fontSize: 14 }}>VAT (10%)</span>
+                  <span style={{ color: '#64748b', fontWeight: 700, fontSize: 16 }}>{f(rentVat)}원</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>총 청구금액</span>
+                  <span style={{ color: '#1e293b', fontWeight: 900, fontSize: 18 }}>총 청구금액</span>
                   <div>
-                    <span style={{ fontSize: 32, fontWeight: 900, color: '#fff' }}>{f(rentWithVat)}</span>
-                    <span style={{ color: '#94a3b8', marginLeft: 4 }}>원</span>
+                    <span style={{ fontSize: 32, fontWeight: 900, color: '#1e293b' }}>{f(rentWithVat)}</span>
+                    <span style={{ color: '#64748b', marginLeft: 4 }}>원</span>
                   </div>
                 </div>
               </div>
@@ -455,7 +455,7 @@ export default function InvoiceDetailPage() {
 
             {shareLoading ? (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ width: 32, height: 32, border: '4px solid #2d5fa8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+                <div style={{ width: 32, height: 32, border: '4px solid #3b6eb5', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
                 <p style={{ color: '#9ca3af', fontSize: 13 }}>링크 생성 중...</p>
               </div>
             ) : shareUrl ? (
@@ -467,7 +467,7 @@ export default function InvoiceDetailPage() {
                       <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{quote.customer_name}</span>
                       <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>{parsed.car}</span>
                     </div>
-                    <span style={{ fontWeight: 900, fontSize: 18, color: '#2d5fa8' }}>{f(rentWithVat)}원</span>
+                    <span style={{ fontWeight: 900, fontSize: 18, color: '#3b6eb5' }}>{f(rentWithVat)}원</span>
                   </div>
                 </div>
 
@@ -485,7 +485,7 @@ export default function InvoiceDetailPage() {
                         onClick={() => { setSendChannel(ch.key); setSendResult(null) }}
                         style={{
                           padding: '10px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center',
-                          border: sendChannel === ch.key ? '2px solid #2d5fa8' : '2px solid #e5e7eb',
+                          border: sendChannel === ch.key ? '2px solid #3b6eb5' : '2px solid #e5e7eb',
                           background: sendChannel === ch.key ? '#eff6ff' : '#fff',
                           color: sendChannel === ch.key ? '#1d4ed8' : '#6b7280',
                         }}
@@ -502,7 +502,7 @@ export default function InvoiceDetailPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button onClick={() => handleCopyShareUrl('message')}
-                        style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: shareCopied ? '#16a34a' : '#2d5fa8', color: '#fff' }}
+                        style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: shareCopied ? '#16a34a' : '#3b6eb5', color: '#fff' }}
                       >{shareCopied ? '✅ 복사됨!' : '💬 메시지 복사'}</button>
                       <button onClick={() => handleCopyShareUrl('link')}
                         style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: '1px solid #d1d5db', cursor: 'pointer', background: '#f9fafb', color: '#374151' }}
@@ -517,7 +517,7 @@ export default function InvoiceDetailPage() {
                       style={{ border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
                     />
                     <button onClick={handleDirectSend} disabled={sending || !sendEmail}
-                      style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#2d5fa8', color: '#fff', opacity: (sending || !sendEmail) ? 0.5 : 1 }}
+                      style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#3b6eb5', color: '#fff', opacity: (sending || !sendEmail) ? 0.5 : 1 }}
                     >{sending ? '발송 중...' : '📧 이메일 발송'}</button>
                   </div>
                 ) : (
@@ -529,7 +529,7 @@ export default function InvoiceDetailPage() {
                     <button onClick={handleDirectSend} disabled={sending || !sendPhone}
                       style={{
                         padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer',
-                        background: sendChannel === 'kakao' ? '#fee500' : '#2d5fa8',
+                        background: sendChannel === 'kakao' ? '#fee500' : '#3b6eb5',
                         color: sendChannel === 'kakao' ? '#3c1e1e' : '#fff',
                         opacity: (sending || !sendPhone) ? 0.5 : 1,
                       }}

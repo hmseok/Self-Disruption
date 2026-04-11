@@ -550,7 +550,7 @@ export default function CreateContractPage() {
             onClick={() => setHasDriver2(!hasDriver2)}
             style={{
               padding: '6px 16px',
-              background: hasDriver2 ? '#ef4444' : '#2d5fa8',
+              background: hasDriver2 ? '#ef4444' : '#3b6eb5',
               color: '#fff',
               border: 'none',
               borderRadius: '8px',
@@ -1141,7 +1141,7 @@ const styles = {
     fontSize: '16px',
     fontWeight: '800',
     marginBottom: '16px',
-    borderLeft: '4px solid #3b82f6',
+    borderLeft: '4px solid #3b6eb5',
     paddingLeft: '12px',
     color: '#1f2937',
   } as React.CSSProperties,
@@ -1214,7 +1214,7 @@ const styles = {
   } as React.CSSProperties,
 
   link: {
-    color: '#3b82f6',
+    color: '#3b6eb5',
     textDecoration: 'none',
     fontSize: '13px',
     fontWeight: '500',
@@ -1261,7 +1261,7 @@ const styles = {
 
   submitButton: {
     padding: '8px 16px',
-    background: '#3b82f6',
+    background: '#3b6eb5',
     color: 'white',
     border: 'none',
     borderRadius: '8px',

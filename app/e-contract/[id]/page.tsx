@@ -79,7 +79,7 @@ export default function EContractDetailPage() {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px', minHeight: '100vh', background: '#f9fafb' }}>
       {/* 브레드크럼 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5', display: 'inline-block' }} />
         <span style={{ fontSize: 13, color: '#6b7280', cursor: 'pointer' }} onClick={() => router.push('/e-contract')}>영업</span>
         <span style={{ fontSize: 13, color: '#d1d5db' }}>&gt;</span>
         <span style={{ fontSize: 13, color: '#6b7280', cursor: 'pointer' }} onClick={() => router.push('/e-contract')}>전자계약서</span>
@@ -105,7 +105,7 @@ export default function EContractDetailPage() {
             {contract.status === 'draft' && (
               <>
                 <button onClick={() => router.push(`/e-contract/create?edit=${id}`)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✏️ 수정</button>
-                <button onClick={() => handleStatusChange('pending_sign')} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#2d5fa8', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📤 발송하기</button>
+                <button onClick={() => handleStatusChange('pending_sign')} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#3b6eb5', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📤 발송하기</button>
               </>
             )}
             {contract.status === 'pending_sign' && (
@@ -135,7 +135,7 @@ export default function EContractDetailPage() {
       {/* 탭 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
         {(['info', 'preview'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '8px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: tab === t ? '#fff' : '#e5e7eb', fontWeight: tab === t ? 700 : 500, fontSize: 13, cursor: 'pointer', color: tab === t ? '#111827' : '#6b7280', borderBottom: tab === t ? '2px solid #2d5fa8' : '2px solid transparent' }}>
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '8px 20px', borderRadius: '8px 8px 0 0', border: 'none', background: tab === t ? '#fff' : '#e5e7eb', fontWeight: tab === t ? 700 : 500, fontSize: 13, cursor: 'pointer', color: tab === t ? '#111827' : '#6b7280', borderBottom: tab === t ? '2px solid #3b6eb5' : '2px solid transparent' }}>
             {t === 'info' ? '📋 계약 정보' : '📄 계약서 미리보기'}
           </button>
         ))}
@@ -146,7 +146,7 @@ export default function EContractDetailPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* 임차인 정보 */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e5e7eb' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 12, borderLeft: '4px solid #3b82f6', paddingLeft: 10 }}>임차인 정보</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 800, color: '#111827', marginBottom: 12, borderLeft: '4px solid #3b6eb5', paddingLeft: 10 }}>임차인 정보</h3>
             {[
               ['이름', contract.renter_name], ['연락처', contract.renter_phone], ['생년월일', contract.renter_birth],
               ['주소', contract.renter_address], ['면허번호', contract.renter_license_no], ['면허구분', contract.renter_license_type],

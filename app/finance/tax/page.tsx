@@ -501,8 +501,8 @@ export default function TaxManagementPage() {
             onClick={() => setActiveTab(t.key)}
             style={{
               padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              border: 'none', borderBottom: activeTab === t.key ? '3px solid #2d5fa8' : '3px solid transparent',
-              color: activeTab === t.key ? '#2d5fa8' : '#9ca3af',
+              border: 'none', borderBottom: activeTab === t.key ? '3px solid #3b6eb5' : '3px solid transparent',
+              color: activeTab === t.key ? '#3b6eb5' : '#9ca3af',
               background: 'transparent',
             }}
           >
@@ -676,7 +676,7 @@ function WithholdingTab({ items, byType, filing }: {
         <button onClick={() => setFilterType('all')}
           style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
             background: filterType === 'all' ? 'rgba(45,95,168,0.08)' : '#f8fafc',
-            color: filterType === 'all' ? '#2d5fa8' : '#64748b',
+            color: filterType === 'all' ? '#3b6eb5' : '#64748b',
             border: filterType === 'all' ? '1px solid rgba(45,95,168,0.3)' : '1px solid #e2e8f0',
           }}>전체 ({items.length})</button>
         {Object.entries(byType).map(([type, data]: [string, any]) => {
@@ -758,7 +758,7 @@ function VatTab({ items, totalSupply, totalVat, filing }: {
       {/* 매출/매입 요약 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div style={{ background: '#eff6ff', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: '#3b82f6', fontWeight: 700, marginBottom: 8 }}>매출 세금계산서</div>
+          <div style={{ fontSize: 12, color: '#3b6eb5', fontWeight: 700, marginBottom: 8 }}>매출 세금계산서</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#1d4ed8' }}>{nf(salesVat)}원</div>
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>공급가 {nf(salesSupply)} / {salesItems.length}건</div>
         </div>

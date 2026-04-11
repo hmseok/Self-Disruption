@@ -619,7 +619,7 @@ export default function FreelancersPage() {
                     {bulkData.map((d, i) => (
                       <tr key={i} style={{ borderTop: '1px solid #f1f5f9', opacity: d._status === 'duplicate' ? 0.4 : 1, background: d._status === 'saved' ? '#f0fdf4' : d._status === 'error' ? '#fef2f2' : '#fff' }}>
                         <td style={{ padding: '8px 12px' }}>
-                          {d._status === 'ready' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#eff6ff', color: '#3b82f6' }}>등록대기</span>}
+                          {d._status === 'ready' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#eff6ff', color: '#3b6eb5' }}>등록대기</span>}
                           {d._status === 'duplicate' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fef3c7', color: '#d97706' }}>중복</span>}
                           {d._status === 'saved' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#dcfce7', color: '#16a34a' }}>완료</span>}
                           {d._status === 'error' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#fee2e2', color: '#dc2626' }}>실패</span>}
@@ -638,7 +638,7 @@ export default function FreelancersPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
                 <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                  전체 {bulkData.length}명 · 등록 대기 <strong style={{ color: '#3b82f6' }}>{bulkData.filter(d => d._status === 'ready').length}</strong>명 · 중복 제외 <strong style={{ color: '#d97706' }}>{bulkData.filter(d => d._status === 'duplicate').length}</strong>명
+                  전체 {bulkData.length}명 · 등록 대기 <strong style={{ color: '#3b6eb5' }}>{bulkData.filter(d => d._status === 'ready').length}</strong>명 · 중복 제외 <strong style={{ color: '#d97706' }}>{bulkData.filter(d => d._status === 'duplicate').length}</strong>명
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => { setBulkData([]); setBulkLogs([]) }}

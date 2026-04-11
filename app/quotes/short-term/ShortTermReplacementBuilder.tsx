@@ -746,7 +746,7 @@ export default function ShortTermReplacementBuilder() {
               style={{
                 padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                background: subTab === t.key ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)',
+                background: subTab === t.key ? '#3b6eb5' : 'rgba(0,0,0,0.04)',
                 color: subTab === t.key ? '#fff' : '#6b7280',
               }}>
               {subTab === t.key && '● '}{t.icon} {t.label}
@@ -769,11 +769,11 @@ export default function ShortTermReplacementBuilder() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>롯데 기준 할인율</span>
                 <input type="range" min={10} max={100} step={5} value={globalDiscount}
                   onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                  style={{ flex: 1, accentColor: 'rgba(59,130,246,0.9)' }} />
+                  style={{ flex: 1, accentColor: '#3b6eb5' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <input type="number" min={1} max={100} value={globalDiscount}
                     onChange={e => applyGlobalDiscount(Number(e.target.value))}
-                    style={{ width: 52, textAlign: 'center', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: 'rgba(59,130,246,0.9)' }} />
+                    style={{ width: 52, textAlign: 'center', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, padding: '6px 4px', fontSize: 14, fontWeight: 800, color: '#3b6eb5' }} />
                   <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 700 }}>%</span>
                 </div>
               </div>
@@ -824,9 +824,9 @@ export default function ShortTermReplacementBuilder() {
             {qcSelectedRate && (
               <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8, background: '#eff6ff' }}>
                 <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.lotte_category}</span>
-                <span style={{ background: '#e0e7ff', color: 'rgba(59,130,246,0.9)', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.service_group}</span>
+                <span style={{ background: '#e0e7ff', color: '#3b6eb5', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{qcSelectedRate.service_group}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', flex: 1 }}>{qcSelectedRate.vehicle_names}</span>
-                <span style={{ fontSize: 13, color: 'rgba(59,130,246,0.9)', fontWeight: 800 }}>{f(calcRate(qcSelectedRate.rate_1_3days, globalDiscount))}원/일</span>
+                <span style={{ fontSize: 13, color: '#3b6eb5', fontWeight: 800 }}>{f(calcRate(qcSelectedRate.rate_1_3days, globalDiscount))}원/일</span>
               </div>
             )}
             {/* Stepper + 결과 카드 (2열, 모바일 1열) */}
@@ -837,9 +837,9 @@ export default function ShortTermReplacementBuilder() {
                 {/* 기간 모드 전환 */}
                 <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
                   <button onClick={() => { if (qcDateMode !== 'days') { setQcDateMode('days'); setQcDays(0); setQcHours(0); setQcDeliveryFee(0); setQcFaultEnabled(false); setQcFaultPercent(100); setQcServiceSupport(0) } }}
-                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'days' ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'days' ? '#fff' : '#9ca3af' }}>일/시간 입력</button>
+                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'days' ? '#3b6eb5' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'days' ? '#fff' : '#9ca3af' }}>일/시간 입력</button>
                   <button onClick={() => { if (qcDateMode !== 'range') { setQcDateMode('range'); const today = new Date(); setQcStartDate(today.toISOString().split('T')[0]); setQcStartTime('09:00'); setQcEndDate(today.toISOString().split('T')[0]); setQcEndTime('09:00'); setQcDeliveryFee(0); setQcFaultEnabled(false); setQcFaultPercent(100); setQcServiceSupport(0) } }}
-                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'range' ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'range' ? '#fff' : '#9ca3af' }}>날짜/시간 선택</button>
+                    style={{ flex: 1, padding: '6px 0', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: qcDateMode === 'range' ? '#3b6eb5' : 'rgba(0,0,0,0.04)', color: qcDateMode === 'range' ? '#fff' : '#9ca3af' }}>날짜/시간 선택</button>
                 </div>
                 {qcDateMode === 'days' ? (
                   <div>
@@ -958,22 +958,22 @@ export default function ShortTermReplacementBuilder() {
               </div>
               {/* 오른쪽: 결과 카드 */}
               <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', borderRadius: 10, padding: 18, textAlign: 'center' }}>
+                <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, padding: 18, textAlign: 'center', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)' }}>
                   {qcResult && qcSelectedRate ? (<>
                     <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>
                       {qcSelectedRate.lotte_category} · {qcSelectedRate.vehicle_names.length > 20 ? qcSelectedRate.vehicle_names.slice(0, 20) + '…' : qcSelectedRate.vehicle_names} · {(() => { const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24); const h = qcDateMode === 'days' ? qcHours : Math.round(qcTotalHours % 24); const p: string[] = []; if (d > 0) p.push(`${d}일`); if (h > 0) p.push(`${h}시간`); return p.join(' ') || '0시간' })()}
                     </div>
-                    <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', letterSpacing: -1 }}>
+                    <div style={{ fontSize: 36, fontWeight: 900, color: '#1e293b', letterSpacing: -1 }}>
                       {f(qcResult.totalWithVat)}<span style={{ fontSize: 14, color: '#475569', marginLeft: 2 }}>원</span>
                     </div>
-                    {(() => { const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24); return d > 0 ? <div style={{ fontSize: 13, color: '#2563eb', marginTop: 2 }}>하루 {f(Math.round(qcResult.totalWithVat / d))}원</div> : null })()}
+                    {(() => { const d = qcDateMode === 'days' ? qcDays : Math.floor(qcTotalHours / 24); return d > 0 ? <div style={{ fontSize: 13, color: '#3b6eb5', marginTop: 2 }}>하루 {f(Math.round(qcResult.totalWithVat / d))}원</div> : null })()}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11, color: '#94a3b8' }}>렌트 {f(qcResult.totalDisc)}</span>
                       {qcResult.faultActive && <span style={{ fontSize: 11, color: '#fb923c' }}>과실 {qcResult.faultPercent}%</span>}
                       {qcResult.supportAmount > 0 && <span style={{ fontSize: 11, color: '#4ade80' }}>지원 -{qcResult.serviceSupport}%</span>}
                       {qcResult.deliveryFee > 0 && <span style={{ fontSize: 11, color: '#94a3b8' }}>탁송 {f(qcResult.deliveryFee)}</span>}
                     </div>
-                    <div style={{ borderTop: '1px solid #334155', paddingTop: 10, marginTop: 10, textAlign: 'left' }}>
+                    <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10, marginTop: 10, textAlign: 'left' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
                         <span style={{ color: '#94a3b8' }}>렌트비 (할인 {globalDiscount}%)</span>
                         <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(qcResult.totalDisc)}원</span>
@@ -989,9 +989,9 @@ export default function ShortTermReplacementBuilder() {
                             <span style={{ color: '#4ade80', fontWeight: 600 }}>-{f(qcResult.supportAmount)}원</span>
                           </div>
                         )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3, borderTop: '1px solid #334155', paddingTop: 4, marginTop: 2 }}>
-                          <span style={{ color: '#fff', fontWeight: 900 }}>실부담금</span>
-                          <span style={{ color: '#fff', fontWeight: 900 }}>{f(qcResult.finalAmount)}원</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 4, marginTop: 2 }}>
+                          <span style={{ color: '#1e293b', fontWeight: 900 }}>실부담금</span>
+                          <span style={{ color: '#1e293b', fontWeight: 900 }}>{f(qcResult.finalAmount)}원</span>
                         </div>
                       </>)}
                       {qcResult.deliveryFee > 0 && (
@@ -1000,7 +1000,7 @@ export default function ShortTermReplacementBuilder() {
                           <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(qcResult.deliveryFee)}원</span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, borderTop: '1px solid #334155', paddingTop: 4, marginTop: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 4, marginTop: 2 }}>
                         <span style={{ color: '#94a3b8' }}>공급가액</span>
                         <span style={{ color: '#94a3b8', fontWeight: 600 }}>{f(qcResult.supplyPrice)}원</span>
                       </div>
@@ -1021,8 +1021,8 @@ export default function ShortTermReplacementBuilder() {
                       disabled={qcSaving}
                       style={{
                         flex: 1, padding: '10px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
-                        background: 'linear-gradient(135deg, rgba(59,130,246,0.9), #1e40af)', color: '#fff',
-                        fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px rgba(45,95,168,0.3)',
+                        background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff',
+                        fontWeight: 800, fontSize: 13, boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
                         opacity: qcSaving ? 0.5 : 1, transition: 'opacity 0.15s',
                       }}
                     >
@@ -1157,7 +1157,7 @@ export default function ShortTermReplacementBuilder() {
                         <span>할인 <span style={{ fontWeight: 700 }}>{r.discount_percent}%</span></span>
                         <span className={r.calc_method === 'auto' ? 'text-green-600' : 'text-orange-600'}>{r.calc_method === 'auto' ? '자동' : '수동'}</span>
                       </div>
-                      <span style={{ fontSize: 14, fontWeight: 900, color: 'rgba(59,130,246,0.9)' }}>{f(computed)}원</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#3b6eb5' }}>{f(computed)}원</span>
                     </div>
                   </div>
                 )
@@ -1306,7 +1306,7 @@ export default function ShortTermReplacementBuilder() {
                     <span>1~3일 <span style={{ color: '#dc2626', fontWeight: 700 }}>{f(lr.rate_1_3days)}</span></span>
                     <span>7일+ <span style={{ fontWeight: 700, color: '#374151' }}>{f(lr.rate_7plus_days)}</span></span>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(59,130,246,0.9)' }}>{f(calcRate(lr.rate_1_3days, globalDiscount))}원<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>/일</span></span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#3b6eb5' }}>{f(calcRate(lr.rate_1_3days, globalDiscount))}원<span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>/일</span></span>
                 </div>
               </div>
             ))}

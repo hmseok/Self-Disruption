@@ -85,7 +85,7 @@ export default function CorporateCardsPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [expenseCategories] = useState([
     { name: '식비', icon: '🍽️', color: '#f59e0b', vatDeductible: true, limit: 0 },
-    { name: '유류비', icon: '⛽', color: '#3b82f6', vatDeductible: true, limit: 0 },
+    { name: '유류비', icon: '⛽', color: '#3b6eb5', vatDeductible: true, limit: 0 },
     { name: '접대비', icon: '🤝', color: '#8b5cf6', vatDeductible: false, limit: 36000000 },
     { name: '교통비', icon: '🚌', color: '#06b6d4', vatDeductible: true, limit: 0 },
     { name: '소모품비', icon: '📦', color: '#10b981', vatDeductible: true, limit: 0 },
@@ -870,7 +870,7 @@ export default function CorporateCardsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+            <svg style={{ width: 28, height: 28, color: '#3b6eb5' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
             법인카드 관리
           </h1>
             <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
@@ -892,7 +892,7 @@ export default function CorporateCardsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg style={{ width: 28, height: 28, color: '#2d5fa8' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+            <svg style={{ width: 28, height: 28, color: '#3b6eb5' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
             법인카드 관리
           </h1>
           <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
@@ -900,7 +900,7 @@ export default function CorporateCardsPage() {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {mainTab === 'cards' && <>
             <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2d5fa8', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#3b6eb5', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
               <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               카드 등록
             </button>
@@ -936,8 +936,8 @@ export default function CorporateCardsPage() {
           <button key={tab.key} onClick={() => setMainTab(tab.key)}
             style={{
               padding: '10px 20px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              background: 'transparent', border: 'none', borderBottom: mainTab === tab.key ? '3px solid #2d5fa8' : '3px solid transparent',
-              color: mainTab === tab.key ? '#2d5fa8' : '#6b7280', position: 'relative',
+              background: 'transparent', border: 'none', borderBottom: mainTab === tab.key ? '3px solid #3b6eb5' : '3px solid transparent',
+              color: mainTab === tab.key ? '#3b6eb5' : '#6b7280', position: 'relative',
             }}>
             {tab.label}
             {tab.badge && tab.badge > 0 && (
@@ -982,7 +982,7 @@ export default function CorporateCardsPage() {
         ) : (
           <>
             <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>{isDragging ? '📥' : '💳'}</span>
-            <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? '#4338ca' : '#0f172a', margin: 0 }}>
+            <p style={{ fontWeight: 800, fontSize: 14, color: isDragging ? '#3b6eb5' : '#1e293b', margin: 0 }}>
               {isDragging ? '여기에 놓으세요!' : '카드 이미지/엑셀 파일을 드래그하여 일괄 등록'}
             </p>
             <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
@@ -1157,7 +1157,7 @@ export default function CorporateCardsPage() {
           <button key={tab.key} onClick={() => setGroupMode(tab.key)}
             style={{
               padding: '7px 16px', borderRadius: 20, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              background: groupMode === tab.key ? '#0f172a' : '#fff',
+              background: groupMode === tab.key ? '#3b6eb5' : '#fff',
               color: groupMode === tab.key ? '#fff' : '#6b7280',
               border: groupMode === tab.key ? 'none' : '1px solid #e5e7eb',
             }}>
@@ -1457,7 +1457,7 @@ export default function CorporateCardsPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <div>
                             <span style={{ fontSize: 10, color: '#94a3b8' }}>사용 </span>
-                            <span style={{ fontSize: 14, fontWeight: 900, color: usage.total > 0 ? '#0f172a' : '#cbd5e1' }}>{formatMoney(usage.total)}</span>
+                            <span style={{ fontSize: 14, fontWeight: 900, color: usage.total > 0 ? '#1e293b' : '#cbd5e1' }}>{formatMoney(usage.total)}</span>
                             {usage.count > 0 && <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 3 }}>{usage.count}건</span>}
                           </div>
                           <div>
@@ -1569,12 +1569,12 @@ export default function CorporateCardsPage() {
                     <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 6 }}>분실/재발급 시 기존 번호 등록</span>
                   </div>
                   <button type="button" onClick={() => setForm({ ...form, previous_card_numbers: [...form.previous_card_numbers, ''] })}
-                    style={{ fontSize: 11, fontWeight: 700, color: '#2d5fa8', background: '#eef3fb', border: '1px solid #d4e0f0', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+                    style={{ fontSize: 11, fontWeight: 700, color: '#3b6eb5', background: '#eef3fb', border: '1px solid #d4e0f0', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
                     + 추가
                   </button>
                 </div>
                 {form.previous_card_numbers.length === 0 ? (
-                  <p style={{ fontSize: 11, color: '#334155', textAlign: 'center', padding: 4 }}>등록된 이전 번호 없음</p>
+                  <p style={{ fontSize: 11, color: 'rgba(0,0,0,0.06)', textAlign: 'center', padding: 4 }}>등록된 이전 번호 없음</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {form.previous_card_numbers.map((num: string, idx: number) => (
@@ -1658,12 +1658,12 @@ export default function CorporateCardsPage() {
                   {historyLoading ? (
                     <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 8 }}>로딩 중...</p>
                   ) : assignmentHistory.length === 0 ? (
-                    <p style={{ fontSize: 12, color: '#334155', textAlign: 'center', padding: 8 }}>이력이 없습니다</p>
+                    <p style={{ fontSize: 12, color: 'rgba(0,0,0,0.06)', textAlign: 'center', padding: 8 }}>이력이 없습니다</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                       {assignmentHistory.map((h, idx) => (
                         <div key={h.id} style={{ display: 'flex', gap: 10, padding: '6px 0', borderLeft: '2px solid #e2e8f0', marginLeft: 6, paddingLeft: 12, position: 'relative' }}>
-                          <div style={{ position: 'absolute', left: -5, top: 10, width: 8, height: 8, borderRadius: '50%', background: idx === 0 && !h.unassigned_at ? '#2d5fa8' : '#cbd5e1' }} />
+                          <div style={{ position: 'absolute', left: -5, top: 10, width: 8, height: 8, borderRadius: '50%', background: idx === 0 && !h.unassigned_at ? '#3b6eb5' : '#cbd5e1' }} />
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ fontSize: 13, fontWeight: 700, color: idx === 0 && !h.unassigned_at ? '#1e3a5f' : '#64748b' }}>
@@ -1718,7 +1718,7 @@ export default function CorporateCardsPage() {
             </div>
             <div style={{ padding: 24, borderTop: '1px solid #f1f5f9', display: 'flex', gap: 12, flexShrink: 0 }}>
               <button onClick={() => { setShowForm(false); setEditingId(null) }} style={{ flex: 1, padding: 12, background: '#f1f5f9', borderRadius: 12, fontWeight: 600, fontSize: 14, color: '#475569', border: 'none', cursor: 'pointer' }}>취소</button>
-              <button onClick={handleSave} style={{ flex: 2, padding: 12, background: '#2d5fa8', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>{editingId ? '수정 완료' : '등록 완료'}</button>
+              <button onClick={handleSave} style={{ flex: 2, padding: 12, background: '#3b6eb5', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>{editingId ? '수정 완료' : '등록 완료'}</button>
             </div>
           </div>
         </div>
@@ -1746,7 +1746,7 @@ export default function CorporateCardsPage() {
                   style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
                 />
                 <button onClick={addDepartment}
-                  style={{ padding: '10px 16px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                  style={{ padding: '10px 16px', background: '#3b6eb5', color: 'white', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
                   추가
                 </button>
               </div>
@@ -1764,7 +1764,7 @@ export default function CorporateCardsPage() {
                     const isRenaming = renameDept?.from === dept
                     return (
                       <div key={dept} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0f172a', flexShrink: 0 }} />
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5', flexShrink: 0 }} />
                         {isRenaming ? (
                           <input
                             autoFocus
@@ -1772,7 +1772,7 @@ export default function CorporateCardsPage() {
                             onChange={e => setRenameDept({ ...renameDept, to: e.target.value })}
                             onKeyDown={e => e.key === 'Enter' && renameDepartment()}
                             onBlur={() => setRenameDept(null)}
-                            style={{ flex: 1, border: '1px solid #3b82f6', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, outline: 'none' }}
+                            style={{ flex: 1, border: '1px solid #3b6eb5', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, outline: 'none' }}
                           />
                         ) : (
                           <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{dept}</span>
@@ -1788,7 +1788,7 @@ export default function CorporateCardsPage() {
                         )}
                         {isRenaming && (
                           <button onClick={renameDepartment}
-                            style={{ fontSize: 11, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>확인</button>
+                            style={{ fontSize: 11, color: '#3b6eb5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>확인</button>
                         )}
                       </div>
                     )
@@ -1822,7 +1822,7 @@ export default function CorporateCardsPage() {
                   style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
                 />
                 <button onClick={addCardType}
-                  style={{ padding: '10px 16px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
+                  style={{ padding: '10px 16px', background: '#3b6eb5', color: 'white', border: 'none', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' as const }}>
                   추가
                 </button>
               </div>
@@ -1933,15 +1933,15 @@ export default function CorporateCardsPage() {
               <div style={{ marginBottom: 24 }}>
                 <h4 style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', marginBottom: 12 }}>🧾 적격증빙 관리</h4>
                 <div style={{ background: '#eff6ff', borderRadius: 12, padding: 16, border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: 12, color: '#1e40af', lineHeight: 2 }}>
+                  <div style={{ fontSize: 12, color: '#5a8fd4', lineHeight: 2 }}>
                     <p><strong>법인카드 사용 시:</strong> 카드 매출전표가 자동으로 적격증빙 역할</p>
                     <p><strong>건당 3만원 초과:</strong> 적격증빙 미수취 시 <span style={{ fontWeight: 900, color: '#dc2626' }}>2% 가산세</span> 부과</p>
                     <p><strong>세금계산서:</strong> 일반과세자 거래 시 세금계산서 수취로 매입세액 공제 가능</p>
                     <p><strong>현금영수증:</strong> 반드시 <strong>"지출증빙용(사업자번호)"</strong>으로 발급</p>
                   </div>
                   <div style={{ marginTop: 12, padding: '10px 12px', background: '#dbeafe', borderRadius: 8 }}>
-                    <p style={{ fontSize: 11, fontWeight: 800, color: '#1e40af' }}>💡 증빙 상태 자동 추적</p>
-                    <p style={{ fontSize: 10, color: '#3b82f6', marginTop: 4 }}>거래 내역에서 증빙 미첨부 건을 자동으로 표시하고, 3만원 초과 미증빙 건에 경고를 띄웁니다.</p>
+                    <p style={{ fontSize: 11, fontWeight: 800, color: '#5a8fd4' }}>💡 증빙 상태 자동 추적</p>
+                    <p style={{ fontSize: 10, color: '#3b6eb5', marginTop: 4 }}>거래 내역에서 증빙 미첨부 건을 자동으로 표시하고, 3만원 초과 미증빙 건에 경고를 띄웁니다.</p>
                   </div>
                 </div>
               </div>
@@ -2057,7 +2057,7 @@ export default function CorporateCardsPage() {
                 <button key={tab.key} onClick={() => setLimitTab(tab.key)}
                   style={{
                     flex: 1, padding: '10px 8px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: limitTab === tab.key ? '#0f172a' : 'transparent',
+                    background: limitTab === tab.key ? '#3b6eb5' : 'transparent',
                     color: limitTab === tab.key ? 'white' : '#64748b',
                     fontSize: 12, fontWeight: 800, transition: 'all 0.15s',
                   }}>
@@ -2095,12 +2095,12 @@ export default function CorporateCardsPage() {
                                 autoFocus
                                 value={limitForm.amount ? Number(limitForm.amount).toLocaleString() : ''}
                                 onChange={e => setLimitForm({ ...limitForm, amount: e.target.value.replace(/[^0-9]/g, '') })}
-                                style={{ width: '100%', border: '2px solid #3b82f6', borderRadius: 8, padding: '8px 30px 8px 12px', fontSize: 13, fontWeight: 800, textAlign: 'right' as const, outline: 'none' }}
+                                style={{ width: '100%', border: '2px solid #3b6eb5', borderRadius: 8, padding: '8px 30px 8px 12px', fontSize: 13, fontWeight: 800, textAlign: 'right' as const, outline: 'none' }}
                                 placeholder="0" />
                               <span style={{ position: 'absolute' as const, right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8' }}>원</span>
                             </div>
                             <button onClick={saveLimitSetting}
-                              style={{ padding: '8px 14px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>저장</button>
+                              style={{ padding: '8px 14px', background: '#3b6eb5', color: 'white', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>저장</button>
                             <button onClick={() => { setEditingLimitKey(null); setLimitForm({ type: 'card_company', key: '', amount: '' }) }}
                               style={{ padding: '8px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>취소</button>
                           </div>
@@ -2169,12 +2169,12 @@ export default function CorporateCardsPage() {
                                 autoFocus
                                 value={limitForm.amount ? Number(limitForm.amount).toLocaleString() : ''}
                                 onChange={e => setLimitForm({ ...limitForm, amount: e.target.value.replace(/[^0-9]/g, '') })}
-                                style={{ width: '100%', border: '2px solid #3b82f6', borderRadius: 8, padding: '8px 30px 8px 12px', fontSize: 13, fontWeight: 800, textAlign: 'right' as const, outline: 'none' }}
+                                style={{ width: '100%', border: '2px solid #3b6eb5', borderRadius: 8, padding: '8px 30px 8px 12px', fontSize: 13, fontWeight: 800, textAlign: 'right' as const, outline: 'none' }}
                                 placeholder="0" />
                               <span style={{ position: 'absolute' as const, right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#94a3b8' }}>원</span>
                             </div>
                             <button onClick={saveLimitSetting}
-                              style={{ padding: '8px 14px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>저장</button>
+                              style={{ padding: '8px 14px', background: '#3b6eb5', color: 'white', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>저장</button>
                             <button onClick={() => { setEditingLimitKey(null); setLimitForm({ type: 'dept', key: '', amount: '' }) }}
                               style={{ padding: '8px 10px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>취소</button>
                           </div>
@@ -2245,14 +2245,14 @@ export default function CorporateCardsPage() {
                               <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>{formatMoney(c.monthly_limit)}</span>
                             ) : (
                               <button onClick={() => handleEdit(c)}
-                                style={{ fontSize: 10, color: '#3b82f6', background: '#eff6ff', border: 'none', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>설정</button>
+                                style={{ fontSize: 10, color: '#3b6eb5', background: '#eff6ff', border: 'none', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}>설정</button>
                             )}
                           </div>
                           <div style={{ textAlign: 'center' as const }}>
                             {c.monthly_limit ? (
                               <span style={{ fontSize: 12, fontWeight: 900, color: limitRate >= 80 ? '#ef4444' : limitRate >= 50 ? '#f59e0b' : '#10b981' }}>{limitRate}%</span>
                             ) : (
-                              <span style={{ fontSize: 10, color: '#334155' }}>-</span>
+                              <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.06)' }}>-</span>
                             )}
                           </div>
                         </div>
@@ -2301,7 +2301,7 @@ export default function CorporateCardsPage() {
               <button key={f.key} onClick={() => setFlagFilter(f.key)}
                 style={{
                   padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                  background: flagFilter === f.key ? '#1e293b' : '#fff',
+                  background: flagFilter === f.key ? '#3b6eb5' : '#fff',
                   color: flagFilter === f.key ? '#fff' : '#6b7280',
                   border: flagFilter === f.key ? 'none' : '1px solid #e5e7eb',
                 }}>
@@ -2363,7 +2363,7 @@ export default function CorporateCardsPage() {
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800 }}>{(flag.amount || 0).toLocaleString()}</td>
                         <td style={{ padding: '10px 12px' }}>
                           {flag.employee_name ? (
-                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontSize: 10, fontWeight: 600 }}>
+                            <span style={{ padding: '2px 6px', borderRadius: 4, background: '#dbeafe', color: '#5a8fd4', fontSize: 10, fontWeight: 600 }}>
                               {flag.employee_name}
                             </span>
                           ) : <span style={{ fontSize: 10, color: '#d1d5db' }}>-</span>}
@@ -2423,7 +2423,7 @@ export default function CorporateCardsPage() {
                 return (
                   <div key={empId} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#1e40af' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#5a8fd4' }}>
                         {(emp?.employee_name || summary.name || '?')[0]}
                       </div>
                       <div>
@@ -2491,7 +2491,7 @@ export default function CorporateCardsPage() {
                           <span style={{
                             padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
                             background: adj.status === 'applied' ? '#f0fdf4' : adj.status === 'approved' ? '#dbeafe' : adj.status === 'cancelled' ? '#f9fafb' : '#fef3c7',
-                            color: adj.status === 'applied' ? '#16a34a' : adj.status === 'approved' ? '#1e40af' : adj.status === 'cancelled' ? '#9ca3af' : '#92400e',
+                            color: adj.status === 'applied' ? '#16a34a' : adj.status === 'approved' ? '#5a8fd4' : adj.status === 'cancelled' ? '#9ca3af' : '#92400e',
                           }}>
                             {adj.status === 'pending' ? '⏳ 대기' : adj.status === 'approved' ? '✅ 승인' : adj.status === 'applied' ? '💰 반영완료' : '❌ 취소'}
                           </span>
