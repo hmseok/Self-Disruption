@@ -258,12 +258,10 @@ export default function CarListPage() {
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ── KPI 스탯 바 ── */}
-        {cars.length > 0 && (
-          <DcStatStrip
-            stats={statItems}
-            actions={actionButtons}
-          />
-        )}
+        <DcStatStrip
+          stats={statItems}
+          actions={actionButtons}
+        />
 
         {/* ── 정비/사고 경고 배너 ── */}
         {maintenanceCars.length > 0 && (

@@ -692,7 +692,7 @@ export default function CustomerPage() {
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ── KPI 스탯 바 ── */}
-        {!loading && customers.length > 0 && (
+        {!loading && (
           <DcStatStrip
             stats={statItems}
             actions={actionButtons}

@@ -996,7 +996,7 @@ export default function QuoteListPage() {
         `}</style>
 
         {/* ═══ Stat Strip ═══ */}
-        {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
+        {(mainTab === 'long_term' || mainTab === 'short_term') && (
           <DcStatStrip
             stats={mainTab === 'long_term' ? [
               { label: '전체', value: statusCounts.all, unit: '건' },

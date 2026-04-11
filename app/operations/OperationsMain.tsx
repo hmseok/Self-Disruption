@@ -1151,7 +1151,7 @@ export default function OperationsMainPage() {
         </div>
 
       {/* KPI Cards - DcStatStrip */}
-      {(viewMode !== 'dashboard' && operations.length > 0) && (
+      {viewMode !== 'dashboard' && (
         <DcStatStrip
           stats={[
             { label: '오늘 출고', value: stats.todayDeliveries, unit: '건' },

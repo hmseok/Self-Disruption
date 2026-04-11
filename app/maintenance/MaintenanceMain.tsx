@@ -545,16 +545,14 @@ export default function MaintenanceMainPage() {
         </div>
 
         {/* KPI Cards using DcStatStrip */}
-        {(maintenanceRecords.length > 0 || inspectionRecords.length > 0) && (
-          <DcStatStrip
-            stats={[
-              { label: '정비 대기', value: stats.maintPending, unit: '건' },
-              { label: '정비 진행', value: stats.maintInProgress, unit: '건' },
-              { label: '검사 예정', value: stats.inspUpcoming, unit: '건' },
-              { label: '만기 초과', value: stats.inspOverdue, unit: '건' },
-            ]}
-          />
-        )}
+        <DcStatStrip
+          stats={[
+            { label: '정비 대기', value: stats.maintPending, unit: '건' },
+            { label: '정비 진행', value: stats.maintInProgress, unit: '건' },
+            { label: '검사 예정', value: stats.inspUpcoming, unit: '건' },
+            { label: '만기 초과', value: stats.inspOverdue, unit: '건' },
+          ]}
+        />
 
         {/* Tab Navigation + Search Bar using DcToolbar */}
         <DcToolbar

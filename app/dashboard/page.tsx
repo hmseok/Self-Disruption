@@ -384,7 +384,7 @@ export default function DashboardPage() {
             if (showCustomers) items.push({ label: '고객', value: loading ? '-' : stats.totalCustomers, unit: '명' })
             if (showInvest) items.push({ label: '투자', value: loading ? '-' : formatMoney(stats.totalInvestAmount), unit: '원' })
             if (showFinance) items.push({ label: '순수익', value: loading ? '-' : formatMoney(stats.netProfit), unit: '원' })
-            return items.length > 0 ? <DcStatStrip stats={items} fullWidth={true} /> : null
+            return <DcStatStrip stats={items} fullWidth={true} />
           })()}
 
           {/* 오늘의 운영 현황 */}

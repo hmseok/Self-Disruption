@@ -374,9 +374,7 @@ export default function ContractListMain() {
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ── KPI 스탯 스트립 ── */}
-        {contracts.length > 0 && (
-          <DcStatStrip stats={statItems} fullWidth />
-        )}
+        <DcStatStrip stats={statItems} fullWidth />
 
         {/* ── 검색 + 필터 툴바 ── */}
         <DcToolbar
