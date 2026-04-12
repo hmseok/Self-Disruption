@@ -1,50 +1,11 @@
 'use client'
 
 import { useApp } from '../../context/AppContext'
+import { f, fDate, MAINT_PACKAGE_LABELS, MAINT_PACKAGE_DESC } from '@/lib/quote-utils'
+import { getAuthHeader } from '@/app/utils/auth-client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-
-// ============================================================================
-// AUTH HELPER
-// ============================================================================
-async function getAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
-}
-
-// ============================================
-// 유틸
-// ============================================
-const f = (n: number) => Math.round(n).toLocaleString()
-const fDate = (d: string) => {
-  const dt = new Date(d)
-  return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, '0')}.${String(dt.getDate()).padStart(2, '0')}`
-}
-
-// ============================================
-// 정비 패키지 라벨
-// ============================================
-const MAINT_PACKAGE_LABELS: Record<string, string> = {
-  self: '자가정비',
-  oil_only: '엔진오일 교환',
-  basic: '기본정비',
-  full: '종합정비',
-}
-
-const MAINT_PACKAGE_DESC: Record<string, string> = {
-  self: '고객 직접 정비 (렌탈료 미포함)',
-  oil_only: '엔진오일+필터 교환 포함',
-  basic: '오일+에어필터+브레이크점검+순회정비 포함',
-  full: '오일+필터+브레이크+타이어+배터리+와이퍼+냉각수 전항목 포함',
-}
 
 // 초과주행 km당 추가요금 fallback (빌더에서 전달 안된 경우)
 const getExcessMileageRateFallback = (factoryPrice: number): number => {

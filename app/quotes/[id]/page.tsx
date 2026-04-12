@@ -1,76 +1,14 @@
 'use client'
 import { auth } from '@/lib/auth-client'
+import { f, fDate, MAINT_PACKAGE_LABELS, MAINT_PACKAGE_DESC, MAINT_ITEMS_MAP, TIMELINE_EVENT_CONFIG } from '@/lib/quote-utils'
+import { DEFAULT_INSURANCE_COVERAGE, DEFAULT_QUOTE_NOTICES } from '@/lib/contract-terms'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 export const dynamic = "force-dynamic";
 
-// ============================================================================
-// AUTH HELPER
-// ============================================================================
-async function getAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
-}
-
-// ============================================
-// 유틸
-// ============================================
-const f = (n: number) => Math.round(n || 0).toLocaleString()
-const fDate = (d: string) => {
-  if (!d) return '-'
-  const dt = new Date(d)
-  return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, '0')}.${String(dt.getDate()).padStart(2, '0')}`
-}
-
-// 정비 패키지 라벨
-const MAINT_PACKAGE_LABELS: Record<string, string> = {
-  self: '자가정비',
-  oil_only: '엔진오일 교환',
-  basic: '기본정비',
-  full: '종합정비',
-}
-const MAINT_PACKAGE_DESC: Record<string, string> = {
-  self: '고객 직접 정비 (렌탈료 미포함)',
-  oil_only: '엔진오일+필터 교환 포함',
-  basic: '오일류+에어필터+점검+순회정비 포함',
-  full: '오일류+필터+브레이크+타이어+배터리+와이퍼+냉각수 전항목 포함',
-}
-const MAINT_ITEMS_MAP: Record<string, string[]> = {
-  oil_only: ['엔진오일+필터 정기 교환'],
-  basic: ['엔진오일+필터', '에어컨필터', '에어클리너', '와이퍼', '점화플러그', '순회정비(방문점검)'],
-  full: ['엔진오일+필터', '에어컨필터', '에어클리너', '와이퍼', '점화플러그', '순회정비(방문점검)', '브레이크패드(전/후)', '타이어(4본)', '배터리', '미션오일', '냉각수/부동액'],
-}
-
-// 기본 보험 보장내역 (약관 데이터 없을 때 fallback)
-const DEFAULT_INSURANCE_COVERAGE = [
-  { label: '대인배상 I (책임)', description: '자배법 의무보험 · 사망/부상 한도 무제한' },
-  { label: '대인배상 II (종합)', description: '대인 1 초과분 무한 보장' },
-  { label: '대물배상', description: '1억원 한도 (상대방 차량·재물 손해)' },
-  { label: '자기신체사고', description: '사망 1.5억 / 부상·휴유장해 3천만원 한도' },
-  { label: '무보험차상해', description: '2억원 한도' },
-  { label: '자기차량손해 (자차)', description: '차량가격 기준 전손/분손 보장 · 면책금 {deductible}원' },
-]
-
-// 기본 유의사항 (약관 데이터 없을 때 fallback)
-const DEFAULT_QUOTE_NOTICES = [
-  '본 견적서는 발행일로부터 30일간 유효하며, 차량 재고 및 시장 상황에 따라 변동될 수 있습니다.',
-  '보증금은 계약 종료 시 차량 상태 확인 후 손해액을 공제한 잔액을 환불합니다.',
-  '약정주행거리 초과 시 계약 종료 시점에 km당 {excessRate}원의 추가 요금이 정산됩니다.',
-  '사고 발생 시 자차 면책금 {deductible}원은 임차인이 부담하며, 초과 수리비는 보험 처리됩니다.',
-  '중도해지 시 잔여 렌탈료의 {earlyTerminationRate}%에 해당하는 위약금이 발생합니다.',
-  '렌탈 차량은 타인에게 전대·양도할 수 없으며 임대인의 사전 동의 없이 차량 개조 불가합니다.',
-  '자동차 정기검사(종합검사)는 관련법의 일정에 맞추어 실시하여야 하며, 검사비용은 렌탈료에 포함됩니다.',
-  { text: '인수 시 소유권 이전에 필요한 취득세 및 수수료는 임차인 부담입니다.', condition: 'buyout' },
-]
 
 // CostBar 컴포넌트
 const CostBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
@@ -98,16 +36,6 @@ const TRow = ({ label, value, bold = false }: { label: string; value: string; bo
 // ============================================
 // 타임라인 컴포넌트
 // ============================================
-const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-  created:          { icon: '📄', label: '견적 생성',   color: '#6b7280', bg: 'rgba(0,0,0,0.04)' },
-  shared:           { icon: '🔗', label: '링크 공유',   color: '#2563eb', bg: '#eff6ff' },
-  sent:             { icon: '📤', label: '견적 발송',   color: '#7c3aed', bg: '#f5f3ff' },
-  viewed:           { icon: '👁️', label: '고객 열람',   color: '#0891b2', bg: '#ecfeff' },
-  signed:           { icon: '✍️', label: '고객 서명',   color: '#059669', bg: '#ecfdf5' },
-  contract_created: { icon: '📋', label: '계약 생성',   color: '#059669', bg: '#ecfdf5' },
-  revoked:          { icon: '🚫', label: '링크 비활성화', color: '#dc2626', bg: '#fef2f2' },
-  pdf_stored:       { icon: '💾', label: 'PDF 저장',    color: '#0369a1', bg: '#f0f9ff' },
-}
 
 function QuoteTimeline({ quoteId }: { quoteId?: string }) {
   const [events, setEvents] = useState<any[]>([])
@@ -146,7 +74,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
     if (e.event_type === 'contract_created') return '계약이 자동 생성됨'
     if (e.event_type === 'revoked') return '공유 링크 비활성화'
     if (e.event_type === 'pdf_stored') return '계약서 PDF 저장 완료'
-    return EVENT_CONFIG[e.event_type]?.label || e.event_type
+    return TIMELINE_EVENT_CONFIG[e.event_type]?.label || e.event_type
   }
 
   const displayed = expanded ? events : events.slice(0, 5)
@@ -168,7 +96,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
               {/* 세로 선 */}
               <div style={{ position: 'absolute', left: 15, top: 8, bottom: 8, width: 2, background: 'rgba(0,0,0,0.06)' }} />
               {displayed.map((ev: any, i: number) => {
-                const cfg = EVENT_CONFIG[ev.event_type] || EVENT_CONFIG.created
+                const cfg = TIMELINE_EVENT_CONFIG[ev.event_type] || TIMELINE_EVENT_CONFIG.created
                 return (
                   <div key={ev.id} style={{ display: 'flex', gap: 12, marginBottom: i < displayed.length - 1 ? 16 : 0, position: 'relative' }}>
                     {/* 점 */}

@@ -1,22 +1,9 @@
 'use client'
 import { auth } from '@/lib/auth-client'
+import { f, fmtPhone, fmtBirth, fmtLicense, openDaumPostcode } from '@/lib/quote-utils'
+import { getAuthHeader } from '@/app/utils/auth-client'
 import { useApp } from '../../context/AppContext'
 import { useState, useEffect, useCallback } from 'react'
-
-// ============================================================================
-// AUTH HELPER
-// ============================================================================
-async function getAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
-}
 
 // ============================================================================
 // LOTTE QUICK RATE DATA (빠른 계산기용 — 1~3일 기준가)
@@ -70,8 +57,6 @@ function calcQuickRate(baseRate: number, discountPct: number, days: number, hour
   return 0
 }
 
-const f = (n: number) => Math.round(n || 0).toLocaleString()
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -105,44 +90,6 @@ export default function ShortTermCalcPage() {
     memo: '',
   })
   const setField = (k: keyof typeof inv, v: string) => setInv(p => ({ ...p, [k]: v }))
-
-  // ── Auto-hyphen formatters ──
-  const fmtPhone = (v: string) => {
-    const d = v.replace(/\D/g, '').slice(0, 11)
-    if (d.length <= 3) return d
-    if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
-    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
-  }
-  const fmtBirth = (v: string) => {
-    const d = v.replace(/[^0-9*]/g, '').slice(0, 13)
-    if (d.length <= 6) return d
-    return `${d.slice(0, 6)}-${d.slice(6)}`
-  }
-  const fmtLicense = (v: string) => {
-    const d = v.replace(/\D/g, '').slice(0, 12)
-    if (d.length <= 2) return d
-    if (d.length <= 4) return `${d.slice(0, 2)}-${d.slice(2)}`
-    if (d.length <= 10) return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`
-    return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 10)}-${d.slice(10)}`
-  }
-
-  // ── Daum address search ──
-  const openAddressSearch = () => {
-    if (!(window as any).daum?.Postcode) {
-      const s = document.createElement('script')
-      s.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
-      s.onload = () => runDaumPostcode()
-      document.head.appendChild(s)
-    } else { runDaumPostcode() }
-  }
-  const runDaumPostcode = () => {
-    new (window as any).daum.Postcode({
-      oncomplete: (data: any) => {
-        const addr = data.roadAddress || data.jibunAddress
-        setField('tenant_address', addr)
-      }
-    }).open()
-  }
 
   // ── Company stamp ──
   useEffect(() => {
@@ -585,8 +532,8 @@ export default function ShortTermCalcPage() {
                   <div>
                     <label style={lS}>주소</label>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: '#fafafa' }} onClick={openAddressSearch} />
-                      <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'rgba(255,255,255,0.60)', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                      <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: '#fafafa' }} onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} />
+                      <button onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, background: 'rgba(255,255,255,0.60)', fontSize: 11, fontWeight: 700, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
                     </div>
                   </div>
                   <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>

@@ -13,21 +13,8 @@ import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
-
-// ============================================================================
-// AUTH HELPER
-// ============================================================================
-async function getAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
-}
+import { f, fDate, fmtPhone, fmtBirth, fmtLicense, openDaumPostcode, QUOTE_STATUS_CONFIG, SHORT_TERM_STATUS_CONFIG } from '@/lib/quote-utils'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 // ============================================================================
 // TYPES
@@ -386,47 +373,6 @@ export default function QuoteListPage() {
   })
   const setField = (k: keyof typeof inv, v: string) => setInv(p => ({ ...p, [k]: v }))
 
-  // ── 자동 하이픈 포맷터 ──
-  const fmtPhone = (v: string) => {
-    const d = v.replace(/\D/g, '').slice(0, 11)
-    if (d.length <= 3) return d
-    if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
-    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
-  }
-  const fmtBirth = (v: string) => {
-    const d = v.replace(/[^0-9*]/g, '').slice(0, 13)
-    if (d.length <= 6) return d
-    return `${d.slice(0, 6)}-${d.slice(6)}`
-  }
-  const fmtLicense = (v: string) => {
-    const d = v.replace(/\D/g, '').slice(0, 12)
-    if (d.length <= 2) return d
-    if (d.length <= 4) return `${d.slice(0, 2)}-${d.slice(2)}`
-    if (d.length <= 10) return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}`
-    return `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 10)}-${d.slice(10)}`
-  }
-
-  // ── 다음 주소검색 ──
-  const openAddressSearch = () => {
-    if (!(window as any).daum?.Postcode) {
-      const s = document.createElement('script')
-      s.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
-      s.onload = () => runDaumPostcode()
-      document.head.appendChild(s)
-    } else {
-      runDaumPostcode()
-    }
-  }
-  const runDaumPostcode = () => {
-    new (window as any).daum.Postcode({
-      oncomplete: (data: any) => {
-        const addr = data.roadAddress || data.jibunAddress
-        setField('tenant_address', addr)
-      }
-    }).open()
-  }
-
-  const f = (n: number) => Math.round(n || 0).toLocaleString()
   const formatDate = (dateString: string) => dateString?.split('T')[0] || ''
 
   // 청구서 memo에서 차량 정보 파싱: "[청구서] 경차 · 스파크, 모닝 | 기간: 6일 3시간 | ..."
@@ -1420,8 +1366,8 @@ export default function QuoteListPage() {
                       <div>
                         <label style={lS}>주소</label>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: 'rgba(0,0,0,0.04)' }} onClick={openAddressSearch} />
-                          <button onClick={openAddressSearch} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(0,0,0,0.04)', fontSize: 11, fontWeight: 700, color: '#334155', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
+                          <input value={inv.tenant_address} onChange={e => setField('tenant_address', e.target.value)} placeholder="주소 검색" readOnly style={{ ...iS, flex: 1, cursor: 'pointer', background: 'rgba(0,0,0,0.04)' }} onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} />
+                          <button onClick={() => openDaumPostcode((addr) => setField('tenant_address', addr))} type="button" style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, background: 'rgba(0,0,0,0.04)', fontSize: 11, fontWeight: 700, color: '#334155', cursor: 'pointer', whiteSpace: 'nowrap' }}>검색</button>
                         </div>
                       </div>
                       <div><label style={lS}>운전면허번호</label><input value={inv.license_number} onChange={e => setField('license_number', fmtLicense(e.target.value))} placeholder="00-00-000000-00" style={iS} inputMode="numeric" /></div>
