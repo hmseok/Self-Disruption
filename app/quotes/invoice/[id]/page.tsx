@@ -301,13 +301,13 @@ export default function InvoiceDetailPage() {
   const statusBadge = quote.signed_at
     ? { label: '서명완료', bg: '#dcfce7', color: '#16a34a', icon: '✅' }
     : quote.shared_at
-    ? { label: '발송됨', bg: '#dbeafe', color: '#2563eb', icon: '📤' }
+    ? { label: '발송됨', bg: '#dbeafe', color: '#2d5a9e', icon: '📤' }
     : { label: '임시저장', bg: '#fef3c7', color: '#d97706', icon: '📝' }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
+    <div>
       {/* ── 상단 네비게이션 ── */}
-      <div className="no-print" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '12px 20px' }}>
+      <div className="no-print" style={{ background: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '12px 20px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Link href="/quotes" style={{ color: '#6b7280', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>← 견적관리</Link>
@@ -321,7 +321,7 @@ export default function InvoiceDetailPage() {
               style={{
                 padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none',
                 background: shareStatus === 'signed' ? '#dcfce7' : shareStatus === 'shared' ? '#dbeafe' : 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-                color: shareStatus === 'signed' ? '#16a34a' : shareStatus === 'shared' ? '#2563eb' : '#fff',
+                color: shareStatus === 'signed' ? '#16a34a' : shareStatus === 'shared' ? '#2d5a9e' : '#fff',
               }}
             >
               {shareStatus === 'signed' ? '✅ 서명완료' : shareStatus === 'shared' ? '📤 발송됨' : '📱 청구서 발송'}
@@ -335,10 +335,10 @@ export default function InvoiceDetailPage() {
 
       {/* ── 메인 컨텐츠 ── */}
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
-        <div ref={printRef} style={{ background: '#fff', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div ref={printRef} style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 20, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)' }}>
 
           {/* ── 헤더 ── */}
-          <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', color: '#1e293b', padding: '24px 32px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', color: '#1e293b', padding: '24px 32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: '-0.5px' }}>단기렌트 청구서</h1>
@@ -361,7 +361,7 @@ export default function InvoiceDetailPage() {
               {/* 임차인 */}
               <div>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid #e5e7eb' }}>임차인 정보</div>
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0.12)' }}>
                   <InfoRow label="임차인" value={quote.customer_name || '-'} bold />
                   <InfoRow label="연락처" value={parsed.phone || '-'} />
                 </div>
@@ -369,7 +369,7 @@ export default function InvoiceDetailPage() {
               {/* 대차 */}
               <div>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid #e5e7eb' }}>대차 정보</div>
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0.12)' }}>
                   <InfoRow label="차종" value={parsed.car} bold />
                   <InfoRow label="대여기간" value={parsed.period} />
                 </div>
@@ -379,7 +379,7 @@ export default function InvoiceDetailPage() {
             {/* ── 요금 안내 ── */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>요금 안내</div>
-              <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.30)', boxShadow: '8px 8px 20px rgba(140,170,210,0.19), -8px -8px 20px rgba(255,255,255,0.47)', borderRadius: 16, padding: '24px 28px', color: '#1e293b' }}>
+              <div style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', borderRadius: 16, padding: '24px 28px', color: '#1e293b' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <span style={{ color: '#64748b', fontSize: 14 }}>공급가</span>
                   <span style={{ color: '#64748b', fontWeight: 700, fontSize: 16 }}>{f(rentTotal)}원</span>
@@ -402,7 +402,7 @@ export default function InvoiceDetailPage() {
             {parsed.memo && (
               <div style={{ marginBottom: 28 }}>
                 <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>메모</div>
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16, fontSize: 13, color: '#4b5563', lineHeight: 1.6 }}>{parsed.memo}</div>
+                <div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, fontSize: 13, color: '#4b5563', lineHeight: 1.6, border: '1px solid rgba(59,130,246,0.12)' }}>{parsed.memo}</div>
               </div>
             )}
 
@@ -423,7 +423,7 @@ export default function InvoiceDetailPage() {
             {/* ── 임대인 (회사) 정보 ── */}
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>임대인 (렌터카 사업자)</div>
-              <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16 }}>
+              <div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: 16, border: '1px solid rgba(59,130,246,0.12)' }}>
                 <p style={{ fontWeight: 900, fontSize: 14, color: '#111827', marginBottom: 4 }}>{company?.name || '주식회사에프엠아이'}</p>
                 {company?.business_number && <p style={{ fontSize: 12, color: '#6b7280' }}>사업자번호: {company.business_number}</p>}
                 {company?.phone && <p style={{ fontSize: 12, color: '#6b7280' }}>TEL: {company.phone}</p>}
@@ -442,10 +442,10 @@ export default function InvoiceDetailPage() {
            공유/발송 모달
          ═══════════════════════════════════════ */}
       {showShareModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
           onClick={() => { setShowShareModal(false); setSendResult(null) }}
         >
-          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', padding: 28, maxWidth: 480, width: '100%', margin: '0 16px' }}
+          <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 20, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', padding: 28, maxWidth: 480, width: '100%', margin: '0 16px', border: '1px solid rgba(0,0,0,0.06)', backdropFilter: 'blur(20px)' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -461,7 +461,7 @@ export default function InvoiceDetailPage() {
             ) : shareUrl ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* 미리보기 */}
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: '12px 16px', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, padding: '12px 16px', border: '1px solid rgba(59,130,246,0.12)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{quote.customer_name}</span>
@@ -514,7 +514,7 @@ export default function InvoiceDetailPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280' }}>수신 이메일</label>
                     <input type="email" value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder="customer@example.com"
-                      style={{ border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
+                      style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
                     />
                     <button onClick={handleDirectSend} disabled={sending || !sendEmail}
                       style={{ padding: '12px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', background: '#3b6eb5', color: '#fff', opacity: (sending || !sendEmail) ? 0.5 : 1 }}
@@ -524,7 +524,7 @@ export default function InvoiceDetailPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280' }}>수신 전화번호</label>
                     <input type="tel" value={sendPhone} onChange={e => setSendPhone(e.target.value)} placeholder="010-1234-5678"
-                      style={{ border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
+                      style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: 10, padding: '10px 14px', fontSize: 13, outline: 'none' }}
                     />
                     <button onClick={handleDirectSend} disabled={sending || !sendPhone}
                       style={{

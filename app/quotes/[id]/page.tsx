@@ -78,7 +78,7 @@ const CostBar = ({ label, value, total, color }: { label: string; value: number;
   return (
     <div className="flex items-center gap-3 text-sm">
       <span className="w-24 text-slate-500 text-xs">{label}</span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+      <div className="flex-1 rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.40)' }}>
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
       <span className="w-24 text-right font-bold text-xs">{f(value)}원</span>
@@ -90,7 +90,7 @@ const CostBar = ({ label, value, total, color }: { label: string; value: number;
 // 테이블 행 컴포넌트
 const TRow = ({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) => (
   <tr className="border-b border-black/5 last:border-0">
-    <td className="bg-gray-50 px-4 py-2.5 font-bold text-slate-500 w-32 text-sm">{label}</td>
+    <td className="px-4 py-2.5 font-bold text-slate-500 w-32 text-sm" style={{ background: 'rgba(255,255,255,0.40)' }}>{label}</td>
     <td className={`px-4 py-2.5 text-sm ${bold ? 'font-black text-slate-800' : 'text-slate-600'}`}>{value}</td>
   </tr>
 )
@@ -153,7 +153,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
 
   return (
     <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px 24px' }}>
-      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111' }}>📋 활동 타임라인</h3>
           <span style={{ fontSize: 12, color: '#9ca3af' }}>{events.length}건</span>
@@ -198,7 +198,7 @@ function QuoteTimeline({ quoteId }: { quoteId?: string }) {
               style={{
                 display: 'block', width: '100%', marginTop: 12, padding: '8px 0',
                 background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 12, color: '#2563eb', fontWeight: 600,
+                fontSize: 12, color: '#2d5a9e', fontWeight: 600,
               }}
             >
               {expanded ? '접기' : `전체 ${events.length}건 보기`}
@@ -498,7 +498,7 @@ export default function QuoteDetailPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="flex items-center justify-center py-20">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-steel-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-slate-500 font-bold">견적서 불러오는 중...</p>
@@ -589,16 +589,10 @@ export default function QuoteDetailPage() {
   const daysUntilExpiry = quote.expires_at ? Math.floor((new Date(quote.expires_at).getTime() - Date.now()) / 86400000) : 999
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div>
 
       {/* ===== 상단 네비게이션 + 액션 바 (인쇄 시 숨김) ===== */}
       <div className="max-w-[900px] mx-auto py-4 px-4 md:py-6 no-print">
-        <div className="flex items-center gap-2 mb-4 no-print">
-          <Link href="/quotes" className="text-slate-500 hover:text-slate-400 text-sm">견적 관리</Link>
-          <span className="text-slate-400">/</span>
-          <span className="text-steel-600 font-bold text-sm">견적 상세</span>
-        </div>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '1rem' }} className="no-print">
           <div style={{ textAlign: 'left' }}>
             <h1 className="text-2xl font-black text-slate-800">{isInvoiceQuote ? '청구서' : '견적서'} #{String(quote.id).slice(0, 8)}</h1>
@@ -732,7 +726,7 @@ export default function QuoteDetailPage() {
             {(['quote', 'analysis'] as const).map(mode => (
               <button key={mode} onClick={() => setViewMode(mode)}
                 className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  viewMode === mode ? 'bg-gray-50 text-white shadow-lg' : 'bg-white text-slate-500 border border-black/[0.06] hover:bg-gray-50'
+                  viewMode === mode ? 'bg-white/80 text-slate-800 shadow-sm border border-black/[0.06]' : 'bg-white/40 text-slate-500 border border-black/[0.06] hover:bg-white/60'
                 }`}>
                 {mode === 'quote' ? '고객용 견적서' : '내부 원가분석'}
               </button>
@@ -763,17 +757,17 @@ export default function QuoteDetailPage() {
 
         return (
         <div className="max-w-[900px] mx-auto pb-10 px-4">
-          <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
+          <div ref={printRef} className="rounded-2xl print:shadow-none print:rounded-none" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
 
             {/* 헤더 */}
-            <div style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#1e293b' }} className="px-6 py-4 rounded-t-2xl">
+            <div style={{ background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff' }} className="px-6 py-4 rounded-t-2xl">
               <div className="flex justify-between items-start">
                 <div>
                   <h1 className="text-xl font-black tracking-tight">단기렌트 청구서</h1>
-                  <p className="text-slate-500 text-xs mt-0.5">SHORT-TERM RENTAL INVOICE</p>
+                  <p className="text-white/70 text-xs mt-0.5">SHORT-TERM RENTAL INVOICE</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-slate-500 text-xs">작성일</p>
+                  <p className="text-white/70 text-xs">작성일</p>
                   <p className="font-bold">{fDate(quote.created_at)}</p>
                 </div>
               </div>
@@ -791,7 +785,7 @@ export default function QuoteDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임차인 정보</p>
-                  <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="p-3" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                     <table className="w-full text-sm">
                       <tbody>
                         <TRow label="임차인" value={quote.customer_name || '-'} bold />
@@ -802,7 +796,7 @@ export default function QuoteDetailPage() {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">대차 정보</p>
-                  <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="p-3" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                     <table className="w-full text-sm">
                       <tbody>
                         <TRow label="차종" value={invCar} bold />
@@ -842,7 +836,7 @@ export default function QuoteDetailPage() {
                 return userMemo ? (
                   <div>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">메모</p>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-slate-600">{userMemo}</div>
+                    <div className="p-3 text-sm text-slate-600" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>{userMemo}</div>
                   </div>
                 ) : null
               })()}
@@ -850,7 +844,7 @@ export default function QuoteDetailPage() {
               {/* 임대인 정보 */}
               <div>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
-                <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
+                <div className="p-3 text-xs space-y-0.5" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                   <p className="font-black text-sm">{company?.name || '주식회사에프엠아이'}</p>
                   {company?.business_number && <p className="text-slate-500">사업자번호: {company.business_number}</p>}
                   {company?.phone && <p className="text-slate-500">TEL: {company.phone}</p>}
@@ -870,7 +864,7 @@ export default function QuoteDetailPage() {
           ============================================================ */}
       {!isInvoiceQuote && viewMode === 'quote' && (
         <div className="max-w-[900px] mx-auto pb-10 px-4">
-          <div ref={printRef} className="bg-white rounded-2xl shadow-xl print:shadow-none print:rounded-none">
+          <div ref={printRef} className="rounded-2xl print:shadow-none print:rounded-none" style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
 
             {/* 헤더 */}
             <div className="bg-gray-50 text-white px-6 py-4 print:px-5 print:py-3 rounded-t-2xl print:rounded-none">
@@ -898,7 +892,7 @@ export default function QuoteDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임대인 (렌터카 사업자)</p>
-                  <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
+                  <div className="p-3 text-xs space-y-0.5" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                     <p className="font-black text-base">{company?.name || '당사'}</p>
                     {company?.business_number && <p className="text-slate-500">사업자번호: {company.business_number}</p>}
                     {company?.address && <p className="text-slate-500">{company.address}</p>}
@@ -908,7 +902,7 @@ export default function QuoteDetailPage() {
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">임차인 (고객)</p>
-                  <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-0.5">
+                  <div className="p-3 text-xs space-y-0.5" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                     <p className="font-black text-base">{customerName}</p>
                     {customerBizNum && <p className="text-slate-500">사업자번호: {customerBizNum}</p>}
                     {customerPhone && <p className="text-slate-500">연락처: {customerPhone}</p>}
@@ -1285,7 +1279,7 @@ export default function QuoteDetailPage() {
                       ['정비상품', MAINT_PACKAGE_LABELS[maintPackage] || '-'],
                       ['보증금', `${f(depositAmt)}원`],
                     ].map(([l, v], i) => (
-                      <div key={i} className="flex justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div key={i} className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}>
                         <span className="text-slate-500">{l}</span>
                         <span className="font-bold">{v}</span>
                       </div>
@@ -1308,7 +1302,7 @@ export default function QuoteDetailPage() {
                       ['현재시장가', f(detail.current_market_value) + '원'],
                       ['만기시장가', f(detail.end_market_value) + '원'],
                     ].map(([l, v], i) => (
-                      <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
+                      <div key={i} className="p-3 text-center" style={{ background: 'rgba(255,255,255,0.60)', borderRadius: 12, border: '1px solid rgba(59,130,246,0.12)' }}>
                         <p className="text-slate-500 text-xs mb-1">{l}</p>
                         <p className="font-black text-sm">{v}</p>
                       </div>
@@ -1340,10 +1334,10 @@ export default function QuoteDetailPage() {
                   <div>
                     <p className="text-slate-500 text-xs mb-2 font-bold">대출</p>
                     <div className="space-y-2">
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">대출금액</span><span className="font-bold">{f(detail.loan_amount)}원</span></div>
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">대출금리</span><span className="font-bold">{detail.loan_rate || 0}%</span></div>
+                      <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">대출금액</span><span className="font-bold">{f(detail.loan_amount)}원</span></div>
+                      <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">대출금리</span><span className="font-bold">{detail.loan_rate || 0}%</span></div>
                       {costBreakdown.avg_loan_balance > 0 && (
-                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_loan_balance)}원</span></div>
+                        <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_loan_balance)}원</span></div>
                       )}
                       <div className="flex justify-between bg-blue-50 rounded-lg px-3 py-2"><span className="text-blue-600">월 이자</span><span className="font-black text-blue-700">{f(monthlyLoanInterest)}원</span></div>
                     </div>
@@ -1351,10 +1345,10 @@ export default function QuoteDetailPage() {
                   <div>
                     <p className="text-slate-500 text-xs mb-2 font-bold">자기자본 / 기회비용</p>
                     <div className="space-y-2">
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">자기자본</span><span className="font-bold">{f(totalAcquisitionCost - (detail.loan_amount || 0))}원</span></div>
-                      <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">투자수익률</span><span className="font-bold">{detail.investment_rate || 0}%</span></div>
+                      <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">자기자본</span><span className="font-bold">{f(totalAcquisitionCost - (detail.loan_amount || 0))}원</span></div>
+                      <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">투자수익률</span><span className="font-bold">{detail.investment_rate || 0}%</span></div>
                       {costBreakdown.avg_equity_balance > 0 && (
-                        <div className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_equity_balance)}원</span></div>
+                        <div className="flex justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(59,130,246,0.12)' }}><span className="text-slate-500">평균잔액</span><span className="font-bold">{f(costBreakdown.avg_equity_balance)}원</span></div>
                       )}
                       <div className="flex justify-between bg-purple-50 rounded-lg px-3 py-2"><span className="text-purple-600">월 기회비용</span><span className="font-black text-purple-700">{f(monthlyOpportunityCost)}원</span></div>
                     </div>
@@ -1473,7 +1467,7 @@ export default function QuoteDetailPage() {
       {/* ===== 견적서 발송 모달 ===== */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 no-print" onClick={() => { setShowShareModal(false); setSendResult(null) }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-black text-slate-800">견적서 발송</h3>
               <button onClick={() => { setShowShareModal(false); setSendResult(null) }} className="text-slate-500 hover:text-slate-400 text-xl font-bold">&times;</button>

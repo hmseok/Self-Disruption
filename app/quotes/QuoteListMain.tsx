@@ -6,6 +6,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilder'
+import dynamic from 'next/dynamic'
+const ShortTermCalcPage = dynamic(() => import('./short-term/ShortTermCalcPage'), { ssr: false })
+const QuoteCreatePage = dynamic(() => import('./create/page'), { ssr: false })
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
@@ -29,7 +32,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 // ============================================================================
 // TYPES
 // ============================================================================
-type MainTab = 'long_term' | 'short_term' | 'lotte_rate'
+type MainTab = 'long_term' | 'short_term' | 'lotte_rate' | 'create_long' | 'calc_short'
 type StatusFilter = 'all' | 'draft' | 'shared' | 'signed' | 'contracted' | 'archived'
 type ShortStatusFilter = 'all' | 'draft' | 'sent' | 'accepted' | 'contracted' | 'cancelled'
 type InvoiceStatusFilter = 'all' | 'draft' | 'shared' | 'signed'
@@ -348,7 +351,7 @@ export default function QuoteListPage() {
   // URL의 tab 파라미터 변경 시 탭 동기화 + 데이터 리프레시
   useEffect(() => {
     const tab = searchParams.get('tab') as MainTab
-    if (tab && ['long_term', 'short_term', 'lotte_rate'].includes(tab)) {
+    if (tab && ['long_term', 'short_term', 'lotte_rate', 'create_long', 'calc_short'].includes(tab)) {
       setMainTab(tab)
       if (refetchRef.current > 0 && fetchDataRef.current) {
         setLoading(true)
@@ -957,9 +960,11 @@ export default function QuoteListPage() {
           search=""
           onSearchChange={() => {}}
           filters={[
-            { key: 'long_term', label: '장기', count: mainTabCounts.long_term },
-            { key: 'short_term', label: '단기', count: mainTabCounts.short_term },
-            { key: 'lotte_rate', label: '요금표' },
+            { key: 'long_term', label: '장기 견적', count: mainTabCounts.long_term },
+            { key: 'short_term', label: '단기/청구서', count: mainTabCounts.short_term },
+            { key: 'create_long', label: '장기견적 산출' },
+            { key: 'calc_short', label: '단기견적' },
+            { key: 'lotte_rate', label: '대차요금표' },
           ]}
           activeFilter={mainTab}
           onFilterChange={(key) => {
@@ -972,19 +977,19 @@ export default function QuoteListPage() {
           }}
           trailing={
             (mainTab === 'long_term' || mainTab === 'short_term') ? (
-              <Link
-                href="/quotes/create"
+              <button
+                onClick={() => setMainTab('create_long')}
                 style={{
                   padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
                   borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                  whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
                   boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
                   marginLeft: 'auto',
                   flexShrink: 0,
                 }}
               >
                 + 새 견적
-              </Link>
+              </button>
             ) : undefined
           }
         />
@@ -1203,9 +1208,19 @@ export default function QuoteListPage() {
           )
         })()}
 
-        {/* ═══ TAB: 롯데렌터카요금표 ═══ */}
+        {/* ═══ TAB: 대차요금표 ═══ */}
         {mainTab === 'lotte_rate' && (
           <ShortTermReplacementBuilder />
+        )}
+
+        {/* ═══ TAB: 장기견적 산출 ═══ */}
+        {mainTab === 'create_long' && (
+          <QuoteCreatePage />
+        )}
+
+        {/* ═══ TAB: 단기견적 계산기 ═══ */}
+        {mainTab === 'calc_short' && (
+          <ShortTermCalcPage />
         )}
 
         {/* ═══ TAB: 장기 견적 목록 ═══ */}
