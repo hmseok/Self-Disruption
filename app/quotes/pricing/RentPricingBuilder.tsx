@@ -2194,7 +2194,7 @@ export default function RentPricingBuilder() {
   // ============================================
   if (loading || editLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-steel-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-slate-500 font-bold">데이터 불러오는 중...</p>
@@ -2220,9 +2220,9 @@ export default function RentPricingBuilder() {
   if (wizardStep === 'customer') {
     const calc = calculations
     return (
-      <div className="max-w-[800px] mx-auto py-8 px-4 min-h-screen" style={{ background: '#f9fafb' }}>
+      <div className="max-w-[800px] mx-auto py-8 px-4">
         {/* 스텝 인디케이터 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, background: 'rgba(255,255,255,0.72)', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           {[
             { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: true },
             { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
@@ -2277,7 +2277,7 @@ export default function RentPricingBuilder() {
         )}
 
         {/* 고객 선택 */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-6 mb-4">
+        <div className="rounded-2xl border border-black/[0.06] p-6 mb-4" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-slate-600 text-sm">고객 정보</h3>
             <div className="flex gap-1.5">
@@ -2346,7 +2346,7 @@ export default function RentPricingBuilder() {
         </div>
 
         {/* 계약 시작일 */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-6 mb-4">
+        <div className="rounded-2xl border border-black/[0.06] p-6 mb-4" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           <h3 className="font-bold text-slate-600 text-sm mb-3">계약 기간</h3>
           <div className="flex items-center gap-4">
             <div>
@@ -2364,7 +2364,7 @@ export default function RentPricingBuilder() {
         </div>
 
         {/* 비고 */}
-        <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-6 mb-6">
+        <div className="rounded-2xl border border-black/[0.06] p-6 mb-6" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           <h3 className="font-bold text-slate-600 text-sm mb-3">비고 (선택)</h3>
           <textarea placeholder="견적서에 표시할 특이사항, 프로모션 안내 등..." value={quoteNote}
             onChange={(e) => setQuoteNote(e.target.value)}
@@ -2811,12 +2811,12 @@ export default function RentPricingBuilder() {
   // Step 1: 원가분석 (기존 UI)
   // ============================================
   return (
-    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6 bg-gray-50/50 min-h-screen">
+    <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
       {/* ===== 스텝 인디케이터 + 헤더 ===== */}
       <div style={{ marginBottom: 24 }}>
         {/* 스텝 인디케이터 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: 'rgba(255,255,255,0.72)', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', marginBottom: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           {[
             { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: false },
             { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
@@ -2907,7 +2907,7 @@ export default function RentPricingBuilder() {
 
       {/* ===== 저장 목록 (워크시트 + 가격표 통합, Collapsible) ===== */}
       {(savedWorksheets.length > 0 || savedCarPrices.length > 0) && (
-      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm mb-6 overflow-hidden">
+      <div className="rounded-2xl border border-black/[0.06] mb-6 overflow-hidden" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
         {/* Header */}
         <button
           onClick={() => setSavedPricesOpen(!savedPricesOpen)}
@@ -3118,7 +3118,7 @@ export default function RentPricingBuilder() {
       )}
 
       {/* ===== 등록차량 선택 (보험/가입 페이지 디자인 기준) ===== */}
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.06)', marginBottom: 24, overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5' }} />
           <h3 style={{ fontWeight: 900, color: '#1f2937', fontSize: 14, margin: 0 }}>🚗 등록차량 선택</h3>
@@ -3178,10 +3178,10 @@ export default function RentPricingBuilder() {
             />
 
             {/* 차량 테이블 */}
-            <div style={{ maxHeight: 420, overflowY: 'auto', overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', background: '#fff' }}>
+            <div style={{ maxHeight: 420, overflowY: 'auto', overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.72)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700, fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
+                  <tr style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', borderBottom: '2px solid rgba(0,0,0,0.06)' }}>
                     <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>차량번호</th>
                     <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>브랜드/모델</th>
                     <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>트림</th>
@@ -3281,7 +3281,7 @@ export default function RentPricingBuilder() {
           const stepIcons = ['①', '②', '③', '④', '⑤', '⑥']
 
           return (
-          <div className="mt-4 p-5 bg-white border border-steel-200 rounded-2xl shadow-sm space-y-4">
+          <div className="mt-4 p-5 border border-steel-200 rounded-2xl space-y-4" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             {/* 모델 헤더 + 저장 버튼 */}
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm font-bold text-slate-600">
