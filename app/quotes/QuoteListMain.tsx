@@ -908,9 +908,9 @@ export default function QuoteListPage() {
           filters={[
             { key: 'long_term', label: '장기 견적', count: mainTabCounts.long_term },
             { key: 'short_term', label: '단기/청구서', count: mainTabCounts.short_term },
-            { key: 'create_long', label: '장기견적 산출' },
-            { key: 'calc_short', label: '단기견적' },
-            { key: 'lotte_rate', label: '대차요금표' },
+            { key: 'create_long', label: '장기 산출기' },
+            { key: 'calc_short', label: '단기 산출기' },
+            { key: 'lotte_rate', label: '요율 관리' },
           ]}
           activeFilter={mainTab}
           onFilterChange={(key) => {
@@ -922,7 +922,7 @@ export default function QuoteListPage() {
             setSortBy('latest')
           }}
           trailing={
-            (mainTab === 'long_term' || mainTab === 'short_term') ? (
+            (mainTab === 'long_term') ? (
               <button
                 onClick={() => setMainTab('create_long')}
                 style={{
@@ -930,12 +930,36 @@ export default function QuoteListPage() {
                   borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
                   whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
                   boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                  marginLeft: 'auto',
-                  flexShrink: 0,
+                  marginLeft: 'auto', flexShrink: 0,
                 }}
               >
-                + 새 견적
+                + 장기 견적
               </button>
+            ) : (mainTab === 'short_term') ? (
+              <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+                <button
+                  onClick={() => setMainTab('calc_short')}
+                  style={{
+                    padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
+                    borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                    boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+                  }}
+                >
+                  + 단기 견적
+                </button>
+                <button
+                  onClick={() => setInvoiceOpen(true)}
+                  style={{
+                    padding: '7px 14px', background: 'rgba(255,255,255,0.60)', color: '#3b6eb5', border: '1px solid rgba(59,110,181,0.2)',
+                    borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                    boxShadow: '3px 3px 8px rgba(140,170,210,0.12), -1px -1px 4px rgba(255,255,255,0.47)',
+                  }}
+                >
+                  + 청구서
+                </button>
+              </div>
             ) : undefined
           }
         />
@@ -1345,9 +1369,10 @@ export default function QuoteListPage() {
                 onClick={() => { setInvoiceOpen(false); setEditingQuoteId(null) }}
               />
               <div style={{
-                position: 'relative', background: '#fff', borderRadius: 16, padding: '24px 28px',
+                position: 'relative', background: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: '24px 28px',
                 width: '90%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5), 0 20px 60px rgba(0,0,0,0.15)',
                 animation: 'fadeInUp 0.2s ease-out',
               }}>
                 <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>

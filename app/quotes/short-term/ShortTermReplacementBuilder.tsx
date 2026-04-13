@@ -1,5 +1,7 @@
 'use client'
 import { auth } from '@/lib/auth-client'
+import { getAuthHeader } from '@/app/utils/auth-client'
+import { f } from '@/lib/quote-utils'
 import { useApp } from '../../context/AppContext'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
@@ -33,18 +35,6 @@ interface RateRow {
   calc_method: string
   sort_order: number
   is_active: boolean
-}
-
-async function getAuthHeader(): Promise<Record<string, string>> {
-  try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
-  } catch {
-    return {}
-  }
 }
 
 // ─── 롯데렌터카 공식 요금 (2025.02.10 기준, 내륙 · 전체 차종) ───
@@ -147,7 +137,6 @@ const SUB_TABS = [
 type SubTab = typeof SUB_TABS[number]['key']
 
 // ─── 헬퍼 ───
-const f = (n: number) => (n || 0).toLocaleString()
 const calcRate = (base: number, pct: number) => Math.round(base * pct / 100)
 
 // ═══════════════════════════════════════════════════
@@ -762,7 +751,7 @@ export default function ShortTermReplacementBuilder() {
         <div className="space-y-4">
 
           {/* ─── 빠른 견적 계산기 ─── */}
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             {/* 할인율 */}
             <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1036,7 +1025,7 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 할인율 + 정비군 매핑 ─── */}
 
           {/* 정비군별 요율 매핑 */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1072,7 +1061,7 @@ export default function ShortTermReplacementBuilder() {
                     const isRvStart = r.service_group === '8군' && (i === 0 || rates[i - 1]?.service_group !== '8군')
                     return (
                       <React.Fragment key={r.id || `rate-${i}`}>{isRvStart && (
-                        <tr className="bg-amber-50/50">
+                        <tr style={{ background: 'rgba(251,191,36,0.15)' }}>
                           <td colSpan={7} className="px-4 py-1.5 text-sm font-bold text-amber-600">RV · SUV · 승합</td>
                         </tr>
                       )}
@@ -1168,8 +1157,8 @@ export default function ShortTermReplacementBuilder() {
           {/* ─── 롯데 참고 자료 (하단, 접이식) ─── */}
 
           {/* 정비군 분류 기준표 */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
-            <button onClick={() => setLotteOpen(!lotteOpen)} className="w-full bg-gray-50/50 border-b border-white/5 px-5 py-3 flex items-center justify-between hover:bg-gray-100/50 transition-colors">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
+            <button onClick={() => setLotteOpen(!lotteOpen)} className="w-full bg-white/40 border-b border-white/5 px-5 py-3 flex items-center justify-between hover:bg-white/50 transition-colors">
               <span className="font-bold text-slate-700 text-sm flex items-center gap-2">롯데렌터카 공식 요금표 <span className="text-xs text-slate-500 font-medium">{lotteUpdateDate} 기준 · 내륙</span></span>
               <span className={`text-slate-500 text-xs transition-transform ${lotteOpen ? 'rotate-180' : ''}`}>▼</span>
             </button>
@@ -1177,7 +1166,7 @@ export default function ShortTermReplacementBuilder() {
 
         {/* 롯데 기준 요금 */}
         <div>
-          <div className="bg-gray-50/30 border-b border-white/5 px-5 py-2.5 flex items-center justify-between">
+          <div className="bg-white/30 border-b border-white/5 px-5 py-2.5 flex items-center justify-between">
             <span className="font-bold text-slate-700 text-sm flex items-center gap-2">
               롯데렌터카 공식 단기렌트 요금
               <span className="text-xs text-slate-500 font-medium">{lotteUpdateDate} 기준 · 내륙</span>
@@ -1312,7 +1301,7 @@ export default function ShortTermReplacementBuilder() {
             ))}
           </div>
 
-          <div className="px-4 py-2 bg-gray-50/50 border-t border-white/5 text-xs text-slate-500 flex items-center justify-between">
+          <div className="px-4 py-2 bg-white/40 border-t border-white/5 text-xs text-slate-500 flex items-center justify-between">
             <span>출처: <a href="https://www.lotterentacar.net/hp/kor/reservation/shortInfo/pay.do" target="_blank" rel="noopener" className="text-steel-600 hover:underline">롯데렌터카 공식</a> · 내륙 · 비회원가</span>
             <div className="flex items-center gap-2">
               {lotteEditMode && (
@@ -1383,7 +1372,7 @@ export default function ShortTermReplacementBuilder() {
         <div className="space-y-4">
 
           {/* ① 시장 표준 요율 설정 + 계약 조건 */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             <div className="px-6 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1436,7 +1425,7 @@ export default function ShortTermReplacementBuilder() {
               </div>
 
               {/* 적용 공식 + 산출 결과 */}
-              <div className="bg-gray-50 rounded-xl px-4 py-2.5 space-y-1">
+              <div style={{ background: 'rgba(255,255,255,0.40)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)', padding: '12px 16px' }} className="space-y-1">
                 <div className="text-[11px] text-slate-500">공식: 일단가 × ((사고발생율÷100 × 사고수리일수) + (고장발생율÷100 × 고장수리일수)) × 대차일수</div>
                 <div className="text-[11px] text-slate-500">리스크 계수: <span className="font-bold text-steel-600">{accidentRisk.toFixed(4)}</span><span className="text-slate-400"> (사고)</span> + <span className="font-bold text-steel-600">{breakdownRisk.toFixed(4)}</span><span className="text-slate-400"> (고장)</span> = <span className="font-black text-steel-700">{totalRisk.toFixed(4)}</span></div>
               </div>
@@ -1481,7 +1470,7 @@ export default function ShortTermReplacementBuilder() {
           </div>
 
           {/* ② 요율표 자동 산출 */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             <div className="px-6 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
@@ -1512,14 +1501,14 @@ export default function ShortTermReplacementBuilder() {
                   ))}
                 </colgroup>
                 <thead>
-                  <tr className="bg-steel-900 text-white text-sm">
-                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-800">등급</th>
-                    <th className="py-2.5 px-2 text-left font-bold border-r border-steel-800">차종</th>
-                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-steel-800">배기량</th>
-                    <th className="py-2.5 px-2 text-right font-bold whitespace-nowrap border-r border-steel-800">일단가</th>
+                  <tr style={{ background: 'rgba(255,255,255,0.40)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.12)' }} className="text-sm">
+                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-slate-200 text-slate-700">등급</th>
+                    <th className="py-2.5 px-2 text-left font-bold border-r border-slate-200 text-slate-700">차종</th>
+                    <th className="py-2.5 px-2 text-center font-bold whitespace-nowrap border-r border-slate-200 text-slate-700">배기량</th>
+                    <th className="py-2.5 px-2 text-right font-bold whitespace-nowrap border-r border-slate-200 text-slate-700">일단가</th>
                     {selectedDaysList.map((d, idx) => (
-                      <th key={d} className={`py-2.5 px-2 text-right font-bold text-yellow-300 whitespace-nowrap ${idx < selectedDaysList.length - 1 ? 'border-r border-steel-800' : ''}`}>
-                        {d}일<span className="text-xs font-medium text-white/50 ml-0.5">/월</span>
+                      <th key={d} className={`py-2.5 px-2 text-right font-bold text-steel-600 whitespace-nowrap ${idx < selectedDaysList.length - 1 ? 'border-r border-slate-200' : ''}`}>
+                        {d}일<span className="text-xs font-medium text-slate-500 ml-0.5">/월</span>
                       </th>
                     ))}
                   </tr>
@@ -1531,11 +1520,11 @@ export default function ShortTermReplacementBuilder() {
                     return (
                       <React.Fragment key={r.id || `ql-${i}`}>
                         {isRvStart && (
-                          <tr className="bg-amber-50/80 border-t-2 border-amber-200">
+                          <tr style={{ background: 'rgba(251,191,36,0.20)', borderTop: '2px solid rgba(251,146,60,0.30)' }}>
                             <td colSpan={colCount} className="px-3 py-1.5 text-sm font-bold text-amber-700">RV · SUV · 승합</td>
                           </tr>
                         )}
-                        <tr className={`border-t border-white/5 hover:bg-steel-50/40 ${isEven ? 'bg-white' : 'bg-gray-50/30'}`}>
+                        <tr className={`border-t border-white/5 hover:bg-white/45 ${isEven ? 'bg-white' : 'bg-white/30'}`}>
                           <td className="py-2 px-1 text-center border-r border-white/5">
                             <span className="bg-steel-100 text-steel-700 text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">{r.service_group}</span>
                           </td>
@@ -1553,14 +1542,14 @@ export default function ShortTermReplacementBuilder() {
                 <tfoot></tfoot>
               </table>
             </div>
-            <div className="px-4 py-2 bg-gray-50/50 border-t border-white/5 text-[10px] text-slate-500 flex justify-between">
+            <div className="px-4 py-2 bg-white/40 border-t border-white/5 text-[10px] text-slate-500 flex justify-between">
               <span>※ 롯데렌터카 대비 {globalDiscount}% · 부가세 별도 · 1대당 월 기준</span>
               <span>{new Date().toLocaleDateString('ko-KR')} 기준</span>
             </div>
           </div>
 
           {/* ③ 고객 정보 + 견적 저장 */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm">
+          <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', overflow: 'hidden', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
             <div className="px-6 py-4 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
