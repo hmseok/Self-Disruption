@@ -71,10 +71,10 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/claims/billing-mgmt': '보험청구관리',
   // 영업/계약 그룹
   '/quotes': '견적 관리',
-  '/contracts': '계약 관리',
+  '/contracts': '계약/고객',
   '/customers': '고객 관리',
   '/finance/collections': '수금/회수',
-  '/finance/settlement': '정산 관리',
+  '/finance/settlement': '정산/수금',
   '/db/pricing-standards': '요금 기준표',
   // 재무/경영 그룹
   '/finance': '재무 대시보드',
@@ -109,6 +109,9 @@ const HIDDEN_PATHS = new Set([
   '/e-contract',             // → 계약 관리에 흡수
   '/quotes/pricing',         // → /quotes/create 통합
   '/quotes/short-term',      // → /quotes/create 통합
+  '/customers',              // → 계약 관리 탭으로 통합
+  '/finance/collections',    // → 정산 관리 탭으로 통합
+  '/db/pricing-standards',   // → 견적 허브 요율 관리 탭으로 통합
   // ── 미사용/불필요 ──
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김

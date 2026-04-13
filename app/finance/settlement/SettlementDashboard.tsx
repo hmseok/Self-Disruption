@@ -22,6 +22,9 @@ import { INCOME_GROUPS, EXPENSE_GROUPS } from './lib/types'
 
 // Import hook
 import { useSettlementData } from './hooks/useSettlementData'
+import dynamic from 'next/dynamic'
+
+const CollectionsTab = dynamic(() => import('../collections/CollectionsTab'), { ssr: false })
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -44,7 +47,7 @@ export default function SettlementDashboard() {
   const effectiveCompanyId = company?.id
 
   // 상태
-  const [activeTab, setActiveTab] = useState<'contracts' | 'revenue' | 'settlement' | 'pnl' | 'execute'>('contracts')
+  const [activeTab, setActiveTab] = useState<'contracts' | 'revenue' | 'settlement' | 'pnl' | 'execute' | 'collections'>('contracts')
   const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0, 7))
 
   // useSettlementData hook 사용
@@ -822,6 +825,7 @@ export default function SettlementDashboard() {
           { key: 'settlement', label: '💳 지급 관리', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
           { key: 'pnl', label: '📊 손익계산서' },
           { key: 'execute', label: '⚡ 정산 실행', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
+          { key: 'collections', label: '💰 수금/회수' },
         ]}
         activeFilter={activeTab}
         onFilterChange={(key) => setActiveTab(key as any)}
@@ -877,6 +881,7 @@ export default function SettlementDashboard() {
                 onBulkPaid={handleBulkPaid}
               />
             )}
+            {activeTab === 'collections' && <CollectionsTab />}
           </>
         )}
       </div>
