@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     const user = await verifyUser(request)
     if (!user) return NextResponse.json({ data: [], error: null }, { status: 200 })
-    const data = await prisma.$queryRaw<any[]>`SELECT * FROM inspection_records ORDER BY inspection_date DESC LIMIT 500`
+    const data = await prisma.$queryRaw<any[]>`SELECT * FROM inspection_records ORDER BY created_at DESC LIMIT 500`
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ data: [], error: e.message }, { status: 500 })
   }
 }
 
