@@ -49,7 +49,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/finance/collections': 'sales', '/finance/settlement': 'sales',
   '/db/pricing-standards': 'sales',
   // ── 재무/경영 (순수 재무·세무·인사) ──
-  '/finance': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance': 'finance', '/finance/transactions': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
   '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
   '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/db/lotte': 'finance',
@@ -78,6 +78,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/db/pricing-standards': '요금 기준표',
   // 재무/경영 그룹
   '/finance': '재무 대시보드',
+  '/finance/transactions': '통장/카드 관리',
   '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
   '/finance/upload': '카드/통장 관리',
@@ -112,6 +113,10 @@ const HIDDEN_PATHS = new Set([
   '/customers',              // → 계약 관리 탭으로 통합
   '/finance/collections',    // → 정산 관리 탭으로 통합
   '/db/pricing-standards',   // → 견적 허브 요율 관리 탭으로 통합
+  '/finance',                // → /finance/transactions 허브 대시보드 탭으로 통합
+  '/finance/upload',         // → /finance/transactions 분류 매칭 탭으로 통합
+  '/finance/codef',          // → /finance/transactions Codef 탭으로 통합
+  '/finance/cards',          // → /finance/transactions 에서 접근
   // ── 미사용/불필요 ──
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
