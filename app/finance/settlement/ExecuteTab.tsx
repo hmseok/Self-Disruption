@@ -47,14 +47,14 @@ type Props = {
   selectedIds: Set<string>
   toggleSelect: (id: string) => void
   toggleSelectAll: () => void
-  onSendNotify: (overrideItems?: SettlementItem[]) => void
+  onSendNotify: (overrideItems?: SettlementItem[]) => void | Promise<void>
   sendingNotify: boolean
   notifyChannel: 'sms' | 'email'
   setNotifyChannel: (ch: 'sms' | 'email') => void
   shareHistory: ShareHistoryItem[]
   onTogglePaid: (shareId: string, currentlyPaid: boolean) => void
-  onBulkPaid: (shareIds: string[]) => void
-  onCancelSettlement: (item: SettlementItem) => void
+  onBulkPaid: (shareIds: string[]) => void | Promise<void>
+  onCancelSettlement: (ids: string[]) => void | Promise<void>
   onDownloadBulkTransfer: () => void
   transferPreview: TransferRow[]
   showTransferPreview: boolean
