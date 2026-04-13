@@ -1589,20 +1589,54 @@ export default function QuoteDetailPage() {
 
           /* 배경색 인쇄 보장 */
           .bg-gray-50 {
-            background-color: #111827 !important;
-          }
-          .bg-gray-50 {
             background-color: #f9fafb !important;
           }
           .bg-gray-100 {
             background-color: rgba(0,0,0,0.04) !important;
           }
 
+          /* Soft Ice glass 스타일 리셋 — 반투명/블러/그림자가 인쇄에서 레이아웃을 무너뜨리는 문제 방지 */
+          [style*="rgba(255,255,255"],
+          [style*="backdrop-filter"],
+          [style*="boxShadow"] {
+            background-color: #ffffff !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: none !important;
+          }
+
+          /* 카드/박스 테두리를 확실하게 */
+          [style*="border-radius"],
+          .rounded-2xl, .rounded-xl, .rounded-lg {
+            border: 1px solid #d1d5db !important;
+          }
+
+          /* 그리드/flex 레이아웃 유지 (인쇄 시 세로 쌓임 방지) */
+          .grid {
+            display: grid !important;
+          }
+          .flex {
+            display: flex !important;
+          }
+
+          /* 이미지 최대 너비 제한 */
+          img {
+            max-width: 100% !important;
+            height: auto !important;
+            page-break-inside: avoid;
+          }
+
           /* 텍스트 크기 미세 조정 (인쇄 가독성) */
           body {
-            font-size: 11pt !important;
+            font-size: 10pt !important;
             line-height: 1.4 !important;
+            color: #111 !important;
           }
+
+          /* 컬러 강조 유지 */
+          .text-blue-600, .text-blue-500 { color: #2563eb !important; }
+          .text-green-600, .text-green-500 { color: #16a34a !important; }
+          .text-red-600, .text-red-500 { color: #dc2626 !important; }
         }
       `}</style>
     </div>

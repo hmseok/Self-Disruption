@@ -9,6 +9,7 @@ import ShortTermReplacementBuilder from './short-term/ShortTermReplacementBuilde
 import dynamic from 'next/dynamic'
 const ShortTermCalcPage = dynamic(() => import('./short-term/ShortTermCalcPage'), { ssr: false })
 const QuoteCreatePage = dynamic(() => import('./create/page'), { ssr: false })
+const PricingStandardsPage = dynamic(() => import('../db/pricing-standards/page'), { ssr: false })
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import DcSubFilters, { SubFilterGroup } from '../components/DcSubFilters'
@@ -556,6 +557,8 @@ export default function QuoteListPage() {
     long_term: longTermQuotes.filter(q => q.status !== 'archived' && !isInvoice(q)).length,
     short_term: invoiceQuotes.length,
     lotte_rate: shortTermQuotes.length,
+    create_long: 0,
+    calc_short: 0,
   }
 
   // ── Filter + Sort (장기) ──
@@ -1178,9 +1181,9 @@ export default function QuoteListPage() {
           )
         })()}
 
-        {/* ═══ TAB: 대차요금표 ═══ */}
+        {/* ═══ TAB: 요율 관리 (요금기준표 통합) ═══ */}
         {mainTab === 'lotte_rate' && (
-          <ShortTermReplacementBuilder />
+          <PricingStandardsPage />
         )}
 
         {/* ═══ TAB: 장기견적 산출 ═══ */}

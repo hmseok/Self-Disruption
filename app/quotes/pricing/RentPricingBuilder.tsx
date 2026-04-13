@@ -2815,38 +2815,43 @@ export default function RentPricingBuilder() {
 
       {/* ===== 스텝 인디케이터 + 헤더 ===== */}
       <div style={{ marginBottom: 24 }}>
-        {/* 스텝 인디케이터 */}
+        {/* 스텝 인디케이터 — Step 1 상태도 완료 여부에 따라 동적 표시 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: 'rgba(255,255,255,0.72)', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', marginBottom: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           {[
-            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: false },
+            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: !!(selectedCar && calculations) },
             { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
             { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
-          ].map((s, i) => (
+          ].map((s, i) => {
+            const active = s.key === 'analysis'
+            const clickable = s.key === 'customer' && !!(selectedCar && calculations)
+            return (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <div
+                onClick={() => { if (clickable) setWizardStep('customer') }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  cursor: 'default',
+                  cursor: clickable ? 'pointer' : 'default',
                   padding: '8px 16px', borderRadius: 10,
-                  background: s.key === 'analysis' ? 'rgba(59,130,246,0.9)' : 'transparent',
+                  background: active ? 'rgba(59,130,246,0.9)' : 'transparent',
+                  transition: 'background 0.15s',
                 }}
               >
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 800, fontSize: 13,
-                  background: s.key === 'analysis' ? '#fff' : 'rgba(0,0,0,0.04)',
-                  color: s.key === 'analysis' ? 'rgba(59,130,246,0.9)' : '#9ca3af',
+                  background: active ? '#fff' : s.done ? '#dcfce7' : 'rgba(0,0,0,0.04)',
+                  color: active ? 'rgba(59,130,246,0.9)' : s.done ? '#16a34a' : '#9ca3af',
                 }}>
-                  {s.num}
+                  {s.done && !active ? '✓' : s.num}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: s.key === 'analysis' ? '#fff' : '#111827' }}>{s.label}</div>
-                  <div style={{ fontSize: 11, color: s.key === 'analysis' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: active ? '#fff' : '#111827' }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: active ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
                 </div>
               </div>
-              {i < 2 && <div style={{ width: 40, height: 2, background: 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
+              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px', transition: 'background 0.15s' }} />}
             </div>
-          ))}
+          )})}
         </div>
         {/* 헤더 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
