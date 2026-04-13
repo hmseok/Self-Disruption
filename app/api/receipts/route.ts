@@ -239,19 +239,23 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
     }
 
+    // 안전한 파라미터 바인딩 + 컬럼 화이트리스트
+    const ALLOWED = ['category', 'item_name', 'customer_team', 'memo'] as const
+    const buildUpdate = (data: Record<string, any>) => {
+      const entries = ALLOWED.filter(k => data[k] !== undefined).map(k => [k, data[k]] as [string, any])
+      if (entries.length === 0) return null
+      const setSql = entries.map(([k]) => `\`${k}\` = ?`).join(', ')
+      const placeholders = ids.map(() => '?').join(',')
+      const sql = `UPDATE expense_receipts SET ${setSql}, updated_at = NOW() WHERE id IN (${placeholders}) AND user_id = ?`
+      const params = [...entries.map(([, v]) => v), ...ids, user.id]
+      return { sql, params }
+    }
+
     let error: any = null
     try {
-      // Build dynamic UPDATE query
-      const setClause: string[] = []
-      if (updateData.category !== undefined) setClause.push(`category = ${JSON.stringify(updateData.category)}`)
-      if (updateData.item_name !== undefined) setClause.push(`item_name = ${JSON.stringify(updateData.item_name)}`)
-      if (updateData.customer_team !== undefined) setClause.push(`customer_team = ${JSON.stringify(updateData.customer_team)}`)
-      if (updateData.memo !== undefined) setClause.push(`memo = ${JSON.stringify(updateData.memo)}`)
-
-      const idPlaceholders = ids.map(id => `'${id}'`).join(',')
-      const query = `UPDATE expense_receipts SET ${setClause.join(', ')}, updated_at = NOW() WHERE id IN (${idPlaceholders}) AND user_id = '${user.id}'`
-
-      await prisma.$executeRawUnsafe(query)
+      const q = buildUpdate(updateData)
+      if (!q) return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
+      await prisma.$executeRawUnsafe(q.sql, ...q.params)
     } catch (e: any) {
       // memo 컬럼 없으면 memo 제외하고 재시도
       if (updateData.memo !== undefined && (e.message?.includes('memo') || e.message?.includes('column'))) {
@@ -259,14 +263,8 @@ export async function PATCH(request: NextRequest) {
         if (Object.keys(updateData).length === 0) {
           return NextResponse.json({ success: true, updated: 0, note: 'memo 컬럼 미존재' })
         }
-        const setClause2: string[] = []
-        if (updateData.category !== undefined) setClause2.push(`category = ${JSON.stringify(updateData.category)}`)
-        if (updateData.item_name !== undefined) setClause2.push(`item_name = ${JSON.stringify(updateData.item_name)}`)
-        if (updateData.customer_team !== undefined) setClause2.push(`customer_team = ${JSON.stringify(updateData.customer_team)}`)
-
-        const idPlaceholders = ids.map(id => `'${id}'`).join(',')
-        const query2 = `UPDATE expense_receipts SET ${setClause2.join(', ')}, updated_at = NOW() WHERE id IN (${idPlaceholders}) AND user_id = '${user.id}'`
-        await prisma.$executeRawUnsafe(query2)
+        const q2 = buildUpdate(updateData)
+        if (q2) await prisma.$executeRawUnsafe(q2.sql, ...q2.params)
       } else {
         error = e
       }

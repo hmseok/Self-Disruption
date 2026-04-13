@@ -8,12 +8,10 @@ import DcToolbar from '../components/DcToolbar'
 import NeuDataTable, { TableColumn, MobileCardConfig } from '../components/NeuDataTable'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
+  if (typeof window === 'undefined') return {}
   try {
-    const { auth } = await import('@/lib/auth-client')
-    const user = auth.currentUser
-    if (!user) return {}
-    const token = await user.getIdToken(false)
-    return { Authorization: `Bearer ${token}` }
+    const token = window.localStorage.getItem('fmi_token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
   } catch {
     return {}
   }
@@ -203,11 +201,12 @@ export default function MaintenanceMainPage() {
     try {
       const headers = await getAuthHeader()
       const res = await fetch('/api/maintenance-records', { headers })
-      const json = await res.json()
-      const data = json.data ?? json ?? []
-      setMaintenanceRecords(data || [])
+      const json = await res.json().catch(() => ({}))
+      const data = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : [])
+      setMaintenanceRecords(data)
     } catch (error) {
-      console.error('정비 기록 로딩 실패:', JSON.stringify(error))
+      console.error('정비 기록 로딩 실패:', error)
+      setMaintenanceRecords([])
     }
     setLoading(false)
   }, [effectiveCompanyId])
@@ -218,11 +217,12 @@ export default function MaintenanceMainPage() {
     try {
       const headers = await getAuthHeader()
       const res = await fetch('/api/inspection-records', { headers })
-      const json = await res.json()
-      const data = json.data ?? json ?? []
-      setInspectionRecords(data || [])
+      const json = await res.json().catch(() => ({}))
+      const data = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : [])
+      setInspectionRecords(data)
     } catch (error) {
-      console.error('검사 기록 로딩 실패:', JSON.stringify(error))
+      console.error('검사 기록 로딩 실패:', error)
+      setInspectionRecords([])
     }
   }, [effectiveCompanyId])
 
@@ -232,11 +232,12 @@ export default function MaintenanceMainPage() {
     try {
       const headers = await getAuthHeader()
       const res = await fetch('/api/cars', { headers })
-      const json = await res.json()
-      const data = json.data ?? json ?? []
-      setCars(data || [])
+      const json = await res.json().catch(() => ({}))
+      const data = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : [])
+      setCars(data)
     } catch (error) {
       console.error('차량 로딩 실패:', error)
+      setCars([])
     }
   }, [effectiveCompanyId])
 

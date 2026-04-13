@@ -110,15 +110,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, data })
     }
 
-    let query = 'UPDATE user_corporate_cards SET '
-    query += updates.join(', ')
-    query += ' WHERE id = ? AND user_id = ?'
-    params.push(id, user.id)
-
-    // Use raw SQL with parameter placeholders
-    const updateQuery = `UPDATE user_corporate_cards SET ${updates.map((_, i) => `${updates[i].split(' = ')[0]} = ${params[i] !== undefined ? `'${params[i]}'` : 'NULL'}`).join(', ')} WHERE id = '${id}' AND user_id = '${user.id}'`
-
-    // Simpler approach using individual if checks
+    // 개별 tagged template 분기 (파라미터 바인딩 안전)
     if (card_name !== undefined && card_company !== undefined && is_default !== undefined) {
       await prisma.$executeRaw`UPDATE user_corporate_cards SET card_name = ${card_name}, card_company = ${card_company}, is_default = ${is_default ? 1 : 0} WHERE id = ${id} AND user_id = ${user.id}`
     } else if (card_name !== undefined && card_company !== undefined) {

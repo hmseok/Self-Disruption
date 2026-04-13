@@ -117,17 +117,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const updates = Object.entries(body)
-      .map(([key, val]) => {
-        if (val === null || val === undefined) return `${key} = NULL`
-        if (typeof val === 'string') return `${key} = '${val.replace(/'/g, "''")}'`
-        if (typeof val === 'boolean') return `${key} = ${val ? '1' : '0'}`
-        return `${key} = ${val}`
-      })
-      .join(', ')
+    const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+    const entries = Object.entries(body).filter(([k]) => SAFE_COL.test(k))
+    if (entries.length === 0) return NextResponse.json({ error: '수정할 항목 없음' }, { status: 400 })
 
-    const query = `UPDATE ${table} SET ${updates} WHERE id = '${id.replace(/'/g, "''")}'`
-    await prisma.$executeRawUnsafe(query)
+    const setClause = entries.map(([k]) => `\`${k}\` = ?`).join(', ')
+    const values = entries.map(([, v]) => (typeof v === 'boolean' ? (v ? 1 : 0) : v))
+    // table은 위 validateTableName으로 화이트리스트 검증됨
+    const query = `UPDATE \`${table}\` SET ${setClause} WHERE id = ?`
+    await prisma.$executeRawUnsafe(query, ...values, id)
 
     return NextResponse.json({ success: true, error: null })
   } catch (e: any) {
@@ -151,14 +149,17 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (softDelete) {
-      // Soft delete - set deleted_at
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-      const query = `UPDATE ${table} SET deleted_at = '${now}' WHERE id = '${id.replace(/'/g, "''")}'`
-      await prisma.$executeRawUnsafe(query)
+      // Soft delete - set deleted_at (table은 validateTableName 화이트리스트 통과)
+      await prisma.$executeRawUnsafe(
+        `UPDATE \`${table}\` SET deleted_at = NOW() WHERE id = ?`,
+        id
+      )
     } else {
       // Hard delete
-      const query = `DELETE FROM ${table} WHERE id = '${id.replace(/'/g, "''")}'`
-      await prisma.$executeRawUnsafe(query)
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM \`${table}\` WHERE id = ?`,
+        id
+      )
     }
 
     return NextResponse.json({ success: true, error: null })
