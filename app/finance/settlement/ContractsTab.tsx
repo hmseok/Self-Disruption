@@ -248,6 +248,18 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
     { key: 'ended', label: '종료', count: filterCounts.ended },
   ]
 
+  // 전체 누적 지급 요약 (활성 계약 기준)
+  const paymentSummary = useMemo(() => {
+    const jiipTotal = jiipList.reduce((a, j) => a + N(settlementMap[`jiip_share:${j.id}`]?.totalExpense || 0), 0)
+    const investTotal = investList.reduce((a, i) => a + N(settlementMap[`invest:${i.id}`]?.totalExpense || 0), 0)
+    const paidShares = shareHistory.filter(s => s.paid_at)
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    const thisMonthTotal = paidShares
+      .filter(s => s.settlement_month === thisMonth)
+      .reduce((a, s) => a + N(s.total_amount), 0)
+    return { jiipTotal, investTotal, thisMonthTotal, paidCount: paidShares.length }
+  }, [jiipList, investList, settlementMap, shareHistory])
+
   if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#9ca3af', fontWeight: 700 }}>데이터를 불러오는 중...</div>
 
   // 컬럼 정의
@@ -280,6 +292,31 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
 
   return (
     <div>
+      {/* ═══ 누적 지급 요약 (4 KPI) ═══ */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, padding: '12px 20px 0',
+      }}>
+        {[
+          { label: '지입 누적 지급', value: fm(paymentSummary.jiipTotal) + '원', tint: 'emerald' },
+          { label: '투자 누적 지급', value: fm(paymentSummary.investTotal) + '원', tint: 'blue' },
+          { label: '이번달 지급', value: fm(paymentSummary.thisMonthTotal) + '원', tint: 'amber' },
+          { label: '총 지급 건수', value: paymentSummary.paidCount + '건', tint: 'violet' },
+        ].map((k, idx) => (
+          <div key={idx} style={{
+            padding: '10px 14px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.60)',
+            border: `1px solid ${k.tint === 'emerald' ? 'rgba(16,185,129,0.25)'
+              : k.tint === 'blue' ? 'rgba(59,110,181,0.25)'
+              : k.tint === 'amber' ? 'rgba(202,138,4,0.25)'
+              : 'rgba(139,92,246,0.25)'}`,
+            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>{k.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
       {/* ═══ 헤더: 서브탭 + 통계 + 신규등록 ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
         {([

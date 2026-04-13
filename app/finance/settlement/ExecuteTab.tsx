@@ -70,7 +70,7 @@ type Props = {
 export default function ExecuteTab({
   items, selectedIds, toggleSelect, toggleSelectAll,
   onSendNotify, sendingNotify, notifyChannel, setNotifyChannel,
-  shareHistory, onTogglePaid, onBulkPaid,
+  shareHistory, onTogglePaid, onBulkPaid, onCancelSettlement,
   onDownloadBulkTransfer, transferPreview,
   onBuildTransferPreview, onDownloadFromPreview, onCloseTransferPreview,
   settlementSettings, setSettlementSettings,
@@ -458,7 +458,7 @@ export default function ExecuteTab({
             <div style={{ width: 90, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>발송일</div>
             <div style={{ width: 90, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>지급일</div>
             <div style={{ flex: 1 }} />
-            <div style={{ width: 60, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
+            <div style={{ width: 140, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
           </div>
 
           {/* 지급완료 행 */}
@@ -489,10 +489,16 @@ export default function ExecuteTab({
                   {sh.paid_at ? new Date(sh.paid_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : '—'}
                 </div>
                 <div style={{ flex: 1 }} />
-                <div style={{ width: 60, flexShrink: 0, textAlign: 'center' }}>
+                <div style={{ width: 140, flexShrink: 0, textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
                   <button onClick={() => onTogglePaid(sh.id, true)}
+                    title="지급완료 취소 (paid_at만 되돌림, 거래이력 유지)"
+                    style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                    완료해제
+                  </button>
+                  <button onClick={() => onCancelSettlement([sh.id])}
+                    title="정산 완전 취소 (거래내역까지 삭제)"
                     style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#dc2626', border: '1px solid #fecaca' }}>
-                    취소
+                    완전취소
                   </button>
                 </div>
               </div>
