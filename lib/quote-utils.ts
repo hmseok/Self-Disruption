@@ -16,6 +16,44 @@
 /** 천단위 콤마 포매터 (반올림) */
 export const f = (n: number) => Math.round(n || 0).toLocaleString()
 
+/**
+ * 억/조 자동 변환 포매터 (오버플로우 방지 + 시인성)
+ * - 1조 이상: "1.23조"
+ * - 1억 이상: "1.23억"
+ * - 그 외: 천단위 콤마 (f)
+ * - NaN/Infinity/null: "0"
+ */
+export const formatWonCompact = (n: number | null | undefined, opts?: { unit?: boolean }): string => {
+  const unit = opts?.unit !== false
+  const v = Number(n)
+  if (!Number.isFinite(v) || v === 0) return unit ? '0원' : '0'
+  const abs = Math.abs(v)
+  const sign = v < 0 ? '-' : ''
+  if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(2)}조${unit ? '원' : ''}`
+  if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)}억${unit ? '원' : ''}`
+  return `${sign}${Math.round(abs).toLocaleString()}${unit ? '원' : ''}`
+}
+
+/**
+ * 안전 숫자 파서: 빈 문자열/null/undefined/NaN → 0
+ * - 과도한 값(1e15 이상)은 0으로 클램프 (오버플로우 방어)
+ */
+export const safeNum = (v: unknown, fallback = 0): number => {
+  if (v === null || v === undefined || v === '') return fallback
+  const n = typeof v === 'string' ? parseFloat(v.replace(/,/g, '')) : Number(v)
+  if (!Number.isFinite(n)) return fallback
+  if (Math.abs(n) >= 1e15) return fallback // 오버플로우 방어
+  return n
+}
+
+/**
+ * 0-divide 방어 나눗셈
+ */
+export const safeDiv = (a: number, b: number, fallback = 0): number => {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return fallback
+  return a / b
+}
+
 /** 날짜 포매터 YYYY.MM.DD */
 export const fDate = (d: string) => {
   if (!d) return '-'

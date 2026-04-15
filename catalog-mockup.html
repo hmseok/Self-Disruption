@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>카달로그 리스트 디자인 4안 비교</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, 'Pretendard', sans-serif;
+    background: linear-gradient(135deg, #e8eef5 0%, #f0f4f8 50%, #e8eef5 100%);
+    color: #2a4a6b;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+  .sub { font-size: 12px; color: #6b8aad; margin-bottom: 24px; }
+
+  .option {
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: 6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5);
+  }
+  .option-title { font-size: 15px; font-weight: 800; color: #3b6eb5; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .option-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: rgba(59,110,181,0.1); color: #3b6eb5; }
+  .option-tag.rec { background: rgba(16,185,129,0.12); color: #047857; }
+  .option-desc { font-size: 12px; color: #6b8aad; margin-bottom: 14px; }
+
+  /* 공통 검색바 + 필터 */
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    padding: 6px 10px 6px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .toolbar input {
+    flex: 0 1 240px; min-width: 120px;
+    border: none; background: transparent; outline: none;
+    font-size: 12px; color: #2a4a6b; font-family: inherit;
+  }
+  .chip {
+    padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    background: transparent; border: none; color: #64748b; cursor: pointer;
+  }
+  .chip.active { background: #0f2440; color: #fff; }
+  .chip .num { font-size: 9px; opacity: 0.7; margin-left: 4px; }
+  .toolbar .spacer { flex: 1; }
+  .sort-sel {
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 8px; padding: 4px 8px; font-size: 11px; color: #64748b;
+  }
+
+  /* 브랜드 헤더 (공통) */
+  .brand-h {
+    display: flex; align-items: center; gap: 8px; padding: 10px 4px 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.06); margin-bottom: 6px;
+  }
+  .brand-h .name { font-size: 12px; font-weight: 800; color: #2a4a6b; }
+  .brand-h .cnt { font-size: 10px; color: #8aabc7; }
+  .brand-h .spacer { flex: 1; }
+  .brand-h .toggle { font-size: 10px; color: #64748b; cursor: pointer; }
+
+  /* ───────── A. 컴팩트 행 (Dense Row) ───────── */
+  .a-row {
+    display: grid;
+    grid-template-columns: 28px minmax(140px, 1.5fr) 1fr 100px 90px 70px 26px;
+    align-items: center; gap: 10px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: rgba(255,255,255,0.4);
+  }
+  .a-row:hover { background: rgba(59,110,181,0.06); border-color: rgba(59,110,181,0.15); }
+  .a-row.selected { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.3); }
+  .a-row .ico { width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .a-row .name { font-weight: 700; color: #2a4a6b; }
+  .a-row .name small { color: #8aabc7; font-weight: 500; margin-left: 6px; }
+  .a-row .meta { color: #64748b; font-size: 11px; }
+  .a-row .badge { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 5px; background: rgba(99,102,241,0.1); color: #4f46e5; text-align: center; }
+  .a-row .price { font-weight: 800; color: #047857; font-size: 12px; text-align: right; }
+  .a-row .date { font-size: 10px; color: #94a3b8; text-align: right; }
+  .a-row .arr { color: #cbd5e1; text-align: center; }
+
+  /* ───────── B. 2열 컴팩트 카드 (Mini Card 2-col) ───────── */
+  .b-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .b-card {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .b-card:hover { border-color: rgba(59,110,181,0.3); }
+  .b-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.04); }
+  .b-card .ico { width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .b-card .body .name { font-size: 12px; font-weight: 800; color: #2a4a6b; line-height: 1.3; }
+  .b-card .body .meta { font-size: 10px; color: #64748b; margin-top: 2px; display: flex; gap: 6px; align-items: center; }
+  .b-card .body .meta .badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.1); color: #4f46e5; }
+  .b-card .price { font-size: 12px; font-weight: 800; color: #047857; text-align: right; }
+  .b-card .price .date { font-size: 9px; color: #94a3b8; font-weight: 500; }
+
+  /* ───────── C. 3열 타일 (Tile Grid) ───────── */
+  .c-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .c-tile {
+    padding: 10px;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+  }
+  .c-tile:hover { border-color: rgba(59,110,181,0.3); }
+  .c-tile.selected { border-color: #6366f1; background: rgba(99,102,241,0.04); }
+  .c-tile .top { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .c-tile .ico { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f1f5f9, #e2e8f0); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .c-tile .name { font-size: 12px; font-weight: 800; color: #2a4a6b; flex: 1; }
+  .c-tile .badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: rgba(99,102,241,0.1); color: #4f46e5; }
+  .c-tile .meta { font-size: 10px; color: #64748b; display: flex; justify-content: space-between; align-items: baseline; }
+  .c-tile .price { font-size: 11px; font-weight: 800; color: #047857; }
+
+  /* ───────── D. 트리/아코디언 (Brand Accordion) ───────── */
+  .d-brand { border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; margin-bottom: 6px; overflow: hidden; background: #fff; }
+  .d-brand-h {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer;
+    background: rgba(248,250,252,0.8);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .d-brand-h .ic { font-size: 11px; color: #64748b; transition: transform 0.15s; }
+  .d-brand-h.collapsed .ic { transform: rotate(-90deg); }
+  .d-brand-h .name { font-size: 13px; font-weight: 800; color: #2a4a6b; }
+  .d-brand-h .cnt { font-size: 10px; color: #8aabc7; background: rgba(0,0,0,0.04); padding: 2px 7px; border-radius: 6px; }
+  .d-brand-h .spacer { flex: 1; }
+  .d-brand-h .summary { font-size: 11px; color: #64748b; }
+  .d-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 1.5fr) 1fr 100px 90px 70px 24px;
+    align-items: center; gap: 10px;
+    padding: 8px 14px;
+    font-size: 12px;
+    border-top: 1px solid rgba(0,0,0,0.03);
+    cursor: pointer;
+  }
+  .d-row:first-child { border-top: none; }
+  .d-row:hover { background: rgba(59,110,181,0.04); }
+  .d-row.selected { background: rgba(99,102,241,0.06); }
+  .d-row .name { font-weight: 700; color: #2a4a6b; }
+  .d-row .name small { color: #8aabc7; font-weight: 500; }
+  .d-row .meta { color: #64748b; font-size: 11px; }
+  .d-row .badge { font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 5px; background: rgba(99,102,241,0.1); color: #4f46e5; text-align: center; }
+  .d-row .price { font-weight: 800; color: #047857; font-size: 12px; text-align: right; }
+  .d-row .date { font-size: 10px; color: #94a3b8; text-align: right; }
+
+  /* Pros/Cons */
+  .meta-cmp { display: flex; gap: 16px; margin-top: 14px; font-size: 12px; }
+  .pros, .cons { flex: 1; padding: 10px 12px; border-radius: 10px; }
+  .pros { background: rgba(16,185,129,0.08); color: #065f46; border: 1px solid rgba(16,185,129,0.15); }
+  .cons { background: rgba(239,68,68,0.06); color: #991b1b; border: 1px solid rgba(239,68,68,0.12); }
+  .meta-cmp b { font-weight: 800; }
+
+  /* 예상 행 수 표시 */
+  .density { font-size: 10px; color: #6b8aad; margin-top: 6px; text-align: right; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>카달로그 리스트 디자인 4안 비교</h1>
+  <p class="sub">공통: 검색 + 브랜드/카테고리 필터 + 정렬. 같은 데이터(BMW 4건, KIA 2건, 신차가격표 3건) 기준으로 비교.</p>
+
+  <!-- ═══════════ OPTION A: 컴팩트 행 ═══════════ -->
+  <div class="option">
+    <div class="option-title">A. 컴팩트 행 (Dense Row) <span class="option-tag rec">최밀도 추천</span></div>
+    <div class="option-desc">한 줄 한 항목. 카드 없이 행 단위로 표시 → 같은 세로 공간에 가장 많은 항목 노출. Excel 같은 느낌.</div>
+
+    <div class="toolbar">
+      <span style="color:#8aabc7">🔍</span>
+      <input placeholder="브랜드, 모델, 트림으로 검색..." />
+      <button class="chip active">전체<span class="num">9</span></button>
+      <button class="chip">카탈로그<span class="num">6</span></button>
+      <button class="chip">가격표<span class="num">3</span></button>
+      <span class="spacer"></span>
+      <select class="sort-sel"><option>최근 저장순</option><option>가격 낮은순</option><option>브랜드순</option></select>
+    </div>
+
+    <div class="brand-h">
+      <span class="name">🚗 BMW</span>
+      <span class="cnt">4건</span>
+      <span class="spacer"></span>
+    </div>
+    <div class="a-row">
+      <div class="ico">🚙</div>
+      <div class="name">520i <small>BMW 520i / M 스포츠 패키지</small></div>
+      <div class="meta">2026년 · 가솔린</div>
+      <div class="badge">카탈로그</div>
+      <div class="price">681,591원</div>
+      <div class="date">3월 3일</div>
+      <div class="arr">›</div>
+    </div>
+    <div class="a-row selected">
+      <div class="ico">🚙</div>
+      <div class="name">520i <small>BMW 520i / M 스포츠 패키지</small></div>
+      <div class="meta">2026년 · 가솔린</div>
+      <div class="badge">카탈로그</div>
+      <div class="price">681,591원</div>
+      <div class="date">3월 3일</div>
+      <div class="arr">›</div>
+    </div>
+    <div class="a-row">
+      <div class="ico">🚙</div>
+      <div class="name">520i <small>BMW 520i / 베이스 + 옥사…</small></div>
+      <div class="meta">2026년 · 가솔린</div>
+      <div class="badge">카탈로그</div>
+      <div class="price">671,113원</div>
+      <div class="date">3월 3일</div>
+      <div class="arr">›</div>
+    </div>
+    <div class="a-row">
+      <div class="ico">🚙</div>
+      <div class="name">520i <small>M 스포츠 패키지 / 520i M…</small></div>
+      <div class="meta">2024년 · 가솔린</div>
+      <div class="badge">카탈로그</div>
+      <div class="price">678,271원</div>
+      <div class="date">3월 3일</div>
+      <div class="arr">›</div>
+    </div>
+
+    <div class="brand-h">
+      <span class="name">🚗 KIA</span>
+      <span class="cnt">2건</span>
+    </div>
+    <div class="a-row">
+      <div class="ico">🚙</div>
+      <div class="name">Ray <small>1.0 가솔린 / 트렌디</small></div>
+      <div class="meta">2024년 · 가솔린</div>
+      <div class="badge">카탈로그</div>
+      <div class="price">387,193원</div>
+      <div class="date">2월 18일</div>
+      <div class="arr">›</div>
+    </div>
+
+    <div class="density">↑ 9건 모두 표시 시 약 410px (현재 디자인의 1/3)</div>
+
+    <div class="meta-cmp">
+      <div class="pros"><b>✓ 장점</b> 최고 밀도 · 컬럼 정렬 일관성 · 검색·정렬 친화적 · 데스크톱 ERP 표준 룩</div>
+      <div class="cons"><b>✗ 단점</b> 모바일에서 좁아짐(가로 스크롤 필요) · 시각적 매력은 약함</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION B: 2열 미니카드 ═══════════ -->
+  <div class="option">
+    <div class="option-title">B. 2열 컴팩트 카드 (Mini Card 2-col) <span class="option-tag">균형</span></div>
+    <div class="option-desc">현재 카드의 크기를 줄이고 2열로 배치. 카드의 시각적 분리감 유지하면서 밀도 2배.</div>
+
+    <div class="toolbar">
+      <span style="color:#8aabc7">🔍</span>
+      <input placeholder="브랜드, 모델, 트림으로 검색..." />
+      <button class="chip active">전체<span class="num">9</span></button>
+      <button class="chip">카탈로그<span class="num">6</span></button>
+      <button class="chip">가격표<span class="num">3</span></button>
+      <span class="spacer"></span>
+      <select class="sort-sel"><option>최근 저장순</option></select>
+    </div>
+
+    <div class="brand-h"><span class="name">🚗 BMW</span><span class="cnt">4건</span></div>
+    <div class="b-grid">
+      <div class="b-card">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">520i</div>
+          <div class="meta">BMW 520i / M 스포츠 · 2026 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">681,591<div class="date">3월 3일</div></div>
+      </div>
+      <div class="b-card selected">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">520i</div>
+          <div class="meta">BMW 520i / M 스포츠 · 2026 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">681,591<div class="date">3월 3일</div></div>
+      </div>
+      <div class="b-card">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">520i</div>
+          <div class="meta">베이스+옥사 · 2026 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">671,113<div class="date">3월 3일</div></div>
+      </div>
+      <div class="b-card">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">520i</div>
+          <div class="meta">M 스포츠 · 2024 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">678,271<div class="date">3월 3일</div></div>
+      </div>
+    </div>
+
+    <div class="brand-h" style="margin-top:12px"><span class="name">🚗 KIA</span><span class="cnt">2건</span></div>
+    <div class="b-grid">
+      <div class="b-card">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">Ray</div>
+          <div class="meta">1.0 가솔린/트렌디 · 2024 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">387,193<div class="date">2월 18일</div></div>
+      </div>
+      <div class="b-card">
+        <div class="ico">🚙</div>
+        <div class="body">
+          <div class="name">Ray</div>
+          <div class="meta">1.0 가솔린/트렌디 · 2024 <span class="badge">카탈로그</span></div>
+        </div>
+        <div class="price">354,240<div class="date">2월 18일</div></div>
+      </div>
+    </div>
+
+    <div class="density">↑ 9건 모두 표시 시 약 460px (현재 디자인의 약 1/3)</div>
+
+    <div class="meta-cmp">
+      <div class="pros"><b>✓ 장점</b> 카드의 시각적 분리감 유지 · 모바일 1열로 자동 축소 가능 · 현재 룩과 가장 유사</div>
+      <div class="cons"><b>✗ 단점</b> A보다 밀도 낮음 · 긴 모델명 잘림 가능</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION C: 3열 타일 ═══════════ -->
+  <div class="option">
+    <div class="option-title">C. 3열 타일 (Tile Grid)</div>
+    <div class="option-desc">정사각에 가까운 작은 타일을 3열로. 가장 컴팩트하지만 정보량 줄여야 함.</div>
+
+    <div class="toolbar">
+      <span style="color:#8aabc7">🔍</span>
+      <input placeholder="브랜드, 모델, 트림으로 검색..." />
+      <button class="chip active">전체</button>
+      <button class="chip">BMW</button>
+      <button class="chip">KIA</button>
+      <button class="chip">현대</button>
+      <span class="spacer"></span>
+      <select class="sort-sel"><option>최근 저장순</option></select>
+    </div>
+
+    <div class="c-grid">
+      <div class="c-tile">
+        <div class="top"><div class="ico">🚙</div><div class="name">520i</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>BMW · 2026</span><span class="price">681,591</span></div>
+      </div>
+      <div class="c-tile selected">
+        <div class="top"><div class="ico">🚙</div><div class="name">520i</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>BMW · 2026</span><span class="price">681,591</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">🚙</div><div class="name">520i</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>BMW · 2026</span><span class="price">671,113</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">🚙</div><div class="name">520i</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>BMW · 2024</span><span class="price">678,271</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">🚙</div><div class="name">Ray</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>KIA · 2024</span><span class="price">387,193</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">🚙</div><div class="name">Ray</div><span class="badge">카탈</span></div>
+        <div class="meta"><span>KIA · 2024</span><span class="price">354,240</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">📋</div><div class="name">GV60</div><span class="badge">가격표</span></div>
+        <div class="meta"><span>제네시스 · 2026</span><span class="price">스탠다드</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">📋</div><div class="name">520i</div><span class="badge">가격표</span></div>
+        <div class="meta"><span>BMW · 2026</span><span class="price">3월 3일</span></div>
+      </div>
+      <div class="c-tile">
+        <div class="top"><div class="ico">📋</div><div class="name">Ray</div><span class="badge">가격표</span></div>
+        <div class="meta"><span>KIA · 2024</span><span class="price">2월 15일</span></div>
+      </div>
+    </div>
+
+    <div class="density">↑ 9건 모두 표시 시 약 230px (가장 컴팩트, 한 화면에 20+건 가능)</div>
+
+    <div class="meta-cmp">
+      <div class="pros"><b>✓ 장점</b> 최대 밀도 · 시각적 비교 쉬움 · 카탈로그 쇼핑 느낌</div>
+      <div class="cons"><b>✗ 단점</b> 트림/옵션 등 긴 텍스트 잘림 · 정보량 줄여야 함 · 브랜드별 그룹핑 약함</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION D: 브랜드 아코디언 ═══════════ -->
+  <div class="option">
+    <div class="option-title">D. 브랜드 아코디언 (Collapsible) <span class="option-tag">대량 데이터 추천</span></div>
+    <div class="option-desc">브랜드 단위로 접기/펴기. 평소엔 브랜드만 보이고 필요 시 펼침. 100건+ 가도 스크롤 짧음.</div>
+
+    <div class="toolbar">
+      <span style="color:#8aabc7">🔍</span>
+      <input placeholder="브랜드, 모델, 트림으로 검색... (검색 시 자동 펼침)" />
+      <button class="chip active">전체</button>
+      <button class="chip">카탈로그<span class="num">6</span></button>
+      <button class="chip">가격표<span class="num">3</span></button>
+      <span class="spacer"></span>
+      <button class="chip" style="background:rgba(0,0,0,0.04);color:#64748b">⮟ 모두 펼침</button>
+      <select class="sort-sel"><option>최근 저장순</option></select>
+    </div>
+
+    <div class="d-brand">
+      <div class="d-brand-h">
+        <span class="ic">▼</span>
+        <span class="name">🚗 BMW</span>
+        <span class="cnt">4건</span>
+        <span class="spacer"></span>
+        <span class="summary">평균 678,066원 · 최근 3월 3일</span>
+      </div>
+      <div class="d-row">
+        <div class="name">520i <small>M 스포츠 패키지</small></div>
+        <div class="meta">2026년 · 가솔린</div>
+        <div class="badge">카탈로그</div>
+        <div class="price">681,591원</div>
+        <div class="date">3월 3일</div>
+        <div>›</div>
+      </div>
+      <div class="d-row selected">
+        <div class="name">520i <small>M 스포츠 패키지</small></div>
+        <div class="meta">2026년 · 가솔린</div>
+        <div class="badge">카탈로그</div>
+        <div class="price">681,591원</div>
+        <div class="date">3월 3일</div>
+        <div>›</div>
+      </div>
+      <div class="d-row">
+        <div class="name">520i <small>베이스 + 옥사</small></div>
+        <div class="meta">2026년 · 가솔린</div>
+        <div class="badge">카탈로그</div>
+        <div class="price">671,113원</div>
+        <div class="date">3월 3일</div>
+        <div>›</div>
+      </div>
+      <div class="d-row">
+        <div class="name">520i <small>M 스포츠</small></div>
+        <div class="meta">2024년 · 가솔린</div>
+        <div class="badge">카탈로그</div>
+        <div class="price">678,271원</div>
+        <div class="date">3월 3일</div>
+        <div>›</div>
+      </div>
+    </div>
+
+    <div class="d-brand">
+      <div class="d-brand-h collapsed">
+        <span class="ic">▼</span>
+        <span class="name">🚗 KIA</span>
+        <span class="cnt">2건</span>
+        <span class="spacer"></span>
+        <span class="summary">평균 370,716원 · 최근 2월 18일</span>
+      </div>
+    </div>
+
+    <div class="d-brand">
+      <div class="d-brand-h collapsed">
+        <span class="ic">▼</span>
+        <span class="name">📋 신차 가격표</span>
+        <span class="cnt">3건</span>
+        <span class="spacer"></span>
+        <span class="summary">Genesis, BMW, KIA</span>
+      </div>
+    </div>
+
+    <div class="density">↑ 모두 접힌 상태 약 150px / 전부 펼친 상태 약 470px · 100건이어도 카테고리만 접으면 스크롤 거의 없음</div>
+
+    <div class="meta-cmp">
+      <div class="pros"><b>✓ 장점</b> 데이터 늘어도 스크롤 일정 · 브랜드 단위 요약(평균가, 최근일자) 표시 · 검색 시 자동 펼침</div>
+      <div class="cons"><b>✗ 단점</b> 클릭 한 번 더 필요 · 항목 비교 시 수동 펼침 필요</div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top: 24px; text-align: center;">
+    <b>현재 디자인 예상 높이:</b> 9건 = 약 1,200px (스크롤 김)<br>
+    <b>제안 4안 모두</b>: 검색바 + 브랜드/카테고리 필터 + 정렬 + 신차 카탈로그/신차 가격표 통합
+  </p>
+</div>
+</body>
+</html>

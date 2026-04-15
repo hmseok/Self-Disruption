@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>견적→전송→계약 파이프라인 UI 목업</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, 'Pretendard', sans-serif;
+    background: linear-gradient(135deg, #e8eef5 0%, #f0f4f8 50%, #e8eef5 100%);
+    color: #2a4a6b;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+  .sub { font-size: 12px; color: #6b8aad; margin-bottom: 24px; }
+
+  .option {
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5);
+  }
+  .option-title { font-size: 15px; font-weight: 800; color: #3b6eb5; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .option-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: rgba(59,110,181,0.1); color: #3b6eb5; }
+  .option-desc { font-size: 12px; color: #6b8aad; margin-bottom: 16px; }
+
+  /* ─── 상단 최상위 탭 (공통) ─── */
+  .toolbar {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 12px;
+    padding: 8px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+  .toolbar .search { color: #8aabc7; }
+  .pill {
+    padding: 7px 14px; border-radius: 10px; border: none;
+    font-size: 12px; font-weight: 700; background: transparent; color: #64748b; cursor: pointer;
+  }
+  .pill.active { background: #0f2440; color: #fff; }
+  .toolbar .spacer { flex: 1; }
+  .btn-primary {
+    padding: 7px 14px; background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff;
+    border: none; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;
+  }
+
+  /* ─── Option A: 스테퍼 ─── */
+  .stepper {
+    display: flex; align-items: center; gap: 0;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 16px 24px;
+    margin-bottom: 12px;
+  }
+  .step { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800;
+    background: rgba(0,0,0,0.06); color: #8aabc7;
+    border: 2px solid transparent;
+  }
+  .step.active .step-circle { background: linear-gradient(135deg, #3b6eb5, #5a8fd4); color: #fff; border-color: #3b6eb5; box-shadow: 0 0 0 4px rgba(59,110,181,0.12); }
+  .step.done .step-circle { background: #10b981; color: #fff; }
+  .step-label { font-size: 13px; font-weight: 700; color: #64748b; }
+  .step.active .step-label { color: #2a4a6b; }
+  .step-bar { flex: 1; height: 2px; background: linear-gradient(to right, #10b981 50%, rgba(0,0,0,0.08) 50%); margin: 0 16px; }
+
+  /* ─── Option B: 서브탭 (세그먼트) ─── */
+  .segment-bar {
+    display: inline-flex; gap: 4px;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 12px;
+    padding: 5px;
+    margin-bottom: 14px;
+  }
+  .segment {
+    padding: 8px 16px; font-size: 12px; font-weight: 700;
+    color: #64748b; background: transparent;
+    border: none; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .segment.active { background: rgba(255,255,255,0.95); color: #2a4a6b; box-shadow: 2px 2px 6px rgba(140,170,210,0.15); }
+  .badge { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,0.06); color: #8aabc7; }
+  .segment.active .badge { background: rgba(59,110,181,0.15); color: #3b6eb5; }
+
+  /* ─── Option C: 사이드 네비 ─── */
+  .side-wrap { display: grid; grid-template-columns: 220px 1fr; gap: 14px; }
+  .side-nav {
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 14px;
+    padding: 10px;
+  }
+  .side-item {
+    padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 700; color: #64748b;
+    margin-bottom: 4px;
+  }
+  .side-item.active { background: rgba(59,110,181,0.1); color: #2a4a6b; }
+  .side-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.06); color: #8aabc7;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800;
+  }
+  .side-item.active .side-num { background: #3b6eb5; color: #fff; }
+  .side-item.done .side-num { background: #10b981; color: #fff; }
+  .side-desc { font-size: 10px; font-weight: 500; color: #8aabc7; margin-top: 2px; }
+
+  /* ─── 공통 컨텐츠 프리뷰 ─── */
+  .content-preview {
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 40px 24px;
+    text-align: center;
+    color: #8aabc7;
+    font-size: 13px;
+  }
+  .content-preview strong { color: #2a4a6b; font-size: 14px; display: block; margin-bottom: 4px; }
+
+  /* Pros/Cons */
+  .meta { display: flex; gap: 16px; margin-top: 14px; font-size: 12px; }
+  .pros, .cons { flex: 1; padding: 10px 12px; border-radius: 10px; }
+  .pros { background: rgba(16,185,129,0.08); color: #065f46; border: 1px solid rgba(16,185,129,0.15); }
+  .cons { background: rgba(239,68,68,0.06); color: #991b1b; border: 1px solid rgba(239,68,68,0.12); }
+  .meta b { font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>견적 → 전송 → 계약 파이프라인 UI 3가지 비교</h1>
+  <p class="sub">공통: 최상위 2탭(장기/단기) + 단계별 전용 페이지 라우트 + 단계별 전용 전송 화면</p>
+
+  <!-- ═══════════ OPTION A: 스테퍼 ═══════════ -->
+  <div class="option">
+    <div class="option-title">A. 스테퍼 (Stepper) <span class="option-tag">추천</span></div>
+    <div class="option-desc">가로 진행바. 현재 단계 하이라이트 + 완료 단계 체크. 워크플로우 순서가 시각적으로 드러남.</div>
+
+    <div class="toolbar">
+      <span class="search">🔍</span>
+      <button class="pill active">장기</button>
+      <button class="pill">단기</button>
+      <span class="spacer"></span>
+      <button class="btn-primary">+ 새로 만들기 ▾</button>
+    </div>
+
+    <div class="stepper">
+      <div class="step done">
+        <div class="step-circle">✓</div>
+        <div class="step-label">① 견적 작성</div>
+      </div>
+      <div class="step-bar"></div>
+      <div class="step active">
+        <div class="step-circle">2</div>
+        <div class="step-label">② 전송 · 고객 매칭</div>
+      </div>
+      <div class="step-bar" style="background: rgba(0,0,0,0.08)"></div>
+      <div class="step">
+        <div class="step-circle">3</div>
+        <div class="step-label">③ 계약 전환</div>
+      </div>
+    </div>
+
+    <div class="content-preview">
+      <strong>② 전송 · 고객 매칭 페이지</strong>
+      작성된 견적 리스트 → 행별 "고객 매칭 → 전송" · 전송 상태 필터링
+    </div>
+
+    <div class="meta">
+      <div class="pros"><b>✓ 장점</b> 워크플로우가 한눈에 보임 · 현재 위치 + 다음 단계 명확 · 사용자 학습 쉬움</div>
+      <div class="cons"><b>✗ 단점</b> 세로 공간 차지 (약 70px) · 단계가 더 늘어나면 좁아짐</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION B: 세그먼트 ═══════════ -->
+  <div class="option">
+    <div class="option-title">B. 세그먼트 탭 (Segmented)</div>
+    <div class="option-desc">가로 세그먼트 버튼. 기존 DcToolbar 스타일과 가장 유사. 건수 뱃지 표시로 데이터 양도 함께 파악 가능.</div>
+
+    <div class="toolbar">
+      <span class="search">🔍</span>
+      <button class="pill active">장기</button>
+      <button class="pill">단기</button>
+      <span class="spacer"></span>
+      <button class="btn-primary">+ 새로 만들기 ▾</button>
+    </div>
+
+    <div class="segment-bar">
+      <button class="segment">① 작성 <span class="badge">7</span></button>
+      <button class="segment active">② 전송 <span class="badge">12</span></button>
+      <button class="segment">③ 계약 전환 <span class="badge">3</span></button>
+    </div>
+
+    <div class="content-preview">
+      <strong>② 전송 · 고객 매칭 페이지</strong>
+      작성된 견적 리스트 → 행별 "고객 매칭 → 전송" · 전송 상태 필터링
+    </div>
+
+    <div class="meta">
+      <div class="pros"><b>✓ 장점</b> 공간 절약 · 건수 뱃지 내장 가능 · 기존 필터 칩과 일관된 룩앤필</div>
+      <div class="cons"><b>✗ 단점</b> 순서감이 약함 · 단계 번호 필수 · 완료/미완료 시각 표현이 약함</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION C: 사이드 네비 ═══════════ -->
+  <div class="option">
+    <div class="option-title">C. 사이드 단계 네비 (Left Nav)</div>
+    <div class="option-desc">왼쪽 세로 네비 + 오른쪽 컨텐츠. 데스크톱 넓은 화면에서 단계별 설명도 함께 노출 가능.</div>
+
+    <div class="toolbar">
+      <span class="search">🔍</span>
+      <button class="pill active">장기</button>
+      <button class="pill">단기</button>
+      <span class="spacer"></span>
+      <button class="btn-primary">+ 새로 만들기 ▾</button>
+    </div>
+
+    <div class="side-wrap">
+      <div class="side-nav">
+        <div class="side-item done">
+          <div class="side-num">✓</div>
+          <div>견적 작성<div class="side-desc">산출기에서 작성</div></div>
+        </div>
+        <div class="side-item active">
+          <div class="side-num">2</div>
+          <div>전송 · 고객 매칭<div class="side-desc">매칭 후 고객에게 전송</div></div>
+        </div>
+        <div class="side-item">
+          <div class="side-num">3</div>
+          <div>계약 전환<div class="side-desc">서명 완료 건 계약 작성</div></div>
+        </div>
+      </div>
+      <div class="content-preview">
+        <strong>② 전송 · 고객 매칭 페이지</strong>
+        작성된 견적 리스트 → 행별 "고객 매칭 → 전송"
+      </div>
+    </div>
+
+    <div class="meta">
+      <div class="pros"><b>✓ 장점</b> 단계별 설명문 공간 넉넉 · 단계가 늘어도 확장 가능 · 데스크톱 앱스러운 느낌</div>
+      <div class="cons"><b>✗ 단점</b> 가로 공간 220px 고정 소모 · 모바일 반응형 처리 복잡 · 테이블 컨텐츠 폭 좁아짐</div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top: 24px; text-align: center;">
+    세 방식 모두 상단 [장기][단기] 탭과 "+ 새로 만들기" 드롭다운은 공통으로 유지됩니다.<br>
+    "요율 관리"는 <code>/db/pricing-standards</code> 또는 설정 메뉴로 이전됩니다.
+  </p>
+</div>
+</body>
+</html>

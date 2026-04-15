@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { DEFAULT_INSURANCE_COVERAGE, DEFAULT_QUOTE_NOTICES, DEFAULT_CALC_PARAMS } from '@/lib/contract-terms'
-import { f, fDate, parseNum, MAINT_PACKAGE_LABELS, MAINT_PACKAGE_DESC } from '@/lib/quote-utils'
+import { f, fDate, parseNum, safeNum, safeDiv, formatWonCompact, MAINT_PACKAGE_LABELS, MAINT_PACKAGE_DESC } from '@/lib/quote-utils'
 import { getAuthHeader } from '@/app/utils/auth-client'
 import type { CarData, MarketComp, NewCarOption, NewCarColor, NewCarTrim, NewCarVariant, NewCarResult, BusinessRules, DepAxes, InsVehicleClass, DriverAgeGroup } from '@/lib/rent-calc-types'
 import { DOMESTIC_BRANDS, IMPORT_BRAND_PRESETS, IMPORT_BRANDS, PREMIUM_MODELS, EV_FUEL_KEYWORDS, EV_MODEL_KEYWORDS, HEV_KEYWORDS } from '@/lib/rent-calc-types'
@@ -14,6 +14,8 @@ import { mapToDepAxes, mapToDepCategory, mapToInsuranceType, getInsVehicleClass,
 
 
 import { CostBar, Section, InputRow, ResultRow } from './components'
+import OptionHPanel, { type PresetMode as OptionHPresetMode } from './OptionHPanel'
+import OptionHTable, { type HTableRow } from './OptionHTable'
 
 // ============================================
 // 메인 컴포넌트
@@ -104,6 +106,15 @@ export default function RentPricingBuilder() {
   const [termMonths, setTermMonths] = useState(36)
   const [margin, setMargin] = useState(0)
   const [savedPricesOpen, setSavedPricesOpen] = useState(true)
+  // Option H: 락 (역산 시 변경하지 않을 레버들)
+  const [lockedParams, setLockedParams] = useState<Set<string>>(new Set())
+  const toggleLock = (key: string) => setLockedParams(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    return next
+  })
+  // Option H: 비교모드 기준값 (월 단위)
+  const [hBaseline, setHBaseline] = useState<{ [k: string]: number } | null>(null)
 
   // 시장 비교
   const [marketComps, setMarketComps] = useState<MarketComp[]>([])
@@ -162,6 +173,10 @@ export default function RentPricingBuilder() {
 
   // 🆕 신차 조회 모드
   const [lookupMode, setLookupMode] = useState<'registered' | 'newcar' | 'saved'>('registered')
+
+  // 🆕 Step 1 탭 네비게이션
+  const [activeTab, setActiveTab] = useState<'registered' | 'newcar' | 'catalog'>('registered')
+
   const [newCarBrand, setNewCarBrand] = useState('')
   const [newCarModel, setNewCarModel] = useState('')
   const [newCarResult, setNewCarResult] = useState<NewCarResult | null>(null)
@@ -189,6 +204,11 @@ export default function RentPricingBuilder() {
   const [carSearchQuery, setCarSearchQuery] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const dropFileRef = useRef<HTMLInputElement>(null)
+  // ── 카달로그 통합 리스트 검색/필터/정렬 ──
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogFilter, setCatalogFilter] = useState<'all' | 'worksheets' | 'prices'>('all')
+  const [catalogSort, setCatalogSort] = useState<'recent' | 'price_asc' | 'price_desc' | 'brand'>('recent')
+  const [showAddPanel, setShowAddPanel] = useState(false)  // 카달로그 내 "+ 가격표 추가" 토글
 
   // --- 데이터 로드 ---
   useEffect(() => {
@@ -298,6 +318,14 @@ export default function RentPricingBuilder() {
     }
     fetchTerms()
   }, [effectiveCompanyId])
+
+  // 탭 변경 시 lookupMode 동기화
+  useEffect(() => {
+    if (activeTab === 'registered') setLookupMode('registered')
+    else if (activeTab === 'newcar') setLookupMode('newcar')
+    // 카달로그 탭: showAddPanel이 켜진 경우만 newcar 모드로 (가격표 추가 UI 활성화)
+    else if (activeTab === 'catalog' && showAddPanel) setLookupMode('newcar')
+  }, [activeTab, showAddPanel])
 
   // ============================================
   // 🆕 공통 기준 테이블 매핑 함수
@@ -772,28 +800,28 @@ export default function RentPricingBuilder() {
         }
         if (q.start_date) setStartDate(q.start_date)
         if (d.note) setQuoteNote(d.note)
-        // 계약 조건 복원
-        if (d.term_months) setTermMonths(d.term_months)
+        // 계약 조건 복원 (safeNum 방어)
+        if (d.term_months) setTermMonths(safeNum(d.term_months, 36))
         if (d.contract_type) setContractType(d.contract_type)
-        if (d.deposit !== undefined) setDeposit(d.deposit)
-        if (d.prepayment !== undefined) setPrepayment(d.prepayment)
-        if (d.annualMileage) setAnnualMileage(d.annualMileage)
-        if (d.baselineKm) setBaselineKm(d.baselineKm)
-        if (d.deductible !== undefined) setDeductible(d.deductible)
-        if (d.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(d.own_damage_coverage_ratio)
-        if (d.margin !== undefined) setMargin(d.margin)
+        if (d.deposit !== undefined) setDeposit(safeNum(d.deposit, 0))
+        if (d.prepayment !== undefined) setPrepayment(safeNum(d.prepayment, 0))
+        if (d.annualMileage) setAnnualMileage(Math.max(2, safeNum(d.annualMileage, 2)))
+        if (d.baselineKm) setBaselineKm(Math.max(2, safeNum(d.baselineKm, 2)))
+        if (d.deductible !== undefined) setDeductible(safeNum(d.deductible, 500000))
+        if (d.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(safeNum(d.own_damage_coverage_ratio, 1))
+        if (d.margin !== undefined) setMargin(safeNum(d.margin, 0))
         if (d.maint_package) setMaintPackage(d.maint_package)
         if (d.driver_age_group) setDriverAgeGroup(d.driver_age_group)
         if (d.dep_curve_preset) setDepCurvePreset(d.dep_curve_preset)
-        if (d.residual_rate !== undefined) setResidualRate(d.residual_rate)
-        if (d.excess_mileage_rate) setExcessMileageRate(d.excess_mileage_rate)
-        // 금융 복원
-        if (d.loan_amount !== undefined) setLoanAmount(d.loan_amount)
-        if (d.loan_rate !== undefined) setLoanRate(d.loan_rate)
-        if (d.investment_rate !== undefined) setInvestmentRate(d.investment_rate)
-        // 가격 복원
-        if (d.factory_price) setFactoryPrice(d.factory_price)
-        if (d.purchase_price) setPurchasePrice(d.purchase_price)
+        if (d.residual_rate !== undefined) setResidualRate(safeNum(d.residual_rate, 0))
+        if (d.excess_mileage_rate) setExcessMileageRate(safeNum(d.excess_mileage_rate, 0))
+        // 금융 복원 (safeNum 방어)
+        if (d.loan_amount !== undefined) setLoanAmount(safeNum(d.loan_amount, 0))
+        if (d.loan_rate !== undefined) setLoanRate(safeNum(d.loan_rate, 4.5))
+        if (d.investment_rate !== undefined) setInvestmentRate(safeNum(d.investment_rate, 6.0))
+        // 가격 복원 (safeNum 방어 - 오버플로우 차단)
+        if (d.factory_price) setFactoryPrice(safeNum(d.factory_price, 0))
+        if (d.purchase_price) setPurchasePrice(safeNum(d.purchase_price, 0))
         // 차량 복원: car_id가 있으면 등록차량 선택
         let loadedInsData: any = null
         let loadedFinData: any = null
@@ -941,34 +969,36 @@ export default function RentPricingBuilder() {
           const hasLinkedFin = !!(loadedFinData?.loan_amount)
 
           // 차량 정보는 이미 위에서 복원됨 → 워크시트의 산출 데이터만 복원
-          setFactoryPrice(ws.factory_price || d.factory_price || 0)
-          setPurchasePrice(ws.purchase_price || d.purchase_price || 0)
+          // ★ safeNum으로 빈문자열/null/NaN/오버플로우(1e15+) 방어 (80경원 버그 방지)
+          setFactoryPrice(safeNum(ws.factory_price, safeNum(d.factory_price, 0)))
+          setPurchasePrice(safeNum(ws.purchase_price, safeNum(d.purchase_price, 0)))
           // 금융: 연동 금융이 있으면 워크시트 값으로 덮어쓰지 않음
           if (!hasLinkedFin) {
-            setLoanAmount(ws.loan_amount ?? d.loan_amount ?? 0)
-            setLoanRate(ws.loan_interest_rate ?? d.loan_rate ?? 4.5)
+            setLoanAmount(safeNum(ws.loan_amount, safeNum(d.loan_amount, 0)))
+            setLoanRate(safeNum(ws.loan_interest_rate, safeNum(d.loan_rate, 4.5)))
           }
-          setInvestmentRate(ws.investment_rate ?? d.investment_rate ?? 6.0)
+          setInvestmentRate(safeNum(ws.investment_rate, safeNum(d.investment_rate, 6.0)))
           // 보험: 연동 보험이 있으면 워크시트 값으로 덮어쓰지 않음
           if (!hasLinkedIns) {
-            setMonthlyInsuranceCost(ws.monthly_insurance || 0)
+            setMonthlyInsuranceCost(safeNum(ws.monthly_insurance, 0))
             if (ws.ins_auto_mode !== undefined) setInsAutoMode(ws.ins_auto_mode)
           }
           if (ws.driver_age_group) setDriverAgeGroup(ws.driver_age_group as DriverAgeGroup)
-          setMonthlyMaintenance(ws.monthly_maintenance ?? d.cost_breakdown?.maintenance ?? 0)
+          setMonthlyMaintenance(safeNum(ws.monthly_maintenance, safeNum(d.cost_breakdown?.maintenance, 0)))
           if (ws.maint_package) setMaintPackage(ws.maint_package as MaintenancePackage)
           if (ws.oil_change_freq) setOilChangeFreq(ws.oil_change_freq as 1 | 2)
-          setDeductible(ws.deductible ?? d.deductible ?? 500000)
-          if (ws.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(ws.own_damage_coverage_ratio)
-          setDeposit(ws.deposit_amount ?? d.deposit ?? 0)
-          setPrepayment(ws.prepayment_amount ?? d.prepayment ?? 0)
-          if (ws.deposit_discount_rate !== undefined && ws.deposit_discount_rate !== null) setDepositDiscountRate(ws.deposit_discount_rate)
-          if (ws.prepayment_discount_rate !== undefined && ws.prepayment_discount_rate !== null) setPrepaymentDiscountRate(ws.prepayment_discount_rate)
+          setDeductible(safeNum(ws.deductible, safeNum(d.deductible, 500000)))
+          if (ws.own_damage_coverage_ratio !== undefined) setOwnDamageCoverageRatio(safeNum(ws.own_damage_coverage_ratio, 1))
+          setDeposit(safeNum(ws.deposit_amount, safeNum(d.deposit, 0)))
+          setPrepayment(safeNum(ws.prepayment_amount, safeNum(d.prepayment, 0)))
+          if (ws.deposit_discount_rate !== undefined && ws.deposit_discount_rate !== null) setDepositDiscountRate(safeNum(ws.deposit_discount_rate, 0))
+          if (ws.prepayment_discount_rate !== undefined && ws.prepayment_discount_rate !== null) setPrepaymentDiscountRate(safeNum(ws.prepayment_discount_rate, 0))
           if (ws.registration_region) setRegistrationRegion(ws.registration_region)
-          setTermMonths(ws.term_months || d.term_months || 36)
-          setMargin(ws.target_margin ?? d.margin ?? 0)
-          setAnnualMileage(ws.annual_mileage || d.annualMileage || 2)
-          setBaselineKm(ws.baseline_km || d.baselineKm || 2)
+          setTermMonths(safeNum(ws.term_months, safeNum(d.term_months, 36)))
+          setMargin(safeNum(ws.target_margin, safeNum(d.margin, 0)))
+          // annual_mileage / baseline_km 은 나눗셈에 사용 → 최소값 2 보장 (divide-by-zero 방어)
+          setAnnualMileage(Math.max(2, safeNum(ws.annual_mileage, safeNum(d.annualMileage, 2))))
+          setBaselineKm(Math.max(2, safeNum(ws.baseline_km, safeNum(d.baselineKm, 2))))
           if (ws.excess_mileage_rate) setExcessMileageRate(ws.excess_mileage_rate)
           if (ws.excess_rate_margin_pct !== undefined) setExcessRateMarginPct(ws.excess_rate_margin_pct)
           if (ws.dep_curve_preset) setDepCurvePreset(ws.dep_curve_preset as DepCurvePreset)
@@ -1051,15 +1081,18 @@ export default function RentPricingBuilder() {
         console.error('[가격표저장] 조회 에러:', existRes.status)
         throw new Error(`DB 조회 실패: ${existRes.statusText}`)
       }
-      const existJson = await existRes.json()
-      const existing = existJson.data ?? existJson ?? null
+      const existJson = await existRes.json().catch(() => ({}))
+      // 서버는 {data: row|null, error: null} 또는 {data: [], error: null}를 돌려준다.
+      // data가 null/빈배열이면 "없음"으로 처리하고 POST 분기로 진입해야 한다.
+      const rawExist = existJson?.data
+      const existing = Array.isArray(rawExist) ? (rawExist[0] || null) : (rawExist || null)
 
       let saveRes: Response
-      if (existing) {
+      if (existing && existing.id) {
         saveRes = await fetch(`/api/new-car-prices/${existing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
+          body: JSON.stringify({ source: payload.source, price_data: payload.price_data })
         })
       } else {
         saveRes = await fetch('/api/new-car-prices', {
@@ -1070,14 +1103,17 @@ export default function RentPricingBuilder() {
       }
 
       if (!saveRes.ok) {
-        const errJson = await saveRes.json()
-        console.error('[가격표저장] DB 에러:', errJson)
-        throw new Error(`저장 실패: ${errJson.error}`)
+        const errText = await saveRes.text().catch(() => '')
+        let errMsg = ''
+        try { errMsg = JSON.parse(errText)?.error || '' } catch { errMsg = errText }
+        console.error('[가격표저장] DB 에러:', saveRes.status, errText)
+        throw new Error(`저장 실패 (HTTP ${saveRes.status}): ${errMsg || '알 수 없는 오류'}`)
       }
 
       setParseStage('✅ 완료!')
       await fetchSavedPrices()
       setLookupMode('saved')
+      setActiveTab('catalog')  // 저장된 목록이 카달로그 탭에 노출되므로 자동 전환
       alert(`${data.brand} ${displayModel} 가격표가 저장 목록에 추가되었습니다.`)
     } catch (err: any) {
       console.error('[가격표 업로드] 실패:', err)
@@ -1125,14 +1161,15 @@ export default function RentPricingBuilder() {
       // 같은 브랜드+상세모델+연식이면 업데이트, 없으면 신규 등록
       const headers = await getAuthHeader()
       const existRes = await fetch(`/api/new-car-prices?brand=${encodeURIComponent(newCarResult.brand)}&model=${encodeURIComponent(displayModel)}&year=${newCarResult.year}`, { headers })
-      const existJson = await existRes.json()
-      const existing = existJson.data ?? existJson ?? null
+      const existJson = await existRes.json().catch(() => ({}))
+      const rawExist = existJson?.data
+      const existing = Array.isArray(rawExist) ? (rawExist[0] || null) : (rawExist || null)
       let res: Response
-      if (existing) {
+      if (existing && existing.id) {
         res = await fetch(`/api/new-car-prices/${existing.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ source: payload.source, price_data: payload.price_data, updated_at: new Date().toISOString() })
+          body: JSON.stringify({ source: payload.source, price_data: payload.price_data })
         })
       } else {
         res = await fetch('/api/new-car-prices', {
@@ -1142,9 +1179,11 @@ export default function RentPricingBuilder() {
         })
       }
       if (!res.ok) {
-        const json = await res.json()
-        console.error('[가격저장] DB 에러:', json)
-        throw new Error(json.error)
+        const errText = await res.text().catch(() => '')
+        let errMsg = ''
+        try { errMsg = JSON.parse(errText)?.error || '' } catch { errMsg = errText }
+        console.error('[가격저장] DB 에러:', res.status, errText)
+        throw new Error(`HTTP ${res.status}: ${errMsg || '알 수 없는 오류'}`)
       }
       await fetchSavedPrices()
       alert('가격 데이터가 저장되었습니다.')
@@ -1910,10 +1949,12 @@ export default function RentPricingBuilder() {
         // 등록차량: car_id로 기존 워크시트 조회 후 insert/update
         const headers = await getAuthHeader()
         const existRes = await fetch(`/api/pricing-worksheets?car_id=${selectedCar.id}`, { headers })
-        const existJson = await existRes.json()
-        const existing = existJson.data ?? existJson ?? null
+        const existJson = await existRes.json().catch(() => ({}))
+        // API가 이제 단일 객체(또는 null)를 반환. 과거 배열 응답도 방어적으로 처리.
+        const raw = existJson?.data
+        const existing = Array.isArray(raw) ? (raw[0] || null) : (raw || null)
 
-        if (existing) {
+        if (existing && existing.id) {
           const updateRes = await fetch(`/api/pricing-worksheets/${existing.id}`, {
             method: 'PATCH',
             headers: { ...headers, 'Content-Type': 'application/json' },
@@ -2873,7 +2914,30 @@ export default function RentPricingBuilder() {
         </div>
       </div>
 
-      {/* ===== 가격표 드래그앤드롭 업로드 영역 ===== */}
+      {/* ===== 탭 네비게이션 ===== */}
+      <div className="flex justify-center mb-6">
+        <div className="bg-white/70 backdrop-blur-md border border-black/5 rounded-2xl p-1 inline-flex gap-1 shadow-sm">
+          {[
+            { id: 'registered' as const, label: '등록차량' },
+            { id: 'catalog' as const, label: '카달로그' },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition ${
+                activeTab === t.id
+                  ? 'bg-white/90 text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== 가격표 드래그앤드롭 업로드 영역 (카달로그에서 + 가격표 추가 클릭 시 펼침) ===== */}
+      {activeTab === 'catalog' && showAddPanel && (
       <div
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -2909,220 +2973,333 @@ export default function RentPricingBuilder() {
           </div>
         )}
       </div>
+      )}
 
-      {/* ===== 저장 목록 (워크시트 + 가격표 통합, Collapsible) ===== */}
-      {(savedWorksheets.length > 0 || savedCarPrices.length > 0) && (
+      {/* ===== 카달로그 통합 리스트 (Compact Row + 검색/필터) ===== */}
+      {activeTab === 'catalog' && (() => {
+        // 1) 두 소스를 단일 행 모델로 정규화
+        type Row = {
+          id: string
+          kind: 'worksheet' | 'price'
+          brand: string
+          model: string
+          trim: string
+          year: number | string
+          number: string
+          isUsed: boolean | undefined
+          rent: number | null
+          updatedAt: string
+          orphan: boolean
+          raw: any
+        }
+        const wsRows: Row[] = savedWorksheets.map((ws: any) => {
+          const car = ws.cars
+          const nc = ws.newcar_info
+          const orphan = !car && !nc?.brand && !nc?.model
+          return {
+            id: `ws-${ws.id}`,
+            kind: 'worksheet' as const,
+            brand: car?.brand || nc?.brand || (orphan ? '미분류' : '기타'),
+            model: car?.model || nc?.model || '차종 미확인',
+            trim: car?.trim || nc?.trim || '',
+            year: car?.year || nc?.year || '',
+            number: car?.number || '',
+            isUsed: car?.is_used,
+            rent: ws.suggested_rent ? Math.round(ws.suggested_rent) : null,
+            updatedAt: ws.updated_at || ws.created_at,
+            orphan,
+            raw: ws,
+          }
+        })
+        // 동일 (브랜드|모델|연식) 중복 제거 — 최신 updated_at만 유지
+        const spDedup = new Map<string, any>()
+        savedCarPrices.forEach((sp: any) => {
+          const key = `${(sp.brand || '').trim().toLowerCase()}|${(sp.model || '').trim().toLowerCase()}|${sp.year || ''}`
+          const prev = spDedup.get(key)
+          const cur = new Date(sp.updated_at || sp.created_at).getTime()
+          const prevT = prev ? new Date(prev.updated_at || prev.created_at).getTime() : -1
+          if (!prev || cur > prevT) spDedup.set(key, sp)
+        })
+        const spRows: Row[] = Array.from(spDedup.values()).map((sp: any) => ({
+          id: `sp-${sp.id}`,
+          kind: 'price' as const,
+          brand: sp.brand || '기타',
+          model: sp.model || '',
+          trim: sp.price_data?.variants?.length ? `${sp.price_data.variants.length}차종` : '',
+          year: sp.year || '',
+          number: '',
+          isUsed: undefined,
+          rent: null,
+          updatedAt: sp.updated_at || sp.created_at,
+          orphan: false,
+          raw: sp,
+        }))
+        const all: Row[] =
+          catalogFilter === 'worksheets' ? wsRows :
+          catalogFilter === 'prices' ? spRows :
+          [...wsRows, ...spRows]
+
+        // 2) 검색 필터 (브랜드/모델/트림/번호판)
+        const q = catalogSearch.trim().toLowerCase()
+        const filtered = q
+          ? all.filter(r =>
+              r.brand.toLowerCase().includes(q) ||
+              r.model.toLowerCase().includes(q) ||
+              r.trim.toLowerCase().includes(q) ||
+              r.number.toLowerCase().includes(q)
+            )
+          : all
+
+        // 3) 정렬
+        const sorted = [...filtered].sort((a, b) => {
+          if (catalogSort === 'price_asc')  return (a.rent || Infinity) - (b.rent || Infinity)
+          if (catalogSort === 'price_desc') return (b.rent || -Infinity) - (a.rent || -Infinity)
+          if (catalogSort === 'brand')      return a.brand.localeCompare(b.brand, 'ko')
+          // recent
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        })
+
+        // 4) 브랜드별 그룹 (정렬 모드가 brand이면 그룹 헤더 강조)
+        const byBrand: Record<string, Row[]> = {}
+        sorted.forEach(r => { (byBrand[r.brand] = byBrand[r.brand] || []).push(r) })
+        const brandOrder = Object.keys(byBrand).sort((a, b) => {
+          if (a === '미분류') return 1
+          if (b === '미분류') return -1
+          return a.localeCompare(b, 'ko')
+        })
+
+        const totalAll = wsRows.length + spRows.length
+        if (totalAll === 0) return null
+
+      return (
       <div className="rounded-2xl border border-black/[0.06] mb-6 overflow-hidden" style={{ background: 'rgba(255,255,255,0.72)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
-        {/* Header */}
-        <button
-          onClick={() => setSavedPricesOpen(!savedPricesOpen)}
-          className="w-full px-6 py-4 border-b border-black/5 flex items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors"
-        >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Header — 항상 펼침 (Compact Row가 작아서 접을 필요 없음) */}
+        <div className="w-full px-5 py-3 border-b border-black/5 flex items-center justify-between gap-3 bg-gray-50/40">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
             <span className="font-black text-slate-700 text-sm shrink-0">📋 저장 목록</span>
             <span className="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
-              {savedWorksheets.length + savedCarPrices.length}
+              {sorted.length}{q || catalogFilter !== 'all' ? ` / ${totalAll}` : ''}
             </span>
           </div>
-          <span className={`text-slate-500 transition-transform shrink-0 ${savedPricesOpen ? 'rotate-180' : ''}`}>▼</span>
-        </button>
+        </div>
 
-        {/* 접힌 상태: 브랜드별 모델 요약 */}
-        {!savedPricesOpen && (
-          <div className="px-6 py-3 bg-gray-50/50">
-            {(() => {
-              const grouped: Record<string, string[]> = {}
-              savedWorksheets.forEach((ws: any) => {
-                const brand = ws.cars?.brand || ws.newcar_info?.brand || '기타'
-                const model = ws.cars?.model || ws.newcar_info?.model || ''
-                if (!grouped[brand]) grouped[brand] = []
-                if (model && !grouped[brand].includes(model)) grouped[brand].push(model)
-              })
-              savedCarPrices.forEach((sp: any) => {
-                const brand = sp.brand || '기타'
-                if (!grouped[brand]) grouped[brand] = []
-                if (!grouped[brand].includes(sp.model)) grouped[brand].push(sp.model)
-              })
+        {/* Toolbar: 검색 + 필터 칩 + 정렬 */}
+        <div className="px-5 py-3 border-b border-black/5 flex items-center gap-2 flex-wrap bg-white/60">
+          {/* 검색 */}
+          <div className="relative flex-1 min-w-[200px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            <input
+              type="text"
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              placeholder="브랜드, 모델, 트림, 차량번호 검색..."
+              className="w-full pl-8 pr-3 py-2 text-xs font-semibold rounded-lg border border-black/[0.06] outline-none focus:border-indigo-300"
+              style={{ background: 'rgba(255,255,255,0.4)', boxShadow: 'inset 2px 2px 4px rgba(140,170,210,0.10)' }}
+            />
+          </div>
+          {/* 필터 칩 */}
+          <div className="flex items-center gap-1 bg-gray-100/70 rounded-lg p-0.5">
+            {([
+              ['all', '전체', wsRows.length + spRows.length],
+              ['worksheets', '🧮 워크시트', wsRows.length],
+              ['prices', '🚘 가격표', spRows.length],
+            ] as const).map(([key, label, cnt]) => (
+              <button
+                key={key}
+                onClick={() => setCatalogFilter(key)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                  catalogFilter === key ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label} <span className="text-slate-400">{cnt}</span>
+              </button>
+            ))}
+          </div>
+          {/* 정렬 */}
+          <select
+            value={catalogSort}
+            onChange={(e) => setCatalogSort(e.target.value as any)}
+            className="text-[11px] font-bold text-slate-600 border border-black/[0.06] rounded-lg px-2 py-1.5 bg-white outline-none cursor-pointer"
+          >
+            <option value="recent">최근순</option>
+            <option value="brand">브랜드순</option>
+            <option value="price_desc">렌트가↓</option>
+            <option value="price_asc">렌트가↑</option>
+          </select>
+          {/* + 가격표 추가 (AI 조회 / 견적서 업로드 패널 토글) */}
+          <button
+            onClick={() => setShowAddPanel(v => !v)}
+            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+              showAddPanel
+                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+            }`}
+            title="견적서 업로드 또는 AI로 신차 가격표 조회"
+          >
+            {showAddPanel ? '✕ 추가 패널 닫기' : '+ 가격표 추가'}
+          </button>
+        </div>
+
+        {/* Body: 결과 없음 / Compact Row 그룹 */}
+        {sorted.length === 0 ? (
+          <div className="px-5 py-10 text-center text-slate-400 text-xs">
+            {q ? `"${catalogSearch}" 검색 결과 없음` : '항목이 없습니다'}
+          </div>
+        ) : (
+          <div className="divide-y divide-black/[0.04]">
+            {brandOrder.map(brand => {
+              const rows = byBrand[brand]
               return (
-                <div className="space-y-1.5">
-                  {Object.entries(grouped).map(([brand, models]) => (
-                    <div key={brand} className="flex items-center gap-2">
-                      <span className="text-xs font-black text-slate-600 w-14 shrink-0">{brand}</span>
-                      <div className="flex flex-wrap gap-1">
-                        {models.map(m => (
-                          <span key={m} className="text-[11px] font-bold text-slate-400 bg-white border border-black/[0.06] px-2 py-0.5 rounded-lg">{m}</span>
-                        ))}
+                <div key={`grp-${brand}`}>
+                  {/* 브랜드 그룹 헤더 */}
+                  <div className="px-5 py-1.5 bg-slate-50/60 flex items-center gap-2">
+                    <span className={`text-[10px] font-black ${brand === '미분류' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {brand === '미분류' ? '🕳️ 미분류' : brand}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{rows.length}</span>
+                  </div>
+                  {/* 행들 */}
+                  {rows.map(row => {
+                    const isPrice = row.kind === 'price'
+                    const isSelected = isPrice && newCarResult && newCarResult.brand === row.brand && (
+                      newCarResult.model === row.model ||
+                      (newCarResult.model_detail || newCarResult.model) === row.model ||
+                      row.model?.startsWith(newCarResult.model)
+                    )
+                    const handleClick = () => {
+                      if (row.orphan) return
+                      if (row.kind === 'worksheet') {
+                        const ws = row.raw
+                        const carId = ws.cars?.id
+                        if (carId) handleCarSelect(String(carId))
+                        router.push(`/quotes/create?worksheet_id=${ws.id}&car_id=${carId || ''}`)
+                      } else {
+                        handleLoadSavedPrice(row.raw)
+                      }
+                    }
+                    return (
+                      <div
+                        key={row.id}
+                        onClick={handleClick}
+                        className={`group px-5 py-2.5 grid gap-x-3 gap-y-0.5 transition-colors ${
+                          row.orphan ? 'cursor-default opacity-60'
+                          : isSelected ? 'bg-indigo-50/70 cursor-pointer'
+                          : 'cursor-pointer hover:bg-indigo-50/40'
+                        }`}
+                        style={{
+                          gridTemplateColumns: '24px minmax(0, 1fr) 100px 76px 48px 24px',
+                          gridTemplateRows: 'auto auto',
+                        }}
+                      >
+                        {/* ── Line 1 ── */}
+                        {/* 아이콘 */}
+                        <span
+                          className={`text-sm self-center ${row.orphan ? 'text-slate-300' : isPrice ? 'text-indigo-500' : 'text-steel-500'}`}
+                          style={{ gridColumn: 1, gridRow: 1 }}
+                        >
+                          {row.orphan ? '🕳️' : isPrice ? '🚘' : '🧮'}
+                        </span>
+                        {/* 모델명 + 번호판 + 뱃지 (한 줄, 자동 wrap) */}
+                        <div
+                          className="min-w-0 flex items-center gap-1.5 flex-wrap"
+                          style={{ gridColumn: 2, gridRow: 1 }}
+                        >
+                          <span className={`font-black text-[13px] ${row.orphan ? 'italic text-slate-400' : 'text-slate-800'}`}>
+                            {row.model || '차종 미확인'}
+                          </span>
+                          {row.number && <span className="text-[10px] font-bold text-steel-600">[{row.number}]</span>}
+                          {row.year && <span className="text-[10px] text-slate-500">{row.year}년</span>}
+                          {row.isUsed !== undefined && (
+                            <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${row.isUsed ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                              {row.isUsed ? '중고' : '신차'}
+                            </span>
+                          )}
+                          {isPrice && (
+                            row.raw.source?.includes('견적서') ? (
+                              <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-emerald-50 text-emerald-600">견적서</span>
+                            ) : (
+                              <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-violet-50 text-violet-600">AI</span>
+                            )
+                          )}
+                          {isPrice && row.raw.price_data?.variants?.length > 0 && (
+                            <span className="text-[9px] text-slate-400 font-bold">{row.raw.price_data.variants.length}차종</span>
+                          )}
+                        </div>
+                        {/* 렌트가 */}
+                        <div
+                          className="text-right text-[11px] font-bold text-emerald-600 tabular-nums self-center whitespace-nowrap"
+                          style={{ gridColumn: 3, gridRow: 1 }}
+                        >
+                          {row.rent ? `${row.rent.toLocaleString()}원` : <span className="text-slate-300">—</span>}
+                        </div>
+                        {/* 날짜 */}
+                        <div
+                          className="text-right text-[10px] text-slate-400 tabular-nums self-center whitespace-nowrap"
+                          style={{ gridColumn: 4, gridRow: 1 }}
+                        >
+                          {new Date(row.updatedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                        </div>
+                        {/* 상태 칩 */}
+                        <div className="text-center self-center" style={{ gridColumn: 5, gridRow: 1 }}>
+                          {isSelected ? (
+                            <span className="text-[10px] font-bold text-indigo-600">선택</span>
+                          ) : row.orphan ? (
+                            <span className="text-[10px] text-slate-400">고아</span>
+                          ) : (
+                            <span className="text-slate-300 text-xs group-hover:text-indigo-500">→</span>
+                          )}
+                        </div>
+                        {/* 액션 (삭제) */}
+                        <div className="text-right self-center" style={{ gridColumn: 6, gridRow: 1 }}>
+                          {row.orphan ? (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                if (!confirm('이 미분류 워크시트를 삭제할까요?')) return
+                                const headers = await getAuthHeader()
+                                await fetch(`/api/pricing-worksheets/${row.raw.id}`, { method: 'DELETE', headers })
+                                fetchSavedWorksheets()
+                              }}
+                              className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded"
+                              title="삭제"
+                            >
+                              ✕
+                            </button>
+                          ) : isPrice ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSavedPrice(row.raw.id) }}
+                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all text-xs"
+                              title="삭제"
+                            >
+                              ✕
+                            </button>
+                          ) : null}
+                        </div>
+                        {/* ── Line 2 (트림/옵션) — 있을 때만, 모델명 컬럼 아래로 전체 폭 사용 ── */}
+                        {row.trim && (
+                          <div
+                            className="text-[10.5px] text-slate-500 leading-snug break-words"
+                            style={{ gridColumn: '2 / span 5', gridRow: 2 }}
+                          >
+                            {row.trim}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
-            })()}
+            })}
           </div>
         )}
-
-        {/* Body */}
-        {savedPricesOpen && (
-        <div className="p-6 space-y-6">
-
-          {/* ── 산출 워크시트 (브랜드별 그룹) ── */}
-          {savedWorksheets.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-black text-steel-600">🧮 산출 워크시트</span>
-              <span className="bg-steel-100 text-steel-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{savedWorksheets.length}</span>
-              <div className="flex-1 h-px bg-gray-100" />
-            </div>
-            {(() => {
-              const grouped: Record<string, any[]> = {}
-              savedWorksheets.forEach((ws: any) => {
-                const brand = ws.cars?.brand || ws.newcar_info?.brand || '기타'
-                if (!grouped[brand]) grouped[brand] = []
-                grouped[brand].push(ws)
-              })
-              return Object.entries(grouped).map(([brand, items]) => (
-                <div key={`ws-${brand}`} className="mb-3 last:mb-0">
-                  <div className="flex items-center gap-2 mb-1.5 px-1">
-                    <span className="text-[11px] font-black text-slate-500">{brand}</span>
-                    <div className="flex-1 h-px bg-gray-100" />
-                    <span className="text-[10px] text-slate-500">{items.length}건</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {items.map((ws: any) => {
-                      const car = ws.cars
-                      const ncInfo = ws.newcar_info
-                      const model = car?.model || ncInfo?.model || '미지정'
-                      const number = car?.number || ''
-                      const year = car?.year || ncInfo?.year || ''
-                      const trim = car?.trim || ncInfo?.trim || ''
-                      const rent = ws.suggested_rent ? Math.round(ws.suggested_rent).toLocaleString() : null
-                      const isUsed = car?.is_used
-                      return (
-                        <div
-                          key={`ws-${ws.id}`}
-                          onClick={() => {
-                            // 워크시트 로드: car_id가 있으면 등록차량 선택, 아니면 신차정보 표시
-                            if (car?.id) {
-                              handleCarSelect(String(car.id))
-                            }
-                            // 워크시트 ID 기억하고 페이지 이동
-                            router.push(`/quotes/create?worksheet_id=${ws.id}&car_id=${car?.id || ''}`)
-                          }}
-                          className="flex items-center gap-3 px-4 py-3 border border-gray-150 rounded-xl group cursor-pointer hover:border-steel-400 hover:shadow-sm transition-all bg-white"
-                        >
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-steel-50 border border-steel-200">
-                            <span className="text-steel-600 text-sm">🧮</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-700 text-sm truncate">{model}</span>
-                              {trim && <span className="text-[10px] text-slate-500 truncate max-w-[120px]">{trim}</span>}
-                              {number && <span className="text-[10px] font-bold text-steel-600">[{number}]</span>}
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {year && <span className="text-[10px] text-slate-500">{year}년</span>}
-                              {isUsed !== undefined && (
-                                <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${isUsed ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
-                                  {isUsed ? '중고' : '신차'}
-                                </span>
-                              )}
-                              {rent && <span className="text-[10px] font-bold text-emerald-600">렌트가 {rent}원</span>}
-                              <span className="text-[10px] text-slate-400">
-                                {new Date(ws.updated_at || ws.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-slate-400 text-sm shrink-0">→</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))
-            })()}
-          </div>
-          )}
-
-          {/* ── 신차 가격표 (브랜드별 그룹) ── */}
-          {savedCarPrices.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-black text-indigo-600">🚘 신차 가격표</span>
-              <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{savedCarPrices.length}</span>
-              <div className="flex-1 h-px bg-gray-100" />
-            </div>
-            {(() => {
-              const grouped: Record<string, any[]> = {}
-              savedCarPrices.forEach((sp: any) => {
-                const brand = sp.brand || '기타'
-                if (!grouped[brand]) grouped[brand] = []
-                grouped[brand].push(sp)
-              })
-              return Object.entries(grouped).map(([brand, items]) => (
-                <div key={`sp-${brand}`} className="mb-3 last:mb-0">
-                  <div className="flex items-center gap-2 mb-1.5 px-1">
-                    <span className="text-[11px] font-black text-slate-500">{brand}</span>
-                    <div className="flex-1 h-px bg-gray-100" />
-                    <span className="text-[10px] text-slate-500">{items.length}개 모델</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {items.map((sp: any) => {
-                      const isSelected = newCarResult && newCarResult.brand === sp.brand && (
-                        newCarResult.model === sp.model ||
-                        (newCarResult.model_detail || newCarResult.model) === sp.model ||
-                        sp.model?.startsWith(newCarResult.model)
-                      )
-                      return (
-                        <div key={`sp-${sp.id}`}
-                          className={`flex items-center gap-3 px-4 py-3 border rounded-xl group cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-indigo-50 border-indigo-400 shadow-sm'
-                              : 'bg-white border-gray-150 hover:border-indigo-400 hover:shadow-sm'
-                          }`}
-                          onClick={() => handleLoadSavedPrice(sp)}
-                        >
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-indigo-100 border border-indigo-300' : 'bg-indigo-50 border border-indigo-200'
-                          }`}>
-                            <span className="text-indigo-600 text-sm">🚘</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-700 text-sm truncate">{sp.model}</span>
-                              <span className="text-[10px] text-slate-500">{sp.year}년</span>
-                              <span className="text-[9px] bg-steel-50 text-steel-600 px-1 py-0.5 rounded font-bold shrink-0">{sp.price_data?.variants?.length || 0}차종</span>
-                              {sp.source?.includes('견적서') ? (
-                                <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded font-bold shrink-0">견적서</span>
-                              ) : (
-                                <span className="text-[9px] bg-violet-50 text-violet-600 px-1 py-0.5 rounded font-bold shrink-0">AI</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-500 mt-0.5 block">
-                              {new Date(sp.updated_at || sp.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 저장
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {isSelected && <span className="text-[10px] text-indigo-600 font-bold">선택됨</span>}
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteSavedPrice(sp.id) }}
-                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all p-1 text-xs">✕</button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))
-            })()}
-          </div>
-          )}
 
         </div>
-        )}
-      </div>
-      )}
+      );
+      })()}
 
       {/* ===== 등록차량 선택 (보험/가입 페이지 디자인 기준) ===== */}
+      {activeTab === 'registered' && (
       <div style={{ background: 'rgba(255,255,255,0.72)', borderRadius: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b6eb5' }} />
@@ -3257,10 +3434,11 @@ export default function RentPricingBuilder() {
           </div>
         )}
       </div>
+      )}
 
         {/* ====== 공통 계층형 선택 UI: 개별소비세 → 유종 → 차종 그룹 → 트림 → 컬러 → 옵션 ====== */}
         {/* 저장목록에서 차량 데이터 선택 시 표시 */}
-        {(lookupMode === 'newcar' || lookupMode === 'saved') && newCarResult && newCarResult.variants?.length > 0 && (() => {
+        {(activeTab === 'newcar' || activeTab === 'catalog') && (lookupMode === 'newcar' || lookupMode === 'saved') && newCarResult && newCarResult.variants?.length > 0 && (() => {
           // 개별소비세 그룹 추출 (중복 제거)
           const taxTypes = [...new Set(
             newCarResult.variants
@@ -3702,15 +3880,112 @@ export default function RentPricingBuilder() {
           </div>
         )}
 
-      {!selectedCar ? (
-        <div className="text-center py-20 text-slate-500">
-          <span className="text-6xl block mb-4">🏗️</span>
-          <p className="text-lg font-bold">차량을 선택하면 렌트가 산출 분석이 시작됩니다</p>
-        </div>
-      ) : calculations && (
+      {!selectedCar ? null : calculations && (
+        <>
+          {/* ===== Option H: 상단 컨트롤 (프리셋 + 비교 + 역산 + 시중가) ===== */}
+          <OptionHPanel
+            monthlyTotalCost={calculations.totalMonthlyCost}
+            monthlyRentWithVat={calculations.rentWithVAT}
+            brand={selectedCar.brand}
+            model={selectedCar.model}
+            year={selectedCar.year}
+            termMonths={termMonths}
+            annualMileage={annualMileage}
+            onApplyPreset={(mode: OptionHPresetMode) => {
+              // 프리셋에 따른 주요 레버 일괄 세팅
+              if (mode === 'conservative') {
+                setMargin(15); setResidualRate(Math.max(residualRate, 50)); setLoanRate(Math.min(loanRate, 4.5))
+              } else if (mode === 'standard') {
+                setMargin(10); setResidualRate(45); setLoanRate(5.5)
+              } else if (mode === 'aggressive') {
+                setMargin(5); setResidualRate(40); setLoanRate(6.5)
+              }
+            }}
+            onCaptureBaseline={() => {
+              // 행별 비교를 위해 주요 월 단위 원가를 전부 저장
+              const snap = {
+                depreciation: calculations.monthlyDepreciation,
+                finance: calculations.totalMonthlyFinance,
+                insurance: monthlyInsuranceCost,
+                tax: calculations.monthlyTax,
+                maintenance: monthlyMaintenance,
+                risk: calculations.monthlyRiskReserve,
+                discount: -calculations.totalDiscount,
+                total: calculations.totalMonthlyCost,
+                rent: calculations.rentWithVAT,
+              }
+              setHBaseline(snap)
+              return {
+                monthlyTotalCost: calculations.totalMonthlyCost,
+                monthlyRentWithVat: calculations.rentWithVAT,
+                capturedAt: new Date().toISOString(),
+              }
+            }}
+            onReverseSolve={(targetRent: number) => {
+              // 다단계 역산 (Phase 4): 락 해제된 레버 순서대로 조정
+              // 1) margin  2) residualRate  3) depositDiscountRate
+              // rentWithVAT = (totalMonthlyCost + margin) * 1.1  (천원반올림 무시)
+              const targetSuggested = targetRent / 1.1
+              let needed = targetSuggested - calculations.totalMonthlyCost // +면 margin ↑, -면 원가 ↓ 필요
+              // Lever 1: margin (고정원가 위에 얹는 절대값)
+              if (!lockedParams.has('margin')) {
+                const nextMargin = Math.max(0, Math.min(calculations.totalMonthlyCost * 0.5, (margin + needed)))
+                setMargin(Math.round(nextMargin / 100) * 100)
+                needed = needed - (nextMargin - margin)
+                if (Math.abs(needed) < 1000) return // 오차 1천원 이내면 종료
+              }
+              // Lever 2: 잔가율 (needed<0일 때 잔가↑로 감가↓, needed>0일 때 잔가↓로 감가↑)
+              if (!lockedParams.has('residualRate') && Math.abs(needed) >= 1000) {
+                // 감가 민감도: 1%p 잔가 변화 ≈ costBase * 0.01 / termMonths
+                const sens = (calculations.costBase * 0.01) / termMonths
+                if (sens > 0) {
+                  const deltaRR = -needed / sens // needed>0 → 잔가↓
+                  const nextRR = Math.max(20, Math.min(70, residualRate + deltaRR))
+                  setResidualRate(Math.round(nextRR * 10) / 10)
+                  needed = needed - (-(nextRR - residualRate) * sens)
+                  if (Math.abs(needed) < 1000) return
+                }
+              }
+              // Lever 3: 보증금 할인율 (절대값 단위는 월)
+              if (!lockedParams.has('depositDiscountRate') && Math.abs(needed) >= 1000 && deposit > 0) {
+                // 월할인 = deposit * rate/100 (대략)
+                const sens = deposit / 100
+                if (sens > 0) {
+                  const deltaRate = needed / sens
+                  const nextRate = Math.max(0, Math.min(5, depositDiscountRate - deltaRate))
+                  setDepositDiscountRate(Math.round(nextRate * 100) / 100)
+                }
+              }
+            }}
+          />
+
+          {/* ===== Option H: 스프레드시트 요약 테이블 ===== */}
+          {(() => {
+            const c = calculations
+            const total = Math.max(1, c.totalMonthlyCost)
+            const share = (n: number) => (n / total) * 100
+            const rows: HTableRow[] = [
+              { id: 'acq_factory', group: '취득', label: '출고가', detail: '공장 출고 기준', total: factoryPrice, monthly: undefined, share: undefined, tone: 'blue', strong: false, baseline: undefined, locked: lockedParams.has('factoryPrice'), onToggleLock: () => toggleLock('factoryPrice') },
+              { id: 'acq_purchase', group: '취득', label: '매입가', detail: '실제 매입 원가', total: purchasePrice, monthly: undefined, share: undefined, tone: 'blue', locked: lockedParams.has('purchasePrice'), onToggleLock: () => toggleLock('purchasePrice') },
+              { id: 'acq_residual', group: '취득', label: '잔존가치', detail: `잔가율 ${residualRate}%`, total: c.residualValue, monthly: undefined, share: undefined, tone: 'blue', locked: lockedParams.has('residualRate'), onToggleLock: () => toggleLock('residualRate') },
+              { id: 'dep_monthly', group: '감가', label: '월 감가', detail: `${termMonths}개월 균분`, total: c.monthlyDepreciation * termMonths, monthly: c.monthlyDepreciation, share: share(c.monthlyDepreciation), baseline: hBaseline?.depreciation, tone: 'violet', locked: lockedParams.has('depreciation'), onToggleLock: () => toggleLock('depreciation') },
+              { id: 'fin_monthly', group: '금융', label: '금융비용', detail: `이자 ${loanRate}% · 대출 ${f(loanAmount)}원`, total: c.totalMonthlyFinance * termMonths, monthly: c.totalMonthlyFinance, share: share(c.totalMonthlyFinance), baseline: hBaseline?.finance, tone: 'amber', locked: lockedParams.has('finance'), onToggleLock: () => toggleLock('finance') },
+              { id: 'ins_monthly', group: '보험', label: '월 보험료', detail: '연동 보험상품 기준', total: monthlyInsuranceCost * termMonths, monthly: monthlyInsuranceCost, share: share(monthlyInsuranceCost), baseline: hBaseline?.insurance, tone: 'emerald', locked: lockedParams.has('insurance'), onToggleLock: () => toggleLock('insurance') },
+              { id: 'tax_monthly', group: '세금', label: '세금/검사', detail: `연세+정기검사`, total: (c.monthlyTax + c.monthlyInspectionCost) * termMonths, monthly: c.monthlyTax + c.monthlyInspectionCost, share: share(c.monthlyTax + c.monthlyInspectionCost), tone: 'slate', locked: lockedParams.has('tax'), onToggleLock: () => toggleLock('tax') },
+              { id: 'mnt_monthly', group: '정비', label: '월 정비', detail: '정비 패키지', total: monthlyMaintenance * termMonths, monthly: monthlyMaintenance, share: share(monthlyMaintenance), baseline: hBaseline?.maintenance, tone: 'slate', locked: lockedParams.has('maintenance'), onToggleLock: () => toggleLock('maintenance') },
+              { id: 'risk_monthly', group: '정비', label: '리스크 적립', detail: '예비비', total: c.monthlyRiskReserve * termMonths, monthly: c.monthlyRiskReserve, share: share(c.monthlyRiskReserve), baseline: hBaseline?.risk, tone: 'slate', locked: lockedParams.has('risk'), onToggleLock: () => toggleLock('risk') },
+              { id: 'dep_discount', group: '보증금', label: '보증금 할인', detail: `${f(deposit)}원 × ${depositDiscountRate}%`, total: -c.monthlyDepositDiscount * termMonths, monthly: -c.monthlyDepositDiscount, share: undefined, baseline: hBaseline?.discount, tone: 'rose', locked: lockedParams.has('depositDiscountRate'), onToggleLock: () => toggleLock('depositDiscountRate') },
+              { id: 'sum_total', group: '합계', label: '월 총원가', detail: `${f(c.totalMonthlyCost)}원/월 (마진 전)`, total: c.totalMonthlyCost * termMonths, monthly: c.totalMonthlyCost, share: 100, baseline: hBaseline?.total, tone: 'slate', strong: true },
+              { id: 'sum_rent', group: '합계', label: '월 렌트가 (VAT포함)', detail: `마진 ${f(margin)}원 + VAT 10%`, total: c.rentWithVAT * termMonths, monthly: c.rentWithVAT, share: undefined, baseline: hBaseline?.rent, tone: 'slate', strong: true },
+            ]
+            return <OptionHTable rows={rows} compactUnit={false} />
+          })()}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* ===== 왼쪽: 입력/분석 영역 ===== */}
+          {/* 카달로그 탭에서도 가격표 선택 후 분석 영역 노출 */}
+          {(activeTab !== 'catalog' || (lookupMode === 'saved' && newCarResult)) && (
           <div className="lg:col-span-8 space-y-4">
 
             {/* 🆕 0. AI 자동분류 결과 */}
@@ -4861,6 +5136,7 @@ export default function RentPricingBuilder() {
             </Section>
 
           </div>
+          )}
 
           {/* ===== 오른쪽: 계약조건 + 최종 렌트가 산출 ===== */}
           <div className="lg:col-span-4">
@@ -5255,6 +5531,7 @@ export default function RentPricingBuilder() {
           </div>
 
         </div>
+        </>
       )}
     </div>
   )

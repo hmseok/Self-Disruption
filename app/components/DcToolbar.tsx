@@ -18,6 +18,8 @@ type Props = {
   search: string
   onSearchChange: (v: string) => void
   placeholder?: string
+  /** Hide search input entirely (for pure tab bars) */
+  noSearch?: boolean
   /** Filter tabs inside the bar */
   filters?: FilterItem[]
   activeFilter?: string
@@ -30,6 +32,7 @@ type Props = {
 
 export default function DcToolbar({
   search, onSearchChange, placeholder = '검색...',
+  noSearch = false,
   filters, activeFilter, onFilterChange,
   trailing, leading,
 }: Props) {
@@ -50,28 +53,33 @@ export default function DcToolbar({
       {/* Leading content */}
       {leading}
 
-      {/* Search icon + input */}
-      <span style={{ color: '#8aabc7', fontSize: 14, flexShrink: 0 }}>🔍</span>
-      <input
-        value={search}
-        onChange={e => onSearchChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          flex: 1,
-          minWidth: 120,
-          border: 'none',
-          background: 'transparent',
-          fontSize: 13,
-          fontWeight: 500,
-          outline: 'none',
-          color: '#2a4a6b',
-          fontFamily: 'inherit',
-        }}
-      />
+      {/* Search icon + input (hidden when noSearch) */}
+      {!noSearch && (
+        <>
+          <span style={{ color: '#8aabc7', fontSize: 14, flexShrink: 0 }}>🔍</span>
+          <input
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+              flex: '0 1 240px',
+              minWidth: 120,
+              maxWidth: 320,
+              border: 'none',
+              background: 'transparent',
+              fontSize: 13,
+              fontWeight: 500,
+              outline: 'none',
+              color: '#2a4a6b',
+              fontFamily: 'inherit',
+            }}
+          />
+        </>
+      )}
 
-      {/* Filter pills */}
+      {/* Filter pills (검색 바로 옆 고정 — trailing 유무와 무관하게 위치 변동 없음) */}
       {filters && filters.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'nowrap' }}>
           {filters.map(f => (
             <button
               key={f.key}
@@ -110,6 +118,9 @@ export default function DcToolbar({
           ))}
         </div>
       )}
+
+      {/* Spacer before trailing so filters stay anchored left regardless of trailing presence */}
+      <div style={{ flex: 1 }} />
 
       {/* Trailing content */}
       {trailing}

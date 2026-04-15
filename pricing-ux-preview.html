@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>견적 원가분석 UX 프리뷰 — 3안 비교</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, "SF Pro Text", "Apple SD Gothic Neo", sans-serif; background: #eef2f8; }
+  .glass4 { background: rgba(255,255,255,0.72); border: 1px solid rgba(0,0,0,0.06);
+            box-shadow: 6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5); }
+  .glass3 { background: rgba(255,255,255,0.60); border: 1px solid rgba(0,0,0,0.05); }
+  .glass2 { background: rgba(255,255,255,0.35); border: 1px solid rgba(0,0,0,0.05); }
+  .glass1 { background: rgba(255,255,255,0.40);
+            box-shadow: inset 2px 2px 4px rgba(140,170,210,0.10);
+            border: 1px solid rgba(0,0,0,0.05); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .tl-dot { position: relative; }
+  .tl-dot::before { content: ''; position: absolute; left: -16px; top: 10px; width: 8px; height: 8px;
+    border-radius: 50%; background: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.18); }
+  .tl-dot.done::before { background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.18); }
+  .tl-dot.muted::before { background: #cbd5e1; box-shadow: none; }
+  .chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px;
+          font-size:10px; font-weight:800; }
+  .k { font-size:11px; color:#64748b; font-weight:700; }
+  .v { font-size:13px; color:#0f172a; font-weight:700; }
+  .v.acc { color:#3b6eb5; }
+  .v.em { color:#059669; }
+</style>
+</head>
+<body class="p-6">
+
+<div class="max-w-[1400px] mx-auto">
+  <header class="mb-6">
+    <h1 class="text-2xl font-black text-slate-800">견적 원가분석 UX 프리뷰</h1>
+    <p class="text-sm text-slate-500 mt-1">현재 긴 스크롤 구조 → 3가지 대안. 각 블록 우측은 공통 고정 요약 패널.</p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION A: 3단계 스테퍼 (수직 스크롤 최소화 + 단계 완료 감각) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">A. 3단계 스테퍼 <span class="text-xs font-bold text-indigo-600 ml-2">추천</span></h2>
+      <p class="text-xs text-slate-500">취득 → 운영비 → 수익성. 각 단계만 보이므로 세로 길이 1/3 이하.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4 grid grid-cols-12 gap-4">
+      <!-- 좌측: 메인 -->
+      <div class="col-span-8">
+        <!-- 스테퍼 헤더 -->
+        <div class="flex items-center gap-2 mb-4">
+          <!-- step 1 -->
+          <div class="flex-1 flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-xl">
+            <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center">1</span>
+            <div class="min-w-0">
+              <div class="text-[11px] font-black text-indigo-700">취득원가</div>
+              <div class="text-[9px] text-indigo-500">매입 + 부대비</div>
+            </div>
+          </div>
+          <span class="text-slate-300">—</span>
+          <!-- step 2 -->
+          <div class="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-black/[0.06]">
+            <span class="w-6 h-6 rounded-full bg-slate-300 text-white text-xs font-black flex items-center justify-center">2</span>
+            <div class="min-w-0">
+              <div class="text-[11px] font-black text-slate-500">운영비</div>
+              <div class="text-[9px] text-slate-400">감가+금융+보험+세금+정비</div>
+            </div>
+          </div>
+          <span class="text-slate-300">—</span>
+          <!-- step 3 -->
+          <div class="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-black/[0.06]">
+            <span class="w-6 h-6 rounded-full bg-slate-300 text-white text-xs font-black flex items-center justify-center">3</span>
+            <div class="min-w-0">
+              <div class="text-[11px] font-black text-slate-500">수익성</div>
+              <div class="text-[9px] text-slate-400">보증금·시중비교·IRR</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 현재 단계 컨텐츠 (예시: 단계 1) -->
+        <div class="glass3 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-700">📦 취득원가 구성</h3>
+            <span class="chip bg-indigo-50 text-indigo-700">STEP 1</span>
+          </div>
+
+          <!-- KPI 3열 -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="glass1 rounded-lg p-3">
+              <div class="k">매입가</div>
+              <div class="v tabular">65,000,000원</div>
+            </div>
+            <div class="glass1 rounded-lg p-3">
+              <div class="k">부대비용 합</div>
+              <div class="v tabular em">+4,009,100원</div>
+            </div>
+            <div class="glass1 rounded-lg p-3" style="background:rgba(99,102,241,0.06)">
+              <div class="k">실 취득원가</div>
+              <div class="v tabular acc">69,009,100원</div>
+            </div>
+          </div>
+
+          <!-- 부대비용 상세 인라인 -->
+          <div class="bg-white/60 rounded-lg p-3 grid grid-cols-3 gap-x-4 gap-y-2 text-xs">
+            <div class="flex justify-between"><span class="text-slate-500">공채 실부담 (서울)</span><span class="tabular font-bold">3,492,100</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">탁송료</span><span class="tabular font-bold">350,000</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">번호판/대행</span><span class="tabular font-bold">167,000</span></div>
+          </div>
+
+          <!-- 다음 버튼 -->
+          <div class="flex items-center justify-between pt-2 border-t border-black/[0.04]">
+            <button class="text-xs text-slate-400 font-bold">← 뒤로</button>
+            <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-black shadow-sm hover:bg-indigo-700">STEP 2 운영비 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 우측: 고정 요약 (스크롤 없음) -->
+      <aside class="col-span-4">
+        <div class="glass3 rounded-xl p-4 sticky top-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-black text-slate-600">💰 실시간 요약</h3>
+            <span class="chip bg-emerald-50 text-emerald-600">LIVE</span>
+          </div>
+          <div class="grid grid-cols-1 gap-2">
+            <div class="flex justify-between items-baseline border-b border-black/[0.04] pb-2">
+              <span class="k">월 원가</span>
+              <span class="v tabular">671,113원</span>
+            </div>
+            <div class="flex justify-between items-baseline border-b border-black/[0.04] pb-2">
+              <span class="k">마진</span>
+              <span class="v tabular">+0원</span>
+            </div>
+            <div class="flex justify-between items-baseline border-b border-black/[0.04] pb-2">
+              <span class="k">공급가</span>
+              <span class="v tabular">671,113원</span>
+            </div>
+            <div class="flex justify-between items-baseline pt-1">
+              <span class="k">월 렌트가 (VAT)</span>
+              <span class="v tabular acc text-base">738,224원</span>
+            </div>
+          </div>
+          <!-- 원형 도넛 요약 -->
+          <div class="bg-white/60 rounded-lg p-3">
+            <div class="text-[10px] text-slate-400 mb-1 font-bold">월 원가 구성</div>
+            <div class="h-2 rounded-full overflow-hidden flex">
+              <span class="bg-blue-400" style="width:79%" title="감가 79%"></span>
+              <span class="bg-violet-400" style="width:20%" title="보험 20%"></span>
+              <span class="bg-emerald-400" style="width:1%" title="세금 1%"></span>
+            </div>
+            <div class="text-[10px] mt-1 flex gap-2">
+              <span><span class="inline-block w-2 h-2 bg-blue-400 rounded-full mr-1"></span>감가 79%</span>
+              <span><span class="inline-block w-2 h-2 bg-violet-400 rounded-full mr-1"></span>보험 20%</span>
+              <span><span class="inline-block w-2 h-2 bg-emerald-400 rounded-full mr-1"></span>기타 1%</span>
+            </div>
+          </div>
+          <button class="w-full py-2 rounded-lg bg-emerald-600 text-white text-xs font-black hover:bg-emerald-700 disabled:opacity-40" disabled>견적서 작성 → (STEP3 완료 시)</button>
+          <button class="w-full py-2 rounded-lg bg-white border border-black/[0.06] text-xs font-bold text-slate-600">워크시트 저장</button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> ① 한 화면에 한 단계만 → 스크롤 길이 ↓↓ ② 단계별 완료 감각 ③ 실수 방지 (다음 버튼 활성 조건)<br/>
+      <strong>단점:</strong> 전체 조망이 필요한 고급 사용자에게는 단계 이동이 번거로움 → "전체 펼침" 토글 필요
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION B: 좌측 2열 그리드 (현재 구조 유지 + 스크롤 절반) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">B. 좌측 2열 그리드</h2>
+      <p class="text-xs text-slate-500">아코디언 8개를 2열로 재배치. 현재 로직 변경 최소, 스크롤 1/2.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4 grid grid-cols-12 gap-4">
+      <div class="col-span-8 grid grid-cols-2 gap-3">
+        <!-- 카드 1 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">📦 취득원가</span>
+            <span class="chip bg-indigo-50 text-indigo-700">69,009,100</span>
+          </div>
+          <div class="text-[11px] text-slate-500 space-y-0.5">
+            <div class="flex justify-between"><span>매입</span><span class="tabular font-bold text-slate-700">65,000,000</span></div>
+            <div class="flex justify-between"><span>공채/탁송/기타</span><span class="tabular font-bold text-slate-700">+4,009,100</span></div>
+          </div>
+        </div>
+        <!-- 카드 2 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">📉 시세하락 (감가)</span>
+            <span class="chip bg-blue-50 text-blue-700">월 530,242</span>
+          </div>
+          <div class="text-[11px] text-slate-500">감가율 34.5% / 60개월</div>
+          <div class="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden"><span class="block h-full bg-blue-400" style="width:34.5%"></span></div>
+        </div>
+        <!-- 카드 3 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">🏦 금융비용</span>
+            <span class="chip bg-violet-50 text-violet-700">월 0</span>
+          </div>
+          <div class="text-[11px] text-slate-500 space-y-0.5">
+            <div class="flex justify-between"><span>대출</span><span class="tabular">45,500,000</span></div>
+            <div class="flex justify-between"><span>자기자본</span><span class="tabular">25,672,000</span></div>
+          </div>
+        </div>
+        <!-- 카드 4 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">🛡️ 보험료</span>
+            <span class="chip bg-violet-50 text-violet-700">월 135,083</span>
+          </div>
+          <div class="text-[11px] text-slate-500">자동산출 · 26세+ · 공제 50만</div>
+        </div>
+        <!-- 카드 5 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">🏛️ 자동차세</span>
+            <span class="chip bg-amber-50 text-amber-700">월 4,113</span>
+          </div>
+          <div class="text-[11px] text-slate-500">1998cc 영업용</div>
+        </div>
+        <!-- 카드 6 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">🔧 정비 상품</span>
+            <span class="chip bg-gray-100 text-gray-600">자가 · 월 0</span>
+          </div>
+          <div class="text-[11px] text-slate-500">엔진오일 연 1회</div>
+        </div>
+        <!-- 카드 7 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">💳 보증금 & 선납</span>
+            <span class="chip bg-gray-100 text-gray-600">미설정</span>
+          </div>
+          <div class="text-[11px] text-slate-500">할인 옵션으로 월 원가↓</div>
+        </div>
+        <!-- 카드 8 -->
+        <div class="glass3 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-black text-slate-700">📊 시중 비교</span>
+            <span class="chip bg-gray-100 text-gray-600">0건</span>
+          </div>
+          <div class="text-[11px] text-slate-500">동일 유형 벤치마크</div>
+        </div>
+      </div>
+
+      <!-- 우측 요약 동일 -->
+      <aside class="col-span-4">
+        <div class="glass3 rounded-xl p-4 sticky top-4 space-y-3">
+          <h3 class="text-xs font-black text-slate-600">💰 실시간 요약</h3>
+          <div class="grid gap-2">
+            <div class="flex justify-between items-baseline"><span class="k">월 원가</span><span class="v tabular">671,113원</span></div>
+            <div class="flex justify-between items-baseline"><span class="k">월 렌트가</span><span class="v tabular acc text-base">738,224원</span></div>
+          </div>
+          <button class="w-full py-2 rounded-lg bg-emerald-600 text-white text-xs font-black">견적서 작성 →</button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 한 눈에 전체 조망 · 기존 로직 거의 그대로 · 구현 부담 최소<br/>
+      <strong>단점:</strong> 상세 입력 시 카드 펼침으로 레이아웃이 깨질 수 있음 (모달 또는 확장 패턴 필요)
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION C: 타임라인 + 누적 -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">C. 타임라인 + 누적 프로그레스</h2>
+      <p class="text-xs text-slate-500">왼쪽 타임라인 내비 · 오른쪽 선택된 섹션만 표시. 각 단계 비중이 프로그레스바로 시각화.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4 grid grid-cols-12 gap-4">
+      <!-- 타임라인 -->
+      <nav class="col-span-3 space-y-1">
+        <a class="block pl-6 pr-3 py-2 rounded-lg bg-indigo-50 tl-dot done">
+          <div class="text-[11px] font-black text-indigo-700">① 취득원가</div>
+          <div class="text-[10px] text-slate-500 tabular">69,009,100원</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg bg-indigo-50/50 tl-dot">
+          <div class="text-[11px] font-black text-indigo-700">② 감가</div>
+          <div class="text-[10px] text-slate-500 tabular">월 530,242원 · 79%</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg hover:bg-white tl-dot muted">
+          <div class="text-[11px] font-black text-slate-600">③ 금융비용</div>
+          <div class="text-[10px] text-slate-400 tabular">월 0원 · 0%</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg hover:bg-white tl-dot muted">
+          <div class="text-[11px] font-black text-slate-600">④ 보험</div>
+          <div class="text-[10px] text-slate-400 tabular">월 135,083원 · 20%</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg hover:bg-white tl-dot muted">
+          <div class="text-[11px] font-black text-slate-600">⑤ 세금·정비</div>
+          <div class="text-[10px] text-slate-400 tabular">월 4,113원 · 1%</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg hover:bg-white tl-dot muted">
+          <div class="text-[11px] font-black text-slate-600">⑥ 보증·선납</div>
+          <div class="text-[10px] text-slate-400 tabular">미설정</div>
+        </a>
+        <a class="block pl-6 pr-3 py-2 rounded-lg hover:bg-white tl-dot muted">
+          <div class="text-[11px] font-black text-slate-600">⑦ 시중 비교</div>
+          <div class="text-[10px] text-slate-400 tabular">0건</div>
+        </a>
+      </nav>
+
+      <!-- 컨텐츠 (②가 선택된 상태) -->
+      <div class="col-span-5 glass3 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-black text-slate-700">📉 ② 감가 (시세하락)</h3>
+          <span class="chip bg-blue-50 text-blue-700">월 530,242원</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="glass1 rounded-lg p-3">
+            <div class="k">감가율</div>
+            <div class="v tabular">34.5%</div>
+          </div>
+          <div class="glass1 rounded-lg p-3">
+            <div class="k">기간</div>
+            <div class="v tabular">60개월</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-[10px] text-slate-500 mb-1 font-bold">감가 커브 (optimistic)</div>
+          <div class="h-20 bg-white rounded-lg p-2 flex items-end gap-0.5">
+            <span class="bg-blue-400" style="height:0%;flex:1"></span>
+            <span class="bg-blue-400" style="height:20%;flex:1"></span>
+            <span class="bg-blue-400" style="height:32%;flex:1"></span>
+            <span class="bg-blue-400" style="height:40%;flex:1"></span>
+            <span class="bg-blue-400" style="height:48%;flex:1"></span>
+            <span class="bg-blue-400" style="height:54%;flex:1"></span>
+            <span class="bg-blue-400" style="height:59%;flex:1"></span>
+            <span class="bg-blue-400" style="height:63%;flex:1"></span>
+            <span class="bg-blue-400 opacity-40" style="height:66.5%;flex:1"></span>
+            <span class="bg-blue-400 opacity-40" style="height:69.5%;flex:1"></span>
+            <span class="bg-blue-400 opacity-40" style="height:72%;flex:1"></span>
+          </div>
+          <div class="flex justify-between text-[9px] text-slate-400 mt-1"><span>0y</span><span>5y</span><span>10y</span></div>
+        </div>
+      </div>
+
+      <!-- 우측 요약 -->
+      <aside class="col-span-4">
+        <div class="glass3 rounded-xl p-4 sticky top-4 space-y-3">
+          <h3 class="text-xs font-black text-slate-600">💰 누적 요약</h3>
+          <div>
+            <div class="text-[10px] text-slate-500 mb-1 font-bold">월 원가 = 671,113원 (누적)</div>
+            <div class="h-3 rounded-full overflow-hidden flex">
+              <span class="bg-blue-400" style="width:79%"></span>
+              <span class="bg-violet-400" style="width:20%"></span>
+              <span class="bg-emerald-400" style="width:1%"></span>
+            </div>
+          </div>
+          <div class="flex justify-between items-baseline pt-1">
+            <span class="k">월 렌트가 (VAT)</span>
+            <span class="v tabular acc text-base">738,224원</span>
+          </div>
+          <button class="w-full py-2 rounded-lg bg-emerald-600 text-white text-xs font-black">견적서 작성 →</button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 단계별 비중이 즉시 보임 · 점프 가능 (선형 아님) · 현재 위치 시각적 강조<br/>
+      <strong>단점:</strong> 좌측 내비가 공간 차지 · 모바일에서 레이아웃 붕괴 가능성 → 반응형 필요
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION D: 아코디언 섹션 (한 번에 하나만 열림) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">D. 아코디언 섹션 <span class="text-xs font-bold text-amber-600 ml-2">심플</span></h2>
+      <p class="text-xs text-slate-500">8개 항목을 접어둠 → 필요한 것만 펼쳐서 편집. 상단 요약 헤더 고정.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4 grid grid-cols-12 gap-4">
+      <div class="col-span-8 space-y-2">
+        <!-- 펼쳐진 섹션 -->
+        <div class="glass3 rounded-xl">
+          <div class="flex items-center justify-between p-3 bg-blue-50/60 rounded-t-xl border-b border-blue-100">
+            <div class="flex items-center gap-2">
+              <span class="text-blue-600">▼</span>
+              <span class="font-black text-sm">1. 취득원가</span>
+              <span class="chip bg-blue-100 text-blue-700">편집 중</span>
+            </div>
+            <span class="v tabular acc">65,000,000원</span>
+          </div>
+          <div class="p-4 grid grid-cols-2 gap-3">
+            <div><div class="k mb-1">공장도가</div><div class="glass1 rounded px-2 py-1.5 v tabular">65,000,000</div></div>
+            <div><div class="k mb-1">옵션</div><div class="glass1 rounded px-2 py-1.5 v tabular">0</div></div>
+            <div><div class="k mb-1">할인</div><div class="glass1 rounded px-2 py-1.5 v tabular">0</div></div>
+            <div><div class="k mb-1">취득세</div><div class="glass1 rounded px-2 py-1.5 v tabular">4,550,000</div></div>
+          </div>
+        </div>
+        <!-- 접힌 섹션들 -->
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">2. 시세하락 (감가)</span></div>
+          <span class="v tabular">월 528,333원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">3. 금융비용</span></div>
+          <span class="v tabular">월 89,456원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">4. 보험료</span></div>
+          <span class="v tabular">월 45,200원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">5. 자동차세</span></div>
+          <span class="v tabular">월 3,124원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">6. 정비·소모품</span></div>
+          <span class="v tabular">월 5,000원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">7. 보증금 운용수익</span></div>
+          <span class="v tabular">월 -833원</span>
+        </div>
+        <div class="glass3 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/80">
+          <div class="flex items-center gap-2"><span class="text-slate-400">▶</span><span class="font-black text-sm text-slate-700">8. 시중 비교</span></div>
+          <span class="chip bg-emerald-100 text-emerald-700">평균 대비 -5%</span>
+        </div>
+      </div>
+      <aside class="col-span-4">
+        <div class="glass3 rounded-xl p-4 sticky top-4 space-y-3">
+          <h3 class="text-xs font-black text-slate-600">📋 펼친 섹션 / 전체</h3>
+          <div class="text-2xl font-black text-indigo-600 tabular">1 / 8</div>
+          <div class="text-[11px] text-slate-500">편집하지 않는 항목은 접혀있어 화면이 깔끔합니다.</div>
+          <div class="border-t border-black/[0.05] pt-3">
+            <div class="k mb-1">월 렌트가 (VAT)</div>
+            <div class="v tabular acc text-base">738,224원</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 가장 익숙한 패턴 · 스크롤 극단적 감소 · 모바일 친화 · 구현 난이도 낮음<br/>
+      <strong>단점:</strong> 전체를 한 눈에 보고 비교하기 어려움 · 닫힌 값은 숨겨져 실수 가능
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION E: 탭 + 요약 대시보드 (상단 KPI + 탭 상세) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">E. 대시보드 + 탭 <span class="text-xs font-bold text-emerald-600 ml-2">프로페셔널</span></h2>
+      <p class="text-xs text-slate-500">상단 4개 KPI 카드 + 탭으로 상세 편집. 증권/회계 대시보드 스타일.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4">
+      <!-- KPI 카드 4개 -->
+      <div class="grid grid-cols-4 gap-3 mb-4">
+        <div class="glass3 rounded-xl p-3 border-l-4 border-blue-400">
+          <div class="k">취득원가</div>
+          <div class="v tabular text-lg">69,550,000</div>
+          <div class="text-[10px] text-emerald-600 font-bold">▼ 할인 0%</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-violet-400">
+          <div class="k">월 총 원가</div>
+          <div class="v tabular text-lg">671,113</div>
+          <div class="text-[10px] text-slate-500 font-bold">감가 79% 집중</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-emerald-400">
+          <div class="k">월 렌트가 (VAT)</div>
+          <div class="v tabular acc text-lg">738,224</div>
+          <div class="text-[10px] text-emerald-600 font-bold">마진 10%</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-amber-400">
+          <div class="k">시중 대비</div>
+          <div class="v tabular em text-lg">-5%</div>
+          <div class="text-[10px] text-amber-600 font-bold">경쟁력 ↑</div>
+        </div>
+      </div>
+
+      <!-- 탭 -->
+      <div class="flex gap-1 border-b border-black/[0.06] mb-3">
+        <button class="px-4 py-2 text-sm font-black text-indigo-600 border-b-2 border-indigo-500">취득</button>
+        <button class="px-4 py-2 text-sm font-bold text-slate-500">감가</button>
+        <button class="px-4 py-2 text-sm font-bold text-slate-500">금융</button>
+        <button class="px-4 py-2 text-sm font-bold text-slate-500">보험·세금</button>
+        <button class="px-4 py-2 text-sm font-bold text-slate-500">정비·보증금</button>
+        <button class="px-4 py-2 text-sm font-bold text-slate-500">시중비교</button>
+      </div>
+
+      <!-- 탭 내용 -->
+      <div class="grid grid-cols-3 gap-3">
+        <div><div class="k mb-1">공장도가</div><div class="glass1 rounded px-3 py-2 v tabular">65,000,000</div></div>
+        <div><div class="k mb-1">옵션가</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+        <div><div class="k mb-1">할인</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+        <div><div class="k mb-1">취득세 (7%)</div><div class="glass1 rounded px-3 py-2 v tabular">4,550,000</div></div>
+        <div><div class="k mb-1">탁송비</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+        <div><div class="k mb-1">기타</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+      </div>
+    </div>
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> KPI가 항상 보임 → 편집 중 결과 즉시 체감 · 탭은 익숙 · 출력/PDF와 유사<br/>
+      <strong>단점:</strong> 탭 전환 시 컨텍스트 잃을 수 있음 · KPI 카드 4개가 공간 고정 차지
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION F: 스프레드시트 뷰 (한 화면 모든 값 + 인라인 편집) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">F. 스프레드시트 뷰 <span class="text-xs font-bold text-slate-600 ml-2">파워유저</span></h2>
+      <p class="text-xs text-slate-500">Excel처럼 한 테이블에 전체. 셀 클릭해 바로 편집. 우측 합계/비중 열.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4 grid grid-cols-12 gap-4">
+      <div class="col-span-9">
+        <table class="w-full text-xs tabular border-collapse">
+          <thead>
+            <tr class="bg-slate-100/80 text-slate-600">
+              <th class="text-left px-3 py-2 font-black">항목</th>
+              <th class="text-left px-3 py-2 font-black">세부</th>
+              <th class="text-right px-3 py-2 font-black">금액</th>
+              <th class="text-right px-3 py-2 font-black">월 환산</th>
+              <th class="text-right px-3 py-2 font-black">비중</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-black/[0.04]">
+            <tr class="hover:bg-blue-50/40"><td class="px-3 py-1.5 font-bold text-blue-700">취득</td><td class="px-3 py-1.5">공장도가</td><td class="px-3 py-1.5 text-right">65,000,000</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+            <tr class="hover:bg-blue-50/40"><td class="px-3 py-1.5"></td><td class="px-3 py-1.5">취득세 7%</td><td class="px-3 py-1.5 text-right">4,550,000</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+            <tr class="hover:bg-violet-50/40"><td class="px-3 py-1.5 font-bold text-violet-700">감가</td><td class="px-3 py-1.5">60개월 직선</td><td class="px-3 py-1.5 text-right">31,700,000</td><td class="px-3 py-1.5 text-right font-bold">528,333</td><td class="px-3 py-1.5 text-right"><span class="chip bg-violet-100 text-violet-700">79%</span></td></tr>
+            <tr class="hover:bg-amber-50/40"><td class="px-3 py-1.5 font-bold text-amber-700">금융</td><td class="px-3 py-1.5">5.5% × 5년</td><td class="px-3 py-1.5 text-right">5,367,360</td><td class="px-3 py-1.5 text-right font-bold">89,456</td><td class="px-3 py-1.5 text-right"><span class="chip bg-amber-100 text-amber-700">13%</span></td></tr>
+            <tr class="hover:bg-emerald-50/40"><td class="px-3 py-1.5 font-bold text-emerald-700">보험</td><td class="px-3 py-1.5">영업용 종합</td><td class="px-3 py-1.5 text-right">2,712,000</td><td class="px-3 py-1.5 text-right font-bold">45,200</td><td class="px-3 py-1.5 text-right"><span class="chip bg-emerald-100 text-emerald-700">6.7%</span></td></tr>
+            <tr class="hover:bg-slate-50/80"><td class="px-3 py-1.5">세금</td><td class="px-3 py-1.5">자동차세</td><td class="px-3 py-1.5 text-right">187,440</td><td class="px-3 py-1.5 text-right">3,124</td><td class="px-3 py-1.5 text-right">0.5%</td></tr>
+            <tr class="hover:bg-slate-50/80"><td class="px-3 py-1.5">정비</td><td class="px-3 py-1.5">소모품 예비</td><td class="px-3 py-1.5 text-right">300,000</td><td class="px-3 py-1.5 text-right">5,000</td><td class="px-3 py-1.5 text-right">0.7%</td></tr>
+            <tr class="hover:bg-slate-50/80"><td class="px-3 py-1.5">보증금</td><td class="px-3 py-1.5">운용수익 차감</td><td class="px-3 py-1.5 text-right text-emerald-600">-50,000</td><td class="px-3 py-1.5 text-right text-emerald-600">-833</td><td class="px-3 py-1.5 text-right text-emerald-600">-0.1%</td></tr>
+            <tr class="bg-slate-100/60 font-black"><td class="px-3 py-2">합계</td><td class="px-3 py-2"></td><td class="px-3 py-2 text-right">—</td><td class="px-3 py-2 text-right acc">671,113</td><td class="px-3 py-2 text-right">100%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <aside class="col-span-3">
+        <div class="glass3 rounded-xl p-4 sticky top-4 space-y-3">
+          <h3 class="text-xs font-black text-slate-600">⚡ 빠른 조정</h3>
+          <div><div class="k mb-1">할인율</div><input type="range" class="w-full" /><div class="v tabular text-center">0%</div></div>
+          <div><div class="k mb-1">금리</div><input type="range" class="w-full" /><div class="v tabular text-center">5.5%</div></div>
+          <div><div class="k mb-1">마진율</div><input type="range" class="w-full" /><div class="v tabular text-center">10%</div></div>
+          <div class="border-t pt-2"><div class="k">렌트가</div><div class="v tabular acc text-base">738,224</div></div>
+        </div>
+      </aside>
+    </div>
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 전체 데이터 한눈에 · 엑셀 익숙한 사용자에 즉시 친숙 · 비중/합계 즉시 검증<br/>
+      <strong>단점:</strong> 초보자에게 압박감 · 모바일 거의 불가능 · 인라인 편집 UX 구현 복잡
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION G: E + 풀세트 조정 패널 (추천 확장판) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">G. E + 풀세트 조정 패널 <span class="text-xs font-bold text-rose-600 ml-2">★ 킬러</span></h2>
+      <p class="text-xs text-slate-500">대시보드 + 탭 상세 + 우측 10레버 + 프리셋 + 비교모드 + 민감도 + 락.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4">
+      <!-- KPI 카드 with 비교모드 -->
+      <div class="grid grid-cols-4 gap-3 mb-3">
+        <div class="glass3 rounded-xl p-3 border-l-4 border-blue-400">
+          <div class="k">취득원가</div>
+          <div class="v tabular text-lg">69,550,000</div>
+          <div class="text-[10px] text-slate-500 font-bold">기준 대비 동일</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-violet-400">
+          <div class="k">월 총 원가</div>
+          <div class="v tabular text-lg">629,875</div>
+          <div class="text-[10px] text-rose-600 font-bold">▼ 41,238 (-6.1%)</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-emerald-400">
+          <div class="k">월 렌트가 (VAT)</div>
+          <div class="v tabular acc text-lg">692,862</div>
+          <div class="text-[10px] text-rose-600 font-bold">▼ 45,362 vs 기준</div>
+        </div>
+        <div class="glass3 rounded-xl p-3 border-l-4 border-amber-400">
+          <div class="k">시중 대비</div>
+          <div class="v tabular em text-lg">-11%</div>
+          <div class="text-[10px] text-emerald-600 font-bold">경쟁력 ↑↑</div>
+        </div>
+      </div>
+
+      <!-- 비교 모드 바 -->
+      <div class="glass3 rounded-xl p-2 mb-3 flex items-center gap-3 text-xs">
+        <span class="chip bg-slate-200 text-slate-700">비교모드 ON</span>
+        <span class="text-slate-500">기준: <span class="font-bold tabular">738,224원</span></span>
+        <span class="text-slate-400">→</span>
+        <span class="text-slate-500">조정 후: <span class="font-black tabular text-rose-600">692,862원</span></span>
+        <span class="ml-auto text-[10px] text-slate-400">※ 슬라이더 조작 시 실시간 갱신</span>
+      </div>
+
+      <div class="grid grid-cols-12 gap-4">
+        <!-- 좌측: 탭 상세 -->
+        <div class="col-span-8">
+          <div class="flex gap-1 border-b border-black/[0.06] mb-3">
+            <button class="px-4 py-2 text-sm font-black text-indigo-600 border-b-2 border-indigo-500">취득</button>
+            <button class="px-4 py-2 text-sm font-bold text-slate-500">감가 <span class="text-[10px] text-violet-600 tabular">495k/월</span></button>
+            <button class="px-4 py-2 text-sm font-bold text-slate-500">금융 <span class="text-[10px] text-amber-600 tabular">79k/월</span></button>
+            <button class="px-4 py-2 text-sm font-bold text-slate-500">보험·세금 <span class="text-[10px] text-emerald-600 tabular">48k/월</span></button>
+            <button class="px-4 py-2 text-sm font-bold text-slate-500">정비·보증금</button>
+            <button class="px-4 py-2 text-sm font-bold text-slate-500">시중비교</button>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div><div class="k mb-1">공장도가</div><div class="glass1 rounded px-3 py-2 v tabular">65,000,000</div></div>
+            <div><div class="k mb-1">옵션가</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+            <div><div class="k mb-1 flex items-center gap-1">할인 <span class="chip bg-rose-100 text-rose-700 text-[9px]">조정됨</span></div><div class="glass1 rounded px-3 py-2 v tabular text-rose-600">-1,950,000</div></div>
+            <div><div class="k mb-1">취득세 (7%)</div><div class="glass1 rounded px-3 py-2 v tabular">4,550,000</div></div>
+            <div><div class="k mb-1">탁송비</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+            <div><div class="k mb-1">기타</div><div class="glass1 rounded px-3 py-2 v tabular">0</div></div>
+          </div>
+        </div>
+
+        <!-- 우측: 풀세트 조정 패널 -->
+        <aside class="col-span-4">
+          <div class="glass3 rounded-xl p-3 sticky top-4 space-y-3">
+            <!-- 헤더 + 프리셋 -->
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-black text-slate-700">⚡ 빠른 조정</h3>
+              <button class="text-[10px] text-slate-400 hover:text-rose-600 font-bold">초기화</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button class="py-1.5 rounded-lg text-[11px] font-black bg-slate-200/70 text-slate-700">보수적</button>
+              <button class="py-1.5 rounded-lg text-[11px] font-black bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400">표준</button>
+              <button class="py-1.5 rounded-lg text-[11px] font-black bg-rose-100/80 text-rose-700">공격적</button>
+            </div>
+
+            <!-- 그룹 1: 가격 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-blue-700 mb-2">💰 가격</div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">할인율 🔓</span><span class="tabular font-black text-rose-600">3%</span></div>
+                  <input type="range" class="w-full accent-rose-500" value="30" />
+                  <div class="text-[9px] text-slate-400">1%↑ ≈ 월 -6,505원</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">선수금 🔓</span><span class="tabular font-black">10%</span></div>
+                  <input type="range" class="w-full accent-blue-500" value="10" />
+                  <div class="text-[9px] text-slate-400">10%↑ ≈ 월 -3,200원</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 그룹 2: 감가 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-violet-700 mb-2">📉 감가 <span class="text-slate-400 font-normal">(파괴력 最)</span></div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">계약기간 🔓</span><span class="tabular font-black">60개월</span></div>
+                  <input type="range" class="w-full accent-violet-500" min="12" max="72" value="60" />
+                  <div class="text-[9px] text-slate-400">12개월↑ ≈ 월 -88,000원</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">잔가율 🔓</span><span class="tabular font-black">45%</span></div>
+                  <input type="range" class="w-full accent-violet-500" value="45" />
+                  <div class="text-[9px] text-slate-400">5%p↑ ≈ 월 -54,300원</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">연 주행거리 🔒</span><span class="tabular font-black text-slate-400">20,000km</span></div>
+                  <input type="range" class="w-full accent-slate-300" value="50" disabled />
+                  <div class="text-[9px] text-slate-400">고정됨 · 클릭해 해제</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 그룹 3: 금융 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-amber-700 mb-2">💳 금융</div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">금리 🔓</span><span class="tabular font-black">5.5%</span></div>
+                  <input type="range" class="w-full accent-amber-500" value="55" />
+                  <div class="text-[9px] text-slate-400">1%p↑ ≈ 월 +16,200원</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">대출기간 🔓</span><span class="tabular font-black">60개월</span></div>
+                  <input type="range" class="w-full accent-amber-500" value="60" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 그룹 4: 운영 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-emerald-700 mb-2">🛡️ 운영</div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">보험등급 🔓</span><span class="tabular font-black">영업용 종합</span></div>
+                  <div class="flex gap-1">
+                    <button class="flex-1 py-1 text-[9px] rounded bg-white/60">기본</button>
+                    <button class="flex-1 py-1 text-[9px] rounded bg-emerald-500 text-white font-black">종합</button>
+                    <button class="flex-1 py-1 text-[9px] rounded bg-white/60">프리미엄</button>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] text-slate-500 font-bold">정비 포함</span>
+                  <div class="w-9 h-5 bg-emerald-500 rounded-full relative"><div class="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 그룹 5: 수익 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-rose-700 mb-2">📊 수익</div>
+              <div>
+                <div class="flex justify-between text-[10px] mb-0.5"><span class="text-slate-500 font-bold">마진율 🔓</span><span class="tabular font-black text-rose-600">10%</span></div>
+                <input type="range" class="w-full accent-rose-500" value="10" />
+                <div class="text-[9px] text-slate-400">1%p↑ ≈ 월 +6,298원</div>
+              </div>
+            </div>
+
+            <!-- 역산 기능 -->
+            <div class="pt-2 border-t border-black/[0.05]">
+              <button class="w-full py-2 rounded-lg bg-slate-800 text-white text-[11px] font-black hover:bg-slate-700">🎯 목표 렌트가로 역산</button>
+              <div class="text-[9px] text-slate-400 mt-1 text-center">목표 금액 입력 → 🔓 레버로 자동 맞춤</div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="k">최종 렌트가 (VAT)</div>
+              <div class="v tabular acc text-lg">692,862원</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 10레버 한 손에 · 프리셋 3버튼으로 협상 시나리오 즉시 전환 · 비교모드로 고객 앞에서 실시간 시뮬 · 민감도 힌트로 "어디 건드리면 가장 큰지" 학습 · 락 + 역산으로 "월 70만원에 맞춰줘" 요청 즉시 대응<br/>
+      <strong>단점:</strong> 정보 밀도 높음 → 신입은 프리셋만 쓰도록 가이드 필요 · 구현 공수 최상 (레버 ↔ 계산 양방향 바인딩)
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- OPTION H: F + 풀세트 레버 + 프리셋 + 락/역산 -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="mb-10">
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-black text-slate-700">H. F + 풀세트 조정 (스프레드시트 킬러판) <span class="text-xs font-bold text-fuchsia-600 ml-2">★ 파워</span></h2>
+      <p class="text-xs text-slate-500">Excel형 표 + 좌측 락 + 상단 프리셋·비교 + 우측 7슬라이더 + 하단 역산. 데스크톱 전용 최강.</p>
+    </div>
+
+    <div class="glass4 rounded-2xl p-4">
+      <!-- 상단 프리셋 + 비교모드 바 -->
+      <div class="flex items-center gap-3 mb-3 flex-wrap">
+        <div class="flex gap-1">
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-black bg-slate-200/70 text-slate-700">🐢 보수적</button>
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-black bg-indigo-100 text-indigo-700 ring-2 ring-indigo-400">⚖️ 표준</button>
+          <button class="px-3 py-1.5 rounded-lg text-[11px] font-black bg-rose-100/80 text-rose-700">🔥 공격적</button>
+        </div>
+        <div class="glass3 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs">
+          <span class="chip bg-slate-200 text-slate-700">비교 ON</span>
+          <span class="text-slate-500">기준 <span class="tabular font-black">738,224</span></span>
+          <span class="text-slate-300">→</span>
+          <span class="text-rose-600 tabular font-black">692,862</span>
+          <span class="text-[10px] text-rose-500 font-bold">(-6.1%)</span>
+        </div>
+        <button class="ml-auto text-[10px] text-slate-400 hover:text-rose-600 font-bold">↺ 초기화</button>
+      </div>
+
+      <div class="grid grid-cols-12 gap-4">
+        <!-- 좌측: 스프레드시트 (9col) -->
+        <div class="col-span-9">
+          <table class="w-full text-xs tabular border-collapse">
+            <thead>
+              <tr class="bg-slate-100/80 text-slate-600">
+                <th class="w-8 px-2 py-2"></th>
+                <th class="text-left px-3 py-2 font-black">항목</th>
+                <th class="text-left px-3 py-2 font-black">세부</th>
+                <th class="text-right px-3 py-2 font-black">금액</th>
+                <th class="text-right px-3 py-2 font-black">월 환산</th>
+                <th class="text-right px-3 py-2 font-black">비중</th>
+                <th class="text-right px-3 py-2 font-black">변동</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-black/[0.04]">
+              <!-- 취득 -->
+              <tr class="bg-blue-50/30"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5 font-bold text-blue-700">취득</td><td class="px-3 py-1.5">공장도가 <span class="text-[9px] text-slate-400">(셀 클릭 편집)</span></td><td class="px-3 py-1.5 text-right">65,000,000</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <tr class="bg-blue-50/30"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td></td><td class="px-3 py-1.5">옵션</td><td class="px-3 py-1.5 text-right">0</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <tr class="bg-blue-50/30 hover:bg-blue-100/40"><td class="text-center"><button class="text-rose-500">🔓</button></td><td></td><td class="px-3 py-1.5">할인 <span class="chip bg-rose-100 text-rose-700 text-[9px]">슬라이더</span></td><td class="px-3 py-1.5 text-right text-rose-600">-1,950,000</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-rose-600">▼ 1,950,000</td></tr>
+              <tr class="bg-blue-50/30"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td></td><td class="px-3 py-1.5">취득세 7%</td><td class="px-3 py-1.5 text-right">4,550,000</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <!-- 감가 -->
+              <tr class="bg-violet-50/40 hover:bg-violet-100/40"><td class="text-center"><button class="text-rose-500">🔓</button></td><td class="px-3 py-1.5 font-bold text-violet-700">감가</td><td class="px-3 py-1.5">60개월·잔가 45% <span class="chip bg-violet-100 text-violet-700 text-[9px]">슬라이더</span></td><td class="px-3 py-1.5 text-right">29,700,000</td><td class="px-3 py-1.5 text-right font-bold">495,000</td><td class="px-3 py-1.5 text-right"><span class="chip bg-violet-100 text-violet-700">77%</span></td><td class="px-3 py-1.5 text-right text-rose-600">▼ 33,333</td></tr>
+              <!-- 금융 -->
+              <tr class="bg-amber-50/40 hover:bg-amber-100/40"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5 font-bold text-amber-700">금융</td><td class="px-3 py-1.5">5.5% × 60개월 <span class="chip bg-amber-100 text-amber-700 text-[9px]">슬라이더</span></td><td class="px-3 py-1.5 text-right">4,770,000</td><td class="px-3 py-1.5 text-right font-bold">79,500</td><td class="px-3 py-1.5 text-right"><span class="chip bg-amber-100 text-amber-700">12.6%</span></td><td class="px-3 py-1.5 text-right text-rose-600">▼ 9,956</td></tr>
+              <!-- 보험 -->
+              <tr class="bg-emerald-50/40"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5 font-bold text-emerald-700">보험</td><td class="px-3 py-1.5">영업용 종합 <span class="chip bg-emerald-100 text-emerald-700 text-[9px]">토글</span></td><td class="px-3 py-1.5 text-right">2,712,000</td><td class="px-3 py-1.5 text-right font-bold">45,200</td><td class="px-3 py-1.5 text-right"><span class="chip bg-emerald-100 text-emerald-700">7.2%</span></td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <!-- 세금 -->
+              <tr class="hover:bg-slate-50/80"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5">세금</td><td class="px-3 py-1.5">자동차세</td><td class="px-3 py-1.5 text-right">187,440</td><td class="px-3 py-1.5 text-right">3,124</td><td class="px-3 py-1.5 text-right">0.5%</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <!-- 정비 -->
+              <tr class="hover:bg-slate-50/80"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5">정비</td><td class="px-3 py-1.5">소모품 예비</td><td class="px-3 py-1.5 text-right">300,000</td><td class="px-3 py-1.5 text-right">5,000</td><td class="px-3 py-1.5 text-right">0.8%</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <!-- 보증금 -->
+              <tr class="hover:bg-slate-50/80"><td class="text-center"><button class="text-slate-300 hover:text-slate-700">🔓</button></td><td class="px-3 py-1.5">보증금</td><td class="px-3 py-1.5">운용수익 차감</td><td class="px-3 py-1.5 text-right text-emerald-600">-50,000</td><td class="px-3 py-1.5 text-right text-emerald-600">-833</td><td class="px-3 py-1.5 text-right text-emerald-600">-0.1%</td><td class="px-3 py-1.5 text-right text-slate-400">—</td></tr>
+              <!-- 합계 -->
+              <tr class="bg-slate-200/70 font-black text-sm"><td></td><td class="px-3 py-2">월 총 원가</td><td></td><td class="px-3 py-2 text-right">—</td><td class="px-3 py-2 text-right">629,991</td><td class="px-3 py-2 text-right">100%</td><td class="px-3 py-2 text-right text-rose-600">▼ 41,122</td></tr>
+              <tr class="bg-emerald-100/60 font-black text-base"><td></td><td class="px-3 py-2 text-emerald-700">월 렌트가 (VAT)</td><td class="px-3 py-2 text-[10px] text-slate-500 font-normal">마진 10% · VAT 10%</td><td></td><td class="px-3 py-2 text-right acc tabular">692,990</td><td></td><td class="px-3 py-2 text-right text-rose-600 tabular">▼ 45,234</td></tr>
+            </tbody>
+          </table>
+
+          <!-- 하단 역산 바 -->
+          <div class="mt-3 glass3 rounded-xl p-3 space-y-2">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="text-[11px] font-black text-slate-700">🎯 목표 렌트가로 역산</span>
+              <input type="text" class="glass1 rounded px-3 py-1.5 text-sm font-bold tabular w-32 text-right" value="700,000" />
+              <span class="text-[10px] text-slate-400">원 / 월</span>
+              <span class="text-slate-300">·</span>
+              <span class="text-[10px] text-slate-500">🔓 레버로 자동 맞춤 (할인·잔가·마진)</span>
+              <button class="ml-auto px-4 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-black hover:bg-slate-700">역산 실행 →</button>
+            </div>
+
+            <!-- 시중 대기업 실판매 샘플 (컴팩트 한 줄) -->
+            <div class="pt-2 border-t border-black/[0.06]">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] font-black text-slate-600 whitespace-nowrap">📊 시중가</span>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-blue-300 text-[11px]">
+                  <span class="text-slate-500 font-bold">롯데</span><span class="tabular font-black">745,000</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-red-300 text-[11px]">
+                  <span class="text-slate-500 font-bold">SK</span><span class="tabular font-black">729,500</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-emerald-300 text-[11px]">
+                  <span class="text-slate-500 font-bold">현대</span><span class="tabular font-black">712,800</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-amber-300 text-[11px]">
+                  <span class="text-slate-500 font-bold">KB</span><span class="tabular font-black">758,200</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-violet-300 text-[11px]">
+                  <span class="text-slate-500 font-bold">AJ</span><span class="tabular font-black">721,000</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md bg-slate-800 text-white hover:bg-slate-700 text-[11px]">
+                  <span class="font-bold">⭐평균</span><span class="tabular font-black">733,300</span>
+                </button>
+                <button class="inline-flex items-baseline gap-1 px-2 py-1 rounded-md glass1 hover:ring-1 hover:ring-rose-300 text-[11px]">
+                  <span class="text-rose-600 font-bold">🏆최저</span><span class="tabular font-black text-rose-700">705,400</span>
+                </button>
+                <span class="ml-auto text-[9px] text-slate-400 whitespace-nowrap">60개월·2만km·'26.04.12 ⓘ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우측: 슬라이더 패널 (3col) -->
+        <aside class="col-span-3">
+          <div class="glass3 rounded-xl p-3 sticky top-4 space-y-3">
+            <h3 class="text-xs font-black text-slate-700">⚡ 시나리오 레버</h3>
+
+            <div>
+              <div class="text-[10px] font-black text-blue-700 mb-1">💰 가격</div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">할인율</span><span class="tabular font-black text-rose-600">3%</span></div>
+                  <input type="range" class="w-full accent-rose-500" value="30" />
+                  <div class="text-[9px] text-slate-400">1%↑ ≈ 월 -6,505</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">선수금</span><span class="tabular font-black">10%</span></div>
+                  <input type="range" class="w-full accent-blue-500" value="10" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-violet-700 mb-1">📉 감가 <span class="text-slate-400 font-normal">(파괴력 最)</span></div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">계약기간</span><span class="tabular font-black">60개월</span></div>
+                  <input type="range" class="w-full accent-violet-500" min="12" max="72" value="60" />
+                  <div class="text-[9px] text-slate-400">12↑ ≈ 월 -88,000</div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">잔가율</span><span class="tabular font-black">45%</span></div>
+                  <input type="range" class="w-full accent-violet-500" value="45" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">연주행</span><span class="tabular font-black">20,000km</span></div>
+                  <input type="range" class="w-full accent-violet-500" value="50" />
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-amber-700 mb-1">💳 금융</div>
+              <div class="space-y-2">
+                <div>
+                  <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">금리</span><span class="tabular font-black">5.5%</span></div>
+                  <input type="range" class="w-full accent-amber-500" value="55" />
+                  <div class="text-[9px] text-slate-400">1%p↑ ≈ 월 +16,200</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-emerald-700 mb-1">🛡️ 운영</div>
+              <div class="flex gap-1">
+                <button class="flex-1 py-1 text-[9px] rounded bg-white/60">기본</button>
+                <button class="flex-1 py-1 text-[9px] rounded bg-emerald-500 text-white font-black">종합</button>
+                <button class="flex-1 py-1 text-[9px] rounded bg-white/60">프리미엄</button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="text-[10px] font-black text-rose-700 mb-1">📊 수익</div>
+              <div>
+                <div class="flex justify-between text-[10px]"><span class="text-slate-500 font-bold">마진율</span><span class="tabular font-black text-rose-600">10%</span></div>
+                <input type="range" class="w-full accent-rose-500" value="10" />
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-black/[0.05]">
+              <div class="k">최종 렌트가</div>
+              <div class="v tabular acc text-base">692,990</div>
+              <div class="text-[9px] text-rose-500 font-bold">▼ 45,234 vs 기준</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="mt-3 text-xs text-slate-600 bg-white/60 rounded-xl p-3 border border-black/[0.04]">
+      <strong>장점:</strong> 전체 표 한눈에 + 행별 색상 구분으로 "뭐가 크고 뭐가 작은지" 즉시 파악 · 셀 직접 편집(고정 입력) + 슬라이더(시나리오 조정) 분리로 입력 경로 명확 · 🔒 락 + 🎯 역산으로 "월 70만원에 맞춰줘" 즉시 대응 · 프리셋으로 신입도 안전<br/>
+      <strong>단점:</strong> 데스크톱 전용 (모바일 거의 불가) · 정보 밀도 최고조 → 시각적 피로 가능성 · 구현 공수 최상 (셀 인라인 편집 + 양방향 바인딩 + 역산 알고리즘)
+    </div>
+  </section>
+
+  <!-- 선택 힌트 -->
+  <div class="glass4 rounded-2xl p-5">
+    <h3 class="font-black text-slate-700 mb-3">🎯 선택 가이드 (8안)</h3>
+    <div class="grid grid-cols-3 gap-3 text-xs text-slate-600">
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-indigo-700 mb-1">A. 3단계 스테퍼</div>
+        영업 사원·신입에게 실수 방지. 단계 강제 진행.
+      </div>
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-indigo-700 mb-1">B. 2열 그리드</div>
+        숙련자가 빠르게 전체 보고 조정. 구현 공수 최소.
+      </div>
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-indigo-700 mb-1">C. 타임라인</div>
+        왕복 미세조정 · 단계 비중 시각화.
+      </div>
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-amber-700 mb-1">D. 아코디언</div>
+        가장 심플 · 모바일 최적 · 구현 난이도 최저.
+      </div>
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-emerald-700 mb-1">E. 대시보드+탭</div>
+        KPI 항상 노출 · 전문가 느낌 · 출력물과 유사.
+      </div>
+      <div class="p-3 bg-white/60 rounded-lg">
+        <div class="font-black text-slate-700 mb-1">F. 스프레드시트</div>
+        Excel 사용자 · 전체 한눈에 · 슬라이더 빠른조정.
+      </div>
+      <div class="p-3 bg-rose-50/60 rounded-lg ring-2 ring-rose-200">
+        <div class="font-black text-rose-700 mb-1">★ G. E + 풀세트</div>
+        대시보드 + 탭 + 10레버 + 프리셋. 균형형 추천.
+      </div>
+      <div class="p-3 bg-fuchsia-50/60 rounded-lg ring-2 ring-fuchsia-200 col-span-2">
+        <div class="font-black text-fuchsia-700 mb-1">★ H. F + 풀세트 (파워 추천)</div>
+        스프레드시트 + 행별 색상 + 셀 편집 + 슬라이더 + 프리셋 + 🔒락 + 🎯역산. 데스크톱 영업 환경 최강.
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-400 mt-3">※ 모든 안에 공통 적용: 억/조 단위 자동 변환, truncate, annual_mileage 방어, 빈 문자열 0 변환 (80경원 버그 근절).</p>
+  </div>
+</div>
+
+</body>
+</html>

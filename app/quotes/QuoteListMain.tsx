@@ -21,6 +21,8 @@ import { getAuthHeader } from '@/app/utils/auth-client'
 // TYPES
 // ============================================================================
 type MainTab = 'long_term' | 'short_term' | 'lotte_rate' | 'create_long' | 'calc_short'
+// 파이프라인 3단계: ① 작성 → ② 전송 → ③ 계약 전환
+type SubStage = 'draft' | 'sent' | 'contract'
 type StatusFilter = 'all' | 'draft' | 'shared' | 'signed' | 'contracted' | 'archived'
 type ShortStatusFilter = 'all' | 'draft' | 'sent' | 'accepted' | 'contracted' | 'cancelled'
 type InvoiceStatusFilter = 'all' | 'draft' | 'shared' | 'signed'
@@ -212,6 +214,90 @@ function ShortTermDetailModal({
 // ============================================================================
 // ROW ACTIONS (⋯ 메뉴)
 // ============================================================================
+/**
+ * CreateMenu — 항상 동일한 위치에 노출되는 "+새로 만들기" 드롭다운.
+ * 탭별로 버튼이 나타났다 사라지면서 레이아웃이 흔들리는 UX 문제를 해결하기 위해
+ * 장기 견적 / 단기 견적 / 청구서 생성 액션을 단일 진입점으로 통합했다.
+ */
+function CreateMenu({
+  onCreateLong, onCreateShort, onCreateInvoice,
+}: {
+  onCreateLong: () => void
+  onCreateShort: () => void
+  onCreateInvoice: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const items = [
+    { key: 'long', label: '장기 견적', desc: '월단위 렌트 산출', action: onCreateLong },
+    { key: 'short', label: '단기 견적', desc: '일단위 견적', action: onCreateShort },
+    { key: 'invoice', label: '청구서', desc: '단기 청구서 발행', action: onCreateInvoice },
+  ]
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          padding: '7px 16px',
+          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
+          color: '#fff', border: 'none', borderRadius: 8,
+          fontWeight: 700, fontSize: 13, cursor: 'pointer',
+          whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
+        }}
+      >
+        <span>+ 새로 만들기</span>
+        <span style={{ fontSize: 10, opacity: 0.85, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+            minWidth: 200,
+            background: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            borderRadius: 12,
+            boxShadow: '6px 10px 24px rgba(140,170,210,0.22), -2px -2px 8px rgba(255,255,255,0.6)',
+            padding: 6,
+            display: 'flex', flexDirection: 'column', gap: 2,
+          }}
+        >
+          {items.map(it => (
+            <button
+              key={it.key}
+              onClick={() => { setOpen(false); it.action() }}
+              style={{
+                textAlign: 'left', padding: '8px 12px', border: 'none',
+                background: 'transparent', borderRadius: 8, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', gap: 1,
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(59,110,181,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#2a4a6b' }}>{it.label}</span>
+              <span style={{ fontSize: 10, color: '#8aabc7' }}>{it.desc}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RowActions({
   quote,
   onEdit,
@@ -352,6 +438,8 @@ export default function QuoteListPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [shortStatusFilter, setShortStatusFilter] = useState<ShortStatusFilter>('all')
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>('all')
+  // 파이프라인 서브 스테이지: 기본 ① 작성. 변경 시 해당 스테이지에 맞는 statusFilter 로 자동 매핑.
+  const [subStage, setSubStage] = useState<SubStage>('draft')
   const [sortBy, setSortBy] = useState<SortOption>('latest')
   const [customers, setCustomers] = useState<Map<string, any>>(new Map())
   const [selectedShortQuote, setSelectedShortQuote] = useState<any>(null)
@@ -904,66 +992,31 @@ export default function QuoteListPage() {
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-        {/* ═══ Main Tab Bar (DcToolbar) ═══ */}
+        {/* ═══ Main Tab Bar (DcToolbar) — 순수 탭바, 검색 없음 ═══ */}
         <DcToolbar
           search=""
           onSearchChange={() => {}}
+          noSearch
           filters={[
-            { key: 'long_term', label: '장기 견적', count: mainTabCounts.long_term },
-            { key: 'short_term', label: '단기/청구서', count: mainTabCounts.short_term },
-            { key: 'create_long', label: '장기 산출기' },
-            { key: 'calc_short', label: '단기 산출기' },
-            { key: 'lotte_rate', label: '요율 관리' },
+            { key: 'long_term', label: '장기', count: mainTabCounts.long_term },
+            { key: 'short_term', label: '단기', count: mainTabCounts.short_term },
           ]}
-          activeFilter={mainTab}
+          activeFilter={(mainTab === 'long_term' || mainTab === 'create_long') ? 'long_term' : (mainTab === 'short_term' || mainTab === 'calc_short') ? 'short_term' : mainTab}
           onFilterChange={(key) => {
             setMainTab(key as MainTab)
             setStatusFilter('all')
             setShortStatusFilter('all')
             setInvoiceStatusFilter('all')
+            setSubStage('draft')
             setSearchTerm('')
             setSortBy('latest')
           }}
           trailing={
-            (mainTab === 'long_term') ? (
-              <button
-                onClick={() => setMainTab('create_long')}
-                style={{
-                  padding: '7px 16px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-                  borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-                  boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                  marginLeft: 'auto', flexShrink: 0,
-                }}
-              >
-                + 장기 견적
-              </button>
-            ) : (mainTab === 'short_term') ? (
-              <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
-                <button
-                  onClick={() => setMainTab('calc_short')}
-                  style={{
-                    padding: '7px 14px', background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)', color: '#fff', border: 'none',
-                    borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-                    boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-                  }}
-                >
-                  + 단기 견적
-                </button>
-                <button
-                  onClick={() => setInvoiceOpen(true)}
-                  style={{
-                    padding: '7px 14px', background: 'rgba(255,255,255,0.60)', color: '#3b6eb5', border: '1px solid rgba(59,110,181,0.2)',
-                    borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                    whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
-                    boxShadow: '3px 3px 8px rgba(140,170,210,0.12), -1px -1px 4px rgba(255,255,255,0.47)',
-                  }}
-                >
-                  + 청구서
-                </button>
-              </div>
-            ) : undefined
+            <CreateMenu
+              onCreateLong={() => { setMainTab('create_long'); setSubStage('draft') }}
+              onCreateShort={() => { setMainTab('calc_short'); setSubStage('draft') }}
+              onCreateInvoice={() => setInvoiceOpen(true)}
+            />
           }
         />
         <style>{`
@@ -973,85 +1026,109 @@ export default function QuoteListPage() {
           }
         `}</style>
 
-        {/* ═══ Stat Strip ═══ */}
-        {(mainTab === 'long_term' || mainTab === 'short_term') && (
-          <DcStatStrip
-            stats={mainTab === 'long_term' ? [
-              { label: '전체', value: statusCounts.all, unit: '건' },
-              { label: '작성중', value: statusCounts.draft, unit: '건' },
-              { label: '발송됨', value: statusCounts.shared, unit: '건' },
-              { label: '서명완료', value: statusCounts.signed, unit: '건' },
-              { label: '계약전환', value: statusCounts.contracted, unit: '건' },
-            ] : [
-              { label: '전체', value: invoiceStatusCounts.all, unit: '건' },
-              { label: '임시저장', value: invoiceStatusCounts.draft, unit: '건' },
-              { label: '발송됨', value: invoiceStatusCounts.shared, unit: '건' },
-              { label: '서명완료', value: invoiceStatusCounts.signed, unit: '건' },
-            ]}
-            fullWidth
-          />
-        )}
-
-        {/* ═══ 검색 + 정렬 + 필터 (모든 탭에서 공통) ═══ */}
-        {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
-          <>
-            {/* DcToolbar with Search + Filters */}
-            <DcToolbar
-              search={searchTerm}
-              onSearchChange={setSearchTerm}
-              placeholder={mainTab === 'long_term' ? '고객명, 차량번호, 브랜드 검색...' : '임차인명, 청구서 검색...'}
-              filters={
-                mainTab === 'long_term'
-                  ? [
-                      { key: 'all', label: '전체', count: statusCounts.all },
-                      { key: 'draft', label: '작성중', count: statusCounts.draft },
-                      { key: 'shared', label: '발송됨', count: statusCounts.shared },
-                      { key: 'signed', label: '서명완료', count: statusCounts.signed },
-                      { key: 'contracted', label: '계약전환', count: statusCounts.contracted },
-                      { key: 'archived', label: '보관', count: statusCounts.archived },
-                    ]
-                  : [
-                      { key: 'all', label: '전체', count: invoiceStatusCounts.all },
-                      { key: 'draft', label: '임시저장', count: invoiceStatusCounts.draft },
-                      { key: 'shared', label: '발송됨', count: invoiceStatusCounts.shared },
-                      { key: 'signed', label: '서명완료', count: invoiceStatusCounts.signed },
-                    ]
-              }
-              activeFilter={mainTab === 'long_term' ? statusFilter : invoiceStatusFilter}
-              onFilterChange={(key) => {
-                if (mainTab === 'long_term') setStatusFilter(key as StatusFilter)
-                else setInvoiceStatusFilter(key as InvoiceStatusFilter)
-              }}
-              trailing={
-                mainTab === 'long_term' ? (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingLeft: 12,
-                    borderLeft: '1px solid rgba(0,0,0,0.06)',
-                    flexShrink: 0,
-                  }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
-                    <select
-                      value={sortBy}
-                      onChange={e => setSortBy(e.target.value as SortOption)}
+        {/* ═══ SubStage 세그먼트 바 (파이프라인 3단계) ═══ */}
+        {(mainTab === 'long_term' || mainTab === 'short_term') && (() => {
+          const counts = mainTab === 'long_term' ? {
+            draft: statusCounts.draft,
+            sent: statusCounts.shared + statusCounts.signed,
+            contract: statusCounts.contracted,
+          } : {
+            draft: invoiceStatusCounts.draft,
+            sent: invoiceStatusCounts.shared,
+            contract: invoiceStatusCounts.signed,
+          }
+          const stages: { key: SubStage; num: string; label: string }[] = [
+            { key: 'draft',    num: '①', label: '작성' },
+            { key: 'sent',     num: '②', label: '전송' },
+            { key: 'contract', num: '③', label: '계약 전환' },
+          ]
+          const handleStage = (s: SubStage) => {
+            setSubStage(s)
+            if (mainTab === 'long_term') {
+              setStatusFilter(s === 'draft' ? 'draft' : s === 'sent' ? 'shared' : 'contracted')
+            } else {
+              setInvoiceStatusFilter(s === 'draft' ? 'draft' : s === 'sent' ? 'shared' : 'signed')
+            }
+          }
+          return (
+            <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                display: 'inline-flex', gap: 4,
+                background: 'rgba(255,255,255,0.72)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: 12,
+                padding: 5,
+                boxShadow: '4px 4px 10px rgba(140,170,210,0.1), -3px -3px 8px rgba(255,255,255,0.5)',
+              }}>
+                {stages.map(st => {
+                  const active = subStage === st.key
+                  return (
+                    <button
+                      key={st.key}
+                      onClick={() => handleStage(st.key)}
                       style={{
-                        padding: '6px 10px', border: 'none', borderRadius: 8,
-                        fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer', background: 'transparent', color: '#1e293b',
+                        padding: '8px 14px', border: 'none', borderRadius: 8,
+                        fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6,
                         fontFamily: 'inherit',
+                        background: active ? 'rgba(255,255,255,0.95)' : 'transparent',
+                        color: active ? '#2a4a6b' : '#64748b',
+                        boxShadow: active ? '2px 2px 6px rgba(140,170,210,0.15)' : 'none',
+                        transition: 'all 0.15s',
                       }}
                     >
-                      <option value="latest">최신순</option>
-                      <option value="customer">고객명순</option>
-                      <option value="expiry">만료일순</option>
-                      <option value="rent">렌트료순</option>
-                    </select>
-                  </div>
-                ) : undefined
-              }
-            />
-          </>
+                      <span style={{ fontSize: 13, color: active ? '#3b6eb5' : '#94a3b8' }}>{st.num}</span>
+                      <span>{st.label}</span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 6,
+                        background: active ? 'rgba(59,110,181,0.15)' : 'rgba(0,0,0,0.06)',
+                        color: active ? '#3b6eb5' : '#8aabc7',
+                      }}>{counts[st.key]}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <span style={{ fontSize: 11, color: '#8aabc7' }}>
+                {subStage === 'draft'    && '작성중인 견적을 관리하고 고객/차량을 확정하세요.'}
+                {subStage === 'sent'     && '전송된 견적입니다. 서명 완료 건은 계약 전환으로 진행하세요.'}
+                {subStage === 'contract' && '계약 전환 대상입니다. 계약 작성을 진행할 수 있습니다.'}
+              </span>
+            </div>
+          )
+        })()}
+
+        {/* ═══ 검색 + 정렬 (필터는 SubStage 세그먼트로 대체되어 제거) ═══ */}
+        {(mainTab === 'long_term' || mainTab === 'short_term') && !loading && (
+          <DcToolbar
+            search={searchTerm}
+            onSearchChange={setSearchTerm}
+            placeholder={mainTab === 'long_term' ? '고객명, 차량번호, 브랜드 검색...' : '임차인명, 청구서 검색...'}
+            trailing={
+              mainTab === 'long_term' ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  paddingLeft: 12, borderLeft: '1px solid rgba(0,0,0,0.06)',
+                  flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>정렬:</span>
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value as SortOption)}
+                    style={{
+                      padding: '6px 10px', border: 'none', borderRadius: 8,
+                      fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer',
+                      background: 'transparent', color: '#1e293b', fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="latest">최신순</option>
+                    <option value="customer">고객명순</option>
+                    <option value="expiry">만료일순</option>
+                    <option value="rent">렌트료순</option>
+                  </select>
+                </div>
+              ) : undefined
+            }
+          />
         )}
 
         {/* ═══ TAB: 단기 청구서 목록 ═══ */}
