@@ -29,8 +29,8 @@ export default function RentPricingBuilder() {
   const initialLoadDone = useRef(false)
 
   // --- 위저드 단계 ---
-  type WizardStep = 'analysis' | 'customer' | 'preview'
-  const [wizardStep, setWizardStep] = useState<WizardStep>('analysis')
+  type WizardStep = 'vehicle' | 'analysis' | 'customer' | 'preview'
+  const [wizardStep, setWizardStep] = useState<WizardStep>('vehicle')
 
   // --- 견적 수정 모드 ---
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
@@ -832,6 +832,8 @@ export default function RentPricingBuilder() {
           const carData = carJson.data
           if (carData) {
             setSelectedCar(carData)
+            // 기존 워크시트 로드 시: 차량이 이미 선택되어 있으므로 원가분석 단계로 바로 이동
+            setWizardStep('analysis')
           setLookupMode('registered')
           if (!d.factory_price) setFactoryPrice(carData.factory_price || Math.round(carData.purchase_price * 1.15))
           if (!d.purchase_price) setPurchasePrice(carData.purchase_price)
@@ -2265,13 +2267,14 @@ export default function RentPricingBuilder() {
         {/* 스텝 인디케이터 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: 24, background: 'rgba(255,255,255,0.72)', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           {[
-            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: true },
-            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
-            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
+            { key: 'vehicle' as const,  label: '차량선택', desc: '등록차량 · 카달로그', num: 1, done: true },
+            { key: 'analysis' as const, label: '원가분석', desc: '비용 항목별 계산',     num: 2, done: true },
+            { key: 'customer' as const, label: '고객정보', desc: '임차인 · 계약기간',    num: 3, done: false },
+            { key: 'preview' as const,  label: '견적서',   desc: '미리보기 · 발송',      num: 4, done: false },
           ].map((s, i) => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <div
-                onClick={() => { if (s.key === 'analysis') setWizardStep('analysis') }}
+                onClick={() => { if (s.key !== 'customer' && s.key !== 'preview') setWizardStep(s.key) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, cursor: s.done ? 'pointer' : 'default',
                   padding: '8px 16px', borderRadius: 10,
@@ -2291,7 +2294,7 @@ export default function RentPricingBuilder() {
                   <div style={{ fontSize: 11, color: s.key === 'customer' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
                 </div>
               </div>
-              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
+              {i < 3 && <div style={{ width: 32, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
             </div>
           ))}
         </div>
@@ -2446,13 +2449,14 @@ export default function RentPricingBuilder() {
         <div className="max-w-[800px] mx-auto print:hidden" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: '#fff', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
           {[
-            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: true },
-            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: true },
-            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
+            { key: 'vehicle' as const,  label: '차량선택', desc: '등록차량 · 카달로그', num: 1, done: true },
+            { key: 'analysis' as const, label: '원가분석', desc: '비용 항목별 계산',     num: 2, done: true },
+            { key: 'customer' as const, label: '고객정보', desc: '임차인 · 계약기간',    num: 3, done: true },
+            { key: 'preview' as const,  label: '견적서',   desc: '미리보기 · 발송',      num: 4, done: false },
           ].map((s, i) => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <div
-                onClick={() => { if (s.key === 'analysis') setWizardStep('analysis'); if (s.key === 'customer') setWizardStep('customer') }}
+                onClick={() => { if (s.key !== 'preview') setWizardStep(s.key) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   cursor: s.done ? 'pointer' : 'default',
@@ -2473,7 +2477,7 @@ export default function RentPricingBuilder() {
                   <div style={{ fontSize: 11, color: s.key === 'preview' ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
                 </div>
               </div>
-              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
+              {i < 3 && <div style={{ width: 32, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px' }} />}
             </div>
           ))}
         </div>
@@ -2856,19 +2860,24 @@ export default function RentPricingBuilder() {
 
       {/* ===== 스텝 인디케이터 + 헤더 ===== */}
       <div style={{ marginBottom: 24 }}>
-        {/* 스텝 인디케이터 — Step 1 상태도 완료 여부에 따라 동적 표시 */}
+        {/* 스텝 인디케이터 — 4단계 (차량선택 → 원가분석 → 고객정보 → 견적서) */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, background: 'rgba(255,255,255,0.72)', padding: '16px 24px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.06)', marginBottom: 16, boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)' }}>
           {[
-            { key: 'analysis', label: '원가분석', desc: '차량 선택 · 비용 산출', num: 1, done: !!(selectedCar && calculations) },
-            { key: 'customer', label: '고객정보', desc: '임차인 · 계약기간', num: 2, done: false },
-            { key: 'preview', label: '견적서', desc: '미리보기 · 발송', num: 3, done: false },
+            { key: 'vehicle' as const,  label: '차량선택', desc: '등록차량 · 카달로그', num: 1, done: !!selectedCar },
+            { key: 'analysis' as const, label: '원가분석', desc: '비용 항목별 계산',     num: 2, done: !!(selectedCar && calculations && wizardStep !== 'vehicle') },
+            { key: 'customer' as const, label: '고객정보', desc: '임차인 · 계약기간',    num: 3, done: false },
+            { key: 'preview' as const,  label: '견적서',   desc: '미리보기 · 발송',      num: 4, done: false },
           ].map((s, i) => {
-            const active = s.key === 'analysis'
-            const clickable = s.key === 'customer' && !!(selectedCar && calculations)
+            const active = s.key === wizardStep
+            const clickable =
+              (s.key === 'vehicle') ||
+              (s.key === 'analysis' && !!selectedCar) ||
+              (s.key === 'customer' && !!(selectedCar && calculations)) ||
+              (s.key === 'preview' && !!(selectedCar && calculations))
             return (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
               <div
-                onClick={() => { if (clickable) setWizardStep('customer') }}
+                onClick={() => { if (clickable) setWizardStep(s.key) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   cursor: clickable ? 'pointer' : 'default',
@@ -2890,7 +2899,7 @@ export default function RentPricingBuilder() {
                   <div style={{ fontSize: 11, color: active ? 'rgba(255,255,255,0.7)' : '#9ca3af' }}>{s.desc}</div>
                 </div>
               </div>
-              {i < 2 && <div style={{ width: 40, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px', transition: 'background 0.15s' }} />}
+              {i < 3 && <div style={{ width: 32, height: 2, background: s.done ? '#16a34a' : 'rgba(0,0,0,0.06)', margin: '0 4px', transition: 'background 0.15s' }} />}
             </div>
           )})}
         </div>
@@ -2914,6 +2923,8 @@ export default function RentPricingBuilder() {
         </div>
       </div>
 
+      {/* ===== Step 1: 차량선택 (탭 네비 + 등록/카달로그 패널) ===== */}
+      {wizardStep === 'vehicle' && (<>
       {/* ===== 탭 네비게이션 ===== */}
       <div className="flex justify-center mb-6">
         <div className="bg-white/70 backdrop-blur-md border border-black/5 rounded-2xl p-1 inline-flex gap-1 shadow-sm">
@@ -3848,7 +3859,9 @@ export default function RentPricingBuilder() {
             <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-black/5 bg-gray-50/50 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-steel-500" />
-                <span className="text-xs font-bold text-slate-400">분석 차량 정보</span>
+                <span className="text-xs font-bold text-slate-400">
+                  {wizardStep === 'vehicle' ? '선택된 차량' : '분석 차량 정보'}
+                </span>
                 {(lookupMode === 'newcar' || lookupMode === 'saved') && newCarResult && (
                   <span className="text-[10px] px-2 py-0.5 bg-steel-100 text-steel-700 rounded-full font-bold ml-auto">✨ 신차 시뮬레이션</span>
                 )}
@@ -3880,7 +3893,40 @@ export default function RentPricingBuilder() {
           </div>
         )}
 
-      {!selectedCar ? null : calculations && (
+        {/* 차량선택 → 원가분석 다음 단계 네비게이션 */}
+        {selectedCar && (
+          <div className="max-w-[800px] mx-auto mt-6 flex justify-end">
+            <button
+              onClick={() => setWizardStep('analysis')}
+              className="px-6 py-2.5 rounded-xl bg-steel-600 text-white text-sm font-black hover:bg-steel-700 shadow-sm"
+              style={{ background: '#3b6eb5' }}
+            >
+              다음: 원가분석 →
+            </button>
+          </div>
+        )}
+      </>)}
+
+      {/* ===== Step 2: 원가분석 (비용 항목별 계산) ===== */}
+      {wizardStep === 'analysis' && selectedCar && (
+        <div className="mb-4 flex items-center justify-between bg-white/70 backdrop-blur-md border border-black/5 rounded-2xl px-4 py-2.5">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="w-2 h-2 rounded-full bg-steel-500" />
+            <span className="font-bold text-slate-700">{selectedCar.brand} {selectedCar.model}</span>
+            <span className="text-slate-400">·</span>
+            <span className="text-slate-500 text-xs">{selectedCar.year}년 · {selectedCar.is_used ? '중고' : '신차'}</span>
+            {selectedCar.number && <><span className="text-slate-400">·</span><span className="text-slate-500 text-xs">{selectedCar.number}</span></>}
+          </div>
+          <button
+            onClick={() => setWizardStep('vehicle')}
+            className="text-xs text-slate-500 hover:text-slate-700 font-bold px-3 py-1 rounded-lg hover:bg-slate-100"
+          >
+            ← 차량 변경
+          </button>
+        </div>
+      )}
+
+      {wizardStep === 'analysis' && selectedCar && calculations && (
         <>
           {/* ===== Option H: 상단 컨트롤 (프리셋 + 비교 + 역산 + 시중가) ===== */}
           <OptionHPanel
