@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "rm -rf .next node_modules/.cache && next dev",
-    "dev:nocache": "next dev --turbo-cache=false",
-    "clean": "rm -rf .next node_modules/.cache",
+    "dev:webpack": "NEXT_DISABLE_TURBOPACK=1 next dev",
+    "clean": "rm -rf .next node_modules/.cache .turbo",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
