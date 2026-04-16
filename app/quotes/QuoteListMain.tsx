@@ -20,7 +20,7 @@ import { getAuthHeader } from '@/app/utils/auth-client'
 // ============================================================================
 // TYPES
 // ============================================================================
-type MainTab = 'long_term' | 'short_term' | 'lotte_rate' | 'create_long' | 'calc_short'
+type MainTab = 'long_term' | 'short_term' | 'catalog' | 'lotte_rate' | 'create_long' | 'calc_short'
 // 파이프라인 3단계: ① 작성 → ② 전송 → ③ 계약 전환
 type SubStage = 'draft' | 'sent' | 'contract'
 type StatusFilter = 'all' | 'draft' | 'shared' | 'signed' | 'contracted' | 'archived'
@@ -1000,8 +1000,9 @@ export default function QuoteListPage() {
           filters={[
             { key: 'long_term', label: '장기', count: mainTabCounts.long_term },
             { key: 'short_term', label: '단기', count: mainTabCounts.short_term },
+            { key: 'catalog', label: '새 견적' },
           ]}
-          activeFilter={(mainTab === 'long_term' || mainTab === 'create_long') ? 'long_term' : (mainTab === 'short_term' || mainTab === 'calc_short') ? 'short_term' : mainTab}
+          activeFilter={(mainTab === 'long_term' || mainTab === 'create_long') ? 'long_term' : (mainTab === 'short_term' || mainTab === 'calc_short') ? 'short_term' : (mainTab === 'catalog') ? 'catalog' : mainTab}
           onFilterChange={(key) => {
             setMainTab(key as MainTab)
             setStatusFilter('all')
@@ -1261,6 +1262,11 @@ export default function QuoteListPage() {
         {/* ═══ TAB: 요율 관리 (요금기준표 통합) ═══ */}
         {mainTab === 'lotte_rate' && (
           <PricingStandardsPage />
+        )}
+
+        {/* ═══ TAB: 카달로그 (새 견적) ═══ */}
+        {mainTab === 'catalog' && (
+          <QuoteCreatePage />
         )}
 
         {/* ═══ TAB: 장기견적 산출 ═══ */}

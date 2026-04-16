@@ -210,6 +210,7 @@ export default function RentPricingBuilder() {
   const [catalogFilter, setCatalogFilter] = useState<'all' | 'worksheets' | 'prices'>('all')
   const [catalogSort, setCatalogSort] = useState<'recent' | 'price_asc' | 'price_desc' | 'brand'>('recent')
   const [showAddPanel, setShowAddPanel] = useState(false)  // 카달로그 내 "+ 가격표 추가" 토글
+  const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set())  // 저장 목록 일괄삭제용 체크
 
   // --- 데이터 로드 ---
   useEffect(() => {
@@ -1235,6 +1236,40 @@ export default function RentPricingBuilder() {
       alert('삭제에 실패했습니다.')
     }
   }, [fetchSavedPrices])
+
+  // 워크시트 개별 삭제
+  const handleDeleteWorksheet = useCallback(async (id: string) => {
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch(`/api/pricing-worksheets/${id}`, { method: 'DELETE', headers })
+      if (!res.ok) throw new Error('삭제 실패')
+      await fetchSavedWorksheets()
+    } catch (e) {
+      console.error('워크시트 삭제 실패:', e)
+      alert('삭제에 실패했습니다.')
+    }
+  }, [fetchSavedWorksheets])
+
+  // 일괄 삭제 (체크된 행)
+  const handleBulkDelete = useCallback(async () => {
+    if (checkedRows.size === 0) return
+    if (!confirm(`선택된 ${checkedRows.size}개 항목을 삭제하시겠습니까?`)) return
+    const headers = await getAuthHeader()
+    const errors: string[] = []
+    for (const rowId of checkedRows) {
+      // rowId 형식: "ws-{id}" 또는 "sp-{id}"
+      const [type, id] = [rowId.substring(0, 2), rowId.substring(3)]
+      try {
+        const url = type === 'ws' ? `/api/pricing-worksheets/${id}` : `/api/new-car-prices/${id}`
+        const res = await fetch(url, { method: 'DELETE', headers })
+        if (!res.ok) errors.push(id)
+      } catch { errors.push(id) }
+    }
+    setCheckedRows(new Set())
+    await fetchSavedWorksheets()
+    await fetchSavedPrices()
+    if (errors.length > 0) alert(`${errors.length}개 항목 삭제 실패`)
+  }, [checkedRows, fetchSavedWorksheets, fetchSavedPrices])
 
   // 업로드 경과 시간 타이머
   useEffect(() => {
@@ -3098,6 +3133,16 @@ export default function RentPricingBuilder() {
               {sorted.length}{q || catalogFilter !== 'all' ? ` / ${totalAll}` : ''}
             </span>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {checkedRows.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
+              >
+                선택 삭제 ({checkedRows.size})
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Toolbar: 검색 + 필터 칩 + 정렬 */}
@@ -3197,29 +3242,48 @@ export default function RentPricingBuilder() {
                     return (
                       <div
                         key={row.id}
-                        onClick={handleClick}
                         className={`group px-5 py-2.5 grid gap-x-3 gap-y-0.5 transition-colors ${
                           row.orphan ? 'cursor-default opacity-60'
                           : isSelected ? 'bg-indigo-50/70 cursor-pointer'
                           : 'cursor-pointer hover:bg-indigo-50/40'
                         }`}
                         style={{
-                          gridTemplateColumns: '24px minmax(0, 1fr) 100px 76px 48px 24px',
+                          gridTemplateColumns: '20px 24px minmax(0, 1fr) 100px 76px 24px',
                           gridTemplateRows: 'auto auto',
                         }}
                       >
                         {/* ── Line 1 ── */}
+                        {/* 체크박스 */}
+                        <div className="self-center" style={{ gridColumn: 1, gridRow: 1 }}>
+                          <input
+                            type="checkbox"
+                            checked={checkedRows.has(row.id)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setCheckedRows(prev => {
+                                const next = new Set(prev)
+                                if (next.has(row.id)) next.delete(row.id)
+                                else next.add(row.id)
+                                return next
+                              })
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 cursor-pointer"
+                          />
+                        </div>
                         {/* 아이콘 */}
                         <span
                           className={`text-sm self-center ${row.orphan ? 'text-slate-300' : isPrice ? 'text-indigo-500' : 'text-steel-500'}`}
-                          style={{ gridColumn: 1, gridRow: 1 }}
+                          style={{ gridColumn: 2, gridRow: 1 }}
+                          onClick={handleClick}
                         >
                           {row.orphan ? '🕳️' : isPrice ? '🚘' : '🧮'}
                         </span>
-                        {/* 모델명 + 번호판 + 뱃지 (한 줄, 자동 wrap) */}
+                        {/* 모델명 + 번호판 + 뱃지 */}
                         <div
                           className="min-w-0 flex items-center gap-1.5 flex-wrap"
-                          style={{ gridColumn: 2, gridRow: 1 }}
+                          style={{ gridColumn: 3, gridRow: 1 }}
+                          onClick={handleClick}
                         >
                           <span className={`font-black text-[13px] ${row.orphan ? 'italic text-slate-400' : 'text-slate-800'}`}>
                             {row.model || '차종 미확인'}
@@ -3241,62 +3305,45 @@ export default function RentPricingBuilder() {
                           {isPrice && row.raw.price_data?.variants?.length > 0 && (
                             <span className="text-[9px] text-slate-400 font-bold">{row.raw.price_data.variants.length}차종</span>
                           )}
+                          {isSelected && <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">선택</span>}
                         </div>
                         {/* 렌트가 */}
                         <div
                           className="text-right text-[11px] font-bold text-emerald-600 tabular-nums self-center whitespace-nowrap"
-                          style={{ gridColumn: 3, gridRow: 1 }}
+                          style={{ gridColumn: 4, gridRow: 1 }}
+                          onClick={handleClick}
                         >
                           {row.rent ? `${row.rent.toLocaleString()}원` : <span className="text-slate-300">—</span>}
                         </div>
                         {/* 날짜 */}
                         <div
                           className="text-right text-[10px] text-slate-400 tabular-nums self-center whitespace-nowrap"
-                          style={{ gridColumn: 4, gridRow: 1 }}
+                          style={{ gridColumn: 5, gridRow: 1 }}
+                          onClick={handleClick}
                         >
                           {new Date(row.updatedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
                         </div>
-                        {/* 상태 칩 */}
-                        <div className="text-center self-center" style={{ gridColumn: 5, gridRow: 1 }}>
-                          {isSelected ? (
-                            <span className="text-[10px] font-bold text-indigo-600">선택</span>
-                          ) : row.orphan ? (
-                            <span className="text-[10px] text-slate-400">고아</span>
-                          ) : (
-                            <span className="text-slate-300 text-xs group-hover:text-indigo-500">→</span>
-                          )}
+                        {/* 삭제 버튼 (모든 행에 hover 시 표시) */}
+                        <div className="text-center self-center" style={{ gridColumn: 6, gridRow: 1 }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!confirm(`"${row.model || '항목'}" 을(를) 삭제하시겠습니까?`)) return
+                              if (isPrice) handleDeleteSavedPrice(row.raw.id)
+                              else handleDeleteWorksheet(row.raw.id)
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all text-xs p-0.5"
+                            title="삭제"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        {/* 액션 (삭제) */}
-                        <div className="text-right self-center" style={{ gridColumn: 6, gridRow: 1 }}>
-                          {row.orphan ? (
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                if (!confirm('이 미분류 워크시트를 삭제할까요?')) return
-                                const headers = await getAuthHeader()
-                                await fetch(`/api/pricing-worksheets/${row.raw.id}`, { method: 'DELETE', headers })
-                                fetchSavedWorksheets()
-                              }}
-                              className="text-[10px] font-bold text-red-500 hover:bg-red-50 px-1.5 py-0.5 rounded"
-                              title="삭제"
-                            >
-                              ✕
-                            </button>
-                          ) : isPrice ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteSavedPrice(row.raw.id) }}
-                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all text-xs"
-                              title="삭제"
-                            >
-                              ✕
-                            </button>
-                          ) : null}
-                        </div>
-                        {/* ── Line 2 (트림/옵션) — 있을 때만, 모델명 컬럼 아래로 전체 폭 사용 ── */}
+                        {/* ── Line 2 (트림/옵션) ── */}
                         {row.trim && (
                           <div
                             className="text-[10.5px] text-slate-500 leading-snug break-words"
-                            style={{ gridColumn: '2 / span 5', gridRow: 2 }}
+                            style={{ gridColumn: '3 / span 4', gridRow: 2 }}
+                            onClick={handleClick}
                           >
                             {row.trim}
                           </div>
