@@ -576,7 +576,7 @@ export default function RentPricingBuilder() {
     const miscTotal = miscItems.reduce((s, r) => s + (Number(r.fixed_amount) || 0), 0) || 167000
     setMiscFee(miscTotal)
 
-    const totalAcq = carInfo.purchase_price + acqTaxAmt + bondNet + dlvFee + miscTotal
+    const totalAcq = Number(carInfo.purchase_price) + acqTaxAmt + bondNet + dlvFee + miscTotal
     // car_costs 실데이터가 있으면 해당 합계 유지, 없을 때만 자동계산값 적용
     if (!hasCarCostsRef.current) {
       setTotalAcquisitionCost(totalAcq)
@@ -1242,8 +1242,8 @@ export default function RentPricingBuilder() {
         if (targetVariant.trims?.length === 1) {
           const trim = targetVariant.trims[0]
           setNewCarSelectedTrim(trim)
-          setFactoryPrice(trim.base_price)
-          setPurchasePrice(trim.base_price)
+          setFactoryPrice(Number(trim.base_price))
+          setPurchasePrice(Number(trim.base_price))
           setWizardStep('options')
         } else {
           setNewCarSelectedTrim(null)
@@ -1334,9 +1334,9 @@ export default function RentPricingBuilder() {
     if (!newCarResult || !newCarSelectedVariant || !newCarSelectedTrim) return
 
     // 출고가 = 트림 기본가 + 선택 옵션 합산 + 컬러 추가금
-    const optionsTotal = newCarSelectedOptions.reduce((sum, opt) => sum + opt.price, 0)
-    const colorExtra = (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0)
-    const factoryTotal = newCarSelectedTrim.base_price + optionsTotal + colorExtra
+    const optionsTotal = newCarSelectedOptions.reduce((sum, opt) => sum + Number(opt.price), 0)
+    const colorExtra = Number(newCarSelectedExterior?.price || 0) + Number(newCarSelectedInterior?.price || 0)
+    const factoryTotal = Number(newCarSelectedTrim.base_price) + optionsTotal + colorExtra
     // 매입가 = 출고가 - 할인금액 (할인 없으면 출고가 그대로)
     const discountAmount = parseNum(newCarPurchasePrice) || 0
     const purchasePrice = factoryTotal - discountAmount
@@ -3728,8 +3728,8 @@ export default function RentPricingBuilder() {
                         setNewCarPurchasePrice('')
                         setSelectedCar(null)
                         // 트림 선택 시 출고가/매입가 즉시 반영
-                        setFactoryPrice(trim.base_price)
-                        setPurchasePrice(trim.base_price)
+                        setFactoryPrice(Number(trim.base_price))
+                        setPurchasePrice(Number(trim.base_price))
                         // 트림 선택 즉시 차량옵션 스텝으로 이동
                         setWizardStep('options')
                       }}
@@ -3887,7 +3887,7 @@ export default function RentPricingBuilder() {
                     <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-black/[0.06]">
                       <span className="font-bold text-slate-600">최종 출고가</span>
                       <span className="font-bold text-lg text-slate-800">
-                        {f(newCarSelectedTrim.base_price + newCarSelectedOptions.reduce((s, o) => s + o.price, 0) + (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0))}원
+                        {f(Number(newCarSelectedTrim.base_price) + newCarSelectedOptions.reduce((s, o) => s + Number(o.price), 0) + Number(newCarSelectedExterior?.price || 0) + Number(newCarSelectedInterior?.price || 0))}원
                       </span>
                     </div>
                   )}
@@ -3895,8 +3895,8 @@ export default function RentPricingBuilder() {
 
                 {/* 매입 할인 입력 + 분석 시작 */}
                 {(() => {
-                  const colorExtra = (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0)
-                  const totalFactory = newCarSelectedTrim.base_price + newCarSelectedOptions.reduce((s, o) => s + o.price, 0) + colorExtra
+                  const colorExtra = Number(newCarSelectedExterior?.price || 0) + Number(newCarSelectedInterior?.price || 0)
+                  const totalFactory = Number(newCarSelectedTrim.base_price) + newCarSelectedOptions.reduce((s, o) => s + Number(o.price), 0) + colorExtra
                   const discountAmt = parseNum(newCarPurchasePrice)
                   const finalPurchase = discountAmt > 0 ? totalFactory - discountAmt : totalFactory
                   return (
@@ -4158,8 +4158,8 @@ export default function RentPricingBuilder() {
                   </div>
                 ))}
                 {(() => {
-                  const colorExtra = (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0)
-                  const totalFactory = newCarSelectedTrim.base_price + newCarSelectedOptions.reduce((s: number, o: any) => s + o.price, 0) + colorExtra
+                  const colorExtra = Number(newCarSelectedExterior?.price || 0) + Number(newCarSelectedInterior?.price || 0)
+                  const totalFactory = Number(newCarSelectedTrim.base_price) + newCarSelectedOptions.reduce((s: number, o: any) => s + Number(o.price), 0) + colorExtra
                   return (newCarSelectedOptions.length > 0 || colorExtra > 0) ? (
                     <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-black/[0.06]">
                       <span className="font-bold text-slate-600">최종 출고가</span>
@@ -4171,8 +4171,8 @@ export default function RentPricingBuilder() {
 
               {/* 매입 할인 입력 + 분석 시작 */}
               {(() => {
-                const colorExtra = (newCarSelectedExterior?.price || 0) + (newCarSelectedInterior?.price || 0)
-                const totalFactory = newCarSelectedTrim.base_price + newCarSelectedOptions.reduce((s: number, o: any) => s + o.price, 0) + colorExtra
+                const colorExtra = Number(newCarSelectedExterior?.price || 0) + Number(newCarSelectedInterior?.price || 0)
+                const totalFactory = Number(newCarSelectedTrim.base_price) + newCarSelectedOptions.reduce((s: number, o: any) => s + Number(o.price), 0) + colorExtra
                 const discountAmt = parseNum(newCarPurchasePrice)
                 const finalPurchase = discountAmt > 0 ? totalFactory - discountAmt : totalFactory
                 return (
