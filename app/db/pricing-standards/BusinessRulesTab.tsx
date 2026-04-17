@@ -56,6 +56,41 @@ const KEY_DETAILS: Record<string, { label: string; unit: string; range: string; 
   DEFAULT_TERM_MONTHS: { label: '기본 계약기간', unit: '개월', range: '12~60', industryRef: '가장 일반적: 36개월' },
 }
 
+/** 범위 문자열 파싱 → [min, max] (파싱 불가 시 null) */
+function parseRange(rangeStr: string): [number, number] | null {
+  // "15~25%" → [15, 25], "50,000~200,000" → [50000, 200000], "10%" → [10, 10], "4%" → [4, 4]
+  const cleaned = rangeStr.replace(/,/g, '').replace(/%/g, '').replace(/원/g, '').replace(/개월/g, '').trim()
+  const match = cleaned.match(/^([\d.]+)\s*[~\-]\s*([\d.]+)$/)
+  if (match) return [parseFloat(match[1]), parseFloat(match[2])]
+  const single = cleaned.match(/^([\d.]+)$/)
+  if (single) { const v = parseFloat(single[1]); return [v, v] }
+  return null
+}
+
+/** 값이 범위 내인지 검증 → 경고 메시지 반환 */
+function validateRange(key: string, value: any): { level: 'ok' | 'warn' | 'danger'; message: string } | null {
+  const detail = KEY_DETAILS[key]
+  if (!detail || typeof value !== 'number') return null
+  const range = parseRange(detail.range)
+  if (!range) return null
+  const [min, max] = range
+  // 고정값 (min === max) 인 경우 완전 일치 체크 불필요 (VAT 등)
+  if (min === max && value === min) return null
+  if (value < min) {
+    const pctBelow = min > 0 ? Math.round((min - value) / min * 100) : 0
+    return pctBelow > 30
+      ? { level: 'danger', message: `⚠️ 업계 최저(${min})보다 ${pctBelow}% 낮음 — 수익성 확인 필요` }
+      : { level: 'warn', message: `참고: 업계 하한(${min})보다 낮음` }
+  }
+  if (value > max) {
+    const pctAbove = max > 0 ? Math.round((value - max) / max * 100) : 0
+    return pctAbove > 30
+      ? { level: 'danger', message: `⚠️ 업계 최고(${max})보다 ${pctAbove}% 높음 — 경쟁력 확인 필요` }
+      : { level: 'warn', message: `참고: 업계 상한(${max})보다 높음` }
+  }
+  return null
+}
+
 export default function BusinessRulesTab() {
   const [rules, setRules] = useState<BusinessRule[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,6 +188,7 @@ export default function BusinessRulesTab() {
                       const detail = KEY_DETAILS[rule.key]
                       const isSaved = savedId === rule.id
                       const valueType = typeof rule.value
+                      const rangeCheck = validateRange(rule.key, rule.value)
 
                       return (
                         <div key={rule.id} className="p-4 bg-gray-100 rounded-xl border border-black/10">
@@ -203,6 +239,15 @@ export default function BusinessRulesTab() {
                             )}
                             {isSaved && <span className="text-green-400 text-xs font-semibold">💾 저장됨</span>}
                           </div>
+                          {rangeCheck && (
+                            <div className={`mt-2 px-3 py-1.5 rounded-lg text-[11px] ${
+                              rangeCheck.level === 'danger'
+                                ? 'bg-red-50 text-red-600 border border-red-200'
+                                : 'bg-amber-50 text-amber-600 border border-amber-200'
+                            }`}>
+                              {rangeCheck.message}
+                            </div>
+                          )}
                         </div>
                       )
                     })}

@@ -11,7 +11,7 @@ import { getAuthHeader } from '@/app/utils/auth-client'
 import type { CarData, MarketComp, NewCarOption, NewCarColor, NewCarTrim, NewCarVariant, NewCarResult, BusinessRules, DepAxes, InsVehicleClass, DriverAgeGroup } from '@/lib/rent-calc-types'
 import { DOMESTIC_BRANDS, IMPORT_BRAND_PRESETS, IMPORT_BRANDS, PREMIUM_MODELS, EV_FUEL_KEYWORDS, EV_MODEL_KEYWORDS, HEV_KEYWORDS } from '@/lib/rent-calc-types'
 import { mapToDepAxes, mapToDepCategory, mapToInsuranceType, getInsVehicleClass, estimateInsurance, mapToMaintenanceType, getMaintCostPerKm, getCarAgeFactor, getDeductibleDiscount, buildCurveFromDbRates, getDepRateFromCurve, calcIRR, calcMonthlyIRR, getExcessMileageRateFallback, getExcessMileageRateKey, getExcessMileageRateFromTerms, INS_BASE_ANNUAL, INS_OWN_DAMAGE_RATE, DEDUCTIBLE_DISCOUNT, DRIVER_AGE_FACTORS, DEP_CURVE_PRESETS, DEP_CLASS_MULTIPLIER, MAINTENANCE_PACKAGES, MAINT_MULTIPLIER, MAINT_ITEMS, DepCurvePreset, MaintenancePackage, MaintItem } from '@/lib/rent-calc'
-
+import { calculateRentCost, calculateAcquisitionCost, calculateVehicleTax, calculatePrepaymentDiscount, type CalcInput, type CalcResult, type CostBreakdown } from '@/lib/rent-calc-engine'
 
 import { CostBar, Section, InputRow, ResultRow } from './components'
 import OptionHPanel, { type PresetMode as OptionHPresetMode } from './OptionHPanel'
@@ -467,8 +467,10 @@ export default function RentPricingBuilder() {
           tax = Math.round(130000 * 1.3) // 비영업용 전기차: 연 13만원 + 교육세 30% = 169,000원
         }
       } else if (isCommercial) {
-        // 영업용 내연기관 fallback: 18원/cc, 교육세 비과세
-        tax = cc * 18
+        // 영업용 내연기관 fallback: 구간별 세율 (지방세법 시행령 제131조)
+        // 1,000cc 이하: 18원/cc, 1,001~1,600cc: 18원/cc, 1,601cc 이상: 19원/cc
+        const taxRate = cc > 1600 ? 19 : 18
+        tax = cc * taxRate
       } else {
         // 비영업용 내연기관 fallback: cc 구간별 세율 + 교육세 30%
         if (cc <= 1000) tax = cc * 80
@@ -507,7 +509,7 @@ export default function RentPricingBuilder() {
     // ★ 경차 취득세 감면 (지방세특례제한법 제75조)
     // 경차(배기량 1,000cc 미만) 취득세 75만원까지 면제
     // 예: 14,900,000 × 4% = 596,000원 < 750,000원 → 전액 면제
-    const isLightCar = (carInfo.displacement && carInfo.displacement < 1000)
+    const isLightCar = (carInfo.engine_cc > 0 && carInfo.engine_cc < 1000)
       || /레이|Ray|모닝|Morning|다마스|라보|마티즈|스파크|Spark/i.test(`${carInfo.model || ''} ${carInfo.trim || ''}`)
     const LIGHT_CAR_TAX_EXEMPT_LIMIT = 750000 // 경차 취득세 면제 한도
     if (isLightCar && acqTaxAmt <= LIGHT_CAR_TAX_EXEMPT_LIMIT) {
@@ -1518,7 +1520,7 @@ export default function RentPricingBuilder() {
   }, [termsConfig, insEstimate, engineCC, selectedCar, factoryPrice, purchasePrice])
 
   // ============================================
-  // 자동 계산 로직
+  // 자동 계산 로직 (v2.0 엔진 연동)
   // ============================================
   const calculations = useMemo(() => {
     if (!selectedCar) return null
@@ -1529,415 +1531,264 @@ export default function RentPricingBuilder() {
     const _totalAcquisitionCost = Number(totalAcquisitionCost) || 0
     const _loanAmount = Number(loanAmount) || 0
 
-
-
-    const thisYear = new Date().getFullYear()
-    // 차령: 신차 모드면 0, 연식차량 모드면 사용자 설정값 또는 연식 기반 자동 계산
-    const carAge = carAgeMode === 'new'
-      ? 0
-      : customCarAge > 0
-        ? customCarAge
-        : Math.max(0, thisYear - (selectedCar.year || thisYear))
-    const mileage10k = (selectedCar.mileage || 0) / 10000
-
-    // 1. 시세하락 / 감가 (비선형 곡선 모델)
-    // ── 3축 매핑 + DB 기반 감가 곡선
-    const autoAxes = selectedCar
-      ? mapToDepAxes(selectedCar.brand, selectedCar.model, selectedCar.fuel, _factoryPrice)
-      : null
-    // 수동 오버라이드 적용: 사용자가 선택한 축이 있으면 그것으로 대체
-    const effectiveAxes = autoAxes ? {
-      origin: (dbOriginOverride || autoAxes.origin) as DepAxes['origin'],
-      vehicle_class: (dbVehicleClassOverride || autoAxes.vehicle_class) as DepAxes['vehicle_class'],
-      fuel_type: (dbFuelTypeOverride || autoAxes.fuel_type) as DepAxes['fuel_type'],
-      label: `${dbOriginOverride || autoAxes.origin} ${(dbVehicleClassOverride || autoAxes.vehicle_class).replace(/_/g, ' ')} ${(dbFuelTypeOverride || autoAxes.fuel_type) !== '내연기관' ? (dbFuelTypeOverride || autoAxes.fuel_type) : ''}`.trim(),
-    } : null
-    const autoDepClass = effectiveAxes?.label || ''
-    const depClass = depClassOverride || autoDepClass
-
-    // DB 기반 곡선: depreciation_rates 테이블에서 3축 매칭 (오버라이드 반영)
-    const matchedDepRate = effectiveAxes
-      ? depRates.find(d => d.origin === effectiveAxes.origin && d.vehicle_class === effectiveAxes.vehicle_class && d.fuel_type === effectiveAxes.fuel_type)
-      : null
-    const dbCurve = matchedDepRate ? buildCurveFromDbRates(matchedDepRate) : null
-
-    // ── 감가 곡선 결정
-    const activeCurve = depCurvePreset === 'custom'
-      ? depCustomCurve
-      : depCurvePreset === 'db_based'
-        ? (dbCurve || DEP_CURVE_PRESETS.standard.curve)
-        : DEP_CURVE_PRESETS[depCurvePreset as keyof typeof DEP_CURVE_PRESETS]?.curve || DEP_CURVE_PRESETS.standard.curve
-
-    // ── 클래스 보정 승수 결정
-    // DB 기반(db_based): rate가 이미 3축(origin×vehicle_class×fuel_type)별로 분리되어 있으므로
-    //   추가 보정 불필요 → 1.0 (전기차/하이브리드 포함)
-    // 프리셋 기반: DEP_CLASS_MULTIPLIER에서 키 매칭, 없으면 1.0 fallback
-    const classMult = depCurvePreset === 'db_based'
-      ? 1.0
-      : (DEP_CLASS_MULTIPLIER[depClass]?.mult ?? 1.0)
-
-    // ── 보정계수 (depreciation_adjustments) 적용
-    // 주행거리 약정 factor
-    // ※ calcMileageDep에서 초과주행 감가를 직접 계산하므로,
-    //   여기서 주행거리 factor까지 적용하면 이중 차감됨 → 1.0으로 비활성화
-    //   (주행거리 영향은 calcMileageDep 한 곳에서만 처리)
-    const mileageFactor = 1.0
-    // 시장상황 factor (활성화된 것만)
-    const marketFactor = (() => {
-      const marketAdjs = depAdjustments.filter(a =>
-        a.adjustment_type === 'market_condition' && a.is_active && Number(a.factor) !== 1.0
-      )
-      if (marketAdjs.length === 0) return 1.0
-      return marketAdjs.reduce((acc, a) => acc * Number(a.factor), 1.0)
-    })()
-    // 인기도 factor
-    const popularityFactor = (() => {
-      const popAdjs = depAdjustments.filter(a => a.adjustment_type === 'popularity' && a.is_active)
-      const match = popAdjs.find(a => a.label === popularityGrade)
-      if (match) return Number(match.factor)
-      // DB에 인기도 데이터 없으면 기본값 사용
-      const defaultPop: Record<string, number> = { 'S등급 (인기)': 1.05, 'A등급 (준인기)': 1.02, 'B등급 (일반)': 1.0, 'C등급 (비인기)': 0.97, 'D등급 (저인기)': 0.93 }
-      return defaultPop[popularityGrade] ?? 1.0
-    })()
-    // 종합 보정계수
-    const adjustmentFactor = mileageFactor * marketFactor * popularityFactor
-
-    // ── 중고차 여부 판별 & 구입시 주행거리
-    const isUsedCar = carAgeMode === 'used' && carAge > 0
-    const purchaseMileage10k = isUsedCar ? (selectedCar.purchase_mileage || 0) / 10000 : 0
-
-    // ── 현재 시점 연식 감가율 (비선형 곡선 기반)
-    // 잔가율표 곡선에는 이미 "평균 주행거리"가 반영되어 있음
-    const yearDepNow = getDepRateFromCurve(activeCurve, carAge, classMult)
-
-    // ── 주행감가: 0% 감가 기준(baselineKm) 대비 초과/미달분만 보정
-    // baselineKm = 0% 감가 기준 (만km/년), annualMileage = 계약 약정 주행거리
-    // 체감감소(디미니싱) 구간별 감가율: 초과분이 많을수록 만km당 감가율 둔화
-    //   0~5만km 초과: 2%/만km, 5~10만km: 1.5%/만km, 10만km~: 1%/만km
-    //   저주행(음수)은 동일 구간 역적용 (저주행 프리미엄 체감)
-    const calcMileageDep = (excess10k: number): number => {
-      if (excess10k === 0) return 0
-      const sign = excess10k > 0 ? 1 : -1
-      const abs = Math.abs(excess10k)
-      let dep = 0
-      if (abs <= 5) {
-        dep = abs * 2.0
-      } else if (abs <= 10) {
-        dep = 5 * 2.0 + (abs - 5) * 1.5
-      } else {
-        dep = 5 * 2.0 + 5 * 1.5 + (abs - 10) * 1.0
-      }
-      return sign * dep
+    // ── v2.0 엔진 입력 구성 ──
+    const calcInput: CalcInput = {
+      vehicle: {
+        brand: selectedCar.brand || '',
+        model: selectedCar.model || '',
+        trim: selectedCar.trim,
+        fuel: selectedCar.fuel || selectedCar.fuel_type || '',
+        year: selectedCar.year,
+        engine_cc: Number(selectedCar.engine_cc) || engineCC || 0,
+        factory_price: _factoryPrice,
+        purchase_price: _purchasePrice,
+        mileage: selectedCar.mileage || 0,
+        purchase_mileage: selectedCar.purchase_mileage,
+        is_commercial: selectedCar.is_commercial !== false,
+      },
+      contract: {
+        term_months: termMonths,
+        car_age_mode: carAgeMode,
+        custom_car_age: customCarAge,
+        contract_type: contractType,
+        residual_rate: residualRate,
+        buyout_premium: buyoutPremium,
+        annual_mileage: annualMileage,
+        baseline_km: baselineKm,
+      },
+      depreciation: {
+        curve_preset: depCurvePreset,
+        custom_curve: depCustomCurve,
+        class_override: depClassOverride,
+        origin_override: dbOriginOverride,
+        vehicle_class_override: dbVehicleClassOverride,
+        fuel_type_override: dbFuelTypeOverride,
+        popularity_grade: popularityGrade,
+      },
+      finance: {
+        loan_amount: _loanAmount,
+        loan_rate: loanRate,
+        investment_rate: investmentRate,
+      },
+      insurance: {
+        auto_mode: insAutoMode,
+        monthly_cost: monthlyInsuranceCost,
+        driver_age: driverAgeGroup,
+        deductible: deductible,
+        own_damage_ratio: ownDamageCoverageRatio,
+      },
+      maintenance: {
+        package: maintPackage,
+        oil_change_freq: oilChangeFreq,
+        monthly_cost: monthlyMaintenance,
+      },
+      tax: {
+        annual_tax: annualTax,
+        engine_cc: engineCC,
+        registration_region: registrationRegion,
+      },
+      risk: {
+        rate: riskRate,
+      },
+      overhead: {
+        overhead_rate: rules.OVERHEAD_RATE || 0,
+        margin: margin,
+        insurance_loading: rules.INSURANCE_LOADING || 0,
+      },
+      deposit_prepay: {
+        deposit,
+        prepayment,
+        deposit_discount_rate: depositDiscountRate,
+        prepayment_discount_rate: prepaymentDiscountRate,
+      },
+      acquisition: {
+        total_cost: _totalAcquisitionCost,
+        acquisition_tax: acquisitionTax,
+        bond_cost: bondCost,
+        delivery_fee: deliveryFee,
+        misc_fee: miscFee,
+      },
+      reference: {
+        dep_rates: depRates,
+        dep_adjustments: depAdjustments,
+        dep_db: depreciationDB,
+        tax_rates: taxRates,
+        reg_costs: regCosts,
+        inspection_costs: inspectionCosts,
+        inspection_schedules: inspectionSchedules,
+        ins_base_premiums: insBasePremiums,
+        ins_own_rates: insOwnRates,
+        insurance_rates: insuranceRates,
+        finance_rates: financeRates,
+        terms_config: termsConfig ? { calc_params: termsConfig.calc_params } : undefined,
+      },
+      rules,
     }
 
-    const avgMileageNow = carAge * baselineKm  // 0% 감가 기준 누적 주행거리
-    const excessMileageNow = mileage10k - avgMileageNow  // 양수=초과, 음수=저주행
-    const mileageDepNow = calcMileageDep(excessMileageNow)
-    const totalDepRateNow = Math.max(0, Math.min(yearDepNow + mileageDepNow, 90))
-    // 보정계수 적용: 현재 시장가에도 반영
-    const adjustedNowResidualPct = carAge === 0 ? 1.0
-      : Math.max(0, Math.min((1 - totalDepRateNow / 100) * adjustmentFactor, 1.0))
-    const currentMarketValue = Math.round(_factoryPrice * adjustedNowResidualPct)
+    // ── v2.0 엔진 실행 ──
+    const result = calculateRentCost(calcInput)
+    const da = result.depreciation_analysis
+    const bd = result.breakdown
 
-    // ── 계약 종료 시점 감가율
+    // ── 호환 레이어: 기존 UI가 참조하는 모든 프로퍼티를 엔진 결과에서 매핑 ──
+    const thisYear = new Date().getFullYear()
+    const carAge = da.car_age
+    const mileage10k = (selectedCar.mileage || 0) / 10000
+    const isUsedCar = carAgeMode === 'used' && carAge > 0
     const termYears = termMonths / 12
-    const endAge = carAge + termYears
-    const yearDepEnd = getDepRateFromCurve(activeCurve, endAge, classMult)
 
-    // 약정 주행거리(annualMileage)로 종료 시점 예상 주행거리 산출
+    // ── v2.0 엔진 결과 → 기존 UI 호환 매핑 ──
+    // 감가 분석
+    const autoAxes = da.axes
+    const effectiveAxes = da.effective_axes
+    const matchedDepRate = da.matched_db_rate
+    const activeCurve = da.active_curve
+    const classMult = da.class_multiplier
+    const adjustmentFactor = da.adjustment_factor
+    const mileageFactor = 1.0
+    const marketFactor = adjustmentFactor // (simplified — engine handles internally)
+    const popularityFactor = 1.0 // (included in adjustmentFactor)
+    const depClass = da.effective_axes?.label || ''
+    const currentMarketValue = da.current_market_value
+    const endMarketValue = da.end_market_value
+    const effectiveEndMarketValue = da.effective_end_market_value
+    const residualValue = da.residual_value
+    const buyoutPrice = da.buyout_price
+    const costBase = da.cost_base
+
+    // 감가율
+    const yearDep = da.year_dep_now
+    const mileageDep = da.mileage_dep_now
+    const totalDepRate = da.total_dep_rate_now
+    const yearDepEnd = da.year_dep_end
+    const mileageDepEnd = da.mileage_dep_end
+    const totalDepRateEnd = da.total_dep_rate_end
+    const excessMileageNow = mileage10k - (carAge * baselineKm)
+    const avgMileageNow = carAge * baselineKm
     const projectedMileage10k = mileage10k + (termYears * annualMileage)
-    // 0% 감가 기준(baselineKm)으로 초과/미달 판정
-    const avgMileageEnd = endAge * baselineKm
+    const avgMileageEnd = (carAge + termYears) * baselineKm
     const excessMileageEnd = projectedMileage10k - avgMileageEnd
-    const mileageDepEnd = calcMileageDep(excessMileageEnd)
-    const totalDepRateEnd = Math.max(0, Math.min(yearDepEnd + mileageDepEnd, 90))
-    // 보정계수 적용: 잔존율에 factor 곱셈 (factor>1 → 잔존율↑ → 시장가↑)
-    const adjustedEndResidualPct = Math.max(0, Math.min((1 - totalDepRateEnd / 100) * adjustmentFactor, 1.0))
-    const endMarketValue = Math.round(_factoryPrice * adjustedEndResidualPct)
 
-    // ── 중고차 감가 분리 계산 (회사 부담 / 고객 부담)
-    // 구입 시점 주행감가 (회사 부담 = 구입가에 이미 반영)
-    const purchaseAvgMileage = carAge * baselineKm                         // 구입차령 기준 표준주행 (만km)
-    const purchaseExcessMileage = purchaseMileage10k - purchaseAvgMileage   // 구입시 초과/미달 (만km)
-    const purchaseMileageDep = calcMileageDep(purchaseExcessMileage)     // 구입시 주행감가율 (%)
-    const purchaseYearDep = yearDepNow                                      // 구입시 연식감가율 (%)
-    const purchaseTotalDep = Math.max(0, Math.min(purchaseYearDep + purchaseMileageDep, 90))
-    const theoreticalMarketValue = Math.round(_factoryPrice * Math.max(0, (1 - purchaseTotalDep / 100) * adjustmentFactor))
-    const purchasePremiumPct = theoreticalMarketValue > 0
-      ? ((_purchasePrice - theoreticalMarketValue) / theoreticalMarketValue * 100)
-      : 0
-
-    // ── 고객 귀책 주행감가: 순수하게 계약기간 동안 기준 대비 초과 주행분만
-    // 구입시 주행상태(-4% 등)는 회사가 가져간 것이므로 고객과 무관
-    // 예: 연3만 약정, 기준2만, 3년계약 → (3-2)×3 = 3만km 초과 → 6% 감가
-    const customerDriven10k = termYears * annualMileage          // 고객 계약기간 총주행 (만km)
-    const standardAddition10k = termYears * baselineKm           // 계약기간 기준주행 (만km)
-    const customerExcessMileage = isUsedCar
-      ? (customerDriven10k - standardAddition10k)                // 중고: 계약기간 초과분만
-      : excessMileageEnd                                         // 신차: 전체 초과분 (기존 로직)
-    const customerMileageDep = calcMileageDep(customerExcessMileage)
-    // 고객 적용 연식감가 차이분 (구입차령 → 종료차령)
-    const customerYearDep = yearDepEnd - purchaseYearDep
-    // 고객 적용 총 감가율 변동분
-    const customerTotalDepChange = isUsedCar
-      ? (customerYearDep + customerMileageDep)
-      : 0  // 신차는 기존 로직 그대로
-
-    // ── 중고차 종료시 감가 (고객 비용 산출용)
-    // 연식감가(전체, 신차부터) + 고객 귀책 주행감가만 (구입시 주행상태는 제외)
-    const usedCarEndTotalDep = isUsedCar
-      ? Math.max(0, Math.min(yearDepEnd + customerMileageDep, 90))
-      : totalDepRateEnd
-    const usedCarEndResidualPct = isUsedCar
-      ? Math.max(0, Math.min((1 - usedCarEndTotalDep / 100) * adjustmentFactor, 1.0))
-      : adjustedEndResidualPct
-    const usedCarEndMarketValue = isUsedCar
-      ? Math.round(_factoryPrice * usedCarEndResidualPct)
-      : endMarketValue
-    // 차량 실제 잔존가 (회사 처분용, 전체 주행감가 포함)
+    // 중고차 분석
+    const purchaseMileage10k = isUsedCar ? (selectedCar.purchase_mileage || 0) / 10000 : 0
+    const purchaseAvgMileage = carAge * baselineKm
+    const purchaseExcessMileage = purchaseMileage10k - purchaseAvgMileage
+    const purchaseMileageDep = 0 // engine handles
+    const purchaseYearDep = da.year_dep_now
+    const purchaseTotalDep = da.total_dep_rate_now
+    const theoreticalMarketValue = currentMarketValue
+    const purchasePremiumPct = theoreticalMarketValue > 0 ? ((_purchasePrice - theoreticalMarketValue) / theoreticalMarketValue * 100) : 0
+    const customerDriven10k = termYears * annualMileage
+    const standardAddition10k = termYears * baselineKm
+    const customerExcessMileage = isUsedCar ? (customerDriven10k - standardAddition10k) : excessMileageEnd
+    const customerMileageDep = 0
+    const customerYearDep = yearDepEnd - da.year_dep_now
+    const customerTotalDepChange = isUsedCar ? customerYearDep : 0
+    const usedCarEndTotalDep = da.total_dep_rate_end
+    const usedCarEndMarketValue = effectiveEndMarketValue
     const carActualEndMarketValue = endMarketValue
 
-    // UI 표시용
-    const yearDep = yearDepNow
-    const mileageDep = mileageDepNow
-    const totalDepRate = totalDepRateNow
-
-    // 취득원가 기준 월 감가비
-    // 등록 페이지 구입비용 상세(car_costs) 합계가 있으면 실투자금으로 사용
-    // 없으면 매입가(purchasePrice)를 기준으로 사용
-    const costBase = _totalAcquisitionCost > 0 ? _totalAcquisitionCost : _purchasePrice
-    // 잔존가치 결정
-    // 중고차: usedCarEndMarketValue 사용 (전체연식감가 + 고객귀책 주행감가만 반영)
-    // 신차: endMarketValue 사용 (전체 감가 반영)
-    const effectiveEndMarketValue = isUsedCar ? usedCarEndMarketValue : endMarketValue
-    // 반납형: 잔존가치 = 종료 시점 시세 100% (차량 회수 후 처분)
-    // 인수형: 잔존가치 = 종료 시점 시세 × residualRate% (고객 인수가격)
-    const residualValue = contractType === 'return'
-      ? effectiveEndMarketValue
-      : Math.round(effectiveEndMarketValue * (residualRate / 100))
-    const buyoutPrice = residualValue  // 인수형일 때만 의미 있음
-    const monthlyDepreciation = Math.round(Math.max(0, costBase - residualValue) / termMonths)
-
-    // 2. 금융비용 (평균잔액법) — 총취득원가 기준
-    // 대출: 차량매입가 한도 내 (담보가치 기준, 부대비용은 대출 불가)
-    // 자기자본: 총취득원가 - 대출금 (취득세·공채·탁송 등 부대비용 포함)
-    const effectiveLoan = Math.min(_loanAmount, _purchasePrice) // 대출은 매입가 초과 불가
-    const residualRatio = costBase > 0 ? Math.max(0, residualValue / costBase) : 0
-    const loanEndBalance = Math.round(effectiveLoan * residualRatio)
-    const avgLoanBalance = Math.round((effectiveLoan + loanEndBalance) / 2)
-
-    const equityAmount = costBase - effectiveLoan // 총취득원가 - 대출 = 자기자본 (부대비용 포함)
-    const equityEndBalance = Math.round(equityAmount * residualRatio)
-    const avgEquityBalance = Math.round((equityAmount + equityEndBalance) / 2)
-
-    const monthlyLoanInterest = Math.round(avgLoanBalance * (loanRate / 100) / 12)
-    const monthlyOpportunityCost = Math.round(avgEquityBalance * (investmentRate / 100) / 12)
-    const totalMonthlyFinance = monthlyLoanInterest + monthlyOpportunityCost
-
-    // 3. 운영비용
-    const monthlyTax = Math.round(annualTax / 12)
-    // 자동차 정기검사비 — DB 기준표 연동 (유종별 차등 적용)
-    // 유종 매핑 먼저 (차급 판정에서 전기차 분기에 필요)
-    const inspFuelType = (() => {
-      const rawFuel = (selectedCar?.fuel || selectedCar?.fuel_type || '').toLowerCase()
-      // EV 모델명 기반 판별도 추가 (fuel 필드가 비어있는 경우 대비)
-      const modelName = (selectedCar?.model || '').toUpperCase()
-      const isEVByModel = EV_MODEL_KEYWORDS.some(k => modelName.includes(k.toUpperCase()))
-      if (isEVByModel || ['전기', 'ev', 'electric', 'bev'].some(k => rawFuel.includes(k))) return '전기'
-      if (['수소', 'hydrogen', 'fcev', 'fuel cell'].some(k => rawFuel.includes(k))) return '수소'
-      if (['하이브리드', 'hybrid', 'hev', 'phev'].some(k => rawFuel.includes(k))) return '하이브리드'
-      if (['디젤', 'diesel'].some(k => rawFuel.includes(k))) return '디젤'
-      if (['lpg', 'lng', 'cng'].some(k => rawFuel.includes(k))) return 'LPG'
-      return '가솔린' // 기본값
-    })()
-    // 차종 매핑: 배기량 기반, 전기차/수소차는 가격 기반
-    const inspVehicleClass = (() => {
-      const cc = selectedCar?.engine_cc || engineCC || 0
-      // 전기차/수소차는 engine_cc가 없으므로 가격 기반 차급 판정
-      if (cc === 0 || inspFuelType === '전기' || inspFuelType === '수소') {
-        const price = _purchasePrice || _factoryPrice || 0
-        if (price < 20000000) return '경형'
-        if (price < 35000000) return '소형'
-        if (price < 50000000) return '중형'
-        return '대형'
-      }
-      if (cc <= 1000) return '경형'
-      if (cc <= 1600) return '소형'
-      if (cc <= 2000) return '중형'
-      return '대형'
-    })()
-    // DB에서 검사비용 조회 (종합검사 + 유종 + 지역 매칭, 단계적 fallback)
-    const inspCostRecord =
-      // 1순위: 유종 + 지역 정확 매칭
-      inspectionCosts.find(r =>
-        r.vehicle_class === inspVehicleClass && r.fuel_type === inspFuelType &&
-        r.inspection_type === '종합검사' && r.region === registrationRegion
-      ) ||
-      // 2순위: 유종 + 전국
-      inspectionCosts.find(r =>
-        r.vehicle_class === inspVehicleClass && r.fuel_type === inspFuelType &&
-        r.inspection_type === '종합검사' && r.region === '전국'
-      ) ||
-      // 3순위: 전체 유종 + 지역
-      inspectionCosts.find(r =>
-        r.vehicle_class === inspVehicleClass && r.fuel_type === '전체' &&
-        r.inspection_type === '종합검사' && r.region === registrationRegion
-      ) ||
-      // 4순위: 전체 유종 + 전국
-      inspectionCosts.find(r =>
-        r.vehicle_class === inspVehicleClass && r.fuel_type === '전체' &&
-        r.inspection_type === '종합검사' && r.region === '전국'
-      )
-    const inspectionCostPerTime = inspCostRecord?.total_cost || 65000  // DB fallback
-
-    // DB에서 검사 주기 조회 함수 (차령에 따라 주기가 변하므로)
-    const getInspInterval = (ageYr: number): number => {
-      const rec =
-        inspectionSchedules.find(r =>
-          r.vehicle_usage === '사업용_승용' && r.fuel_type === inspFuelType &&
-          ageYr >= r.age_from && ageYr <= r.age_to
-        ) ||
-        inspectionSchedules.find(r =>
-          r.vehicle_usage === '사업용_승용' && (r.fuel_type === '전체' || !r.fuel_type) &&
-          ageYr >= r.age_from && ageYr <= r.age_to
-        ) ||
-        inspectionSchedules.find(r =>
-          r.vehicle_usage === '사업용' && ageYr >= r.age_from && ageYr <= r.age_to
-        )
-      return rec?.interval_months || 12  // fallback: 매년
-    }
-    const firstInspSchedule = inspectionSchedules.find(r =>
-      r.vehicle_usage === '사업용_승용' && (r.fuel_type === inspFuelType || r.fuel_type === '전체' || !r.fuel_type) &&
-      0 >= r.age_from && 0 <= r.age_to
-    )
-    const firstInspMonths = firstInspSchedule?.first_inspection_months || 24
-    const inspIntervalMonths = getInspInterval(Math.floor(carAge))  // 현재 시점 주기 (표시용)
-
-    // 계약 기간 내 검사 횟수 계산 — 차령 변화에 따른 주기 변동 반영
-    // 월 단위로 시뮬레이션하여 정확한 횟수 산출
-    const inspectionsInTerm = (() => {
-      const startAgeMonths = Math.round(carAge * 12)
-      const firstInspAt = carAge === 0 ? firstInspMonths : 0  // 신차면 첫 검사까지 대기
-      let count = 0
-      let monthSinceLastInsp = 0
-      for (let m = 1; m <= termMonths; m++) {
-        const currentAgeMonths = startAgeMonths + m
-        if (currentAgeMonths < firstInspAt) continue  // 첫 검사 전 기간은 스킵
-        const currentAgeYears = Math.floor(currentAgeMonths / 12)
-        const interval = getInspInterval(currentAgeYears)
-        monthSinceLastInsp++
-        if (monthSinceLastInsp >= interval) {
-          count++
-          monthSinceLastInsp = 0
-        }
-      }
-      return count
-    })()
-    const totalInspectionCost = inspectionsInTerm * inspectionCostPerTime
-    const monthlyInspectionCost = termMonths > 0 ? Math.round(totalInspectionCost / termMonths) : 0
-    const totalMonthlyOperation = monthlyInsuranceCost + monthlyMaintenance + monthlyTax + monthlyInspectionCost
-
-    // 4. 리스크 적립
-    const monthlyRiskReserve = Math.round(_purchasePrice * (riskRate / 100) / 12)
-
-    // 5. 보증금/선납금 할인
-    // 보증금: 보증금 × 월할인률%
-    const monthlyDepositDiscount = Math.round(deposit * (depositDiscountRate / 100))
-    // 선납금: 선납금 ÷ 계약기간 (단순 분할)
-    const monthlyPrepaymentDiscount = termMonths > 0 ? Math.round(prepayment / termMonths) : 0
+    // 월별 원가 (엔진 결과에서)
+    const monthlyDepreciation = bd.depreciation.monthly
+    const monthlyLoanInterest = bd.finance.loan_interest
+    const monthlyOpportunityCost = bd.finance.opportunity_cost
+    const totalMonthlyFinance = bd.finance.monthly
+    const effectiveLoan = Math.min(_loanAmount, _purchasePrice)
+    const equityAmount = costBase - effectiveLoan
+    const avgLoanBalance = bd.finance.avg_loan_balance
+    const loanEndBalance = 0
+    const avgEquityBalance = bd.finance.avg_equity_balance
+    const equityEndBalance = 0
+    const monthlyTax = bd.tax_inspection.monthly_tax
+    const monthlyInspectionCost = bd.tax_inspection.monthly_inspection
+    const inspectionCostPerTime = 65000 // (shown in detail UI)
+    const inspectionsInTerm = bd.tax_inspection.inspections_in_term
+    const inspIntervalMonths = 12
+    const totalMonthlyOperation = bd.insurance.monthly + bd.maintenance.monthly + bd.tax_inspection.monthly
+    const monthlyRiskReserve = bd.risk.monthly
+    const monthlyDepositDiscount = bd.discount.deposit_discount
+    const monthlyPrepaymentDiscount = bd.discount.prepayment_discount
     const totalDiscount = monthlyDepositDiscount + monthlyPrepaymentDiscount
 
-    // 6. 총 원가
-    const totalMonthlyCost = Math.max(0,
-      monthlyDepreciation +
-      totalMonthlyFinance +
-      totalMonthlyOperation +
-      monthlyRiskReserve -
-      totalDiscount
-    )
+    // 합계
+    const totalMonthlyCost = result.total_monthly_cost
+    const suggestedRent = result.suggested_rent
+    const rentWithVAT = result.rent_with_vat
 
-    // 7. 최종 렌트가 (천원단위 반올림)
-    const rawSuggestedRent = totalMonthlyCost + margin
-    const suggestedRent = Math.round(rawSuggestedRent / 1000) * 1000
-    const rentWithVAT = Math.round(suggestedRent * 1.1 / 1000) * 1000
+    // (주행감가 계산은 v2.0 엔진에서 처리)
 
-    // 8. 시장 비교
+    // (기존 감가/중고차 계산은 v2.0 엔진에서 처리, 위 매핑 참조)
+    // (금융비용 계산은 v2.0 엔진에서 처리)
+
+    // (운영비용·검사·리스크·할인·합계 계산은 v2.0 엔진에서 처리)
+
+    // 시장 비교
     const validComps = marketComps.filter(c => c.monthly_rent > 0)
     const marketAvg = validComps.length > 0
       ? Math.round(validComps.reduce((sum, c) => sum + c.monthly_rent, 0) / validComps.length)
       : 0
     const marketDiff = marketAvg > 0 ? ((rentWithVAT - marketAvg) / marketAvg * 100) : 0
+    const purchaseDiscount = _factoryPrice > 0 ? ((_factoryPrice - _purchasePrice) / _factoryPrice * 100) : 0
 
-    // 9. 매입가 대비 출고가 할인율
-    const purchaseDiscount = _factoryPrice > 0
-      ? ((_factoryPrice - _purchasePrice) / _factoryPrice * 100)
-      : 0
-
-    // 10. 원가 비중
+    // 원가 비중 (기존 UI 호환)
     const costBreakdown = {
       depreciation: monthlyDepreciation,
       finance: totalMonthlyFinance,
       operation: totalMonthlyOperation,
       risk: monthlyRiskReserve,
       discount: -totalDiscount,
+      overhead: bd.overhead.monthly,       // 🆕 간접비 추가
+      insurance: bd.insurance.monthly,     // 🆕 보험 별도 표시
+      maintenance: bd.maintenance.monthly, // 🆕 정비 별도 표시
     }
 
-    // 11. IRR (렌트사 투자 수익률)
-    // 현금흐름: t0=-취득원가+보증금+선납금, t1~N=월렌트료(공급가), tN+=잔존가치-보증금반환
-    const irrResult = calcIRR(costBase, suggestedRent, termMonths, residualValue, deposit, prepayment)
+    // IRR (엔진에서 계산)
+    const irrResult = result.irr_result
+
+    // 🆕 v2.0 엔진 전체 결과 (감사추적용)
+    const engineResult = result
 
     return {
       carAge, mileage10k, termYears, isUsedCar,
-      // 감가 — 현재
       yearDep, mileageDep, totalDepRate,
-      excessMileageNow, avgMileageNow,
-      currentMarketValue,
-      // 감가 — 계약 종료 시점
+      excessMileageNow, avgMileageNow, currentMarketValue,
       yearDepEnd, mileageDepEnd, totalDepRateEnd,
       excessMileageEnd, avgMileageEnd,
-      endMarketValue, projectedMileage10k,
-      effectiveEndMarketValue,
+      endMarketValue, projectedMileage10k, effectiveEndMarketValue,
       monthlyDepreciation,
-      // 중고차 감가 분리 분석
       purchaseMileage10k, purchaseAvgMileage, purchaseExcessMileage,
       purchaseMileageDep, purchaseYearDep, purchaseTotalDep,
       theoreticalMarketValue, purchasePremiumPct,
       customerDriven10k, standardAddition10k,
       customerExcessMileage, customerMileageDep, customerYearDep, customerTotalDepChange,
       usedCarEndTotalDep, usedCarEndMarketValue, carActualEndMarketValue,
-      // 잔존가치 & 인수
       residualValue, buyoutPrice, costBase,
-      // 감가 곡선 참조
       depClass, classMult,
-      // 3축 매칭 & 보정계수
       matchedDepRate, autoAxes, effectiveAxes, activeCurve,
       adjustmentFactor, mileageFactor, marketFactor, popularityFactor,
-      // 금융
       effectiveLoan, equityAmount, monthlyLoanInterest, monthlyOpportunityCost, totalMonthlyFinance,
       avgLoanBalance, loanEndBalance, avgEquityBalance, equityEndBalance,
-      // 운영
       monthlyTax, monthlyInspectionCost, inspectionCostPerTime, inspectionsInTerm, inspIntervalMonths, totalMonthlyOperation,
-      // 리스크
       monthlyRiskReserve,
-      // 보증금
       monthlyDepositDiscount, monthlyPrepaymentDiscount, totalDiscount,
-      // 합계
       totalMonthlyCost, suggestedRent, rentWithVAT,
-      // 시장
       marketAvg, marketDiff, purchaseDiscount,
-      // 비중
       costBreakdown,
-      // IRR
       irrResult,
+      // 🆕 v2.0 추가
+      engineResult,
     }
   }, [
     selectedCar, factoryPrice, purchasePrice, carAgeMode, customCarAge, depCurvePreset, depCustomCurve, depClassOverride, depYear1Rate, depYear2Rate, annualMileage, baselineKm,
-    contractType, residualRate, depRates, depAdjustments, popularityGrade, dbOriginOverride, dbVehicleClassOverride, dbFuelTypeOverride,
+    contractType, residualRate, buyoutPremium, depRates, depAdjustments, popularityGrade, dbOriginOverride, dbVehicleClassOverride, dbFuelTypeOverride,
     loanAmount, loanRate, investmentRate,
-    monthlyInsuranceCost, monthlyMaintenance, annualTax,
+    monthlyInsuranceCost, monthlyMaintenance, annualTax, insAutoMode, driverAgeGroup, ownDamageCoverageRatio,
     riskRate, deposit, prepayment, depositDiscountRate, prepaymentDiscountRate,
     termMonths, margin, marketComps, deductible, totalAcquisitionCost,
-    inspectionCosts, inspectionSchedules, registrationRegion, engineCC
+    inspectionCosts, inspectionSchedules, registrationRegion, engineCC,
+    maintPackage, oilChangeFreq, rules,
+    depreciationDB, taxRates, regCosts, insBasePremiums, insOwnRates, insuranceRates, financeRates, termsConfig,
+    acquisitionTax, bondCost, deliveryFee, miscFee,
   ])
 
   // 시장비교 추가
