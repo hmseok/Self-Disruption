@@ -332,11 +332,18 @@ export default function RentPricingBuilder() {
   // ============================================
   // 🆕 공통 기준 테이블 매핑 함수
   // ============================================
-  const applyReferenceTableMappings = useCallback((carInfo: {
+  const applyReferenceTableMappings = useCallback((rawCarInfo: {
     brand: string, model: string, fuel_type?: string, fuel?: string,
     purchase_price: number, engine_cc?: number, year?: number,
     factory_price?: number, is_commercial?: boolean, displacement?: number, trim?: string
   }, opts?: { skipInsurance?: boolean, skipFinance?: boolean }) => {
+    // ★ 안전장치: DB에서 문자열로 올 수 있는 숫자 필드를 강제 변환
+    const carInfo = {
+      ...rawCarInfo,
+      purchase_price: Number(rawCarInfo.purchase_price) || 0,
+      engine_cc: Number(rawCarInfo.engine_cc) || 0,
+      factory_price: Number(rawCarInfo.factory_price) || 0,
+    }
     // fuel_type 우선, 없으면 fuel 사용
     const resolvedFuel = carInfo.fuel_type || carInfo.fuel || ''
     // 3축 카테고리 자동 매핑
@@ -569,7 +576,7 @@ export default function RentPricingBuilder() {
     const bondNet = bondRate > 0 ? Math.round(bondGross * (1 - bondDiscountRate)) : 0
     setBondCost(bondNet)
 
-    const dlvFee = deliveryRecord?.fixed_amount || 350000
+    const dlvFee = Number(deliveryRecord?.fixed_amount) || 350000
     setDeliveryFee(dlvFee)
 
     const miscItems = regCosts.filter(r => ['번호판', '인지세', '대행료', '검사비'].includes(r.cost_type))
@@ -596,10 +603,10 @@ export default function RentPricingBuilder() {
     if (!car) return
 
     setSelectedCar(car)
-    setFactoryPrice(car.factory_price || Math.round(car.purchase_price * 1.15))
-    setPurchasePrice(car.purchase_price)
-    setEngineCC(car.engine_cc || 0)
-    setLoanAmount(Math.round(car.purchase_price * 0.7))
+    setFactoryPrice(Number(car.factory_price) || Math.round(Number(car.purchase_price) * 1.15))
+    setPurchasePrice(Number(car.purchase_price) || 0)
+    setEngineCC(Number(car.engine_cc) || 0)
+    setLoanAmount(Math.round(Number(car.purchase_price) * 0.7))
     // 신차/중고차 구분: DB의 is_used 반영, 없으면 연식 기반 추정
     const thisY = new Date().getFullYear()
     if (car.is_used === false && (car.year || thisY) >= thisY) {
@@ -627,8 +634,8 @@ export default function RentPricingBuilder() {
     const finData = finJson.data ?? finJson ?? null
     setLinkedFinance(finData)
     if (finData) {
-      if (finData.loan_amount) setLoanAmount(finData.loan_amount)
-      if (finData.interest_rate) setLoanRate(finData.interest_rate)
+      if (finData.loan_amount) setLoanAmount(Number(finData.loan_amount) || 0)
+      if (finData.interest_rate) setLoanRate(Number(finData.interest_rate) || 0)
     }
 
     // 시장 비교 데이터 조회
@@ -655,10 +662,10 @@ export default function RentPricingBuilder() {
         brand: car.brand,
         model: car.model,
         fuel_type: car.fuel_type || car.fuel,
-        purchase_price: car.purchase_price,
-        engine_cc: car.engine_cc,
+        purchase_price: Number(car.purchase_price) || 0,
+        engine_cc: Number(car.engine_cc) || 0,
         year: car.year,
-        factory_price: car.factory_price,
+        factory_price: Number(car.factory_price) || 0,
         is_commercial: car.is_commercial,
       },
       { skipInsurance: !!insData, skipFinance: !!finData }
@@ -837,9 +844,9 @@ export default function RentPricingBuilder() {
             // 기존 워크시트 로드 시: 차량이 이미 선택되어 있으므로 원가분석 단계로 바로 이동
             setWizardStep('analysis')
           setLookupMode('registered')
-          if (!d.factory_price) setFactoryPrice(carData.factory_price || Math.round(carData.purchase_price * 1.15))
-          if (!d.purchase_price) setPurchasePrice(carData.purchase_price)
-          setEngineCC(carData.engine_cc || 0)
+          if (!d.factory_price) setFactoryPrice(Number(carData.factory_price) || Math.round(Number(carData.purchase_price) * 1.15))
+          if (!d.purchase_price) setPurchasePrice(Number(carData.purchase_price) || 0)
+          setEngineCC(Number(carData.engine_cc) || 0)
           // 신차/중고차 구분
           const thisY = new Date().getFullYear()
           if (carData.is_used === false && (carData.year || thisY) >= thisY) {
@@ -863,8 +870,8 @@ export default function RentPricingBuilder() {
             if (costTotal > 0) setTotalAcquisitionCost(costTotal)
           }
           // quote_detail에 저장된 totalAcquisitionCost가 있으면 우선 사용
-          if (d.total_acquisition_cost > 0) {
-            setTotalAcquisitionCost(d.total_acquisition_cost)
+          if (Number(d.total_acquisition_cost) > 0) {
+            setTotalAcquisitionCost(safeNum(d.total_acquisition_cost, 0))
           }
 
           // --- 연동 보험/금융 로드 ---
@@ -883,8 +890,8 @@ export default function RentPricingBuilder() {
           loadedFinData = finData
           setLinkedFinance(finData)
           if (finData) {
-            if (finData.loan_amount) setLoanAmount(finData.loan_amount)
-            if (finData.interest_rate) setLoanRate(finData.interest_rate)
+            if (finData.loan_amount) setLoanAmount(Number(finData.loan_amount) || 0)
+            if (finData.interest_rate) setLoanRate(Number(finData.interest_rate) || 0)
           }
 
           // 기준 테이블 매핑 적용
@@ -893,10 +900,10 @@ export default function RentPricingBuilder() {
               brand: carData.brand,
               model: carData.model,
               fuel_type: carData.fuel_type,
-              purchase_price: carData.purchase_price,
-              engine_cc: carData.engine_cc,
+              purchase_price: Number(carData.purchase_price) || 0,
+              engine_cc: Number(carData.engine_cc) || 0,
               year: carData.year,
-              factory_price: carData.factory_price,
+              factory_price: Number(carData.factory_price) || 0,
               is_commercial: carData.is_commercial,
             },
             { skipInsurance: !!insData, skipFinance: !!finData }
@@ -906,8 +913,8 @@ export default function RentPricingBuilder() {
             const costTotal = costsData!.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
             if (costTotal > 0) setTotalAcquisitionCost(costTotal)
           }
-          if (d.total_acquisition_cost > 0) {
-            setTotalAcquisitionCost(d.total_acquisition_cost)
+          if (Number(d.total_acquisition_cost) > 0) {
+            setTotalAcquisitionCost(safeNum(d.total_acquisition_cost, 0))
           }
         }
       }
@@ -932,13 +939,13 @@ export default function RentPricingBuilder() {
         }
         setSelectedCar(tempCar)
         setLookupMode('newcar')
-        setFactoryPrice(d.factory_price || tempCar.factory_price || 0)
-        setPurchasePrice(d.purchase_price || tempCar.purchase_price || 0)
+        setFactoryPrice(safeNum(d.factory_price, safeNum(tempCar.factory_price, 0)))
+        setPurchasePrice(safeNum(d.purchase_price, safeNum(tempCar.purchase_price, 0)))
         setEngineCC(ci.engine_cc || 0)
         setCarAgeMode('new')
         setCustomCarAge(0)
-        if (d.total_acquisition_cost > 0) {
-          setTotalAcquisitionCost(d.total_acquisition_cost)
+        if (Number(d.total_acquisition_cost) > 0) {
+          setTotalAcquisitionCost(safeNum(d.total_acquisition_cost, 0))
         }
         // 기준 테이블 매핑 적용
         applyReferenceTableMappings(
@@ -946,15 +953,15 @@ export default function RentPricingBuilder() {
             brand: ci.brand,
             model: ci.model,
             fuel_type: ci.fuel,
-            purchase_price: d.purchase_price || tempCar.purchase_price,
+            purchase_price: Number(d.purchase_price || tempCar.purchase_price) || 0,
             engine_cc: ci.engine_cc,
             year: ci.year || currentYear,
-            factory_price: d.factory_price || tempCar.factory_price,
+            factory_price: Number(d.factory_price || tempCar.factory_price) || 0,
           },
           {}
         )
-        if (d.total_acquisition_cost > 0) {
-          setTotalAcquisitionCost(d.total_acquisition_cost)
+        if (Number(d.total_acquisition_cost) > 0) {
+          setTotalAcquisitionCost(safeNum(d.total_acquisition_cost, 0))
         }
       }
 
