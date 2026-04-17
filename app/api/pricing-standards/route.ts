@@ -5,7 +5,9 @@ import { prisma } from '@/lib/prisma'
 const ALLOWED_TABLES = [
   'business_rules',
   'depreciation_adjustments',
+  'depreciation_db',
   'depreciation_history',
+  'depreciation_rates',
   'emission_standard_table',
   'finance_rate_table',
   'inspection_cost_table',
@@ -33,6 +35,10 @@ function buildSelectQuery(table: string): string {
   switch (table) {
     case 'depreciation_adjustments':
       return `SELECT * FROM ${table} ORDER BY adjustment_type, factor DESC`
+    case 'depreciation_db':
+      return `SELECT * FROM ${table} ORDER BY category`
+    case 'depreciation_rates':
+      return `SELECT * FROM ${table} ORDER BY origin, vehicle_class, fuel_type`
     case 'inspection_cost_table':
       return `SELECT * FROM ${table} WHERE is_active = true ORDER BY vehicle_class, fuel_type`
     case 'inspection_schedule_table':

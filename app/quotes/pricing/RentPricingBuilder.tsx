@@ -231,6 +231,7 @@ export default function RentPricingBuilder() {
           // 기본값 설정 — 최초 로드 시에만 (사용자가 수동 변경한 값 보존)
           if (!initialLoadDone.current) {
             const toPercent = (v: number) => v > 0 && v < 1 ? v * 100 : v
+            // ── 기존 연동 항목 ──
             if (ruleMap.DEP_YEAR_1) setDepYear1Rate(toPercent(ruleMap.DEP_YEAR_1))
             else if (ruleMap.DEP_YEAR) setDepYear1Rate(toPercent(ruleMap.DEP_YEAR))
             if (ruleMap.DEP_YEAR_2PLUS) setDepYear2Rate(toPercent(ruleMap.DEP_YEAR_2PLUS))
@@ -241,6 +242,10 @@ export default function RentPricingBuilder() {
             if (ruleMap.RISK_RESERVE_RATE) setRiskRate(ruleMap.RISK_RESERVE_RATE)
             if (ruleMap.DEPOSIT_DISCOUNT_RATE) setDepositDiscountRate(ruleMap.DEPOSIT_DISCOUNT_RATE)
             if (ruleMap.PREPAYMENT_DISCOUNT_RATE) setPrepaymentDiscountRate(ruleMap.PREPAYMENT_DISCOUNT_RATE)
+            // ── 신규 연동 항목 (기존 하드코딩 → BusinessRules 설정값) ──
+            if (ruleMap.DEFAULT_TERM_MONTHS) setTermMonths(ruleMap.DEFAULT_TERM_MONTHS)
+            if (ruleMap.DEFAULT_DEPOSIT) setDeposit(ruleMap.DEFAULT_DEPOSIT)
+            if (ruleMap.DEFAULT_MARGIN_RATE) setMargin(ruleMap.DEFAULT_MARGIN_RATE)
           }
         }
 
@@ -606,7 +611,7 @@ export default function RentPricingBuilder() {
     setFactoryPrice(Number(car.factory_price) || Math.round(Number(car.purchase_price) * 1.15))
     setPurchasePrice(Number(car.purchase_price) || 0)
     setEngineCC(Number(car.engine_cc) || 0)
-    setLoanAmount(Math.round(Number(car.purchase_price) * 0.7))
+    setLoanAmount(Math.round(Number(car.purchase_price) * (rules.LOAN_LTV_DEFAULT ? rules.LOAN_LTV_DEFAULT / 100 : 0.7)))
     // 신차/중고차 구분: DB의 is_used 반영, 없으면 연식 기반 추정
     const thisY = new Date().getFullYear()
     if (car.is_used === false && (car.year || thisY) >= thisY) {
@@ -1376,7 +1381,7 @@ export default function RentPricingBuilder() {
     setFactoryPrice(factoryTotal)
     setPurchasePrice(purchasePrice)
     setEngineCC(newCarSelectedVariant.engine_cc || 0)
-    setLoanAmount(Math.round(purchasePrice * 0.7))
+    setLoanAmount(Math.round(purchasePrice * (rules.LOAN_LTV_DEFAULT ? rules.LOAN_LTV_DEFAULT / 100 : 0.7)))
     setCarAgeMode('new')  // 신차 분석이므로 차령 0
     setCustomCarAge(0)
 
@@ -5192,7 +5197,7 @@ export default function RentPricingBuilder() {
                       onClick={() => {
                         if (opt.val === 'loan') setLoanAmount(purchasePrice) // 매입가 한도까지
                         else if (opt.val === 'equity') setLoanAmount(0)
-                        else setLoanAmount(Math.round(purchasePrice * 0.7))
+                        else setLoanAmount(Math.round(purchasePrice * (rules.LOAN_LTV_DEFAULT ? rules.LOAN_LTV_DEFAULT / 100 : 0.7)))
                       }}
                       className={`py-1 px-2.5 text-xs rounded-lg border font-bold transition-colors
                         ${current === opt.val
