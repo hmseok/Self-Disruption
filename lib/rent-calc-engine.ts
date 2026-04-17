@@ -166,6 +166,7 @@ export interface CalcInput {
     ins_own_rates: any[]
     insurance_rates: any[]
     finance_rates: any[]
+    maintenance_costs: any[]      // maintenance_cost_table (차종별 정비 단가)
     terms_config?: {
       calc_params: Record<string, any>
     }
@@ -472,14 +473,20 @@ export function calculatePrepaymentDiscount(
 // ============================================================
 // 비선형 주행감가 (체감감소)
 // ============================================================
-function calcMileageDep(excess10k: number): number {
+/**
+ * 주행거리 감가 계산
+ * @param excess10k - 기준 초과 주행 (만km 단위)
+ * @param basePer10k - 만km당 기본 감가율 % (BusinessRules DEP_MILEAGE_10K, 기본 2.0)
+ */
+function calcMileageDep(excess10k: number, basePer10k: number = 2.0): number {
   if (excess10k === 0) return 0
   const sign = excess10k > 0 ? 1 : -1
   const abs = Math.abs(excess10k)
+  // basePer10k 적용: 첫 5만km까지 basePer10k, 5~10만km는 basePer10k×0.75, 10만km 초과는 basePer10k×0.5
   let dep = 0
-  if (abs <= 5) dep = abs * 2.0
-  else if (abs <= 10) dep = 5 * 2.0 + (abs - 5) * 1.5
-  else dep = 5 * 2.0 + 5 * 1.5 + (abs - 10) * 1.0
+  if (abs <= 5) dep = abs * basePer10k
+  else if (abs <= 10) dep = 5 * basePer10k + (abs - 5) * (basePer10k * 0.75)
+  else dep = 5 * basePer10k + 5 * (basePer10k * 0.75) + (abs - 10) * (basePer10k * 0.5)
   return sign * dep
 }
 
@@ -575,12 +582,20 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   )
   const dbCurve = matchedDepRate ? buildCurveFromDbRates(matchedDepRate) : null
 
-  // 활성 곡선 결정
+  // BusinessRules 기반 폴백 커브 생성 (DEP_YEAR_1, DEP_YEAR_2PLUS가 설정되어 있을 때)
+  const ruleYear1 = n(rules.DEP_YEAR_1)
+  const ruleYear2Plus = n(rules.DEP_YEAR_2PLUS)
+  const rulesFallbackCurve = (ruleYear1 > 0 || ruleYear2Plus > 0)
+    ? [ruleYear1 || 20, ruleYear2Plus || 12, ruleYear2Plus || 12, ruleYear2Plus || 11, ruleYear2Plus || 10]
+    : null
+
+  // 활성 곡선 결정 (DB → BusinessRules 폴백 → 하드코딩 프리셋)
+  const defaultFallback = rulesFallbackCurve || DEP_CURVE_PRESETS.standard.curve
   const activeCurve = depreciation.curve_preset === 'custom'
-    ? (depreciation.custom_curve || DEP_CURVE_PRESETS.standard.curve)
+    ? (depreciation.custom_curve || defaultFallback)
     : depreciation.curve_preset === 'db_based'
-      ? (dbCurve || DEP_CURVE_PRESETS.standard.curve)
-      : DEP_CURVE_PRESETS[depreciation.curve_preset as keyof typeof DEP_CURVE_PRESETS]?.curve || DEP_CURVE_PRESETS.standard.curve
+      ? (dbCurve || defaultFallback)
+      : DEP_CURVE_PRESETS[depreciation.curve_preset as keyof typeof DEP_CURVE_PRESETS]?.curve || defaultFallback
 
   // 클래스 보정 승수
   const classMult = depreciation.curve_preset === 'db_based'
@@ -602,12 +617,13 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   })()
 
   const adjustmentFactor = marketFactor * popularityFactor
+  const mileageDepPer10k = n(rules.DEP_MILEAGE_10K, 2.0) // BusinessRules 폴백: 만km당 2%
 
   // 현재 시점 감가
   const yearDepNow = getDepRateFromCurve(activeCurve, carAge, classMult)
   const avgMileageNow = carAge * c.baseline_km
   const excessMileageNow = mileage10k - avgMileageNow
-  const mileageDepNow = calcMileageDep(excessMileageNow)
+  const mileageDepNow = calcMileageDep(excessMileageNow, mileageDepPer10k)
   const totalDepRateNow = Math.max(0, Math.min(yearDepNow + mileageDepNow, 90))
   const adjustedNowResidualPct = carAge === 0 ? 1.0 : Math.max(0, Math.min((1 - totalDepRateNow / 100) * adjustmentFactor, 1.0))
   const currentMarketValue = Math.round(factoryPrice * adjustedNowResidualPct)
@@ -619,7 +635,7 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const projectedMileage10k = mileage10k + (termYears * c.annual_mileage)
   const avgMileageEnd = endAge * c.baseline_km
   const excessMileageEnd = projectedMileage10k - avgMileageEnd
-  const mileageDepEnd = calcMileageDep(excessMileageEnd)
+  const mileageDepEnd = calcMileageDep(excessMileageEnd, mileageDepPer10k)
   const totalDepRateEnd = Math.max(0, Math.min(yearDepEnd + mileageDepEnd, 90))
   const adjustedEndResidualPct = Math.max(0, Math.min((1 - totalDepRateEnd / 100) * adjustmentFactor, 1.0))
   const endMarketValue = Math.round(factoryPrice * adjustedEndResidualPct)
@@ -629,7 +645,7 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const customerDriven10k = termYears * c.annual_mileage
   const standardAddition10k = termYears * c.baseline_km
   const customerExcessMileage = isUsedCar ? (customerDriven10k - standardAddition10k) : excessMileageEnd
-  const customerMileageDep = calcMileageDep(customerExcessMileage)
+  const customerMileageDep = calcMileageDep(customerExcessMileage, mileageDepPer10k)
   const usedCarEndTotalDep = isUsedCar ? Math.max(0, Math.min(yearDepEnd + customerMileageDep, 90)) : totalDepRateEnd
   const usedCarEndResidualPct = isUsedCar
     ? Math.max(0, Math.min((1 - usedCarEndTotalDep / 100) * adjustmentFactor, 1.0))
@@ -691,11 +707,18 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const monthlyInsuranceWithLoading = monthlyInsurance + loadingAmount
 
   // ─────────────────────────────────────────
-  // 4. 정비비용
+  // 4. 정비비용 (DB 우선 → 하드코딩 폴백)
   // ─────────────────────────────────────────
   const maintType = mapToMaintenanceType(v.brand, v.model, v.fuel, purchasePrice)
   const multiplier = MAINT_MULTIPLIER[maintType.type] || 1.0
-  const baseMaintCost = MAINTENANCE_PACKAGES[maintenance.package].monthly
+  // DB maintenance_cost_table에서 차종별 월 정비비 조회
+  const maintCostRecords = reference.maintenance_costs || []
+  const dbMaintRecord = maintCostRecords.find((r: any) => r.vehicle_type === maintType.type)
+    || maintCostRecords.find((r: any) => r.vehicle_type === '기본')
+  const dbMaintMonthly = dbMaintRecord ? n(dbMaintRecord.monthly_cost || dbMaintRecord.cost_per_month) : 0
+  // DB 값이 있으면 DB 우선, 없으면 하드코딩 패키지 폴백
+  const baseMaintCost = dbMaintMonthly > 0 ? dbMaintMonthly : MAINTENANCE_PACKAGES[maintenance.package].monthly
+  const maintSource: 'db' | 'calc' | 'manual' = dbMaintMonthly > 0 ? 'db' : 'calc'
   const oilAdjust = maintenance.package === 'oil_only' && maintenance.oil_change_freq === 2 ? 1.8 : 1.0
   const monthlyMaint = maintenance.package === 'self'
     ? 0
@@ -795,7 +818,7 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const costPct = (v: number) => costTotal > 0 ? Math.round(v / costTotal * 1000) / 10 : 0
   const marginRate = suggestedRent > 0 ? Math.round((suggestedRent - totalMonthlyCost) / suggestedRent * 1000) / 10 : 0
   // 경쟁력 지수: 업계 평균 rent-to-price 비율 대비 (장기렌트 평균 약 2.0~2.5%)
-  const INDUSTRY_AVG_RENT_RATIO = 2.2
+  const INDUSTRY_AVG_RENT_RATIO = n(rules.INDUSTRY_AVG_RENT_RATIO, 2.2) // BusinessRules에서 조정 가능
   const competitiveIndex = INDUSTRY_AVG_RENT_RATIO > 0 ? Math.round(rentToPriceRatio / INDUSTRY_AVG_RENT_RATIO * 100) / 100 : 1.0
   // 손익분기: 총 투자금을 월수익으로 나눈 월수
   const monthlyNetIncome = suggestedRent - totalMonthlyCost
@@ -858,8 +881,11 @@ export function calculateRentCost(input: CalcInput): CalcResult {
       label: '정비비',
       monthly: monthlyMaint,
       annual: monthlyMaint * 12,
-      source: maintenance.package === 'self' ? 'manual' : 'calc',
-      formula: `${MAINTENANCE_PACKAGES[maintenance.package].label} × ${multiplier} 배수`,
+      source: maintenance.package === 'self' ? 'manual' : (n(maintenance.monthly_cost) > 0 ? 'manual' : maintSource),
+      formula: maintenance.package === 'self' ? '자가정비 (미포함)'
+        : n(maintenance.monthly_cost) > 0 ? '직접입력'
+        : dbMaintMonthly > 0 ? `DB기준 ${dbMaintMonthly.toLocaleString()}원 × ${multiplier} 배수`
+        : `${MAINTENANCE_PACKAGES[maintenance.package].label} × ${multiplier} 배수`,
     },
     tax_inspection: {
       label: '세금·검사',

@@ -1620,6 +1620,7 @@ export default function RentPricingBuilder() {
         ins_own_rates: insOwnRates,
         insurance_rates: insuranceRates,
         finance_rates: financeRates,
+        maintenance_costs: maintenanceCosts,
         terms_config: termsConfig ? { calc_params: termsConfig.calc_params } : undefined,
       },
       rules,
@@ -1787,7 +1788,7 @@ export default function RentPricingBuilder() {
     termMonths, margin, marketComps, deductible, totalAcquisitionCost,
     inspectionCosts, inspectionSchedules, registrationRegion, engineCC,
     maintPackage, oilChangeFreq, rules,
-    depreciationDB, taxRates, regCosts, insBasePremiums, insOwnRates, insuranceRates, financeRates, termsConfig,
+    depreciationDB, taxRates, regCosts, insBasePremiums, insOwnRates, insuranceRates, financeRates, maintenanceCosts, termsConfig,
     acquisitionTax, bondCost, deliveryFee, miscFee,
   ])
 
