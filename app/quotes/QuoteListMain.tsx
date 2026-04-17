@@ -214,89 +214,7 @@ function ShortTermDetailModal({
 // ============================================================================
 // ROW ACTIONS (⋯ 메뉴)
 // ============================================================================
-/**
- * CreateMenu — 항상 동일한 위치에 노출되는 "+새로 만들기" 드롭다운.
- * 탭별로 버튼이 나타났다 사라지면서 레이아웃이 흔들리는 UX 문제를 해결하기 위해
- * 장기 견적 / 단기 견적 / 청구서 생성 액션을 단일 진입점으로 통합했다.
- */
-function CreateMenu({
-  onCreateLong, onCreateShort, onCreateInvoice,
-}: {
-  onCreateLong: () => void
-  onCreateShort: () => void
-  onCreateInvoice: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-
-  const items = [
-    { key: 'long', label: '장기 견적', desc: '월단위 렌트 산출', action: onCreateLong },
-    { key: 'short', label: '단기 견적', desc: '일단위 견적', action: onCreateShort },
-    { key: 'invoice', label: '청구서', desc: '단기 청구서 발행', action: onCreateInvoice },
-  ]
-
-  return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{
-          padding: '7px 16px',
-          background: 'linear-gradient(135deg, #3b6eb5, #5a8fd4)',
-          color: '#fff', border: 'none', borderRadius: 8,
-          fontWeight: 700, fontSize: 13, cursor: 'pointer',
-          whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '3px 3px 8px rgba(140,170,210,0.19), -1px -1px 4px rgba(255,255,255,0.47)',
-        }}
-      >
-        <span>+ 새로 만들기</span>
-        <span style={{ fontSize: 10, opacity: 0.85, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
-            minWidth: 200,
-            background: 'rgba(255,255,255,0.92)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(0,0,0,0.06)',
-            borderRadius: 12,
-            boxShadow: '6px 10px 24px rgba(140,170,210,0.22), -2px -2px 8px rgba(255,255,255,0.6)',
-            padding: 6,
-            display: 'flex', flexDirection: 'column', gap: 2,
-          }}
-        >
-          {items.map(it => (
-            <button
-              key={it.key}
-              onClick={() => { setOpen(false); it.action() }}
-              style={{
-                textAlign: 'left', padding: '8px 12px', border: 'none',
-                background: 'transparent', borderRadius: 8, cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', gap: 1,
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(59,110,181,0.08)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#2a4a6b' }}>{it.label}</span>
-              <span style={{ fontSize: 10, color: '#8aabc7' }}>{it.desc}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+/* CreateMenu 제거됨 — "새 견적" 탭으로 대체 */
 
 function RowActions({
   quote,
@@ -1012,13 +930,7 @@ export default function QuoteListPage() {
             setSearchTerm('')
             setSortBy('latest')
           }}
-          trailing={
-            <CreateMenu
-              onCreateLong={() => { setMainTab('create_long'); setSubStage('draft') }}
-              onCreateShort={() => { setMainTab('calc_short'); setSubStage('draft') }}
-              onCreateInvoice={() => setInvoiceOpen(true)}
-            />
-          }
+          trailing={undefined}
         />
         <style>{`
           input[type="text"]::placeholder {

@@ -1207,10 +1207,6 @@ export default function RentPricingBuilder() {
     setNewCarBrand(data.brand || '')
     setNewCarModel(data.model || '')
     setNewCarResult(data)
-    setNewCarSelectedTax('')
-    setNewCarSelectedFuel('')
-    setNewCarSelectedVariant(null)
-    setNewCarSelectedTrim(null)
     setNewCarSelectedOptions([])
     setNewCarSelectedExterior(null)
     setNewCarSelectedInterior(null)
@@ -1218,6 +1214,50 @@ export default function RentPricingBuilder() {
     setLookupError('')
     // 저장목록에서 선택 → 신차 선택 UI 활성화
     setLookupMode('saved')
+
+    // 자동 선택: variants가 하나뿐이거나 트림이 하나뿐이면 자동 선택 후 옵션 스텝으로 이동
+    const variants = data.variants || []
+    if (variants.length > 0) {
+      // 개별소비세 자동 선택
+      const taxTypes = [...new Set(variants.map((v: any) => v.consumption_tax || '').filter((t: string) => t !== ''))]
+      if (taxTypes.length === 1) setNewCarSelectedTax(taxTypes[0] as string)
+      else setNewCarSelectedTax('')
+
+      // 유종 자동 선택
+      const fuelTypes = [...new Set(variants.map((v: any) => v.fuel_type))]
+      if (fuelTypes.length === 1) setNewCarSelectedFuel(fuelTypes[0])
+      else setNewCarSelectedFuel('')
+
+      // variant 필터링 후 자동 선택
+      const filteredVariants = variants.filter((v: any) => {
+        if (taxTypes.length > 1 && taxTypes[0]) return v.consumption_tax === taxTypes[0]
+        if (fuelTypes.length > 1 && fuelTypes[0]) return v.fuel_type === fuelTypes[0]
+        return true
+      })
+      const targetVariant = filteredVariants.length === 1 ? filteredVariants[0] : (variants.length === 1 ? variants[0] : null)
+
+      if (targetVariant) {
+        setNewCarSelectedVariant(targetVariant)
+        // 트림이 1개면 자동 선택 → 옵션 스텝으로 바로 이동
+        if (targetVariant.trims?.length === 1) {
+          const trim = targetVariant.trims[0]
+          setNewCarSelectedTrim(trim)
+          setFactoryPrice(trim.base_price)
+          setPurchasePrice(trim.base_price)
+          setWizardStep('options')
+        } else {
+          setNewCarSelectedTrim(null)
+        }
+      } else {
+        setNewCarSelectedVariant(null)
+        setNewCarSelectedTrim(null)
+      }
+    } else {
+      setNewCarSelectedTax('')
+      setNewCarSelectedFuel('')
+      setNewCarSelectedVariant(null)
+      setNewCarSelectedTrim(null)
+    }
   }, [])
 
   // 🆕 저장된 가격 데이터 삭제
@@ -3690,6 +3730,8 @@ export default function RentPricingBuilder() {
                         // 트림 선택 시 출고가/매입가 즉시 반영
                         setFactoryPrice(trim.base_price)
                         setPurchasePrice(trim.base_price)
+                        // 트림 선택 즉시 차량옵션 스텝으로 이동
+                        setWizardStep('options')
                       }}
                       className={`p-4 rounded-xl border-2 transition-all text-left ${
                         newCarSelectedTrim?.name === trim.name
@@ -3706,19 +3748,7 @@ export default function RentPricingBuilder() {
               </div>
             )}
 
-            {/* ── 외장/내장/옵션/가격은 options step에서 표시 — vehicle step에서는 트림 선택 후 "다음" 안내 ── */}
-            {newCarSelectedTrim && wizardStep === 'vehicle' && (
-              <div className="mt-3 flex items-center justify-between bg-emerald-50/80 border border-emerald-200/60 rounded-xl px-4 py-3">
-                <span className="text-xs font-bold text-emerald-600">✓ {newCarSelectedTrim.name} 선택됨</span>
-                <button
-                  onClick={() => setWizardStep('options')}
-                  className="px-4 py-1.5 rounded-lg text-white text-xs font-bold hover:opacity-90 transition-opacity"
-                  style={{ background: '#3b6eb5' }}
-                >
-                  다음: 차량옵션 →
-                </button>
-              </div>
-            )}
+            {/* ── 트림 선택 시 자동으로 options step 이동 (별도 안내바 불필요) ── */}
 
             {/* ── STEP: 외장 컬러 선택 (vehicle step에서 숨김) ── */}
             {wizardStep !== 'vehicle' && newCarSelectedTrim && (newCarSelectedTrim.exterior_colors?.length ?? 0) > 0 && (
