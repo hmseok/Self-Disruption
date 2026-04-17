@@ -1524,6 +1524,8 @@ export default function RentPricingBuilder() {
     const _totalAcquisitionCost = Number(totalAcquisitionCost) || 0
     const _loanAmount = Number(loanAmount) || 0
 
+
+
     const thisYear = new Date().getFullYear()
     // 차령: 신차 모드면 0, 연식차량 모드면 사용자 설정값 또는 연식 기반 자동 계산
     const carAge = carAgeMode === 'new'
