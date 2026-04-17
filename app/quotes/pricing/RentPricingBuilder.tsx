@@ -1511,6 +1511,12 @@ export default function RentPricingBuilder() {
   const calculations = useMemo(() => {
     if (!selectedCar) return null
 
+    // ★ 안전장치: 외부에서 문자열이 유입될 수 있으므로 핵심 가격변수를 숫자로 강제 변환
+    const _factoryPrice = Number(factoryPrice) || 0
+    const _purchasePrice = Number(purchasePrice) || 0
+    const _totalAcquisitionCost = Number(totalAcquisitionCost) || 0
+    const _loanAmount = Number(loanAmount) || 0
+
     const thisYear = new Date().getFullYear()
     // 차령: 신차 모드면 0, 연식차량 모드면 사용자 설정값 또는 연식 기반 자동 계산
     const carAge = carAgeMode === 'new'
@@ -1523,7 +1529,7 @@ export default function RentPricingBuilder() {
     // 1. 시세하락 / 감가 (비선형 곡선 모델)
     // ── 3축 매핑 + DB 기반 감가 곡선
     const autoAxes = selectedCar
-      ? mapToDepAxes(selectedCar.brand, selectedCar.model, selectedCar.fuel, factoryPrice)
+      ? mapToDepAxes(selectedCar.brand, selectedCar.model, selectedCar.fuel, _factoryPrice)
       : null
     // 수동 오버라이드 적용: 사용자가 선택한 축이 있으면 그것으로 대체
     const effectiveAxes = autoAxes ? {
@@ -1617,7 +1623,7 @@ export default function RentPricingBuilder() {
     // 보정계수 적용: 현재 시장가에도 반영
     const adjustedNowResidualPct = carAge === 0 ? 1.0
       : Math.max(0, Math.min((1 - totalDepRateNow / 100) * adjustmentFactor, 1.0))
-    const currentMarketValue = Math.round(factoryPrice * adjustedNowResidualPct)
+    const currentMarketValue = Math.round(_factoryPrice * adjustedNowResidualPct)
 
     // ── 계약 종료 시점 감가율
     const termYears = termMonths / 12
@@ -1633,7 +1639,7 @@ export default function RentPricingBuilder() {
     const totalDepRateEnd = Math.max(0, Math.min(yearDepEnd + mileageDepEnd, 90))
     // 보정계수 적용: 잔존율에 factor 곱셈 (factor>1 → 잔존율↑ → 시장가↑)
     const adjustedEndResidualPct = Math.max(0, Math.min((1 - totalDepRateEnd / 100) * adjustmentFactor, 1.0))
-    const endMarketValue = Math.round(factoryPrice * adjustedEndResidualPct)
+    const endMarketValue = Math.round(_factoryPrice * adjustedEndResidualPct)
 
     // ── 중고차 감가 분리 계산 (회사 부담 / 고객 부담)
     // 구입 시점 주행감가 (회사 부담 = 구입가에 이미 반영)
@@ -1642,9 +1648,9 @@ export default function RentPricingBuilder() {
     const purchaseMileageDep = calcMileageDep(purchaseExcessMileage)     // 구입시 주행감가율 (%)
     const purchaseYearDep = yearDepNow                                      // 구입시 연식감가율 (%)
     const purchaseTotalDep = Math.max(0, Math.min(purchaseYearDep + purchaseMileageDep, 90))
-    const theoreticalMarketValue = Math.round(factoryPrice * Math.max(0, (1 - purchaseTotalDep / 100) * adjustmentFactor))
+    const theoreticalMarketValue = Math.round(_factoryPrice * Math.max(0, (1 - purchaseTotalDep / 100) * adjustmentFactor))
     const purchasePremiumPct = theoreticalMarketValue > 0
-      ? ((purchasePrice - theoreticalMarketValue) / theoreticalMarketValue * 100)
+      ? ((_purchasePrice - theoreticalMarketValue) / theoreticalMarketValue * 100)
       : 0
 
     // ── 고객 귀책 주행감가: 순수하게 계약기간 동안 기준 대비 초과 주행분만
@@ -1672,7 +1678,7 @@ export default function RentPricingBuilder() {
       ? Math.max(0, Math.min((1 - usedCarEndTotalDep / 100) * adjustmentFactor, 1.0))
       : adjustedEndResidualPct
     const usedCarEndMarketValue = isUsedCar
-      ? Math.round(factoryPrice * usedCarEndResidualPct)
+      ? Math.round(_factoryPrice * usedCarEndResidualPct)
       : endMarketValue
     // 차량 실제 잔존가 (회사 처분용, 전체 주행감가 포함)
     const carActualEndMarketValue = endMarketValue
@@ -1685,7 +1691,7 @@ export default function RentPricingBuilder() {
     // 취득원가 기준 월 감가비
     // 등록 페이지 구입비용 상세(car_costs) 합계가 있으면 실투자금으로 사용
     // 없으면 매입가(purchasePrice)를 기준으로 사용
-    const costBase = totalAcquisitionCost > 0 ? totalAcquisitionCost : purchasePrice
+    const costBase = _totalAcquisitionCost > 0 ? _totalAcquisitionCost : _purchasePrice
     // 잔존가치 결정
     // 중고차: usedCarEndMarketValue 사용 (전체연식감가 + 고객귀책 주행감가만 반영)
     // 신차: endMarketValue 사용 (전체 감가 반영)
@@ -1701,7 +1707,7 @@ export default function RentPricingBuilder() {
     // 2. 금융비용 (평균잔액법) — 총취득원가 기준
     // 대출: 차량매입가 한도 내 (담보가치 기준, 부대비용은 대출 불가)
     // 자기자본: 총취득원가 - 대출금 (취득세·공채·탁송 등 부대비용 포함)
-    const effectiveLoan = Math.min(loanAmount, purchasePrice) // 대출은 매입가 초과 불가
+    const effectiveLoan = Math.min(_loanAmount, _purchasePrice) // 대출은 매입가 초과 불가
     const residualRatio = costBase > 0 ? Math.max(0, residualValue / costBase) : 0
     const loanEndBalance = Math.round(effectiveLoan * residualRatio)
     const avgLoanBalance = Math.round((effectiveLoan + loanEndBalance) / 2)
@@ -1735,7 +1741,7 @@ export default function RentPricingBuilder() {
       const cc = selectedCar?.engine_cc || engineCC || 0
       // 전기차/수소차는 engine_cc가 없으므로 가격 기반 차급 판정
       if (cc === 0 || inspFuelType === '전기' || inspFuelType === '수소') {
-        const price = purchasePrice || factoryPrice || 0
+        const price = _purchasePrice || _factoryPrice || 0
         if (price < 20000000) return '경형'
         if (price < 35000000) return '소형'
         if (price < 50000000) return '중형'
@@ -1818,7 +1824,7 @@ export default function RentPricingBuilder() {
     const totalMonthlyOperation = monthlyInsuranceCost + monthlyMaintenance + monthlyTax + monthlyInspectionCost
 
     // 4. 리스크 적립
-    const monthlyRiskReserve = Math.round(purchasePrice * (riskRate / 100) / 12)
+    const monthlyRiskReserve = Math.round(_purchasePrice * (riskRate / 100) / 12)
 
     // 5. 보증금/선납금 할인
     // 보증금: 보증금 × 월할인률%
@@ -1849,8 +1855,8 @@ export default function RentPricingBuilder() {
     const marketDiff = marketAvg > 0 ? ((rentWithVAT - marketAvg) / marketAvg * 100) : 0
 
     // 9. 매입가 대비 출고가 할인율
-    const purchaseDiscount = factoryPrice > 0
-      ? ((factoryPrice - purchasePrice) / factoryPrice * 100)
+    const purchaseDiscount = _factoryPrice > 0
+      ? ((_factoryPrice - _purchasePrice) / _factoryPrice * 100)
       : 0
 
     // 10. 원가 비중
