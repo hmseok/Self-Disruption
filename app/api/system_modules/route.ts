@@ -28,6 +28,7 @@ const DEFAULT_MODULES = [
   { id: 'mod-collections', name: '수금/회수', path: '/finance/collections', icon_key: 'Money', sort_order: 23 },
   { id: 'mod-settlement', name: '정산 관리', path: '/finance/settlement', icon_key: 'Chart', sort_order: 24 },
   { id: 'mod-pricing', name: '요금 기준표', path: '/db/pricing-standards', icon_key: 'Database', sort_order: 25 },
+  { id: 'mod-operational-learning', name: '운영학습', path: '/quotes/operational-learning', icon_key: 'Chart', sort_order: 26 },
   // ── 재무/경영 (finance) ──
   { id: 'mod-finance', name: '재무 대시보드', path: '/finance', icon_key: 'Money', sort_order: 30 },
   { id: 'mod-fleet-fin', name: '차량 수익', path: '/finance/fleet', icon_key: 'Chart', sort_order: 31 },

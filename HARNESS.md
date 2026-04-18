@@ -1,6 +1,6 @@
 # FMI ERP — 기능 현황 (HARNESS.md)
 
-> 마지막 업데이트: 2026-04-18
+> 마지막 업데이트: 2026-04-18 (Phase 3.1 운영학습 UI 완료)
 
 ---
 
@@ -41,24 +41,39 @@
 - [x] SimulationPanel 실시간 시뮬레이션 (13개 기준표 → 엔진 호출 → 즉시 렌트료)
 - [x] page.tsx 레이아웃 변경 (8탭 + 우측 시뮬레이션 사이드바)
 - [x] RentPricingBuilder 모듈 분리 (5,853줄 → 5개 파일)
-  - RentPricingBuilder.tsx (2,438줄 — 상태+핸들러+오케스트레이터)
-  - PricingContext.tsx (24줄 — React Context)
-  - VehicleStep.tsx (1,337줄 — 차량선택+옵션)
-  - AnalysisStep.tsx (1,791줄 — 원가분석)
-  - CustomerPreviewStep.tsx (642줄 — 고객+미리보기)
-- [x] 코드 리뷰: 핸들러 매핑 오류 5건 발견 → 수정 완료
 - [x] 평가: 8.9/10
-- **⚠️ 미커밋 상태** — 커밋 + 푸시 필요
+- **커밋**: 806def6 + 104a9ce (pushed)
+
+### Phase 3.1: 운영학습 UI 연동 (2026-04-18)
+- [x] Migrator: calc_snapshots / operational_actuals / rule_suggestion_logs 3개 테이블 생성 (Cloud SQL 적용)
+- [x] 백엔드 API 6종 구현
+  - `POST/GET /api/operational-learning/snapshots` — 스냅샷 CRUD (Quote 저장 훅 대상)
+  - `POST/GET /api/operational-learning/actuals` — 월별 실적 UPSERT (단건/배치)
+  - `GET /api/operational-learning/analyze` — analyzeActualVsPredicted 실행
+  - `POST /api/operational-learning/suggest-rules` — suggestBusinessRules + current_value 채움
+  - `POST /api/operational-learning/auto-aggregate` — FmiPayment/FmiAccident 월별 집계 UPSERT
+  - `POST/GET /api/operational-learning/apply-rule` — business_rules 갱신 + 이력 기록
+- [x] 공용 헬퍼: `lib/operational-learning-helpers.ts` (rowToCalcSnapshot, averageActuals, serialize, monthRange)
+- [x] 프론트 페이지 `/quotes/operational-learning` — Context + 8개 컴포넌트
+  - OperationalLearningContext.tsx / page.tsx
+  - FilterPanel (Level 2) / KpiStrip (Level 3 틴트 4색)
+  - SnapshotTable (Level 4) / ActualInputModal (Level 4 + Level 1 inset 인풋)
+  - AccuracyChart (Level 3 blue, 수동 SVG) / RuleSuggestionPanel (Level 3 purple)
+  - ComparisonDetail (Level 4, 항목별 편차/추천)
+- [x] 네비 등록: system_modules fallback + ClientLayout NAME_OVERRIDES/PATH_TO_GROUP + PageTitle
+- [x] TypeScript: 운영학습 영역 0 errors (프로젝트 기존 에러 150개는 미관여)
+- [x] 평가: 9.4/10 (evaluate.js)
 
 ---
 
 ## 진행 중 / 대기 작업
 
 ### 즉시 필요
-- [ ] Phase 2 변경사항 커밋 + 푸시 (사용자 요청 대기)
+- [ ] Phase 3.1 변경사항 커밋 + 푸시 (사용자 요청 대기)
 
 ### 다음 우선순위 (사용자 확인 후)
-- [ ] 운영학습 모듈 UI 연동 (analyzeActualVsPredicted, suggestBusinessRules 호출 UI)
+- [ ] Quote 저장 직후 `POST /api/operational-learning/snapshots` 훅 연결 (현재는 수동 호출만 가능)
+- [ ] AccuracyChart 월별 시계열 확장 (Phase 3.2)
 - [ ] 견적 심플 작성 UI (사용자: "원가분석 먼저, 견적작성은 뒤에")
 - [ ] PricingContext 타입 정의 (any → PricingState 인터페이스)
 
@@ -89,6 +104,14 @@
 - `POST /api/public/quote/[token]/sign` — 고객 서명
 - `GET /api/pricing-standards?table=...` — 기준표 17종 CRUD
 - `GET /api/business-rules` — BusinessRules 20개 키
+
+### 운영학습
+- `GET/POST /api/operational-learning/snapshots` — 스냅샷 목록/생성
+- `GET/POST /api/operational-learning/actuals` — 실적 월별 CRUD (UPSERT 배치)
+- `GET /api/operational-learning/analyze?snapshotId=` — 단건 비교 분석
+- `POST /api/operational-learning/suggest-rules` — BusinessRules 자동 추천
+- `POST /api/operational-learning/auto-aggregate` — FmiPayment/Accident 월별 자동 집계
+- `POST/GET /api/operational-learning/apply-rule` — 추천 적용 + 적용 이력
 
 ### 재무
 - `GET /api/transactions` — 거래내역

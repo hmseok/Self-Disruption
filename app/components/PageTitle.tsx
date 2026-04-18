@@ -15,7 +15,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/fleet/factory-mgmt': 'vehicle',
   '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
   // ── 영업/계약 (견적→계약→수금→정산 파이프라인) ──
-  '/quotes': 'sales', '/quotes/create': 'sales',
+  '/quotes': 'sales', '/quotes/create': 'sales', '/quotes/operational-learning': 'sales',
   '/contracts': 'sales', '/customers': 'sales',
   '/finance/collections': 'sales', '/finance/settlement': 'sales',
   '/db/pricing-standards': 'sales',
@@ -55,6 +55,7 @@ const PAGE_NAMES: Record<string, string> = {
   // 영업/계약
   '/quotes': '견적 관리',
   '/quotes/create': '견적 작성',
+  '/quotes/operational-learning': '운영학습',
   '/contracts': '계약 관리',
   '/customers': '고객 관리',
   '/finance/collections': '수금/회수',

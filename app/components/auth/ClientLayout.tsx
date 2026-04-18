@@ -45,6 +45,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
   // ── 영업/계약 (견적→계약→수금→정산 파이프라인 + 요금기준) ──
   '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
+  '/quotes/operational-learning': 'sales',
   '/contracts': 'sales', '/customers': 'sales',
   '/finance/collections': 'sales', '/finance/settlement': 'sales',
   '/db/pricing-standards': 'sales',
@@ -71,6 +72,7 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/claims/billing-mgmt': '보험청구관리',
   // 영업/계약 그룹
   '/quotes': '견적 관리',
+  '/quotes/operational-learning': '운영학습',
   '/contracts': '계약/고객',
   '/customers': '고객 관리',
   '/finance/collections': '수금/회수',
