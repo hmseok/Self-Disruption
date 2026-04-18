@@ -81,6 +81,16 @@ export interface CalcInput {
     buyout_premium: number      // 인수형 추가마진 (원/월)
     annual_mileage: number      // 만km/년 (약정주행)
     baseline_km: number         // 만km/년 (0% 감가 기준)
+
+    // ── v2.1 신규 (모두 optional, 기본값은 기존 동작 유지) ──
+    /** 계약 원천 — owned: 자체보유, external_rent: 외부렌탈, lease: 리스 (default: owned) */
+    contract_source?: 'owned' | 'external_rent' | 'lease'
+    /** 렌트 기간 분류 — longterm/shortterm/subscription (default: longterm) */
+    rental_term?: 'longterm' | 'shortterm' | 'subscription'
+    /** 가동률 % — 단기에서만 원가 보정 적용 (default: 100) */
+    utilization_rate?: number
+    /** 외부렌탈 월렌탈료 (contract_source === 'external_rent'일 때만 사용) */
+    external_rent_monthly?: number
   }
 
   // ── 1. 감가 설정 ──
@@ -170,6 +180,8 @@ export interface CalcInput {
     terms_config?: {
       calc_params: Record<string, any>
     }
+    /** v2.1 신규 — 외부시세 (vehicle_market_price, optional) */
+    vehicle_market_prices?: any[]
   }
 
   // ── BusinessRules ──
@@ -542,9 +554,137 @@ function isLightVehicle(engineCC: number, model: string, trim?: string): boolean
 }
 
 // ============================================================
+// v2.1 외부렌탈 계산 (pass-through + 마진)
+// ============================================================
+/**
+ * 외부렌탈 차량은 자체 원가 계산을 하지 않고 월 렌탈료를 pass-through,
+ * 마진(EXTERNAL_RENT_MARGIN_RATE)만 추가. 단기일 경우 가동률 보정도 적용.
+ *
+ * 원가 구조:
+ *   depreciation / finance / tax / risk = 0 (외부업체가 부담)
+ *   insurance / maintenance = 0 (통상 렌탈료에 포함)
+ *   external_rent (금융비용 항목으로 표시) = monthly rent pass-through
+ *   overhead = OVERHEAD_MONTHLY_PER_VEHICLE (우리 측 고정비는 발생)
+ *   margin = external_rent × EXTERNAL_RENT_MARGIN_RATE%
+ */
+export function calculateExternalRent(input: CalcInput): CalcResult {
+  const { vehicle: v, contract: c, rules } = input
+  const monthlyRent = n(c.external_rent_monthly)
+  const rentalTerm = c.rental_term || 'longterm'
+  const utilRate = n(c.utilization_rate, n(rules.SHORT_TERM_UTILIZATION_RATE, 60))
+
+  // 가동률 보정 (단기일 때만)
+  const utilMultiplier = rentalTerm === 'shortterm' ? (100 / utilRate) : 1.0
+
+  // 간접비 (고정액)
+  const overheadPerVehicle = n(rules.OVERHEAD_MONTHLY_PER_VEHICLE, 1111111)
+  const monthlyOverhead = Math.round(overheadPerVehicle * utilMultiplier)
+
+  // 외부렌탈 원가 (가동률 보정 포함)
+  const adjustedRent = Math.round(monthlyRent * utilMultiplier)
+
+  // 합계 (원가)
+  const totalMonthlyCost = adjustedRent + monthlyOverhead
+
+  // 마진 (총원가 = 외부렌탈료 + 간접비 위에 EXTERNAL_RENT_MARGIN_RATE% 부과)
+  const marginRate = n(rules.EXTERNAL_RENT_MARGIN_RATE, 15)
+  const marginAmount = Math.round(totalMonthlyCost * marginRate / 100)
+
+  const rawSuggestedRent = totalMonthlyCost + marginAmount
+  const suggestedRent = Math.round(rawSuggestedRent / 1000) * 1000
+  const vatRate = n(rules.VAT_RATE, 10)
+  const rentWithVAT = Math.round(suggestedRent * (1 + vatRate / 100) / 1000) * 1000
+  const vatAmount = rentWithVAT - suggestedRent
+
+  const utilSuffix = rentalTerm === 'shortterm' ? ` × 가동률보정 ${utilMultiplier.toFixed(2)}` : ''
+
+  const breakdown: CostBreakdown = {
+    depreciation: {
+      label: '감가상각비', monthly: 0, annual: 0, source: 'calc',
+      formula: '외부렌탈: 감가는 외부업체 부담',
+    },
+    finance: {
+      label: '외부렌탈료 (pass-through)',
+      monthly: adjustedRent, annual: adjustedRent * 12, source: 'manual',
+      formula: `월렌탈료 ${monthlyRent.toLocaleString()}${utilSuffix}`,
+      loan_interest: adjustedRent, opportunity_cost: 0, avg_loan_balance: 0, avg_equity_balance: 0,
+    },
+    insurance: {
+      label: '보험료', monthly: 0, annual: 0, source: 'manual',
+      formula: '외부렌탈: 렌탈료에 포함',
+      base_premium: 0, own_damage_premium: 0, loading_amount: 0,
+    },
+    maintenance: {
+      label: '정비비', monthly: 0, annual: 0, source: 'manual',
+      formula: '외부렌탈: 렌탈료에 포함',
+    },
+    tax_inspection: {
+      label: '세금·검사', monthly: 0, annual: 0, source: 'manual',
+      formula: '외부렌탈: 외부업체 부담',
+      monthly_tax: 0, monthly_inspection: 0, annual_tax: 0, inspections_in_term: 0,
+    },
+    risk: {
+      label: '리스크적립', monthly: 0, annual: 0, source: 'calc',
+      formula: '외부렌탈: 자체 리스크 없음',
+    },
+    overhead: {
+      label: '간접비', monthly: monthlyOverhead, annual: monthlyOverhead * 12, source: 'calc',
+      formula: `월 간접비 ${overheadPerVehicle.toLocaleString()}원/대${utilSuffix}`,
+    },
+    discount: {
+      label: '할인(보증금·선납)', monthly: 0, source: 'calc',
+      formula: '외부렌탈: 할인 미적용',
+      deposit_discount: 0, prepayment_discount: 0,
+    },
+  }
+
+  const costTotal = adjustedRent + monthlyOverhead
+  const costPct = (v: number) => costTotal > 0 ? Math.round(v / costTotal * 1000) / 10 : 0
+  const purchasePrice = n(v.purchase_price)
+  const rentToPriceRatio = purchasePrice > 0 ? Math.round((suggestedRent / purchasePrice) * 10000) / 100 : 0
+  const marginRateCalc = suggestedRent > 0 ? Math.round(marginAmount / suggestedRent * 1000) / 10 : 0
+
+  return {
+    breakdown,
+    depreciation_analysis: {
+      car_age: 0, axes: null, effective_axes: null, matched_db_rate: null,
+      active_curve: [], class_multiplier: 1, adjustment_factor: 1,
+      year_dep_now: 0, mileage_dep_now: 0, total_dep_rate_now: 0, current_market_value: 0,
+      year_dep_end: 0, mileage_dep_end: 0, total_dep_rate_end: 0, end_market_value: 0,
+      effective_end_market_value: 0, residual_value: 0, buyout_price: 0, cost_base: 0,
+    },
+    total_monthly_cost: totalMonthlyCost,
+    suggested_rent: suggestedRent,
+    rent_with_vat: rentWithVAT,
+    vat_amount: vatAmount,
+    irr_result: null,
+    excess_mileage_rate: 0,
+    excess_mileage_source: 'fallback',
+    market_analysis: {
+      rent_to_price_ratio: rentToPriceRatio,
+      annual_cost_ratio: 0,
+      cost_structure_pct: {
+        depreciation: 0, finance: costPct(adjustedRent), insurance: 0, maintenance: 0,
+        tax_inspection: 0, risk: 0, overhead: costPct(monthlyOverhead),
+      },
+      breakeven_months: 999,
+      competitive_index: 1.0,
+      margin_rate: marginRateCalc,
+    },
+    calculation_version: '2.1.0',
+    calculated_at: new Date().toISOString(),
+  }
+}
+
+// ============================================================
 // 메인 계산 함수
 // ============================================================
 export function calculateRentCost(input: CalcInput): CalcResult {
+  // v2.1 분기: 외부렌탈은 별도 경로
+  if (input.contract.contract_source === 'external_rent') {
+    return calculateExternalRent(input)
+  }
+
   const { vehicle, contract, depreciation, finance, insurance, maintenance, tax, risk, overhead, deposit_prepay, acquisition, reference, rules } = input
   const v = vehicle
   const c = contract
@@ -626,7 +766,20 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const mileageDepNow = calcMileageDep(excessMileageNow, mileageDepPer10k)
   const totalDepRateNow = Math.max(0, Math.min(yearDepNow + mileageDepNow, 90))
   const adjustedNowResidualPct = carAge === 0 ? 1.0 : Math.max(0, Math.min((1 - totalDepRateNow / 100) * adjustmentFactor, 1.0))
-  const currentMarketValue = Math.round(factoryPrice * adjustedNowResidualPct)
+  const curveBasedMarketValue = Math.round(factoryPrice * adjustedNowResidualPct)
+
+  // v2.1: 외부시세 가중치 블렌드 (DEP_MARKET_PRICE_WEIGHT / DEP_CURVE_WEIGHT)
+  const marketPrices = reference.vehicle_market_prices || []
+  const matchedMarketPrice = marketPrices.find((p: any) =>
+    p.brand === v.brand && p.model === v.model && p.year === v.year && (p.is_active !== false && p.is_active !== 0)
+  )
+  const marketWeight = n(rules.DEP_MARKET_PRICE_WEIGHT, 0.7)
+  const curveWeight  = n(rules.DEP_CURVE_WEIGHT, 0.3)
+  const externalMarketPrice = matchedMarketPrice ? n(matchedMarketPrice.market_price) : 0
+  const currentMarketValue = externalMarketPrice > 0
+    ? Math.round(externalMarketPrice * marketWeight + curveBasedMarketValue * curveWeight)
+    : curveBasedMarketValue
+  const marketPriceSource: 'external+curve' | 'curve_only' = externalMarketPrice > 0 ? 'external+curve' : 'curve_only'
 
   // 종료 시점 감가
   const termYears = c.term_months / 12
@@ -765,11 +918,35 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const monthlyRiskReserve = Math.round(purchasePrice * (risk.rate / 100) / 12)
 
   // ─────────────────────────────────────────
-  // 7. 간접비 (OVERHEAD)
+  // 7. 간접비 (OVERHEAD) — v2.1: 고정액 우선, % 폴백
   // ─────────────────────────────────────────
-  // 간접비 = 총원가 × 간접비율% (인건비, 사무실, 시스템 운영비 등)
+  // v2.1 원칙:
+  //   1순위: OVERHEAD_MONTHLY_PER_VEHICLE (원/대·월) — 월 고정비 ÷ 자체 대수
+  //   2순위: OVERHEAD_MONTHLY_TOTAL / OVERHEAD_FLEET_SIZE 계산
+  //   3순위: overhead.overhead_rate % × 원가소계 (구 방식, 폴백)
   const subtotalBeforeOverhead = monthlyDepreciation + totalMonthlyFinance + monthlyInsuranceWithLoading + monthlyMaint + totalMonthlyTaxInsp + monthlyRiskReserve
-  const monthlyOverhead = Math.round(subtotalBeforeOverhead * (n(overhead.overhead_rate) / 100))
+
+  const overheadPerVehicleRule = n(rules.OVERHEAD_MONTHLY_PER_VEHICLE, 0)
+  const overheadMonthlyTotal = n(rules.OVERHEAD_MONTHLY_TOTAL, 0)
+  const overheadFleetSize = n(rules.OVERHEAD_FLEET_SIZE, 0)
+
+  let monthlyOverhead: number
+  let overheadSource: 'fixed_per_vehicle' | 'total_div_fleet' | 'rate_percent' = 'rate_percent'
+  let overheadFormula: string
+
+  if (overheadPerVehicleRule > 0) {
+    monthlyOverhead = overheadPerVehicleRule
+    overheadSource = 'fixed_per_vehicle'
+    overheadFormula = `고정 월 간접비 ${overheadPerVehicleRule.toLocaleString()}원/대`
+  } else if (overheadMonthlyTotal > 0 && overheadFleetSize > 0) {
+    monthlyOverhead = Math.round(overheadMonthlyTotal / overheadFleetSize)
+    overheadSource = 'total_div_fleet'
+    overheadFormula = `월 고정비 ${overheadMonthlyTotal.toLocaleString()}원 ÷ ${overheadFleetSize}대`
+  } else {
+    monthlyOverhead = Math.round(subtotalBeforeOverhead * (n(overhead.overhead_rate) / 100))
+    overheadSource = 'rate_percent'
+    overheadFormula = `[구방식] 원가소계 ${subtotalBeforeOverhead.toLocaleString()} × ${overhead.overhead_rate}%`
+  }
 
   // ─────────────────────────────────────────
   // 8. 보증금/선납금 할인
@@ -783,16 +960,42 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const totalDiscount = monthlyDepositDiscount + prepayResult.monthly
 
   // ─────────────────────────────────────────
+  // v2.1: 단기 가동률 보정
+  //   단기렌트는 차량이 항상 대여되지 않음 (60% 가동률 기본).
+  //   감가·세금·검사는 시간비례라 가동률 무관, 나머지는 ÷ 가동률로 상승.
+  //   → 한 고객당 실제로 받는 일수가 줄어드니 원가가 더 빨리 회수되어야 함.
+  // ─────────────────────────────────────────
+  const rentalTerm = c.rental_term || 'longterm'
+  const utilRateRaw = n(c.utilization_rate, n(rules.SHORT_TERM_UTILIZATION_RATE, 60))
+  const utilRate = utilRateRaw > 0 && utilRateRaw <= 100 ? utilRateRaw : 60
+  const utilMultiplier = rentalTerm === 'shortterm' ? (100 / utilRate) : 1.0
+
+  // 단기면 항목별 보정 적용 (감가·세금·검사 제외)
+  let adjFinance      = totalMonthlyFinance
+  let adjInsurance    = monthlyInsuranceWithLoading
+  let adjMaint        = monthlyMaint
+  let adjRisk         = monthlyRiskReserve
+  let adjOverhead     = monthlyOverhead
+
+  if (rentalTerm === 'shortterm' && utilMultiplier > 1.0) {
+    adjFinance      = Math.round(totalMonthlyFinance * utilMultiplier)
+    adjInsurance    = Math.round(monthlyInsuranceWithLoading * utilMultiplier)
+    adjMaint        = Math.round(monthlyMaint * utilMultiplier)
+    adjRisk         = Math.round(monthlyRiskReserve * utilMultiplier)
+    adjOverhead     = Math.round(monthlyOverhead * utilMultiplier)
+  }
+
+  // ─────────────────────────────────────────
   // 합계 & 렌트가
   // ─────────────────────────────────────────
   const totalMonthlyCost = Math.max(0,
     monthlyDepreciation +
-    totalMonthlyFinance +
-    monthlyInsuranceWithLoading +
-    monthlyMaint +
+    adjFinance +
+    adjInsurance +
+    adjMaint +
     totalMonthlyTaxInsp +
-    monthlyRiskReserve +
-    monthlyOverhead -
+    adjRisk +
+    adjOverhead -
     totalDiscount
   )
 
@@ -810,17 +1013,16 @@ export function calculateRentCost(input: CalcInput): CalcResult {
   const excessInfo = getExcessMileageRateFromTerms(reference.terms_config?.calc_params, vehicleClass, factoryPrice || purchasePrice)
 
   // ─────────────────────────────────────────
-  // 9. 시장 경쟁력 분석
+  // 9. 시장 경쟁력 분석 — v2.1: 가동률 보정된 값 기준
   // ─────────────────────────────────────────
   const rentToPriceRatio = purchasePrice > 0 ? Math.round((suggestedRent / purchasePrice) * 10000) / 100 : 0
   const annualCostRatio = purchasePrice > 0 ? Math.round((totalMonthlyCost * 12 / purchasePrice) * 10000) / 100 : 0
-  const costTotal = subtotalBeforeOverhead + monthlyOverhead
+  const adjSubtotal = monthlyDepreciation + adjFinance + adjInsurance + adjMaint + totalMonthlyTaxInsp + adjRisk
+  const costTotal = adjSubtotal + adjOverhead
   const costPct = (v: number) => costTotal > 0 ? Math.round(v / costTotal * 1000) / 10 : 0
   const marginRate = suggestedRent > 0 ? Math.round((suggestedRent - totalMonthlyCost) / suggestedRent * 1000) / 10 : 0
-  // 경쟁력 지수: 업계 평균 rent-to-price 비율 대비 (장기렌트 평균 약 2.0~2.5%)
-  const INDUSTRY_AVG_RENT_RATIO = n(rules.INDUSTRY_AVG_RENT_RATIO, 2.2) // BusinessRules에서 조정 가능
+  const INDUSTRY_AVG_RENT_RATIO = n(rules.INDUSTRY_AVG_RENT_RATIO, 2.2)
   const competitiveIndex = INDUSTRY_AVG_RENT_RATIO > 0 ? Math.round(rentToPriceRatio / INDUSTRY_AVG_RENT_RATIO * 100) / 100 : 1.0
-  // 손익분기: 총 투자금을 월수익으로 나눈 월수
   const monthlyNetIncome = suggestedRent - totalMonthlyCost
   const breakevenMonths = monthlyNetIncome > 0 ? Math.ceil(costBase / monthlyNetIncome) : 999
 
@@ -829,12 +1031,12 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     annual_cost_ratio: annualCostRatio,
     cost_structure_pct: {
       depreciation: costPct(monthlyDepreciation),
-      finance: costPct(totalMonthlyFinance),
-      insurance: costPct(monthlyInsuranceWithLoading),
-      maintenance: costPct(monthlyMaint),
+      finance: costPct(adjFinance),
+      insurance: costPct(adjInsurance),
+      maintenance: costPct(adjMaint),
       tax_inspection: costPct(totalMonthlyTaxInsp),
-      risk: costPct(monthlyRiskReserve),
-      overhead: costPct(monthlyOverhead),
+      risk: costPct(adjRisk),
+      overhead: costPct(adjOverhead),
     },
     breakeven_months: breakevenMonths,
     competitive_index: competitiveIndex,
@@ -856,10 +1058,12 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     },
     finance: {
       label: '금융비용',
-      monthly: totalMonthlyFinance,
-      annual: totalMonthlyFinance * 12,
+      monthly: adjFinance,
+      annual: adjFinance * 12,
       source: 'calc',
-      formula: `대출이자 ${monthlyLoanInterest.toLocaleString()} + 기회비용 ${monthlyOpportunityCost.toLocaleString()}`,
+      formula: rentalTerm === 'shortterm'
+        ? `(대출이자 ${monthlyLoanInterest.toLocaleString()} + 기회비용 ${monthlyOpportunityCost.toLocaleString()}) × 가동률보정 ${utilMultiplier.toFixed(2)}`
+        : `대출이자 ${monthlyLoanInterest.toLocaleString()} + 기회비용 ${monthlyOpportunityCost.toLocaleString()}`,
       loan_interest: monthlyLoanInterest,
       opportunity_cost: monthlyOpportunityCost,
       avg_loan_balance: avgLoanBalance,
@@ -867,25 +1071,31 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     },
     insurance: {
       label: '보험료',
-      monthly: monthlyInsuranceWithLoading,
-      annual: monthlyInsuranceWithLoading * 12,
+      monthly: adjInsurance,
+      annual: adjInsurance * 12,
       source: insurance.auto_mode ? 'calc' : 'manual',
-      formula: insurance.auto_mode
-        ? `기본분담금 ${basePremium.toLocaleString()} + 자차 ${ownDamagePremium.toLocaleString()} + 로딩 ${loadingAmount.toLocaleString()}`
-        : '직접입력',
+      formula: (() => {
+        const base = insurance.auto_mode
+          ? `기본분담금 ${basePremium.toLocaleString()} + 자차 ${ownDamagePremium.toLocaleString()} + 로딩 ${loadingAmount.toLocaleString()}`
+          : '직접입력'
+        return rentalTerm === 'shortterm' ? `(${base}) × 가동률보정 ${utilMultiplier.toFixed(2)}` : base
+      })(),
       base_premium: basePremium,
       own_damage_premium: ownDamagePremium,
       loading_amount: loadingAmount,
     },
     maintenance: {
       label: '정비비',
-      monthly: monthlyMaint,
-      annual: monthlyMaint * 12,
+      monthly: adjMaint,
+      annual: adjMaint * 12,
       source: maintenance.package === 'self' ? 'manual' : (n(maintenance.monthly_cost) > 0 ? 'manual' : maintSource),
-      formula: maintenance.package === 'self' ? '자가정비 (미포함)'
-        : n(maintenance.monthly_cost) > 0 ? '직접입력'
-        : dbMaintMonthly > 0 ? `DB기준 ${dbMaintMonthly.toLocaleString()}원 × ${multiplier} 배수`
-        : `${MAINTENANCE_PACKAGES[maintenance.package].label} × ${multiplier} 배수`,
+      formula: (() => {
+        const base = maintenance.package === 'self' ? '자가정비 (미포함)'
+          : n(maintenance.monthly_cost) > 0 ? '직접입력'
+          : dbMaintMonthly > 0 ? `DB기준 ${dbMaintMonthly.toLocaleString()}원 × ${multiplier} 배수`
+          : `${MAINTENANCE_PACKAGES[maintenance.package].label} × ${multiplier} 배수`
+        return rentalTerm === 'shortterm' ? `(${base}) × 가동률보정 ${utilMultiplier.toFixed(2)}` : base
+      })(),
     },
     tax_inspection: {
       label: '세금·검사',
@@ -900,17 +1110,21 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     },
     risk: {
       label: '리스크적립',
-      monthly: monthlyRiskReserve,
-      annual: monthlyRiskReserve * 12,
+      monthly: adjRisk,
+      annual: adjRisk * 12,
       source: 'calc',
-      formula: `매입가 ${purchasePrice.toLocaleString()} × ${risk.rate}% / 12`,
+      formula: rentalTerm === 'shortterm'
+        ? `(매입가 ${purchasePrice.toLocaleString()} × ${risk.rate}% / 12) × 가동률보정 ${utilMultiplier.toFixed(2)}`
+        : `매입가 ${purchasePrice.toLocaleString()} × ${risk.rate}% / 12`,
     },
     overhead: {
       label: '간접비',
-      monthly: monthlyOverhead,
-      annual: monthlyOverhead * 12,
-      source: overhead.overhead_rate > 0 ? 'calc' : 'manual',
-      formula: `원가소계 ${subtotalBeforeOverhead.toLocaleString()} × ${overhead.overhead_rate}%`,
+      monthly: adjOverhead,
+      annual: adjOverhead * 12,
+      source: overheadSource === 'rate_percent' ? 'calc' : 'db',
+      formula: rentalTerm === 'shortterm'
+        ? `${overheadFormula} × 가동률보정 ${utilMultiplier.toFixed(2)}`
+        : overheadFormula,
     },
     discount: {
       label: '할인(보증금·선납)',
@@ -955,7 +1169,7 @@ export function calculateRentCost(input: CalcInput): CalcResult {
     excess_mileage_rate: excessInfo.rate,
     excess_mileage_source: excessInfo.source,
     market_analysis: marketAnalysis,
-    calculation_version: '2.0.0',
+    calculation_version: '2.1.0',
     calculated_at: new Date().toISOString(),
   }
 }

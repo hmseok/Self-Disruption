@@ -21,6 +21,7 @@ const ALLOWED_TABLES = [
   'maintenance_cost_table',
   'registration_cost_table',
   'vehicle_tax_table',
+  'vehicle_market_price',
 ]
 
 function serialize<T>(data: T): T {
@@ -67,6 +68,8 @@ function buildSelectQuery(table: string): string {
       return `SELECT * FROM ${table} ORDER BY cost_type`
     case 'vehicle_tax_table':
       return `SELECT * FROM ${table} ORDER BY tax_type ASC`
+    case 'vehicle_market_price':
+      return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY brand, model, year DESC`
     case 'depreciation_history':
       return `SELECT * FROM ${table} ORDER BY created_at DESC`
     default:

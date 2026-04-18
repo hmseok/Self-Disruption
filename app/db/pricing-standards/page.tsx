@@ -6,6 +6,7 @@ import DcToolbar from '../../components/DcToolbar'
 
 // 탭 설정 — 각 탭에 설명 추가
 const tabs = [
+  { id: 'market', label: '차량시세', icon: '🚗', desc: '외부+자체 블렌드' },
   { id: 'depreciation', label: '감가기준', icon: '📉', desc: '차량 잔존가치율' },
   { id: 'insurance', label: '보험료', icon: '🛡️', desc: '보험료 기준표' },
   { id: 'maintenance', label: '정비비', icon: '🔧', desc: '월 정비비 기준' },
@@ -28,6 +29,7 @@ function TabPlaceholder() {
 }
 
 const TabComponents: Record<string, React.ComponentType<any>> = {
+  market: dynamicImport(() => import('./MarketPriceTab').catch(() => TabPlaceholder), { ssr: false }),
   depreciation: dynamicImport(() => import('./DepreciationTab').catch(() => TabPlaceholder), { ssr: false }),
   insurance: dynamicImport(() => import('./InsuranceTab').catch(() => TabPlaceholder), { ssr: false }),
   maintenance: dynamicImport(() => import('./MaintenanceTab').catch(() => TabPlaceholder), { ssr: false }),
@@ -41,7 +43,7 @@ const TabComponents: Record<string, React.ComponentType<any>> = {
 const SimulationPanel = dynamicImport(() => import('./SimulationPanel'), { ssr: false })
 
 export default function PricingStandardsPage() {
-  const [activeTab, setActiveTab] = useState<string>('depreciation')
+  const [activeTab, setActiveTab] = useState<string>('market')
   const [showGuide, setShowGuide] = useState(true)
   const [showSimulation, setShowSimulation] = useState(true)
 
