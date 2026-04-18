@@ -113,4 +113,62 @@ main push → 빌드 → 배포 → 헬스체크
 
 ---
 
-_마지막 업데이트: 2026-04-04_
+## 2026-04-17: 렌트 원가 계산엔진 v2.0 (순수함수 기반)
+
+### 결정
+기존 RentPricingBuilder 내장 계산 로직을 `lib/rent-calc-engine.ts`로 분리, 순수함수 기반 v2.0 엔진 구현
+
+### 근거
+- 기존: UI 컴포넌트 안에 계산 로직 혼재 → 테스트 불가, 재사용 불가
+- v2.0: CalcInput → calculateRentCost() → CalcResult 순수함수
+- 7대 원가 구조 (감가/금융/보험/정비/세금·검사/리스크/간접비)
+- DB 우선 폴백 체인 (DB → BusinessRules → 하드코딩)
+- 모든 CostItem에 source + formula 감사추적
+
+### 핵심 파일
+- `lib/rent-calc-engine.ts` (~1,253줄) — 핵심 엔진
+- `lib/rent-calc.ts` (541줄) — 유틸리티
+- `lib/rent-calc-types.ts` (128줄) — 타입 정의
+
+---
+
+## 2026-04-18: RentPricingBuilder 모듈 분리 (PricingContext 패턴)
+
+### 결정
+5,853줄 단일 파일을 React Context 기반 5개 모듈로 분리
+
+### 근거
+- 5,853줄 단일 파일은 유지보수 불가
+- 122개 useState가 모든 스텝에서 공유 → props 전달 비현실적
+- React Context (PricingContext.Provider) 패턴으로 상태 공유
+
+### 분리 구조
+- RentPricingBuilder.tsx (2,438줄) — 상태+핸들러+오케스트레이터
+- PricingContext.tsx (24줄) — Context + usePricing 훅
+- VehicleStep.tsx (1,337줄) — 차량선택+옵션
+- AnalysisStep.tsx (1,791줄) — 원가분석
+- CustomerPreviewStep.tsx (642줄) — 고객+미리보기
+
+### 주의사항
+- PricingContext는 현재 `any` 타입 → 후속으로 PricingState 인터페이스 정의 필요
+- 핸들러 이름 매핑 필요 (handleSaveNewCarPrice → handleSaveCarPrice 등)
+
+---
+
+## 2026-04-18: SimulationPanel 사이드바 패턴
+
+### 결정
+기준표 설정 페이지에 실시간 시뮬레이션 사이드 패널 추가
+
+### 근거
+- 기준표 값 수정 시 즉시 렌트료 영향을 확인할 수 없었음
+- SimulationPanel이 calculateRentCost() 엔진을 직접 호출하여 실시간 산출
+- xl(1280px) 이상에서 우측 340px 고정, 미만에서 숨김
+
+### 레이아웃
+- page.tsx: max-w-[1800px], flex 레이아웃 (좌: 탭 / 우: SimulationPanel sticky)
+- 토글 버튼으로 시뮬레이션 패널 표시/숨기기
+
+---
+
+_마지막 업데이트: 2026-04-18_

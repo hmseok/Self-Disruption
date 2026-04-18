@@ -38,9 +38,12 @@ const TabComponents: Record<string, React.ComponentType<any>> = {
   rules: dynamicImport(() => import('./BusinessRulesTab').catch(() => TabPlaceholder), { ssr: false }),
 }
 
+const SimulationPanel = dynamicImport(() => import('./SimulationPanel'), { ssr: false })
+
 export default function PricingStandardsPage() {
   const [activeTab, setActiveTab] = useState<string>('depreciation')
   const [showGuide, setShowGuide] = useState(true)
+  const [showSimulation, setShowSimulation] = useState(true)
 
   const getCurrentTabComponent = () => {
     const TabComponent = TabComponents[activeTab] || TabPlaceholder
@@ -49,7 +52,7 @@ export default function PricingStandardsPage() {
 
   return (
     <div className="page-bg">
-      <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
+      <div className="max-w-[1800px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
         {/* ═══ Toolbar with tab filters ═══ */}
         <DcToolbar
@@ -60,17 +63,32 @@ export default function PricingStandardsPage() {
           activeFilter={activeTab}
           onFilterChange={(key) => setActiveTab(key)}
           trailing={
-            <button
-              onClick={() => setShowGuide(!showGuide)}
-              style={{
-                padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
-                border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
-                color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}
-            >
-              💡 {showGuide ? '가이드 숨기기' : '가이드 보기'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSimulation(!showSimulation)}
+                style={{
+                  padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  background: showSimulation ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.6)',
+                  color: showSimulation ? '#3b82f6' : '#64748b',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                🧮 {showSimulation ? '시뮬레이션' : '시뮬레이션'}
+              </button>
+              <button
+                onClick={() => setShowGuide(!showGuide)}
+                style={{
+                  padding: '5px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+                  border: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.6)',
+                  color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                💡 {showGuide ? '가이드 숨기기' : '가이드 보기'}
+              </button>
+            </div>
           }
         />
 
@@ -119,8 +137,22 @@ export default function PricingStandardsPage() {
           </div>
         )}
 
-        {/* 탭 컨텐츠 */}
-        {getCurrentTabComponent()}
+        {/* 메인 레이아웃: 탭 콘텐츠 + 시뮬레이션 사이드패널 */}
+        <div className="flex gap-5">
+          {/* 좌측: 탭 콘텐츠 영역 */}
+          <div className={`${showSimulation ? 'flex-1 min-w-0' : 'w-full'}`}>
+            {getCurrentTabComponent()}
+          </div>
+
+          {/* 우측: 실시간 시뮬레이션 사이드 패널 */}
+          {showSimulation && (
+            <div className="hidden xl:block w-[340px] flex-shrink-0">
+              <div className="sticky top-4">
+                <SimulationPanel />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
