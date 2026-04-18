@@ -288,28 +288,38 @@ export async function POST(request: NextRequest) {
     let parsedItems: ParsedReceipt[] = []
     let ocrEngine = 'none'
     let isMulti = false
+    let failReason: string | undefined
 
     // 2-1. Gemini Vision API 시도
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY
-    if (geminiKey) {
+    if (!geminiKey) {
+      failReason = 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다. Cloud Run 환경변수를 확인해주세요.'
+      console.warn('⚠️', failReason)
+    } else {
       try {
         const geminiResult = await analyzeWithGemini(base64, file.type)
         parsedItems = geminiResult.items
         isMulti = geminiResult.isMulti
         ocrEngine = 'gemini'
+        if (parsedItems.length === 0) {
+          failReason = 'Gemini가 응답했으나 영수증 데이터를 추출하지 못했습니다 (이미지 품질 확인 필요).'
+        }
       } catch (e: any) {
+        failReason = `Gemini API 오류: ${e.message}`
         console.warn('⚠️ Gemini 분석 실패, CLOVA 폴백 시도:', e.message)
       }
     }
 
-    // 2-2. Gemini 실패 시 CLOVA OCR 폴백
+    // 2-2. Gemini 실패/미설정 시 CLOVA OCR 폴백
     if (ocrEngine === 'none' && (process.env.NAVER_CLOVA_OCR_SECRET && process.env.NAVER_CLOVA_OCR_URL)) {
       try {
         const clovaResult = await analyzeWithClovaOCR(buffer, ext, file.name)
         parsedItems = [clovaResult]
         ocrEngine = 'clova'
+        failReason = undefined
         console.log('✅ CLOVA OCR 분석 성공')
       } catch (e: any) {
+        failReason = `Gemini 실패 + CLOVA OCR 실패: ${e.message}`
         console.warn('⚠️ CLOVA OCR도 실패, 수동 입력 필요:', e.message)
       }
     }
@@ -326,6 +336,7 @@ export async function POST(request: NextRequest) {
       has_ocr: ocrEngine !== 'none',
       is_multi: isMulti,
       item_count: parsedItems.length,
+      fail_reason: failReason,
     })
   } catch (e: any) {
     console.error('영수증 분석 오류:', e.message)
@@ -338,6 +349,7 @@ export async function POST(request: NextRequest) {
       has_ocr: false,
       is_multi: false,
       item_count: 0,
+      fail_reason: `서버 처리 오류: ${e.message}`,
     })
   }
 }

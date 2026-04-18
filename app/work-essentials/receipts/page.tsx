@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { auth } from '@/lib/auth-client'
 import { useApp } from '../../context/AppContext'
-import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
-import DcToolbar from '../../components/DcToolbar'
+import DcStatStrip, { StatItem, ActionButton } from '../../components/DcStatStrip'
+import DcToolbar, { FilterItem } from '../../components/DcToolbar'
 
 // ════════════════════════════════════════════
 // 영수증 제출 / 법인카드 사용내역 관리
@@ -289,6 +289,7 @@ export default function ReceiptsPage() {
     let geminiCount = 0
     let clovaCount = 0
     let failedCount = 0
+    const failReasons = new Set<string>()
 
     for (let i = 0; i < unique.length; i++) {
       setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'uploading' } : q))
@@ -311,6 +312,8 @@ export default function ReceiptsPage() {
         if (engine === 'gemini') geminiCount++
         else if (engine === 'clova') clovaCount++
         else failedCount++
+
+        if (ocrJson.fail_reason) failReasons.add(ocrJson.fail_reason)
 
         // 각 OCR 항목을 DB에 저장할 아이템으로 변환
         const itemsToSave = ocrItems
@@ -431,7 +434,12 @@ export default function ReceiptsPage() {
       // 월 목록 갱신
       fetchDataMonths()
     } else if (unique.length > 0) {
-      setTimeout(() => alert('업로드한 파일의 분석 결과가 없습니다.\n서버 로그를 확인해주세요.'), 300)
+      const reasonLines = Array.from(failReasons)
+      const msg = [
+        `업로드한 ${unique.length}건의 분석 결과가 없습니다.`,
+        reasonLines.length > 0 ? `\n[원인]\n${reasonLines.join('\n')}` : '\n서버 로그를 확인해주세요.',
+      ].join('')
+      setTimeout(() => alert(msg), 300)
     }
 
     setIsProcessing(false)
@@ -814,71 +822,76 @@ export default function ReceiptsPage() {
     )
   }
 
+  // ── DcStatStrip 통계 + 액션 ──
+  const statItems: StatItem[] = [
+    { label: '총 지출액', value: fmt(totalAmount), unit: '원' },
+    { label: '등록 항목', value: allRawItems.length, unit: '건' },
+    { label: '미비 항목', value: incompleteCount, unit: '건' },
+  ]
+
+  const statActions: ActionButton[] = [
+    { label: '엑셀 다운로드', onClick: handleDownloadXlsx, variant: 'secondary', icon: '📥' },
+    { label: '영수증 업로드', onClick: () => fileRef.current?.click(), variant: 'primary', icon: '+' },
+  ]
+
+  // ── DcToolbar 월 필터탭 ──
+  const monthFilters: FilterItem[] = allMonths.map(m => ({
+    key: m,
+    label: `${parseInt(m.split('-')[1])}월`,
+  }))
+
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
 
-        <DcStatStrip
-          stats={[
-            { label: '총 지출액', value: fmt(totalAmount), unit: '원' },
-            { label: '등록 항목', value: allRawItems.length, unit: '건' },
-            { label: '미비 항목', value: incompleteCount, unit: '건' },
-          ] as StatItem[]}
-          fullWidth
-        />
-
-        {/* ── 다운로드 버튼 ── */}
-        <div style={{ marginBottom: 20, textAlign: 'right' }}>
-          <button
-            onClick={handleDownloadXlsx}
-            style={{ padding: '10px 18px', background: '#059669', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: 'pointer', whiteSpace: 'nowrap' }}
-          >
-            {isMobile ? '다운로드' : '엑셀 다운로드'}
-          </button>
-        </div>
-
-      {/* ── 드롭존 ── */}
-      <div
-        style={{
-          border: isDragOver ? '2px solid #3b6eb5' : '2px dashed #cbd5e1',
-          borderRadius: 16, padding: isProcessing ? '12px 16px' : isMobile ? '20px 16px' : '28px 20px',
-          textAlign: 'center', marginBottom: 20,
-          background: isDragOver ? '#eff6ff' : '#fafbfc',
-          cursor: 'pointer', transition: 'all 0.2s ease',
-        }}
-        onClick={() => !isProcessing && fileRef.current?.click()}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
+        {/* 숨겨진 파일 입력 */}
         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileInput} style={{ display: 'none' }} />
 
-        {isProcessing || uploadQueue.length > 0 ? (
-          <div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+        {/* DcStatStrip + Action Buttons */}
+        <DcStatStrip stats={statItems} actions={statActions} />
+
+        {/* ── 업로드 진행 배너 (진행중일 때만 표시) ── */}
+        {(isProcessing || uploadQueue.length > 0) && (
+          <div style={{
+            background: 'rgba(255,255,255,0.72)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            borderRadius: 16,
+            padding: '14px 18px',
+            marginBottom: 16,
+            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>🤖</span>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#0f2440' }}>
+                Gemini AI 분석 진행 중
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#3b6eb5' }}>
+                {uploadQueue.filter(q => q.status === 'done').length} / {uploadQueue.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {uploadQueue.map((q, i) => (
                 <div key={i} style={{
-                  width: 56, height: 56, borderRadius: 10, overflow: 'hidden', position: 'relative',
+                  width: 48, height: 48, borderRadius: 10, overflow: 'hidden', position: 'relative',
                   border: q.status === 'uploading' ? '2px solid #3b6eb5' : q.status === 'done' ? '2px solid #22c55e' : q.status === 'error' ? '2px solid #ef4444' : '2px solid #e2e8f0',
                   opacity: q.status === 'pending' ? 0.4 : 1,
                 }}>
                   <img src={q.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   {q.status === 'uploading' && (
                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(37,99,235,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <div style={{ width: 14, height: 14, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                     </div>
                   )}
                   {q.status === 'done' && (
-                    <div style={{ position: 'absolute', bottom: 2, right: 2, background: '#22c55e', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 900 }}>✓</span>
+                    <div style={{ position: 'absolute', bottom: 2, right: 2, background: '#22c55e', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: '#fff', fontSize: 9, fontWeight: 900 }}>✓</span>
                     </div>
                   )}
                   {q.status === 'done' && q.engine && (
                     <div style={{
                       position: 'absolute', top: 2, left: 2,
                       background: q.engine === 'gemini' ? '#4285f4' : q.engine === 'clova' ? '#03c75a' : '#94a3b8',
-                      borderRadius: 4, padding: '1px 4px',
+                      borderRadius: 4, padding: '1px 3px',
                     }}>
                       <span style={{ color: '#fff', fontSize: 7, fontWeight: 800 }}>
                         {q.engine === 'gemini' ? 'AI' : q.engine === 'clova' ? 'OCR' : '?'}
@@ -888,116 +901,69 @@ export default function ReceiptsPage() {
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: 13, color: '#3b6eb5', fontWeight: 700 }}>
-              {uploadQueue.filter(q => q.status === 'done').length} / {uploadQueue.length} AI 분석 완료
-            </p>
-            {isProcessing && (
-              <p style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Gemini AI가 영수증을 분석하고 있습니다...</p>
-            )}
-          </div>
-        ) : isDragOver ? (
-          <div>
-            <div style={{ fontSize: 44, marginBottom: 6 }}>🤖</div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: '#3b6eb5' }}>여기에 놓으면 AI가 자동 분석합니다</p>
-          </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: isMobile ? 32 : 44, marginBottom: 6 }}>🧾</div>
-            <p style={{ fontSize: isMobile ? 13 : 15, fontWeight: 700, color: '#334155', wordBreak: 'keep-all' }}>
-              {isMobile ? '영수증 이미지를 클릭하여 업로드' : '영수증 이미지를 여기에 드래그하거나 클릭'}
-            </p>
-            <p style={{ fontSize: isMobile ? 11 : 12, color: '#64748b', marginTop: 4, wordBreak: 'keep-all' }}>
-              여러 장 동시 가능 · <span style={{ color: '#4285f4', fontWeight: 600 }}>Gemini AI</span> 자동 분석
-            </p>
           </div>
         )}
-      </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        {/* ── 드래그앤드롭 영역 (최소화) ── */}
+        {!isProcessing && uploadQueue.length === 0 && (
+          <div
+            style={{
+              border: isDragOver ? '2px solid #3b6eb5' : '1px dashed rgba(0,0,0,0.12)',
+              borderRadius: 14,
+              padding: isMobile ? '14px 12px' : '16px 20px',
+              textAlign: 'center',
+              marginBottom: 16,
+              background: isDragOver ? 'rgba(59,110,181,0.08)' : 'rgba(255,255,255,0.45)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+            }}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <span style={{ fontSize: isMobile ? 20 : 22 }}>{isDragOver ? '🤖' : '🧾'}</span>
+            <span style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, color: isDragOver ? '#3b6eb5' : '#475569' }}>
+              {isDragOver
+                ? '여기에 놓으면 AI가 자동 분석합니다'
+                : (isMobile ? '영수증을 클릭하여 업로드' : '영수증 이미지를 드래그하거나 위 [영수증 업로드] 버튼 클릭')}
+            </span>
+            <span style={{ fontSize: 11, color: '#8aabc7' }}>
+              · <span style={{ color: '#4285f4', fontWeight: 600 }}>Gemini AI</span> 자동 분석
+            </span>
+          </div>
+        )}
 
-      {/* ── 월 필터 + 검색 + 합계 ── */}
-      <div style={{ display: 'flex', gap: isMobile ? 8 : 12, marginBottom: 16, alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', width: '100%', boxSizing: 'border-box' }}>
-        {isMobile ? (
-          /* 모바일: 월 + 검색을 한 줄로 */
-          <div style={{ display: 'flex', gap: 8, width: '100%', boxSizing: 'border-box' }}>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, fontWeight: 600, background: '#fff', flexShrink: 0, width: 'auto', minWidth: 0 }}
-            >
-              {allMonths.map(m => (
-                <option key={m} value={m}>{m.replace('-', '년 ')}월</option>
-              ))}
-            </select>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <input
-                type="text"
-                placeholder="검색..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%', padding: '8px 10px 8px 30px', borderRadius: 8,
-                  border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
-                  background: '#fff', boxSizing: 'border-box',
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
-                onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
-              />
-              <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#64748b', pointerEvents: 'none' }}>🔍</span>
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+        {/* ── DcToolbar: 검색 + 월 필터탭 ── */}
+        <DcToolbar
+          search={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="사용처, 품명, 구분, 고객명, 금액 검색..."
+          filters={monthFilters}
+          activeFilter={selectedMonth}
+          onFilterChange={setSelectedMonth}
+          trailing={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {incompleteCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef3c7', padding: '6px 12px', borderRadius: 10, border: '1px solid #fde68a' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>⚠ 미비 {incompleteCount}건</span>
+                </div>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(224,242,254,0.6)', padding: '6px 14px', borderRadius: 10, border: '1px solid rgba(186,230,253,0.8)' }}>
+                <span style={{ fontSize: 12, color: '#0369a1', fontWeight: 600 }}>합계</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#0c4a6e' }}>{fmt(totalAmount)}원</span>
+                <span style={{ fontSize: 11, color: '#64748b' }}>({allDisplayItems.length}건)</span>
+              </div>
             </div>
-          </div>
-        ) : (
-          /* 데스크톱: 기존 레이아웃 */
-          <>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, fontWeight: 600, background: '#fff', flexShrink: 0 }}
-            >
-              {allMonths.map(m => (
-                <option key={m} value={m}>{m.replace('-', '년 ')}월</option>
-              ))}
-            </select>
-            <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
-              <input
-                type="text"
-                placeholder="사용처, 품명, 구분, 고객명, 금액 검색..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8,
-                  border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
-                  background: '#fff', boxSizing: 'border-box',
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = '#93c5fd'}
-                onBlur={e => e.currentTarget.style.borderColor = '#d1d5db'}
-              />
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#64748b', pointerEvents: 'none' }}>🔍</span>
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
-              )}
-            </div>
-          </>
-        )}
-        {searchQuery && (
-          <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>{allDisplayItems.length}건</span>
-        )}
-        {incompleteCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef3c7', padding: '6px 14px', borderRadius: 8, border: '1px solid #fde68a', flexShrink: 0, width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#d97706' }}>⚠ 미비 {incompleteCount}건</span>
-          </div>
-        )}
-        <div style={{ marginLeft: isMobile ? 0 : 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, background: '#f0f9ff', padding: '8px 16px', borderRadius: 8, border: '1px solid #bae6fd', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-start', boxSizing: 'border-box' }}>
-          <span style={{ fontSize: 13, color: '#0369a1', fontWeight: 600 }}>합계</span>
-          <span style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, color: '#0c4a6e' }}>{fmt(totalAmount)}원</span>
-          <span style={{ fontSize: 12, color: '#64748b', marginLeft: 'auto' }}>({allDisplayItems.length}건)</span>
-        </div>
-      </div>
+          }
+        />
 
       {/* ── 카테고리별 칩 ── */}
       {Object.keys(categoryTotals).length > 0 && (
@@ -1104,9 +1070,21 @@ export default function ReceiptsPage() {
       {isMobile ? (
         <div style={{ paddingBottom: selectedIds.size > 0 ? 100 : 0 }}>
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>로딩 중...</div>
+            <div style={{
+              background: 'rgba(255,255,255,0.72)',
+              borderRadius: 16,
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+              padding: 40, textAlign: 'center', color: '#8aabc7', fontWeight: 500,
+            }}>불러오는 중...</div>
           ) : allDisplayItems.length === 0 ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#64748b' }}>
+            <div style={{
+              background: 'rgba(255,255,255,0.72)',
+              borderRadius: 16,
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+              padding: 60, textAlign: 'center', color: '#64748b',
+            }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>등록된 지출내역이 없습니다</div>
               <div style={{ fontSize: 12, marginTop: 4 }}>위 영역에 영수증 이미지를 올려보세요</div>
@@ -1140,11 +1118,17 @@ export default function ReceiptsPage() {
           )}
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.72)',
+          borderRadius: 16,
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '6px 6px 18px rgba(140,170,210,0.14), -6px -6px 18px rgba(255,255,255,0.47)',
+          overflow: 'hidden',
+        }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <tr style={{ background: 'rgba(248,250,252,0.72)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                   <th style={{ padding: '12px 6px', textAlign: 'center', width: 36 }}>
                     <input
                       type="checkbox"
@@ -1163,7 +1147,7 @@ export default function ReceiptsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>로딩 중...</td></tr>
+                  <tr><td colSpan={10} style={{ padding: 40, textAlign: 'center', color: '#8aabc7', fontWeight: 500 }}>불러오는 중...</td></tr>
                 ) : allDisplayItems.length === 0 ? (
                   <tr><td colSpan={10} style={{ padding: 60, textAlign: 'center', color: '#64748b' }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
@@ -1196,7 +1180,7 @@ export default function ReceiptsPage() {
               </tbody>
               {allDisplayItems.length > 0 && (
                 <tfoot>
-                  <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                  <tr style={{ borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(248,250,252,0.72)' }}>
                     <td colSpan={6} style={{ padding: '12px 10px', fontWeight: 700, color: '#1e293b' }}>합계</td>
                     <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 800, color: '#0c4a6e', fontSize: 15 }}>{fmt(totalAmount)}원</td>
                     <td colSpan={2}></td>
