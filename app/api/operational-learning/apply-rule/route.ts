@@ -7,8 +7,13 @@ import { serialize } from '@/lib/operational-learning-helpers'
 // BusinessRules 추천 적용 API
 //   POST /api/operational-learning/apply-rule
 //     body: { rule_key, new_value, reason?, confidence?, sample_size? }
-//     → business_rules 업데이트
+//     → business_rules 업데이트 (컬럼: key/value — value는 JSON)
 //     → rule_suggestion_logs에 이력 기록
+//
+// NOTE:
+//   business_rules 실제 컬럼은 `key` (text), `value` (json).
+//   `key`는 MySQL 예약어라 backtick 필수.
+//   `value`는 JSON 컬럼이라 JSON 텍스트(`'2'`)로 바인딩해야 함.
 // ═══════════════════════════════════════════════════════════════
 
 export async function POST(request: NextRequest) {
@@ -26,22 +31,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'new_value는 숫자' }, { status: 400 })
     }
 
-    // 1. 기존 rule 조회
-    const existing = await prisma.$queryRaw<any[]>`
-      SELECT id, rule_value FROM business_rules WHERE rule_name = ${rule_key} LIMIT 1
-    `
+    // 1. 기존 rule 조회 (key는 예약어 → backtick)
+    const existing = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT id, `value` FROM business_rules WHERE `key` = ? LIMIT 1',
+      rule_key
+    )
     if (existing.length === 0) {
       return NextResponse.json({ error: `BusinessRule '${rule_key}' 없음` }, { status: 404 })
     }
-    const oldValue = Number(existing[0].rule_value)
+    const oldRaw = existing[0].value
+    const oldValue = typeof oldRaw === 'string' ? Number(oldRaw) : Number(oldRaw ?? 0)
     const newValueNum = Number(new_value)
 
-    // 2. 업데이트
-    await prisma.$executeRaw`
-      UPDATE business_rules
-      SET rule_value = ${newValueNum}, updated_at = NOW()
-      WHERE id = ${existing[0].id}
-    `
+    // 2. 업데이트 — JSON 컬럼이므로 JSON 텍스트(숫자 literal)로 바인딩
+    const jsonVal = JSON.stringify(newValueNum)
+    await prisma.$executeRawUnsafe(
+      'UPDATE business_rules SET `value` = ?, updated_at = NOW() WHERE id = ?',
+      jsonVal, existing[0].id
+    )
 
     // 3. 이력 기록
     const logId = crypto.randomUUID()

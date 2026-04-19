@@ -36,21 +36,19 @@ export async function POST(request: NextRequest) {
     const result = suggestBusinessRules(snapshots)
 
     // current_value 채우기: business_rules에서 각 key의 현재 값 조회
+    // NOTE: 실제 컬럼명은 `key` / `value` (value는 JSON). key는 MySQL 예약어라 backtick 필수.
     if (result.suggestions.length > 0) {
       const keys = result.suggestions.map(s => s.key)
       const placeholders = keys.map(() => '?').join(',')
-      const rules = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT rule_name, rule_value FROM business_rules WHERE rule_name IN (${placeholders})`,
+      const rulesWithId = await prisma.$queryRawUnsafe<any[]>(
+        'SELECT id, `key`, `value` FROM business_rules WHERE `key` IN (' + placeholders + ')',
         ...keys
       )
       const ruleMap = new Map<string, { id: string; value: number }>()
-      // business_rules.id도 필요하므로 다시 조회
-      const rulesWithId = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, rule_name, rule_value FROM business_rules WHERE rule_name IN (${placeholders})`,
-        ...keys
-      )
       for (const r of rulesWithId) {
-        ruleMap.set(r.rule_name, { id: r.id, value: Number(r.rule_value) })
+        let v = r.value
+        if (typeof v === 'string') { try { v = JSON.parse(v) } catch {} }
+        ruleMap.set(r.key, { id: r.id, value: Number(v) })
       }
 
       result.suggestions = result.suggestions.map(s => ({

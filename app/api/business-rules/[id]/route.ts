@@ -29,10 +29,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
     const updates: string[] = []
     const values: any[] = []
+    const ALLOWED = new Set(['key', 'value', 'description', 'rule_name', 'rule_value'])
 
-    for (const [key, value] of Object.entries(body)) {
-      updates.push(`${key} = ?`)
-      values.push(value)
+    // NOTE: `key`/`value`는 MySQL 예약어/JSON → backtick + CAST 필요
+    for (const [rawKey, rawValue] of Object.entries(body)) {
+      if (!ALLOWED.has(rawKey)) continue
+      const col = rawKey === 'rule_name' ? 'key' : (rawKey === 'rule_value' ? 'value' : rawKey)
+      if (col === 'value') {
+        // JSON 컬럼 — JSON 텍스트로 바인딩 후 CAST
+        let jsonVal: string
+        if (rawValue === null || rawValue === undefined) jsonVal = 'null'
+        else if (typeof rawValue === 'string') {
+          try { JSON.parse(rawValue); jsonVal = rawValue } catch { jsonVal = JSON.stringify(rawValue) }
+        } else jsonVal = JSON.stringify(rawValue)
+        updates.push('`value` = CAST(? AS JSON)')
+        values.push(jsonVal)
+      } else {
+        updates.push('`' + col + '` = ?')
+        values.push(rawValue)
+      }
     }
 
     values.push(id)

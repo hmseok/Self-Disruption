@@ -59,7 +59,7 @@ function buildSelectQuery(table: string): string {
     case 'insurance_vehicle_group':
       return `SELECT * FROM ${table} WHERE is_active = true ORDER BY sort_order`
     case 'business_rules':
-      return `SELECT * FROM ${table} ORDER BY key`
+      return `SELECT * FROM ${table} ORDER BY \`key\``
     case 'finance_rate_table':
       return `SELECT * FROM ${table} ORDER BY effective_date DESC`
     case 'maintenance_cost_table':
@@ -167,12 +167,24 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
+    // business_rules는 `key`(예약어), `value`(JSON) 특수 처리
+    const isBR = table === 'business_rules'
     const updates = Object.entries(body)
       .map(([key, val]) => {
-        if (val === null || val === undefined) return `${key} = NULL`
-        if (typeof val === 'string') return `${key} = '${val.replace(/'/g, "''")}'`
-        if (typeof val === 'boolean') return `${key} = ${val ? '1' : '0'}`
-        return `${key} = ${val}`
+        const colName = isBR ? '`' + key + '`' : key
+        if (isBR && key === 'value') {
+          // JSON 컬럼 — JSON 텍스트로 바인딩
+          let jsonText: string
+          if (val === null || val === undefined) jsonText = 'null'
+          else if (typeof val === 'string') {
+            try { JSON.parse(val); jsonText = val } catch { jsonText = JSON.stringify(val) }
+          } else jsonText = JSON.stringify(val)
+          return `${colName} = CAST('${jsonText.replace(/'/g, "''")}' AS JSON)`
+        }
+        if (val === null || val === undefined) return `${colName} = NULL`
+        if (typeof val === 'string') return `${colName} = '${val.replace(/'/g, "''")}'`
+        if (typeof val === 'boolean') return `${colName} = ${val ? '1' : '0'}`
+        return `${colName} = ${val}`
       })
       .join(', ')
 
