@@ -425,6 +425,52 @@ export default function QuoteDetailPage() {
     else router.push(`/quotes/create?quote_id=${quoteId}`)
   }
 
+  // ============================================
+  // 직원용 PDF 다운로드 — printRef 컨텐츠를 A4 PDF로 저장
+  // ============================================
+  const [pdfGenerating, setPdfGenerating] = useState(false)
+  const handleDownloadStaffPdf = async () => {
+    if (!printRef.current) { alert('견적서 내용이 아직 준비되지 않았습니다.'); return }
+    setPdfGenerating(true)
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const jsPDFModule = await import('jspdf')
+      const JsPDF = (jsPDFModule as any).jsPDF || (jsPDFModule as any).default
+      // 고해상도 캡쳐
+      const canvas = await html2canvas(printRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new JsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      // 비율 유지하여 A4 폭에 맞춤
+      const imgW = pageW
+      const imgH = (canvas.height * imgW) / canvas.width
+      let heightLeft = imgH
+      let position = 0
+      pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH, undefined, 'FAST')
+      heightLeft -= pageH
+      while (heightLeft > 0) {
+        position = heightLeft - imgH
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgW, imgH, undefined, 'FAST')
+        heightLeft -= pageH
+      }
+      const customerName = (quote?.customer_name || '고객').replace(/[\\/:*?"<>|]/g, '')
+      const dateStr = new Date().toISOString().slice(0, 10)
+      pdf.save(`견적서_${customerName}_${dateStr}.pdf`)
+    } catch (e: any) {
+      console.error('[Staff PDF]', e)
+      alert('PDF 생성 실패: ' + (e?.message || String(e)))
+    } finally {
+      setPdfGenerating(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <div className="text-center">
@@ -538,6 +584,13 @@ export default function QuoteDetailPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => window.print()} className="px-4 py-2 text-sm border border-black/10 rounded-xl font-bold text-slate-400 hover:bg-white">인쇄</button>
+            <button
+              onClick={handleDownloadStaffPdf}
+              disabled={pdfGenerating}
+              title="견적서 내용을 PDF로 저장 (직원용)"
+              className="px-4 py-2 text-sm border border-violet-300 rounded-xl font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-50">
+              {pdfGenerating ? '생성 중…' : '📄 직원용 PDF'}
+            </button>
             {!isInvoiceQuote && (
               <button onClick={handleEditWorksheet}
                 className="px-4 py-2 text-sm border border-steel-300 rounded-xl font-bold text-steel-600 hover:bg-steel-50">
