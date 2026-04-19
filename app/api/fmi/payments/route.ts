@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { verifyUser } from '@/lib/auth-server';
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
@@ -15,6 +16,8 @@ function serialize<T>(data: T): T {
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await verifyUser(req);
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action') || 'list';
     const category = searchParams.get('category');
@@ -159,6 +162,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await verifyUser(req);
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 });
     const body = await req.json();
     const { action, ...payload } = body;
 

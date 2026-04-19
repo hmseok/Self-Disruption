@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ⚡️ 사업자등록증 업로드 — 회원가입 시 서버사이드에서 처리
 // 회원가입 직후에는 이메일 인증 전이라 클라이언트 세션이 없음
@@ -8,6 +9,8 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const userId = formData.get('userId') as string | null

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================================
 // Codef 동기화 API (Prisma)
@@ -9,6 +10,8 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { startDate, endDate } = await req.json()
 
     if (!startDate || !endDate) {
@@ -105,6 +108,8 @@ export async function POST(req: NextRequest) {
 // GET: 싱크 로그 조회
 export async function GET(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '20')
 
     const logs = await prisma.codefSyncLog.findMany({

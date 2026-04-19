@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { codefRequest } from '../lib/auth'
 import { encryptPassword } from '../lib/crypto'
+import { verifyUser } from '@/lib/auth-server'
 
 // Organization codes mapping
 const ORG_CODES: Record<string, { code: string; name: string; type: 'bank' | 'card'; businessType: string }> = {
@@ -26,6 +27,8 @@ function getCodefError(result: any): string {
 // POST: Create or add account to connectedId
 export async function POST(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const {
       action,
       orgCode,
@@ -149,8 +152,10 @@ export async function POST(req: NextRequest) {
 }
 
 // GET: List connected accounts
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const connections = await prisma.codefConnection.findMany({
       where: { is_active: true },
     })
@@ -167,6 +172,8 @@ export async function GET() {
 // DELETE: Remove account
 export async function DELETE(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id } = await req.json()
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 })

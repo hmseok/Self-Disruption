@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { verifyUser } from '@/lib/auth-server'
 
 // GET: 오픈뱅킹 OAuth 인증 페이지로 리다이렉트
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const clientId = process.env.OPENBANKING_CLIENT_ID!
   const redirectUri = process.env.OPENBANKING_REDIRECT_URI!
   const apiHost = process.env.OPENBANKING_API_HOST || 'https://testapi.openbanking.or.kr'

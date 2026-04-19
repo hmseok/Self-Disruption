@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculatePayroll } from '../../../utils/payroll-calc'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 개별 급여명세서 관리 API
@@ -39,6 +40,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -81,6 +84,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -165,6 +170,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

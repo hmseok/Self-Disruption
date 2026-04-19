@@ -3,6 +3,7 @@ import { PDFDocument, rgb, PDFPage, PDFFont } from 'pdf-lib'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import fontkit from '@pdf-lib/fontkit'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 단기렌트 계약서 PDF — 일반 계약서 양식 기준
@@ -68,6 +69,8 @@ function headerCell(d: D, text: string, x: number, top: number, w: number, h: nu
 // ============================================
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const b = await request.json()
     const preview = !!b.is_preview  // 미리보기 모드
     const PLACEHOLDER = rgb(0.75, 0.75, 0.75)  // 플레이스홀더 색상

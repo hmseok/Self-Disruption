@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
@@ -8,6 +9,8 @@ function serialize<T>(data: T): T {
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await verifyUser(req)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const { id } = await params
   try {
     const data = await prisma.$queryRaw<any[]>`
@@ -21,6 +24,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await verifyUser(req)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const { id } = await params
   const body = await req.json()
 

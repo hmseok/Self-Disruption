@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { verifyUser } from '@/lib/auth-server'
 
 const COMPANY_ID = '971784ff-f42c-49cf-a4b5-32ce7883c00a'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const body = await request.json()
     const { action, excelRows } = body
 

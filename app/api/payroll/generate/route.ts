@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculatePayroll, reverseCalculatePayroll, annualToMonthly, hourlyToMonthly, dailyToMonthly } from '../../../utils/payroll-calc'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 월별 급여 일괄 생성 API (확장판)
@@ -36,6 +37,8 @@ async function verifyAdmin(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

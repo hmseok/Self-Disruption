@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 급여 설정 CRUD API
@@ -35,6 +36,8 @@ async function verifyAdmin(request: NextRequest) {
 // GET: 급여 설정 목록
 // 단독 회사 ERP — company_id 컬럼은 employee_salaries 테이블에 유지됨
 export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -60,6 +63,8 @@ export async function GET(request: NextRequest) {
 
 // POST: 급여 설정 생성/수정 (upsert)
 export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

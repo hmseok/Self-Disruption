@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 function serialize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data, (_, v) =>
@@ -10,6 +11,8 @@ function serialize<T>(data: T): T {
 // GET: list contracts
 // 단독 회사 ERP — company_id 컬럼 제거됨
 export async function GET(req: NextRequest) {
+  const user = await verifyUser(req)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
@@ -29,6 +32,8 @@ export async function GET(req: NextRequest) {
 
 // POST: create new contract
 export async function POST(req: NextRequest) {
+  const user = await verifyUser(req)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const body = await req.json()
 
   try {

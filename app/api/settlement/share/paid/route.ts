@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 정산 지급완료 처리 API (Prisma 버전)
@@ -40,6 +41,8 @@ async function verifyAdmin(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const admin = await verifyAdmin(request)
     if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

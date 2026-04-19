@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 결제 스케줄 API
@@ -36,6 +37,8 @@ async function verifyAdmin(request: NextRequest) {
 
 // POST: 결제 스케줄 생성
 export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -133,6 +136,8 @@ export async function POST(request: NextRequest) {
 
 // GET: 스케줄 목록 + 실제 입금 현황
 export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

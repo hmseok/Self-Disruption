@@ -5,6 +5,7 @@ import {
   sendSMS, sendEmail, sendKakaoAlimtalk, logMessageSend,
   sendWithTemplate, buildEmailHTML, buildInfoTableHTML,
 } from '../../../utils/messaging'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 계약 발송 API (이메일 + 카카오 알림톡)
@@ -68,6 +69,8 @@ ${vars.signUrl}`
 
 // POST: 계약서 발송 (이메일 / 카카오 / 둘 다)
 export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -262,6 +265,8 @@ export async function POST(request: NextRequest) {
 
 // GET: 발송 이력 조회
 export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

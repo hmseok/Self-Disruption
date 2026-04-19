@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { codefRequest } from '../lib/auth'
+import { verifyUser } from '@/lib/auth-server'
 
 const CARD_CODES = {
   '0019': '우리카드',
@@ -10,6 +11,8 @@ const CARD_CODES = {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { connectedId, orgCode, startDate, endDate } = await req.json()
 
     if (!connectedId || !orgCode || !startDate || !endDate) {

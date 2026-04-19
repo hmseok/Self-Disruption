@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 계약 상태 관리 API
@@ -42,6 +43,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 // POST: 상태 변경
 export async function POST(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 
@@ -97,6 +100,8 @@ export async function POST(request: NextRequest) {
 
 // GET: 상태 변경 이력
 export async function GET(request: NextRequest) {
+  const user = await verifyUser(request)
+  if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
   const admin = await verifyAdmin(request)
   if (!admin) return NextResponse.json({ error: '권한 없음' }, { status: 403 })
 

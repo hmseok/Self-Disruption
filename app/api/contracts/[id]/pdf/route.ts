@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 /**
  * 계약서 PDF 다운로드 API
@@ -13,6 +14,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await verifyUser(req)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { id: contractId } = await params
 
     // 계약 조회
