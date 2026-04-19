@@ -108,6 +108,12 @@ export async function GET(request: NextRequest) {
 
         return {
           ...vmp,
+          // BIGINT/DECIMAL은 serialize 시 문자열로 직렬화되므로 명시적 Number 캐스팅
+          market_price: marketPrice,
+          min_price: vmp.min_price !== null && vmp.min_price !== undefined ? Number(vmp.min_price) : null,
+          max_price: vmp.max_price !== null && vmp.max_price !== undefined ? Number(vmp.max_price) : null,
+          mileage_km: vmp.mileage_km !== null && vmp.mileage_km !== undefined ? Number(vmp.mileage_km) : null,
+          sample_count: Number(vmp.sample_count || 0),
           fleet_count: fleetCount,
           avg_purchase_price: avgPurchase,
           min_purchase_price: fleet ? Number(fleet.min_purchase_price) : 0,

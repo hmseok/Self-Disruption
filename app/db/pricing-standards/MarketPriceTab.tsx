@@ -302,18 +302,18 @@ function MarketPriceRowView({
             style={{ width: 120, padding: '4px 8px', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, fontSize: 12, background: 'rgba(255,255,255,0.7)' }}
           />
         ) : (
-          (row.market_price).toLocaleString() + '원'
+          Number(row.market_price).toLocaleString() + '원'
         )}
       </td>
       <td style={{ ...tdStyle, color: '#64748b', fontSize: 11 }}>n={row.sample_count}</td>
       <td style={{ ...tdStyle, background: 'rgba(240,253,244,0.4)', fontWeight: 700, color: hasPurchase ? '#047857' : '#94a3b8' }}>
-        {hasPurchase ? (row.avg_purchase_price || 0).toLocaleString() + '원' : '—'}
+        {hasPurchase ? Number(row.avg_purchase_price || 0).toLocaleString() + '원' : '—'}
       </td>
       <td style={{ ...tdStyle, color: '#64748b', fontSize: 11 }}>
         {hasPurchase ? `${row.fleet_count}대` : '—'}
       </td>
       <td style={{ ...tdStyle, background: 'rgba(245,243,255,0.4)', fontWeight: 800, color: '#6d28d9' }}>
-        {(row.blended_price || 0).toLocaleString()}원
+        {Number(row.blended_price || 0).toLocaleString()}원
       </td>
       <td style={{ ...tdStyle, color: deviationColor, fontWeight: 700 }}>
         {row.deviation_pct === null || row.deviation_pct === undefined ? '—' : `${row.deviation_pct > 0 ? '+' : ''}${row.deviation_pct}%`}

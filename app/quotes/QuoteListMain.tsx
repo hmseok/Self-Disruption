@@ -930,7 +930,21 @@ export default function QuoteListPage() {
             setSearchTerm('')
             setSortBy('latest')
           }}
-          trailing={undefined}
+          trailing={
+            <a
+              href="/quotes/simple"
+              style={{
+                padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 10,
+                border: '1px solid rgba(59,130,246,0.35)',
+                background: 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(99,102,241,0.12) 100%)',
+                color: '#2563eb', textDecoration: 'none', whiteSpace: 'nowrap',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+              title="8개 필드만으로 빠른 견적 작성"
+            >
+              ⚡ 심플 견적
+            </a>
+          }
         />
         <style>{`
           input[type="text"]::placeholder {
