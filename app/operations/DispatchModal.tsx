@@ -305,11 +305,12 @@ export default function DispatchModal({
   }
 
   // ============================================
-  // Save - Insurance/Replacement dispatch
+  // Save - Insurance/Replacement dispatch → fmi_rentals (배반차 일원화)
   // ============================================
   const handleSaveInsuranceDispatch = async () => {
     if (!company?.id || !userId) return
     if (!form.car_id) return alert('대차 차량을 선택해주세요.')
+    if (!insuranceForm.customer_name) return alert('고객명을 입력해주세요.')
     if (!insuranceForm.replacement_start_date) return alert('대차 시작일을 입력해주세요.')
     if (insuranceForm.dispatch_category !== 'maintenance' && !insuranceForm.insurance_company_billing) {
       return alert('청구 대상 보험사를 입력해주세요.')
@@ -317,83 +318,127 @@ export default function DispatchModal({
 
     setSaving(true)
     try {
-      const payload: any = {
-        
-        operation_type: 'delivery', // 대차 출고
-        car_id: Number(form.car_id),
-        customer_id: form.customer_id || null,
-        scheduled_date: insuranceForm.replacement_start_date,
-        scheduled_time: form.scheduled_time || '10:00',
-        location: form.location || '',
-        location_address: form.location_address || '',
-        handler_name: form.handler_name || '',
-        driver_name: form.driver_name || '',
-        driver_phone: form.driver_phone || '',
-        fuel_level: form.fuel_level || 'full',
-        mileage_at_op: form.mileage_at_op || 0,
-        notes: form.notes || '',
-        status: editingOp ? editingOp.status : 'scheduled',
-        created_by: editingOp ? editingOp.created_by : userId,
-        // Insurance fields
-        dispatch_category: insuranceForm.dispatch_category,
-        accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
-        damaged_car_id: insuranceForm.damaged_car_id ? Number(insuranceForm.damaged_car_id) : null,
-        insurance_company_billing: insuranceForm.insurance_company_billing || null,
+      const car = cars.find(c => String(c.id) === String(form.car_id))
+      const damagedCar = insuranceForm.damaged_car_id
+        ? cars.find(c => String(c.id) === String(insuranceForm.damaged_car_id))
+        : null
+
+      // fmi_rentals 페이로드
+      const rentalPayload: any = {
+        customer_name: insuranceForm.customer_name,
+        customer_phone: insuranceForm.customer_phone || null,
+        customer_car_number: damagedCar?.car_number || null,
+        customer_car_type: damagedCar?.model_name || damagedCar?.car_type || null,
+
+        vehicle_id: Number(form.car_id),
+        vehicle_car_number: car?.car_number || null,
+        vehicle_car_type: car?.model_name || car?.car_type || null,
+
+        insurance_company: insuranceForm.insurance_company_billing || null,
         insurance_claim_no: insuranceForm.insurance_claim_no || null,
-        insurance_daily_rate: insuranceForm.insurance_daily_rate || 0,
-        fault_ratio: insuranceForm.fault_ratio || 0,
-        replacement_start_date: insuranceForm.replacement_start_date,
-        replacement_end_date: insuranceForm.replacement_end_date || null,
-        repair_shop_name: insuranceForm.repair_shop_name || null,
-        insurance_billing_status: 'pending',
-        insurance_billed_amount: insuranceCompanyShare,
-        customer_charge: customerShare,
+
+        dispatch_date: insuranceForm.replacement_start_date,
+        dispatch_location: form.location || null,
+        expected_return_date: insuranceForm.replacement_end_date || null,
+        rental_days: insuranceDays || null,
+        dispatch_mileage: form.mileage_at_op || null,
+
+        daily_rate: insuranceForm.insurance_daily_rate || null,
+        total_rental_fee: insuranceTotalCost || null,
+        final_claim_amount: insuranceCompanyShare || null,
+
+        accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
+
+        status: 'dispatched',
+        handler_id: userId,
+        handler_name: form.handler_name || null,
+        dispatcher_name: form.driver_name || null,
+        notes: form.notes || null,
       }
 
-      if (editingOp) {
-        await fetch(`/api/vehicle-operations/${editingOp.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify(payload) })
+      if (editingOp && editingOp._source === 'fmi_rental') {
+        // 편집: fmi_rentals PATCH
+        const r = await fetch(`/api/fmi-rentals/${editingOp.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(rentalPayload),
+        })
+        const j = await r.json()
+        if (!r.ok) throw new Error(j.error || 'fmi-rentals PATCH 실패')
+      } else if (editingOp) {
+        // 레거시 vehicle_operations 편집 (backward compat)
+        const legacyPayload: any = {
+          operation_type: 'delivery',
+          car_id: Number(form.car_id),
+          customer_id: form.customer_id || null,
+          scheduled_date: insuranceForm.replacement_start_date,
+          scheduled_time: form.scheduled_time || '10:00',
+          location: form.location || '',
+          handler_name: form.handler_name || '',
+          status: editingOp.status,
+          dispatch_category: insuranceForm.dispatch_category,
+          insurance_company_billing: insuranceForm.insurance_company_billing || null,
+          insurance_claim_no: insuranceForm.insurance_claim_no || null,
+          insurance_daily_rate: insuranceForm.insurance_daily_rate || 0,
+          fault_ratio: insuranceForm.fault_ratio || 0,
+          replacement_start_date: insuranceForm.replacement_start_date,
+          replacement_end_date: insuranceForm.replacement_end_date || null,
+          repair_shop_name: insuranceForm.repair_shop_name || null,
+          insurance_billed_amount: insuranceCompanyShare,
+          customer_charge: customerShare,
+        }
+        await fetch(`/api/vehicle-operations/${editingOp.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(legacyPayload),
+        })
       } else {
-        const insertRes = await fetch('/api/vehicle-operations', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify([payload]) }); const insertedJson = await insertRes.json(); const inserted = insertedJson.data
+        // 신규: fmi_rentals INSERT
+        const r = await fetch('/api/fmi-rentals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+          body: JSON.stringify(rentalPayload),
+        })
+        const j = await r.json()
+        if (!r.ok || j.error) throw new Error(j.error || 'fmi-rentals POST 실패')
+        const rental = j.data
 
-        if (inserted?.[0]) {
-          const car = cars.find(c => String(c.id) === String(form.car_id))
+        // 캘린더 일정 — best-effort
+        if (rental?.id) {
           const catLabel = DISPATCH_CATEGORY_LABELS[insuranceForm.dispatch_category]?.label || '대차'
-
-          // Create schedule for the replacement period
-          const schedRes = await fetch('/api/vehicle-schedules', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
-            body: JSON.stringify({
-              car_id: Number(form.car_id),
-              schedule_type: 'accident_repair',
-              start_date: insuranceForm.replacement_start_date,
-              end_date: insuranceForm.replacement_end_date || insuranceForm.replacement_start_date,
-              title: `${catLabel} - ${insuranceForm.customer_name || '고객'}`,
-              color: '#f59e0b',
-              accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
-              operation_id: inserted[0].id,
-              created_by: userId,
-            })
-          })
-          if (!schedRes.ok) throw new Error('일정 생성 실패')
-
-          // Update accident record's replacement info
-          if (insuranceForm.accident_id) {
-            const accRes = await fetch(`/api/accident-records/${insuranceForm.accident_id}`, {
-              method: 'PATCH',
+          try {
+            await fetch('/api/vehicle-schedules', {
+              method: 'POST',
               headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
               body: JSON.stringify({
-                replacement_car_id: Number(form.car_id),
-                replacement_start: insuranceForm.replacement_start_date,
-                replacement_end: insuranceForm.replacement_end_date || null,
-                replacement_cost: insuranceCompanyShare,
-              })
+                car_id: Number(form.car_id),
+                schedule_type: 'accident_repair',
+                start_date: insuranceForm.replacement_start_date,
+                end_date: insuranceForm.replacement_end_date || insuranceForm.replacement_start_date,
+                title: `${catLabel} - ${insuranceForm.customer_name || '고객'}`,
+                color: '#f59e0b',
+                accident_id: insuranceForm.accident_id ? Number(insuranceForm.accident_id) : null,
+                rental_id: rental.id,
+                created_by: userId,
+              }),
             })
-            if (!accRes.ok) throw new Error('사고기록 업데이트 실패')
-          }
+          } catch (e) { console.warn('schedule create skipped', e) }
 
-          // Update car status
-          await fetch(`/api/cars/${form.car_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({ status: 'rented' }) })
+          // 사고기록 업데이트
+          if (insuranceForm.accident_id) {
+            try {
+              await fetch(`/api/accident-records/${insuranceForm.accident_id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+                body: JSON.stringify({
+                  replacement_car_id: Number(form.car_id),
+                  replacement_start: insuranceForm.replacement_start_date,
+                  replacement_end: insuranceForm.replacement_end_date || null,
+                  replacement_cost: insuranceCompanyShare,
+                }),
+              })
+            } catch (e) { console.warn('accident update skipped', e) }
+          }
         }
       }
 

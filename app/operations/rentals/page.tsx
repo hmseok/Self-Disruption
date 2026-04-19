@@ -85,6 +85,12 @@ export default function RentalsDashboardPage() {
   const [fleetFilter, setFleetFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
 
+  // 반납 처리 모달 상태
+  const [returnModal, setReturnModal] = useState<Rental | null>(null)
+  const [returnMileage, setReturnMileage] = useState<string>('')
+  const [returnNotes, setReturnNotes] = useState<string>('')
+  const [returnSaving, setReturnSaving] = useState(false)
+
   async function load() {
     try {
       setLoading(true)
@@ -122,6 +128,55 @@ export default function RentalsDashboardPage() {
     return new Date(r.expected_return_date) < new Date() && ['dispatched', 'claiming'].includes(r.status)
   }
 
+  const openReturnModal = (r: Rental) => {
+    setReturnModal(r)
+    setReturnMileage('')
+    setReturnNotes('')
+  }
+
+  const handleConfirmReturn = async () => {
+    if (!returnModal) return
+    try {
+      setReturnSaving(true)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('fmi_token') : null
+      const res = await fetch(`/api/fmi-rentals/${returnModal.id}/return`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          return_mileage: returnMileage ? Number(returnMileage) : null,
+          notes: returnNotes || null,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok || j.error) throw new Error(j.error || '반납 처리 실패')
+      setReturnModal(null)
+      await load()
+    } catch (e: any) {
+      alert('반납 처리 오류: ' + (e.message || String(e)))
+    } finally {
+      setReturnSaving(false)
+    }
+  }
+
+  const handleDelete = async (r: Rental) => {
+    if (!confirm(`${r.customer_name}님의 배차를 삭제할까요?\n(${r.vehicle_car_number || 'N/A'})`)) return
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('fmi_token') : null
+      const res = await fetch(`/api/fmi-rentals/${r.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const j = await res.json()
+      if (!res.ok || j.error) throw new Error(j.error || '삭제 실패')
+      await load()
+    } catch (e: any) {
+      alert('삭제 오류: ' + (e.message || String(e)))
+    }
+  }
+
   const statCards = useMemo(() => {
     if (!stats) return []
     return [
@@ -141,6 +196,10 @@ export default function RentalsDashboardPage() {
             <p className="text-xs text-slate-500 mt-1">fmi_rentals — 배차·반차·청구·정산 통합 현황</p>
           </div>
           <div className="flex gap-2">
+            <a href="/operations?dispatch_type=replacement&new=1"
+               className="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm">
+              ➕ 신규 배차 등록
+            </a>
             <a href="/operations/intake-bulk"
                className="px-3 py-1.5 text-xs rounded-lg bg-white/60 border border-black/[0.06] hover:bg-white/80 text-slate-700 font-medium">
               📥 엑셀 일괄 업로드
@@ -251,6 +310,7 @@ export default function RentalsDashboardPage() {
                     <th className="px-2 py-2 text-center font-semibold">실제반납</th>
                     <th className="px-2 py-2 text-right font-semibold">청구금</th>
                     <th className="px-2 py-2 text-center font-semibold">상태</th>
+                    <th className="px-2 py-2 text-center font-semibold">액션</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -290,6 +350,20 @@ export default function RentalsDashboardPage() {
                             {STATUS_LABEL[r.status] || r.status}
                           </span>
                         </td>
+                        <td className="px-2 py-2 text-center whitespace-nowrap">
+                          {!r.actual_return_date && ['dispatched', 'claiming', 'pending'].includes(r.status) && (
+                            <button
+                              onClick={() => openReturnModal(r)}
+                              className="px-2 py-0.5 text-[10px] rounded-md bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200 mr-1">
+                              🏁 반납
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(r)}
+                            className="px-2 py-0.5 text-[10px] rounded-md bg-white/60 text-slate-500 border border-black/[0.06] hover:bg-red-50 hover:text-red-600">
+                            삭제
+                          </button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -303,6 +377,87 @@ export default function RentalsDashboardPage() {
           fmi_rentals {rentals.length}건 표시 · 상태/플릿/검색 필터 적용 결과
         </div>
       </div>
+
+      {/* 반납 처리 모달 */}
+      {returnModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !returnSaving && setReturnModal(null)}
+        >
+          <div
+            className="bg-white/95 rounded-2xl border border-black/[0.06] shadow-xl max-w-md w-full p-5 space-y-4"
+            style={{ backdropFilter: 'blur(20px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="text-base font-bold text-slate-800">🏁 반납 처리</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {returnModal.customer_name} · {returnModal.vehicle_car_number || '-'}
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 p-2 rounded-lg bg-slate-50/80 border border-black/[0.05]">
+                <div>
+                  <span className="text-slate-500">출고일:</span>{' '}
+                  <span className="text-slate-800">{fmtDate(returnModal.dispatch_date)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">반납예정:</span>{' '}
+                  <span className="text-slate-800">{fmtDate(returnModal.expected_return_date)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">일일요금:</span>{' '}
+                  <span className="text-slate-800">{fmtMoney(returnModal.daily_rate)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">총액:</span>{' '}
+                  <span className="text-slate-800">{fmtMoney(returnModal.total_rental_fee)}</span>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="text-slate-600 font-medium">반납 주행거리 (km)</span>
+                <input
+                  type="number"
+                  value={returnMileage}
+                  onChange={(e) => setReturnMileage(e.target.value)}
+                  placeholder="예: 85000"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-white/60 border border-black/[0.05] text-slate-800"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-slate-600 font-medium">메모</span>
+                <textarea
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
+                  rows={3}
+                  placeholder="반납 상태, 파손 여부 등"
+                  className="mt-1 w-full px-3 py-2 rounded-lg bg-white/60 border border-black/[0.05] text-slate-800"
+                />
+              </label>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                onClick={() => setReturnModal(null)}
+                disabled={returnSaving}
+                className="px-3 py-1.5 text-xs rounded-lg bg-white/60 border border-black/[0.06] text-slate-700 hover:bg-white/80 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmReturn}
+                disabled={returnSaving}
+                className="px-4 py-1.5 text-xs rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 font-medium"
+              >
+                {returnSaving ? '처리 중...' : '반납 확정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

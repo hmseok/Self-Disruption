@@ -114,3 +114,85 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+// ============================================
+// POST /api/fmi-rentals — 배반차 신규 등록
+// body: FmiRental 필드 (customer_name 필수)
+// 생성 후 vehicle_id 있으면 fmi_vehicles.status = 'rented'
+// ============================================
+function toMySqlDt(d: string | null | undefined): string | null {
+  if (!d) return null
+  const s = String(d)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + ' 00:00:00'
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 19).replace('T', ' ')
+  return s
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const body = await request.json()
+    if (!body.customer_name) {
+      return NextResponse.json({ error: 'customer_name 필수' }, { status: 400 })
+    }
+
+    // rental_no 자동 채번 (RYYYYMMDD-XXXX)
+    let rentalNo: string = body.rental_no
+    if (!rentalNo) {
+      const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const suffix = String(Math.floor(Math.random() * 9000) + 1000)
+      rentalNo = `R${ymd}-${suffix}`
+    }
+
+    const id: string = body.id || (globalThis.crypto?.randomUUID?.() ?? require('crypto').randomUUID())
+    const status: string = body.status || 'dispatched'
+
+    await prisma.$executeRaw`
+      INSERT INTO fmi_rentals (
+        id, rental_no, accident_id,
+        customer_name, customer_phone, customer_car_number, customer_car_type,
+        vehicle_id, vehicle_car_number, vehicle_car_type,
+        insurance_company, insurance_claim_no, adjuster_name, adjuster_phone,
+        dispatch_date, dispatch_location, expected_return_date,
+        rental_days, dispatch_mileage,
+        daily_rate, total_rental_fee, final_claim_amount,
+        status, handler_id, handler_name, dispatcher_name, notes,
+        created_at, updated_at
+      ) VALUES (
+        ${id}, ${rentalNo}, ${body.accident_id || null},
+        ${body.customer_name}, ${body.customer_phone || null},
+        ${body.customer_car_number || null}, ${body.customer_car_type || null},
+        ${body.vehicle_id || null}, ${body.vehicle_car_number || null}, ${body.vehicle_car_type || null},
+        ${body.insurance_company || null}, ${body.insurance_claim_no || null},
+        ${body.adjuster_name || null}, ${body.adjuster_phone || null},
+        ${toMySqlDt(body.dispatch_date)}, ${body.dispatch_location || null},
+        ${toMySqlDt(body.expected_return_date)},
+        ${body.rental_days != null ? Number(body.rental_days) : null},
+        ${body.dispatch_mileage != null ? Number(body.dispatch_mileage) : null},
+        ${body.daily_rate != null ? Number(body.daily_rate) : null},
+        ${body.total_rental_fee != null ? Number(body.total_rental_fee) : null},
+        ${body.final_claim_amount != null ? Number(body.final_claim_amount) : null},
+        ${status}, ${body.handler_id || null},
+        ${body.handler_name || null}, ${body.dispatcher_name || null},
+        ${body.notes || null}, NOW(), NOW()
+      )
+    `
+
+    // 배차중이면 차량 상태 동기화 (best-effort)
+    if (body.vehicle_id && (status === 'dispatched' || status === 'claiming')) {
+      try {
+        await prisma.$executeRaw`UPDATE fmi_vehicles SET status = 'rented' WHERE id = ${body.vehicle_id}`
+      } catch {}
+    }
+
+    const inserted = await prisma.$queryRaw<any[]>`
+      SELECT * FROM fmi_rentals WHERE id = ${id} LIMIT 1
+    `
+    return NextResponse.json({ data: serialize(inserted[0] || null), error: null })
+  } catch (e: any) {
+    console.error('[fmi-rentals POST] error:', e)
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
