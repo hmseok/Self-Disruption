@@ -687,6 +687,17 @@ function UploadContent() {
     confidence: number
     suggested_category: string | null
   }>>({})
+  // ── 투자자/지입 계약 매칭 (contract-match) ──
+  // 투자자/지입 차주 이름이 포함된 거래를 general_investments/jiip_contracts와 매칭
+  const [contractMatching, setContractMatching] = useState(false)
+  const [contractResult, setContractResult] = useState<{ total: number; matched: number } | null>(null)
+  const [contractMatches, setContractMatches] = useState<Record<string, {
+    contract: { id: string; type: 'invest' | 'jiip'; investor_name: string; invest_amount?: number | null; expected_amount?: number; account_holder?: string } | null
+    confidence: number
+    suggested_category: string | null
+    suggested_related_type: 'invest' | 'jiip' | null
+    reasons: string[]
+  }>>({})
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
@@ -2507,6 +2518,84 @@ function UploadContent() {
     })
   }
 
+  // ── 투자/지입 계약 매칭: 이름이 포함된 미확정 거래를 general_investments/jiip_contracts로 자동매칭 ──
+  const handleContractMatch = async () => {
+    const candidates = sourceFilteredItems
+      .filter((it: any) => {
+        const sd = it.source_data || {}
+        if (it.status === 'confirmed') return false
+        // 텍스트 기반 후보 선별 — 거래처명/적요가 있으면 모두 시도 (이름 매칭은 서버가 판정)
+        const text = `${sd.client_name || ''} ${sd.description || ''} ${sd.memo || ''}`.trim()
+        return text.length > 0
+      })
+      .map((it: any) => {
+        const sd = it.source_data || {}
+        return {
+          id: it.id,
+          date: sd.transaction_date || sd.date || '',
+          amount: Math.abs(Number(sd.amount || 0)),
+          memo: sd.memo || '',
+          description: sd.description || '',
+          client_name: sd.client_name || '',
+          type: sd.type || (Number(sd.amount || 0) >= 0 ? 'income' : 'expense'),
+        }
+      })
+    if (candidates.length === 0) {
+      alert('매칭 대상 미확정 거래가 없습니다.')
+      return
+    }
+    setContractMatching(true)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/transactions/contract-match', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: candidates }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert('계약 매칭 실패: ' + (err.error || '알 수 없는 오류'))
+        setContractMatching(false)
+        return
+      }
+      const data = await res.json()
+      const map: Record<string, any> = {}
+      for (const m of (data.matches || [])) {
+        if (m.contract) {
+          map[String(m.tx_id)] = {
+            contract: m.contract,
+            confidence: m.confidence,
+            suggested_category: m.suggested_category,
+            suggested_related_type: m.suggested_related_type,
+            reasons: m.reasons || [],
+          }
+        }
+      }
+      setContractMatches(map)
+      setContractResult({ total: data.total || candidates.length, matched: data.matched || 0 })
+    } catch (e: any) {
+      console.error('[contract-match] error:', e)
+      alert('계약 매칭 요청 중 오류가 발생했습니다.')
+    }
+    setContractMatching(false)
+  }
+
+  // ── 계약 매칭 결과 적용: 해당 거래를 제안된 카테고리 + invest/jiip 연결로 확정 ──
+  const applyContractMatch = async (item: any) => {
+    const match = contractMatches[String(item.id)]
+    if (!match || !match.contract || !match.suggested_category) return
+    await handleConfirm(item, {
+      category: match.suggested_category,
+      related_type: match.suggested_related_type || match.contract.type,
+      related_id: match.contract.id,
+    })
+    setContractMatches((prev) => {
+      const next = { ...prev }
+      delete next[String(item.id)]
+      return next
+    })
+  }
+
   // ── 조회(새로고침): 데이터를 DB에서 다시 불러오기 ──
   const [refreshing, setRefreshing] = useState(false)
   const handleRefresh = async () => {
@@ -3917,6 +4006,18 @@ function UploadContent() {
                   }}>
                   🚗 {dispatchMatching ? '매칭 중...' : '배반차매칭'}
                 </button>
+                <button onClick={handleContractMatch} disabled={contractMatching}
+                  title="거래처명/적요에서 투자자·지입 차주 이름을 추출해 계약(general_investments/jiip_contracts)과 매칭합니다"
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    color: '#fff', background: '#d97706', border: 'none',
+                    cursor: contractMatching ? 'not-allowed' : 'pointer',
+                    opacity: contractMatching ? 0.5 : 1,
+                    boxShadow: '0 1px 4px rgba(217,119,6,0.3)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                  💰 {contractMatching ? '매칭 중...' : '계약매칭'}
+                </button>
                 <button onClick={handleAiReclassify} disabled={aiClassifying}
                   style={{
                     padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
@@ -4237,6 +4338,29 @@ function UploadContent() {
             </p>
           </div>
           <button onClick={() => { setDispatchResult(null); setDispatchMatches({}) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
+      {/* 투자/지입 계약 매칭 결과 배너 (Soft Ice Glass Level 3 - Amber tint) */}
+      {contractResult && (
+        <div style={{
+          background: 'rgba(255,255,255,0.60)',
+          backdropFilter: 'blur(16px) saturate(1.1)',
+          WebkitBackdropFilter: 'blur(16px) saturate(1.1)',
+          border: '1px solid rgba(253,230,138,0.80)',
+          borderRadius: 14, padding: '14px 20px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 4px 16px rgba(217,119,6,0.08)',
+        }}>
+          <span style={{ fontSize: 22 }}>💰</span>
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 13, color: '#92400e', margin: 0 }}>투자/지입 계약 매칭 완료</p>
+            <p style={{ fontSize: 13, color: '#d97706', marginTop: 2 }}>
+              미확정 거래 {contractResult.total}건 중 <b>{contractResult.matched}건</b>이 general_investments/jiip_contracts와 매칭되었습니다.
+              각 거래 행의 <b>💰 계약매칭</b> 뱃지에서 <b>적용</b>을 누르면 제안 카테고리 + 계약 연결로 확정됩니다.
+            </p>
+          </div>
+          <button onClick={() => { setContractResult(null); setContractMatches({}) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       )}
 
@@ -6956,6 +7080,39 @@ function UploadContent() {
                                     <button onClick={() => applyDispatchMatch(item)}
                                       style={{
                                         background: '#7c3aed', color: '#fff',
+                                        padding: '2px 8px', borderRadius: 6,
+                                        fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer',
+                                      }}>
+                                      적용
+                                    </button>
+                                  </div>
+                                )
+                              })()}
+
+                              {/* 투자/지입 계약 매칭 뱃지 + 적용 버튼 */}
+                              {(() => {
+                                const cm = contractMatches[String(item.id)]
+                                if (!cm || !cm.contract || isConfirmed) return null
+                                const confidencePct = Math.round((cm.confidence || 0) * 100)
+                                const confColor = confidencePct >= 70 ? '#059669' : confidencePct >= 40 ? '#d97706' : '#94a3b8'
+                                const typeIcon = cm.contract.type === 'invest' ? '💰' : '🚛'
+                                const typeLabel = cm.contract.type === 'invest' ? '투자자' : '지입'
+                                return (
+                                  <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                                    padding: '4px 8px', borderRadius: 8,
+                                    background: 'rgba(254,243,199,0.60)',
+                                    border: '1px solid rgba(253,230,138,0.80)',
+                                    fontSize: 11,
+                                  }}
+                                  title={`${typeLabel} 계약 매칭: ${cm.contract.investor_name} / 제안 "${cm.suggested_category}" / 신뢰도 ${confidencePct}%\n근거: ${(cm.reasons || []).join(', ')}`}>
+                                    <span style={{ fontWeight: 800, color: '#92400e' }}>{typeIcon} {cm.contract.investor_name}</span>
+                                    <span style={{ color: '#6b7280' }}>→</span>
+                                    <span style={{ fontWeight: 700, color: '#92400e' }}>{cm.suggested_category}</span>
+                                    <span style={{ fontWeight: 700, color: confColor }}>{confidencePct}%</span>
+                                    <button onClick={() => applyContractMatch(item)}
+                                      style={{
+                                        background: '#d97706', color: '#fff',
                                         padding: '2px 8px', borderRadius: 6,
                                         fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer',
                                       }}>
