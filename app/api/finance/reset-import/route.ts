@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // POST: 기존 데이터 soft-delete + 새 데이터 삽입
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { company_id, transactions } = await request.json()
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {

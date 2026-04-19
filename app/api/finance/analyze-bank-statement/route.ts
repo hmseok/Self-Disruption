@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // 통장 거래 자동 분석 & 계약 매칭 API
@@ -91,6 +92,8 @@ interface ScheduleInfo {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { transactions, company_id } = await request.json()
 
     if (!transactions || !Array.isArray(transactions)) {

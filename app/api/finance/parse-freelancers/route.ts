@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyUser } from '@/lib/auth-server'
 
 // ── Gemini AI로 프리랜서 정보 파싱 ──
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     if (!GEMINI_API_KEY) {
       return NextResponse.json({ error: 'Gemini API 키가 설정되지 않았습니다.' }, { status: 500 })
     }

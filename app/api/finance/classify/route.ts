@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { verifyUser } from '@/lib/auth-server'
 
 // ============================================
 // AI 통합 분류 API v3.0
@@ -346,6 +347,8 @@ interface ClassifyResult {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { transactions, company_id } = await request.json()
 
     if (!transactions || !Array.isArray(transactions)) {
@@ -958,6 +961,8 @@ export async function POST(request: NextRequest) {
 // ── GET: 분류 검토 조회 (classification_queue 우선, fallback: transactions) ──
 export async function GET(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { searchParams } = new URL(request.url)
     const company_id = searchParams.get('company_id')
     const status = searchParams.get('status') || 'pending'
@@ -1179,6 +1184,8 @@ export async function GET(request: NextRequest) {
 // ── PUT: 재매칭 (classification_queue 항목의 연결만 다시 실행) ──
 export async function PUT(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { company_id } = await request.json()
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
 
@@ -1381,6 +1388,8 @@ export async function PUT(request: NextRequest) {
 // ── PATCH: 분류 확정 (classification_queue 업데이트) ──
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const body = await request.json()
 
     // ★ 일괄분류 + 학습: bulk_classify 모드
@@ -1649,6 +1658,8 @@ export async function PATCH(request: NextRequest) {
 // ── DELETE: 분류 항목 일괄 삭제 (classification_queue + transactions 양쪽) ──
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const body = await request.json()
     const { company_id, status, ids } = body
 

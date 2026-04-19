@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ── 중복 거래 감지 & 삭제 API ──
 // GET: 중복 건수 조회
@@ -34,6 +35,8 @@ function groupDuplicates(allTxs: any[]) {
 // 중복 감지: 날짜 + 거래처 + 금액 + 결제수단이 동일한 건
 export async function GET(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { searchParams } = new URL(request.url)
     const company_id = searchParams.get('company_id')
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
@@ -76,6 +79,8 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { company_id } = await request.json()
     if (!company_id) return NextResponse.json({ error: 'company_id 필요' }, { status: 400 })
 

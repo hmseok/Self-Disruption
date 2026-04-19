@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ── 엑셀 기준 데이터 임포트 API ──
 // POST: 엑셀 파싱 데이터를 받아서
@@ -26,6 +27,8 @@ async function fetchAll(table: string, select: string, _company_id?: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { company_id, excel_rows } = await request.json()
     if (!company_id || !excel_rows?.length) {
       return NextResponse.json({ error: 'company_id와 excel_rows 필요' }, { status: 400 })

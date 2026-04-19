@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyUser } from '@/lib/auth-server'
 
 // ── AI 재분류 API ──
 // POST: 이미 저장된 미분류 거래들을 Gemini로 재분류
@@ -17,6 +18,8 @@ const CATEGORY_LIST = [
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyUser(request)
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
     const { company_id, transaction_ids } = await request.json()
 
     if (!company_id) {
