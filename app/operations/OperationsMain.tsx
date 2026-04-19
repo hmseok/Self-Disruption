@@ -1190,13 +1190,22 @@ export default function OperationsMainPage() {
         activeFilter={viewMode}
         onFilterChange={(k) => setViewMode(k as any)}
         trailing={
-          <a
-            href="/operations/intake-bulk"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium whitespace-nowrap"
-            title="마춤카/빌려타/부가세(캐피탈)/따봉 엑셀 일괄 인테이크"
-          >
-            📥 대차 엑셀 일괄
-          </a>
+          <div className="flex gap-2">
+            <a
+              href="/operations/rentals"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium whitespace-nowrap"
+              title="fmi_rentals 기반 배반차 스케줄 대시보드"
+            >
+              🚗 배반차 대시보드
+            </a>
+            <a
+              href="/operations/intake-bulk"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium whitespace-nowrap"
+              title="마춤카/빌려타/부가세(캐피탈)/따봉 엑셀 일괄 인테이크"
+            >
+              📥 대차 엑셀 일괄
+            </a>
+          </div>
         }
       />
 
