@@ -677,6 +677,16 @@ function UploadContent() {
   const [stats, setStats] = useState({ pending: 0, confirmed: 0 })
   const [aiClassifying, setAiClassifying] = useState(false)
   const [aiResult, setAiResult] = useState<{ updated: number; total: number } | null>(null)
+  // ── 배반차 매칭 (dispatch-match) ──
+  // 차량번호가 포함된 입금 거래를 fmi_rentals와 대조해 "보험금 수령/매출" 후보로 연결
+  const [dispatchMatching, setDispatchMatching] = useState(false)
+  const [dispatchResult, setDispatchResult] = useState<{ total: number; matched: number } | null>(null)
+  const [dispatchMatches, setDispatchMatches] = useState<Record<string, {
+    car_number_found: string | null
+    rental: any | null
+    confidence: number
+    suggested_category: string | null
+  }>>({})
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
@@ -2415,6 +2425,88 @@ function UploadContent() {
     setAiClassifying(false)
   }
 
+  // ── 배반차 매칭: 입금 거래 적요에 차량번호가 있으면 fmi_rentals 매칭 후보 조회 ──
+  const handleDispatchMatch = async () => {
+    // 입금 거래만 대상 (출금은 매출이 될 수 없음)
+    const candidates = sourceFilteredItems
+      .filter((it: any) => {
+        const sd = it.source_data || {}
+        if (sd.type !== 'income') return false
+        // 이미 확정된 건 제외
+        if (it.status === 'confirmed') return false
+        // 적요/메모에 차량번호 패턴이 있는지 사전 필터
+        const text = `${sd.description || ''} ${sd.memo || ''} ${sd.client_name || ''}`
+        return /\d{2,3}[가-힣]\d{4}/.test(text)
+      })
+      .map((it: any) => {
+        const sd = it.source_data || {}
+        return {
+          id: it.id,
+          date: sd.transaction_date || sd.date || '',
+          amount: Math.abs(Number(sd.amount || 0)),
+          memo: sd.memo || sd.description || '',
+          description: sd.description || '',
+          client_name: sd.client_name || '',
+        }
+      })
+    if (candidates.length === 0) {
+      alert('차량번호가 포함된 미확정 입금 거래가 없습니다.\n(배반차 대시보드/엑셀 일괄에서 대차 데이터를 먼저 등록해주세요)')
+      return
+    }
+    setDispatchMatching(true)
+    try {
+      const headers = await getAuthHeader()
+      const res = await fetch('/api/transactions/dispatch-match', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: candidates }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert('배반차 매칭 실패: ' + (err.error || '알 수 없는 오류'))
+        setDispatchMatching(false)
+        return
+      }
+      const data = await res.json()
+      const map: Record<string, any> = {}
+      for (const m of (data.matches || [])) {
+        if (m.rental) {
+          map[String(m.tx_id)] = {
+            car_number_found: m.car_number_found,
+            rental: m.rental,
+            confidence: m.confidence,
+            suggested_category: m.suggested_category,
+          }
+        }
+      }
+      setDispatchMatches(map)
+      setDispatchResult({ total: data.total || candidates.length, matched: data.matched || 0 })
+    } catch (e: any) {
+      console.error('[dispatch-match] error:', e)
+      alert('배반차 매칭 요청 중 오류가 발생했습니다.')
+    }
+    setDispatchMatching(false)
+  }
+
+  // ── 배반차 매칭 결과 적용: 해당 거래를 "보험금 수령"으로 확정 + rental 연결 ──
+  const applyDispatchMatch = async (item: any) => {
+    const match = dispatchMatches[String(item.id)]
+    if (!match || !match.rental) return
+    // 매출-보험청구 = "보험금 수령" 카테고리
+    const targetCategory = '보험금 수령'
+    await handleConfirm(item, {
+      category: targetCategory,
+      related_type: 'rental',
+      related_id: match.rental.id,
+    })
+    // 적용 후 매칭맵에서 제거
+    setDispatchMatches((prev) => {
+      const next = { ...prev }
+      delete next[String(item.id)]
+      return next
+    })
+  }
+
   // ── 조회(새로고침): 데이터를 DB에서 다시 불러오기 ──
   const [refreshing, setRefreshing] = useState(false)
   const handleRefresh = async () => {
@@ -3813,6 +3905,18 @@ function UploadContent() {
                   }}>
                   🔗 {reMatching ? '매칭 중...' : '재매칭'}
                 </button>
+                <button onClick={handleDispatchMatch} disabled={dispatchMatching}
+                  title="입금 거래 적요에서 차량번호를 추출해 배반차(fmi_rentals)와 매칭하여 '보험금 수령/매출' 후보를 표시합니다"
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    color: '#fff', background: '#7c3aed', border: 'none',
+                    cursor: dispatchMatching ? 'not-allowed' : 'pointer',
+                    opacity: dispatchMatching ? 0.5 : 1,
+                    boxShadow: '0 1px 4px rgba(124,58,237,0.3)',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                  🚗 {dispatchMatching ? '매칭 중...' : '배반차매칭'}
+                </button>
                 <button onClick={handleAiReclassify} disabled={aiClassifying}
                   style={{
                     padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
@@ -4110,6 +4214,29 @@ function UploadContent() {
             <p style={{ fontSize: 13, color: '#15803d', marginTop: 2 }}>총 {aiResult.total}건 중 {aiResult.updated}건이 AI에 의해 분류되었습니다</p>
           </div>
           <button onClick={() => setAiResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
+      {/* 배반차 매칭 결과 배너 (Soft Ice Glass Level 3 - Violet tint) */}
+      {dispatchResult && (
+        <div style={{
+          background: 'rgba(255,255,255,0.60)',
+          backdropFilter: 'blur(16px) saturate(1.1)',
+          WebkitBackdropFilter: 'blur(16px) saturate(1.1)',
+          border: '1px solid rgba(221,214,254,0.80)',
+          borderRadius: 14, padding: '14px 20px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 4px 16px rgba(124,58,237,0.08)',
+        }}>
+          <span style={{ fontSize: 22 }}>🚗</span>
+          <div>
+            <p style={{ fontWeight: 800, fontSize: 13, color: '#5b21b6', margin: 0 }}>배반차 매칭 완료</p>
+            <p style={{ fontSize: 13, color: '#7c3aed', marginTop: 2 }}>
+              차량번호 포함 입금 {dispatchResult.total}건 중 <b>{dispatchResult.matched}건</b>이 fmi_rentals와 매칭되었습니다.
+              각 거래 행에 <b>🚗 배차매칭</b> 뱃지를 확인하고 <b>적용</b>을 누르면 "보험금 수령" 카테고리로 확정됩니다.
+            </p>
+          </div>
+          <button onClick={() => { setDispatchResult(null); setDispatchMatches({}) }} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
       )}
 
@@ -6804,6 +6931,37 @@ function UploadContent() {
                                     {ad.text}
                                     {ad.originalText && <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 600 }}>({ad.originalText})</div>}
                                   </span>
+                                )
+                              })()}
+
+                              {/* 배반차 매칭 뱃지 + 적용 버튼 */}
+                              {(() => {
+                                const dm = dispatchMatches[String(item.id)]
+                                if (!dm || !dm.rental || isConfirmed) return null
+                                const confidencePct = Math.round((dm.confidence || 0) * 100)
+                                const confColor = confidencePct >= 70 ? '#059669' : confidencePct >= 40 ? '#d97706' : '#94a3b8'
+                                return (
+                                  <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                                    padding: '4px 8px', borderRadius: 8,
+                                    background: 'rgba(237,233,254,0.60)',
+                                    border: '1px solid rgba(221,214,254,0.80)',
+                                    fontSize: 11,
+                                  }}
+                                  title={`fmi_rentals 매칭: ${dm.rental.customer_name || ''} / ${dm.rental.insurance_company || ''} / 신뢰도 ${confidencePct}%`}>
+                                    <span style={{ fontWeight: 800, color: '#5b21b6' }}>🚗 {dm.car_number_found}</span>
+                                    <span style={{ color: '#6b7280' }}>→</span>
+                                    <span style={{ fontWeight: 700, color: '#5b21b6' }}>{dm.rental.insurance_company || '보험'}</span>
+                                    <span style={{ fontWeight: 700, color: confColor }}>{confidencePct}%</span>
+                                    <button onClick={() => applyDispatchMatch(item)}
+                                      style={{
+                                        background: '#7c3aed', color: '#fff',
+                                        padding: '2px 8px', borderRadius: 6,
+                                        fontWeight: 700, fontSize: 11, border: 'none', cursor: 'pointer',
+                                      }}>
+                                      적용
+                                    </button>
+                                  </div>
                                 )
                               })()}
 
