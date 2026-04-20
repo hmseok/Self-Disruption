@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
     let data: any[]
 
     if (paidOnly) {
-      // 지급완료된 정산 공유 전체
+      // 지급완료된 정산 공유 전체 (payment_date 가 설정되어 있으면 지급완료 간주)
       data = await prisma.$queryRaw<any[]>`
         SELECT * FROM settlement_shares
-        WHERE paid_at IS NOT NULL
-        ORDER BY paid_at DESC
+        WHERE payment_date IS NOT NULL
+        ORDER BY payment_date DESC, created_at DESC
         LIMIT 1000
       `
     } else if (monthsParam) {
