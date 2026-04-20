@@ -64,7 +64,7 @@ export async function fetchSettlementData(
     fetch('/api/jiip?status=active', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/investments?status=active', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/loans', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-    fetch(`/api/transactions?related_type=jiip_share,invest,loan&type=expense&from=${past12Start}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+    fetch(`/api/transactions?related_type=jiip,jiip_share,invest,loan&type=expense&from=${past12Start}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch(`/api/transactions?related_type=car&from=${past12Start}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/classification-queue?status=confirmed,auto_confirmed&limit=500', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch(`/api/settlement/shares?months=${filterDate},${prevMonth}`, { headers }).then(r => r.json()).catch(() => ({ data: [] })),
@@ -72,7 +72,7 @@ export async function fetchSettlementData(
     fetch('/api/transactions?related_type=invest', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/jiip', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/investments', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
-    fetch('/api/transactions?related_type=jiip_share,invest', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
+    fetch('/api/transactions?related_type=jiip,jiip_share,invest&limit=2000', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
     fetch('/api/settlement/shares?paid_only=true', { headers }).then(r => r.json()).catch(() => ({ data: [] })),
   ])
 

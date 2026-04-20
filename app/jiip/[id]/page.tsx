@@ -63,10 +63,16 @@ type ShareRow = {
 
 type Car = {
   id: string
+  number?: string
+  brand?: string
+  model?: string
+  year?: number | string
+  status?: string
+  fuel?: string
+  // legacy aliases (fallback)
   car_number?: string
   car_name?: string
   manufacturer?: string
-  model?: string
 }
 
 const N = (v: any): number => {
@@ -92,6 +98,10 @@ export default function JiipDetailPage() {
   const [car, setCar] = useState<Car | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [form, setForm] = useState<any>({})
+  const [saving, setSaving] = useState(false)
+  const [availableCars, setAvailableCars] = useState<any[]>([])
 
   useEffect(() => {
     if (!id) return
@@ -165,6 +175,77 @@ export default function JiipDetailPage() {
   const startDate = contract?.contract_start_date || contract?.contract_period_start
   const endDate = contract?.contract_end_date || contract?.contract_period_end
 
+  async function openEdit() {
+    if (!contract) return
+    setForm({
+      investor_name: contract.investor_name || '',
+      investor_phone: contract.investor_phone || '',
+      investor_email: contract.investor_email || '',
+      investor_address: contract.investor_address || '',
+      investor_reg_number: contract.investor_reg_number || '',
+      bank_name: contract.bank_name || '',
+      account_number: contract.account_number || '',
+      account_holder: contract.account_holder || '',
+      invest_amount: contract.invest_amount || 0,
+      share_ratio: contract.share_ratio || 0,
+      admin_fee: contract.admin_fee || 0,
+      payout_day: contract.payout_day || 25,
+      contract_start_date: (contract.contract_start_date || '').slice(0, 10),
+      contract_end_date: (contract.contract_end_date || '').slice(0, 10),
+      tax_type: contract.tax_type || '사업소득(3.3%)',
+      status: contract.status || 'active',
+      memo: contract.memo || '',
+      mortgage_setup: !!contract.mortgage_setup,
+      car_id: contract.car_id ? String(contract.car_id) : '',
+    })
+    setEditOpen(true)
+    // 차량 목록 로드
+    try {
+      const { auth } = await import('@/lib/auth-client')
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken(false) : ''
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+      const r = await fetch('/api/cars', { headers }).then(r => r.json())
+      setAvailableCars(r.data || [])
+    } catch {}
+  }
+
+  async function saveEdit() {
+    if (!contract) return
+    setSaving(true)
+    try {
+      const { auth } = await import('@/lib/auth-client')
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken(false) : ''
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      }
+      const body = {
+        ...form,
+        car_id: form.car_id || null,
+        contract_start_date: form.contract_start_date || null,
+        contract_end_date: form.contract_end_date || null,
+      }
+      const res = await fetch(`/api/jiip/${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body),
+      })
+      const j = await res.json()
+      if (!res.ok || j.error) {
+        alert('저장 실패: ' + (j.error || res.statusText))
+        return
+      }
+      setEditOpen(false)
+      window.location.reload()
+    } catch (e: any) {
+      alert('저장 실패: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-6 md:p-10">
       <div className="max-w-6xl mx-auto">
@@ -201,13 +282,21 @@ export default function JiipDetailPage() {
                   <h1 className="text-2xl font-bold text-slate-900">{contract.investor_name}</h1>
                   {contract.investor_phone && <div className="text-sm text-slate-500 mt-1">{contract.investor_phone}</div>}
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">계약 상태</div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                    contract.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {contract.status === 'active' ? '운용 중' : contract.status || '—'}
+                <div className="text-right flex flex-col items-end gap-2">
+                  <div>
+                    <div className="text-xs text-slate-500">계약 상태</div>
+                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                      contract.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {contract.status === 'active' ? '운용 중' : contract.status || '—'}
+                    </div>
                   </div>
+                  <button
+                    onClick={openEdit}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                  >
+                    ✏ 계약 수정
+                  </button>
                 </div>
               </div>
 
@@ -258,12 +347,21 @@ export default function JiipDetailPage() {
                   {car ? (
                     <button
                       onClick={() => router.push(`/cars/${car.id}`)}
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-left w-full group"
                     >
-                      {car.car_number || car.car_name || car.id}
+                      <div className="text-sm font-bold text-blue-600 group-hover:underline">
+                        {car.number || car.car_number || `차량 #${car.id}`}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {[car.brand || car.manufacturer, car.model].filter(Boolean).join(' ') || '—'}
+                        {car.year ? ` · ${car.year}년` : ''}
+                      </div>
+                      {car.status && (
+                        <div className="text-[10px] text-slate-400 mt-0.5">상태: {car.status}</div>
+                      )}
                     </button>
                   ) : contract.car_id ? (
-                    <div className="text-sm text-slate-900">차량 ID #{contract.car_id}</div>
+                    <div className="text-sm text-slate-900">차량 ID #{contract.car_id} <span className="text-[11px] text-slate-400">(로드 중...)</span></div>
                   ) : (
                     <div className="text-sm text-slate-400">미연결</div>
                   )}
@@ -380,7 +478,118 @@ export default function JiipDetailPage() {
             </div>
           </>
         )}
+
+        {/* ── 계약 수정 모달 ── */}
+        {editOpen && (
+          <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-3xl p-6 my-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-900">지입 계약 수정</h2>
+                <button onClick={() => setEditOpen(false)} className="text-slate-500 hover:text-slate-800 text-lg">✕</button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <Field label="투자자명" value={form.investor_name} onChange={v => setForm({ ...form, investor_name: v })} />
+                <Field label="전화번호" value={form.investor_phone} onChange={v => setForm({ ...form, investor_phone: v })} placeholder="010-0000-0000" />
+                <Field label="이메일" value={form.investor_email} onChange={v => setForm({ ...form, investor_email: v })} />
+                <Field label="주민등록번호" value={form.investor_reg_number} onChange={v => setForm({ ...form, investor_reg_number: v })} placeholder="000000-0000000" />
+                <div className="md:col-span-2">
+                  <Field label="주소" value={form.investor_address} onChange={v => setForm({ ...form, investor_address: v })} />
+                </div>
+
+                <Field label="은행" value={form.bank_name} onChange={v => setForm({ ...form, bank_name: v })} />
+                <Field label="계좌번호" value={form.account_number} onChange={v => setForm({ ...form, account_number: v })} />
+                <Field label="예금주" value={form.account_holder} onChange={v => setForm({ ...form, account_holder: v })} />
+
+                <div>
+                  <label className="text-xs text-slate-500">연결 차량</label>
+                  <select value={form.car_id} onChange={e => setForm({ ...form, car_id: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="">미연결</option>
+                    {availableCars.map(c => (
+                      <option key={c.id} value={c.id}>{c.number || '(번호없음)'} · {c.brand || ''} {c.model || ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Field label="투자원금 (원)" type="number" value={form.invest_amount} onChange={v => setForm({ ...form, invest_amount: Number(v) || 0 })} />
+                <Field label="지분율 (%)" type="number" step="0.1" value={form.share_ratio} onChange={v => setForm({ ...form, share_ratio: Number(v) || 0 })} />
+                <Field label="월 관리비 (원)" type="number" value={form.admin_fee} onChange={v => setForm({ ...form, admin_fee: Number(v) || 0 })} />
+                <Field label="지급일 (일)" type="number" value={form.payout_day} onChange={v => setForm({ ...form, payout_day: Number(v) || 0 })} />
+
+                <Field label="계약 시작일" type="date" value={form.contract_start_date} onChange={v => setForm({ ...form, contract_start_date: v })} />
+                <Field label="계약 종료일" type="date" value={form.contract_end_date} onChange={v => setForm({ ...form, contract_end_date: v })} />
+
+                <div>
+                  <label className="text-xs text-slate-500">세금 유형</label>
+                  <select value={form.tax_type} onChange={e => setForm({ ...form, tax_type: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="사업소득(3.3%)">사업소득 (3.3%)</option>
+                    <option value="이자소득(27.5%)">이자소득 (27.5%)</option>
+                    <option value="세금계산서">세금계산서 (VAT)</option>
+                    <option value="비과세">비과세</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500">계약 상태</label>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="active">운용 중</option>
+                    <option value="expired">만기</option>
+                    <option value="terminated">해지</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <input type="checkbox" id="mortgage_setup" checked={!!form.mortgage_setup}
+                    onChange={e => setForm({ ...form, mortgage_setup: e.target.checked })} />
+                  <label htmlFor="mortgage_setup" className="text-sm text-slate-700">🔒 저당 설정</label>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-500">메모</label>
+                  <textarea value={form.memo || ''} onChange={e => setForm({ ...form, memo: e.target.value })}
+                    rows={2} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-slate-200">
+                <button onClick={() => setEditOpen(false)} disabled={saving}
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">
+                  취소
+                </button>
+                <button onClick={saveEdit} disabled={saving}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">
+                  {saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, step }: {
+  label: string
+  value: any
+  onChange: (v: string) => void
+  type?: string
+  placeholder?: string
+  step?: string
+}) {
+  return (
+    <div>
+      <label className="text-xs text-slate-500">{label}</label>
+      <input
+        type={type}
+        step={step}
+        value={value ?? ''}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
+      />
     </div>
   )
 }

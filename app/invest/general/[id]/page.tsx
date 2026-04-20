@@ -32,6 +32,15 @@ type Contract = {
   car_number?: string
 }
 
+type Car = {
+  id: string
+  number?: string
+  brand?: string
+  model?: string
+  year?: number | string
+  status?: string
+}
+
 type TxRow = {
   id: string
   transaction_date: string
@@ -78,8 +87,13 @@ export default function InvestorDetailPage() {
   const [contract, setContract] = useState<Contract | null>(null)
   const [txs, setTxs] = useState<TxRow[]>([])
   const [shares, setShares] = useState<ShareRow[]>([])
+  const [car, setCar] = useState<Car | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [form, setForm] = useState<any>({})
+  const [saving, setSaving] = useState(false)
+  const [availableCars, setAvailableCars] = useState<any[]>([])
 
   useEffect(() => {
     if (!id) return
@@ -118,6 +132,14 @@ export default function InvestorDetailPage() {
           const all: ShareRow[] = sRes.data || []
           setShares(all.filter(s => s.recipient_name === c.investor_name))
         }
+
+        // 연결 차량 로드 (car_id 가 있으면)
+        if (c.car_id) {
+          try {
+            const carRes = await fetch(`/api/cars/${c.car_id}`, { headers }).then(r => r.json())
+            if (carRes.data) setCar(carRes.data)
+          } catch {}
+        }
       } catch (e: any) {
         setError(e.message || '로드 실패')
       } finally {
@@ -136,6 +158,76 @@ export default function InvestorDetailPage() {
   }, [txs, shares])
 
   if (!id) return <div className="p-8 text-slate-500">잘못된 요청입니다.</div>
+
+  async function openEdit() {
+    if (!contract) return
+    setForm({
+      investor_name: contract.investor_name || '',
+      investor_phone: contract.investor_phone || '',
+      investor_email: contract.investor_email || '',
+      investor_address: contract.investor_address || '',
+      investor_reg_number: contract.investor_reg_number || '',
+      bank_name: contract.bank_name || '',
+      account_number: contract.account_number || '',
+      account_holder: contract.account_holder || '',
+      invest_amount: contract.invest_amount || 0,
+      interest_rate: contract.interest_rate || 0,
+      payment_day: contract.payment_day || 25,
+      contract_start_date: (contract.contract_start_date || '').slice(0, 10),
+      contract_end_date: (contract.contract_end_date || '').slice(0, 10),
+      tax_type: contract.tax_type || '이자소득(27.5%)',
+      status: contract.status || 'active',
+      memo: contract.memo || '',
+      grace_period_months: contract.grace_period_months || 0,
+      car_id: contract.car_id ? String(contract.car_id) : '',
+      car_number: contract.car_number || '',
+    })
+    setEditOpen(true)
+    try {
+      const { auth } = await import('@/lib/auth-client')
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken(false) : ''
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+      const r = await fetch('/api/cars', { headers }).then(r => r.json())
+      setAvailableCars(r.data || [])
+    } catch {}
+  }
+
+  async function saveEdit() {
+    if (!contract) return
+    setSaving(true)
+    try {
+      const { auth } = await import('@/lib/auth-client')
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken(false) : ''
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      }
+      const body = {
+        ...form,
+        car_id: form.car_id || null,
+        contract_start_date: form.contract_start_date || null,
+        contract_end_date: form.contract_end_date || null,
+      }
+      const res = await fetch(`/api/investments/${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body),
+      })
+      const j = await res.json()
+      if (!res.ok || j.error) {
+        alert('저장 실패: ' + (j.error || res.statusText))
+        return
+      }
+      setEditOpen(false)
+      window.location.reload()
+    } catch (e: any) {
+      alert('저장 실패: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-6 md:p-10">
@@ -173,13 +265,21 @@ export default function InvestorDetailPage() {
                   <h1 className="text-2xl font-bold text-slate-900">{contract.investor_name}</h1>
                   {contract.investor_phone && <div className="text-sm text-slate-500 mt-1">{contract.investor_phone}</div>}
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">계약 상태</div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                    contract.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {contract.status === 'active' ? '운용 중' : contract.status || '—'}
+                <div className="text-right flex flex-col items-end gap-2">
+                  <div>
+                    <div className="text-xs text-slate-500">계약 상태</div>
+                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                      contract.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {contract.status === 'active' ? '운용 중' : contract.status || '—'}
+                    </div>
                   </div>
+                  <button
+                    onClick={openEdit}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                  >
+                    ✏ 계약 수정
+                  </button>
                 </div>
               </div>
 
@@ -223,9 +323,24 @@ export default function InvestorDetailPage() {
                 </div>
                 <div className="bg-slate-50/70 border border-black/[0.05] rounded-xl p-4">
                   <div className="text-xs text-slate-500 mb-2">연결 차량</div>
-                  <div className="text-sm text-slate-900">
-                    {contract.car_number || '미연결'}
-                  </div>
+                  {car ? (
+                    <button
+                      onClick={() => router.push(`/cars/${car.id}`)}
+                      className="text-left w-full group"
+                    >
+                      <div className="text-sm font-bold text-blue-600 group-hover:underline">
+                        {car.number || contract.car_number || `차량 #${car.id}`}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {[car.brand, car.model].filter(Boolean).join(' ') || '—'}
+                        {car.year ? ` · ${car.year}년` : ''}
+                      </div>
+                    </button>
+                  ) : contract.car_number ? (
+                    <div className="text-sm text-slate-900">{contract.car_number}</div>
+                  ) : (
+                    <div className="text-sm text-slate-400">미연결</div>
+                  )}
                 </div>
               </div>
 
@@ -336,7 +451,112 @@ export default function InvestorDetailPage() {
             </div>
           </>
         )}
+
+        {/* ── 계약 수정 모달 ── */}
+        {editOpen && (
+          <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-3xl p-6 my-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-900">일반투자 계약 수정</h2>
+                <button onClick={() => setEditOpen(false)} className="text-slate-500 hover:text-slate-800 text-lg">✕</button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <Field label="투자자명" value={form.investor_name} onChange={v => setForm({ ...form, investor_name: v })} />
+                <Field label="전화번호" value={form.investor_phone} onChange={v => setForm({ ...form, investor_phone: v })} />
+                <Field label="이메일" value={form.investor_email} onChange={v => setForm({ ...form, investor_email: v })} />
+                <Field label="주민등록번호" value={form.investor_reg_number} onChange={v => setForm({ ...form, investor_reg_number: v })} />
+                <div className="md:col-span-2">
+                  <Field label="주소" value={form.investor_address} onChange={v => setForm({ ...form, investor_address: v })} />
+                </div>
+
+                <Field label="은행" value={form.bank_name} onChange={v => setForm({ ...form, bank_name: v })} />
+                <Field label="계좌번호" value={form.account_number} onChange={v => setForm({ ...form, account_number: v })} />
+                <Field label="예금주" value={form.account_holder} onChange={v => setForm({ ...form, account_holder: v })} />
+
+                <div>
+                  <label className="text-xs text-slate-500">연결 차량</label>
+                  <select value={form.car_id} onChange={e => setForm({ ...form, car_id: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="">미연결</option>
+                    {availableCars.map(c => (
+                      <option key={c.id} value={c.id}>{c.number || '(번호없음)'} · {c.brand || ''} {c.model || ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Field label="투자원금 (원)" type="number" value={form.invest_amount} onChange={v => setForm({ ...form, invest_amount: Number(v) || 0 })} />
+                <Field label="연이율 (%)" type="number" step="0.01" value={form.interest_rate} onChange={v => setForm({ ...form, interest_rate: Number(v) || 0 })} />
+                <Field label="지급일 (일)" type="number" value={form.payment_day} onChange={v => setForm({ ...form, payment_day: Number(v) || 0 })} />
+                <Field label="거치기간 (개월)" type="number" value={form.grace_period_months} onChange={v => setForm({ ...form, grace_period_months: Number(v) || 0 })} />
+
+                <Field label="계약 시작일" type="date" value={form.contract_start_date} onChange={v => setForm({ ...form, contract_start_date: v })} />
+                <Field label="계약 종료일" type="date" value={form.contract_end_date} onChange={v => setForm({ ...form, contract_end_date: v })} />
+
+                <div>
+                  <label className="text-xs text-slate-500">세금 유형</label>
+                  <select value={form.tax_type} onChange={e => setForm({ ...form, tax_type: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="이자소득(27.5%)">이자소득 (27.5%)</option>
+                    <option value="사업소득(3.3%)">사업소득 (3.3%)</option>
+                    <option value="세금계산서">세금계산서 (VAT)</option>
+                    <option value="비과세">비과세</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500">계약 상태</label>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white">
+                    <option value="active">운용 중</option>
+                    <option value="expired">만기</option>
+                    <option value="terminated">해지</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-500">메모</label>
+                  <textarea value={form.memo || ''} onChange={e => setForm({ ...form, memo: e.target.value })}
+                    rows={2} className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-slate-200">
+                <button onClick={() => setEditOpen(false)} disabled={saving}
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">
+                  취소
+                </button>
+                <button onClick={saveEdit} disabled={saving}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">
+                  {saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, step }: {
+  label: string
+  value: any
+  onChange: (v: string) => void
+  type?: string
+  placeholder?: string
+  step?: string
+}) {
+  return (
+    <div>
+      <label className="text-xs text-slate-500">{label}</label>
+      <input
+        type={type}
+        step={step}
+        value={value ?? ''}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white"
+      />
     </div>
   )
 }

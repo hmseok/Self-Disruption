@@ -31,14 +31,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
 
-    const fields = ['car_id', 'investor_name', 'invest_amount', 'interest_rate', 'payment_day', 'contract_start_date', 'contract_end_date', 'status']
+    const fields = [
+      'car_id', 'car_number',
+      'investor_name', 'investor_phone', 'investor_email', 'investor_address', 'investor_reg_number',
+      'bank_name', 'account_number', 'account_holder',
+      'invest_amount', 'interest_rate', 'payment_day',
+      'contract_start_date', 'contract_end_date',
+      'tax_type', 'status', 'memo', 'grace_period_months',
+    ]
     const updates: string[] = []
     const values: any[] = []
 
     for (const f of fields) {
       if (body[f] !== undefined) {
         updates.push(`${f} = ?`)
-        values.push(body[f] || null)
+        values.push(body[f] === '' ? null : body[f])
       }
     }
 

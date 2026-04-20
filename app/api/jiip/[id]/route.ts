@@ -32,8 +32,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
 
     const fields = [
-      'investor_name', 'payout_day', 'share_ratio', 'admin_fee', 'contract_start_date', 'contract_end_date', 'status',
-      'owner_name', 'owner_phone', 'monthly_management_fee', 'profit_share_ratio', 'bank_name', 'account_number', 'car_id',
+      'investor_name', 'investor_phone', 'investor_email', 'investor_address', 'investor_reg_number',
+      'bank_name', 'account_number', 'account_holder',
+      'invest_amount', 'share_ratio', 'admin_fee', 'payout_day',
+      'contract_start_date', 'contract_end_date',
+      'tax_type', 'status', 'memo', 'mortgage_setup',
+      'car_id', 'signed_file_url',
     ]
     const updates: string[] = []
     const values: any[] = []

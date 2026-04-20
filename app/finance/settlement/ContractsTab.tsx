@@ -218,9 +218,20 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
     return order.filter(k => groups[k]).map(k => [k, groups[k]] as [string, typeof groups[string]])
   }, [filteredList, activeSubTab])
 
+  // 지입 계약의 지급 합계 — jiip: (transactions) + jiip_share: (shareHistory) 두 키 모두 합산
+  const jiipPaidTotal = (id: string | number) =>
+    N(settlementMap[`jiip:${id}`]?.totalExpense) + N(settlementMap[`jiip_share:${id}`]?.totalExpense)
+  const jiipPaidMonths = (id: string | number) => {
+    const a = settlementMap[`jiip:${id}`]?.monthsPaid
+    const b = settlementMap[`jiip_share:${id}`]?.monthsPaid
+    const set = new Set<string>()
+    a?.forEach(m => set.add(m)); b?.forEach(m => set.add(m))
+    return set.size
+  }
+
   const summaryStats = useMemo(() => {
     if (activeSubTab === 'jiip') {
-      const totalPaid = jiipList.reduce((s: number, c: any) => s + N(settlementMap[`jiip_share:${c.id}`]?.totalExpense), 0)
+      const totalPaid = jiipList.reduce((s: number, c: any) => s + jiipPaidTotal(c.id), 0)
       return { income: jiipList.reduce((s: number, c: any) => s + N(c.invest_amount), 0), expense: monthlyJiip, totalPaid, totalCount: jiipActive.length, avgRate: jiipList.length > 0 ? (jiipList.reduce((s: number, c: any) => s + N(c.share_ratio), 0) / jiipList.length).toFixed(1) : '0' }
     } else {
       const totalPaid = investList.reduce((s: number, c: any) => s + N(settlementMap[`invest:${c.id}`]?.totalExpense), 0)
@@ -250,15 +261,15 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
 
   // 전체 누적 지급 요약 (활성 계약 기준)
   const paymentSummary = useMemo(() => {
-    const jiipTotal = jiipList.reduce((a, j) => a + N(settlementMap[`jiip_share:${j.id}`]?.totalExpense || 0), 0)
+    const jiipTotal = jiipList.reduce((a, j) => a + jiipPaidTotal(j.id), 0)
     const investTotal = investList.reduce((a, i) => a + N(settlementMap[`invest:${i.id}`]?.totalExpense || 0), 0)
     const paidShares = shareHistory.filter(s => s.paid_at)
-    const thisMonth = new Date().toISOString().slice(0, 7)
+    // 이번달 기준 — 필터된 월(settlementMonth) 로 맞춤
     const thisMonthTotal = paidShares
-      .filter(s => s.settlement_month === thisMonth)
+      .filter(s => s.settlement_month === today.toISOString().slice(0, 7))
       .reduce((a, s) => a + N(s.total_amount), 0)
     return { jiipTotal, investTotal, thisMonthTotal, paidCount: paidShares.length }
-  }, [jiipList, investList, settlementMap, shareHistory])
+  }, [jiipList, investList, settlementMap, shareHistory, today])
 
   if (loading) return <div style={{ padding: 80, textAlign: 'center', color: '#9ca3af', fontWeight: 700 }}>데이터를 불러오는 중...</div>
 
@@ -432,9 +443,14 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
 
                 {/* ── 행 ── */}
                 {isExpanded && group.items.map((item: any) => {
-                  const stKey = activeSubTab === 'jiip' ? `jiip_share:${item.id}` : `invest:${item.id}`
-                  const info = settlementMap[stKey]
-                  const totalPaid = info?.totalExpense || 0
+                  // 지입: transactions(jiip:) + shareHistory(jiip_share:) 모두 합산
+                  // 투자: invest: 단일 키
+                  const totalPaid = activeSubTab === 'jiip'
+                    ? jiipPaidTotal(item.id)
+                    : N(settlementMap[`invest:${item.id}`]?.totalExpense || 0)
+                  const monthsPaidCount = activeSubTab === 'jiip'
+                    ? jiipPaidMonths(item.id)
+                    : (settlementMap[`invest:${item.id}`]?.monthsPaid.size || 0)
                   const months = monthsSince(item.contract_start_date)
 
                   const rowBase: React.CSSProperties = {
@@ -474,7 +490,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                         {/* 누적 지급 */}
                         <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
                           <div style={{ fontWeight: 700, fontSize: 13, color: totalPaid > 0 ? '#111827' : '#d0d0d0' }}>{totalPaid > 0 ? f(totalPaid) : '—'}</div>
-                          {totalPaid > 0 && <div style={{ fontSize: 10, color: '#b0b0b0' }}>{info?.monthsPaid.size || 0}개월</div>}
+                          {totalPaid > 0 && <div style={{ fontSize: 10, color: '#b0b0b0' }}>{monthsPaidCount}개월</div>}
                         </div>
                         {/* 지급률 */}
                         <div style={{ width: 65, flexShrink: 0, textAlign: 'center' }}>
@@ -523,7 +539,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                         {/* 누적 지급 */}
                         <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
                           <div style={{ fontWeight: 700, fontSize: 13, color: totalPaid > 0 ? '#111827' : '#d0d0d0' }}>{totalPaid > 0 ? f(totalPaid) : '—'}</div>
-                          {totalPaid > 0 && <div style={{ fontSize: 10, color: '#b0b0b0' }}>{info?.monthsPaid.size || 0}개월</div>}
+                          {totalPaid > 0 && <div style={{ fontSize: 10, color: '#b0b0b0' }}>{monthsPaidCount}개월</div>}
                         </div>
                         {/* 지급률 */}
                         <div style={{ width: 65, flexShrink: 0, textAlign: 'center' }}>

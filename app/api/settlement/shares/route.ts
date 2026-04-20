@@ -69,7 +69,15 @@ export async function GET(request: NextRequest) {
       `
     }
 
-    return NextResponse.json({ data: serialize(data), error: null })
+    // paid_at 파생 (payment_date 가 오늘 이전이면 지급완료로 간주 — settlement_shares 에 paid_at 컬럼이 없음)
+    const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0)
+    const enriched = (data || []).map((s: any) => {
+      const pd = s.payment_date ? new Date(s.payment_date) : null
+      const paidAt = pd && pd <= todayDate ? pd.toISOString() : null
+      return { ...s, paid_at: paidAt }
+    })
+
+    return NextResponse.json({ data: serialize(enriched), error: null })
   } catch (e: any) {
     console.error('[GET /api/settlement/shares]', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
