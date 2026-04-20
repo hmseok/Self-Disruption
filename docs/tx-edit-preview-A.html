@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>거래 편집 UI 프리뷰 — A안 (업로드 이력 탭)</title>
+<style>
+  body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;background:linear-gradient(to bottom right,#f8fafc,#eff6ff,#f1f5f9);padding:32px;margin:0;color:#0f172a;font-size:13px;min-height:100vh}
+  h1{font-size:18px;color:#0f172a;margin:0 0 4px}
+  .sub{font-size:12px;color:#64748b;margin-bottom:20px}
+  .wrap{max-width:1100px;margin:0 auto}
+  .tabs{display:flex;gap:4px;background:rgba(255,255,255,0.5);border-radius:12px;padding:4px;border:1px solid rgba(0,0,0,0.05);margin-bottom:16px}
+  .tab{flex:1;padding:10px 16px;font-size:13px;color:#64748b;text-align:center;border-radius:10px;cursor:pointer}
+  .tab.active{background:rgba(255,255,255,0.85);color:#1e293b;font-weight:700;border:1px solid rgba(0,0,0,0.06);box-shadow:6px 6px 16px rgba(140,170,210,0.12),-4px -4px 12px rgba(255,255,255,0.5)}
+  .card{background:rgba(255,255,255,0.72);border:1px solid rgba(0,0,0,0.06);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:6px 6px 16px rgba(140,170,210,0.12)}
+  h2{font-size:14px;color:#0f172a;margin:0 0 12px}
+  .btn{padding:8px 14px;background:#0891b2;color:white;border:0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn.ghost{background:white;color:#64748b;border:1px solid #e2e8f0}
+  .btn.sm{padding:4px 10px;font-size:11px}
+  .fileblock{border:1px solid #e0f2fe;border-radius:12px;padding:14px 16px;margin-bottom:10px;background:linear-gradient(to right,#f0f9ff,#ffffff)}
+  .fileblock.active{border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,0.1)}
+  .f-top{display:flex;justify-content:space-between;align-items:center}
+  .f-name{font-weight:700;color:#0c4a6e;font-size:14px}
+  .f-meta{font-size:11px;color:#64748b;margin-top:4px}
+  .f-stats{display:flex;gap:16px;margin-top:8px}
+  .f-stat{font-size:11px}
+  .f-stat .v{font-weight:700}
+  .green{color:#16a34a}.amber{color:#d97706}.red{color:#dc2626}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:9px 10px;color:#64748b;font-size:11px;background:#f8fafc;font-weight:700;border-bottom:1px solid #e2e8f0}
+  td{padding:10px;border-bottom:1px solid #f1f5f9}
+  td.right{text-align:right}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+  .bg-green{background:#dcfce7;color:#166534}.bg-red{background:#fee2e2;color:#991b1b}.bg-amber{background:#fef3c7;color:#92400e}.bg-blue{background:#dbeafe;color:#1e40af}.bg-violet{background:#ede9fe;color:#5b21b6}.bg-slate{background:#f1f5f9;color:#475569}
+  .dropzone{border:2px dashed #cbd5e1;border-radius:12px;padding:24px;text-align:center;color:#64748b;margin-bottom:16px;background:#fafafa}
+  .dropzone .big{font-size:24px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📂 업로드 이력 — 프리뷰 (A안)</h1>
+  <div class="sub">/finance/transactions 탭허브에 "📂 업로드 이력" 탭 신규 추가. 파일 단위로 묶어 보고, 각 행은 클릭 시 편집.</div>
+
+  <div class="tabs">
+    <div class="tab">📊 입출금 대시보드</div>
+    <div class="tab">🏷️ 거래 분류 매칭</div>
+    <div class="tab active">📂 업로드 이력</div>
+    <div class="tab">🔌 Codef</div>
+  </div>
+
+  <div class="dropzone">
+    <div class="big">📄</div>
+    <div style="font-weight:700;color:#0f172a">엑셀·PDF 파일을 여기 끌어놓거나 <span style="color:#0891b2;text-decoration:underline;cursor:pointer">클릭해서 선택</span></div>
+    <div style="font-size:11px;margin-top:6px">통장 엑셀(.xlsx) / 카드 명세서(.pdf) 지원 · 업로드 후 자동 분류기로 이동</div>
+  </div>
+
+  <div class="card">
+    <h2>업로드 파일 (3건)</h2>
+
+    <div class="fileblock active">
+      <div class="f-top">
+        <div>
+          <div class="f-name">🏦 국민은행_2026-04.xlsx</div>
+          <div class="f-meta">2026-04-15 14:23 업로드 · 석호민 · 168건 / 4.2MB</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm ghost">↻ 재분류</button>
+          <button class="btn sm ghost" style="color:#dc2626;border-color:#fecaca">🗑 일괄 롤백</button>
+        </div>
+      </div>
+      <div class="f-stats">
+        <div class="f-stat"><span class="v green">분류 완료 164</span></div>
+        <div class="f-stat"><span class="v amber">미분류 4</span></div>
+        <div class="f-stat"><span class="v">수입 68,400,000</span></div>
+        <div class="f-stat"><span class="v">지출 31,200,000</span></div>
+      </div>
+    </div>
+
+    <div class="fileblock">
+      <div class="f-top">
+        <div>
+          <div class="f-name">💳 국민카드_2026-04.pdf</div>
+          <div class="f-meta">2026-04-10 09:12 업로드 · 석호민 · 52건 / 0.8MB</div>
+        </div>
+        <div><button class="btn sm ghost">↻ 재분류</button></div>
+      </div>
+      <div class="f-stats">
+        <div class="f-stat"><span class="v green">분류 완료 52</span></div>
+        <div class="f-stat"><span class="v">지출 2,890,000</span></div>
+      </div>
+    </div>
+
+    <div class="fileblock">
+      <div class="f-top">
+        <div>
+          <div class="f-name">🏦 국민은행_2026-03.xlsx</div>
+          <div class="f-meta">2026-03-31 16:45 업로드 · 석호민 · 142건</div>
+        </div>
+        <div><button class="btn sm ghost">↻ 재분류</button></div>
+      </div>
+      <div class="f-stats">
+        <div class="f-stat"><span class="v green">분류 완료 142</span></div>
+        <div class="f-stat"><span class="v">수입 42,300,000</span></div>
+        <div class="f-stat"><span class="v">지출 28,900,000</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🏦 국민은행_2026-04.xlsx — 거래 내역 (168건)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>거래일</th>
+          <th>적요</th>
+          <th class="right">금액</th>
+          <th>카테고리</th>
+          <th>연결 대상</th>
+          <th style="width:70px">편집</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026-04-15</td>
+          <td>올시에스널스 홀더스 입금<div style="font-size:10px;color:#94a3b8">보험금 수령</div></td>
+          <td class="right" style="color:#166534;font-weight:700">+1,200,000</td>
+          <td><span class="badge bg-green">보험금 수령</span></td>
+          <td><span class="badge bg-slate">차량 88라0123</span></td>
+          <td><button class="btn sm">✏</button></td>
+        </tr>
+        <tr>
+          <td>2026-04-12</td>
+          <td>임성민 입금<div style="font-size:10px;color:#94a3b8">지입 관리비</div></td>
+          <td class="right" style="color:#166534;font-weight:700">+2,800,000</td>
+          <td><span class="badge bg-blue">지입 관리비</span></td>
+          <td><span class="badge bg-violet">지입: 임성민</span></td>
+          <td><button class="btn sm">✏</button></td>
+        </tr>
+        <tr>
+          <td>2026-04-08</td>
+          <td>급여 이체 - 김기사</td>
+          <td class="right" style="color:#991b1b;font-weight:700">-3,200,000</td>
+          <td><span class="badge bg-green">일용직급여</span></td>
+          <td><span class="badge bg-slate">직원: 김기사</span></td>
+          <td><button class="btn sm">✏</button></td>
+        </tr>
+        <tr style="background:#fef3c7">
+          <td>2026-04-10</td>
+          <td>참존 기림집</td>
+          <td class="right" style="color:#991b1b;font-weight:700">-85,000</td>
+          <td><span class="badge" style="background:#fecaca;color:#991b1b">⚠️ 미분류</span></td>
+          <td style="color:#cbd5e1">—</td>
+          <td><button class="btn sm">✏</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

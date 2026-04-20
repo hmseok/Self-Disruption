@@ -16,6 +16,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
+import TransactionEditModal from '../components/TransactionEditModal'
 export default function FinancePage() {
   const { company, role } = useApp()
 
@@ -23,6 +24,7 @@ export default function FinancePage() {
 const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'ledger' | 'schedule'>('ledger')
+  const [editingTxId, setEditingTxId] = useState<string | null>(null)
 
   const [list, setList] = useState<any[]>([])
   const [summary, setSummary] = useState({ income: 0, expense: 0, profit: 0, pendingExpense: 0 })
@@ -374,7 +376,12 @@ const router = useRouter()
                           </thead>
                           <tbody>
                               {filteredList.map((item) => (
-                                  <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                                  <tr
+                                    key={item.id}
+                                    onClick={() => setEditingTxId(item.id)}
+                                    className="hover:bg-cyan-50 transition-colors group cursor-pointer"
+                                    title="클릭하여 편집"
+                                  >
                                       <td className="p-3 md:p-4 pl-4 md:pl-6 font-bold text-slate-600">{item.transaction_date.slice(5)}</td>
                                       <td className="p-3 md:p-4">
                                           <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${item.type === 'income' ? 'bg-blue-400/20 text-blue-400' : 'bg-red-400/20 text-red-400'}`}>
@@ -389,7 +396,7 @@ const router = useRouter()
                                       <td className={`p-3 md:p-4 text-right font-bold text-base ${item.type === 'income' ? 'text-blue-400' : 'text-red-400'}`}>
                                           {item.type === 'income' ? '+' : '-'}{nf(item.amount)}
                                       </td>
-                                      <td className="p-3 md:p-4 pr-4 md:pr-6 text-center">
+                                      <td className="p-3 md:p-4 pr-4 md:pr-6 text-center" onClick={e => e.stopPropagation()}>
                                           {item.status === 'pending' ? (
                                               <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                   <button onClick={() => handleConfirm(item.id)} className="bg-blue-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-sm">
@@ -398,9 +405,14 @@ const router = useRouter()
                                                   <button onClick={() => handleDelete(item.id)} className="text-slate-500 hover:text-red-400 p-1.5">🗑️</button>
                                               </div>
                                           ) : (
-                                              <button onClick={() => handleDelete(item.id)} className="text-slate-400 hover:text-red-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity px-2">
-                                                  삭제
-                                              </button>
+                                              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <button onClick={() => setEditingTxId(item.id)} className="text-slate-500 hover:text-cyan-600 font-bold px-2">
+                                                      ✏️ 편집
+                                                  </button>
+                                                  <button onClick={() => handleDelete(item.id)} className="text-slate-400 hover:text-red-400 font-bold px-2">
+                                                      삭제
+                                                  </button>
+                                              </div>
                                           )}
                                       </td>
                                   </tr>
@@ -413,7 +425,8 @@ const router = useRouter()
                   <div className="md:hidden" style={{ padding: '8px 12px' }}>
                       {filteredList.map((item) => (
                           <div key={item.id}
-                            style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                            onClick={() => setEditingTxId(item.id)}
+                            style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'income' ? 'bg-blue-400/20 text-blue-400' : 'bg-red-400/20 text-red-400'}`}>
@@ -440,6 +453,13 @@ const router = useRouter()
               </>
           )}
       </div>
+
+      {/* 거래 편집 모달 */}
+      <TransactionEditModal
+        txId={editingTxId}
+        onClose={() => setEditingTxId(null)}
+        onSaved={() => fetchTransactions()}
+      />
     </div>
     </div>
   )

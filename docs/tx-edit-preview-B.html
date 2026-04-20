@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>거래 편집 UI 프리뷰 — B안 (메인 대시보드 인라인 편집)</title>
+<style>
+  body{font-family:-apple-system,"Apple SD Gothic Neo",sans-serif;background:linear-gradient(to bottom right,#f8fafc,#eff6ff,#f1f5f9);padding:32px;margin:0;color:#0f172a;font-size:13px;min-height:100vh}
+  h1{font-size:18px;color:#0f172a;margin:0 0 4px}
+  .sub{font-size:12px;color:#64748b;margin-bottom:20px}
+  .wrap{max-width:1100px;margin:0 auto}
+  .tabs{display:flex;gap:4px;background:rgba(255,255,255,0.5);border-radius:12px;padding:4px;border:1px solid rgba(0,0,0,0.05);margin-bottom:16px}
+  .tab{flex:1;padding:10px 16px;font-size:13px;color:#64748b;text-align:center;border-radius:10px;cursor:pointer}
+  .tab.active{background:rgba(255,255,255,0.85);color:#1e293b;font-weight:700;border:1px solid rgba(0,0,0,0.06);box-shadow:6px 6px 16px rgba(140,170,210,0.12),-4px -4px 12px rgba(255,255,255,0.5)}
+  .card{background:rgba(255,255,255,0.72);border:1px solid rgba(0,0,0,0.06);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:6px 6px 16px rgba(140,170,210,0.12)}
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .kpi .k{background:rgba(255,255,255,0.6);border:1px solid rgba(59,110,181,0.25);border-radius:12px;padding:14px 16px}
+  .kpi .k.g{border-color:rgba(16,185,129,0.25)}
+  .kpi .k.r{border-color:rgba(220,38,38,0.25)}
+  .kpi .k.a{border-color:rgba(217,119,6,0.25)}
+  .kpi .l{font-size:11px;color:#64748b}
+  .kpi .v{font-size:20px;font-weight:800;margin-top:4px;color:#0f172a}
+  .toolbar{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+  .toolbar input{padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;flex:1}
+  .btn{padding:8px 14px;background:#0891b2;color:white;border:0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn.ghost{background:white;color:#64748b;border:1px solid #e2e8f0}
+  .btn.danger{background:#dc2626}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:10px 12px;color:#64748b;font-size:11px;background:#f8fafc;font-weight:700;border-bottom:1px solid #e2e8f0}
+  th.right{text-align:right}
+  td{padding:11px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}
+  tr:hover td{background:#ecfeff}
+  tr.selected td{background:#cffafe}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+  .bg-green{background:#dcfce7;color:#166534}
+  .bg-red{background:#fee2e2;color:#991b1b}
+  .bg-amber{background:#fef3c7;color:#92400e}
+  .bg-blue{background:#dbeafe;color:#1e40af}
+  .bg-violet{background:#ede9fe;color:#5b21b6}
+  .bg-slate{background:#f1f5f9;color:#475569}
+  .right{text-align:right}
+  .hint{color:#94a3b8;font-size:10px;margin-top:2px}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;z-index:100;padding:40px 20px;overflow-y:auto}
+  .modal{background:white;border-radius:18px;padding:24px;width:560px;box-shadow:0 24px 60px rgba(0,0,0,0.3)}
+  .modal h3{margin:0 0 4px;font-size:17px}
+  .modal .h-sub{font-size:11px;color:#64748b;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:11px;color:#64748b;margin-bottom:4px;font-weight:600}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box;background:white}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,0.12)}
+  .readonly{background:#f8fafc;color:#64748b}
+  .section{border-top:1px solid #f1f5f9;padding-top:12px;margin-top:12px}
+  .section-title{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:8px}
+  .audit{font-size:10px;color:#94a3b8;background:#f8fafc;border-radius:6px;padding:6px 8px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💰 재무 / 입출금 대시보드 — 프리뷰 (B안)</h1>
+  <div class="sub">행 아무 곳이나 클릭 → 편집 모달 열림. 분류된 통장/카드 데이터도 동일 방식으로 수정 가능.</div>
+
+  <div class="tabs">
+    <div class="tab active">📊 입출금 대시보드</div>
+    <div class="tab">🏷️ 거래 분류 매칭</div>
+    <div class="tab">🔌 Codef 자동연동</div>
+  </div>
+
+  <div class="card">
+    <div class="kpi">
+      <div class="k g"><div class="l">이번달 수입</div><div class="v" style="color:#16a34a">42,300,000</div></div>
+      <div class="k r"><div class="l">이번달 지출</div><div class="v" style="color:#dc2626">28,900,000</div></div>
+      <div class="k"><div class="l">순이익</div><div class="v" style="color:#0891b2">13,400,000</div></div>
+      <div class="k a"><div class="l">미분류 / 검토 필요</div><div class="v" style="color:#d97706">4건</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input placeholder="🔎 적요·카테고리·금액 검색..." />
+      <select style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px"><option>📅 2026-04</option><option>2026-03</option></select>
+      <select style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px"><option>📥 모든 출처</option><option>국민은행</option><option>국민카드</option><option>수기</option></select>
+      <button class="btn">+ 직접 입력</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>거래일</th>
+          <th>구분</th>
+          <th class="right">금액</th>
+          <th>적요</th>
+          <th>카테고리</th>
+          <th>연결</th>
+          <th>출처</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026-04-15</td>
+          <td><span class="badge bg-green">수입</span></td>
+          <td class="right" style="color:#166534;font-weight:700">+1,200,000</td>
+          <td>올시에스널스 홀더스 입금<div class="hint">보험금 수령</div></td>
+          <td><span class="badge bg-green">보험금 수령</span></td>
+          <td><span class="badge bg-slate">차량 88라0123</span></td>
+          <td style="color:#94a3b8;font-size:11px">🏦 국민은행</td>
+        </tr>
+        <tr class="selected">
+          <td>2026-04-12</td>
+          <td><span class="badge bg-green">수입</span></td>
+          <td class="right" style="color:#166534;font-weight:700">+2,800,000</td>
+          <td>임성민 입금<div class="hint">지입 관리비</div></td>
+          <td><span class="badge bg-blue">지입 관리비</span></td>
+          <td><span class="badge bg-violet">지입: 임성민</span></td>
+          <td style="color:#94a3b8;font-size:11px">🏦 국민은행</td>
+        </tr>
+        <tr>
+          <td>2026-04-11</td>
+          <td><span class="badge bg-red">지출</span></td>
+          <td class="right" style="color:#991b1b;font-weight:700">-125,000</td>
+          <td>SK에너지 주유소<div class="hint">유류비</div></td>
+          <td><span class="badge bg-amber">유류비</span></td>
+          <td><span class="badge bg-slate">차량 12가8765</span></td>
+          <td style="color:#94a3b8;font-size:11px">💳 국민카드</td>
+        </tr>
+        <tr>
+          <td>2026-04-10</td>
+          <td><span class="badge bg-red">지출</span></td>
+          <td class="right" style="color:#991b1b;font-weight:700">-85,000</td>
+          <td>참존 기림집<div class="hint">식대?</div></td>
+          <td><span class="badge" style="background:#fecaca;color:#991b1b">⚠️ 미분류</span></td>
+          <td style="color:#cbd5e1">—</td>
+          <td style="color:#94a3b8;font-size:11px">💳 국민카드</td>
+        </tr>
+        <tr>
+          <td>2026-04-08</td>
+          <td><span class="badge bg-red">지출</span></td>
+          <td class="right" style="color:#991b1b;font-weight:700">-3,200,000</td>
+          <td>급여 이체 - 김기사<div class="hint">일용직급여</div></td>
+          <td><span class="badge bg-green">일용직급여</span></td>
+          <td><span class="badge bg-slate">직원: 김기사</span></td>
+          <td style="color:#94a3b8;font-size:11px">🏦 국민은행</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 편집 모달 -->
+<div class="modal-overlay">
+  <div class="modal">
+    <h3>거래 상세 / 편집</h3>
+    <div class="h-sub">국민은행 업로드 · 2026-04-12 14:23 분류 완료</div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>거래일</label>
+        <input type="date" value="2026-04-12" />
+      </div>
+      <div class="field">
+        <label>구분</label>
+        <select><option>수입</option><option>지출</option></select>
+      </div>
+      <div class="field">
+        <label>금액 (원)</label>
+        <input value="2,800,000" />
+      </div>
+      <div class="field">
+        <label>결제수단</label>
+        <select><option>통장</option><option>카드</option><option>현금</option></select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>카테고리</label>
+      <select>
+        <option>💼 지입 관리비/수수료</option>
+        <option>🚛 렌트/운송수입</option>
+        <option>💰 투자원금 입금</option>
+        <option>🛡️ 보험금 수령</option>
+        <option>⛽ 유류비</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>적요</label>
+      <input value="임성민 입금" />
+    </div>
+
+    <div class="field">
+      <label>연결 대상</label>
+      <select>
+        <option>지입 차주: 임성민 (BMW 520i)</option>
+        <option>차량: 88라0123</option>
+        <option>계약: #2024-045</option>
+        <option>— 연결 없음 —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>메모</label>
+      <textarea rows="2" placeholder="선택사항">3월분 지입료 수령</textarea>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🔒 원본 정보 (수정 불가)</div>
+      <div class="grid2">
+        <div class="field">
+          <label>출처</label>
+          <input class="readonly" value="🏦 국민은행 엑셀업로드" readonly />
+        </div>
+        <div class="field">
+          <label>업로드 파일</label>
+          <input class="readonly" value="국민은행_2026-04.xlsx" readonly />
+        </div>
+      </div>
+      <div class="audit">마지막 수정: 2026-04-20 18:24 · 편집자 석호민 · 카테고리 "미분류" → "지입 관리비/수수료"</div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
+      <button class="btn danger" style="flex:0 0 auto">🗑 소프트 삭제</button>
+      <div style="flex:1"></div>
+      <button class="btn ghost">취소</button>
+      <button class="btn">저장</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

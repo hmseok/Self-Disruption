@@ -96,6 +96,35 @@ export async function POST(request: NextRequest) {
     const query = `INSERT INTO ${table} (${columnStr}) VALUES ${valueSets}`
     const result = await prisma.$executeRawUnsafe(query)
 
+    // 🪝 transactions insert 시 imported_from이 있으면 upload_batches 자동 upsert
+    //    (기존 배치는 건드리지 않고, 신규만 메타데이터 오버레이 등록)
+    if (table === 'transactions') {
+      const batchIds = new Set<string>()
+      for (const row of rows) {
+        const impFrom = row.imported_from
+        if (impFrom && typeof impFrom === 'string') batchIds.add(impFrom)
+      }
+      const uploadedBy = user.name || user.email || (user as any).id || null
+      for (const batchId of batchIds) {
+        try {
+          // source_type 자동 감지 (prefix 기반)
+          let sourceType = 'manual'
+          if (batchId.startsWith('excel_bank_')) sourceType = 'excel_bank'
+          else if (batchId.startsWith('excel_card_')) sourceType = 'excel_card'
+          else if (batchId.startsWith('pdf_card_')) sourceType = 'pdf_card'
+          else if (batchId.startsWith('codef_')) sourceType = 'codef_bank'
+          await prisma.$executeRaw`
+            INSERT INTO upload_batches (id, source_type, uploaded_by)
+            VALUES (${batchId}, ${sourceType}, ${uploadedBy})
+            ON DUPLICATE KEY UPDATE
+              uploaded_by = COALESCE(uploaded_by, VALUES(uploaded_by))
+          `
+        } catch (e) {
+          console.warn('[upload-batches auto-register]', batchId, e)
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, inserted: result, error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
