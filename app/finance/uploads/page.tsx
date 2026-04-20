@@ -252,6 +252,10 @@ export default function UploadsHistoryPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); router.push(`/finance/uploads/${encodeURIComponent(b.id)}`) }}
+                          style={{ ...btnStyleGhost, color: '#0891b2', borderColor: '#e0f2fe' }}
+                        >상세 →</button>
                         {isRolledBack ? (
                           <button
                             onClick={e => { e.stopPropagation(); handleRestore(b.id) }}
