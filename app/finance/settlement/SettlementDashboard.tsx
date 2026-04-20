@@ -2,7 +2,7 @@
 import { auth } from '@/lib/auth-client'
 
 import { useApp } from '../../context/AppContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
@@ -96,22 +96,30 @@ export default function SettlementDashboard() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  // shareHistory가 로드되면: 정산월 자동 감지 + 이체 미리보기 빌드 (execute 탭일 때만)
+  // shareHistory가 로드되면: 정산월 자동 감지(최초 1회) + 이체 미리보기 빌드(execute 탭일 때만, 최초 1회)
+  // ⚠️ setFilterDate / handleBuildTransferPreview 가 shareHistory 를 갱신 → 무한 루프 방지용 ref 가드
+  const autoSwitchedMonthRef = useRef(false)
+  const autoBuiltPreviewRef = useRef<string | null>(null)
   useEffect(() => {
-    if (shareHistory.length > 0 && !loading) {
-      // 가장 최근 발송 이력의 정산월이 현재 filterDate와 다르면 자동 전환
+    if (loading) return
+    if (shareHistory.length === 0) return
+
+    // ① 정산월 자동 전환 — 최초 1회만
+    if (!autoSwitchedMonthRef.current) {
+      autoSwitchedMonthRef.current = true
       const latestMonth = shareHistory[0]?.settlement_month
       if (latestMonth && latestMonth !== filterDate) {
         setFilterDate(latestMonth)
-        // filterDate 변경 시 useEffect에서 refresh가 다시 호출되므로 여기서는 빌드 안 함
-        return
-      }
-      // execute 탭일 때만 자동 빌드 (silent=true로 alert 방지)
-      if (activeTab === 'execute' && transferPreview.length === 0) {
-        handleBuildTransferPreview(true)
+        return // 전환 시 재로드되므로 이번 effect 에서는 빌드 생략
       }
     }
-  }, [shareHistory, loading, activeTab])
+
+    // ② execute 탭 이체 미리보기 자동 빌드 — filterDate 별 최초 1회만
+    if (activeTab === 'execute' && transferPreview.length === 0 && autoBuiltPreviewRef.current !== filterDate) {
+      autoBuiltPreviewRef.current = filterDate
+      handleBuildTransferPreview(true)
+    }
+  }, [shareHistory, loading, activeTab, filterDate])
 
   // ============================================
   // 정산 실행
@@ -661,6 +669,100 @@ export default function SettlementDashboard() {
   }
 
   // ============================================
+  // 개별 정산서 (Share 기준) — 이체대기 / 지급완료 목록용
+  // recipient_name 으로 해당 월 settlementItems 전부 묶어서 한 장으로 출력
+  // ============================================
+  const handleShowStatementByShare = (share: { id: string; recipient_name: string; recipient_phone: string; settlement_month: string; total_amount: number; paid_at: string | null }) => {
+    try {
+      const monthKey = share.settlement_month || filterDate
+      const matchItems = settlementItems.filter(i =>
+        i.name === share.recipient_name &&
+        (i.type === 'jiip' || i.type === 'invest') &&
+        (i.monthLabel?.slice(0, 7) === monthKey.slice(0, 7) || !i.monthLabel)
+      )
+
+      // 은행정보: 첫 매칭 아이템 기준
+      let bank: any = {}
+      let primaryType: 'jiip' | 'invest' = 'jiip'
+      if (matchItems.length > 0) {
+        const first = matchItems[0]
+        primaryType = first.type as 'jiip' | 'invest'
+        if (first.type === 'jiip') {
+          const jiip = jiips.find(j => String(j.id) === String(first.relatedId))
+          if (jiip) {
+            const cars: any = jiip.cars || {}
+            bank = {
+              bank_name: cars.owner_bank || (jiip as any).bank_name || '',
+              account_number: cars.owner_account || (jiip as any).account_number || '',
+              account_holder: cars.owner_account_holder || (jiip as any).account_holder || share.recipient_name,
+            }
+          }
+        } else if (first.type === 'invest') {
+          const inv = investors.find(i => String(i.id) === String(first.relatedId))
+          if (inv) {
+            bank = {
+              bank_name: (inv as any).bank_name || '',
+              account_number: (inv as any).account_number || '',
+              account_holder: (inv as any).account_holder || share.recipient_name,
+            }
+          }
+        }
+      }
+
+      const totalAmount = matchItems.length > 0
+        ? matchItems.reduce((s, i) => s + i.amount, 0)
+        : share.total_amount
+
+      // 매칭된 항목이 없으면 share 정보만으로 간소한 정산서 생성
+      const payloadItems = matchItems.length > 0
+        ? matchItems.map(i => ({
+            type: i.type,
+            monthLabel: i.monthLabel || monthKey,
+            amount: i.amount,
+            detail: i.detail,
+            carNumber: i.carNumber,
+            carModel: i.carModel,
+            breakdown: i.breakdown,
+            dueDate: i.dueDate,
+          }))
+        : [{
+            type: 'jiip' as const,
+            monthLabel: monthKey,
+            amount: share.total_amount,
+            detail: '정산금',
+          }]
+
+      const payload = {
+        recipientName: share.recipient_name,
+        recipientPhone: share.recipient_phone || '',
+        settlementMonth: monthKey,
+        paymentDate: share.paid_at ? share.paid_at.slice(0, 10) : settlementSettings.paymentDate,
+        totalAmount,
+        items: payloadItems,
+        bank,
+        company: {
+          name: company?.name || '주식회사 에프엠아이',
+          business_number: (company as any)?.business_number || (company as any)?.biz_no || '',
+          address: (company as any)?.address || '',
+          phone: (company as any)?.phone || (company as any)?.tel || '',
+          ceo_name: (company as any)?.ceo_name || (company as any)?.representative || '',
+          logo_url: (company as any)?.logo_url || '',
+        },
+        memo: settlementSettings.memo || '',
+        type: matchItems.length > 0 ? matchItems[0].type : primaryType,
+      }
+
+      sessionStorage.setItem('settlementStatementPayload', JSON.stringify(payload))
+      const win = window.open('/finance/settlement/statement', '_blank')
+      if (!win) {
+        showToast('팝업이 차단되어 정산서를 열 수 없습니다. 팝업을 허용해주세요.', 'error')
+      }
+    } catch (e: any) {
+      alert('정산서 생성 실패: ' + (e?.message || '오류'))
+    }
+  }
+
+  // ============================================
   // 발송 확정
   // ============================================
   const handleConfirmSend = async () => {
@@ -945,6 +1047,7 @@ export default function SettlementDashboard() {
                 setSettlementSettings={setSettlementSettings}
                 onSendIndividual={(item: SettlementItem) => handleSendNotify([item])}
                 onShowStatement={handleShowStatement}
+                onShowStatementByShare={handleShowStatementByShare}
                 companyName={company?.name || '정산'}
                 onBulkPaid={handleBulkPaid}
               />

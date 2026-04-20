@@ -65,6 +65,7 @@ type Props = {
   setSettlementSettings: (s: SettlementSettings | ((prev: SettlementSettings) => SettlementSettings)) => void
   onSendIndividual: (item: SettlementItem) => void
   onShowStatement?: (item: SettlementItem) => void
+  onShowStatementByShare?: (share: ShareHistoryItem) => void
   companyName: string
 }
 
@@ -75,7 +76,7 @@ export default function ExecuteTab({
   onDownloadBulkTransfer, transferPreview,
   onBuildTransferPreview, onDownloadFromPreview, onCloseTransferPreview,
   settlementSettings, setSettlementSettings,
-  onSendIndividual, onShowStatement, companyName,
+  onSendIndividual, onShowStatement, onShowStatementByShare, companyName,
 }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('send')
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
@@ -393,7 +394,7 @@ export default function ExecuteTab({
             <div style={{ width: 150, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b' }}>계좌번호</div>
             <div style={{ width: 120, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'right' }}>이체금액</div>
             <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#64748b' }}>보내는분</div>
-            <div style={{ width: 70, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
+            <div style={{ width: 160, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
           </div>
 
           {/* 이체 행 */}
@@ -419,10 +420,17 @@ export default function ExecuteTab({
                   <div style={{ width: 150, flexShrink: 0, fontFamily: 'monospace', fontSize: 12, color: row.account ? '#374151' : '#ef4444' }}>{row.account || '미등록'}</div>
                   <div style={{ width: 120, flexShrink: 0, textAlign: 'right', fontWeight: 900, fontSize: 13, color: '#2563eb' }}>{nf(row.amount)}원</div>
                   <div style={{ flex: 1, fontSize: 12, color: '#6b7280' }}>{liveSenderLabel}</div>
-                  <div style={{ width: 70, flexShrink: 0, textAlign: 'center' }}>
+                  <div style={{ width: 160, flexShrink: 0, textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    {matchShare && onShowStatementByShare && (
+                      <button onClick={() => onShowStatementByShare(matchShare)}
+                        title="개별 정산서 출력(PDF/인쇄)"
+                        style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#7c3aed', border: '1px solid #ddd6fe', whiteSpace: 'nowrap' }}>
+                        📄 정산서
+                      </button>
+                    )}
                     {matchShare && (
                       <button onClick={() => onTogglePaid(matchShare.id, false)}
-                        style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#16a34a', color: '#fff', border: 'none' }}>
+                        style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#16a34a', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}>
                         지급완료
                       </button>
                     )}
@@ -467,7 +475,7 @@ export default function ExecuteTab({
             <div style={{ width: 90, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>발송일</div>
             <div style={{ width: 90, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>지급일</div>
             <div style={{ flex: 1 }} />
-            <div style={{ width: 140, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
+            <div style={{ width: 210, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>처리</div>
           </div>
 
           {/* 지급완료 행 */}
@@ -498,15 +506,22 @@ export default function ExecuteTab({
                   {sh.paid_at ? new Date(sh.paid_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : '—'}
                 </div>
                 <div style={{ flex: 1 }} />
-                <div style={{ width: 140, flexShrink: 0, textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                <div style={{ width: 210, flexShrink: 0, textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                  {onShowStatementByShare && (
+                    <button onClick={() => onShowStatementByShare(sh)}
+                      title="개별 정산서 출력(PDF/인쇄)"
+                      style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#7c3aed', border: '1px solid #ddd6fe', whiteSpace: 'nowrap' }}>
+                      📄 정산서
+                    </button>
+                  )}
                   <button onClick={() => onTogglePaid(sh.id, true)}
                     title="지급완료 취소 (paid_at만 되돌림, 거래이력 유지)"
-                    style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                    style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
                     완료해제
                   </button>
                   <button onClick={() => onCancelSettlement([sh.id])}
                     title="정산 완전 취소 (거래내역까지 삭제)"
-                    style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#dc2626', border: '1px solid #fecaca' }}>
+                    style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', whiteSpace: 'nowrap' }}>
                     완전취소
                   </button>
                 </div>
