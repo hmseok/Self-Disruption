@@ -18,23 +18,55 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const companyId = searchParams.get('company_id') || user.company_id || null
+  const relatedType = searchParams.get('related_type')   // 'invest' 또는 'jiip,jiip_share'
+  const relatedId = searchParams.get('related_id')
+  const typeFilter = searchParams.get('type')             // 'income' 또는 'expense'
+  const limitParam = parseInt(searchParams.get('limit') || '0', 10)
 
   try {
-    let sql: string
+    // WHERE 절 조립
+    const where: string[] = []
     const params: any[] = []
 
-    if (from && to && companyId) {
-      sql = `SELECT * FROM transactions WHERE company_id = ? AND transaction_date >= ? AND transaction_date <= ? ORDER BY transaction_date DESC, created_at DESC`
-      params.push(companyId, from, to)
-    } else if (from && to) {
-      sql = `SELECT * FROM transactions WHERE transaction_date >= ? AND transaction_date <= ? ORDER BY transaction_date DESC, created_at DESC LIMIT 1000`
-      params.push(from, to)
-    } else if (companyId) {
-      sql = `SELECT * FROM transactions WHERE company_id = ? ORDER BY transaction_date DESC, created_at DESC LIMIT 500`
+    if (companyId) {
+      where.push('company_id = ?')
       params.push(companyId)
-    } else {
-      sql = `SELECT * FROM transactions ORDER BY transaction_date DESC, created_at DESC LIMIT 200`
     }
+    if (from) {
+      where.push('transaction_date >= ?')
+      params.push(from)
+    }
+    if (to) {
+      where.push('transaction_date <= ?')
+      params.push(to)
+    }
+    if (relatedType) {
+      const types = relatedType.split(',').map(s => s.trim()).filter(Boolean)
+      if (types.length === 1) {
+        where.push('related_type = ?')
+        params.push(types[0])
+      } else if (types.length > 1) {
+        where.push(`related_type IN (${types.map(() => '?').join(',')})`)
+        params.push(...types)
+      }
+    }
+    if (relatedId) {
+      where.push('related_id = ?')
+      params.push(relatedId)
+    }
+    if (typeFilter) {
+      where.push('type = ?')
+      params.push(typeFilter)
+    }
+
+    // 기본 LIMIT: 필터 다중(companyId+from+to) 시 무제한, 그 외 합리적 상한
+    let limit = 1000
+    if (limitParam > 0 && limitParam <= 5000) limit = limitParam
+    else if (from && to && companyId) limit = 5000
+    else if (!from && !to && !relatedId && !companyId) limit = 200
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+    const sql = `SELECT * FROM transactions ${whereSql} ORDER BY transaction_date DESC, created_at DESC LIMIT ${limit}`
 
     const data = await prisma.$queryRawUnsafe<any[]>(sql, ...params)
     return NextResponse.json({ data: serialize(data), error: null })
