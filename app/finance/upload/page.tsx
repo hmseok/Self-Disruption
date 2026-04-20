@@ -4,140 +4,26 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { useUpload } from '@/app/context/UploadContext'
-import { fetchFinanceData, updateFinanceRow, insertFinanceRows, deleteFinanceRow, batchUpdateFinanceRows, batchDeleteFinanceRows, getAuthHeader } from '@/app/utils/finance-upload'
+import { fetchFinanceData, updateFinanceRow, insertFinanceRows, deleteFinanceRow, batchUpdateFinanceRows, batchDeleteFinanceRows, getAuthHeader, fetchWithAuth, generateBatchId, registerUploadBatch } from '@/app/utils/finance-upload'
 
-// For auth-dependent operations (bank sync, storage, etc.)
-// DarkHeader 제거 — A1 브랜드 스트라이프 디자인 적용
-
-// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-// 분류 카테고리 & 상수 (Both files)
-// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-
-// ═══ 회계 기준 카테고리 (DB 저장용, select 드롭다운용) ═══
-const CATEGORIES = [
-  { group: '매출(영업수익)', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익'] },
-  { group: '자본변동', items: ['투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)', '차량구입비', '선납금(차량대출)'] },
-  { group: '영업비용-차량', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험', '주차비'] },
-  { group: '영업비용-금융', items: ['이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)', '수수료/카드수수료'] },
-  { group: '영업비용-인건비', items: ['급여(정규직)', '일용직급여', '성과급지급', '용역비(3.3%)', '4대보험(회사부담)'] },
-  { group: '영업비용-관리', items: ['복리후생(식대)', '접대비', '여비교통비', '임차료/사무실', '차고지비용', '통신비', '소모품/사무용품', '교육/훈련비', '광고/마케팅', '보험료(일반)', '전기/수도/가스', '경비/보안', '조합비/회비'] },
-  { group: '세금/공과', items: ['원천세/부가세', '법인세/지방세', '세금/공과금', '세무서기장료'] },
-  { group: '영업비용-금융2', items: ['카드대금납부', '보증금(지출)'] },
-  { group: '기타', items: ['쇼핑/온라인구매', '도서/신문', '감가상각비', '수선/유지비', '기타수입', '기타'] },
-]
-
-// ═══ 용도별 카테고리 (사용자 화면 표시용 — 같은 업종/종류끼리 묶기) ═══
-const DISPLAY_CATEGORIES = [
-  { group: '💰 돈 들어오는 것', icon: '💰', items: ['렌트/운송수입', '지입 관리비/수수료', '보험금 수령', '매각/처분수입', '이자/잡이익', '기타수입'] },
-  { group: '🏦 투자/대출 입출금', icon: '🏦', items: ['투자원금 입금', '지입 초기비용/보증금', '렌터카 보증금(입금)', '대출 실행(입금)', '차량구입비', '선납금(차량대출)', '이자비용(대출/투자)', '원금상환', '지입 수익배분금(출금)'] },
-  { group: '🚛 차량 운영', icon: '🚛', items: ['유류비', '정비/수리비', '차량보험료', '자동차세/공과금', '차량할부/리스료', '화물공제/적재물보험', '주차비'] },
-  { group: '👨‍💼 급여/인건비', icon: '👨‍💼', items: ['급여(정규직)', '일용직급여', '성과급지급', '용역비(3.3%)', '4대보험(회사부담)'] },
-  { group: '🏢 사무실/운영비', icon: '🏢', items: ['임차료/사무실', '차고지비용', '통신비', '소모품/사무용품', '전기/수도/가스', '경비/보안', '수선/유지비', '조합비/회비'] },
-  { group: '🍽️ 식비/접대/출장', icon: '🍽️', items: ['복리후생(식대)', '접대비', '여비교통비'] },
-  { group: '💳 수수료/카드', icon: '💳', items: ['수수료/카드수수료', '카드대금납부', '보증금(지출)'] },
-  { group: '🏛️ 세금/공과금', icon: '🏛️', items: ['원천세/부가세', '법인세/지방세', '세금/공과금', '세무서기장료'] },
-  { group: '📦 기타 지출', icon: '📦', items: ['쇼핑/온라인구매', '도서/신문', '교육/훈련비', '광고/마케팅', '보험료(일반)', '감가상각비', '기타'] },
-]
-
-const ALL_CATEGORIES = CATEGORIES.flatMap(g => g.items)
-
-const CATEGORY_ICONS: Record<string, string> = {
-  '렌트/운송수입': '🚛', '지입 관리비/수수료': '📋', '보험금 수령': '🛡️', '매각/처분수입': '🏷️', '이자/잡이익': '📈',
-  '투자원금 입금': '💰', '지입 초기비용/보증금': '🔑', '렌터카 보증금(입금)': '🚗', '대출 실행(입금)': '🏦', '차량구입비': '🚙', '선납금(차량대출)': '💵',
-  '유류비': '⛽', '정비/수리비': '🔧', '차량보험료': '🚗', '자동차세/공과금': '📄', '차량할부/리스료': '💳', '화물공제/적재물보험': '📦', '주차비': '🅿️',
-  '이자비용(대출/투자)': '📊', '원금상환': '💸', '지입 수익배분금(출금)': '🤝', '수수료/카드수수료': '🧾',
-  '급여(정규직)': '👨‍💼', '일용직급여': '👤', '성과급지급': '🎯', '용역비(3.3%)': '👷', '4대보험(회사부담)': '🏥',
-  '복리후생(식대)': '🍽️', '접대비': '🥂', '여비교통비': '🚕', '임차료/사무실': '🏢', '통신비': '📱', '소모품/사무용품': '🗃️',
-  '교육/훈련비': '📚', '광고/마케팅': '📣', '보험료(일반)': '🛡️', '전기/수도/가스': '💡', '경비/보안': '🔒',
-  '원천세/부가세': '🏛️', '법인세/지방세': '🏛️', '세금/공과금': '🏛️', '세무서기장료': '📋',
-  '차고지비용': '🅿️', '카드대금납부': '💳', '보증금(지출)': '🔐', '사무실임차료': '🏢', '조합비/회비': '🤝',
-  '쇼핑/온라인구매': '🛒', '도서/신문': '📰', '감가상각비': '📉', '수선/유지비': '🔩', '기타수입': '📥', '기타': '📦', '미분류': '❓',
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  // 회계 기준
-  '매출(영업수익)': '#3b6eb5', '자본변동': '#6366f1', '영업비용-차량': '#f59e0b', '영업비용-금융': '#8b5cf6',
-  '영업비용-인건비': '#10b981', '영업비용-관리': '#ec4899', '세금/공과': '#ef4444', '영업비용-금융2': '#a855f7', '기타': '#94a3b8',
-  // 용도별
-  '💰 돈 들어오는 것': '#3b6eb5', '🏦 투자/대출 입출금': '#6366f1', '🚛 차량 운영': '#f59e0b',
-  '👨‍💼 급여/인건비': '#10b981', '🏢 사무실/운영비': '#8b5cf6', '🍽️ 식비/접대/출장': '#ec4899',
-  '💳 수수료/카드': '#a855f7', '🏛️ 세금/공과금': '#ef4444', '📦 기타 지출': '#94a3b8',
-}
-
-const TYPE_LABELS: Record<string, string> = { jiip: '지입', invest: '투자', loan: '대출', salary: '급여', freelancer: '프리랜서', insurance: '보험', car: '차량', employee: '직원', card: '법인카드', contract: '계약' }
-
-// ═══ 카테고리 → 연결 대상 타입 매핑 ═══
-// 각 세부항목이 어떤 연결 대상 그룹만 보여줄지 결정
-// 'all' = 전체 표시, string[] = 해당 그룹명만 표시 (relatedOptions의 group명 기준)
-const CATEGORY_RELATED_MAP: Record<string, string[] | 'all'> = {
-  // ── 수입(매출) ──
-  '렌트/운송수입': ['계약', '차량', '지입 차주'],
-  '지입 관리비/수수료': ['지입 차주'],
-  '보험금 수령': ['보험', '차량'],
-  '매각/처분수입': ['차량'],
-  '이자/잡이익': [],
-  '기타수입': [],
-  // ── 투자/대출 입출금 ──
-  '투자원금 입금': ['투자자'],
-  '지입 초기비용/보증금': ['지입 차주'],
-  '렌터카 보증금(입금)': ['계약', '렌터카'],
-  '대출 실행(입금)': ['대출', '차량'],
-  '차량구입비': ['차량', '대출'],
-  '선납금(차량대출)': ['차량', '대출'],
-  '이자비용(대출/투자)': ['대출', '투자자'],
-  '원금상환': ['대출', '차량', '투자자'],
-  '지입 수익배분금(출금)': ['지입 차주'],
-  // ── 차량 운영 ──
-  '유류비': ['차량'],
-  '정비/수리비': ['차량'],
-  '차량보험료': ['차량', '보험'],
-  '자동차세/공과금': ['차량'],
-  '차량할부/리스료': ['차량', '대출'],
-  '화물공제/적재물보험': ['차량', '보험'],
-  '주차비': ['차량'],
-  '탁송비': ['차량'],
-  '자동차세': ['차량'],
-  '과태료': ['차량'],
-  // ── 급여/인건비 ──
-  '급여(정규직)': ['직원', '프리랜서'],
-  '일용직급여': ['프리랜서', '직원'],
-  '성과급지급': ['직원', '프리랜서'],
-  '용역비(3.3%)': ['프리랜서', '직원'],
-  '4대보험(회사부담)': ['직원', '프리랜서'],
-  // ── 사무실/운영비 (연결 불필요) ──
-  '임차료/사무실': [],
-  '통신비': [],
-  '소모품/사무용품': [],
-  '전기/수도/가스': [],
-  '경비/보안': [],
-  '수선/유지비': [],
-  // ── 식비/접대/출장 (연결 불필요) ──
-  '복리후생(식대)': [],
-  '접대비': [],
-  '여비교통비': [],
-  // ── 수수료 ──
-  '수수료/카드수수료': ['법인카드'],
-  // ── 세금/공과금 (연결 불필요) ──
-  '원천세/부가세': [],
-  '법인세/지방세': [],
-  '세금/공과금': [],
-  // ── 카드/보증금 ──
-  '카드대금납부': ['법인카드'],
-  '보증금(지출)': [],
-  // ── 사무실/차고지/조합 ──
-  '차고지비용': ['차량'],
-  '조합비/회비': [],
-  '세무서기장료': [],
-  // ── 보험 ──
-  '보험료(일반)': ['보험'],
-  // ── 기타 지출 (연결 불필요) ──
-  '쇼핑/온라인구매': [],
-  '도서/신문': [],
-  '교육/훈련비': [],
-  '광고/마케팅': [],
-  '감가상각비': [],
-  '기타': [],
-}
+// 분류 카테고리 & 매핑 — 단일 진실 원천(SSOT) from finance-categories.ts
+import {
+  CATEGORIES,
+  DISPLAY_CATEGORIES,
+  ALL_CATEGORIES,
+  CATEGORY_ICONS,
+  CATEGORY_COLORS,
+  CATEGORY_RELATED_MAP,
+  TYPE_LABELS,
+  getMergedCategoryGroups,
+} from '@/app/utils/finance-categories'
+import type {
+  QueueItem,
+  QueueSourceData,
+  ClassificationCandidate,
+  UploadResultItem,
+  TransactionRow,
+} from '@/app/utils/finance-types'
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
@@ -157,10 +43,10 @@ const formatDatetime = (dt: string | null | undefined) => {
 }
 
 // ═══ 클라이언트사이드 파싱 헬퍼 ═══
-function parseQueueItem(q: any) {
+function parseQueueItem(q: any): QueueItem & Record<string, any> {
   let altData: any = {}
-  let sd: any = {}
-  let candidates: any[] = []
+  let sd: QueueSourceData = {}
+  let candidates: ClassificationCandidate[] = []
 
   // alternatives 파싱
   const rawAlt = q.alternatives
@@ -1739,13 +1625,42 @@ function UploadContent() {
 
     if (!confirm(`확정된 ${uniqueResults.length}건을 저장하시겠습니까?`)) return
 
+    // ── 배치 ID 생성 — 카드/통장 분리 (같은 저장 세션 안에 두 소스가 섞일 수 있음) ──
+    // 같은 payment_method는 하나의 배치로 묶여서 업로드 이력 탭에서 파일 단위로 조회 가능
+    const hasCard = uniqueResults.some(r => r.payment_method === '카드' || r.payment_method === 'Card')
+    const hasBank = uniqueResults.some(r => r.payment_method !== '카드' && r.payment_method !== 'Card')
+    const cardBatchId = hasCard ? generateBatchId('excel_card') : null
+    const bankBatchId = hasBank ? generateBatchId('excel_bank') : null
+    try {
+      if (cardBatchId) {
+        await registerUploadBatch({
+          id: cardBatchId,
+          source_type: 'excel_card',
+          file_name: `카드 업로드 ${new Date().toLocaleDateString('ko-KR')}`,
+          memo: `${uniqueResults.filter(r => r.payment_method === '카드' || r.payment_method === 'Card').length}건 일괄 저장`,
+        })
+      }
+      if (bankBatchId) {
+        await registerUploadBatch({
+          id: bankBatchId,
+          source_type: 'excel_bank',
+          file_name: `통장 업로드 ${new Date().toLocaleDateString('ko-KR')}`,
+          memo: `${uniqueResults.filter(r => r.payment_method !== '카드' && r.payment_method !== 'Card').length}건 일괄 저장`,
+        })
+      }
+    } catch (e) {
+      console.warn('[handleBulkSave] upload_batches 선등록 실패 (계속 진행):', e)
+    }
+
     const scheduleLinks: { schedule_id: string; tx_index: number; amount: number }[] = []
     const payload = uniqueResults.map((item, idx) => {
       if (item.matched_schedule_id) {
         scheduleLinks.push({ schedule_id: item.matched_schedule_id, tx_index: idx, amount: item.amount })
       }
+      const isCard = item.payment_method === '카드' || item.payment_method === 'Card'
+      const batchId = isCard ? cardBatchId : bankBatchId
       return {
-        
+        imported_from: batchId, // 🪝 upload_batches 자동 연결 훅 트리거
         transaction_date: item.transaction_date,
         client_name: item.client_name,
         amount: item.amount,
@@ -4640,7 +4555,7 @@ function UploadContent() {
                                             <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                               {catPopoverStep === 'group' ? (<>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
+                                                {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                   <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                     style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
@@ -4876,7 +4791,7 @@ function UploadContent() {
                                             {catPopoverStep === 'group' ? (
                                               <>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
+                                                {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                   <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                     style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                     onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
@@ -5205,7 +5120,7 @@ function UploadContent() {
                                                 {catPopoverStep === 'group' ? (
                                                   <>
                                                     <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                    {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
+                                                    {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                       <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                         style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                         onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
@@ -5556,7 +5471,7 @@ function UploadContent() {
                                                   {catPopoverStep === 'group' ? (
                                                     <>
                                                       <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                      {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
+                                                      {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                         <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                           style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                           onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
@@ -5773,7 +5688,7 @@ function UploadContent() {
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                              {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map(i => ({ label: i })) }))].map(g => (
+                                              {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                 <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                   style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
@@ -5993,10 +5908,20 @@ function UploadContent() {
                     if (!confirm(`${selectedItems.length}건을 확정 저장하시겠습니까?\n확정된 항목은 DB에 저장되어 '확정완료' 탭에서 확인할 수 있습니다.`)) return
 
                     try {
+                      // ── 배치 ID 생성 — 카드/통장 분리 (#53 upload_batches 연동) ──
+                      const _hasCard = selectedItems.some(r => r.payment_method === '카드' || r.payment_method === 'Card')
+                      const _hasBank = selectedItems.some(r => r.payment_method !== '카드' && r.payment_method !== 'Card')
+                      const _cardBatchId = _hasCard ? generateBatchId('excel_card') : null
+                      const _bankBatchId = _hasBank ? generateBatchId('excel_bank') : null
+                      try {
+                        if (_cardBatchId) await registerUploadBatch({ id: _cardBatchId, source_type: 'excel_card', file_name: `카드 분류확정 ${new Date().toLocaleDateString('ko-KR')}`, memo: `${selectedItems.filter(r => r.payment_method === '카드' || r.payment_method === 'Card').length}건` })
+                        if (_bankBatchId) await registerUploadBatch({ id: _bankBatchId, source_type: 'excel_bank', file_name: `통장 분류확정 ${new Date().toLocaleDateString('ko-KR')}`, memo: `${selectedItems.filter(r => r.payment_method !== '카드' && r.payment_method !== 'Card').length}건` })
+                      } catch (e) { console.warn('[분류확정] upload_batches 선등록 실패:', e) }
                       // DB에 저장할 payload 구성 (handleBulkSave와 동일한 형식)
                       const payload = selectedItems.map(item => {
+                        const isCard = item.payment_method === '카드' || item.payment_method === 'Card'
                         return {
-                          
+                          imported_from: isCard ? _cardBatchId : _bankBatchId,
                           transaction_date: item.transaction_date,
                           client_name: item.client_name,
                           amount: item.amount,
@@ -6853,7 +6778,7 @@ function UploadContent() {
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                              {[...(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES), ...customCategories.filter(c => !(categoryMode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES).some(d => d.group === c.group)).map(c => ({ group: c.group, items: c.items.map((i: string) => ({ label: i })) }))].map(g => (
+                                              {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
                                                 <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
                                                   style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
                                                   onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}

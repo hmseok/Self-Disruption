@@ -1,15 +1,16 @@
 'use client'
 
 /**
- * 심플 견적 작성 페이지
- *  - 기존 5-step 빌더(/quotes/pricing)와 병렬 존재
+ * 심플 견적 작성 페이지 (유일한 견적 작성 UI)
  *  - 8개 필드만 입력 → 실시간 월 렌트료 산출 → 1클릭 저장 + 상세 이동
- *  - 저장 시 operational-learning snapshot 자동 훅 (HARNESS.md 보류건 해결)
+ *  - 저장 시 operational-learning snapshot 자동 훅
+ *  - 편집 모드: ?quote_id=... 쿼리로 진입 시 기존 견적 로드 후 PATCH
+ *  - 사전선택: ?car_id=... 쿼리로 진입 시 차량 자동선택
  *  - 소프트아이스 Level 4 + 색상 틴트 Level 3
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { calculateRentCost, type CalcInput, type CalcResult } from '@/lib/rent-calc-engine'
 
@@ -232,15 +233,18 @@ async function saveSimpleQuote(
   f: Form,
   result: CalcResult,
   input: CalcInput,
+  editingQuoteId?: string | null,
 ): Promise<string | number> {
   if (!f.customerName) throw new Error('고객명을 입력하세요')
   if (!result?.suggested_rent) throw new Error('계산 결과가 없습니다')
 
   const h = await getAuth()
 
-  // 1) 견적 저장
-  const qRes = await fetch('/api/quotes', {
-    method: 'POST',
+  // 1) 견적 저장 — editingQuoteId 있으면 PATCH, 없으면 POST
+  const method = editingQuoteId ? 'PATCH' : 'POST'
+  const url = editingQuoteId ? `/api/quotes/${editingQuoteId}` : '/api/quotes'
+  const qRes = await fetch(url, {
+    method,
     headers: { ...h, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       customer_name: f.customerName,
@@ -286,8 +290,8 @@ async function saveSimpleQuote(
     }),
   })
   const json = await qRes.json().catch(() => ({}))
-  if (!qRes.ok || !json.data) throw new Error(json.error || `HTTP ${qRes.status}`)
-  const quoteId = json.data.id || json.data.quote_id || json.data
+  if (!qRes.ok) throw new Error(json.error || `HTTP ${qRes.status}`)
+  const quoteId = editingQuoteId || json.data?.id || json.data?.quote_id || json.data
 
   // 2) operational-learning 스냅샷 훅 (논블로킹)
   fetch('/api/operational-learning/snapshots', {
@@ -308,13 +312,56 @@ async function saveSimpleQuote(
   return quoteId
 }
 
-// ─── 메인 컴포넌트 ─────────────────────────────────────────
-export default function SimpleQuotePage() {
+// ─── 메인 컴포넌트 (Inner — useSearchParams 를 위해 Suspense 분리) ────────
+function SimpleQuotePageInner() {
   const router = useRouter()
+  const search = useSearchParams()
+  const editingQuoteId = search.get('quote_id') || null
+  const prefillCarId = search.get('car_id') || null
+
   const ref = useRefTables()
   const [form, setForm] = useState<Form>(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [loadingExisting, setLoadingExisting] = useState(!!editingQuoteId)
+
+  // 기존 견적 로드 (편집 모드)
+  useEffect(() => {
+    if (!editingQuoteId) return
+    ;(async () => {
+      try {
+        const h = await getAuth()
+        const res = await fetch(`/api/quotes/${editingQuoteId}`, { headers: h })
+        const j = await res.json().catch(() => ({}))
+        const q = j?.data || j
+        const det = q?.quote_detail || {}
+        setForm((prev) => ({
+          ...prev,
+          carId: det.car_id ? String(det.car_id) : prev.carId,
+          brand: det.car_info?.brand || prev.brand,
+          model: det.car_info?.model || prev.model,
+          purchasePrice: Number(det.purchase_price || det.factory_price || 0) || prev.purchasePrice,
+          year: Number(det.car_info?.year || prev.year),
+          fuel: det.car_info?.fuel || prev.fuel,
+          termMonths: Number(det.term_months || prev.termMonths),
+          annualMileage: Number(det.annualMileage || det.annual_mileage || prev.annualMileage),
+          contractType: det.contract_type === 'buyout' ? 'buyout' : 'return',
+          customerName: det.manual_customer?.name || q?.customer_name || prev.customerName,
+          customerPhone: det.manual_customer?.phone || prev.customerPhone,
+        }))
+      } catch (e) {
+        console.warn('[편집 로드 실패]', e)
+      } finally {
+        setLoadingExisting(false)
+      }
+    })()
+  }, [editingQuoteId])
+
+  // URL car_id prefill (신규 작성 + 차량 사전선택)
+  useEffect(() => {
+    if (editingQuoteId || !prefillCarId) return
+    setForm((f) => ({ ...f, carId: prefillCarId }))
+  }, [prefillCarId, editingQuoteId])
 
   // 차량 선택 시 자동 필드 채우기
   useEffect(() => {
@@ -353,7 +400,7 @@ export default function SimpleQuotePage() {
     if (!result || !input) return
     setSaving(true); setSaveError(null)
     try {
-      const id = await saveSimpleQuote(form, result, input)
+      const id = await saveSimpleQuote(form, result, input, editingQuoteId)
       router.push(`/quotes/${id}`)
     } catch (e: any) {
       setSaveError(e?.message || '저장 실패')
@@ -554,6 +601,15 @@ export default function SimpleQuotePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Suspense 래퍼 (useSearchParams 용) ─────────────────────
+export default function SimpleQuotePage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 24, fontSize: 13, color: '#64748b' }}>견적 페이지 로딩중...</div>}>
+      <SimpleQuotePageInner />
+    </Suspense>
   )
 }
 
