@@ -1,23 +1,67 @@
+# ─── Docker/빌드 자체 파일 ──────────────────────
 Dockerfile
 .dockerignore
 .gcloudignore
+
+# ─── 빌드 산출물 & 의존성 (런타임에서 재생성) ─
 node_modules
 .next
+.turbo
+
+# ─── 버전관리 & OS 메타 ──────────────────────────
 .git
+.gitignore
+.github
 .DS_Store
+
+# ─── 환경변수 (시크릿) ────────────────────────────
+.env*
+!.env.production.example
+
+# ─── 배포 불필요 대형 디렉터리 ─────────────────
 mobile
 sql
 email-templates
 _archive
 docs
 supabase
-*.md
-.claude
-.env*
 .vercel
-npm-debug.log
+.firebase
+.firebaserc
+.claude
+.idea
+.vscode
+scripts
+mnt
 
-# public 내 개발/미리보기용 임시 파일
+# ─── 하네스 에이전트 (프롬프트·지식·리포트) ───
+harness-engineering
+
+# ─── 문서 (*.md는 README 포함) ──────────────────
+*.md
+
+# ─── 루트 디자인 프리뷰 / 목업 (gitignore 참조) ─
+/*.html
+/*.jsx
+
+# ─── 루트 문서/자료 파일 (배포 불필요) ──────────
+/*.docx
+/*.xlsx
+/*.txt
+/*.log
+/*.patch
+/*.sh
+/*.plan
+.plan
+
+# ─── TypeScript 빌드 캐시 ───────────────────────
+*.tsbuildinfo
+
+# ─── Firebase 디버그 ─────────────────────────────
+firebase-debug.log
+firebase.json
+
+# ─── public 내 개발/미리보기용 임시 파일 ────────
 public/*.html
 public/*.js
 public/*.sql
@@ -26,3 +70,8 @@ public/*.json
 public/reset-data.json
 public/excel_import.json
 public/excel_parsed2.json
+
+# ─── 개발 중 로그 ────────────────────────────────
+npm-debug.log
+yarn-debug.log
+yarn-error.log
