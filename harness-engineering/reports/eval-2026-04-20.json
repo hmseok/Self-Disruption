@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-20T13:13:00.965Z",
+  "timestamp": "2026-04-20T13:57:44.617Z",
   "baseUrl": "https://hmseok.com",
   "scores": {
     "uiux": 10,
@@ -56,7 +56,7 @@
     {
       "category": "코드품질",
       "item": "SQL Injection 패턴",
-      "reason": "65개 파일",
+      "reason": "66개 파일",
       "hint": "파라미터 바인딩으로 전환"
     }
   ],

@@ -792,6 +792,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // ── 3e-2. 법인카드 → 배정차량 자동 매칭 ──
+      // 카드가 매칭되었고, 해당 카드에 assigned_car_id가 설정되어 있으며,
+      // 아직 강한 related 매칭이 없는 경우 → 배정 차량에 자동 연결
+      if (isCard && tx.card_id && !result.related_id) {
+        const matchedCard = cards.find((c: any) => c.id === tx.card_id)
+        if (matchedCard?.assigned_car_id) {
+          const assignedCar = cars.find((c: any) => c.id === matchedCard.assigned_car_id)
+          if (assignedCar) {
+            result.related_type = 'car'
+            result.related_id = assignedCar.id
+            result.matched_name = assignedCar.number || null
+            result.confidence = Math.max(result.confidence, 70)
+            console.log(`[classify] 🚗 카드→차량 자동매칭: card=${matchedCard.card_alias || matchedCard.card_number} → car=${assignedCar.number}`)
+          }
+        }
+      }
+
       // ── 3f. 스케줄 매칭 ──
       if (result.related_id && result.related_type && ['jiip', 'invest', 'loan'].includes(result.related_type)) {
         const candidateSchedules = schedules.filter(s =>

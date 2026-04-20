@@ -9,6 +9,7 @@ const CodefPage = dynamic(() => import('../codef/page'), { ssr: false, loading: 
 const UploadPage = dynamic(() => import('../upload/page'), { ssr: false, loading: () => <TabLoading /> })
 const LedgerPage = dynamic(() => import('../page'), { ssr: false, loading: () => <TabLoading /> })
 const UploadsHistoryPage = dynamic(() => import('../uploads/page'), { ssr: false, loading: () => <TabLoading /> })
+const CardsPage = dynamic(() => import('../../admin/cards/page'), { ssr: false, loading: () => <TabLoading /> })
 
 function TabLoading() {
   return (
@@ -18,19 +19,20 @@ function TabLoading() {
   )
 }
 
-type Tab = 'dashboard' | 'classify' | 'uploads' | 'codef'
+type Tab = 'dashboard' | 'classify' | 'uploads' | 'cards' | 'codef'
 
 export default function TransactionsHub() {
   const searchParams = useSearchParams()
   const initialTab = (searchParams.get('tab') as Tab) || 'dashboard'
   const [tab, setTab] = useState<Tab>(
-    ['dashboard', 'classify', 'uploads', 'codef'].includes(initialTab) ? initialTab : 'dashboard'
+    ['dashboard', 'classify', 'uploads', 'cards', 'codef'].includes(initialTab) ? initialTab : 'dashboard'
   )
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: '📊 입출금 대시보드' },
     { key: 'classify', label: '🏷️ 거래 분류 매칭' },
     { key: 'uploads', label: '📂 업로드 이력' },
+    { key: 'cards', label: '💳 법인카드' },
     { key: 'codef', label: '🔌 Codef 자동연동' },
   ]
 
@@ -77,6 +79,7 @@ export default function TransactionsHub() {
       {tab === 'dashboard' && <LedgerPage />}
       {tab === 'classify' && <UploadPage />}
       {tab === 'uploads' && <UploadsHistoryPage />}
+      {tab === 'cards' && <CardsPage />}
       {tab === 'codef' && <CodefPage />}
     </>
   )

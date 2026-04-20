@@ -2,10 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
-import DcToolbar from '../../components/DcToolbar'
+import DcStatStrip from '../../components/DcStatStrip'
 
-const CARD_COMPANIES = ['신한카드', '삼성카드', '현대카드', 'KB국민카드', '하나카드', '롯데카드', 'BC카드', 'NH농협카드', '우리카드', 'IBK기업은행']
+// 카드사 추론 — card_alias 또는 card_number 로 표시 색상만 결정
+function inferCardCompany(c: any): string {
+  const hay = ((c.card_alias || '') + ' ' + (c.holder_name || '')).toLowerCase()
+  if (hay.includes('신한') || hay.includes('shinhan')) return '신한카드'
+  if (hay.includes('삼성') || hay.includes('samsung')) return '삼성카드'
+  if (hay.includes('현대') || hay.includes('hyundai')) return '현대카드'
+  if (hay.includes('kb') || hay.includes('국민')) return 'KB국민카드'
+  if (hay.includes('하나') || hay.includes('hana')) return '하나카드'
+  if (hay.includes('롯데') || hay.includes('lotte')) return '롯데카드'
+  if (hay.includes('bc')) return 'BC카드'
+  if (hay.includes('nh') || hay.includes('농협')) return 'NH농협카드'
+  if (hay.includes('우리') || hay.includes('woori')) return '우리카드'
+  if (hay.includes('ibk') || hay.includes('기업')) return 'IBK기업은행'
+  return '법인카드'
+}
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -20,12 +33,13 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 }
 
 export default function CorporateCardsPage() {
-  const { company, role } = useApp()
+  const { company } = useApp()
   const companyId = company?.id
 
   const [loading, setLoading] = useState(true)
   const [cards, setCards] = useState<any[]>([])
   const [employees, setEmployees] = useState<any[]>([])
+  const [carsList, setCarsList] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -33,13 +47,19 @@ export default function CorporateCardsPage() {
   const [cardUsage, setCardUsage] = useState<Record<string, { count: number; total: number }>>({})
 
   const emptyForm = {
-    card_company: '신한카드', card_number: '', card_alias: '',
-    holder_name: '', assigned_employee_id: '', monthly_limit: '',
-    is_active: true, memo: ''
+    card_number: '', card_alias: '',
+    holder_name: '', assigned_employee_id: '',
+    assigned_car_id: '',
+    status: 'active',
   }
   const [form, setForm] = useState<any>(emptyForm)
 
-  useEffect(() => { if (companyId) { fetchCards(); fetchEmployees(); fetchCardUsage() } }, [companyId])
+  useEffect(() => {
+    fetchCards()
+    fetchEmployees()
+    fetchCars()
+    fetchCardUsage()
+  }, [companyId])
 
   const fetchCards = async () => {
     setLoading(true)
@@ -67,23 +87,36 @@ export default function CorporateCardsPage() {
     }
   }
 
+  const fetchCars = async () => {
+    try {
+      const res = await fetch('/api/cars', { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to fetch cars')
+      setCarsList(json.data || [])
+    } catch (err) {
+      console.error('fetchCars error:', err)
+      setCarsList([])
+    }
+  }
+
   const fetchCardUsage = async () => {
     const now = new Date()
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
 
     try {
-      const res = await fetch(`/api/transactions?type=card&from=${ym}-01&to=${ym}-${lastDay}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
+      const res = await fetch(`/api/transactions?payment_method=card&from=${ym}-01&to=${ym}-${lastDay}`, { headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) } })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to fetch usage')
       const data = json.data || []
 
       const usage: Record<string, { count: number; total: number }> = {}
       data.forEach((t: any) => {
-        if (!t.card_id) return
-        if (!usage[t.card_id]) usage[t.card_id] = { count: 0, total: 0 }
-        usage[t.card_id].count++
-        usage[t.card_id].total += Number(t.amount || 0)
+        const cid = t.related_type === 'card' ? t.related_id : null
+        if (!cid) return
+        if (!usage[cid]) usage[cid] = { count: 0, total: 0 }
+        usage[cid].count++
+        usage[cid].total += Number(t.amount || 0)
       })
       setCardUsage(usage)
     } catch (err) {
@@ -92,11 +125,13 @@ export default function CorporateCardsPage() {
   }
 
   const handleSave = async () => {
-    if (!form.card_company) return alert('카드사를 선택해주세요.')
     const payload = {
-      ...form,
-      monthly_limit: form.monthly_limit ? Number(form.monthly_limit) : null,
+      card_number: form.card_number || null,
+      card_alias: form.card_alias || null,
+      holder_name: form.holder_name || null,
       assigned_employee_id: form.assigned_employee_id || null,
+      assigned_car_id: form.assigned_car_id || null,
+      status: form.status || 'active',
     }
 
     try {
@@ -127,10 +162,12 @@ export default function CorporateCardsPage() {
 
   const handleEdit = (c: any) => {
     setForm({
-      card_company: c.card_company, card_number: c.card_number || '',
-      card_alias: c.card_alias || '', holder_name: c.holder_name || '',
+      card_number: c.card_number || '',
+      card_alias: c.card_alias || '',
+      holder_name: c.holder_name || '',
       assigned_employee_id: c.assigned_employee_id || '',
-      monthly_limit: c.monthly_limit || '', is_active: c.is_active, memo: c.memo || ''
+      assigned_car_id: c.assigned_car_id || '',
+      status: c.status || 'active',
     })
     setEditingId(c.id); setShowForm(true)
   }
@@ -160,7 +197,7 @@ export default function CorporateCardsPage() {
 
   const totalMonthlyUsage = Object.values(cardUsage).reduce((s, u) => s + u.total, 0)
   const totalMonthlyCount = Object.values(cardUsage).reduce((s, u) => s + u.count, 0)
-  const activeCards = cards.filter(c => c.is_active).length
+  const activeCards = cards.filter(c => (c.status || 'active') === 'active').length
 
   return (
     <div className="page-bg">
@@ -182,26 +219,27 @@ export default function CorporateCardsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {cards.map(c => {
           const usage = cardUsage[c.id] || { count: 0, total: 0 }
-          const limitRate = c.monthly_limit ? Math.min(100, Math.round((usage.total / c.monthly_limit) * 100)) : 0
+          const cardCompany = inferCardCompany(c)
+          const isActive = (c.status || 'active') === 'active'
 
           return (
-            <div key={c.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${c.is_active ? 'border-slate-200/80' : 'border-slate-100 opacity-60'}`}>
+            <div key={c.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isActive ? 'border-slate-200/80' : 'border-slate-100 opacity-60'}`}>
               {/* 카드 헤더 - 카드사 색상 */}
               <div className={`px-5 py-4 ${
-                c.card_company?.includes('신한') ? 'bg-blue-600' :
-                c.card_company?.includes('삼성') ? 'bg-slate-800' :
-                c.card_company?.includes('현대') ? 'bg-zinc-900' :
-                c.card_company?.includes('KB') || c.card_company?.includes('국민') ? 'bg-amber-600' :
-                c.card_company?.includes('하나') ? 'bg-teal-600' :
-                c.card_company?.includes('롯데') ? 'bg-red-600' :
+                cardCompany.includes('신한') ? 'bg-blue-600' :
+                cardCompany.includes('삼성') ? 'bg-slate-800' :
+                cardCompany.includes('현대') ? 'bg-zinc-900' :
+                cardCompany.includes('KB') || cardCompany.includes('국민') ? 'bg-amber-600' :
+                cardCompany.includes('하나') ? 'bg-teal-600' :
+                cardCompany.includes('롯데') ? 'bg-red-600' :
                 'bg-slate-700'
               } text-white`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-white/70">{c.card_company}</p>
+                    <p className="text-xs font-medium text-white/70">{cardCompany}</p>
                     <p className="font-mono text-lg font-bold tracking-wider mt-1">{maskCardNumber(c.card_number)}</p>
                   </div>
-                  {!c.is_active && <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">비활성</span>}
+                  {!isActive && <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">비활성</span>}
                 </div>
                 {c.card_alias && <p className="text-sm text-white/80 mt-2">{c.card_alias}</p>}
               </div>
@@ -214,25 +252,23 @@ export default function CorporateCardsPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">사용 직원</span>
-                  <span className="font-semibold text-slate-700">{c.assigned_employee?.employee_name || '미배정'}</span>
+                  <span className="font-semibold text-slate-700">{c.assigned_employee_name || '미배정'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">배정 차량</span>
+                  <span className="font-semibold text-slate-700">
+                    {c.assigned_car_number ? (
+                      <>
+                        {c.assigned_car_number}
+                        {c.assigned_car_model && <span className="text-slate-400 font-normal ml-1">· {c.assigned_car_model}</span>}
+                      </>
+                    ) : '미배정'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">이번달 사용</span>
                   <span className="font-bold text-slate-900">{formatMoney(usage.total)}원 <span className="text-slate-400 font-normal">({usage.count}건)</span></span>
                 </div>
-
-                {/* 한도 진행률 */}
-                {c.monthly_limit && (
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-400">월 한도</span>
-                      <span className={`font-semibold ${limitRate >= 80 ? 'text-red-500' : 'text-slate-500'}`}>{limitRate}% ({formatMoney(c.monthly_limit)}원)</span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-500 ${limitRate >= 80 ? 'bg-red-500' : limitRate >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${limitRate}%` }} />
-                    </div>
-                  </div>
-                )}
 
                 {/* 액션 버튼 */}
                 <div className="flex gap-2 pt-2 border-t border-slate-100">
@@ -244,7 +280,7 @@ export default function CorporateCardsPage() {
           )
         })}
 
-        {cards.length === 0 && (
+        {cards.length === 0 && !loading && (
           <div className="col-span-full bg-white rounded-2xl border border-slate-200/80 shadow-sm text-center py-16">
             <svg className="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
             <p className="font-semibold text-sm text-slate-500">등록된 법인카드가 없습니다</p>
@@ -260,48 +296,45 @@ export default function CorporateCardsPage() {
             <div className="p-6 border-b border-slate-100">
               <h3 className="font-bold text-lg text-slate-900">{editingId ? '카드 수정' : '법인카드 등록'}</h3>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">카드사 <span className="text-red-400">*</span></label>
-                  <select className="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-white" value={form.card_company} onChange={e => setForm({ ...form, card_company: e.target.value })}>
-                    {CARD_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">카드번호</label>
-                  <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm font-mono" value={form.card_number} onChange={e => setForm({ ...form, card_number: e.target.value })} placeholder="0000-0000-0000-0000" />
-                </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">카드번호</label>
+                <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm font-mono" value={form.card_number} onChange={e => setForm({ ...form, card_number: e.target.value })} placeholder="0000-0000-0000-0000" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">카드 별칭</label>
-                <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm" value={form.card_alias} onChange={e => setForm({ ...form, card_alias: e.target.value })} placeholder="예: 대표님 카드, 영업팀 법인카드" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">명의자</label>
-                  <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm" value={form.holder_name} onChange={e => setForm({ ...form, holder_name: e.target.value })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">사용 직원</label>
-                  <select className="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-white" value={form.assigned_employee_id} onChange={e => setForm({ ...form, assigned_employee_id: e.target.value })}>
-                    <option value="">미배정</option>
-                    {employees.map(e => <option key={e.id} value={e.id}>{e.employee_name}</option>)}
-                  </select>
-                </div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">카드 별칭 <span className="text-red-400">*</span></label>
+                <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm" value={form.card_alias} onChange={e => setForm({ ...form, card_alias: e.target.value })} placeholder="예: 신한-영업팀, KB-대표님" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">월 한도</label>
-                <div className="relative">
-                  <input type="text" className="w-full border border-slate-200 p-2.5 pr-10 rounded-lg text-sm text-right"
-                    value={form.monthly_limit ? Number(form.monthly_limit).toLocaleString() : ''}
-                    onChange={e => setForm({ ...form, monthly_limit: e.target.value.replace(/,/g, '') })} placeholder="0" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">원</span>
-                </div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">명의자</label>
+                <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm" value={form.holder_name} onChange={e => setForm({ ...form, holder_name: e.target.value })} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">메모</label>
-                <input className="w-full border border-slate-200 p-2.5 rounded-lg text-sm" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} />
+                <label className="block text-xs font-semibold text-slate-500 mb-1">사용 직원</label>
+                <select className="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-white" value={form.assigned_employee_id} onChange={e => setForm({ ...form, assigned_employee_id: e.target.value })}>
+                  <option value="">미배정</option>
+                  {employees.map((e: any) => <option key={e.id} value={e.id}>{e.name || e.employee_name || e.email}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                  🚗 배정 차량 <span className="text-slate-400 font-normal">(카드 거래가 자동으로 차량에 매칭됩니다)</span>
+                </label>
+                <select className="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-white" value={form.assigned_car_id} onChange={e => setForm({ ...form, assigned_car_id: e.target.value })}>
+                  <option value="">미배정</option>
+                  {carsList.map((car: any) => (
+                    <option key={car.id} value={car.id}>
+                      {car.number} · {[car.brand, car.model].filter(Boolean).join(' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">상태</label>
+                <select className="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-white" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                  <option value="active">활성</option>
+                  <option value="inactive">비활성</option>
+                </select>
               </div>
             </div>
             <div className="p-6 border-t border-slate-100 flex gap-3">

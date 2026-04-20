@@ -42,18 +42,67 @@ export async function GET(
     }
 
     const whereSql = `WHERE ${where.join(' AND ')}`
+    const whereSqlAliased = `WHERE ${where.map(c => c.replace(/^(imported_from|deleted_at)/, 't.$1')).join(' AND ')}`
+
+    // 실체 이름 LEFT JOIN — related_type별 분기하여 한 컬럼(related_name)으로 합침
+    //   car → cars.number(+brand/model) · invest/jiip → investor_name
+    //   employee/salary → profiles.name · freelancer → freelancers.name
+    //   contract → contracts.customer_name · fmi_rental/rental → fmi_rentals.customer_name
+    //   card → corporate_cards.card_alias · insurance → insurance_contracts.insurance_company
+    //   loan → loans.finance_name
     const txSql = `
       SELECT
-        id, transaction_date, type, status, category,
-        client_name, description, amount, payment_method,
-        related_type, related_id, memo, imported_from,
-        created_at, updated_at, deleted_at
-      FROM transactions
-      ${whereSql}
-      ORDER BY transaction_date DESC, created_at DESC
+        t.id, t.transaction_date, t.type, t.status, t.category,
+        t.client_name, t.description, t.amount, t.payment_method,
+        t.related_type, t.related_id, t.memo, t.imported_from,
+        t.created_at, t.updated_at, t.deleted_at,
+        COALESCE(
+          CASE WHEN t.related_type = 'car'        THEN CONCAT_WS(' · ', c.number, NULLIF(CONCAT_WS(' ', c.brand, c.model), '')) END,
+          CASE WHEN t.related_type = 'invest'     THEN gi.investor_name END,
+          CASE WHEN t.related_type = 'jiip'       THEN jc.investor_name END,
+          CASE WHEN t.related_type IN ('employee', 'salary') THEN p.name END,
+          CASE WHEN t.related_type = 'freelancer' THEN fl.name END,
+          CASE WHEN t.related_type = 'contract'   THEN con.customer_name END,
+          CASE WHEN t.related_type IN ('fmi_rental', 'rental') THEN fr.customer_name END,
+          CASE WHEN t.related_type = 'card'       THEN cc.card_alias END,
+          CASE WHEN t.related_type = 'insurance'  THEN ic.insurance_company END,
+          CASE WHEN t.related_type = 'loan'       THEN ln.finance_name END,
+          NULL
+        ) AS related_name
+      FROM transactions t
+      LEFT JOIN cars c                 ON t.related_type = 'car'        AND t.related_id = c.id
+      LEFT JOIN general_investments gi ON t.related_type = 'invest'     AND t.related_id = gi.id
+      LEFT JOIN jiip_contracts jc      ON t.related_type = 'jiip'       AND t.related_id = jc.id
+      LEFT JOIN profiles p             ON (t.related_type IN ('employee', 'salary')) AND t.related_id = p.id
+      LEFT JOIN freelancers fl         ON t.related_type = 'freelancer' AND t.related_id = fl.id
+      LEFT JOIN contracts con          ON t.related_type = 'contract'   AND t.related_id = con.id
+      LEFT JOIN fmi_rentals fr         ON (t.related_type IN ('fmi_rental', 'rental')) AND t.related_id = fr.id
+      LEFT JOIN corporate_cards cc     ON t.related_type = 'card'       AND t.related_id = cc.id
+      LEFT JOIN insurance_contracts ic ON t.related_type = 'insurance'  AND t.related_id = ic.id
+      LEFT JOIN loans ln               ON t.related_type = 'loan'       AND t.related_id = ln.id
+      ${whereSqlAliased}
+      ORDER BY t.transaction_date DESC, t.created_at DESC
       LIMIT 5000
     `
-    const transactions = await prisma.$queryRawUnsafe<any[]>(txSql, ...values)
+    let transactions: any[] = []
+    try {
+      transactions = await prisma.$queryRawUnsafe<any[]>(txSql, ...values)
+    } catch (joinErr: any) {
+      // 일부 테이블(loans, insurances 등)이 없는 환경이면 degrade — 기본 SELECT로 재시도
+      console.warn('[upload-batches/[id]] JOIN 쿼리 실패, 기본 SELECT 로 폴백:', joinErr?.message)
+      const fallbackSql = `
+        SELECT id, transaction_date, type, status, category,
+               client_name, description, amount, payment_method,
+               related_type, related_id, memo, imported_from,
+               created_at, updated_at, deleted_at,
+               NULL AS related_name
+        FROM transactions
+        ${whereSql}
+        ORDER BY transaction_date DESC, created_at DESC
+        LIMIT 5000
+      `
+      transactions = await prisma.$queryRawUnsafe<any[]>(fallbackSql, ...values)
+    }
 
     // 배치 메타데이터
     let batch: any = null

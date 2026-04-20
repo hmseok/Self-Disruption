@@ -794,10 +794,12 @@ model CorporateCard {
   holder_name          String?
   card_alias           String?
   assigned_employee_id String?  @db.Char(36)
+  assigned_car_id      String?  @db.Char(36)
   status               String?
   created_at           DateTime @default(now())
   updated_at           DateTime @default(now()) @updatedAt
 
+  @@index([assigned_car_id], map: "idx_corp_cards_car")
   @@map("corporate_cards")
 }
 

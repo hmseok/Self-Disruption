@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import TransactionEditModal from '../../../components/TransactionEditModal'
-import { DISPLAY_CATEGORIES } from '../../../utils/finance-categories'
+import { DISPLAY_CATEGORIES, TYPE_LABELS } from '../../../utils/finance-categories'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -386,12 +386,19 @@ export default function BatchDetailPage() {
                         </td>
                         <td style={tdStyle}>
                           {t.related_type ? (
-                            <span style={{
-                              display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                              background: '#f1f5f9', color: '#475569',
-                            }}>
-                              {t.related_type}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{
+                                display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                                background: '#dbeafe', color: '#1e40af', width: 'fit-content',
+                              }}>
+                                {TYPE_LABELS[t.related_type] || t.related_type}
+                              </span>
+                              {t.related_name && (
+                                <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>
+                                  {t.related_name}
+                                </span>
+                              )}
+                            </div>
                           ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                         </td>
                         <td style={tdStyle}>
