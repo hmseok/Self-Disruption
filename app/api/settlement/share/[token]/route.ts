@@ -61,16 +61,15 @@ export async function GET(
       phoneVerified = true
     }
 
-    // 4. 첫 조회 시 viewed_at 설정
-    const isFirstView = !share.viewed_at
-    const newViewCount = (share.view_count || 0) + 1
-    const now = toMySQLDatetime(new Date())
+    // 4. 조회수 증가 (viewed_at 컬럼이 없으므로 view_count 만 증가)
+    const prevViewCount = share.view_count || 0
+    const isFirstView = prevViewCount === 0
+    const newViewCount = prevViewCount + 1
 
-    // 5. 조회 정보 업데이트
+    // 5. 조회수 업데이트
     await prisma.$executeRaw`
       UPDATE settlement_shares SET
-        view_count = ${newViewCount},
-        viewed_at = ${isFirstView ? now : share.viewed_at}
+        view_count = ${newViewCount}
       WHERE id = ${share.id}
     `
 
@@ -93,7 +92,7 @@ export async function GET(
       )
 
       const pastData = await prisma.$queryRaw<any[]>`
-        SELECT settlement_month, total_amount, items, created_at, paid_at
+        SELECT settlement_month, total_amount, items, created_at, payment_date
         FROM settlement_shares
         WHERE recipient_phone = ${share.recipient_phone}
         AND recipient_name = ${share.recipient_name}
@@ -114,6 +113,11 @@ export async function GET(
           itemsArr = typeof ps.items === 'string' ? JSON.parse(ps.items) : (Array.isArray(ps.items) ? ps.items : [])
         } catch {}
 
+        // payment_date 가 오늘 이전이면 지급완료로 간주
+        const today = new Date(); today.setHours(0,0,0,0)
+        const pd = ps.payment_date ? new Date(ps.payment_date) : null
+        const derivedPaidAt = pd && pd <= today ? pd.toISOString() : null
+
         if (months.length <= 1) {
           // 단일 월
           const m = months[0] || ps.settlement_month
@@ -124,7 +128,7 @@ export async function GET(
             settlement_month: m,
             total_amount: ps.total_amount,
             created_at: ps.created_at,
-            paid_at: ps.paid_at,
+            paid_at: derivedPaidAt,
           })
         } else {
           // 여러 월 → 각 월별로 분리 (items에서 해당 월 금액 추출)
@@ -141,7 +145,7 @@ export async function GET(
               settlement_month: m,
               total_amount: monthAmount,
               created_at: ps.created_at,
-              paid_at: ps.paid_at,
+              paid_at: derivedPaidAt,
             })
           })
         }
@@ -191,6 +195,11 @@ export async function GET(
       transaction_details = typeof share.transaction_details === 'string' ? JSON.parse(share.transaction_details) : share.transaction_details
     } catch {}
 
+    // 현재 정산서의 paid_at 파생 (payment_date 가 오늘 이전이면 지급완료로 간주)
+    const todayDate = new Date(); todayDate.setHours(0,0,0,0)
+    const sharePd = share.payment_date ? new Date(share.payment_date) : null
+    const sharePaidAt = sharePd && sharePd <= todayDate ? sharePd.toISOString() : null
+
     // 9. 반환 데이터 가공
     const publicData = {
       id: share.id,
@@ -198,7 +207,7 @@ export async function GET(
       recipient_name: share.recipient_name,
       settlement_month: share.settlement_month,
       payment_date: share.payment_date,
-      paid_at: share.paid_at || null,
+      paid_at: sharePaidAt,
       total_amount: share.total_amount,
       items,
       breakdown,
@@ -207,7 +216,7 @@ export async function GET(
       message: share.message,
       created_at: share.created_at,
       expires_at: share.expires_at,
-      viewed_at: share.viewed_at,
+      viewed_at: null,
       view_count: newViewCount,
       is_first_view: isFirstView,
       phone_verified: phoneVerified,
