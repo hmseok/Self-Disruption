@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import ContractsTab from './ContractsTab'
 import ExecuteTab from './ExecuteTab'
+import LedgerTab from './LedgerTab'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
 import DcToolbar from '../../components/DcToolbar'
 
@@ -47,7 +48,7 @@ export default function SettlementDashboard() {
   const effectiveCompanyId = company?.id
 
   // 상태
-  const [activeTab, setActiveTab] = useState<'contracts' | 'revenue' | 'settlement' | 'pnl' | 'execute' | 'collections'>('contracts')
+  const [activeTab, setActiveTab] = useState<'contracts' | 'revenue' | 'settlement' | 'pnl' | 'execute' | 'ledger' | 'collections'>('contracts')
   const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0, 7))
 
   // useSettlementData hook 사용
@@ -994,6 +995,7 @@ export default function SettlementDashboard() {
           { key: 'settlement', label: '💳 지급 관리', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
           { key: 'pnl', label: '📊 손익계산서' },
           { key: 'execute', label: '⚡ 정산 실행', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
+          { key: 'ledger', label: '📒 정산 원장' },
           { key: 'collections', label: '💰 수금/회수' },
         ]}
         activeFilter={activeTab}
@@ -1052,6 +1054,7 @@ export default function SettlementDashboard() {
                 onBulkPaid={handleBulkPaid}
               />
             )}
+            {activeTab === 'ledger' && <LedgerTab filterDate={filterDate} />}
             {activeTab === 'collections' && <CollectionsTab />}
           </>
         )}
