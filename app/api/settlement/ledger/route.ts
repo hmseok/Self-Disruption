@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     const monthFrom = searchParams.get('from') // 범위 시작
     const monthTo = searchParams.get('to') // 범위 끝
     const status = searchParams.get('status') // pending|matched|paid
-    const type = searchParams.get('type') // jiip|invest|loan
+    const type = searchParams.get('type') || searchParams.get('contract_type') // jiip|invest|loan_out
+    const contractId = searchParams.get('contract_id') // 단일 계약 조회
 
     const where: string[] = []
     const values: any[] = []
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
     if (monthTo) { where.push('settlement_month <= ?'); values.push(monthTo) }
     if (status && status !== 'all') { where.push('status = ?'); values.push(status) }
     if (type && type !== 'all') { where.push('contract_type = ?'); values.push(type) }
+    if (contractId) { where.push('contract_id = ?'); values.push(contractId) }
 
     const sql = `
       SELECT * FROM settlement_ledger

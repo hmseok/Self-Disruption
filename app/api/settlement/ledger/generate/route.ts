@@ -116,6 +116,80 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ────── 3. 대여 계약 (회사 → 외부, 이자 수입) ──────
+    const loanOutList = await prisma.$queryRaw<any[]>`
+      SELECT id, borrower_name, principal_amount, current_balance, interest_rate, tax_type,
+             contract_start_date, contract_end_date, grace_period_months, repayment_type, status
+        FROM company_loans_out
+       WHERE status='active' OR status IS NULL
+    `
+
+    for (const ln of loanOutList) {
+      const startOk = !ln.contract_start_date || ln.contract_start_date.toISOString().slice(0, 7) <= month
+      const endOk = !ln.contract_end_date || ln.contract_end_date.toISOString().slice(0, 7) >= month
+      if (!startOk || !endOk) continue
+
+      // 거치기간 체크
+      if (ln.grace_period_months && ln.contract_start_date) {
+        const startY = ln.contract_start_date.getFullYear()
+        const startM = ln.contract_start_date.getMonth() + 1
+        const graceEnd = new Date(startY, startM - 1 + Number(ln.grace_period_months), 1)
+        const mDate = new Date(y, m - 1, 1)
+        if (mDate < graceEnd) continue
+      }
+
+      const principal = Number(ln.current_balance || ln.principal_amount || 0)
+      const rate = Number(ln.interest_rate || 0)
+      const monthlyInterest = Math.floor(principal * (rate / 100) / 12)
+      if (monthlyInterest <= 0) continue
+
+      // 대여는 회사가 받는 이자이므로 세금은 대출자가 원천징수하지 않음 (단순 이자수입)
+      // breakdown에 세액 표시만 하고 실제 미수액은 gross 유지
+      const taxType = ln.tax_type || '이자소득(27.5%)'
+      const taxRate = taxType.includes('3.3') ? 0.033 : taxType.includes('27.5') ? 0.275 : 0
+      const taxAmount = Math.floor(monthlyInterest * taxRate)
+      const netExpected = monthlyInterest - taxAmount
+
+      const breakdown = {
+        direction: 'inbound',  // 회사 기준 수입
+        principal, rate, monthlyInterest, taxType, taxRate, taxAmount, netExpected,
+        repaymentType: ln.repayment_type,
+      }
+
+      const existing = await prisma.$queryRaw<any[]>`
+        SELECT id, status FROM settlement_ledger
+         WHERE contract_type='loan_out' AND contract_id=${String(ln.id)} AND settlement_month=${month}
+         LIMIT 1
+      `
+      if (existing[0]) {
+        if (existing[0].status === 'paid') {
+          results.push({ type: 'loan_out', id: ln.id, name: ln.borrower_name, action: 'skip-paid' })
+          continue
+        }
+        if (!force) {
+          results.push({ type: 'loan_out', id: ln.id, name: ln.borrower_name, action: 'skip-exists' })
+          continue
+        }
+        await prisma.$executeRaw`
+          UPDATE settlement_ledger
+             SET due_amount=${netExpected}, breakdown=${JSON.stringify(breakdown)},
+                 updated_at=${nowIso}, generated_by=${generatedBy}
+           WHERE id=${existing[0].id}
+        `
+        results.push({ type: 'loan_out', id: ln.id, name: ln.borrower_name, action: 'updated', amount: netExpected })
+      } else {
+        const lid = randomUUID()
+        await prisma.$executeRaw`
+          INSERT INTO settlement_ledger
+            (id, contract_type, contract_id, recipient_name, settlement_month,
+             due_amount, paid_amount, status, breakdown, generated_at, generated_by, updated_at)
+          VALUES (${lid}, 'loan_out', ${String(ln.id)}, ${ln.borrower_name}, ${month},
+                  ${netExpected}, 0, 'pending', ${JSON.stringify(breakdown)}, ${nowIso}, ${generatedBy}, ${nowIso})
+        `
+        results.push({ type: 'loan_out', id: ln.id, name: ln.borrower_name, action: 'inserted', amount: netExpected })
+      }
+    }
+
     // ────── 2. 투자 계약 ──────
     const investList = await prisma.$queryRaw<any[]>`
       SELECT id, investor_name, invest_amount, current_balance, interest_rate, tax_type,

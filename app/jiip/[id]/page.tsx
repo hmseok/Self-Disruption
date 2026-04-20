@@ -302,9 +302,9 @@ export default function JiipDetailPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                 <div className="bg-blue-50/50 border border-blue-100/80 rounded-xl p-4">
-                  <div className="text-xs text-slate-500">투자원금</div>
+                  <div className="text-xs text-slate-500">계약 자본금</div>
                   <div className="text-xl font-bold text-slate-900 mt-1">{fm(contract.invest_amount)}</div>
-                  <div className="text-[11px] text-slate-400 mt-1">{f(contract.invest_amount)}원</div>
+                  <div className="text-[11px] text-slate-400 mt-1">{f(contract.invest_amount)}원 (지입 차주 납입금)</div>
                 </div>
                 <div className="bg-green-50/50 border border-green-100/80 rounded-xl p-4">
                   <div className="text-xs text-slate-500">지분율</div>
@@ -512,7 +512,7 @@ export default function JiipDetailPage() {
                   </select>
                 </div>
 
-                <Field label="투자원금 (원)" type="number" value={form.invest_amount} onChange={v => setForm({ ...form, invest_amount: Number(v) || 0 })} />
+                <Field label="계약 자본금 (원)" type="number" value={form.invest_amount} onChange={v => setForm({ ...form, invest_amount: Number(v) || 0 })} />
                 <Field label="지분율 (%)" type="number" step="0.1" value={form.share_ratio} onChange={v => setForm({ ...form, share_ratio: Number(v) || 0 })} />
                 <Field label="월 관리비 (원)" type="number" value={form.admin_fee} onChange={v => setForm({ ...form, admin_fee: Number(v) || 0 })} />
                 <Field label="지급일 (일)" type="number" value={form.payout_day} onChange={v => setForm({ ...form, payout_day: Number(v) || 0 })} />

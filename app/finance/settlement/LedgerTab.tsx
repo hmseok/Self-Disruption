@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth-client'
 
 type LedgerRow = {
   id: string
-  contract_type: 'jiip' | 'invest' | 'loan'
+  contract_type: 'jiip' | 'invest' | 'loan' | 'loan_out'
   contract_id: string
   recipient_name: string
   settlement_month: string
@@ -40,7 +40,7 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string>('')
   const [status, setStatus] = useState<'all' | 'pending' | 'matched' | 'paid'>('all')
-  const [type, setType] = useState<'all' | 'jiip' | 'invest'>('all')
+  const [type, setType] = useState<'all' | 'jiip' | 'invest' | 'loan_out'>('all')
   const [toast, setToast] = useState<string>('')
 
   const load = async () => {
@@ -144,6 +144,7 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
   const typeBadge = (t: string) => {
     if (t === 'jiip') return { label: '지입', color: '#7c3aed', bg: '#f3e8ff' }
     if (t === 'invest') return { label: '투자', color: '#2563eb', bg: '#dbeafe' }
+    if (t === 'loan_out') return { label: '대여', color: '#0891b2', bg: '#cffafe' }
     return { label: t, color: '#64748b', bg: '#f1f5f9' }
   }
 
@@ -193,13 +194,13 @@ export default function LedgerTab({ filterDate }: { filterDate: string }) {
           </button>
         ))}
         <span style={{ marginLeft: 12, fontSize: 11, color: '#64748b', fontWeight: 600 }}>유형:</span>
-        {(['all', 'jiip', 'invest'] as const).map(t => (
+        {(['all', 'jiip', 'invest', 'loan_out'] as const).map(t => (
           <button key={t} onClick={() => setType(t)}
             style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 6,
               border: '1px solid ' + (type === t ? '#3b6eb5' : '#e2e8f0'),
               background: type === t ? '#3b6eb5' : '#fff',
               color: type === t ? '#fff' : '#334155', cursor: 'pointer' }}>
-            {t === 'all' ? '전체' : t === 'jiip' ? '지입' : '투자'}
+            {t === 'all' ? '전체' : t === 'jiip' ? '지입' : t === 'invest' ? '투자' : '대여'}
           </button>
         ))}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>{loading ? '조회 중...' : `${filtered.length}건`}</span>

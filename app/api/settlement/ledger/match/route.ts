@@ -44,11 +44,14 @@ export async function POST(request: NextRequest) {
       const fmt = (d: Date) => d.toISOString().slice(0, 10)
       const tolerance = Math.max(1000, Math.floor(due * 0.05))
 
+      // loan_out은 회사가 받는 이자(income), 나머지는 회사가 지급(expense)
+      const txType = row.contract_type === 'loan_out' ? 'income' : 'expense'
+
       // 1) related_id 정확 매칭
       const exact = await prisma.$queryRaw<any[]>`
         SELECT id, transaction_date, amount, client_name, description
           FROM transactions
-         WHERE type='expense'
+         WHERE type=${txType}
            AND related_type=${row.contract_type}
            AND related_id=${row.contract_id}
            AND transaction_date >= ${fmt(searchStart)}
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
         const fuzzy = await prisma.$queryRaw<any[]>`
           SELECT id, transaction_date, amount, client_name, description
             FROM transactions
-           WHERE type='expense'
+           WHERE type=${txType}
              AND (client_name LIKE ${'%' + row.recipient_name + '%'}
                   OR description LIKE ${'%' + row.recipient_name + '%'})
              AND transaction_date >= ${fmt(searchStart)}

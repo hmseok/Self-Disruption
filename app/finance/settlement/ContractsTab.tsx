@@ -35,13 +35,13 @@ function taxLabel(t: string): string {
   return '27.5%'
 }
 
-type SubTab = 'jiip' | 'invest'
+type SubTab = 'all' | 'jiip' | 'invest'
 type ShareHistoryItem = { id: string; recipient_name: string; settlement_month: string; total_amount: number; paid_at: string | null; items?: any[] }
 type Props = { jiipList: any[]; investList: any[]; settleTxs: any[]; shareHistory: ShareHistoryItem[]; loading: boolean }
 
 export default function ContractsTab({ jiipList, investList, settleTxs, shareHistory, loading }: Props) {
   const router = useRouter()
-  const [activeSubTab, setActiveSubTab] = useState<SubTab>('jiip')
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>('all')
   const [sourceFilter, setSourceFilter] = useState('all')
   const [searchText, setSearchText] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['운영 중', '운용중']))
@@ -171,7 +171,14 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
   const totalInvestAmount = jiipList.reduce((s: number, c: any) => s + N(c.invest_amount), 0)
     + investList.reduce((s: number, c: any) => s + N(c.invest_amount), 0)
 
-  const currentList = activeSubTab === 'jiip' ? jiipList : investList
+  // '전체' 탭: 지입/투자를 __kind 태그로 구분하여 합친 리스트
+  const combinedList = useMemo(() => {
+    const a = jiipList.map((x: any) => ({ ...x, __kind: 'jiip' }))
+    const b = investList.map((x: any) => ({ ...x, __kind: 'invest' }))
+    return [...a, ...b]
+  }, [jiipList, investList])
+
+  const currentList = activeSubTab === 'all' ? combinedList : activeSubTab === 'jiip' ? jiipList : investList
   const ninetyDays = new Date(today.getTime() + 90 * 86400000)
 
   const filterCounts = useMemo(() => {
@@ -198,7 +205,8 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
     if (searchText) {
       const t = searchText.toLowerCase()
       list = list.filter((item: any) => {
-        if (activeSubTab === 'jiip') return (item.car?.number || '').toLowerCase().includes(t) || (item.investor_name || '').toLowerCase().includes(t)
+        const kind = item.__kind || activeSubTab
+        if (kind === 'jiip') return (item.car?.number || '').toLowerCase().includes(t) || (item.investor_name || '').toLowerCase().includes(t)
         return (item.investor_name || '').toLowerCase().includes(t) || (item.investor_phone || '').includes(t)
       })
     }
@@ -208,13 +216,16 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: any[]; totalAmount: number }> = {}
     for (const item of filteredList) {
-      const k = item.status === 'active' ? (activeSubTab === 'jiip' ? '운영 중' : '운용중') :
+      const kind = item.__kind || activeSubTab
+      const k = item.status === 'active' ? (kind === 'jiip' ? '운영 중' : '운용중') :
         item.status === 'expired' ? '만기' : item.status === 'terminated' ? '해지' : '종료'
       if (!groups[k]) groups[k] = { items: [], totalAmount: 0 }
       groups[k].items.push(item)
       groups[k].totalAmount += N(item.invest_amount)
     }
-    const order = activeSubTab === 'jiip' ? ['운영 중', '만기', '해지', '종료'] : ['운용중', '만기', '해지', '종료']
+    const order = activeSubTab === 'all'
+      ? ['운영 중', '운용중', '만기', '해지', '종료']
+      : activeSubTab === 'jiip' ? ['운영 중', '만기', '해지', '종료'] : ['운용중', '만기', '해지', '종료']
     return order.filter(k => groups[k]).map(k => [k, groups[k]] as [string, typeof groups[string]])
   }, [filteredList, activeSubTab])
 
@@ -230,6 +241,17 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
   }
 
   const summaryStats = useMemo(() => {
+    if (activeSubTab === 'all') {
+      const jiipPaid = jiipList.reduce((s: number, c: any) => s + jiipPaidTotal(c.id), 0)
+      const investPaid = investList.reduce((s: number, c: any) => s + N(settlementMap[`invest:${c.id}`]?.totalExpense), 0)
+      return {
+        income: totalInvestAmount,
+        expense: monthlyTotal,
+        totalPaid: jiipPaid + investPaid,
+        totalCount: activeCount,
+        avgRate: '—',
+      }
+    }
     if (activeSubTab === 'jiip') {
       const totalPaid = jiipList.reduce((s: number, c: any) => s + jiipPaidTotal(c.id), 0)
       return { income: jiipList.reduce((s: number, c: any) => s + N(c.invest_amount), 0), expense: monthlyJiip, totalPaid, totalCount: jiipActive.length, avgRate: jiipList.length > 0 ? (jiipList.reduce((s: number, c: any) => s + N(c.share_ratio), 0) / jiipList.length).toFixed(1) : '0' }
@@ -237,7 +259,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
       const totalPaid = investList.reduce((s: number, c: any) => s + N(settlementMap[`invest:${c.id}`]?.totalExpense), 0)
       return { income: investList.reduce((s: number, c: any) => s + N(c.invest_amount), 0), expense: monthlyInvest, totalPaid, totalCount: investActive.length, avgRate: investList.length > 0 ? (investList.reduce((s: number, c: any) => s + N(c.interest_rate), 0) / investList.length).toFixed(1) : '0' }
     }
-  }, [jiipList, investList, jiipActive, investActive, settlementMap, activeSubTab, monthlyJiip, monthlyInvest])
+  }, [jiipList, investList, jiipActive, investActive, settlementMap, activeSubTab, monthlyJiip, monthlyInvest, monthlyTotal, totalInvestAmount, activeCount])
 
   const toggleGroup = useCallback((k: string) => {
     setExpandedGroups(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
@@ -245,10 +267,18 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
 
   const handleSubTabChange = (tab: SubTab) => {
     setActiveSubTab(tab); setSourceFilter('all'); setSearchText('')
-    setExpandedGroups(new Set([tab === 'jiip' ? '운영 중' : '운용중']))
+    setExpandedGroups(new Set(
+      tab === 'all' ? ['운영 중', '운용중']
+      : tab === 'jiip' ? ['운영 중']
+      : ['운용중']
+    ))
   }
 
-  const filterChips = activeSubTab === 'jiip' ? [
+  const filterChips = activeSubTab === 'all' ? [
+    { key: 'all', label: '전체', count: filterCounts.all },
+    { key: 'active', label: '운용중', count: filterCounts.active },
+    { key: 'ended', label: '종료', count: filterCounts.ended },
+  ] : activeSubTab === 'jiip' ? [
     { key: 'all', label: '전체', count: filterCounts.all },
     { key: 'active', label: '운영중', count: filterCounts.active },
     { key: 'ended', label: '종료', count: filterCounts.ended },
@@ -291,7 +321,17 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
     { label: '지급률', w: 65, align: 'center' as const },
     { label: '만기', w: 80, align: 'center' as const },
   ]
-  const cols = activeSubTab === 'jiip' ? jiipCols : investCols
+  // 전체 탭 통합 컬럼
+  const allCols = [
+    { label: '유형', w: 60, align: 'center' as const },
+    { label: '이름/차량', w: 180, align: 'left' as const },
+    { label: '원금', w: 130, align: 'right' as const },
+    { label: '월 지급(세후)', w: 130, align: 'right' as const },
+    { label: '누적 지급', w: 110, align: 'right' as const },
+    { label: '지급률', w: 65, align: 'center' as const },
+    { label: '기간', w: 110, align: 'center' as const },
+  ]
+  const cols = activeSubTab === 'all' ? allCols : activeSubTab === 'jiip' ? jiipCols : investCols
 
   const STATUS_BADGE: Record<string, { color: string; bg: string }> = {
     '운영 중': { color: '#16a34a', bg: '#dcfce7' },
@@ -331,6 +371,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
       {/* ═══ 헤더: 서브탭 + 통계 + 신규등록 ═══ */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '0 20px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
         {([
+          { key: 'all' as SubTab, label: '전체', count: jiipList.length + investList.length },
           { key: 'jiip' as SubTab, label: '위수탁(지입)', count: jiipList.length },
           { key: 'invest' as SubTab, label: '투자/펀딩', count: investList.length },
         ]).map(tab => (
@@ -362,10 +403,12 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
               {s.sub && <div style={{ fontSize: 9, color: '#b0b0b0', lineHeight: 1 }}>{s.sub}</div>}
             </div>
           ))}
-          <button onClick={() => router.push(activeSubTab === 'jiip' ? '/jiip/new' : '/invest/general/new')}
-            style={{ background: '#3b6eb5', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>
-            + 신규 등록
-          </button>
+          {activeSubTab !== 'all' && (
+            <button onClick={() => router.push(activeSubTab === 'jiip' ? '/jiip/new' : '/invest/general/new')}
+              style={{ background: '#3b6eb5', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 4 }}>
+              + 신규 등록
+            </button>
+          )}
         </div>
       </div>
 
@@ -435,20 +478,25 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                   <span style={{ fontSize: 12, color: '#3b6eb5', fontWeight: 700 }}>{fm(group.totalAmount)}원</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>·</span>
                   <span style={{ fontSize: 11, color: '#94a3b8' }}>월 {fm(
-                    activeSubTab === 'jiip'
-                      ? group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? N(c.admin_fee) : 0), 0)
-                      : group.items.reduce((s: number, c: any) => s + (c.status === 'active' ? Math.round(N(c.invest_amount) * N(c.interest_rate) / 100 / 12) : 0), 0)
+                    group.items.reduce((s: number, c: any) => {
+                      if (c.status !== 'active') return s
+                      const kind = c.__kind || activeSubTab
+                      return s + (kind === 'jiip'
+                        ? N(c.admin_fee)
+                        : Math.round(N(c.invest_amount) * N(c.interest_rate) / 100 / 12))
+                    }, 0)
                   )} 지급</span>
                 </div>
 
                 {/* ── 행 ── */}
                 {isExpanded && group.items.map((item: any) => {
+                  const kind: 'jiip' | 'invest' = (item.__kind || activeSubTab) === 'jiip' ? 'jiip' : 'invest'
                   // 지입: transactions(jiip:) + shareHistory(jiip_share:) 모두 합산
                   // 투자: invest: 단일 키
-                  const totalPaid = activeSubTab === 'jiip'
+                  const totalPaid = kind === 'jiip'
                     ? jiipPaidTotal(item.id)
                     : N(settlementMap[`invest:${item.id}`]?.totalExpense || 0)
-                  const monthsPaidCount = activeSubTab === 'jiip'
+                  const monthsPaidCount = kind === 'jiip'
                     ? jiipPaidMonths(item.id)
                     : (settlementMap[`invest:${item.id}`]?.monthsPaid.size || 0)
                   const months = monthsSince(item.contract_start_date)
@@ -459,7 +507,87 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
                     background: '#fff', transition: 'background 0.1s',
                   }
 
-                  if (activeSubTab === 'jiip') {
+                  // ── 전체 탭: 통합 행 렌더러 ──
+                  if (activeSubTab === 'all') {
+                    const isJiip = kind === 'jiip'
+                    const monthlyGross = isJiip
+                      ? N(item.admin_fee)
+                      : Math.round(N(item.invest_amount) * N(item.interest_rate) / 100 / 12)
+                    const monthlyNet = isJiip
+                      ? monthlyGross
+                      : calcAfterTax(monthlyGross, item.tax_type || '이자소득(27.5%)')
+                    const exp = months * monthlyGross
+                    const rate = exp > 0 ? Math.min(100, Math.round((totalPaid / exp) * 100)) : 0
+                    const endDate = item.contract_end_date ? new Date(item.contract_end_date) : null
+                    const dLeft = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / 86400000) : null
+                    return (
+                      <div key={`${kind}-${item.id}`} style={rowBase}
+                        onClick={() => router.push(isJiip ? `/jiip/${item.id}` : `/invest/general/${item.id}`)}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f8faff'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        {/* 유형 */}
+                        <div style={{ width: 60, flexShrink: 0, textAlign: 'center' }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 4,
+                            background: isJiip ? '#ede9fe' : '#dbeafe',
+                            color: isJiip ? '#7c3aed' : '#3b6eb5',
+                          }}>{isJiip ? '지입' : '투자'}</span>
+                        </div>
+                        {/* 이름/차량 */}
+                        <div style={{ width: 180, flexShrink: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>{item.investor_name}</div>
+                          <div style={{ fontSize: 10, color: '#b0b0b0', marginTop: 1 }}>
+                            {isJiip ? (item.car?.number || '차량 미지정') : (item.investor_phone || '—')}
+                          </div>
+                        </div>
+                        {/* 원금 */}
+                        <div style={{ width: 130, flexShrink: 0, textAlign: 'right' }}>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>{f(item.invest_amount)}</div>
+                          <span style={{ fontSize: 10, background: '#eff6ff', color: '#3b6eb5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                            {isJiip ? `배분 ${N(item.share_ratio).toFixed(0)}%` : `연 ${N(item.interest_rate).toFixed(1)}%`}
+                          </span>
+                        </div>
+                        {/* 월 지급(세후) */}
+                        <div style={{ width: 130, flexShrink: 0, textAlign: 'right' }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#374151' }}>{f(monthlyNet)}</div>
+                          <div style={{ fontSize: 10, color: '#b0b0b0' }}>
+                            {isJiip ? `관리비 · ${item.payout_day || 25}일` : `이자 세전 ${fm(monthlyGross)}`}
+                          </div>
+                        </div>
+                        {/* 누적 지급 */}
+                        <div style={{ width: 110, flexShrink: 0, textAlign: 'right' }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: totalPaid > 0 ? '#111827' : '#d0d0d0' }}>{totalPaid > 0 ? f(totalPaid) : '—'}</div>
+                          {totalPaid > 0 && <div style={{ fontSize: 10, color: '#b0b0b0' }}>{monthsPaidCount}개월</div>}
+                        </div>
+                        {/* 지급률 */}
+                        <div style={{ width: 65, flexShrink: 0, textAlign: 'center' }}>
+                          {exp > 0 ? (
+                            <span style={{
+                              fontSize: 11, fontWeight: 800, padding: '3px 7px', borderRadius: 4,
+                              background: rate >= 90 ? '#dcfce7' : rate >= 50 ? '#fef9c3' : '#fee2e2',
+                              color: rate >= 90 ? '#16a34a' : rate >= 50 ? '#ca8a04' : '#dc2626',
+                            }}>{rate}%</span>
+                          ) : <span style={{ fontSize: 11, color: '#d0d0d0' }}>—</span>}
+                        </div>
+                        {/* 기간 */}
+                        <div style={{ width: 110, flexShrink: 0, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>{item.contract_start_date?.slice(5, 10) || '—'} ~ {item.contract_end_date?.slice(5, 10) || '—'}</div>
+                          {dLeft !== null && dLeft >= 0 && dLeft <= 90 && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                              background: dLeft <= 7 ? '#fee2e2' : dLeft <= 30 ? '#fff7ed' : '#fefce8',
+                              color: dLeft <= 7 ? '#dc2626' : dLeft <= 30 ? '#ea580c' : '#ca8a04',
+                            }}>D-{dLeft}</span>
+                          )}
+                          {dLeft !== null && dLeft < 0 && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: '#fee2e2', color: '#dc2626' }}>초과</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  if (kind === 'jiip') {
                     const exp = months * N(item.admin_fee)
                     const rate = exp > 0 ? Math.min(100, Math.round((totalPaid / exp) * 100)) : 0
                     return (
@@ -586,7 +714,7 @@ export default function ContractsTab({ jiipList, investList, settleTxs, shareHis
           <span>총 투자금 <b style={{ color: '#111827' }}>{fm(summaryStats.income)}</b></span>
           <span>월 지급 <b style={{ color: '#111827' }}>{fm(summaryStats.expense)}</b></span>
           <span>누적 지급 <b style={{ color: '#3b6eb5' }}>{fm(summaryStats.totalPaid)}</b></span>
-          <span>{activeSubTab === 'jiip' ? '평균 배분율' : '평균 이자율'} <b>{summaryStats.avgRate}%</b></span>
+          {activeSubTab !== 'all' && <span>{activeSubTab === 'jiip' ? '평균 배분율' : '평균 이자율'} <b>{summaryStats.avgRate}%</b></span>}
         </div>
       )}
     </div>

@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
       where.push('type = ?')
       params.push(typeFilter)
     }
+    // soft-delete 제외 (기본 적용)
+    where.push('deleted_at IS NULL')
 
     // 기본 LIMIT: 필터 다중(companyId+from+to) 시 무제한, 그 외 합리적 상한
     let limit = 1000
