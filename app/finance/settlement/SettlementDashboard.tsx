@@ -594,6 +594,73 @@ export default function SettlementDashboard() {
   }
 
   // ============================================
+  // 개별 정산서 페이지 열기 (인쇄/PDF)
+  // ============================================
+  const handleShowStatement = (item: SettlementItem) => {
+    try {
+      // 은행 정보 조회 (수신자 계좌)
+      let bank: any = {}
+      if (item.type === 'jiip') {
+        const jiip = jiips.find(j => String(j.id) === String(item.relatedId))
+        if (jiip) {
+          const cars: any = jiip.cars || {}
+          bank = {
+            bank_name: cars.owner_bank || (jiip as any).bank_name || '',
+            account_number: cars.owner_account || (jiip as any).account_number || '',
+            account_holder: cars.owner_account_holder || (jiip as any).account_holder || item.name,
+          }
+        }
+      } else if (item.type === 'invest') {
+        const inv = investors.find(i => String(i.id) === String(item.relatedId))
+        if (inv) {
+          bank = {
+            bank_name: (inv as any).bank_name || '',
+            account_number: (inv as any).account_number || '',
+            account_holder: (inv as any).account_holder || item.name,
+          }
+        }
+      }
+
+      const payload = {
+        recipientName: item.name,
+        recipientPhone: '',
+        settlementMonth: settlementSettings.settlementMonth || filterDate,
+        paymentDate: settlementSettings.paymentDate,
+        totalAmount: item.amount,
+        items: [{
+          type: item.type,
+          monthLabel: item.monthLabel || filterDate,
+          amount: item.amount,
+          detail: item.detail,
+          carNumber: item.carNumber,
+          carModel: item.carModel,
+          breakdown: item.breakdown,
+          dueDate: item.dueDate,
+        }],
+        bank,
+        company: {
+          name: company?.name || '주식회사 에프엠아이',
+          business_number: (company as any)?.business_number || (company as any)?.biz_no || '',
+          address: (company as any)?.address || '',
+          phone: (company as any)?.phone || (company as any)?.tel || '',
+          ceo_name: (company as any)?.ceo_name || (company as any)?.representative || '',
+          logo_url: (company as any)?.logo_url || '',
+        },
+        memo: settlementSettings.memo || '',
+        type: item.type === 'jiip' ? 'jiip' : 'invest',
+      }
+
+      sessionStorage.setItem('settlementStatementPayload', JSON.stringify(payload))
+      const win = window.open('/finance/settlement/statement', '_blank')
+      if (!win) {
+        showToast('팝업이 차단되어 정산서를 열 수 없습니다. 팝업을 허용해주세요.', 'error')
+      }
+    } catch (e: any) {
+      alert('정산서 생성 실패: ' + (e?.message || '오류'))
+    }
+  }
+
+  // ============================================
   // 발송 확정
   // ============================================
   const handleConfirmSend = async () => {
@@ -877,6 +944,7 @@ export default function SettlementDashboard() {
                 settlementSettings={settlementSettings}
                 setSettlementSettings={setSettlementSettings}
                 onSendIndividual={(item: SettlementItem) => handleSendNotify([item])}
+                onShowStatement={handleShowStatement}
                 companyName={company?.name || '정산'}
                 onBulkPaid={handleBulkPaid}
               />

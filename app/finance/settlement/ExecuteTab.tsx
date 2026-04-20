@@ -64,6 +64,7 @@ type Props = {
   settlementSettings: SettlementSettings
   setSettlementSettings: (s: SettlementSettings | ((prev: SettlementSettings) => SettlementSettings)) => void
   onSendIndividual: (item: SettlementItem) => void
+  onShowStatement?: (item: SettlementItem) => void
   companyName: string
 }
 
@@ -74,7 +75,7 @@ export default function ExecuteTab({
   onDownloadBulkTransfer, transferPreview,
   onBuildTransferPreview, onDownloadFromPreview, onCloseTransferPreview,
   settlementSettings, setSettlementSettings,
-  onSendIndividual, companyName,
+  onSendIndividual, onShowStatement, companyName,
 }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('send')
   const [typeFilter, setTypeFilter] = useState<'all' | 'jiip' | 'invest' | 'loan'>('all')
@@ -277,7 +278,7 @@ export default function ExecuteTab({
             <div style={{ width: 100, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b' }}>차량</div>
             <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#64748b' }}>상세</div>
             <div style={{ width: 110, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'right' }}>금액</div>
-            <div style={{ width: 60, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>발송</div>
+            <div style={{ width: 130, flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'center' }}>작업</div>
           </div>
 
           {/* 데이터 행 */}
@@ -317,11 +318,19 @@ export default function ExecuteTab({
                   <div style={{ width: 100, flexShrink: 0, fontSize: 11, color: '#9ca3af' }}>{item.carNumber || '—'}</div>
                   <div style={{ flex: 1, fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.detail}</div>
                   <div style={{ width: 110, flexShrink: 0, textAlign: 'right', fontWeight: 900, fontSize: 13, color: '#dc2626' }}>{nf(item.amount)}원</div>
-                  <div style={{ width: 60, flexShrink: 0, textAlign: 'center' }}>
+                  <div style={{ width: 130, flexShrink: 0, textAlign: 'center', display: 'flex', gap: 4, justifyContent: 'center' }}>
                     <button onClick={e => { e.stopPropagation(); onSendIndividual(item) }}
+                      title="정산 안내 SMS/이메일 발송"
                       style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'transparent', color: '#2563eb', border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
                       발송
                     </button>
+                    {onShowStatement && (item.type === 'jiip' || item.type === 'invest') && (
+                      <button onClick={e => { e.stopPropagation(); onShowStatement(item) }}
+                        title="개별 정산서 출력(PDF/인쇄)"
+                        style={{ padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#7c3aed', border: '1px solid #ddd6fe', whiteSpace: 'nowrap' }}>
+                        📄 정산서
+                      </button>
+                    )}
                   </div>
                 </div>
               )
