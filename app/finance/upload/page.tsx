@@ -4495,11 +4495,13 @@ function UploadContent() {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           {group.isBank ? (() => {
-                            const inc = group.items.filter(i => i.type === 'income').reduce((s, i) => s + Math.abs(i.amount || 0), 0)
-                            const exp = group.items.filter(i => i.type === 'expense').reduce((s, i) => s + Math.abs(i.amount || 0), 0)
+                            const inc = group.items.filter(i => i.type === 'income').reduce((s, i) => s + Math.abs(safeNumber(i.amount)), 0)
+                            const exp = group.items.filter(i => i.type === 'expense').reduce((s, i) => s + Math.abs(safeNumber(i.amount)), 0)
+                            // 0원은 렌더 생략, 나머지는 수입=파랑 / 지출=빨강
                             return (<>
-                              <p style={{ fontWeight: 800, fontSize: 13, color: '#2563eb', margin: 0 }}>+{inc.toLocaleString()}원</p>
-                              <p style={{ fontWeight: 800, fontSize: 13, color: '#dc2626', margin: 0 }}>-{exp.toLocaleString()}원</p>
+                              {inc > 0 && <p style={{ fontWeight: 800, fontSize: 13, color: '#2563eb', margin: 0 }}>+{inc.toLocaleString()}원</p>}
+                              {exp > 0 && <p style={{ fontWeight: 800, fontSize: 13, color: '#dc2626', margin: 0 }}>-{exp.toLocaleString()}원</p>}
+                              {inc === 0 && exp === 0 && <p style={{ fontWeight: 800, fontSize: 13, color: '#94a3b8', margin: 0 }}>0원</p>}
                             </>)
                           })() : (
                             <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', margin: 0 }}>{Math.abs(group.totalAmount).toLocaleString()}원</p>
@@ -6547,9 +6549,10 @@ function UploadContent() {
       {/* ═══ 분류 관리 탭 — DB 데이터 (업로드 결과 없을 때) / 확정완료 탭 ═══ */}
       {((activeTab === 'classify' && results.length === 0) || activeTab === 'confirmed') && (
         <>
-          {/* 전체선택 + 전체삭제 (간소화) */}
+          {/* 전체선택 / 복원 / 전체삭제 — 파괴적 액션은 우측 끝으로 분리 + danger 스타일 격상 */}
           {items.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8, gap: 8 }}>
+              {/* 좌: 전체선택 (비파괴) */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
@@ -6562,14 +6565,35 @@ function UploadContent() {
                   {selectedIds.size > 0 ? `${selectedIds.size}건 선택됨` : `전체 선택`}
                 </span>
               </label>
-              <button onClick={handleDeleteAll} disabled={deleting}
-                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', color: '#dc2626' }}>
-                {deleting ? '삭제 중...' : `전체 삭제`}
-              </button>
-              <button onClick={handleRestoreDeleted}
-                style={{ padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b' }}>
-                🗑️ 휴지통 복원
-              </button>
+
+              {/* 우: 복원(중립) ↔ 파괴적 액션(danger 스타일) 구분자 포함 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={handleRestoreDeleted}
+                  title="최근 삭제된 항목 복원"
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#64748b',
+                  }}>
+                  ↩ 휴지통 복원
+                </button>
+                <div style={{ width: 1, height: 20, background: '#e2e8f0', flexShrink: 0 }} aria-hidden />
+                <button onClick={handleDeleteAll} disabled={deleting || sourceFilteredItems.length === 0}
+                  title={sourceFilteredItems.length === 0 ? '삭제할 항목이 없습니다' : `현재 필터 기준 ${sourceFilteredItems.length}건 일괄 삭제`}
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                    cursor: (deleting || sourceFilteredItems.length === 0) ? 'not-allowed' : 'pointer',
+                    border: '1px solid #fecaca',
+                    background: (deleting || sourceFilteredItems.length === 0) ? '#fafafa' : '#fef2f2',
+                    color: (deleting || sourceFilteredItems.length === 0) ? '#cbd5e1' : '#dc2626',
+                    opacity: (deleting || sourceFilteredItems.length === 0) ? 0.6 : 1,
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                  🗑️ {deleting ? '삭제 중...' : '전체 삭제'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -6647,9 +6671,14 @@ function UploadContent() {
                         </div>
                       </div>
 
-                      {/* Count & Amount */}
+                      {/* Count & Amount — 0원은 중립색(회색)으로 렌더 ('경고색'으로 오해 방지) */}
                       <div style={{ textAlign: 'right', marginRight: 12 }}>
-                        <p style={{ fontWeight: 800, fontSize: 15, color: isIncome ? '#3b6eb5' : '#ef4444', margin: 0 }}>
+                        <p style={{
+                          fontWeight: 800, fontSize: 15, margin: 0,
+                          color: group.totalAmount === 0
+                            ? '#94a3b8'
+                            : isIncome ? '#3b6eb5' : '#ef4444',
+                        }}>
                           {nf(group.totalAmount)}원
                         </p>
                         {(group as any).foreignAmounts && formatForeignAmounts((group as any).foreignAmounts) && (
