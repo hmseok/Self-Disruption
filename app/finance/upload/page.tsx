@@ -3757,6 +3757,153 @@ function UploadContent() {
     )
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // Phase D: Render helpers — 중복 블록 추출 (#80)
+  // 이전: RelatedBadge 5중복, CategoryBadge 5 default + 1 compact (총 ~500줄)
+  // 이후: 단일 helper로 통합 + 일관성 보장
+  // ※ compact variant(line ~6564)는 handleChangeCategory 호출로 별도 유지
+  // ═══════════════════════════════════════════════════════════════════
+  const renderCategoryBadge = (item: any) => {
+    const catParts = getCategoryParts(item.category, categoryMode, customCategories)
+    const isUnclassified = !catParts.group
+    const isOpen = openCategoryId === item.id
+    const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
+    const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
+    return (
+      <div style={{ position: 'relative' }}>
+        <div
+          onClick={(e) => {
+            if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) }
+            else {
+              setOpenCategoryId(item.id)
+              setCatPopoverStep(catParts.group ? 'item' : 'group')
+              setCatPopoverGroup(catParts.group)
+              setCatPopoverPos(calcPopPos(e.currentTarget))
+            }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer',
+            border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0',
+            borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s',
+          }}>
+          {isUnclassified ? (
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
+          ) : (
+            <>
+              <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
+              </div>
+            </>
+          )}
+          <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
+        </div>
+        {isOpen && catPopoverPos && (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
+            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+              {catPopoverStep === 'group' ? (
+                <>
+                  <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
+                  {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
+                    <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
+                      style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
+                      onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
+                      onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />{g.group}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
+                    ② 세부항목
+                  </div>
+                  <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null) }}
+                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
+                    📂 중그룹만 (미지정)
+                  </button>
+                  {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(c => c.group === catPopoverGroup)?.items || [])].map(c => (
+                    <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null) }}
+                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
+                      onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
+                      onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
+                      <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>{c}
+                      {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  const renderRelatedBadge = (item: any) => {
+    const rd = getRelatedDisplay(item.related_type, item.related_id)
+    const isOpen = openRelatedId === item.id
+    const _fGroups = getFilteredRelatedGroups(item.category)
+    const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
+    return (
+      <div style={{ position: 'relative' }}>
+        <button
+          onClick={(e) => {
+            if (!_hasRelOpts && !rd) return
+            if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) }
+            else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) }
+          }}
+          style={{
+            width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px',
+            fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563',
+            cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32,
+          }}>
+          {rd ? (
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
+              {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
+            </div>
+          ) : (
+            <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
+          )}
+          {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
+        </button>
+        {isOpen && relPopoverPos && (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
+            <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+              <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
+                <span style={{ fontSize: 12 }}>✕</span> 연결 해제
+              </button>
+              {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
+                <div key={group.group}>
+                  <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
+                  {group.items.map(opt => {
+                    const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
+                    return (
+                      <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
+                          <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
+                        </div>
+                        {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="page-bg">
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6"
@@ -4491,115 +4638,10 @@ function UploadContent() {
                                     />
                                   </td>
                                   <td style={{ padding: '4px 6px', position: 'relative' }}>
-                                    {(() => {
-                                      const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-                                      const isUnclassified = !catParts.group
-                                      const isOpen = openCategoryId === item.id
-                                      const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-                                      const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-                                      return (
-                                        <div style={{ position: 'relative' }}>
-                                          <div onClick={(e) => { if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer', border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0', borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff' }}>
-                                            {isUnclassified ? (
-                                              <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-                                            ) : (<>
-                                              <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-                                              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-                                              </div>
-                                            </>)}
-                                            <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-                                          </div>
-                                          {isOpen && catPopoverPos && (<>
-                                            <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-                                              {catPopoverStep === 'group' ? (<>
-                                                <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                                                  <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                                                    onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                                                    onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
-                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />{g.group}
-                                                  </button>
-                                                ))}
-                                              </>) : (<>
-                                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                                                  ② 세부항목
-                                                </div>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                                                  📂 중그룹만 (미지정)
-                                                </button>
-                                                {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(c => c.group === catPopoverGroup)?.items || [])].map(c => (
-                                                  <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null) }}
-                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                                                    onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                                                    onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
-                                                    <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>{c}
-                                                    {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
-                                                  </button>
-                                                ))}
-                                              </>)}
-                                            </div>
-                                          </>)}
-                                        </div>
-                                      )
-                                    })()}
+                                    {renderCategoryBadge(item)}
                                   </td>
                                   <td style={{ padding: '4px 8px', position: 'relative' }}>
-                                    {(() => {
-                                      const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                      const isOpen = openRelatedId === item.id
-                                      const _fGroups = getFilteredRelatedGroups(item.category)
-                                      const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
-                                      return (
-                                        <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
-                                            {rd ? (
-                                              <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-                                                {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-                                              </div>
-                                            ) : (
-                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-                                            )}
-                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-                                          </button>
-                                          {isOpen && relPopoverPos && (
-                                            <>
-                                              <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
-                                                  <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-                                                </button>
-                                                {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                                  <div key={group.group}>
-                                                    <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
-                                                    {group.items.map(opt => {
-                                                      const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                                                      return (
-                                                        <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
-                                                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                          <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                            <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                                                          </div>
-                                                          {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                                                        </button>
-                                                      )
-                                                    })}
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </>
-                                          )}
-                                        </div>
-                                      )
-                                    })()}
+                                    {renderRelatedBadge(item)}
                                   </td>
                                   {(() => { const ad = getAmountDisplay(item); return (
                                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
@@ -4717,136 +4759,10 @@ function UploadContent() {
                               </td>
                               {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 */}
                               <td style={{ padding: '4px 4px', position: 'relative' }}>
-                                {(() => {
-                                  const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-                                  const isUnclassified = !catParts.group
-                                  const isOpen = openCategoryId === item.id
-                                  const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-                                  const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-                                  return (
-                                    <div style={{ position: 'relative' }}>
-                                      <div
-                                        onClick={(e) => { if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer',
-                                          border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0',
-                                          borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s',
-                                        }}
-                                      >
-                                        {isUnclassified ? (
-                                          <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-                                        ) : (
-                                          <>
-                                            <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-                                            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                              <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                              <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-                                            </div>
-                                          </>
-                                        )}
-                                        <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-                                      </div>
-                                      {isOpen && catPopoverPos && (
-                                        <>
-                                          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-                                            {catPopoverStep === 'group' ? (
-                                              <>
-                                                <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                                                  <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                    style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                                                    onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                                                    onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}
-                                                  >
-                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
-                                                    {g.group}
-                                                  </button>
-                                                ))}
-                                                <button onClick={() => { handleUpdateItem(item.id, 'category', '미분류', item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
-                                                  ✕ 미분류로 초기화
-                                                </button>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                  <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                                                  ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
-                                                </div>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                                                  📂 중그룹만 (미지정)
-                                                </button>
-                                                {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
-                                                  <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                                                    onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                                                    onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}
-                                                  >
-                                                    <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
-                                                    {c}
-                                                  </button>
-                                                ))}
-                                              </>
-                                            )}
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  )
-                                })()}
+                                {renderCategoryBadge(item)}
                               </td>
                               <td style={{ padding: '4px 8px', position: 'relative' }}>
-                                {(() => {
-                                  const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                  const isOpen = openRelatedId === item.id
-                                  const _fGroups = getFilteredRelatedGroups(item.category)
-                                  const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
-                                  return (
-                                    <div style={{ position: 'relative' }}>
-                                      <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
-                                        {rd ? (
-                                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-                                            {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-                                          </div>
-                                        ) : (
-                                          <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-                                        )}
-                                        {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-                                      </button>
-                                      {isOpen && relPopoverPos && (
-                                        <>
-                                          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
-                                            <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
-                                              <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-                                            </button>
-                                            {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                              <div key={group.group}>
-                                                <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
-                                                {group.items.map(opt => {
-                                                  const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                                                  return (
-                                                    <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
-                                                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                      <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                        <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                                                      </div>
-                                                      {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                                                    </button>
-                                                  )
-                                                })}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  )
-                                })()}
+                                {renderRelatedBadge(item)}
                               </td>
                               {(() => { const ad = getAmountDisplay(item); return (
                               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
@@ -5052,128 +4968,10 @@ function UploadContent() {
                                   </td>
                                   {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 (차량별) */}
                                   <td style={{ padding: '4px 4px', position: 'relative' }}>
-                                    {(() => {
-                                      const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-                                      const isUnclassified = !catParts.group
-                                      const isCatOpen = openCategoryId === item.id
-                                      const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-                                      const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-                                      return (
-                                        <div style={{ position: 'relative' }}>
-                                          <div onClick={(e) => { if (isCatOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer', border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0', borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s' }}>
-                                            {isUnclassified ? (
-                                              <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-                                            ) : (
-                                              <>
-                                                <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-                                                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                                  <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-                                                </div>
-                                              </>
-                                            )}
-                                            <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-                                          </div>
-                                          {isCatOpen && catPopoverPos && (
-                                            <>
-                                              <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-                                                {catPopoverStep === 'group' ? (
-                                                  <>
-                                                    <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                    {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                                                      <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                        style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                                                        onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                                                        onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
-                                                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
-                                                        {g.group}
-                                                      </button>
-                                                    ))}
-                                                    <button onClick={() => { handleUpdateItem(item.id, 'category', '미분류', item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                      style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
-                                                      ✕ 미분류로 초기화
-                                                    </button>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                      <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                                                      ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
-                                                    </div>
-                                                    <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                                                      📂 중그룹만 (미지정)
-                                                    </button>
-                                                    {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
-                                                      <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                        style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                                                        onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                                                        onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
-                                                        <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
-                                                        {c}
-                                                      </button>
-                                                    ))}
-                                                  </>
-                                                )}
-                                              </div>
-                                            </>
-                                          )}
-                                        </div>
-                                      )
-                                    })()}
+                                    {renderCategoryBadge(item)}
                                   </td>
                                   <td style={{ padding: '4px 8px', position: 'relative' }}>
-                                    {(() => {
-                                      const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                      const isOpen = openRelatedId === item.id
-                                      const _fGroups = getFilteredRelatedGroups(item.category)
-                                      const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
-                                      return (
-                                        <div style={{ position: 'relative' }}>
-                                          <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
-                                            {rd ? (
-                                              <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-                                                {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-                                              </div>
-                                            ) : (
-                                              <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-                                            )}
-                                            {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-                                          </button>
-                                          {isOpen && relPopoverPos && (
-                                            <>
-                                              <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
-                                                <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
-                                                  <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-                                                </button>
-                                                {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                                  <div key={group.group}>
-                                                    <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
-                                                    {group.items.map(opt => {
-                                                      const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                                                      return (
-                                                        <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
-                                                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                          <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                            <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                                                          </div>
-                                                          {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                                                        </button>
-                                                      )
-                                                    })}
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </>
-                                          )}
-                                        </div>
-                                      )
-                                    })()}
+                                    {renderRelatedBadge(item)}
                                   </td>
                                   {(() => { const ad = getAmountDisplay(item); return (
                                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color }}>
@@ -5403,129 +5201,11 @@ function UploadContent() {
                                     </td>
                                     {/* 분류: 중분류 > 하분류 인터랙티브 팝오버 (공통 그룹뷰) */}
                                     <td style={{ padding: '4px 4px', position: 'relative' }}>
-                                      {(() => {
-                                        const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-                                        const isUnclassified = !catParts.group
-                                        const isCatOpen = openCategoryId === item.id
-                                        const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-                                        const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-                                        return (
-                                          <div style={{ position: 'relative' }}>
-                                            <div onClick={(e) => { if (isCatOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
-                                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer', border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0', borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s' }}>
-                                              {isUnclassified ? (
-                                                <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-                                              ) : (
-                                                <>
-                                                  <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-                                                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                                    <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-                                                  </div>
-                                                </>
-                                              )}
-                                              <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-                                            </div>
-                                            {isCatOpen && catPopoverPos && (
-                                              <>
-                                                <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-                                                  {catPopoverStep === 'group' ? (
-                                                    <>
-                                                      <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                                      {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                                                        <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                          style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                                                          onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                                                          onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
-                                                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
-                                                          {g.group}
-                                                        </button>
-                                                      ))}
-                                                      <button onClick={() => { handleUpdateItem(item.id, 'category', '미분류', item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                        style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
-                                                        ✕ 미분류로 초기화
-                                                      </button>
-                                                    </>
-                                                  ) : (
-                                                    <>
-                                                      <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                                                        ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
-                                                      </div>
-                                                      <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                        style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                                                        📂 중그룹만 (미지정)
-                                                      </button>
-                                                      {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
-                                                        <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                          style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                                                          onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                                                          onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
-                                                          <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
-                                                          {c}
-                                                        </button>
-                                                      ))}
-                                                    </>
-                                                  )}
-                                                </div>
-                                              </>
-                                            )}
-                                          </div>
-                                        )
-                                      })()}
+                                      {renderCategoryBadge(item)}
                                     </td>
                                     {/* 연결 팝오버 (공통 그룹뷰) */}
                                     <td style={{ padding: '4px 8px', position: 'relative' }}>
-                                      {(() => {
-                                        const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                        const isRelOpen = openRelatedId === item.id
-                                        const _fGroups = getFilteredRelatedGroups(item.category)
-                                        const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
-                                        return (
-                                          <div style={{ position: 'relative' }}>
-                                            <button onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isRelOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }} style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32 }}>
-                                              {rd ? (
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                  <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-                                                  {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-                                                </div>
-                                              ) : (
-                                                <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-                                              )}
-                                              {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-                                            </button>
-                                            {isRelOpen && relPopoverPos && (
-                                              <>
-                                                <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
-                                                  <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
-                                                    <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-                                                  </button>
-                                                  {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                                    <div key={group.group}>
-                                                      <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
-                                                      {group.items.map(opt => {
-                                                        const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                                                        return (
-                                                          <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
-                                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                              <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                              <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                                                            </div>
-                                                            {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                                                          </button>
-                                                        )
-                                                      })}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </>
-                                            )}
-                                          </div>
-                                        )
-                                      })()}
+                                      {renderRelatedBadge(item)}
                                     </td>
                                     {(() => { const ad = getAmountDisplay(item); return (
                                     <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: ad.color, whiteSpace: 'nowrap' }}>
@@ -5619,86 +5299,7 @@ function UploadContent() {
                             <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><input value={item.client_name || ''} onChange={e => handleUpdateItem(item.id, 'client_name', e.target.value, item)} style={{ width: '100%', background: 'transparent', outline: 'none', fontWeight: 700, color: '#1f2937', fontSize: 13 }} /></td>
                             <td style={{ padding: '4px 8px', overflow: 'hidden', textOverflow: 'ellipsis' }}><input value={item.description || ''} onChange={e => handleUpdateItem(item.id, 'description', e.target.value, item)} style={{ width: '100%', background: 'transparent', border: '1px solid #f1f5f9', borderRadius: 4, padding: '2px 4px', outline: 'none', fontSize: 13, fontWeight: 600, color: '#475569' }} /></td>
                             <td style={{ padding: '4px 4px', position: 'relative' }}>
-                              {(() => {
-                                const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-                                const isUnclassified = !catParts.group
-                                const isOpen = openCategoryId === item.id
-                                const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-                                const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-                                return (
-                                  <div style={{ position: 'relative' }}>
-                                    <div
-                                      onClick={(e) => { if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) } else { setOpenCategoryId(item.id); setCatPopoverStep(catParts.group ? 'item' : 'group'); setCatPopoverGroup(catParts.group); setCatPopoverPos(calcPopPos(e.currentTarget)) } }}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer',
-                                        border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0',
-                                        borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s',
-                                      }}
-                                    >
-                                      {isUnclassified ? (
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-                                      ) : (
-                                        <>
-                                          <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-                                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                            <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-                                          </div>
-                                        </>
-                                      )}
-                                      <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-                                    </div>
-                                    {isOpen && catPopoverPos && (
-                                      <>
-                                        <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-                                          {catPopoverStep === 'group' ? (
-                                            <>
-                                              <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                                              {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                                                <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                                                  style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                                                  onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                                                  onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}
-                                                >
-                                                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />
-                                                  {g.group}
-                                                </button>
-                                              ))}
-                                              <button onClick={() => { handleUpdateItem(item.id, 'category', '미분류', item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#94a3b8', borderTop: '1px solid #f1f5f9' }}>
-                                                ✕ 미분류로 초기화
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                                                ② 세부항목 · <span style={{ color: CATEGORY_COLORS[catPopoverGroup] || '#94a3b8' }}>{catPopoverGroup}</span>
-                                              </div>
-                                              <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                                                📂 중그룹만 (미지정)
-                                              </button>
-                                              {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(cc => cc.group === catPopoverGroup)?.items || [])].map(c => (
-                                                <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null); setCatPopoverPos(null) }}
-                                                  style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                                                  onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                                                  onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}
-                                                >
-                                                  <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>
-                                                  {c}
-                                                  {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
-                                                </button>
-                                              ))}
-                                            </>
-                                          )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )
-                              })()}
+                              {renderCategoryBadge(item)}
                             </td>
                             <td style={{ padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {cardInfo ? (
@@ -5714,85 +5315,7 @@ function UploadContent() {
                               ) : null}
                             </td>
                             <td style={{ padding: '4px 8px', position: 'relative' }}>
-                              {(() => {
-                                const rd = getRelatedDisplay(item.related_type, item.related_id)
-                                const isOpen = openRelatedId === item.id
-                                const _fGroups = getFilteredRelatedGroups(item.category)
-                                const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
-                                return (
-                                  <div style={{ position: 'relative' }}>
-                                    <button
-                                      onClick={(e) => { if (!_hasRelOpts && !rd) return; if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) } else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) } }}
-                                      style={{
-                                        width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px',
-                                        fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563', cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
-                                        display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none',
-                                        minHeight: 32,
-                                      }}
-                                    >
-                                      {rd ? (
-                                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                                          <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-                                          {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-                                        </div>
-                                      ) : (
-                                        <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 12, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-                                      )}
-                                      {(_hasRelOpts || rd) && <span style={{ fontSize: 8, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-                                    </button>
-                                    {isOpen && relPopoverPos && (
-                                      <>
-                                        <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                        <div style={{
-                                          position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99,
-                                          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
-                                          boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: 320, overflowY: 'auto',
-                                        }}>
-                                          <button
-                                            onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }}
-                                            style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }}
-                                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                                            onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}
-                                          >
-                                            <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-                                          </button>
-                                          {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                                            <div key={group.group}>
-                                              <div style={{ padding: '6px 12px', fontSize: 13, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-                                                {group.icon} {group.group}
-                                              </div>
-                                              {group.items.map(opt => {
-                                                const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                                                return (
-                                                  <button
-                                                    key={opt.value}
-                                                    onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }}
-                                                    style={{
-                                                      width: '100%', padding: '6px 12px', border: 'none',
-                                                      background: selected ? '#eff6ff' : 'transparent',
-                                                      cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
-                                                      borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent',
-                                                    }}
-                                                    onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }}
-                                                    onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}
-                                                  >
-                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                                                      <div style={{ fontSize: 13, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                                                    </div>
-                                                    {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                                                  </button>
-                                                )
-                                              })}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )
-                              })()}
+                              {renderRelatedBadge(item)}
                             </td>
                             {(() => { const ad = getAmountDisplay(item); return (
                             <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 800, fontSize: 12, color: ad.color, whiteSpace: 'nowrap' }}>
