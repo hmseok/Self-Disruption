@@ -43,6 +43,32 @@ const formatDatetime = (dt: string | null | undefined) => {
 }
 
 // ═══ 클라이언트사이드 파싱 헬퍼 ═══
+// JSON 컬럼이 문자열로 반환되는 케이스 대응 (mysql2 raw query)
+function parseJsonMaybe(raw: any): any {
+  if (raw == null) return null
+  if (typeof raw === 'object') return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      // 이중 stringify 방어
+      return typeof parsed === 'string' ? JSON.parse(parsed) : parsed
+    } catch { return null }
+  }
+  return null
+}
+
+// 숫자/문자 혼재 amount 안전 변환 (콤마/화폐기호 허용)
+function safeNumber(v: any): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  if (typeof v === 'string') {
+    const cleaned = v.replace(/[,\s₩원$]/g, '')
+    const n = Number(cleaned)
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
+}
+
 function parseQueueItem(q: any): QueueItem & Record<string, any> {
   let altData: any = {}
   let sd: QueueSourceData = {}
@@ -59,12 +85,14 @@ function parseQueueItem(q: any): QueueItem & Record<string, any> {
     altData = rawAlt
   }
 
-  // source_data 찾기
-  if (q.source_data && typeof q.source_data === 'object' && Object.keys(q.source_data).length > 0) {
-    sd = q.source_data
-  } else if (altData.source_data && typeof altData.source_data === 'object') {
-    sd = altData.source_data
-  } else if (altData.transaction_date || altData.client_name || altData.amount) {
+  // source_data 찾기 — mysql2 raw 쿼리는 JSON 컬럼을 문자열로 반환할 수 있어 parseJsonMaybe로 보정
+  const parsedSd = parseJsonMaybe(q.source_data)
+  const parsedAltSd = parseJsonMaybe(altData?.source_data)
+  if (parsedSd && typeof parsedSd === 'object' && Object.keys(parsedSd).length > 0) {
+    sd = parsedSd
+  } else if (parsedAltSd && typeof parsedAltSd === 'object') {
+    sd = parsedAltSd
+  } else if (altData && (altData.transaction_date || altData.client_name || altData.amount)) {
     sd = altData
   }
 
@@ -75,14 +103,14 @@ function parseQueueItem(q: any): QueueItem & Record<string, any> {
 
   return {
     id: q.id,
-    
+
     transaction_id: q.transaction_id,
     source_type: q.source_type || (sd.payment_method === '카드' ? 'card_statement' : 'bank_statement'),
     source_data: {
       transaction_date: sd.transaction_date || '',
       client_name: sd.client_name || '',
       description: sd.description || '',
-      amount: sd.amount || 0,
+      amount: safeNumber(sd.amount),
       type: sd.type || 'expense',
       payment_method: sd.payment_method || '',
       card_number: sd.card_number || '',
@@ -1086,11 +1114,13 @@ function UploadContent() {
       if (!key) key = '미분류'
       if (!groups[key]) groups[key] = { items: [], totalAmount: 0, type: 'expense', foreignAmounts: {} }
       groups[key].items.push(item)
-      groups[key].totalAmount += Math.abs(item.source_data?.amount || 0)
-      if (item.source_data?.type === 'income') groups[key].type = 'income'
+      // amount 소스 폴백 체인: source_data.amount → item.amount (results 경로 / legacy 구조 방어)
+      const _amt = safeNumber(item.source_data?.amount ?? item.amount)
+      groups[key].totalAmount += Math.abs(_amt)
+      if (item.source_data?.type === 'income' || item.type === 'income') groups[key].type = 'income'
       const _cur = item.source_data?.currency || 'KRW'
       if (_cur !== 'KRW') {
-        const _origAmt = item.source_data?.original_amount || 0
+        const _origAmt = safeNumber(item.source_data?.original_amount)
         if (_origAmt) { if (!(groups[key] as any).foreignAmounts[_cur]) (groups[key] as any).foreignAmounts[_cur] = 0; (groups[key] as any).foreignAmounts[_cur] += Math.abs(_origAmt) }
       }
       // 서브그룹 추적: 카테고리별이 아닌 경우 양쪽 모드 모두, 카테고리별+용도별일 때도
@@ -1110,7 +1140,7 @@ function UploadContent() {
         if (!groups[key].subGroups) groups[key].subGroups = {}
         if (!groups[key].subGroups![subKey]) groups[key].subGroups![subKey] = { items: [], totalAmount: 0 }
         groups[key].subGroups![subKey].items.push(item)
-        groups[key].subGroups![subKey].totalAmount += Math.abs(item.source_data?.amount || 0)
+        groups[key].subGroups![subKey].totalAmount += Math.abs(safeNumber(item.source_data?.amount ?? item.amount))
       }
     }
     // 용도별 모드: DISPLAY_CATEGORIES 순서 정렬
@@ -1144,9 +1174,12 @@ function UploadContent() {
     return Object.entries(groups).sort((a, b) => b[1].items.length - a[1].items.length)
   }, [sourceFilteredItems, groupBy, corpCards, cars, getCardDisplayName, categoryMode])
 
-  // ── 리뷰 탭 미분류 통계 ──
+  // ── 리뷰 탭 미분류 통계 ── ('미분류' + '기타' 모두 정리 필요 항목으로 집계 — 합계 = 전체 - 분류완료)
   const reviewUnclassifiedCount = useMemo(() => {
-    return items.filter(i => !i.ai_category || i.ai_category === '미분류').length
+    return items.filter(i => {
+      const c = i.ai_category || i.category || ''
+      return !c || c === '미분류' || c === '기타'
+    }).length
   }, [items])
 
   // ── B1 하단 요약바 데이터 ──
@@ -4004,6 +4037,8 @@ function UploadContent() {
             ))}
             <div style={{ width: 1, height: 20, background: '#e5e7eb', flexShrink: 0 }} />
             {/* 분류 완료 필터 칩 (분류관리 탭에서만 표시) */}
+            {/* 분류완료 = 실제 카테고리가 지정된 건 ('기타'는 정리 필요 상태로 간주하여 제외) */}
+            {/* 이 정의는 '미분류 + 분류완료 = 전체'를 보장 — reviewUnclassifiedCount와 짝 */}
             {activeTab !== 'confirmed' && (() => {
               const baseItems = results.length > 0 ? results : items
               const catMatchedCount = baseItems.filter(i => {
