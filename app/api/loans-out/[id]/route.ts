@@ -41,13 +41,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const args: any[] = []
     for (const k of allowedKeys) {
       if (body[k] !== undefined) {
-        setParts.push(`${k} = ?`)
+        // 화이트리스트 통과 필드만 컬럼명에 포함 — 백틱 이스케이프
+        setParts.push(`\`${k}\` = ?`)
         args.push(['principal_amount', 'current_balance', 'interest_rate', 'payment_day', 'grace_period_months'].includes(k)
           ? Number(body[k]) : body[k])
       }
     }
     if (setParts.length === 0) return NextResponse.json({ error: '업데이트할 필드 없음' }, { status: 400 })
-    setParts.push('updated_at = NOW()')
+    setParts.push('`updated_at` = NOW()')
     args.push(id)
 
     const sql = `UPDATE company_loans_out SET ${setParts.join(', ')} WHERE id = ?`

@@ -79,22 +79,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '삽입할 행이 없습니다' }, { status: 400 })
     }
 
+    // 컬럼명 화이트리스트 (SAFE_COL regex) + 파라미터 바인딩 — SQL Injection 방지
+    const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
     const columns = Object.keys(rows[0])
-    const columnStr = columns.join(', ')
+    const invalidCol = columns.find(c => !SAFE_COL.test(c))
+    if (invalidCol) {
+      return NextResponse.json({ error: `잘못된 컬럼명: ${invalidCol}` }, { status: 400 })
+    }
+    const columnStr = columns.map(c => `\`${c}\``).join(', ')
 
+    const allValues: any[] = []
     const valueSets = rows.map((row: any) => {
-      const values = columns.map((col: string) => {
+      const placeholders = columns.map((col: string) => {
         const val = row[col]
-        if (val === null || val === undefined) return 'NULL'
-        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
-        if (typeof val === 'boolean') return val ? '1' : '0'
-        return val
+        if (val === null || val === undefined) {
+          allValues.push(null)
+        } else if (typeof val === 'boolean') {
+          allValues.push(val ? 1 : 0)
+        } else {
+          allValues.push(val)
+        }
+        return '?'
       }).join(', ')
-      return `(${values})`
+      return `(${placeholders})`
     }).join(', ')
 
-    const query = `INSERT INTO ${table} (${columnStr}) VALUES ${valueSets}`
-    const result = await prisma.$executeRawUnsafe(query)
+    const query = `INSERT INTO \`${table}\` (${columnStr}) VALUES ${valueSets}`
+    const result = await prisma.$executeRawUnsafe(query, ...allValues)
 
     // 🪝 transactions insert 시 imported_from이 있으면 upload_batches 자동 upsert
     //    (기존 배치는 건드리지 않고, 신규만 메타데이터 오버레이 등록)

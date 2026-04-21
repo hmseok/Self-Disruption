@@ -32,6 +32,18 @@ function validateTableName(table: string): boolean {
   return ALLOWED_TABLES.includes(table)
 }
 
+// 컬럼명 검증 (SQL Injection 방지 — 영문/숫자/_ 만 허용)
+const COL_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+function validateColumnName(col: string): boolean {
+  return COL_NAME_RE.test(col)
+}
+
+// UUID 형식만 허용 (DELETE/PATCH id)
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+function validateUuid(id: string): boolean {
+  return UUID_RE.test(id)
+}
+
 function buildSelectQuery(table: string): string {
   switch (table) {
     case 'depreciation_adjustments':
@@ -121,27 +133,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const rows = Array.isArray(body) ? body : [body]
 
-    // Build INSERT query dynamically
+    // Build INSERT query dynamically — 파라미터 바인딩 + 컬럼명 화이트리스트
     if (rows.length === 0) {
       return NextResponse.json({ error: '삽입할 행이 없습니다' }, { status: 400 })
     }
 
     const columns = Object.keys(rows[0])
-    const columnStr = columns.join(', ')
+    const invalidCol = columns.find(c => !validateColumnName(c))
+    if (invalidCol) {
+      return NextResponse.json({ error: `잘못된 컬럼명: ${invalidCol}` }, { status: 400 })
+    }
+    const columnStr = columns.map(c => `\`${c}\``).join(', ')
 
-    const valueSets = rows.map((row: any, idx: number) => {
-      const values = columns.map((col: string) => {
+    const values: any[] = []
+    const valueSets = rows.map((row: any) => {
+      const placeholders = columns.map((col: string) => {
         const val = row[col]
-        if (val === null || val === undefined) return 'NULL'
-        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
-        if (typeof val === 'boolean') return val ? '1' : '0'
-        return val
+        if (val === null || val === undefined) {
+          values.push(null)
+        } else if (typeof val === 'boolean') {
+          values.push(val ? 1 : 0)
+        } else {
+          values.push(val)
+        }
+        return '?'
       }).join(', ')
-      return `(${values})`
+      return `(${placeholders})`
     }).join(', ')
 
-    const query = `INSERT INTO ${table} (${columnStr}) VALUES ${valueSets}`
-    await prisma.$executeRawUnsafe(query)
+    const query = `INSERT INTO \`${table}\` (${columnStr}) VALUES ${valueSets}`
+    await prisma.$executeRawUnsafe(query, ...values)
 
     return NextResponse.json({ success: true, error: null })
   } catch (e: any) {
@@ -169,27 +190,45 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     // business_rules는 `key`(예약어), `value`(JSON) 특수 처리
     const isBR = table === 'business_rules'
-    const updates = Object.entries(body)
-      .map(([key, val]) => {
-        const colName = isBR ? '`' + key + '`' : key
-        if (isBR && key === 'value') {
-          // JSON 컬럼 — JSON 텍스트로 바인딩
-          let jsonText: string
-          if (val === null || val === undefined) jsonText = 'null'
-          else if (typeof val === 'string') {
-            try { JSON.parse(val); jsonText = val } catch { jsonText = JSON.stringify(val) }
-          } else jsonText = JSON.stringify(val)
-          return `${colName} = CAST('${jsonText.replace(/'/g, "''")}' AS JSON)`
-        }
-        if (val === null || val === undefined) return `${colName} = NULL`
-        if (typeof val === 'string') return `${colName} = '${val.replace(/'/g, "''")}'`
-        if (typeof val === 'boolean') return `${colName} = ${val ? '1' : '0'}`
-        return `${colName} = ${val}`
-      })
-      .join(', ')
 
-    const query = `UPDATE ${table} SET ${updates} WHERE id = '${id.replace(/'/g, "''")}'`
-    await prisma.$executeRawUnsafe(query)
+    // 컬럼명 화이트리스트 검증
+    const keys = Object.keys(body)
+    const invalidKey = keys.find(k => !validateColumnName(k))
+    if (invalidKey) {
+      return NextResponse.json({ error: `잘못된 컬럼명: ${invalidKey}` }, { status: 400 })
+    }
+
+    const setClauses: string[] = []
+    const values: any[] = []
+    for (const key of keys) {
+      const val = (body as any)[key]
+      const colRef = `\`${key}\``
+      if (isBR && key === 'value') {
+        // JSON 컬럼 — CAST(? AS JSON)
+        let jsonText: string
+        if (val === null || val === undefined) jsonText = 'null'
+        else if (typeof val === 'string') {
+          try { JSON.parse(val); jsonText = val } catch { jsonText = JSON.stringify(val) }
+        } else jsonText = JSON.stringify(val)
+        setClauses.push(`${colRef} = CAST(? AS JSON)`)
+        values.push(jsonText)
+      } else if (val === null || val === undefined) {
+        setClauses.push(`${colRef} = NULL`)
+      } else if (typeof val === 'boolean') {
+        setClauses.push(`${colRef} = ?`)
+        values.push(val ? 1 : 0)
+      } else {
+        setClauses.push(`${colRef} = ?`)
+        values.push(val)
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: '업데이트할 필드가 없습니다' }, { status: 400 })
+    }
+
+    const query = `UPDATE \`${table}\` SET ${setClauses.join(', ')} WHERE id = ?`
+    await prisma.$executeRawUnsafe(query, ...values, id)
 
     return NextResponse.json({ success: true, error: null })
   } catch (e: any) {
@@ -214,8 +253,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '잘못된 테이블' }, { status: 400 })
     }
 
-    const query = `DELETE FROM ${table} WHERE id = '${id.replace(/'/g, "''")}'`
-    await prisma.$executeRawUnsafe(query)
+    const query = `DELETE FROM \`${table}\` WHERE id = ?`
+    await prisma.$executeRawUnsafe(query, id)
 
     return NextResponse.json({ success: true, error: null })
   } catch (e: any) {

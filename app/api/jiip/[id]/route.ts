@@ -43,13 +43,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const values: any[] = []
     for (const field of fields) {
       if (body[field] !== undefined) {
-        updates.push(`${field} = ?`)
+        // 화이트리스트 통과 필드만 컬럼명에 포함 — 백틱 이스케이프
+        updates.push(`\`${field}\` = ?`)
         values.push(body[field] === '' ? null : body[field])
       }
     }
 
     if (updates.length === 0) return NextResponse.json({ error: '업데이트할 필드 없음' }, { status: 400 })
-    updates.push('updated_at = NOW()')
+    updates.push('`updated_at` = NOW()')
     values.push(id)
     await prisma.$executeRawUnsafe(`UPDATE jiip_contracts SET ${updates.join(', ')} WHERE id = ?`, ...values)
     return NextResponse.json({ data: { id }, error: null })

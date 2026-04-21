@@ -24,14 +24,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const allowed = ['card_number', 'card_alias', 'holder_name', 'assigned_employee_id', 'assigned_car_id', 'status']
     for (const key of allowed) {
       if (key in body) {
-        sets.push(`${key} = ?`)
+        // 화이트리스트 통과 필드만 컬럼명에 포함 — 백틱 이스케이프
+        sets.push(`\`${key}\` = ?`)
         values.push(body[key] === '' ? null : body[key])
       }
     }
     if (sets.length === 0) {
       return NextResponse.json({ data: { id }, error: null })
     }
-    sets.push('updated_at = NOW(3)')
+    sets.push('`updated_at` = NOW(3)')
     values.push(id)
 
     await prisma.$executeRawUnsafe(

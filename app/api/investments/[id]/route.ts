@@ -44,14 +44,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     for (const f of fields) {
       if (body[f] !== undefined) {
-        updates.push(`${f} = ?`)
+        // 화이트리스트 통과 필드만 컬럼명에 포함 — 백틱으로 이스케이프
+        updates.push(`\`${f}\` = ?`)
         values.push(body[f] === '' ? null : body[f])
       }
     }
 
     if (!updates.length) return NextResponse.json({ error: '없음' }, { status: 400 })
 
-    updates.push('updated_at = NOW()')
+    updates.push('`updated_at` = NOW()')
     values.push(id)
 
     await prisma.$executeRawUnsafe(`UPDATE general_investments SET ${updates.join(', ')} WHERE id = ?`, ...values)

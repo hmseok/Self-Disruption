@@ -259,6 +259,7 @@ export default function LoanListPage() {
 
   const statActions: ActionButton[] = [
     { label: '직접 등록', onClick: () => router.push('/loans/new'), variant: 'primary', icon: '+' },
+    { label: '역추적', onClick: () => router.push('/loans/backtrace'), variant: 'secondary', icon: '🔍' },
   ]
 
   // ─── DcToolbar 필터 데이터 ───

@@ -58,9 +58,11 @@ export async function PATCH(req: NextRequest) {
       }
 
       const existingColumns = Object.keys(current[0])
+      const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
       const updatePayload: Record<string, any> = {}
       for (const [key, value] of Object.entries(fields)) {
-        if (existingColumns.includes(key)) {
+        // 화이트리스트 2중 검증: (1) 실제 DB 컬럼 존재 + (2) 컬럼명 안전한 패턴
+        if (existingColumns.includes(key) && SAFE_COL.test(key)) {
           updatePayload[key] = value
         }
       }
@@ -71,7 +73,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: '업데이트할 필드가 없습니다.', missingColumns }, { status: 400 })
       }
 
-      const setClauses = Object.keys(updatePayload).map(k => `${k} = ?`).join(', ')
+      const setClauses = Object.keys(updatePayload).map(k => `\`${k}\` = ?`).join(', ')
       const values = [...Object.values(updatePayload), id]
       await prisma.$executeRawUnsafe(`UPDATE companies SET ${setClauses} WHERE id = ?`, ...values)
 

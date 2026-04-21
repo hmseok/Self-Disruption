@@ -30,9 +30,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const updates: string[] = []
     const values: any[] = []
 
+    // 화이트리스트 — companies 테이블에 허용된 컬럼만
+    const ALLOWED_COLS = new Set([
+      'name', 'business_number', 'representative', 'address', 'phone',
+      'email', 'website', 'industry', 'logo_url', 'fax', 'bank_name',
+      'bank_account', 'bank_holder', 'stamp_url', 'memo', 'status',
+    ])
+    const SAFE_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+
     for (const [key, value] of Object.entries(body)) {
-      updates.push(`${key} = ?`)
-      values.push(value)
+      if (!ALLOWED_COLS.has(key) || !SAFE_COL.test(key)) continue
+      updates.push(`\`${key}\` = ?`)
+      values.push(typeof value === 'boolean' ? (value ? 1 : 0) : value)
     }
 
     values.push(id)
