@@ -9,7 +9,7 @@ const CodefPage = dynamic(() => import('../codef/page'), { ssr: false, loading: 
 const UploadPage = dynamic(() => import('../upload/page'), { ssr: false, loading: () => <TabLoading /> })
 const LedgerPage = dynamic(() => import('../page'), { ssr: false, loading: () => <TabLoading /> })
 const UploadsHistoryPage = dynamic(() => import('../uploads/page'), { ssr: false, loading: () => <TabLoading /> })
-const CardsPage = dynamic(() => import('../../admin/cards/page'), { ssr: false, loading: () => <TabLoading /> })
+const CardsPage = dynamic(() => import('../cards/page'), { ssr: false, loading: () => <TabLoading /> })
 
 function TabLoading() {
   return (
