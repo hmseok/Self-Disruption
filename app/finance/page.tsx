@@ -12,11 +12,12 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     return {}
   }
 }
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import DcStatStrip, { StatItem } from '../components/DcStatStrip'
 import DcToolbar, { FilterItem } from '../components/DcToolbar'
 import TransactionEditModal from '../components/TransactionEditModal'
+import QuickTxModal from '../components/QuickTxModal'
 export default function FinancePage() {
   const { company, role } = useApp()
 
@@ -25,34 +26,17 @@ const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'ledger' | 'schedule'>('ledger')
   const [editingTxId, setEditingTxId] = useState<string | null>(null)
+  // Phase H1 (#84): 인라인 입력 폼 → QuickTxModal 분리 (Decision 8β)
+  const [quickOpen, setQuickOpen] = useState(false)
 
   const [list, setList] = useState<any[]>([])
   const [summary, setSummary] = useState({ income: 0, expense: 0, profit: 0, pendingExpense: 0 })
   const [filterDate, setFilterDate] = useState(new Date().toISOString().slice(0, 7)) // YYYY-MM
   const [searchText, setSearchText] = useState('')
 
-  const formRef = useRef<HTMLDivElement>(null)
-
-  const [form, setForm] = useState({
-    transaction_date: new Date().toISOString().split('T')[0],
-    type: 'expense',
-    status: 'completed',
-    category: '기타운영비',
-    client_name: '',
-    description: '',
-    amount: '',
-    payment_method: '통장'
-  })
-
   const pathname = usePathname()
 
   useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, pathname])
-
-  // Phase F (#82): activeTab 변경 시 form.status 동기화
-  // 이전: <input type="hidden" value={form.status = ...}/> 렌더 중 state mutation (안티패턴)
-  useEffect(() => {
-    setForm(prev => ({ ...prev, status: activeTab === 'ledger' ? 'completed' : 'pending' }))
-  }, [activeTab])
 
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
@@ -105,25 +89,7 @@ const router = useRouter()
       setSummary({ income: inc, expense: exp, profit: inc - exp, pendingExpense: pending })
   }
 
-  const handleSave = async () => {
-      if (role === 'admin' && !company) return alert('⚠️ 회사를 먼저 선택해주세요.')
-      if (!form.amount || !form.client_name) return alert('필수 항목을 입력해주세요.')
-      try {
-        const headers = await getAuthHeader()
-        const res = await fetch('/api/transactions', {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, amount: Number(form.amount.replace(/,/g, '')), company_id: company?.id }),
-        })
-        const json = await res.json()
-        if (json.error) alert('저장 실패: ' + json.error)
-        else {
-          alert('✅ 저장되었습니다.')
-          fetchTransactions()
-          setForm({ ...form, client_name: '', description: '', amount: '' })
-        }
-      } catch (e: any) { alert('저장 실패: ' + e.message) }
-  }
+  // Phase H1: handleSave → QuickTxModal 내부로 이전
 
   const handleConfirm = async (id: string) => {
       if(!confirm('지급/수금 완료 처리하시겠습니까?')) return
@@ -163,10 +129,9 @@ const router = useRouter()
       } catch (e: any) { alert('오류: ' + e.message); setLoading(false) }
   }
 
-  const scrollToForm = () => {
-      formRef.current?.scrollIntoView({ behavior: 'smooth' })
-      setActiveTab('ledger')
-      setForm(prev => ({ ...prev, status: 'completed' }))
+  // Phase H1: scrollToForm → openQuickModal (모달 오픈)
+  const openQuickModal = () => {
+      setQuickOpen(true)
   }
 
   const nf = (num: number) => num ? num.toLocaleString() : '0'
@@ -261,7 +226,7 @@ const router = useRouter()
               📂 엑셀
             </button>
             <button
-              onClick={scrollToForm}
+              onClick={openQuickModal}
               style={{
                 padding: '6px 12px',
                 borderRadius: 8,
@@ -274,7 +239,7 @@ const router = useRouter()
                 whiteSpace: 'nowrap',
               }}
             >
-              ✏️ 직접 입력
+              ⚡ 빠른 입력
             </button>
             {activeTab === 'schedule' && (
               <button
@@ -298,52 +263,7 @@ const router = useRouter()
         }
       />
 
-      {/* 4. 입력 폼 (Ref) */}
-      <div ref={formRef} className="si-card p-4 md:p-6 mb-8 scroll-mt-32">
-          <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  {activeTab === 'schedule' ? '🗓️ 예정 내역 등록' : '✏️ 입출금 내역 등록'}
-              </h3>
-              <span className="text-xs text-slate-400 bg-gray-50 px-2 py-1 rounded">
-                  {activeTab === 'schedule' ? '아직 돈이 나가지 않은 예정 건' : '실제 통장 거래 내역'}
-              </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-              <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-400 mb-1">날짜</label>
-                  <input type="date" className="w-full border border-black/[0.06] p-2.5 rounded-xl bg-gray-50 text-sm font-bold" value={form.transaction_date} onChange={e=>setForm({...form, transaction_date: e.target.value})} />
-              </div>
-              <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-400 mb-1">구분</label>
-                  <select className="w-full border border-black/[0.06] p-2.5 rounded-xl bg-gray-50 text-sm font-bold" value={form.type} onChange={e=>setForm({...form, type: e.target.value})}>
-                      <option value="expense">🔴 지출 (출금)</option>
-                      <option value="income">🔵 수입 (입금)</option>
-                  </select>
-              </div>
-              <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-400 mb-1">계정과목</label>
-                  <input placeholder="검색 또는 입력" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-sm" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} list="category-list" />
-                  <datalist id="category-list">
-                      <option value="투자이자" /><option value="지입정산금" /><option value="보험료" />
-                      <option value="대출원리금" /><option value="차량할부금" /><option value="관리비수입" />
-                  </datalist>
-              </div>
-              <div className="md:col-span-3">
-                  <label className="block text-xs font-bold text-slate-400 mb-1">거래처/내용</label>
-                  <input placeholder="내용 입력" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-sm" value={form.client_name} onChange={e=>setForm({...form, client_name: e.target.value})} />
-              </div>
-              <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-400 mb-1">금액</label>
-                  <input type="text" placeholder="0" className="w-full border border-black/[0.06] p-2.5 rounded-xl text-right font-black text-slate-800" value={form.amount ? Number(form.amount).toLocaleString() : ''} onChange={e=>setForm({...form, amount: e.target.value.replace(/,/g, '')})} />
-              </div>
-              <div className="md:col-span-1">
-                  <button onClick={handleSave} className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-transform active:scale-95 ${activeTab === 'schedule' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                      등록
-                  </button>
-              </div>
-          </div>
-          {/* Phase F: form.status는 activeTab 전환 useEffect에서 동기화 (hidden input 제거) */}
-      </div>
+      {/* 4. 입력 폼 → Phase H1에서 QuickTxModal로 분리됨 (Decision 8β) */}
 
       {/* 5. 리스트 뷰 */}
       <div className="si-card min-h-[400px]">
@@ -465,6 +385,16 @@ const router = useRouter()
         txId={editingTxId}
         onClose={() => setEditingTxId(null)}
         onSaved={() => fetchTransactions()}
+      />
+
+      {/* Phase H1: 빠른 입력 모달 (인라인 폼 대체) */}
+      <QuickTxModal
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        onSaved={() => fetchTransactions()}
+        initialStatus={activeTab === 'schedule' ? 'pending' : 'completed'}
+        companyId={company?.id ?? null}
+        requireCompany={role === 'admin'}
       />
     </div>
     </div>
