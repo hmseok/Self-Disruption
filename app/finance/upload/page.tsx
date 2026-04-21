@@ -698,7 +698,7 @@ function UploadContent() {
     if (prevResultsLen.current > 0 && results.length === 0) {
       // results가 방금 비워짐 → review 뷰로 전환됨
       // uploadGroupBy → groupBy 동기화 (이미 위에서 같이 설정되므로 OK)
-      // uploadSubFilter → sourceFilter 동기화
+      // Phase E (#81): uploadSubFilter 제거 — sourceFilter 단일 소스
       setExpandedGroups(new Set())
     }
     prevResultsLen.current = results.length
@@ -3198,8 +3198,8 @@ function UploadContent() {
     }
   }
 
-  // ── Upload Results Sub-filter & Grouping ──
-  const [uploadSubFilter, setUploadSubFilter] = useState<'all' | 'card' | 'bank' | 'unclassified'>('all')
+  // ── Upload Results Grouping ──
+  // Phase E (#81): uploadSubFilter 제거 — sourceFilter 칩으로 일원화
   const [uploadGroupBy, setUploadGroupBy] = useState<'none' | 'card_number' | 'category' | 'vehicle' | 'client' | 'income_expense' | 'date' | 'user'>(() => {
     // groupBy와 동기화 — 업로드 뷰에서도 동일한 그룹핑 유지
     if (typeof window !== 'undefined') {
@@ -3209,13 +3209,11 @@ function UploadContent() {
     }
     return 'category'
   })
-  // 업로드 결과 필터링 (1차: 결제수단 + 검색)
+  // 업로드 결과 필터링 (sourceFilter 단일 소스 + 검색)
+  // Phase E (#81): uploadSubFilter 제거 — sourceFilter로 일원화
   const filteredByPayment = useMemo(() => {
     let filtered = results
-    if (uploadSubFilter === 'card') filtered = results.filter(r => r.payment_method === '카드' || r.payment_method === 'Card')
-    else if (uploadSubFilter === 'bank') filtered = results.filter(r => r.payment_method === '통장' || r.payment_method === 'Bank' || (r.payment_method !== '카드' && r.payment_method !== 'Card'))
-    else if (uploadSubFilter === 'unclassified') filtered = results.filter(r => !r.category || r.category === '미분류')
-    // sourceFilter 적용 (분류완료/연결완료 칩)
+    // sourceFilter 적용 (칩 단일 소스)
     if (sourceFilter === 'cat_matched') {
       filtered = filtered.filter(r => {
         const cat = r.ai_category || r.category || ''
@@ -3246,9 +3244,9 @@ function UploadContent() {
       })
     }
     return filtered
-  }, [results, uploadSubFilter, sourceFilter, searchTerm])
+  }, [results, sourceFilter, searchTerm])
 
-  // 2차 필터: 정렬만 적용 (서브필터는 제거됨 — sourceFilter 칩으로 일원화)
+  // 2차 필터: 정렬만 적용 (uploadSubFilter 제거 완료 — sourceFilter 칩으로 일원화)
   const filteredResults = useMemo(() => {
     let items = filteredByPayment
     // ── 정렬 적용 ──
@@ -4066,9 +4064,8 @@ function UploadContent() {
             ]).map(chip => (
               <button key={chip.key} onClick={() => {
                 setSourceFilter(chip.key)
-                // 업로드 결과가 있을 때는 uploadSubFilter도 동기화
+                // Phase E: uploadSubFilter 제거됨 — sourceFilter 단일 소스. 그룹핑만 추가 동기화.
                 if (results.length > 0) {
-                  setUploadSubFilter(chip.key === 'all' ? 'all' : chip.key === 'card' ? 'card' : chip.key === 'bank' ? 'bank' : 'unclassified')
                   if (chip.key === 'card') setUploadGroupBy('card_number')
                   else if (chip.key === 'all') setUploadGroupBy('none')
                   else setUploadGroupBy('none')
@@ -5008,7 +5005,7 @@ function UploadContent() {
               {/* 통장 요약은 B1 하단 요약바로 통합 — 여기서는 제거 */}
 
               {/* ═══ 미분류 수동 정리 배너 ═══ */}
-              {uploadSubFilter === 'unclassified' && uploadStats.unclassifiedCount > 0 && (
+              {sourceFilter === 'unclassified' && uploadStats.unclassifiedCount > 0 && (
                 <div style={{ padding: '14px 16px', background: 'linear-gradient(135deg, #fef2f2, #fff1f2)', borderBottom: '1px solid #fecaca', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <p style={{ fontWeight: 800, fontSize: 14, color: '#991b1b', margin: 0 }}>
