@@ -622,6 +622,16 @@ function UploadContent() {
     }
     return 'display'
   })
+  // Decision 2β: accounting(회계기준)은 고급 모드에서만 노출. 기본 = 용도별(display).
+  const [showAdvancedCategory, setShowAdvancedCategory] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      // 이미 accounting 모드로 사용 중이던 사용자는 고급 모드 자동 유지
+      const saved = localStorage.getItem('finance_showAdvancedCategory')
+      if (saved !== null) return saved === 'true'
+      return (localStorage.getItem('finance_categoryMode') as any) === 'accounting'
+    }
+    return false
+  })
 
   // ── Related Data (Review) ──
   const [reviewJiips, setReviewJiips] = useState<any[]>([])
@@ -661,6 +671,15 @@ function UploadContent() {
       localStorage.setItem('finance_categoryMode', categoryMode)
     }
   }, [categoryMode])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finance_showAdvancedCategory', String(showAdvancedCategory))
+      // 고급 모드 OFF 시 자동으로 display로 복귀 (accounting이 불필요한 상태로 남지 않도록)
+      if (!showAdvancedCategory && categoryMode === 'accounting') {
+        setCategoryMode('display')
+      }
+    }
+  }, [showAdvancedCategory, categoryMode])
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('finance_groupBy', groupBy)
@@ -4081,22 +4100,43 @@ function UploadContent() {
                 }
               }
 
+              // Decision 2β: 기본은 '용도별'만. 고급 모드에서 '회계기준별' 추가 노출.
+              const visibleOptions = showAdvancedCategory
+                ? options
+                : options.filter(o => o.value !== 'category_accounting')
+
               return (
-                <select
-                  value={dropdownVal}
-                  onChange={(e) => handleChange(e.target.value)}
-                  style={{
-                    padding: '6px 28px 6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800,
-                    border: '1.5px solid #3b6eb5', color: '#334155', background: '#fff', cursor: 'pointer',
-                    appearance: 'none',
-                    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%232d5fa8\' stroke-width=\'3\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")',
-                    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
-                  }}>
-                  {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <>
+                  <select
+                    value={dropdownVal}
+                    onChange={(e) => handleChange(e.target.value)}
+                    style={{
+                      padding: '6px 28px 6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800,
+                      border: '1.5px solid #3b6eb5', color: '#334155', background: '#fff', cursor: 'pointer',
+                      appearance: 'none',
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%232d5fa8\' stroke-width=\'3\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")',
+                      backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+                    }}>
+                    {visibleOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  {/* 고급 토글: 회계기준(accounting) 옵션 표시/숨김 */}
+                  <button
+                    onClick={() => setShowAdvancedCategory(v => !v)}
+                    title={showAdvancedCategory ? '고급 모드 ON — 회계기준별 그룹핑 선택 가능' : '고급 모드 OFF — 용도별만 노출 (클릭 시 회계기준별 추가)'}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                      border: showAdvancedCategory ? '1.5px solid #6366f1' : '1.5px solid #e2e8f0',
+                      background: showAdvancedCategory ? '#eef2ff' : '#fff',
+                      color: showAdvancedCategory ? '#4338ca' : '#94a3b8',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}>
+                    🧮 {showAdvancedCategory ? '고급' : '고급'}
+                  </button>
+                </>
               )
             })()}
-            {/* 용도별/회계기준은 드롭다운에 통합됨 */}
+            {/* 용도별=기본, 회계기준=고급 모드 토글 뒤 (Decision 2β) */}
             {/* 검색 입력 */}
             <div style={{ marginLeft: 'auto', position: 'relative', flexShrink: 0 }}>
               <input
