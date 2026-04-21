@@ -48,6 +48,12 @@ const router = useRouter()
 
   useEffect(() => { fetchTransactions() }, [filterDate, activeTab, company, pathname])
 
+  // Phase F (#82): activeTab 변경 시 form.status 동기화
+  // 이전: <input type="hidden" value={form.status = ...}/> 렌더 중 state mutation (안티패턴)
+  useEffect(() => {
+    setForm(prev => ({ ...prev, status: activeTab === 'ledger' ? 'completed' : 'pending' }))
+  }, [activeTab])
+
   // 탭 포커스 시 자동 새로고침
   useEffect(() => {
     const onFocus = () => fetchTransactions()
@@ -336,7 +342,7 @@ const router = useRouter()
                   </button>
               </div>
           </div>
-          <input type="hidden" value={form.status = activeTab === 'ledger' ? 'completed' : 'pending'} />
+          {/* Phase F: form.status는 activeTab 전환 useEffect에서 동기화 (hidden input 제거) */}
       </div>
 
       {/* 5. 리스트 뷰 */}
