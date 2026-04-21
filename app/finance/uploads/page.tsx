@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import TransactionEditModal from '../../components/TransactionEditModal'
-import { COLORS, GLASS } from '../../utils/ui-tokens'
+import { COLORS, GLASS, BTN, SPACING, pillStyle } from '../../utils/ui-tokens'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -186,25 +186,44 @@ export default function UploadsHistoryPage() {
 
   return (
     <div className="page-bg">
+      {/* Phase H3: hover CSS — onMouseEnter/onMouseLeave 제거 + :hover로 처리 */}
+      <style>{`
+        .uploads-tx-row[data-tone="uncat"]    { background: ${COLORS.bgRed}; }
+        .uploads-tx-row[data-tone="etc"]      { background: ${COLORS.bgAmber}; }
+        .uploads-tx-row[data-tone="deleted"]  { background: #fee2e2; }
+        .uploads-tx-row[data-tone="normal"]   { background: transparent; }
+        .uploads-tx-row:hover                 { background: ${COLORS.bgBlue} !important; }
+        .uploads-btn-ghost:hover:not(:disabled)              { background: ${COLORS.bgGray}; border-color: ${COLORS.borderSubtle}; }
+        .uploads-btn-primary-tint:hover:not(:disabled)       { background: ${COLORS.bgBlue}; border-color: ${COLORS.borderBlue}; }
+        .uploads-btn-danger-tint:hover:not(:disabled)        { background: ${COLORS.bgRed};  border-color: ${COLORS.borderRed}; }
+        .uploads-btn-primary:hover:not(:disabled)            { background: ${COLORS.primaryDark}; }
+        .uploads-btn-ghost:disabled,
+        .uploads-btn-primary:disabled                        { opacity: 0.55; cursor: not-allowed; }
+      `}</style>
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
         {/* 헤더 + 업로드 버튼 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>📂 업로드 이력</h1>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.textPrimary, margin: 0 }}>📂 업로드 이력</h1>
+            <div style={{ fontSize: 11, color: COLORS.textSecondary, marginTop: 2 }}>
               파일 단위로 묶어 확인 · 각 거래는 클릭하여 수정
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', gap: SPACING.md, alignItems: 'center' }}>
+            <label style={{ fontSize: 11, color: COLORS.textSecondary, display: 'flex', alignItems: 'center', gap: 4 }}>
               <input type="checkbox" checked={includeRolledBack} onChange={e => setIncludeRolledBack(e.target.checked)} />
               롤백 배치 포함
             </label>
             <button
               onClick={() => router.push('/finance/upload')}
+              className="uploads-btn-primary"
               style={{
-                padding: '8px 14px', background: '#0891b2', color: 'white', border: 0,
-                borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                ...BTN.md,
+                background: COLORS.primary,
+                color: '#fff',
+                border: 0,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(59,110,181,0.25)',
               }}
             >+ 새 업로드</button>
           </div>
@@ -217,9 +236,9 @@ export default function UploadsHistoryPage() {
           </div>
 
           {loading ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>불러오는 중...</div>
+            <div style={{ padding: 60, textAlign: 'center', color: COLORS.textMuted }}>불러오는 중...</div>
           ) : batches.length === 0 ? (
-            <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>업로드 이력이 없습니다.</div>
+            <div style={{ padding: 60, textAlign: 'center', color: COLORS.textMuted }}>업로드 이력이 없습니다.</div>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {batches.map(b => {
@@ -247,48 +266,51 @@ export default function UploadsHistoryPage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: '#0c4a6e', fontSize: 14 }}>
+                        <div style={{ fontWeight: 700, color: COLORS.textPrimary, fontSize: 14 }}>
                           {batchIcon(b)} {b.file_name || b.id}
-                          {isRolledBack && <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 999, background: '#fee2e2', color: '#991b1b' }}>롤백됨</span>}
+                          {isRolledBack && <span style={{ ...pillStyle('danger'), marginLeft: 8, fontSize: 10, padding: '2px 6px' }}>롤백됨</span>}
                         </div>
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: COLORS.textSecondary, marginTop: 4 }}>
                           {batchLabel(b)} · {fmtDatetime(b.uploaded_at)}
                           {b.uploaded_by ? ` · ${b.uploaded_by}` : ''}
                           {b.min_tx_date && b.max_tx_date ? ` · 거래기간 ${fmtDate(b.min_tx_date)} ~ ${fmtDate(b.max_tx_date)}` : ''}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: SPACING.sm }}>
                         <button
+                          className="uploads-btn-ghost uploads-btn-primary-tint"
                           onClick={e => { e.stopPropagation(); router.push(`/finance/uploads/${encodeURIComponent(b.id)}`) }}
-                          style={{ ...btnStyleGhost, color: '#0891b2', borderColor: '#e0f2fe' }}
+                          style={{ ...btnStyleGhost, color: COLORS.primary, borderColor: COLORS.borderBlue }}
                         >상세 →</button>
                         {isRolledBack ? (
                           <button
+                            className="uploads-btn-ghost"
                             onClick={e => { e.stopPropagation(); handleRestore(b.id) }}
                             disabled={rollingBack === b.id}
                             style={btnStyleGhost}
                           >↩ 복원</button>
                         ) : b.id !== '__manual__' ? (
                           <button
+                            className="uploads-btn-ghost uploads-btn-danger-tint"
                             onClick={e => { e.stopPropagation(); handleRollback(b.id) }}
                             disabled={rollingBack === b.id || Number(b.live_count) === 0}
-                            style={{ ...btnStyleGhost, color: '#dc2626', borderColor: '#fecaca' }}
+                            style={{ ...btnStyleGhost, color: COLORS.danger, borderColor: COLORS.borderRed }}
                           >🗑 일괄 롤백</button>
                         ) : null}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 11 }}>
-                      <span>✅ 분류 <b style={{ color: '#16a34a' }}>{nf(Number(b.live_classified))}</b></span>
+                    <div style={{ display: 'flex', gap: SPACING.xl, marginTop: SPACING.md, fontSize: 11 }}>
+                      <span>✅ 분류 <b style={{ color: COLORS.success }}>{nf(Number(b.live_classified))}</b></span>
                       {Number(b.live_unclassified) > 0 && (
-                        <span>⚠️ 미분류 <b style={{ color: '#d97706' }}>{nf(Number(b.live_unclassified))}</b></span>
+                        <span>⚠️ 미분류 <b style={{ color: COLORS.warning }}>{nf(Number(b.live_unclassified))}</b></span>
                       )}
                       {Number(b.live_income) > 0 && (
-                        <span>수입 <b style={{ color: '#16a34a' }}>{nf(Number(b.live_income))}</b></span>
+                        <span>수입 <b style={{ color: COLORS.success }}>{nf(Number(b.live_income))}</b></span>
                       )}
                       {Number(b.live_expense) > 0 && (
-                        <span>지출 <b style={{ color: '#dc2626' }}>{nf(Number(b.live_expense))}</b></span>
+                        <span>지출 <b style={{ color: COLORS.danger }}>{nf(Number(b.live_expense))}</b></span>
                       )}
-                      <span style={{ color: '#94a3b8' }}>총 {nf(Number(b.live_count))}건</span>
+                      <span style={{ color: COLORS.textMuted }}>총 {nf(Number(b.live_count))}건</span>
                     </div>
                   </div>
                 )
@@ -303,7 +325,7 @@ export default function UploadsHistoryPage() {
             <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>
                 {batchIcon(selectedBatch)} {selectedBatch.file_name || selectedBatch.id} — 거래 내역
-                {batchDetail?.stats && <span style={{ marginLeft: 10, fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                {batchDetail?.stats && <span style={{ marginLeft: 10, fontSize: 11, color: COLORS.textSecondary, fontWeight: 500 }}>
                   ({batchDetail.stats.live_count}건)
                 </span>}
               </h2>
@@ -316,14 +338,14 @@ export default function UploadsHistoryPage() {
             </div>
 
             {detailLoading ? (
-              <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>불러오는 중...</div>
+              <div style={{ padding: 60, textAlign: 'center', color: COLORS.textMuted }}>불러오는 중...</div>
             ) : !batchDetail?.transactions?.length ? (
-              <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>거래가 없습니다.</div>
+              <div style={{ padding: 60, textAlign: 'center', color: COLORS.textMuted }}>거래가 없습니다.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
-                    <tr style={{ background: '#f8fafc' }}>
+                    <tr style={{ background: COLORS.bgGray }}>
                       <th style={thStyle}>거래일</th>
                       <th style={thStyle}>구분</th>
                       <th style={{ ...thStyle, textAlign: 'right' }}>금액</th>
@@ -340,63 +362,54 @@ export default function UploadsHistoryPage() {
                       const isUncat = !t.category || t.category === '미분류' || t.category === ''
                       const isEtc = t.category === '기타'
                       // Decision 1α: 미분류=red / 기타=amber / 삭제=red-tint / 정상=투명
-                      const _rowBg = isUncat ? COLORS.bgRed : isEtc ? COLORS.bgAmber : isDeleted ? '#fee2e2' : undefined
-                      const _rowHover = COLORS.bgBlue
+                      // Phase H3: hover CSS 전환 → data-tone + :hover로 처리
+                      const tone: 'uncat' | 'etc' | 'deleted' | 'normal' =
+                        isUncat ? 'uncat' : isEtc ? 'etc' : isDeleted ? 'deleted' : 'normal'
                       return (
                         <tr
                           key={t.id}
+                          className="uploads-tx-row"
+                          data-tone={tone}
                           onClick={() => setEditingTxId(t.id)}
                           style={{
                             borderBottom: '1px solid #f1f5f9',
-                            background: _rowBg,
                             opacity: isDeleted ? 0.6 : 1,
                             cursor: 'pointer',
+                            transition: 'background 0.15s ease',
                           }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = _rowHover }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = _rowBg || '' }}
                         >
                           <td style={tdStyle}>{fmtDate(t.transaction_date)}</td>
                           <td style={tdStyle}>
-                            <span style={{
-                              display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                              background: t.type === 'income' ? '#dcfce7' : '#fee2e2',
-                              color: t.type === 'income' ? '#166534' : '#991b1b',
-                            }}>
+                            <span style={pillStyle(t.type === 'income' ? 'success' : 'danger')}>
                               {t.type === 'income' ? '수입' : '지출'}
                             </span>
                           </td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: t.type === 'income' ? '#166534' : '#991b1b' }}>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: t.type === 'income' ? COLORS.success : COLORS.danger }}>
                             {t.type === 'income' ? '+' : '-'}{nf(Number(t.amount))}
                           </td>
                           <td style={tdStyle}>
-                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{t.client_name || '—'}</div>
-                            {t.description && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{t.description}</div>}
+                            <div style={{ fontWeight: 600, color: COLORS.textPrimary }}>{t.client_name || '—'}</div>
+                            {t.description && <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 2 }}>{t.description}</div>}
                           </td>
                           <td style={tdStyle}>
-                            <span style={{
-                              display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                              background: isUncat ? '#fecaca' : '#dbeafe',
-                              color: isUncat ? '#991b1b' : '#1e40af',
-                            }}>
+                            <span style={pillStyle(isUncat ? 'danger' : 'info')}>
                               {isUncat ? '⚠️ 미분류' : cat}
                             </span>
                           </td>
                           <td style={tdStyle}>
                             {t.related_type ? (
-                              <span style={{
-                                display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
-                                background: '#f1f5f9', color: '#475569',
-                              }}>
-                                {t.related_type}
-                              </span>
-                            ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                              <span style={pillStyle('neutral')}>{t.related_type}</span>
+                            ) : <span style={{ color: COLORS.textDim }}>—</span>}
                           </td>
                           <td style={{ ...tdStyle, textAlign: 'center' }}>
                             <button
                               onClick={e => { e.stopPropagation(); setEditingTxId(t.id) }}
                               style={{
-                                padding: '4px 8px', background: '#0891b2', color: 'white', border: 0,
-                                borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                ...BTN.sm,
+                                background: COLORS.primary,
+                                color: '#fff',
+                                border: 0,
+                                cursor: 'pointer',
                               }}
                             >✏</button>
                           </td>
@@ -406,7 +419,7 @@ export default function UploadsHistoryPage() {
                   </tbody>
                 </table>
                 {batchDetail.transactions.length > 500 && (
-                  <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#64748b' }}>
+                  <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: COLORS.textSecondary }}>
                     첫 500건만 표시 · 총 {batchDetail.transactions.length}건
                   </div>
                 )}
@@ -430,13 +443,17 @@ export default function UploadsHistoryPage() {
 }
 
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '10px 12px', color: '#64748b', fontSize: 11,
-  fontWeight: 700, borderBottom: '1px solid #e2e8f0',
+  textAlign: 'left', padding: '10px 12px', color: COLORS.textSecondary, fontSize: 11,
+  fontWeight: 700, borderBottom: `1px solid ${COLORS.borderSubtle}`,
 }
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', color: '#0f172a',
+  padding: '10px 12px', color: COLORS.textPrimary,
 }
 const btnStyleGhost: React.CSSProperties = {
-  padding: '5px 10px', background: 'white', color: '#64748b',
-  border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+  ...BTN.sm,
+  background: 'rgba(255,255,255,0.85)',
+  color: COLORS.textSecondary,
+  border: `1px solid ${COLORS.borderSubtle}`,
+  cursor: 'pointer',
+  transition: 'background 0.15s ease, border-color 0.15s ease',
 }
