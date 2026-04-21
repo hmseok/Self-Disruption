@@ -3190,11 +3190,6 @@ function UploadContent() {
     }
     return 'category'
   })
-  // 카드 전용 서브필터
-  const [cardSubFilter, setCardSubFilter] = useState<'all' | 'matched' | 'unmatched' | 'by_company' | 'by_user'>('all')
-  // 통장 전용 서브필터
-  const [bankSubFilter, setBankSubFilter] = useState<'all' | 'income' | 'expense' | 'auto_transfer' | 'salary_tax'>('all')
-
   // 업로드 결과 필터링 (1차: 결제수단 + 검색)
   const filteredByPayment = useMemo(() => {
     let filtered = results
@@ -3234,50 +3229,9 @@ function UploadContent() {
     return filtered
   }, [results, uploadSubFilter, sourceFilter, searchTerm])
 
-  // 2차 필터: 카드/통장 전용 서브필터 적용
+  // 2차 필터: 정렬만 적용 (서브필터는 제거됨 — sourceFilter 칩으로 일원화)
   const filteredResults = useMemo(() => {
     let items = filteredByPayment
-    // 카드 서브필터
-    if (uploadSubFilter === 'card' && cardSubFilter !== 'all') {
-      if (cardSubFilter === 'matched') {
-        items = items.filter(r => {
-          if (!r.card_number) return false
-          return corpCards.some(cc => {
-            const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
-            const rNum = (r.card_number || '').replace(/\D/g, '')
-            return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
-          })
-        })
-      } else if (cardSubFilter === 'unmatched') {
-        items = items.filter(r => {
-          if (!r.card_number) return true
-          return !corpCards.some(cc => {
-            const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
-            const rNum = (r.card_number || '').replace(/\D/g, '')
-            return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
-          })
-        })
-      }
-    }
-    // 통장 서브필터
-    if (uploadSubFilter === 'bank' && bankSubFilter !== 'all') {
-      if (bankSubFilter === 'income') {
-        items = items.filter(r => r.type === 'income')
-      } else if (bankSubFilter === 'expense') {
-        items = items.filter(r => r.type === 'expense')
-      } else if (bankSubFilter === 'auto_transfer') {
-        items = items.filter(r => {
-          const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
-          return desc.includes('자동이체') || desc.includes('cms') || desc.includes('자동납부') || desc.includes('자동') || desc.includes('정기')
-        })
-      } else if (bankSubFilter === 'salary_tax') {
-        items = items.filter(r => {
-          const cat = r.category || ''
-          const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
-          return cat.includes('급여') || cat.includes('세금') || cat.includes('원천세') || cat.includes('부가세') || cat.includes('4대보험') || desc.includes('급여') || desc.includes('세금') || desc.includes('국세') || desc.includes('연금') || desc.includes('건강보험') || desc.includes('고용보험')
-        })
-      }
-    }
     // ── 정렬 적용 ──
     if (sortField) {
       items = [...items].sort((a, b) => {
@@ -3297,76 +3251,7 @@ function UploadContent() {
       })
     }
     return items
-  }, [filteredByPayment, uploadSubFilter, cardSubFilter, bankSubFilter, corpCards, sortField, sortDir])
-
-  // 카드 서브필터 통계
-  const cardSubStats = useMemo(() => {
-    if (uploadSubFilter !== 'card') return { all: 0, matched: 0, unmatched: 0, companies: [] as { name: string; count: number }[], users: [] as { name: string; count: number }[] }
-    const cardItems = filteredByPayment
-    const matched = cardItems.filter(r => {
-      if (!r.card_number) return false
-      return corpCards.some(cc => {
-        const allNums = [cc.card_number, ...(cc.previous_card_numbers || [])].filter(Boolean).map((n: string) => n.replace(/\D/g, ''))
-        const rNum = (r.card_number || '').replace(/\D/g, '')
-        return allNums.some((n: string) => n.includes(rNum.slice(-4)) || rNum.includes(n.slice(-4)))
-      })
-    })
-    // 카드사별 집계
-    const companyMap: Record<string, number> = {}
-    for (const r of cardItems) {
-      const card = findCardByNumber(r.card_number)
-      const company = card?.card_company || '미등록'
-      companyMap[company] = (companyMap[company] || 0) + 1
-    }
-    // 사용자별 집계 (assigned_employee 우선)
-    const userMap: Record<string, number> = {}
-    for (const r of cardItems) {
-      const card = findCardByNumber(r.card_number)
-      let user = '미매칭'
-      if (card) {
-        if (card.assigned_employee_id) {
-          const emp = employees.find((e: any) => e.id === card.assigned_employee_id)
-          user = emp?.name || emp?.employee_name || card.holder_name || card.card_alias || '공용'
-        } else {
-          user = card.holder_name || card.card_alias || '공용'
-        }
-      }
-      userMap[user] = (userMap[user] || 0) + 1
-    }
-    return {
-      all: cardItems.length,
-      matched: matched.length,
-      unmatched: cardItems.length - matched.length,
-      companies: Object.entries(companyMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-      users: Object.entries(userMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-    }
-  }, [filteredByPayment, uploadSubFilter, corpCards])
-
-  // 통장 서브필터 통계
-  const bankSubStats = useMemo(() => {
-    if (uploadSubFilter !== 'bank') return { all: 0, income: 0, expense: 0, autoTransfer: 0, salaryTax: 0, incomeAmount: 0, expenseAmount: 0 }
-    const bankItems = filteredByPayment
-    const income = bankItems.filter(r => r.type === 'income')
-    const expense = bankItems.filter(r => r.type === 'expense')
-    const autoTransfer = bankItems.filter(r => {
-      const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
-      return desc.includes('자동이체') || desc.includes('cms') || desc.includes('자동납부') || desc.includes('자동') || desc.includes('정기')
-    })
-    const salaryTax = bankItems.filter(r => {
-      const cat = r.category || ''
-      const desc = ((r.description || '') + (r.client_name || '')).toLowerCase()
-      return cat.includes('급여') || cat.includes('세금') || cat.includes('원천세') || cat.includes('부가세') || cat.includes('4대보험') || desc.includes('급여') || desc.includes('세금') || desc.includes('국세') || desc.includes('연금') || desc.includes('건강보험') || desc.includes('고용보험')
-    })
-    return {
-      all: bankItems.length,
-      income: income.length,
-      expense: expense.length,
-      autoTransfer: autoTransfer.length,
-      salaryTax: salaryTax.length,
-      incomeAmount: income.reduce((s, r) => s + Math.abs(r.amount || 0), 0),
-      expenseAmount: expense.reduce((s, r) => s + Math.abs(r.amount || 0), 0),
-    }
-  }, [filteredByPayment, uploadSubFilter])
+  }, [filteredByPayment, sortField, sortDir])
 
   // 카드번호별 그룹핑 (법인카드 사용자 매칭 포함, 통장거래 별도 분리)
   const groupedByCard = useMemo(() => {
@@ -5665,8 +5550,13 @@ function UploadContent() {
                     <tbody style={{ borderTop: '1px solid #f3f4f6' }}>
                       {filteredResults.map((item) => {
                         const cardInfo = getCardDisplayInfo(item.card_id)
+                        // Decision 1 α: 미분류=red / 기타=amber 행 배경 구분
+                        const _isUnclass = !item.category || item.category === '미분류'
+                        const _isEtc = item.category === '기타'
+                        const _rowBg = _isUnclass ? '#fef2f2' : _isEtc ? '#fffbeb' : 'transparent'
+                        const _rowBgHover = _isUnclass ? '#fee2e2' : _isEtc ? '#fef3c7' : 'rgba(45, 95, 168, 0.03)'
                         return (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent', transition: 'background 0.15s', height: 36, opacity: uploadConfirmedIds.has(item.id) ? 0.6 : 1 }} onMouseEnter={(e) => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = (!item.category || item.category === '미분류' || item.category === '기타') ? '#fee2e2' : 'rgba(45, 95, 168, 0.03)' }} onMouseLeave={(e) => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : (!item.category || item.category === '미분류' || item.category === '기타') ? '#fef2f2' : 'transparent' }}>
+                          <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9', background: uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : _rowBg, transition: 'background 0.15s', height: 36, opacity: uploadConfirmedIds.has(item.id) ? 0.6 : 1 }} onMouseEnter={(e) => { if (!uploadSelectedIds.has(item.id)) e.currentTarget.style.background = _rowBgHover }} onMouseLeave={(e) => { e.currentTarget.style.background = uploadSelectedIds.has(item.id) ? 'rgba(59,130,246,0.05)' : uploadConfirmedIds.has(item.id) ? 'rgba(16,185,129,0.04)' : _rowBg }}>
                             <td style={{ padding: '4px 4px', textAlign: 'center' }}>
                               {uploadConfirmedIds.has(item.id) ? (
                                 <span title="확정됨" style={{ fontSize: 13, color: '#10b981', cursor: 'pointer' }} onClick={() => { const next = new Set(uploadConfirmedIds); next.delete(item.id); setUploadConfirmedIds(next) }}>✅</span>
@@ -6624,6 +6514,12 @@ function UploadContent() {
                 const groupColor = CATEGORY_COLORS[isDisplayCat ? category : groupName] || '#64748b'
                 const isIncome = group.type === 'income'
 
+                // Decision 1 α: 미분류(빨강, 즉각 액션) ≠ 기타(앰버, 세분화 여지)
+                const isUnclassified = category === '미분류'
+                const isEtc = category === '기타'
+                const headerBg = isUnclassified ? '#fef2f2' : isEtc ? '#fffbeb' : '#f8fafc'
+                const headerBgHover = isUnclassified ? '#fee2e2' : isEtc ? '#fef3c7' : '#f1f5f9'
+
                 return (
                   <div key={category} style={{
                     borderTop: gIdx > 0 ? '1px solid #e2e8f0' : 'none',
@@ -6633,11 +6529,11 @@ function UploadContent() {
                       style={{
                         display: 'flex', alignItems: 'center', padding: '12px 20px', cursor: 'pointer', gap: 12,
                         borderBottom: isExpanded ? '1px solid #f1f5f9' : 'none',
-                        background: (category === '미분류' || category === '기타') ? '#fef2f2' : '#f8fafc',
+                        background: headerBg,
                         transition: 'background 0.2s', position: 'sticky', top: 0, zIndex: 6,
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fee2e2' : '#f1f5f9'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = (category === '미분류' || category === '기타') ? '#fef2f2' : '#f8fafc'}>
+                      onMouseEnter={(e) => e.currentTarget.style.background = headerBgHover}
+                      onMouseLeave={(e) => e.currentTarget.style.background = headerBg}>
 
                       {/* Group Checkbox */}
                       <input
