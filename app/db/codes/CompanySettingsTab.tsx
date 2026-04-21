@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDaumPostcodePopup } from 'react-daum-postcode'
 import { useApp } from '../../context/AppContext'
+import { getAuthHeader } from '@/app/utils/auth-client'
 
 interface CompanyData {
   id: string
@@ -59,7 +60,9 @@ export default function CompanySettingsTab() {
     }
     try {
       setLoading(true)
-      const res = await fetch(`/api/company?id=${targetCompanyId}`)
+      const res = await fetch(`/api/company?id=${targetCompanyId}`, {
+        headers: { ...(await getAuthHeader()) },
+      })
       if (!res.ok) throw new Error((await res.json()).error || '로드 실패')
       const row = await res.json()
       const mapped: CompanyData = {
@@ -99,7 +102,7 @@ export default function CompanySettingsTab() {
       setSaving(true)
       const res = await fetch('/api/company', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({
           id: targetCompanyId,
           name: data.name,

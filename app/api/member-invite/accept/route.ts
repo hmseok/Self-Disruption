@@ -57,9 +57,10 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         UPDATE profiles SET
           role = ${invite.role || 'user'},
-          position = ${invite.position_id || null},
-          department = ${invite.department_id || null},
+          position_id = ${invite.position_id || null},
+          department_id = ${invite.department_id || null},
           name = ${name},
+          employee_name = ${name},
           phone = ${phone || null},
           password_hash = ${passwordHash},
           is_active = 1,
@@ -71,8 +72,8 @@ export async function POST(request: NextRequest) {
       userId = crypto.randomUUID()
       await prisma.$executeRaw`
         INSERT INTO profiles
-        (id, email, role, position, department, name, phone, password_hash, is_active, is_approved, created_at)
-        VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
+        (id, email, role, position_id, department_id, name, employee_name, phone, password_hash, is_active, is_approved, created_at)
+        VALUES (${userId}, ${invite.email}, ${invite.role || 'user'}, ${invite.position_id || null}, ${invite.department_id || null}, ${name}, ${name}, ${phone || null}, ${passwordHash}, 1, 1, NOW())
       `
     }
 
