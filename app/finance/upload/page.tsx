@@ -4474,7 +4474,7 @@ function UploadContent() {
                                           </div>
                                           {isOpen && catPopoverPos && (<>
                                             <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                               {catPopoverStep === 'group' ? (<>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
                                                 {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
@@ -4532,7 +4532,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -4709,7 +4709,7 @@ function UploadContent() {
                                       {isOpen && catPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                          <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                             {catPopoverStep === 'group' ? (
                                               <>
                                                 <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
@@ -4779,7 +4779,7 @@ function UploadContent() {
                                       {isOpen && relPopoverPos && (
                                         <>
                                           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                          <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                             <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                               <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                             </button>
@@ -5038,7 +5038,7 @@ function UploadContent() {
                                           {isCatOpen && catPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                                 {catPopoverStep === 'group' ? (
                                                   <>
                                                     <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
@@ -5106,7 +5106,7 @@ function UploadContent() {
                                           {isOpen && relPopoverPos && (
                                             <>
                                               <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                              <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                 <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                   <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                 </button>
@@ -5389,7 +5389,7 @@ function UploadContent() {
                                             {isCatOpen && catPopoverPos && (
                                               <>
                                                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                                <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                                   {catPopoverStep === 'group' ? (
                                                     <>
                                                       <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
@@ -5458,7 +5458,7 @@ function UploadContent() {
                                             {isRelOpen && relPopoverPos && (
                                               <>
                                                 <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
+                                                <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
                                                   <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
                                                     <span style={{ fontSize: 12 }}>✕</span> 연결 해제
                                                   </button>
@@ -5611,7 +5611,7 @@ function UploadContent() {
                                     {isOpen && catPopoverPos && (
                                       <>
                                         <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
@@ -6004,8 +6004,8 @@ function UploadContent() {
                 const bulkPreview = bulkItem || bulkGroup || '미분류'
                 const bulkGroupColor = bulkGroup ? (CATEGORY_COLORS[bulkGroup] || '#94a3b8') : ''
                 return (
-                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setBulkClassifyOpen(false)}>
-                    <div style={{ background: '#fff', borderRadius: 16, width: 480, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '10px 10px 30px rgba(140,170,210,0.22), -10px -10px 30px rgba(255,255,255,0.7)' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }} onClick={() => setBulkClassifyOpen(false)}>
+                    <div style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(20px) saturate(150%)', WebkitBackdropFilter: 'blur(20px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, width: 480, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 64px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10)' }} onClick={e => e.stopPropagation()}>
                       {/* 헤더 */}
                       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
@@ -6495,7 +6495,16 @@ function UploadContent() {
               </div>
             </div>
           ) : items.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0' }}>
+            // Phase B: 빈 상태 카드도 Glass L4 — 일관성
+            <div style={{
+              textAlign: 'center', padding: '60px 20px',
+              background: 'rgba(255,255,255,0.72)',
+              backdropFilter: 'blur(16px) saturate(150%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              borderRadius: 16,
+              boxShadow: '0 4px 16px rgba(30,41,59,0.04)',
+            }}>
               <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>✅</span>
               <p style={{ fontWeight: 700, fontSize: 14, color: '#475569', margin: 0 }}>
                 {activeTab === 'classify' ? '분류 대기 항목이 없습니다' : '확정된 항목이 없습니다'}
@@ -6503,7 +6512,15 @@ function UploadContent() {
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>업로드된 거래가 AI 분류되면 여기에 표시됩니다</p>
             </div>
           ) : (
-            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            // Phase B: 테이블 카드 = Soft Ice Glass L4 (불투명 72% + 섬세한 블러)
+            <div style={{
+              background: 'rgba(255,255,255,0.72)',
+              backdropFilter: 'blur(16px) saturate(150%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+              border: '1px solid rgba(0,0,0,0.06)',
+              borderRadius: 12, overflow: 'hidden',
+              boxShadow: '0 4px 16px rgba(30,41,59,0.04)',
+            }}>
               {/* 용도별/회계기준 토글은 상단 1줄에 통합됨 */}
               {groupedItems.map(([category, group], gIdx) => {
                 const isExpanded = expandedGroups.has(category)
@@ -6734,7 +6751,7 @@ function UploadContent() {
                                     {isCatOpen && catPopoverPos && (
                                       <>
                                         <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '8px 8px 20px rgba(140,170,210,0.15), -8px -8px 20px rgba(255,255,255,0.7)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
+                                        <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
                                           {catPopoverStep === 'group' ? (
                                             <>
                                               <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
@@ -7183,10 +7200,17 @@ function UploadContent() {
           {linkModalOpen && (
             <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onClick={() => { setLinkModalOpen(false); setLinkModalSelectedId(null) }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+              {/* 백드롭: 진한 어두운 블러 */}
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
               <div style={{
-                position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 600, maxHeight: '80vh',
-                display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(140,170,210,0.25)',
+                position: 'relative',
+                background: 'rgba(255,255,255,0.88)',
+                backdropFilter: 'blur(20px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: 16, width: '90%', maxWidth: 600, maxHeight: '80vh',
+                display: 'flex', flexDirection: 'column',
+                boxShadow: '0 32px 64px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10)',
               }} onClick={e => e.stopPropagation()}>
                 {/* 모달 헤더 */}
                 <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
@@ -7399,10 +7423,15 @@ function UploadContent() {
       {deleteModal.open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setDeleteModal(prev => ({ ...prev, open: false }))}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
           <div style={{
-            position: 'relative', background: '#fff', borderRadius: 16, width: '90%', maxWidth: 420,
-            boxShadow: '0 20px 60px rgba(140,170,210,0.25)', overflow: 'hidden',
+            position: 'relative',
+            background: 'rgba(255,255,255,0.88)',
+            backdropFilter: 'blur(20px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            borderRadius: 16, width: '90%', maxWidth: 420,
+            boxShadow: '0 32px 64px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10)', overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '24px 24px 16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -7449,11 +7478,16 @@ function UploadContent() {
       {dupModal.open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setDupModal(prev => ({ ...prev, open: false, onConfirm: null }))}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.40)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
           <div style={{
-            position: 'relative', background: '#fff', borderRadius: 16, width: '95%', maxWidth: 680,
+            position: 'relative',
+            background: 'rgba(255,255,255,0.88)',
+            backdropFilter: 'blur(20px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            borderRadius: 16, width: '95%', maxWidth: 680,
             maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(140,170,210,0.25)', overflow: 'hidden',
+            boxShadow: '0 32px 64px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10)', overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
             {/* 헤더 */}
             <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid #f1f5f9' }}>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import TransactionEditModal from '../../components/TransactionEditModal'
+import { COLORS, GLASS } from '../../utils/ui-tokens'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -224,17 +225,22 @@ export default function UploadsHistoryPage() {
               {batches.map(b => {
                 const isActive = b.id === selectedBatchId
                 const isRolledBack = !!b.rolled_back_at
+                // Phase B: 그래디언트 제거 → Soft Ice Glass L3 flat 톤 (롤백=red 틴트 / 정상=blue 틴트)
                 return (
                   <div
                     key={b.id}
                     onClick={() => setSelectedBatchId(b.id)}
                     style={{
-                      border: isActive ? '1px solid #0891b2' : '1px solid #e0f2fe',
+                      border: isActive
+                        ? `1px solid ${COLORS.primary}`
+                        : isRolledBack
+                          ? `1px solid ${COLORS.borderRed}`
+                          : `1px solid ${COLORS.borderBlue}`,
                       borderRadius: 12, padding: '14px 16px',
-                      background: isRolledBack
-                        ? 'linear-gradient(to right, #fef2f2, #ffffff)'
-                        : 'linear-gradient(to right, #f0f9ff, #ffffff)',
-                      boxShadow: isActive ? '0 0 0 3px rgba(8,145,178,0.1)' : 'none',
+                      background: isRolledBack ? COLORS.bgRed : COLORS.bgBlue,
+                      backdropFilter: GLASS.L3.backdropFilter,
+                      WebkitBackdropFilter: GLASS.L3.WebkitBackdropFilter,
+                      boxShadow: isActive ? `0 0 0 3px ${COLORS.primary}33` : 'none',
                       cursor: 'pointer',
                       opacity: isRolledBack ? 0.75 : 1,
                     }}
@@ -302,7 +308,8 @@ export default function UploadsHistoryPage() {
                 </span>}
               </h2>
               {batchDetail?.stats?.unclassified_count > 0 && (
-                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                // Decision 1α: 미분류 = 빨강 (amber 아님)
+                <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: COLORS.bgRed, color: COLORS.unclassified, fontWeight: 700, border: `1px solid ${COLORS.borderRed}` }}>
                   미분류 {batchDetail.stats.unclassified_count}건
                 </span>
               )}
@@ -331,18 +338,22 @@ export default function UploadsHistoryPage() {
                       const isDeleted = !!t.deleted_at
                       const cat = t.category || '미분류'
                       const isUncat = !t.category || t.category === '미분류' || t.category === ''
+                      const isEtc = t.category === '기타'
+                      // Decision 1α: 미분류=red / 기타=amber / 삭제=red-tint / 정상=투명
+                      const _rowBg = isUncat ? COLORS.bgRed : isEtc ? COLORS.bgAmber : isDeleted ? '#fee2e2' : undefined
+                      const _rowHover = COLORS.bgBlue
                       return (
                         <tr
                           key={t.id}
                           onClick={() => setEditingTxId(t.id)}
                           style={{
                             borderBottom: '1px solid #f1f5f9',
-                            background: isUncat ? '#fef9c3' : isDeleted ? '#fee2e2' : undefined,
+                            background: _rowBg,
                             opacity: isDeleted ? 0.6 : 1,
                             cursor: 'pointer',
                           }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#ecfeff' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = isUncat ? '#fef9c3' : isDeleted ? '#fee2e2' : '' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = _rowHover }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = _rowBg || '' }}
                         >
                           <td style={tdStyle}>{fmtDate(t.transaction_date)}</td>
                           <td style={tdStyle}>
