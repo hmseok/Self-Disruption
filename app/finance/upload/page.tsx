@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useApp } from '../../context/AppContext'
 import { useUpload } from '@/app/context/UploadContext'
 import { fetchFinanceData, updateFinanceRow, insertFinanceRows, deleteFinanceRow, batchUpdateFinanceRows, batchDeleteFinanceRows, getAuthHeader, fetchWithAuth, generateBatchId, registerUploadBatch } from '@/app/utils/finance-upload'
+// Phase H2 (#86): FinanceContext 통합 — 허브 하위면 Context, 직접 접근이면 localStorage
+import { useFinanceOptional } from '../transactions/_context/FinanceContext'
+import type { SourceFilter as CtxSourceFilter, GroupBy as CtxGroupBy, CategoryMode as CtxCategoryMode } from '../transactions/_context/FinanceContext'
 
 // 분류 카테고리 & 매핑 — 단일 진실 원천(SSOT) from finance-categories.ts
 import {
@@ -535,6 +538,9 @@ function UploadContent() {
   const router = useRouter()
   const { company, role } = useApp()
 
+  // Phase H2 (#86): FinanceContext (옵셔널) — 허브 하위면 공유, 직접 접근이면 localStorage
+  const financeCtx = useFinanceOptional()
+
   // ── Upload Context ──
   const {
     results,
@@ -615,23 +621,50 @@ function UploadContent() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [groupItemLimits, setGroupItemLimits] = useState<Record<string, number>>({})
   const [duplicateInfo, setDuplicateInfo] = useState<{ count: number; checking: boolean }>({ count: 0, checking: false })
-  // 카테고리 뷰 모드: 회계 기준 vs 용도별 (localStorage 영속화)
-  const [categoryMode, setCategoryMode] = useState<'accounting' | 'display'>(() => {
+  // ── Phase H2 (#86): 카테고리 뷰 모드 / 고급 토글 — 듀얼 모드 ──
+  // 허브 하위(FinanceProvider 있음)면 Context 직통, 아니면 local state + fmi_finance_*
+  const [localCategoryMode, setLocalCategoryMode] = useState<CtxCategoryMode>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('finance_categoryMode') as 'accounting' | 'display') || 'display'
+      const v = localStorage.getItem('fmi_finance_categoryMode') || localStorage.getItem('finance_categoryMode')
+      return (v as CtxCategoryMode) || 'display'
     }
     return 'display'
   })
-  // Decision 2β: accounting(회계기준)은 고급 모드에서만 노출. 기본 = 용도별(display).
-  const [showAdvancedCategory, setShowAdvancedCategory] = useState<boolean>(() => {
+  const [localShowAdvancedCategory, setLocalShowAdvancedCategory] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      // 이미 accounting 모드로 사용 중이던 사용자는 고급 모드 자동 유지
-      const saved = localStorage.getItem('finance_showAdvancedCategory')
+      const saved = localStorage.getItem('fmi_finance_showAdvancedCategory') ?? localStorage.getItem('finance_showAdvancedCategory')
       if (saved !== null) return saved === 'true'
-      return (localStorage.getItem('finance_categoryMode') as any) === 'accounting'
+      const m = localStorage.getItem('fmi_finance_categoryMode') || localStorage.getItem('finance_categoryMode')
+      return m === 'accounting'
     }
     return false
   })
+  const categoryMode: CtxCategoryMode = financeCtx ? financeCtx.state.categoryMode : localCategoryMode
+  const showAdvancedCategory: boolean = financeCtx ? financeCtx.state.showAdvancedCategory : localShowAdvancedCategory
+  const setCategoryMode = (m: CtxCategoryMode) => {
+    if (financeCtx) financeCtx.setCategoryMode(m)
+    else {
+      setLocalCategoryMode(m)
+      try { localStorage.setItem('fmi_finance_categoryMode', m) } catch {}
+    }
+  }
+  const setShowAdvancedCategory = (v: boolean | ((prev: boolean) => boolean)) => {
+    const resolve = (prev: boolean): boolean => typeof v === 'function' ? (v as any)(prev) : v
+    if (financeCtx) {
+      financeCtx.setAdvancedCategory(resolve(financeCtx.state.showAdvancedCategory))
+    } else {
+      setLocalShowAdvancedCategory(prev => {
+        const next = resolve(prev)
+        try { localStorage.setItem('fmi_finance_showAdvancedCategory', String(next)) } catch {}
+        // 고급 OFF + 현재 accounting → display로 revert (Context reducer와 동일 로직)
+        if (!next && localCategoryMode === 'accounting') {
+          setLocalCategoryMode('display')
+          try { localStorage.setItem('fmi_finance_categoryMode', 'display') } catch {}
+        }
+        return next
+      })
+    }
+  }
 
   // ── Related Data (Review) ──
   const [reviewJiips, setReviewJiips] = useState<any[]>([])
@@ -642,22 +675,42 @@ function UploadContent() {
 
   // ── Tab State ── (2탭 구조: 분류 관리 + 확정완료)
   const [activeTab, setActiveTab] = useState<'classify' | 'confirmed'>('classify')
-  // classify 탭의 소스 필터 (칩): 전체/카드/통장/미분류/중분류완료/하분류완료
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'card' | 'bank' | 'unclassified' | 'cat_matched' | 'fully_matched'>(() => {
+  // Phase H2 (#86): sourceFilter / groupBy 듀얼 모드 (Context ↔ localStorage)
+  type SourceFilter = Extract<CtxSourceFilter, 'all' | 'card' | 'bank' | 'unclassified' | 'cat_matched' | 'fully_matched'>
+  type GroupBy = Extract<CtxGroupBy, 'category' | 'card' | 'bank' | 'vehicle' | 'user' | 'link' | 'date' | 'client' | 'income_expense'>
+  const [localSourceFilter, setLocalSourceFilter] = useState<SourceFilter>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('finance_sourceFilter') as any) || 'all'
+      const v = localStorage.getItem('fmi_finance_sourceFilter') || localStorage.getItem('finance_sourceFilter')
+      return (v as SourceFilter) || 'all'
     }
     return 'all'
   })
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [deleting, setDeleting] = useState(false)
-  const [groupBy, setGroupBy] = useState<'category' | 'card' | 'bank' | 'vehicle' | 'user' | 'link' | 'date' | 'client' | 'income_expense'>(() => {
+  const [localGroupBy, setLocalGroupBy] = useState<GroupBy>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('finance_groupBy') as any) || 'category'
+      const v = localStorage.getItem('fmi_finance_groupBy') || localStorage.getItem('finance_groupBy')
+      return (v as GroupBy) || 'category'
     }
     return 'category'
   })
+  const sourceFilter: SourceFilter = (financeCtx ? financeCtx.state.sourceFilter : localSourceFilter) as SourceFilter
+  const groupBy: GroupBy = (financeCtx ? financeCtx.state.groupBy : localGroupBy) as GroupBy
+  const setSourceFilter = (f: SourceFilter) => {
+    if (financeCtx) financeCtx.setSourceFilter(f)
+    else {
+      setLocalSourceFilter(f)
+      try { localStorage.setItem('fmi_finance_sourceFilter', f) } catch {}
+    }
+  }
+  const setGroupBy = (g: GroupBy) => {
+    if (financeCtx) financeCtx.setGroupBy(g)
+    else {
+      setLocalGroupBy(g)
+      try { localStorage.setItem('fmi_finance_groupBy', g) } catch {}
+    }
+  }
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
   const [linkPopoverId, setLinkPopoverId] = useState<string | null>(null)
   const [linkPopoverTab, setLinkPopoverTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'freelancer' | 'contract' | 'card'>('car')
   const [linkPopoverSearch, setLinkPopoverSearch] = useState('')
@@ -665,31 +718,9 @@ function UploadContent() {
   const [linkModalTab, setLinkModalTab] = useState<'car' | 'jiip' | 'invest' | 'loan' | 'insurance' | 'employee' | 'contract' | 'card'>('car')
   const [linkModalSelectedId, setLinkModalSelectedId] = useState<string | null>(null)
 
-  // ── UI 상태 영속화 (localStorage) ──
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('finance_categoryMode', categoryMode)
-    }
-  }, [categoryMode])
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('finance_showAdvancedCategory', String(showAdvancedCategory))
-      // 고급 모드 OFF 시 자동으로 display로 복귀 (accounting이 불필요한 상태로 남지 않도록)
-      if (!showAdvancedCategory && categoryMode === 'accounting') {
-        setCategoryMode('display')
-      }
-    }
-  }, [showAdvancedCategory, categoryMode])
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('finance_groupBy', groupBy)
-    }
-  }, [groupBy])
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('finance_sourceFilter', sourceFilter)
-    }
-  }, [sourceFilter])
+  // Phase H2 (#86): UI 상태 영속화 useEffect 4종 제거
+  //  → setter 함수가 localStorage 쓰기 수행 (local 모드) / Context reducer가 처리 (허브 모드)
+  //  → 고급 OFF → display revert 로직도 setShowAdvancedCategory 내부 + Context reducer에서 처리
 
   // ── results ↔ 그룹핑 상태 동기화 ──
   // results가 비워질 때 (확정 저장 후 등) upload 상태를 review 상태와 동기화

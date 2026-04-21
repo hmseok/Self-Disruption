@@ -18,8 +18,27 @@ import type { ReactNode } from 'react'
 // ──────────────────────────────────────────────────────────────
 
 export type FinanceTab = 'dashboard' | 'classify' | 'uploads' | 'cards' | 'codef'
-export type SourceFilter = 'all' | 'bank' | 'card' | 'manual' | 'unclassified'
-export type GroupBy = 'category' | 'source' | 'date' | 'amount'
+// ClassifyTab의 실제 운영 타입을 반영한 확장 유니온 (Phase H2)
+export type SourceFilter =
+  | 'all'
+  | 'bank'
+  | 'card'
+  | 'manual'
+  | 'unclassified'
+  | 'cat_matched'       // 중분류 완료
+  | 'fully_matched'     // 하분류(연관) 완료
+export type GroupBy =
+  | 'category'
+  | 'source'            // (하위호환 — 구 레거시)
+  | 'card'
+  | 'bank'
+  | 'vehicle'
+  | 'user'
+  | 'link'
+  | 'date'
+  | 'amount'            // (하위호환)
+  | 'client'
+  | 'income_expense'
 export type CategoryMode = 'display' | 'accounting'
 
 export type FinanceState = {
@@ -65,8 +84,12 @@ export type FinanceAction =
 // ──────────────────────────────────────────────────────────────
 
 const VALID_TABS: FinanceTab[] = ['dashboard', 'classify', 'uploads', 'cards', 'codef']
-const VALID_SOURCE: SourceFilter[] = ['all', 'bank', 'card', 'manual', 'unclassified']
-const VALID_GROUP: GroupBy[] = ['category', 'source', 'date', 'amount']
+const VALID_SOURCE: SourceFilter[] = [
+  'all', 'bank', 'card', 'manual', 'unclassified', 'cat_matched', 'fully_matched',
+]
+const VALID_GROUP: GroupBy[] = [
+  'category', 'source', 'card', 'bank', 'vehicle', 'user', 'link', 'date', 'amount', 'client', 'income_expense',
+]
 const VALID_MODE: CategoryMode[] = ['display', 'accounting']
 
 const OLD_KEYS = [

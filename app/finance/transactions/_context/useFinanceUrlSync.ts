@@ -16,7 +16,9 @@ import { useFinance } from './FinanceContext'
 import type { FinanceState, FinanceTab, SourceFilter } from './FinanceContext'
 
 const VALID_TABS: FinanceTab[] = ['dashboard', 'classify', 'uploads', 'cards', 'codef']
-const VALID_SOURCE: SourceFilter[] = ['all', 'bank', 'card', 'manual', 'unclassified']
+const VALID_SOURCE: SourceFilter[] = [
+  'all', 'bank', 'card', 'manual', 'unclassified', 'cat_matched', 'fully_matched',
+]
 
 /** URL에 싣을 필드만 골라 QueryString 생성 */
 function buildQuery(s: FinanceState): URLSearchParams {
