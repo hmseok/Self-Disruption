@@ -1123,6 +1123,52 @@ model GeneralInvestment {
 }
 
 // ============================================================
+// SMS 웹훅 — 카드사 사용알림 SMS 자동 수집
+//   · 안드로이드 공기계 + SMS Forwarder 앱 → /api/finance/sms-webhook
+//   · KB / 우리 / 현대 카드 실시간 거래 자동 적재
+//   · raw_hash 로 중복 제거, parse_status 로 실패 건 수동 처리
+// ============================================================
+model CardSmsTransaction {
+  id               String    @id @default(uuid()) @db.Char(36)
+  company_id       String?   @db.Char(36)
+
+  // 원본 SMS
+  raw_text         String    @db.Text
+  raw_hash         String    @unique @db.VarChar(64) // SHA-256(from|text) 중복 방지
+  sender           String?   @db.VarChar(32)         // 발신번호 (15884000 등)
+  received_at      DateTime  // SMS 수신 시각 (공기계 타임스탬프)
+
+  // 파싱 결과
+  parse_status     String    @default("pending") // pending, parsed, failed, canceled
+  parse_error      String?   @db.Text
+  card_issuer      String?   @db.VarChar(16)  // KB, WOORI, HYUNDAI
+  card_alias       String?   @db.VarChar(64)  // SMS 상 카드 별칭 (예: "법인4455")
+  holder_name      String?   @db.VarChar(64)  // 승인자명 (SMS에 찍힌 이름)
+  transaction_type String    @default("approved") // approved, canceled
+  transaction_at   DateTime? // 카드사 승인 시각
+  amount           Decimal?  @db.Decimal(15, 0)
+  merchant         String?   @db.VarChar(255) // 가맹점명
+  installment      String?   @db.VarChar(32)  // 일시불, 3개월 등
+
+  // 연결 (파싱 성공 후)
+  transaction_id   String?   @db.Char(36)     // transactions.id (적재 성공 시)
+  card_id          String?   @db.Char(36)     // corporate_cards.id (매칭 시)
+
+  // 취소 연결 (같은 승인번호 매칭 후)
+  canceled_sms_id  String?   @db.Char(36)     // 이 승인을 취소한 SMS
+
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  @@index([company_id])
+  @@index([parse_status])
+  @@index([card_issuer])
+  @@index([transaction_at])
+  @@index([card_id])
+  @@map("card_sms_transactions")
+}
+
+// ============================================================
 // 페이지 권한 (RBAC)
 // ============================================================
 model UserPagePermission {

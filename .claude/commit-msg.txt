@@ -1,15 +1,54 @@
-style(ui): DcStatStrip을 Soft Ice 글래스 스탯카드로 재작성 (Phase 1)
+feat(finance): 카드 SMS 자동수집 웹훅 (Phase 1 — KB/우리/현대)
 
-기존 Design C (파란 솔리드 그라데이션 스트립) → Design G (Level 3 글래스 + 컬러 틴트)
+안드로이드 공기계 SMS Forwarder → /api/finance/sms-webhook → DB 자동 적재.
+Codef(월 20~50만원) / BizPlay(월 5만원+) 대안으로 월 1만원 이하 운영.
+(+ 기존 DcStatStrip Soft Ice 글래스 재작성 병행 커밋)
 
-- 배경: white/0.60 + backdrop-blur(10px) + 색상-100/0.80 틴트 보더
-- 라벨 키워드로 자동 틴트 추론:
-  · 수입/매출/입금/운용중 → green
-  · 지출/출금/비용/만기초과 → red
-  · 손익/이익/예정/경고 → amber
-  · 잔액/전체/진행 → blue
-  · 플러그인/확장 → purple
-- 호출부(26개) 인터페이스 100% 하위호환 — `StatItem[]` 그대로
-- 필요 시 `tint` / `defaultTint` prop으로 override 가능
+■ DB (card_sms_transactions 테이블 신설)
+  - raw_text / raw_hash(SHA-256 중복 방지) / sender / received_at
+  - parse_status (pending/parsed/failed/canceled), parse_error
+  - card_issuer / card_alias / holder_name / transaction_type
+  - transaction_at / amount / merchant / installment
+  - 인덱스: company_id, parse_status, card_issuer, transaction_at, card_id
+  - 마이그레이션: scripts/migrate_sms_webhook_2026_04_21.mjs
 
-관련 작업: #59 글래스 톤 통일 Phase 1
+■ 파서 (lib/sms-parsers.ts)
+  - 발신번호(15884000=KB, 15881688=우리, 16445000=현대) + 본문 prefix fallback
+  - KB  일시불/할부/취소 (공백 구분)
+  - 우리 일시불/할부/취소 (공백 구분)
+  - 현대 슬래시 포맷 + 공백 포맷 둘 다 지원
+  - 단위 테스트 8/8 통과
+
+■ API
+  - POST /api/finance/sms-webhook
+    · X-Sms-Token 검증 (env SMS_WEBHOOK_TOKEN)
+    · raw_hash 로 중복 skip → {"status":"duplicate"}
+    · 파싱 실패 시 parse_status='failed' 로 원문 보존
+  - GET  /api/finance/sms-webhook (공개 헬스체크)
+  - GET/DELETE/PATCH /api/finance/sms (인증, 관리 UI용)
+
+■ UI (/finance/sms)
+  - Soft Ice Level 4 글래스 + DcStatStrip (Phase 1 변형 A)
+  - 스탯: 최근 30일 수신/성공/실패/승인합계
+  - 필터: 상태(parsed/failed) × 카드사(KB/우리/현대)
+  - 테이블: 수신시각/카드사/승인자/가맹점/금액/구분/원문/삭제
+
+■ DcStatStrip 병행 (Phase 1 글래스 재작성)
+  - white/0.60 + backdrop-blur(10px) + 색상-100/0.80 틴트 보더
+  - 라벨 키워드 기반 자동 틴트 (수입=green, 지출=red, 손익=amber...)
+  - 기존 26개 호출부 100% 하위호환 (StatItem 인터페이스 유지)
+
+■ 운영 가이드 (.claude/sms-setup-guide.md)
+  - Cloud Run env SMS_WEBHOOK_TOKEN 설정
+  - 안드로이드 공기계 SMS Forwarder 앱 설정
+  - KB/우리/현대 SMS 수신번호 변경 방법
+  - 테스트 체크리스트 + curl 예제 + 월 운영비 시뮬(6.6k~15k원)
+
+■ Phase 2 예정
+  - parsed → transactions 테이블 자동 적재
+  - 취소 SMS ↔ 승인 건 자동 매칭
+  - corporate_cards.card_alias 연결 (차량/직원)
+  - 가맹점명 → 카테고리 자동 분류
+  - 월말 명세서 CSV 자동 대조 + 누락률 리포트
+
+관련: #59 Soft Ice Phase 1, 카드 자동연동 비용절감
