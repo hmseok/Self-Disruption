@@ -1,0 +1,9 @@
+fix(admin): 프로필 PATCH 라우트 생성 + 회사정보 저장 인증 + 직원이름 폴백
+
+- /api/profiles/[id] 신규 (PATCH/DELETE/GET) — 없어서 404였음
+  · SHOW COLUMNS 기반 스키마 드리프트 대응
+  · name ↔ employee_name 양방향 동기화
+- /api/profiles GET: positions/departments LEFT JOIN + 이메일 로컬파트 폴백
+- /api/member-invite/accept: position_id/department_id + employee_name 동기화
+- CompanySettingsTab: getAuthHeader() 추가 (fetch 인증 누락 → 저장 실패 해결)
+- scripts/ship.sh: 원커맨드 배포 스크립트 (tsc → evaluate.js → commit → push → 헬스체크)
