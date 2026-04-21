@@ -1,9 +1,15 @@
-fix(admin): 프로필 PATCH 라우트 생성 + 회사정보 저장 인증 + 직원이름 폴백
+style(ui): DcStatStrip을 Soft Ice 글래스 스탯카드로 재작성 (Phase 1)
 
-- /api/profiles/[id] 신규 (PATCH/DELETE/GET) — 없어서 404였음
-  · SHOW COLUMNS 기반 스키마 드리프트 대응
-  · name ↔ employee_name 양방향 동기화
-- /api/profiles GET: positions/departments LEFT JOIN + 이메일 로컬파트 폴백
-- /api/member-invite/accept: position_id/department_id + employee_name 동기화
-- CompanySettingsTab: getAuthHeader() 추가 (fetch 인증 누락 → 저장 실패 해결)
-- scripts/ship.sh: 원커맨드 배포 스크립트 (tsc → evaluate.js → commit → push → 헬스체크)
+기존 Design C (파란 솔리드 그라데이션 스트립) → Design G (Level 3 글래스 + 컬러 틴트)
+
+- 배경: white/0.60 + backdrop-blur(10px) + 색상-100/0.80 틴트 보더
+- 라벨 키워드로 자동 틴트 추론:
+  · 수입/매출/입금/운용중 → green
+  · 지출/출금/비용/만기초과 → red
+  · 손익/이익/예정/경고 → amber
+  · 잔액/전체/진행 → blue
+  · 플러그인/확장 → purple
+- 호출부(26개) 인터페이스 100% 하위호환 — `StatItem[]` 그대로
+- 필요 시 `tint` / `defaultTint` prop으로 override 가능
+
+관련 작업: #59 글래스 톤 통일 Phase 1
