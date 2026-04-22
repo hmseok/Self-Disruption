@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth-client'
 import { useEffect, useState, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import * as XLSX from 'xlsx'
+import { COLORS, SPACING } from '../../utils/ui-tokens'
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
     const { auth } = await import('@/lib/auth-client')
@@ -886,25 +887,53 @@ export default function CorporateCardsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', background: '#f9fafb', minHeight: '100vh' }}>
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', background: COLORS.bgGray, minHeight: '100vh' }}>
+      {/* Phase H4: hover CSS 주입 — onMouseEnter/Leave 제거, BTN.md 토큰 동기화 */}
+      <style>{`
+        .cards-btn-primary {
+          padding: 8px 14px; font-size: 13px; border-radius: 8px; font-weight: 700;
+          background: ${COLORS.primary}; color: #fff; border: none; cursor: pointer;
+          display: inline-flex; align-items: center; gap: 8px;
+          box-shadow: 0 2px 6px rgba(59,110,181,0.25);
+          transition: background 0.15s ease;
+        }
+        .cards-btn-primary:hover:not(:disabled) { background: ${COLORS.primaryDark}; }
+        .cards-btn-ghost {
+          padding: 8px 14px; font-size: 13px; border-radius: 8px; font-weight: 700;
+          background: rgba(255,255,255,0.85); color: ${COLORS.textSecondary};
+          border: 1px solid ${COLORS.borderSubtle}; cursor: pointer;
+          display: inline-flex; align-items: center; gap: 8px;
+          transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+        .cards-btn-ghost:hover:not(:disabled) { background: ${COLORS.bgBlue}; border-color: ${COLORS.borderBlue}; color: ${COLORS.primary}; }
+        .cards-main-tab {
+          padding: 10px 20px; font-weight: 700; font-size: 13px; cursor: pointer;
+          background: transparent; border: none; border-bottom: 3px solid transparent;
+          color: ${COLORS.textSecondary}; position: relative;
+          transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .cards-main-tab:hover:not([data-active="true"]) { color: ${COLORS.primary}; }
+        .cards-main-tab[data-active="true"] { color: ${COLORS.primary}; border-bottom-color: ${COLORS.primary}; }
+        .cards-flag-row:hover { background: ${COLORS.bgBlue} !important; }
+        .cards-btn-primary:disabled, .cards-btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }
+      `}</style>
 
       {/* ══════ 헤더 — 보험 페이지 스타일 ══════ */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xxl, flexWrap: 'wrap', gap: SPACING.lg }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: '#111827', letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg style={{ width: 28, height: 28, color: '#3b6eb5' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: COLORS.textPrimary, letterSpacing: '-0.025em', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg style={{ width: 28, height: 28, color: COLORS.primary }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
             법인카드 관리
           </h1>
-          <p style={{ color: '#6b7280', fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
+          <p style={{ color: COLORS.textSecondary, fontSize: 14, marginTop: 4, margin: '4px 0 0' }}>법인카드 등록 및 사용내역 자동 분류 · 직원 배정 · 한도 관리</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: SPACING.md, flexShrink: 0 }}>
           {mainTab === 'cards' && <>
-            <button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#3b6eb5', color: '#fff', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            <button className="cards-btn-primary" onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true) }}>
               <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               카드 등록
             </button>
-            <button onClick={() => {
+            <button className="cards-btn-ghost" onClick={() => {
               const rows = [['카드사', '카드번호', '명의자', '부서', '종류', '한도', '이번달사용', '사용률%', '배치차량', '유효기간', '상태']]
               cards.forEach((c: any) => {
                 const u = cardUsage[c.id] || { count: 0, total: 0 }
@@ -918,8 +947,7 @@ export default function CorporateCardsPage() {
               XLSX.utils.book_append_sheet(wb, ws, '법인카드현황')
               const now = new Date()
               XLSX.writeFile(wb, `법인카드현황_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`)
-            }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', color: '#374151', border: '1px solid #e5e7eb', padding: '10px 20px', fontSize: 14, borderRadius: 12, fontWeight: 700, cursor: 'pointer' }}>
+            }}>
               📤 엑셀 내보내기
             </button>
           </>}
@@ -927,21 +955,16 @@ export default function CorporateCardsPage() {
       </div>
 
       {/* ══════ 메인 탭 (카드관리 / 특이건 검토 / 급여 반영) ══════ */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e5e7eb', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: SPACING.xl, borderBottom: `2px solid ${COLORS.borderSubtle}`, paddingBottom: 0 }}>
         {[
           { key: 'cards' as const, label: '💳 카드 관리', badge: null },
           { key: 'flags' as const, label: '⚠️ 특이건 검토', badge: flagSummary.pending ? flagSummary.pending : null },
           { key: 'salary' as const, label: '💰 급여 반영', badge: null },
         ].map(tab => (
-          <button key={tab.key} onClick={() => setMainTab(tab.key)}
-            style={{
-              padding: '10px 20px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              background: 'transparent', border: 'none', borderBottom: mainTab === tab.key ? '3px solid #3b6eb5' : '3px solid transparent',
-              color: mainTab === tab.key ? '#3b6eb5' : '#6b7280', position: 'relative',
-            }}>
+          <button key={tab.key} className="cards-main-tab" data-active={mainTab === tab.key} onClick={() => setMainTab(tab.key)}>
             {tab.label}
             {tab.badge && tab.badge > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 4, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ position: 'absolute', top: 4, right: 4, background: COLORS.danger, color: '#fff', fontSize: 10, fontWeight: 800, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {tab.badge > 99 ? '99+' : tab.badge}
               </span>
             )}
@@ -2349,9 +2372,7 @@ export default function CorporateCardsPage() {
                     }
                     const tc = typeConfig[flag.flag_type] || typeConfig.other
                     return (
-                      <tr key={flag.id} style={{ borderBottom: '1px solid #f3f4f6' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <tr key={flag.id} className="cards-flag-row" style={{ borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s ease' }}>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: `${tc.color}15`, color: tc.color }}>
                             {tc.icon} {tc.label}
