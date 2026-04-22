@@ -1,6 +1,58 @@
 # FMI ERP — 기능 현황 (HARNESS.md)
 
-> 마지막 업데이트: 2026-04-19 (Phase 2A — 배차 엑셀 인테이크 + 4축 매출 매칭 helper)
+> 마지막 업데이트: 2026-04-22 (Finance Consolidation v1 — Phase H 탭 디자인 토큰화 + Phase I 301 리다이렉트 + 전역 빠른 입력)
+
+---
+
+## Finance Consolidation v1: Phase H + I (2026-04-22) — 커밋 `e665dfa`, `0011142`
+
+재무 모듈 하위의 5개 분산 페이지(`/finance`, `/finance/upload`, `/finance/uploads`, `/finance/cards`, `/finance/codef`)를 단일 허브 `/finance/transactions?tab=*`로 통합. URL 라우팅은 301로 강제하고, 본문은 `_tabs` 재수출 래퍼로 재사용. 모든 탭에 Soft Ice 디자인 토큰 적용.
+
+### Phase H — 탭별 본문 이전 + 디자인 시스템 적용
+
+- [x] **H2 — ClassifyTab** (`044f280`) — localStorage → FinanceContext + URL 쿼리 양방향 동기화
+  - `upload/page.tsx` 4개 useEffect persistence 제거 → Context/Provider 기반 dual-mode
+  - SourceFilter 유니온 확장: `'all'|'bank'|'card'|'manual'|'unclassified'|'cat_matched'|'fully_matched'`
+  - `useFinanceUrlSync` VALID_SOURCE 배열 동기 업데이트
+  - 배지 컴포넌트 추출(renderCategoryBadge/renderRelatedBadge)은 20개 의존 prop로 별도 작업으로 deferred
+- [x] **H3 — UploadsTab** (`e2d031c`) — onMouseEnter/Leave 런타임 스타일 변경을 CSS :hover로 전환
+  - 주입 `<style>` 블록: `.uploads-tx-row[data-tone]` + `.uploads-btn-{ghost|primary-tint|danger-tint|primary}:hover`
+  - 상태 pill을 `pillStyle('success'|'danger'|'info'|'neutral')` 헬퍼로 통일
+  - 442→459줄, 7개 pill/5개 hover 인라인 구문 제거
+- [x] **H4 — CardsTab** (`43ff1d6`) — 스코프 제한(2510줄) 헤더/탭/액션 버튼 디자인 토큰화
+  - `.cards-btn-{primary|ghost}` + `.cards-main-tab[data-active]` + `.cards-flag-row:hover` 주입
+  - 외부 wrapper `bg-#f9fafb` → `COLORS.bgGray`, SVG/타이틀 색상 토큰
+  - 카드 지갑/한도 모달/급여 탭(2000+줄)은 H4b로 deferred
+- [x] **H5 — CodefTab** (`e665dfa`) — 5개 카드 섹션에 violet GLASS.L3 틴트 (CLAUDE.md §10 "플러그인/확장 기능" 카테고리)
+  - `.codef-card` 유틸리티 클래스로 `bg-gray-50 rounded-lg p-6 border-black/[0.06]` 5회 반복 통합
+  - `.codef-btn-{primary|ghost|success}` + `.codef-segment[data-active]` + `.codef-tx-row:hover`
+  - 연동하기(BTN.md+primary), 지금 동기화(BTN.lg+success), 로그인 방식 segmented control
+  - 기관/상태 pill 6곳 → `pillStyle('info'|'primary'|'success'|'danger')`
+  - Tailwind `bg-emerald/red-50` 메시지 배너 → `COLORS.bgGreen/bgRed` 토큰
+
+### Phase I — 301 리다이렉트 + 전역 빠른 입력 (`0011142`)
+
+- [x] **Next.js `redirects()`** — 5건 permanent redirect로 외부 북마크/링크 보존
+  - `/finance` → `/finance/transactions?tab=dashboard`
+  - `/finance/upload` → `?tab=classify`
+  - `/finance/uploads` → `?tab=uploads`
+  - `/finance/cards` → `?tab=cards`
+  - `/finance/codef` → `?tab=codef`
+  - 레거시 `*.tsx`는 `_tabs`에서 재수출로 유지 → 내부 import는 영향 없이 URL만 허브로 강제
+- [x] **전역 "⚡ 빠른 입력" 진입점** — `ClientLayout`에 통합
+  - 사이드바 대시보드 바로 아래 에메랄드 그라디언트 버튼 (`#10b981 → #059669`)
+  - **Alt+N** 키보드 단축키 (input/textarea/contentEditable 포커스 시 무시)
+  - 전역 `<QuickTxModal>` 레이아웃 최하단 렌더 (어느 페이지에서든 즉시 거래 기록)
+  - `initialStatus="completed"` 기본값으로 즉시 확정 저장 경로
+
+### 검증
+
+- [x] **TypeScript**: 154 error baseline 유지 (Phase H2-H5, Phase I 전체에서 회귀 0건)
+- [x] **evaluate.js**: 9.4/10 PASS (no-browser 모드, 합격선 8.0 초과)
+  - UI/UX 10/10, 기능완성도 12/12, 코드품질 6/12, 반응형 8/8, 보안 10/10, 디자인품질 14/14, 독창성 10/10, 완성도 12/12, 기능성 12/12
+  - ❌ 잔여: SQL Injection 패턴 67개 파일 (기존 baseline, #72에서 일부 패치됨)
+  - ⚠️ 경고: console.log 44개 파일
+- **커밋**: `e665dfa` (Phase H5), `0011142` (Phase I) pushed → Cloud Run 배포 완료
 
 ---
 
