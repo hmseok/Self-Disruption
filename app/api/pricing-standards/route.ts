@@ -1,27 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { verifyUser } from '@/lib/auth-server'
 import { prisma } from '@/lib/prisma'
 
+// 2026-04-22 구조 점검:
+// - 계산엔진이 input.reference.* 필드로 실제 소비하는 참조 테이블은 유지
+//   (quotes/simple 이 Promise.all 로 fetch → calc 엔진에 feed)
+// - UI 가 편집하는 핵심 기준표 (business_rules + 6종) 는 EvidenceDrawer + AI 검증 대상
+// - 5개 진짜 고아 테이블만 DROP: depreciation_history(→pricing_standard_changes 로 대체),
+//     emission_standard_table, inspection_penalty_table,
+//     insurance_policy_record, insurance_vehicle_group
+//   (실제 DROP 은 migrations/2026-04-22_drop_unused_pricing_tables.sql)
 const ALLOWED_TABLES = [
+  // 핵심 (UI 편집 + EvidenceDrawer 대상)
   'business_rules',
-  'depreciation_adjustments',
-  'depreciation_db',
-  'depreciation_history',
-  'depreciation_rates',
-  'emission_standard_table',
-  'finance_rate_table',
-  'inspection_cost_table',
-  'inspection_penalty_table',
-  'inspection_schedule_table',
-  'insurance_base_premium',
-  'insurance_own_vehicle_rate',
-  'insurance_policy_record',
-  'insurance_rate_table',
-  'insurance_vehicle_group',
-  'maintenance_cost_table',
-  'registration_cost_table',
-  'vehicle_tax_table',
   'vehicle_market_price',
+  'depreciation_rates',
+  'insurance_rate_table',
+  'maintenance_cost_table',
+  'finance_rate_table',
+  'vehicle_tax_table',
+  'sales_presets',
+  // 계산엔진이 실제로 읽는 참조 테이블 (quotes/simple 이 fetch 해서 feed)
+  'depreciation_adjustments',     // 시세/인기도 보정 계수
+  'depreciation_db',              // 레거시 감가 DB (curve_preset=db_based 시 사용)
+  'registration_cost_table',      // 취득세/공채/탁송료/번호판/인지세/대행료
+  'inspection_cost_table',        // 정기검사 비용
+  'inspection_schedule_table',    // 정기검사 스케줄
+  'insurance_base_premium',       // 보험 기본 보험료
+  'insurance_own_vehicle_rate',   // 보험 자기부담 요율
 ]
 
 function serialize<T>(data: T): T {
@@ -46,47 +53,104 @@ function validateUuid(id: string): boolean {
 
 function buildSelectQuery(table: string): string {
   switch (table) {
-    case 'depreciation_adjustments':
-      return `SELECT * FROM ${table} ORDER BY adjustment_type, factor DESC`
-    case 'depreciation_db':
-      return `SELECT * FROM ${table} ORDER BY category`
-    case 'depreciation_rates':
-      return `SELECT * FROM ${table} ORDER BY origin, vehicle_class, fuel_type`
-    case 'inspection_cost_table':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY vehicle_class, fuel_type`
-    case 'inspection_schedule_table':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY vehicle_usage, fuel_type, age_from`
-    case 'inspection_penalty_table':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY penalty_type`
-    case 'emission_standard_table':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY fuel_type, year_from`
-    case 'insurance_rate_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type, value_min`
-    case 'insurance_policy_record':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY created_at DESC`
-    case 'insurance_base_premium':
-      return `SELECT * FROM ${table} WHERE is_active = true`
-    case 'insurance_own_vehicle_rate':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY origin, fuel_type, value_min`
-    case 'insurance_vehicle_group':
-      return `SELECT * FROM ${table} WHERE is_active = true ORDER BY sort_order`
     case 'business_rules':
       return `SELECT * FROM ${table} ORDER BY \`key\``
-    case 'finance_rate_table':
-      return `SELECT * FROM ${table} ORDER BY effective_date DESC`
-    case 'maintenance_cost_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type`
-    case 'registration_cost_table':
-      return `SELECT * FROM ${table} ORDER BY cost_type`
-    case 'vehicle_tax_table':
-      return `SELECT * FROM ${table} ORDER BY tax_type ASC`
     case 'vehicle_market_price':
       return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY brand, model, year DESC`
-    case 'depreciation_history':
-      return `SELECT * FROM ${table} ORDER BY created_at DESC`
+    case 'depreciation_rates':
+      return `SELECT * FROM ${table} ORDER BY origin, vehicle_class, fuel_type`
+    case 'depreciation_adjustments':
+      return `SELECT * FROM ${table} ORDER BY adjustment_type, label`
+    case 'depreciation_db':
+      return `SELECT * FROM ${table} ORDER BY vehicle_class, year_offset`
+    case 'insurance_rate_table':
+      return `SELECT * FROM ${table} ORDER BY vehicle_type, value_min`
+    case 'insurance_base_premium':
+      return `SELECT * FROM ${table} ORDER BY vehicle_type`
+    case 'insurance_own_vehicle_rate':
+      return `SELECT * FROM ${table} ORDER BY age_band`
+    case 'maintenance_cost_table':
+      return `SELECT * FROM ${table} ORDER BY vehicle_type`
+    case 'finance_rate_table':
+      return `SELECT * FROM ${table} ORDER BY effective_date DESC`
+    case 'vehicle_tax_table':
+      return `SELECT * FROM ${table} ORDER BY tax_type ASC`
+    case 'registration_cost_table':
+      return `SELECT * FROM ${table} ORDER BY cost_type`
+    case 'inspection_cost_table':
+      return `SELECT * FROM ${table} ORDER BY vehicle_type`
+    case 'inspection_schedule_table':
+      return `SELECT * FROM ${table} ORDER BY vehicle_type, year_from`
+    case 'sales_presets':
+      return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY sort_order ASC`
     default:
       return `SELECT * FROM ${table}`
   }
+}
+
+// ============================================================
+// 변경 이력 로깅 유틸 — Phase A-1
+// ============================================================
+function stringifyVal(v: any): string | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v) } catch { return String(v) }
+  }
+  return String(v)
+}
+
+function normalizeForCompare(v: any): string | null {
+  // DB에서 오는 값과 요청 본문 값을 같은 형태로 비교하기 위한 정규화
+  if (v === null || v === undefined) return null
+  if (v instanceof Date) return v.toISOString()
+  if (typeof v === 'boolean') return v ? '1' : '0'
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v) } catch { return String(v) }
+  }
+  // Decimal from MySQL comes as string; numbers become strings too — trim trailing zeros
+  if (typeof v === 'number') return String(v)
+  return String(v)
+}
+
+async function logChanges(opts: {
+  table: string
+  rowId: string
+  oldRow: any
+  newBody: any
+  userId: string | null
+  reason?: string | null
+}) {
+  const { table, rowId, oldRow, newBody, userId, reason } = opts
+  if (!oldRow) return
+  // [id, table_name, row_id, field, old_value, new_value, user_id, reason]
+  const rows: Array<[string, string, string, string, string | null, string | null, string | null, string | null]> = []
+  for (const key of Object.keys(newBody)) {
+    // 대상 row에 해당 컬럼이 원래 있던 경우에만 diff 계산
+    const before = oldRow[key]
+    const after = (newBody as any)[key]
+    const beforeNorm = normalizeForCompare(before)
+    const afterNorm = normalizeForCompare(after)
+    if (beforeNorm === afterNorm) continue
+    rows.push([
+      crypto.randomUUID(),
+      table,
+      rowId,
+      key,
+      stringifyVal(before),
+      stringifyVal(after),
+      userId,
+      reason ?? null,
+    ])
+  }
+  if (rows.length === 0) return
+  const placeholders = rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ')
+  const flat = rows.flat()
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO pricing_standard_changes
+      (id, table_name, row_id, field, old_value, new_value, user_id, reason)
+     VALUES ${placeholders}`,
+    ...flat,
+  )
 }
 
 export async function GET(request: NextRequest) {
@@ -96,6 +160,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const table = searchParams.get('table')
+    const history = searchParams.get('history')
+    const rowId = searchParams.get('id')
 
     if (!table) {
       return NextResponse.json({ error: 'table 파라미터 필수' }, { status: 400 })
@@ -103,6 +169,38 @@ export async function GET(request: NextRequest) {
 
     if (!validateTableName(table)) {
       return NextResponse.json({ error: '잘못된 테이블' }, { status: 400 })
+    }
+
+    // ── 변경 이력 조회 모드 ──
+    if (history === '1') {
+      if (!rowId) {
+        // table 전체 최근 이력 (최대 50건)
+        const rows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT c.id, c.table_name, c.row_id, c.field, c.old_value, c.new_value,
+                  c.user_id, p.name AS user_name, p.email AS user_email,
+                  c.reason, c.changed_at
+             FROM pricing_standard_changes c
+             LEFT JOIN profiles p ON p.id = c.user_id
+            WHERE c.table_name = ?
+            ORDER BY c.changed_at DESC
+            LIMIT 50`,
+          table,
+        )
+        return NextResponse.json({ data: serialize(rows), error: null })
+      }
+      const rows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT c.id, c.table_name, c.row_id, c.field, c.old_value, c.new_value,
+                c.user_id, p.name AS user_name, p.email AS user_email,
+                c.reason, c.changed_at
+           FROM pricing_standard_changes c
+           LEFT JOIN profiles p ON p.id = c.user_id
+          WHERE c.table_name = ? AND c.row_id = ?
+          ORDER BY c.changed_at DESC
+          LIMIT 50`,
+        table,
+        rowId,
+      )
+      return NextResponse.json({ data: serialize(rows), error: null })
     }
 
     const query = buildSelectQuery(table)
@@ -191,11 +289,27 @@ export async function PATCH(request: NextRequest) {
     // business_rules는 `key`(예약어), `value`(JSON) 특수 처리
     const isBR = table === 'business_rules'
 
+    // 변경 이유 (선택) — body._reason 으로 받고, 저장엔 포함하지 않음
+    const reason: string | null = typeof (body as any)?._reason === 'string' ? (body as any)._reason : null
+    if ('_reason' in body) delete (body as any)._reason
+
     // 컬럼명 화이트리스트 검증
     const keys = Object.keys(body)
     const invalidKey = keys.find(k => !validateColumnName(k))
     if (invalidKey) {
       return NextResponse.json({ error: `잘못된 컬럼명: ${invalidKey}` }, { status: 400 })
+    }
+
+    // ── 변경 전 row 스냅샷 (로깅용) ──
+    let oldRow: any = null
+    try {
+      const oldRows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT * FROM \`${table}\` WHERE id = ? LIMIT 1`,
+        id,
+      )
+      oldRow = oldRows?.[0] ?? null
+    } catch {
+      oldRow = null
     }
 
     const setClauses: string[] = []
@@ -229,6 +343,22 @@ export async function PATCH(request: NextRequest) {
 
     const query = `UPDATE \`${table}\` SET ${setClauses.join(', ')} WHERE id = ?`
     await prisma.$executeRawUnsafe(query, ...values, id)
+
+    // ── 변경 이력 자동 로깅 (실패해도 update 는 유지) ──
+    try {
+      await logChanges({
+        table,
+        rowId: id,
+        oldRow,
+        newBody: body,
+        userId: (user as any)?.id ?? null,
+        reason,
+      })
+    } catch (logErr) {
+      // 로깅 실패는 무시 — 기준값 저장 자체는 이미 성공했음
+      // eslint-disable-next-line no-console
+      console.warn('[pricing-standards] change log failed:', logErr)
+    }
 
     return NextResponse.json({ success: true, error: null })
   } catch (e: any) {

@@ -47,14 +47,17 @@ interface Adjustment {
   is_active: boolean
 }
 
+// 2026-04-22: depreciation_history 테이블 DROP → pricing_standard_changes 로 통합
 interface HistoryEntry {
-  id: number
-  source_table: string
-  source_id: number
-  changed_field: string
+  id: string
+  table_name: string
+  row_id: string
+  field: string
   old_value: string | null
   new_value: string | null
   changed_at: string
+  user_name: string | null
+  user_email: string | null
   reason: string | null
 }
 
@@ -126,7 +129,8 @@ export default function DepreciationTab() {
       const [ratesRes, adjRes, histRes] = await Promise.all([
         fetch('/api/pricing-standards?table=depreciation_rates', { headers }),
         fetch('/api/pricing-standards?table=depreciation_adjustments', { headers }),
-        fetch('/api/pricing-standards?table=depreciation_history', { headers }),
+        // 2026-04-22: 통합 change log 에서 depreciation_rates + depreciation_adjustments 이력 합산
+        fetch('/api/pricing-standards?table=depreciation_rates&history=1', { headers }),
       ])
       const [ratesData, adjData, histData] = await Promise.all([
         ratesRes.json(), adjRes.json(), histRes.json()
@@ -177,20 +181,7 @@ export default function DepreciationTab() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '업데이트 실패')
       setRates(rates.map(r => r.id === rowId ? { ...r, [field]: newValue } : r))
-
-      // 이력 기록
-      const histRes = await fetch('/api/pricing-standards/depreciation_history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          source_table: 'depreciation_rates',
-          source_id: rowId,
-          changed_field: field,
-          old_value: String(oldValue),
-          new_value: String(newValue),
-        })
-      })
-      if (!histRes.ok) console.error('이력 기록 실패')
+      // 2026-04-22: PATCH API 가 pricing_standard_changes 에 자동 로그 → 수동 이력 기록 제거
     } catch (error) {
       console.error('업데이트 실패:', error)
     } finally {
@@ -247,19 +238,7 @@ export default function DepreciationTab() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '변경 실패')
       setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, is_active: !a.is_active } : a))
-
-      const histRes = await fetch('/api/pricing-standards/depreciation_history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          source_table: 'depreciation_adjustments',
-          source_id: adj.id,
-          changed_field: 'is_active',
-          old_value: String(adj.is_active),
-          new_value: String(!adj.is_active),
-        })
-      })
-      if (!histRes.ok) console.error('이력 기록 실패')
+      // 2026-04-22: PATCH API 가 자동 로그 → 수동 이력 기록 제거
     } catch (error) {
       console.error('보정 계수 변경 실패:', error)
     }
@@ -277,19 +256,7 @@ export default function DepreciationTab() {
       const updateData = await updateRes.json()
       if (updateData.error) throw new Error(updateData.error)
       setAdjustments(adjustments.map(a => a.id === adj.id ? { ...a, factor: newFactor } : a))
-
-      const histRes = await fetch('/api/pricing-standards?table=depreciation_history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
-          source_table: 'depreciation_adjustments',
-          source_id: adj.id,
-          changed_field: 'factor',
-          old_value: String(adj.factor),
-          new_value: String(newFactor),
-        })
-      })
-      if (!histRes.ok) console.error('이력 기록 실패')
+      // 2026-04-22: PATCH API 가 자동 로그 → 수동 이력 기록 제거
     } catch (error) {
       console.error('계수 업데이트 실패:', error)
     }
@@ -696,10 +663,11 @@ export default function DepreciationTab() {
               {history.map(h => (
                 <div key={h.id} className="flex items-center gap-3 text-xs py-1.5 border-b border-gray-50">
                   <span className="text-[10px] text-gray-400 whitespace-nowrap">{formatDate(h.changed_at)}</span>
-                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-mono">{h.changed_field}</span>
+                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-mono">{h.field}</span>
                   <span className="text-red-400 line-through">{h.old_value}</span>
                   <span className="text-gray-300">→</span>
                   <span className="text-emerald-600 font-semibold">{h.new_value}</span>
+                  {h.user_name && <span className="text-gray-400 text-[10px]">{h.user_name}</span>}
                   {h.reason && <span className="text-gray-400 text-[10px]">({h.reason})</span>}
                 </div>
               ))}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { fetchPricingStandardsData, updatePricingStandardsRow, getAuthHeader } from '@/app/utils/pricing-standards'
+import EvidenceDrawer, { type EvidenceContext } from './EvidenceDrawer'
 
 interface BusinessRule {
   id: string
@@ -14,12 +15,12 @@ interface BusinessRule {
 interface RuleCategory { name: string; icon: string; keys: string[]; explanation: string }
 
 const RULE_CATEGORIES: RuleCategory[] = [
-  { name: '감가 설정', icon: '📉', keys: ['DEP_YEAR_1', 'DEP_YEAR_2PLUS', 'DEP_MILEAGE_10K'],
-    explanation: '차량 잔존가치 산출에 사용되는 감가율 파라미터입니다. 1년차 감가율, 2년차 이후 감가율, 주행거리 감가 보정치를 관리합니다.' },
+  { name: '감가 설정', icon: '📉', keys: ['DEP_YEAR_1', 'DEP_YEAR_2PLUS', 'DEP_MILEAGE_10K', 'DEFAULT_RESIDUAL_RATE_RETURN', 'DEFAULT_RESIDUAL_RATE_BUYOUT'],
+    explanation: '차량 잔존가치 산출에 사용되는 감가율 파라미터입니다. 1년차/2년차 감가율, 주행거리 보정치, 반납/인수형 기본 잔존가치율을 관리합니다.' },
   { name: '금융 설정', icon: '🏦', keys: ['LOAN_INTEREST_RATE', 'LOAN_LTV_DEFAULT', 'INVESTMENT_RETURN_RATE'],
     explanation: '차량 구매 자금의 대출 이자율, 담보인정비율(LTV), 자체자금 운용 시 기회비용(투자수익률)을 설정합니다.' },
-  { name: '운영 설정', icon: '🔧', keys: ['INSURANCE_LOADING', 'MONTHLY_MAINTENANCE_BASE', 'CAR_TAX_RATE', 'CAR_TAX_TYPE'],
-    explanation: '보험료 로딩율(보험사 수수료 반영), 기본 월정비비, 자동차세 기본 세율(영업용), 자동차세 유형을 관리합니다.' },
+  { name: '운영 설정', icon: '🔧', keys: ['INSURANCE_LOADING', 'OWN_DAMAGE_RATIO', 'MONTHLY_MAINTENANCE_BASE', 'CAR_TAX_RATE', 'CAR_TAX_TYPE'],
+    explanation: '보험료 로딩율, 자차 면책 비율, 기본 월정비비, 자동차세 기본 세율(영업용), 자동차세 유형을 관리합니다.' },
   { name: '리스크/할인', icon: '🛡️', keys: ['DEDUCTIBLE_AMOUNT', 'RISK_RESERVE_RATE', 'DEPOSIT_DISCOUNT_RATE', 'PREPAYMENT_DISCOUNT_RATE', 'DEFAULT_DEPOSIT'],
     explanation: '자차 면책금, 리스크 적립율(사고·수리 대비), 보증금 할인율, 선납 할인율, 기본 보증금을 관리합니다.' },
   // 등록비는 registration_cost_table(등록비용 탭)에서 직접 관리 → 여기서 중복 제거
@@ -50,6 +51,9 @@ const KEY_DETAILS: Record<string, { label: string; unit: string; range: string; 
   REG_BOND_RATE_GYEONGGI: { label: '(미사용) 경기 공채', unit: '%', range: '0%', industryRef: '→ 등록비용 탭에서 관리' },
   REG_DELIVERY_FEE: { label: '(미사용) 탁송료', unit: '원', range: '350,000', industryRef: '→ 등록비용 탭에서 관리' },
   REG_MISC_FEE: { label: '(미사용) 기타 등록비', unit: '원', range: '167,000', industryRef: '→ 등록비용 탭에서 관리' },
+  DEFAULT_RESIDUAL_RATE_RETURN: { label: '반납형 기본 잔존가치율', unit: '%', range: '0~10%', industryRef: '반납형은 0% (차량 회수 후 중고시장 매각)' },
+  DEFAULT_RESIDUAL_RATE_BUYOUT: { label: '인수형 기본 잔존가치율', unit: '%', range: '20~40%', industryRef: '인수형 30% 전후 (3년 기준 시장 잔존가 연동)' },
+  OWN_DAMAGE_RATIO: { label: '자차 면책 비율', unit: '%', range: '50~80%', industryRef: '업계 평균 60% (자차사고 부담 비율)' },
   DEFAULT_MARGIN_RATE: { label: '기본 마진율', unit: '%', range: '5~20%', industryRef: '대형사 5~10%, 중소사 10~20%' },
   OVERHEAD_RATE: { label: '관리비율', unit: '%', range: '3~10%', industryRef: '인건비·사무실·시스템 등 간접비' },
   VAT_RATE: { label: '부가세율', unit: '%', range: '10%', industryRef: '법정 10% 고정' },
@@ -91,11 +95,43 @@ function validateRange(key: string, value: any): { level: 'ok' | 'warn' | 'dange
   return null
 }
 
+// business_rules 의 각 key → operational_actuals 실측 필드 매핑
+//   (매핑 없는 키는 null → Drawer 가 "비교 데이터 없음" 표시)
+const ACTUAL_FIELD_MAP: Record<string, EvidenceContext['actualField']> = {
+  DEP_YEAR_1: 'actual_depreciation',
+  DEP_YEAR_2PLUS: 'actual_depreciation',
+  DEP_MILEAGE_10K: 'actual_depreciation',
+  DEFAULT_RESIDUAL_RATE_RETURN: 'actual_depreciation',
+  DEFAULT_RESIDUAL_RATE_BUYOUT: 'actual_depreciation',
+  INSURANCE_LOADING: 'actual_insurance',
+  DEDUCTIBLE_AMOUNT: 'actual_accident_cost',
+  OWN_DAMAGE_RATIO: 'actual_accident_cost',
+  RISK_RESERVE_RATE: 'actual_accident_cost',
+  MONTHLY_MAINTENANCE_BASE: 'actual_maintenance',
+  CAR_TAX_RATE: 'actual_tax',
+}
+
 export default function BusinessRulesTab() {
   const [rules, setRules] = useState<BusinessRule[]>([])
   const [loading, setLoading] = useState(true)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(true)
+  const [evidence, setEvidence] = useState<EvidenceContext | null>(null)
+
+  const openEvidence = (rule: BusinessRule) => {
+    const detail = KEY_DETAILS[rule.key]
+    setEvidence({
+      table: 'business_rules',
+      rowId: rule.id,
+      title: detail?.label || rule.key,
+      subtitle: rule.key,
+      currentValue: rule.value,
+      unit: detail?.unit,
+      range: detail?.range,
+      industryRef: detail?.industryRef,
+      actualField: ACTUAL_FIELD_MAP[rule.key] ?? null,
+    })
+  }
 
   useEffect(() => { loadRules() }, [])
 
@@ -108,13 +144,22 @@ export default function BusinessRulesTab() {
     finally { setLoading(false) }
   }
 
-  const handleSave = async (id: string, newValue: any) => {
+  const handleSave = async (id: string, newValue: any, reason?: string) => {
     try {
-      await updatePricingStandardsRow('business_rules', id, { value: newValue })
+      const body: any = { value: newValue }
+      if (reason) body._reason = reason
+      await updatePricingStandardsRow('business_rules', id, body)
       setRules(rules.map(r => r.id === id ? { ...r, value: newValue } : r))
       setSavedId(id)
       setTimeout(() => setSavedId(null), 2000)
     } catch (error) { console.error('Error:', error) }
+  }
+
+  const applyFromDrawer = async (newValue: number, reason: string) => {
+    if (!evidence) return
+    await handleSave(evidence.rowId, newValue, reason)
+    // drawer 내부 currentValue 갱신 + 변경이력 새로고침을 위해 context 교체
+    setEvidence({ ...evidence, currentValue: newValue })
   }
 
   const getRuleByKey = (key: string) => rules.find(r => r.key === key)
@@ -138,9 +183,18 @@ export default function BusinessRulesTab() {
   }
 
   return (
+    <>
     <div className="space-y-4">
       {showGuide && (
-        <div className="bg-gradient-to-r from-white/5 to-slate-900/10 rounded-2xl p-5 border border-black/10">
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.72)',
+            borderRadius: 16,
+            padding: 20,
+            border: '1px solid rgba(0,0,0,0.06)',
+            boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -4px -4px 12px rgba(255,255,255,0.5)',
+          }}
+        >
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">⚙️</span>
@@ -168,7 +222,22 @@ export default function BusinessRulesTab() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-8">
           {!showGuide && (
-            <button onClick={() => setShowGuide(true)} className="mb-3 px-3 py-1.5 text-xs text-steel-600 bg-steel-50 rounded-lg hover:bg-steel-100">가이드 💡</button>
+            <button
+              onClick={() => setShowGuide(true)}
+              style={{
+                marginBottom: 12,
+                padding: '6px 12px',
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: 8,
+                border: '1px solid rgba(0,0,0,0.06)',
+                background: 'rgba(255,255,255,0.6)',
+                color: '#64748b',
+                cursor: 'pointer',
+              }}
+            >
+              💡 가이드 보기
+            </button>
           )}
           <div className="space-y-4">
             {RULE_CATEGORIES.map((category) => {
@@ -191,26 +260,90 @@ export default function BusinessRulesTab() {
                       const rangeCheck = validateRange(rule.key, rule.value)
 
                       return (
-                        <div key={rule.id} className="p-4 bg-gray-100 rounded-xl border border-black/10">
+                        <div
+                          key={rule.id}
+                          style={{
+                            padding: 14,
+                            background: 'rgba(255,255,255,0.72)',
+                            borderRadius: 12,
+                            border: '1px solid rgba(0,0,0,0.06)',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+                          }}
+                        >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-bold text-slate-800">{detail?.label || rule.key}</span>
-                                <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-slate-400 rounded font-mono">{rule.key}</span>
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '2px 6px',
+                                    background: 'rgba(100,116,139,0.10)',
+                                    color: '#64748b',
+                                    borderRadius: 4,
+                                    fontFamily: 'monospace',
+                                  }}
+                                >{rule.key}</span>
                               </div>
-                              <p className="text-xs text-slate-400">{rule.description}</p>
+                              <p className="text-xs text-slate-500">{rule.description}</p>
                             </div>
-                            <div className="text-[10px] text-slate-500 text-right flex-shrink-0 ml-3">
-                              {formatDate(rule.updated_at)}
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-3">
+                              <div className="text-[10px] text-slate-500 text-right">
+                                {formatDate(rule.updated_at)}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openEvidence(rule)}
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  borderRadius: 6,
+                                  border: '1px solid rgba(59,130,246,0.25)',
+                                  background: 'rgba(59,130,246,0.08)',
+                                  color: '#1d4ed8',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title="이 기준값의 변경 이력·실운영 대비 근거 보기"
+                              >
+                                📜 근거
+                              </button>
                             </div>
                           </div>
 
                           {/* 업계 참고 정보 */}
                           {detail && (
-                            <div className="flex flex-wrap gap-3 mb-3 text-[10px]">
-                              <span className="px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">적정 범위: {detail.range}</span>
-                              <span className="px-2 py-0.5 bg-green-900/30 text-green-400 rounded-full">업계: {detail.industryRef}</span>
-                              {detail.unit && <span className="px-2 py-0.5 bg-gray-100 text-slate-400 rounded-full">단위: {detail.unit}</span>}
+                            <div className="flex flex-wrap gap-2 mb-3 text-[10px]">
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  background: 'rgba(59,130,246,0.10)',
+                                  color: '#1d4ed8',
+                                  borderRadius: 9999,
+                                  border: '1px solid rgba(59,130,246,0.20)',
+                                }}
+                              >적정 범위: {detail.range}</span>
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  background: 'rgba(16,185,129,0.10)',
+                                  color: '#047857',
+                                  borderRadius: 9999,
+                                  border: '1px solid rgba(16,185,129,0.20)',
+                                }}
+                              >업계: {detail.industryRef}</span>
+                              {detail.unit && (
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    background: 'rgba(100,116,139,0.10)',
+                                    color: '#475569',
+                                    borderRadius: 9999,
+                                    border: '1px solid rgba(100,116,139,0.20)',
+                                  }}
+                                >단위: {detail.unit}</span>
+                              )}
                             </div>
                           )}
 
@@ -224,20 +357,55 @@ export default function BusinessRulesTab() {
                                   const v = parseFloat(e.target.value)
                                   if (!isNaN(v) && v !== rule.value) handleSave(rule.id, v)
                                 }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`} />
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  borderRadius: 8,
+                                  border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
+                                  background: 'rgba(255,255,255,0.95)',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                                }}
+                              />
                             ) : valueType === 'boolean' ? (
                               <select defaultValue={rule.value ? 'true' : 'false'}
                                 onChange={(e) => handleSave(rule.id, e.target.value === 'true')}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`}>
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  borderRadius: 8,
+                                  border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
+                                  background: 'rgba(255,255,255,0.95)',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                }}
+                              >
                                 <option value="true">활성화</option>
                                 <option value="false">비활성화</option>
                               </select>
                             ) : (
                               <input type="text" defaultValue={rule.value}
                                 onBlur={(e) => { if (e.target.value !== rule.value) handleSave(rule.id, e.target.value) }}
-                                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 bg-gray-100 text-white ${isSaved ? 'border-green-500' : 'border-white/20'}`} />
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 12px',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  borderRadius: 8,
+                                  border: `1px solid ${isSaved ? '#10b981' : 'rgba(0,0,0,0.08)'}`,
+                                  background: 'rgba(255,255,255,0.95)',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                                }}
+                              />
                             )}
-                            {isSaved && <span className="text-green-400 text-xs font-semibold">💾 저장됨</span>}
+                            {isSaved && <span style={{ color: '#059669', fontSize: 11, fontWeight: 700 }}>💾 저장됨</span>}
                           </div>
                           {rangeCheck && (
                             <div className={`mt-2 px-3 py-1.5 rounded-lg text-[11px] ${
@@ -259,47 +427,109 @@ export default function BusinessRulesTab() {
         </div>
 
         <div className="lg:col-span-4">
-          <div className="bg-slate-900 rounded-2xl shadow-sm p-5 text-white sticky top-32">
-            <h3 className="text-sm font-bold mb-1">현재 설정 시뮬레이션</h3>
-            <p className="text-[10px] text-slate-400 mb-4">3천만원 · 36개월 기준 예상 비용</p>
+          <div
+            style={{
+              background: 'rgba(255,255,255,0.72)',
+              borderRadius: 16,
+              padding: 20,
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '8px 8px 20px rgba(140,170,210,0.14), -4px -4px 14px rgba(255,255,255,0.6)',
+              backdropFilter: 'blur(16px)',
+              position: 'sticky',
+              top: 128,
+            }}
+          >
+            <h3 className="text-sm font-bold text-slate-800 mb-1">현재 설정 시뮬레이션</h3>
+            <p className="text-[10px] text-slate-500 mb-4">3천만원 · 36개월 기준 예상 비용</p>
 
             <div className="space-y-3">
-              <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] text-slate-400 mb-1">월 대출이자</div>
-                <div className="text-sm font-bold text-white">{calculateMonthlyInterest().toLocaleString()}원</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{getRuleByKey('LOAN_INTEREST_RATE')?.value}% 적용</div>
-              </div>
-              <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] text-slate-400 mb-1">월 기회비용</div>
-                <div className="text-sm font-bold text-white">{calculateOpportunityCost().toLocaleString()}원</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{getRuleByKey('INVESTMENT_RETURN_RATE')?.value}% 적용</div>
-              </div>
-              <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] text-slate-400 mb-1">월 리스크 적립</div>
-                <div className="text-sm font-bold text-white">{calculateRiskReserve().toLocaleString()}원</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{getRuleByKey('RISK_RESERVE_RATE')?.value}% 적용</div>
+              {/* 월 대출이자 — blue tint */}
+              <div
+                style={{
+                  padding: 12,
+                  background: 'rgba(255,255,255,0.60)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(59,130,246,0.18)',
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#475569', marginBottom: 2 }}>월 대출이자</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e40af' }}>{calculateMonthlyInterest().toLocaleString()}원</div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{getRuleByKey('LOAN_INTEREST_RATE')?.value}% 적용</div>
               </div>
 
-              <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-[10px] font-semibold text-slate-600 mb-2">주요 설정값 요약</div>
-                <div className="space-y-1 text-xs text-slate-600">
-                  {getRuleByKey('DEFAULT_MARGIN_RATE') && <div className="flex justify-between"><span>마진율</span><span className="font-semibold text-white">{getRuleByKey('DEFAULT_MARGIN_RATE')!.value}%</span></div>}
-                  {getRuleByKey('VAT_RATE') && <div className="flex justify-between"><span>부가세율</span><span className="font-semibold text-white">{getRuleByKey('VAT_RATE')!.value}%</span></div>}
-                  {getRuleByKey('DEFAULT_TERM_MONTHS') && <div className="flex justify-between"><span>기본 기간</span><span className="font-semibold text-white">{getRuleByKey('DEFAULT_TERM_MONTHS')!.value}개월</span></div>}
-                  {getRuleByKey('CAR_TAX_TYPE') && <div className="flex justify-between"><span>세금 유형</span><span className="font-semibold text-white">{getRuleByKey('CAR_TAX_TYPE')!.value}</span></div>}
-                  {getRuleByKey('INSURANCE_LOADING') && <div className="flex justify-between"><span>보험 로딩</span><span className="font-semibold text-white">{getRuleByKey('INSURANCE_LOADING')!.value}%</span></div>}
+              {/* 월 기회비용 — violet tint */}
+              <div
+                style={{
+                  padding: 12,
+                  background: 'rgba(255,255,255,0.60)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(139,92,246,0.18)',
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#475569', marginBottom: 2 }}>월 기회비용</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#6d28d9' }}>{calculateOpportunityCost().toLocaleString()}원</div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{getRuleByKey('INVESTMENT_RETURN_RATE')?.value}% 적용</div>
+              </div>
+
+              {/* 월 리스크 적립 — amber tint */}
+              <div
+                style={{
+                  padding: 12,
+                  background: 'rgba(255,255,255,0.60)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(245,158,11,0.20)',
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#475569', marginBottom: 2 }}>월 리스크 적립</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#b45309' }}>{calculateRiskReserve().toLocaleString()}원</div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{getRuleByKey('RISK_RESERVE_RATE')?.value}% 적용</div>
+              </div>
+
+              {/* 주요 설정값 요약 */}
+              <div
+                style={{
+                  padding: 12,
+                  background: 'rgba(255,255,255,0.50)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,0,0,0.05)',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 8 }}>주요 설정값 요약</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: '#334155' }}>
+                  {getRuleByKey('DEFAULT_MARGIN_RATE') && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>마진율</span><span style={{ fontWeight: 700, color: '#0f172a' }}>{getRuleByKey('DEFAULT_MARGIN_RATE')!.value}%</span></div>}
+                  {getRuleByKey('VAT_RATE') && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>부가세율</span><span style={{ fontWeight: 700, color: '#0f172a' }}>{getRuleByKey('VAT_RATE')!.value}%</span></div>}
+                  {getRuleByKey('DEFAULT_TERM_MONTHS') && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>기본 기간</span><span style={{ fontWeight: 700, color: '#0f172a' }}>{getRuleByKey('DEFAULT_TERM_MONTHS')!.value}개월</span></div>}
+                  {getRuleByKey('CAR_TAX_TYPE') && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>세금 유형</span><span style={{ fontWeight: 700, color: '#0f172a' }}>{getRuleByKey('CAR_TAX_TYPE')!.value}</span></div>}
+                  {getRuleByKey('INSURANCE_LOADING') && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>보험 로딩</span><span style={{ fontWeight: 700, color: '#0f172a' }}>{getRuleByKey('INSURANCE_LOADING')!.value}%</span></div>}
                 </div>
               </div>
 
-              <div className="p-3 bg-gradient-to-br from-steel-800 to-slate-900 rounded-lg border border-steel-700">
-                <div className="text-[10px] font-semibold text-slate-600 mb-1">월 금융비용 합계</div>
-                <div className="text-lg font-black text-white">
+              {/* 월 금융비용 합계 — emerald tint */}
+              <div
+                style={{
+                  padding: 14,
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.10), rgba(5,150,105,0.08))',
+                  borderRadius: 12,
+                  border: '1px solid rgba(16,185,129,0.25)',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#047857', marginBottom: 2 }}>월 금융비용 합계</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#064e3b' }}>
                   {(calculateMonthlyInterest() + calculateOpportunityCost() + calculateRiskReserve()).toLocaleString()}원
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">대출이자 + 기회비용 + 리스크적립</div>
+                <div style={{ fontSize: 10, color: '#047857', marginTop: 2 }}>대출이자 + 기회비용 + 리스크적립</div>
               </div>
 
-              <div className="p-2 bg-slate-800 rounded-lg text-[10px] text-slate-500 border border-slate-700">
+              <div
+                style={{
+                  padding: 10,
+                  background: 'rgba(255,255,255,0.40)',
+                  borderRadius: 8,
+                  fontSize: 10,
+                  color: '#64748b',
+                  border: '1px solid rgba(0,0,0,0.04)',
+                }}
+              >
                 변경사항은 자동 저장됩니다. 새 견적 생성 시 이 기본값이 적용됩니다.
               </div>
             </div>
@@ -307,5 +537,13 @@ export default function BusinessRulesTab() {
         </div>
       </div>
     </div>
+
+    {/* 근거/학습 드로어 + AI 추천값 한 클릭 반영 */}
+    <EvidenceDrawer
+      ctx={evidence}
+      onClose={() => setEvidence(null)}
+      onApply={applyFromDrawer}
+    />
+    </>
   )
 }

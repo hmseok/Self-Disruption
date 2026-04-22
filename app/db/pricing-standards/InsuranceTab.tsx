@@ -101,15 +101,30 @@ interface InsuranceGroup {
   updated_at: string
 }
 
-// ── 포맷 헬퍼 ──────────────────────────────────────────────────────────
-const fmt = (n: number) => n?.toLocaleString('ko-KR') ?? '-'
-const fmtMan = (n: number) => {
+// ── 포맷 헬퍼 (DECIMAL 컬럼은 MySQL/Prisma에서 string 으로 내려오므로 Number() 방어) ─────────
+const toNum = (v: any): number => {
+  if (v === null || v === undefined || v === '') return 0
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const fmt = (v: any) => {
+  const n = toNum(v)
+  return n ? n.toLocaleString('ko-KR') : '-'
+}
+const fmtMan = (v: any) => {
+  const n = toNum(v)
   if (!n) return '-'
   const man = Math.round(n / 10000)
   return man >= 100 ? `${(man / 100).toFixed(0)}억` : `${man.toLocaleString()}만`
 }
-const fmtWon = (n: number) => n ? `${fmt(n)}원` : '-'
-const fmtPct = (n: number, d = 2) => n ? `${n.toFixed(d)}%` : '-'
+const fmtWon = (v: any) => {
+  const n = toNum(v)
+  return n ? `${n.toLocaleString('ko-KR')}원` : '-'
+}
+const fmtPct = (v: any, d = 2) => {
+  const n = toNum(v)
+  return n ? `${n.toFixed(d)}%` : '-'
+}
 
 // ── 서브탭 타입 ──────────────────────────────────────────────────────────
 type SubTab = 'rates' | 'records' | 'groups' | 'analysis'
@@ -147,18 +162,18 @@ export default function InsuranceTab() {
   async function loadAll() {
     try {
       setLoading(true)
-      const [rateRows, policies, basePremiums, ownRates, groups] = await Promise.all([
+      // 2026-04-22: insurance_policy_record / insurance_vehicle_group 테이블 DROP
+      //   (계산엔진 비사용, 레거시 운영 기록 → 빈 배열로 폴백; TODO: operational_actuals 로 이전)
+      const [rateRows, basePremiums, ownRates] = await Promise.all([
         fetchPricingStandardsData('insurance_rate_table'),
-        fetchPricingStandardsData('insurance_policy_record'),
         fetchPricingStandardsData('insurance_base_premium'),
         fetchPricingStandardsData('insurance_own_vehicle_rate'),
-        fetchPricingStandardsData('insurance_vehicle_group'),
       ])
       setRateRows(rateRows || [])
-      setPolicies(policies || [])
+      setPolicies([])
       setBasePremiums(basePremiums || [])
       setOwnRates(ownRates || [])
-      setGroups(groups || [])
+      setGroups([])
     } catch (error) { console.error('Error:', error) }
     finally { setLoading(false) }
   }
@@ -527,7 +542,7 @@ export default function InsuranceTab() {
                                     <td className="py-2 px-2 text-right text-steel-200">{fmtMan(p.vehicle_value)}</td>
                                     <td className="py-2 px-2 text-right text-amber-300">{fmtWon(p.premium_own_vehicle)}</td>
                                     <td className="py-2 px-2 text-right font-bold text-amber-300">
-                                      {(p.premium_own_vehicle / p.vehicle_value * 100).toFixed(2)}%
+                                      {(toNum(p.premium_own_vehicle) / toNum(p.vehicle_value) * 100).toFixed(2)}%
                                     </td>
                                     <td className="py-2 px-2 text-right font-bold text-white">{fmtWon(p.total_premium)}</td>
                                     <td className="py-2 px-2 text-steel-300">
@@ -542,8 +557,8 @@ export default function InsuranceTab() {
                             <div className="flex gap-4 mt-2 pt-2 border-t border-steel-700/30 text-sm">
                               <span className="text-steel-300">그룹 내 요율 범위:</span>
                               <span className="text-amber-300 font-bold">
-                                {Math.min(...groupPolicies.map(p => p.premium_own_vehicle / p.vehicle_value * 100)).toFixed(2)}%
-                                ~ {Math.max(...groupPolicies.map(p => p.premium_own_vehicle / p.vehicle_value * 100)).toFixed(2)}%
+                                {Math.min(...groupPolicies.map(p => toNum(p.premium_own_vehicle) / toNum(p.vehicle_value) * 100)).toFixed(2)}%
+                                ~ {Math.max(...groupPolicies.map(p => toNum(p.premium_own_vehicle) / toNum(p.vehicle_value) * 100)).toFixed(2)}%
                               </span>
                               <span className="text-steel-300 ml-2">보험료 범위:</span>
                               <span className="text-white font-bold">
@@ -609,8 +624,8 @@ export default function InsuranceTab() {
                 {groups.map(g => {
                   const groupPolicies = policies.filter(p => p.group_id === g.id)
                   const rate = groupPolicies.length > 0
-                    ? groupPolicies.reduce((sum, p) => sum + (p.premium_own_vehicle / p.vehicle_value * 100), 0) / groupPolicies.length
-                    : g.avg_own_rate
+                    ? groupPolicies.reduce((sum, p) => sum + (toNum(p.premium_own_vehicle) / toNum(p.vehicle_value) * 100), 0) / groupPolicies.length
+                    : toNum(g.avg_own_rate)
                   const maxRate = 3.0
                   const barW = Math.min(100, (rate / maxRate) * 100)
                   return (

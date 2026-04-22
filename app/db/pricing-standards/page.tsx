@@ -4,17 +4,16 @@ import { useState } from 'react'
 import dynamicImport from 'next/dynamic'
 import DcToolbar from '../../components/DcToolbar'
 
-// 탭 설정 — 각 탭에 설명 추가
+// 탭 설정 — 2026-04-22 구조 간소화: 계산엔진 비연결·저사용 탭(검사비/등록비용) 제거
 const tabs = [
   { id: 'market', label: '차량시세', icon: '🚗', desc: '외부+자체 블렌드' },
   { id: 'depreciation', label: '감가기준', icon: '📉', desc: '차량 잔존가치율' },
   { id: 'insurance', label: '보험료', icon: '🛡️', desc: '보험료 기준표' },
   { id: 'maintenance', label: '정비비', icon: '🔧', desc: '월 정비비 기준' },
-  { id: 'inspection', label: '검사비', icon: '🔍', desc: '차량 검사비용' },
   { id: 'tax', label: '자동차세', icon: '🏛️', desc: '법정 세율 기준' },
   { id: 'finance', label: '금융금리', icon: '🏦', desc: '금융상품 요율' },
-  { id: 'registration', label: '등록비용', icon: '📋', desc: '취등록 비용' },
   { id: 'rules', label: '기본설정', icon: '⚙️', desc: '시스템 파라미터' },
+  { id: 'presets', label: '영업프리셋', icon: '🎯', desc: '표준/할인/프리미엄' },
 ]
 
 // 동적 탭 컴포넌트 로딩
@@ -33,11 +32,10 @@ const TabComponents: Record<string, React.ComponentType<any>> = {
   depreciation: dynamicImport(() => import('./DepreciationTab').catch(() => TabPlaceholder), { ssr: false }),
   insurance: dynamicImport(() => import('./InsuranceTab').catch(() => TabPlaceholder), { ssr: false }),
   maintenance: dynamicImport(() => import('./MaintenanceTab').catch(() => TabPlaceholder), { ssr: false }),
-  inspection: dynamicImport(() => import('./InspectionTab').catch(() => TabPlaceholder), { ssr: false }),
   tax: dynamicImport(() => import('./TaxTab').catch(() => TabPlaceholder), { ssr: false }),
   finance: dynamicImport(() => import('./FinanceTab').catch(() => TabPlaceholder), { ssr: false }),
-  registration: dynamicImport(() => import('./RegistrationTab').catch(() => TabPlaceholder), { ssr: false }),
   rules: dynamicImport(() => import('./BusinessRulesTab').catch(() => TabPlaceholder), { ssr: false }),
+  presets: dynamicImport(() => import('./PresetsTab').catch(() => TabPlaceholder), { ssr: false }),
 }
 
 const SimulationPanel = dynamicImport(() => import('./SimulationPanel'), { ssr: false })
