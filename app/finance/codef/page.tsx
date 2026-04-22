@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import DcStatStrip, { StatItem } from '../../components/DcStatStrip'
+import { COLORS, pillStyle } from '../../utils/ui-tokens'
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -241,6 +242,95 @@ export default function CodefPage() {
 
   return (
     <div className="page-bg">
+      <style>{`
+        .codef-card {
+          background: ${COLORS.bgViolet};
+          border: 1px solid ${COLORS.borderViolet};
+          backdrop-filter: blur(12px) saturate(140%);
+          -webkit-backdrop-filter: blur(12px) saturate(140%);
+          border-radius: 12px;
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+        .codef-btn-primary {
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 8px;
+          background: ${COLORS.primary};
+          color: #ffffff;
+          border: 1px solid ${COLORS.primary};
+          transition: background 120ms ease, border-color 120ms ease;
+          cursor: pointer;
+        }
+        .codef-btn-primary:hover:not(:disabled) {
+          background: ${COLORS.primaryDark};
+          border-color: ${COLORS.primaryDark};
+        }
+        .codef-btn-ghost {
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.85);
+          color: ${COLORS.textSecondary};
+          border: 1px solid ${COLORS.borderSubtle};
+          transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+          cursor: pointer;
+        }
+        .codef-btn-ghost:hover:not(:disabled) {
+          background: ${COLORS.bgBlue};
+          border-color: ${COLORS.borderBlue};
+          color: ${COLORS.primary};
+        }
+        .codef-btn-success {
+          width: 100%;
+          padding: 12px 16px;
+          font-size: 14px;
+          font-weight: 700;
+          border-radius: 10px;
+          background: ${COLORS.success};
+          color: #ffffff;
+          border: 1px solid ${COLORS.success};
+          transition: background 120ms ease, border-color 120ms ease;
+          cursor: pointer;
+        }
+        .codef-btn-success:hover:not(:disabled) {
+          background: #059669;
+          border-color: #059669;
+        }
+        .codef-btn-success:disabled {
+          background: ${COLORS.bgGray};
+          color: ${COLORS.textMuted};
+          border-color: ${COLORS.borderFaint};
+          cursor: not-allowed;
+        }
+        .codef-segment {
+          flex: 1;
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 8px;
+          border: 1px solid ${COLORS.borderSubtle};
+          background: rgba(255,255,255,0.70);
+          color: ${COLORS.textSecondary};
+          cursor: pointer;
+          transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+        }
+        .codef-segment:hover:not([data-active="true"]) {
+          background: ${COLORS.bgBlue};
+          border-color: ${COLORS.borderBlue};
+          color: ${COLORS.primary};
+        }
+        .codef-segment[data-active="true"] {
+          background: ${COLORS.primary};
+          border-color: ${COLORS.primary};
+          color: #ffffff;
+        }
+        .codef-tx-row:hover {
+          background: ${COLORS.bgBlue} !important;
+        }
+      `}</style>
       <div className="max-w-[1400px] mx-auto py-4 px-4 md:py-5 md:px-6">
         {/* Stats Section */}
         <DcStatStrip
@@ -254,11 +344,12 @@ export default function CodefPage() {
         {/* Message */}
         {message && (
           <div
-            className={`mb-6 p-4 rounded-lg ${
+            className="mb-6 p-4 rounded-lg"
+            style={
               message.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                : 'bg-red-50 border border-red-200 text-red-800'
-            }`}
+                ? { background: COLORS.bgGreen, border: `1px solid ${COLORS.borderGreen}`, color: COLORS.success }
+                : { background: COLORS.bgRed, border: `1px solid ${COLORS.borderRed}`, color: COLORS.danger }
+            }
           >
             {message.text.split('\n').map((line, idx) => (
               <div key={idx}>{line}</div>
@@ -268,8 +359,8 @@ export default function CodefPage() {
 
         {/* Add Connection Form */}
         {showForm && (
-          <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
-            <h2 className="text-xl font-bold text-slate-800 mb-6">계정 연동 추가</h2>
+          <div className="codef-card">
+            <h2 className="text-xl font-bold mb-6" style={{ color: COLORS.textPrimary }}>계정 연동 추가</h2>
 
             <form onSubmit={handleAddConnection} className="space-y-4">
               <div>
@@ -328,22 +419,16 @@ export default function CodefPage() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, loginType: '0' })}
-                    className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
-                      form.loginType === '0'
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-100 border-black/[0.06] text-slate-600 hover:bg-gray-100'
-                    }`}
+                    className="codef-segment"
+                    data-active={form.loginType === '0'}
                   >
                     🔐 공동인증서
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, loginType: '1' })}
-                    className={`flex-1 py-2 px-4 rounded font-medium text-sm border ${
-                      form.loginType === '1'
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-100 border-black/[0.06] text-slate-600 hover:bg-gray-100'
-                    }`}
+                    className="codef-segment"
+                    data-active={form.loginType === '1'}
                   >
                     🔑 ID/비밀번호
                   </button>
@@ -439,14 +524,16 @@ export default function CodefPage() {
               <div className="flex gap-4">
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                  className="codef-btn-primary"
+                  style={{ flex: 1 }}
                 >
                   연동하기
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded"
+                  className="codef-btn-ghost"
+                  style={{ flex: 1 }}
                 >
                   취소
                 </button>
@@ -456,12 +543,12 @@ export default function CodefPage() {
         )}
 
         {/* Connected Accounts */}
-        <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
+        <div className="codef-card">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-slate-800">연동된 계정</h2>
+            <h2 className="text-xl font-bold" style={{ color: COLORS.textPrimary }}>연동된 계정</h2>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              className="codef-btn-primary"
             >
               {showForm ? '접기' : '계정 추가'}
             </button>
@@ -484,32 +571,24 @@ export default function CodefPage() {
                 </thead>
                 <tbody>
                   {connections.map((conn) => (
-                    <tr key={conn.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                      <td className="py-3 px-4 text-slate-800 font-medium">{conn.org_name}</td>
-                      <td className="py-3 px-4 text-slate-600">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
-                            conn.org_type === 'bank'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}
-                        >
+                    <tr key={conn.id} className="codef-tx-row border-b border-slate-100">
+                      <td className="py-3 px-4 font-medium" style={{ color: COLORS.textPrimary }}>{conn.org_name}</td>
+                      <td className="py-3 px-4" style={{ color: COLORS.textSecondary }}>
+                        <span style={pillStyle(conn.org_type === 'bank' ? 'info' : 'primary')}>
                           {conn.org_type === 'bank' ? '은행' : '카드'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-600">{conn.account_number || '—'}</td>
-                      <td className="py-3 px-4 text-slate-500">
+                      <td className="py-3 px-4" style={{ color: COLORS.textSecondary }}>{conn.account_number || '—'}</td>
+                      <td className="py-3 px-4" style={{ color: COLORS.textMuted }}>
                         {new Date(conn.created_at).toLocaleDateString('ko-KR')}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700">
-                          활성
-                        </span>
+                        <span style={pillStyle('success')}>활성</span>
                       </td>
                       <td className="py-3 px-4">
                         <button
                           onClick={() => handleRemoveConnection(conn.id)}
-                          className="text-red-600 hover:text-red-700 font-medium"
+                          style={{ color: COLORS.danger, fontWeight: 600, background: 'transparent', border: 'none', cursor: 'pointer' }}
                         >
                           해제
                         </button>
@@ -523,8 +602,8 @@ export default function CodefPage() {
         </div>
 
         {/* Sync Section */}
-        <div className="bg-gray-50 rounded-lg p-6 mb-8 border border-black/[0.06]">
-          <h2 className="text-xl font-bold text-slate-800 mb-6">거래 동기화</h2>
+        <div className="codef-card">
+          <h2 className="text-xl font-bold mb-6" style={{ color: COLORS.textPrimary }}>거래 동기화</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
@@ -550,54 +629,51 @@ export default function CodefPage() {
           <button
             onClick={handleSync}
             disabled={syncing || connections.length === 0}
-            className={`w-full py-3 px-4 rounded font-bold text-white ${
-              syncing || connections.length === 0
-                ? 'bg-gray-100 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
+            className="codef-btn-success"
           >
             {syncing ? '동기화 중...' : '지금 동기화'}
           </button>
         </div>
 
         {/* Sync Logs */}
-        <div className="bg-gray-50 rounded-lg p-6 border border-black/[0.06]">
-          <h2 className="text-xl font-bold text-slate-800 mb-6">동기화 기록</h2>
+        <div className="codef-card" style={{ marginBottom: 0 }}>
+          <h2 className="text-xl font-bold mb-6" style={{ color: COLORS.textPrimary }}>동기화 기록</h2>
 
           {logs.length === 0 ? (
             <p className="text-slate-500">동기화 기록이 없습니다.</p>
           ) : (
             <div className="space-y-4">
               {logs.map((log) => (
-                <div key={log.id} className="border border-black/[0.06] rounded p-4 bg-gray-100/30">
+                <div
+                  key={log.id}
+                  className="rounded p-4"
+                  style={{
+                    border: `1px solid ${COLORS.borderSubtle}`,
+                    background: 'rgba(255,255,255,0.55)',
+                  }}
+                >
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="text-slate-800 font-semibold">
+                      <h3 className="font-semibold" style={{ color: COLORS.textPrimary }}>
                         {log.sync_type === 'bank' ? '은행' : log.sync_type === 'card' ? '카드' : '전체'} 동기화
                         {log.org_name && ` - ${log.org_name}`}
                       </h3>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm" style={{ color: COLORS.textMuted }}>
                         {new Date(log.synced_at).toLocaleString('ko-KR')}
                       </p>
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        log.status === 'success'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
+                    <span style={pillStyle(log.status === 'success' ? 'success' : 'danger')}>
                       {log.status === 'success' ? '성공' : '실패'}
                     </span>
                   </div>
 
-                  <div className="flex gap-6 text-sm text-slate-600">
+                  <div className="flex gap-6 text-sm" style={{ color: COLORS.textSecondary }}>
                     <span>조회: {log.fetched}건</span>
                     <span>저장: {log.inserted}건</span>
                   </div>
 
                   {log.error_message && (
-                    <p className="mt-2 text-sm text-red-600">{log.error_message}</p>
+                    <p className="mt-2 text-sm" style={{ color: COLORS.danger }}>{log.error_message}</p>
                   )}
                 </div>
               ))}
