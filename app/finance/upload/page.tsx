@@ -19,6 +19,10 @@ import {
   CATEGORY_RELATED_MAP,
   TYPE_LABELS,
   getMergedCategoryGroups,
+  getCategoryParts,
+  getItemsForGroup,
+  ALL_ACCOUNTING_GROUPS,
+  ALL_DISPLAY_GROUPS,
 } from '@/app/utils/finance-categories'
 import type {
   QueueItem,
@@ -27,6 +31,9 @@ import type {
   UploadResultItem,
   TransactionRow,
 } from '@/app/utils/finance-types'
+// #90 Badge 컴포넌트 추출 — 분류/연결 배지 프레젠테이션
+import CategoryBadge from '../transactions/_components/CategoryBadge'
+import RelatedBadge from '../transactions/_components/RelatedBadge'
 
 const nf = (n: number) => n ? Math.abs(n).toLocaleString() : '0'
 
@@ -457,48 +464,8 @@ function getCategoryGroup(cat: string, mode: 'accounting' | 'display' = 'account
 }
 
 // ═══ 중그룹/하위그룹 분리 헬퍼 ═══
-const ALL_ACCOUNTING_GROUPS = new Set(CATEGORIES.map(g => g.group))
-const ALL_DISPLAY_GROUPS = new Set(DISPLAY_CATEGORIES.map(g => g.group))
-
-function getCategoryParts(cat: string | null | undefined, mode: 'accounting' | 'display', customCats?: Array<{ group: string; items: string[] }>): { group: string; item: string } {
-  if (!cat || cat === '미분류') return { group: '', item: '' }
-  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
-  const groupSet = mode === 'display' ? ALL_DISPLAY_GROUPS : ALL_ACCOUNTING_GROUPS
-  // cat이 현재 모드의 그룹명인 경우
-  if (groupSet.has(cat)) return { group: cat, item: '' }
-  // cat이 커스텀 그룹명인 경우
-  if (customCats) {
-    const customGrp = customCats.find(c => c.group === cat)
-    if (customGrp) return { group: cat, item: '' }
-    // cat이 커스텀 세부항목인 경우
-    for (const c of customCats) {
-      if (c.items.includes(cat)) return { group: c.group, item: cat }
-    }
-  }
-  // cat이 다른 모드의 그룹명인 경우 → 현재 모드 그룹으로 매핑
-  const otherSource = mode === 'display' ? CATEGORIES : DISPLAY_CATEGORIES
-  const otherGroupSet = mode === 'display' ? ALL_ACCOUNTING_GROUPS : ALL_DISPLAY_GROUPS
-  if (otherGroupSet.has(cat)) {
-    const otherGrp = otherSource.find(g => g.group === cat)
-    if (otherGrp && otherGrp.items.length > 0) {
-      for (const sg of source) {
-        if (sg.items.includes(otherGrp.items[0])) return { group: sg.group, item: '' }
-      }
-    }
-    return { group: '', item: '' }
-  }
-  // cat이 세부항목인 경우 → 현재 모드의 그룹 찾기
-  for (const g of source) {
-    if (g.items.includes(cat)) return { group: g.group, item: cat }
-  }
-  return { group: '', item: cat }
-}
-
-function getItemsForGroup(groupName: string, mode: 'accounting' | 'display'): string[] {
-  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
-  const grp = source.find(g => g.group === groupName)
-  return grp?.items || []
-}
+// #90: getCategoryParts, getItemsForGroup, ALL_*_GROUPS 는 finance-categories.ts 로 이동됨
+// (CategoryBadge 컴포넌트와 공유 — 단일 진실 원천)
 
 const DEFAULT_RULES = [
   { group: '매출(영업수익)', label: '렌트/운송수입', type: 'income', keywords: ['매출', '정산', '운송료', '입금'] },
@@ -3792,144 +3759,68 @@ function UploadContent() {
   // 이후: 단일 helper로 통합 + 일관성 보장
   // ※ compact variant(line ~6564)는 handleChangeCategory 호출로 별도 유지
   // ═══════════════════════════════════════════════════════════════════
-  const renderCategoryBadge = (item: any) => {
-    const catParts = getCategoryParts(item.category, categoryMode, customCategories)
-    const isUnclassified = !catParts.group
-    const isOpen = openCategoryId === item.id
-    const groupColor = catParts.group ? (CATEGORY_COLORS[catParts.group] || '#94a3b8') : ''
-    const groupIcon = catParts.item ? (CATEGORY_ICONS[catParts.item] || '📋') : '❓'
-    return (
-      <div style={{ position: 'relative' }}>
-        <div
-          onClick={(e) => {
-            if (isOpen) { setOpenCategoryId(null); setCatPopoverPos(null) }
-            else {
-              setOpenCategoryId(item.id)
-              setCatPopoverStep(catParts.group ? 'item' : 'group')
-              setCatPopoverGroup(catParts.group)
-              setCatPopoverPos(calcPopPos(e.currentTarget))
-            }
-          }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', cursor: 'pointer',
-            border: isUnclassified ? '1.5px dashed #f87171' : '1px solid #e2e8f0',
-            borderRadius: 6, background: isUnclassified ? '#fef2f2' : '#fff', transition: 'border-color 0.15s',
-          }}>
-          {isUnclassified ? (
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', flex: 1 }}>❓ 미분류</span>
-          ) : (
-            <>
-              <span style={{ fontSize: 12, flexShrink: 0 }}>{groupIcon}</span>
-              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: groupColor, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catParts.group.replace(/^[^\s]+\s/, '')}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{catParts.item || '(미지정)'}</div>
-              </div>
-            </>
-          )}
-          <span style={{ fontSize: 8, color: '#94a3b8', flexShrink: 0 }}>▼</span>
-        </div>
-        {isOpen && catPopoverPos && (
-          <>
-            <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenCategoryId(null); setCatPopoverPos(null) }} />
-            <div style={{ position: 'fixed', top: catPopoverPos.top, left: catPopoverPos.left, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 220, maxHeight: catPopoverPos.maxH || 340, overflowY: 'auto' }}>
-              {catPopoverStep === 'group' ? (
-                <>
-                  <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>① 중그룹 선택</div>
-                  {getMergedCategoryGroups(categoryMode, customCategories).map(g => (
-                    <button key={g.group} onClick={() => { setCatPopoverGroup(g.group); setCatPopoverStep('item') }}
-                      style={{ width: '100%', padding: '8px 12px', border: 'none', background: catParts.group === g.group ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.group === g.group ? `3px solid ${CATEGORY_COLORS[g.group] || '#94a3b8'}` : '3px solid transparent' }}
-                      onMouseEnter={e => { if (catParts.group !== g.group) e.currentTarget.style.background = '#f8fafc' }}
-                      onMouseLeave={e => { if (catParts.group !== g.group) e.currentTarget.style.background = 'transparent' }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: CATEGORY_COLORS[g.group] || '#94a3b8', flexShrink: 0 }} />{g.group}
-                    </button>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button onClick={() => setCatPopoverStep('group')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#3b6eb5', padding: 0 }}>←</button>
-                    ② 세부항목
-                  </div>
-                  <button onClick={() => { handleUpdateItem(item.id, 'category', catPopoverGroup, item); setOpenCategoryId(null) }}
-                    style={{ width: '100%', padding: '7px 12px', border: 'none', background: !catParts.item ? '#fffbeb' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#92400e', borderBottom: '1px solid #f1f5f9' }}>
-                    📂 중그룹만 (미지정)
-                  </button>
-                  {[...getItemsForGroup(catPopoverGroup, categoryMode), ...(customCategories.find(c => c.group === catPopoverGroup)?.items || [])].map(c => (
-                    <button key={c} onClick={() => { handleUpdateItem(item.id, 'category', c, item); setOpenCategoryId(null) }}
-                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: catParts.item === c ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, borderLeft: catParts.item === c ? '3px solid #3b6eb5' : '3px solid transparent' }}
-                      onMouseEnter={e => { if (catParts.item !== c) e.currentTarget.style.background = '#f8fafc' }}
-                      onMouseLeave={e => { if (catParts.item !== c) e.currentTarget.style.background = 'transparent' }}>
-                      <span style={{ fontSize: 12 }}>{CATEGORY_ICONS[c] || '📋'}</span>{c}
-                      {catParts.item === c && <span style={{ marginLeft: 'auto', color: '#3b6eb5', fontSize: 13 }}>✓</span>}
-                    </button>
-                  ))}
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
+  // #90: renderCategoryBadge/renderRelatedBadge — 프레젠테이션 컴포넌트로 승격
+  //      상태는 부모 소유, 호출부 10곳은 변경 없이 동작
+  const renderCategoryBadge = (item: any) => (
+    <CategoryBadge
+      item={item}
+      categoryMode={categoryMode}
+      customCategories={customCategories}
+      isOpen={openCategoryId === item.id}
+      popoverStep={catPopoverStep}
+      popoverGroup={catPopoverGroup}
+      popoverPos={catPopoverPos}
+      onToggle={(el) => {
+        if (openCategoryId === item.id) { setOpenCategoryId(null); setCatPopoverPos(null) }
+        else {
+          const catParts = getCategoryParts(item.category, categoryMode, customCategories)
+          setOpenCategoryId(item.id)
+          setCatPopoverStep(catParts.group ? 'item' : 'group')
+          setCatPopoverGroup(catParts.group)
+          setCatPopoverPos(calcPopPos(el))
+        }
+      }}
+      onStepChange={setCatPopoverStep}
+      onGroupSelect={(group) => { setCatPopoverGroup(group); setCatPopoverStep('item') }}
+      onItemSelect={(cat) => {
+        const value = cat === null ? catPopoverGroup : cat
+        handleUpdateItem(item.id, 'category', value, item)
+        setOpenCategoryId(null)
+      }}
+      onClose={() => { setOpenCategoryId(null); setCatPopoverPos(null) }}
+    />
+  )
 
   const renderRelatedBadge = (item: any) => {
     const rd = getRelatedDisplay(item.related_type, item.related_id)
-    const isOpen = openRelatedId === item.id
-    const _fGroups = getFilteredRelatedGroups(item.category)
-    const _hasRelOpts = !_fGroups || relatedOptions.some(rg => _fGroups.includes(rg.group))
+    const fGroups = getFilteredRelatedGroups(item.category)
+    const hasRelOpts = !fGroups || relatedOptions.some(rg => fGroups.includes(rg.group))
+    const pos = relPopoverPos
+      ? { top: relPopoverPos.top, right: (relPopoverPos as any).right ?? 20, maxH: (relPopoverPos as any).maxH ?? 320 }
+      : null
     return (
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={(e) => {
-            if (!_hasRelOpts && !rd) return
-            if (isOpen) { setOpenRelatedId(null); setRelPopoverPos(null) }
-            else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(e.currentTarget, 320)) }
-          }}
-          style={{
-            width: '100%', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px',
-            fontSize: 13, background: rd ? '#f8fafc' : '#fff', color: '#4b5563',
-            cursor: (!_hasRelOpts && !rd) ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4, textAlign: 'left', outline: 'none', minHeight: 32,
-          }}>
-          {rd ? (
-            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: rd.color || '#374151', whiteSpace: 'nowrap' }}>{rd.icon} {rd.label}</div>
-              {rd.detail && <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{rd.detail}</div>}
-            </div>
-          ) : (
-            <span style={{ flex: 1, color: _hasRelOpts ? '#f59e0b' : '#d1d5db', fontSize: 13, fontWeight: _hasRelOpts ? 600 : 400 }}>{_hasRelOpts ? '⚠ 연결 없음' : '—'}</span>
-          )}
-          {(_hasRelOpts || rd) && <span style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>▼</span>}
-        </button>
-        {isOpen && relPopoverPos && (
-          <>
-            <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setOpenRelatedId(null); setRelPopoverPos(null) }} />
-            <div style={{ position: 'fixed', top: relPopoverPos.top, right: (relPopoverPos as any).right || 20, zIndex: 99, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px) saturate(150%)', WebkitBackdropFilter: 'blur(16px) saturate(150%)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, boxShadow: '0 20px 48px rgba(30,41,59,0.12), 0 4px 16px rgba(30,41,59,0.08)', minWidth: 240, maxWidth: 320, maxHeight: (relPopoverPos as any).maxH || 320, overflowY: 'auto' }}>
-              <button onClick={() => { handleUpdateItem(item.id, 'related_composite', '', item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '8px 12px', border: 'none', background: !rd ? '#f1f5f9' : 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid #f1f5f9' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = !rd ? '#f1f5f9' : 'transparent'}>
-                <span style={{ fontSize: 12 }}>✕</span> 연결 해제
-              </button>
-              {relatedOptions.filter(rg => { const _ag = getFilteredRelatedGroups(item.category); return !_ag || _ag.includes(rg.group) }).map(group => (
-                <div key={group.group}>
-                  <div style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>{group.icon} {group.group}</div>
-                  {group.items.map(opt => {
-                    const selected = item.related_id ? `${item.related_type}_${item.related_id}` === opt.value : false
-                    return (
-                      <button key={opt.value} onClick={() => { handleUpdateItem(item.id, 'related_composite', opt.value, item); setOpenRelatedId(null); setRelPopoverPos(null) }} style={{ width: '100%', padding: '6px 12px', border: 'none', background: selected ? '#eff6ff' : 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, borderLeft: selected ? `3px solid ${opt.color}` : '3px solid transparent' }} onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#f8fafc' }} onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
-                          <div style={{ fontSize: 12, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.sub}</div>
-                        </div>
-                        {selected && <span style={{ fontSize: 13, color: opt.color }}>✓</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <RelatedBadge
+        item={item}
+        relatedOptions={relatedOptions}
+        filteredRelatedGroups={fGroups}
+        relatedDisplay={rd}
+        isOpen={openRelatedId === item.id}
+        popoverPos={pos}
+        onToggle={(el) => {
+          if (!hasRelOpts && !rd) return
+          if (openRelatedId === item.id) { setOpenRelatedId(null); setRelPopoverPos(null) }
+          else { setOpenRelatedId(item.id); setRelPopoverPos(calcPopPosRight(el, 320)) }
+        }}
+        onSelect={(value) => {
+          handleUpdateItem(item.id, 'related_composite', value, item)
+          setOpenRelatedId(null); setRelPopoverPos(null)
+        }}
+        onClear={() => {
+          handleUpdateItem(item.id, 'related_composite', '', item)
+          setOpenRelatedId(null); setRelPopoverPos(null)
+        }}
+        onClose={() => { setOpenRelatedId(null); setRelPopoverPos(null) }}
+      />
     )
   }
 

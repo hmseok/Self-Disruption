@@ -187,6 +187,58 @@ export const DISPLAY_CATEGORIES = [
 
 export const ALL_CATEGORIES = CATEGORIES.flatMap(g => g.items)
 
+// 모드별 그룹명 Set — getCategoryParts 에서 O(1) 조회용
+export const ALL_ACCOUNTING_GROUPS = new Set(CATEGORIES.map(g => g.group))
+export const ALL_DISPLAY_GROUPS = new Set(DISPLAY_CATEGORIES.map(g => g.group))
+
+/**
+ * 카테고리 문자열을 `{ group, item }` 튜플로 분해
+ * - "미분류" / null → { '', '' }
+ * - 현재 모드 그룹명 → { cat, '' }
+ * - 커스텀 그룹/아이템 매칭
+ * - 다른 모드 그룹 → 현재 모드로 매핑
+ * - 세부항목 → 소속 그룹 역추적
+ */
+export function getCategoryParts(
+  cat: string | null | undefined,
+  mode: 'accounting' | 'display',
+  customCats?: Array<{ group: string; items: string[] }>,
+): { group: string; item: string } {
+  if (!cat || cat === '미분류') return { group: '', item: '' }
+  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
+  const groupSet = mode === 'display' ? ALL_DISPLAY_GROUPS : ALL_ACCOUNTING_GROUPS
+  if (groupSet.has(cat)) return { group: cat, item: '' }
+  if (customCats) {
+    const customGrp = customCats.find(c => c.group === cat)
+    if (customGrp) return { group: cat, item: '' }
+    for (const c of customCats) {
+      if (c.items.includes(cat)) return { group: c.group, item: cat }
+    }
+  }
+  const otherSource = mode === 'display' ? CATEGORIES : DISPLAY_CATEGORIES
+  const otherGroupSet = mode === 'display' ? ALL_ACCOUNTING_GROUPS : ALL_DISPLAY_GROUPS
+  if (otherGroupSet.has(cat)) {
+    const otherGrp = otherSource.find(g => g.group === cat)
+    if (otherGrp && otherGrp.items.length > 0) {
+      for (const sg of source) {
+        if (sg.items.includes(otherGrp.items[0])) return { group: sg.group, item: '' }
+      }
+    }
+    return { group: '', item: '' }
+  }
+  for (const g of source) {
+    if (g.items.includes(cat)) return { group: g.group, item: cat }
+  }
+  return { group: '', item: cat }
+}
+
+/** 특정 그룹의 세부항목 배열을 반환 */
+export function getItemsForGroup(groupName: string, mode: 'accounting' | 'display'): string[] {
+  const source = mode === 'display' ? DISPLAY_CATEGORIES : CATEGORIES
+  const grp = source.find(g => g.group === groupName)
+  return grp?.items || []
+}
+
 // ═══ 카테고리 그룹 색상 (UI 전용) ═══
 export const CATEGORY_COLORS: Record<string, string> = {
   // 회계 기준
