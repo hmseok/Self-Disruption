@@ -7,6 +7,7 @@ import { useApp } from '../../context/AppContext'
 import { usePermission } from '../../hooks/usePermission'
 import { UploadProvider, useUpload } from '@/app/context/UploadContext'
 import PageTitle from '../PageTitle'
+import QuickTxModal from '../QuickTxModal'
 import { getAuthHeader } from '@/app/utils/auth-client'
 
 // ============================================
@@ -198,6 +199,8 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
   const [dynamicMenus, setDynamicMenus] = useState<any[]>([])
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  // Phase I (#85) — 전역 "빠른 입력" 모달 상태
+  const [quickOpen, setQuickOpen] = useState(false)
 
   // 데스크톱에서는 사이드바 기본 열림
   useEffect(() => {
@@ -223,6 +226,22 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
       setIsSidebarOpen(false)
     }
   }, [pathname])
+
+  // Phase I (#85) — Alt+N 단축키로 빠른 입력 모달 오픈
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        const target = e.target as HTMLElement
+        const tag = target?.tagName?.toLowerCase()
+        // 인풋/에디터 포커스 중에는 무시
+        if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
+        e.preventDefault()
+        setQuickOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // ★ 메뉴 로드 (단일회사 — system_modules 직접 + 직원별 권한 필터)
   useEffect(() => {
@@ -382,7 +401,7 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
           <nav className="flex-1 px-3 pb-4 overflow-y-auto">
 
             {/* 대시보드 */}
-            <div className="mb-4">
+            <div className="mb-2">
               <Link
                 href="/dashboard"
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-medium ${
@@ -398,6 +417,36 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
                 <Icons.Home />
                 대시보드
               </Link>
+            </div>
+
+            {/* Phase I (#85) — 빠른 입금/출금 입력 (전역 진입점) */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setQuickOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-[13px] font-bold text-white"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  boxShadow: '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
+                  ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    '4px 4px 12px rgba(16,185,129,0.30), -1px -1px 4px rgba(255,255,255,0.55)'
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.transform = 'none'
+                  ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    '3px 3px 8px rgba(16,185,129,0.22), -1px -1px 4px rgba(255,255,255,0.47)'
+                }}
+                aria-label="빠른 입력"
+                title="어느 페이지에서든 바로 거래를 기록 (Alt+N)"
+              >
+                <span style={{ fontSize: 15, lineHeight: 1 }}>⚡</span>
+                <span>빠른 입력</span>
+              </button>
             </div>
 
             {/* 비즈니스 메뉴 그룹 */}
@@ -511,6 +560,14 @@ function ClientLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* 플로팅 업로드 진행률 위젯 */}
       <UploadProgressWidget />
+
+      {/* Phase I (#85) — 전역 빠른 입력 모달 (Alt+N / 사이드바 버튼) */}
+      <QuickTxModal
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        onSaved={() => setQuickOpen(false)}
+        initialStatus="completed"
+      />
     </div>
   )
 }

@@ -21,7 +21,38 @@ const nextConfig: NextConfig = {
   // 3. 개발모드 인디케이터 비활성화 (좌측하단 떠다니는 N 아이콘)
   devIndicators: false,
 
-  // 4. Cloudflare CDN 캐시 제어 — HTML은 캐시 금지, 정적 자산은 영구 캐시
+  // 4. Phase I (#85) — 구 finance 경로 → /finance/transactions 탭 허브 301 리다이렉트
+  //    레거시 페이지(/finance/page.tsx 등)는 _tabs/*에서 재수출로 여전히 사용되지만,
+  //    URL 라우팅은 허브 단일 진입점으로 강제한다 (외부 북마크/링크 보존용 301).
+  redirects: async () => [
+    {
+      source: '/finance',
+      destination: '/finance/transactions?tab=dashboard',
+      permanent: true,
+    },
+    {
+      source: '/finance/upload',
+      destination: '/finance/transactions?tab=classify',
+      permanent: true,
+    },
+    {
+      source: '/finance/uploads',
+      destination: '/finance/transactions?tab=uploads',
+      permanent: true,
+    },
+    {
+      source: '/finance/cards',
+      destination: '/finance/transactions?tab=cards',
+      permanent: true,
+    },
+    {
+      source: '/finance/codef',
+      destination: '/finance/transactions?tab=codef',
+      permanent: true,
+    },
+  ],
+
+  // 5. Cloudflare CDN 캐시 제어 — HTML은 캐시 금지, 정적 자산은 영구 캐시
   headers: async () => [
     {
       // _next/static 은 파일명에 해시가 포함되므로 안전하게 장기 캐시
