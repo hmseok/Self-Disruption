@@ -2170,6 +2170,44 @@ export default function RentPricingBuilder() {
         alert('저장 실패:\n' + errors.join('\n'))
       } else {
         const savedId = editingQuoteId || (Array.isArray(insertData) ? insertData?.[0]?.id : insertData?.id)
+
+        // ★ 운영학습 스냅샷 자동 생성 — 견적 저장 성공 시 calc_snapshots에 기록
+        if (savedId && calc.engineResult) {
+          try {
+            const snapshotPayload = {
+              quote_id: String(savedId),
+              vehicle_id: car.id && !String(car.id).startsWith('newcar-') ? String(car.id) : null,
+              purchase_price: purchasePrice,
+              term_months: termMonths,
+              contract_type: contractType,
+              annual_mileage: annualMileage,
+              loan_rate: loanRate,
+              vehicle_class: car.vehicle_class || car.class || 'auto',
+              calc_result: {
+                monthly_rent: calc.suggestedRent,
+                breakdown: {
+                  depreciation: { monthly: calc.monthlyDepreciation },
+                  insurance: { monthly: monthlyInsuranceCost },
+                  maintenance: { monthly: monthlyMaintenance },
+                  tax_inspection: { monthly: calc.monthlyTax + (calc.monthlyInspectionCost || 0) },
+                  risk: { monthly: calc.monthlyRiskReserve },
+                  overhead: { monthly: calc.engineResult.breakdown?.overhead?.monthly || 0 },
+                  margin: { monthly: calc.suggestedRent - calc.totalMonthlyCost },
+                },
+                cost_breakdown: calc.costBreakdown,
+                irr_result: calc.irrResult,
+              },
+            }
+            fetch('/api/operational-learning/snapshots', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...headers },
+              body: JSON.stringify(snapshotPayload),
+            }).catch(e => console.warn('[snapshot 자동 저장 실패 — 무시]', e))
+          } catch (snapErr) {
+            console.warn('[snapshot 자동 저장 에러 — 무시]', snapErr)
+          }
+        }
+
         alert(`견적서가 ${status === 'draft' ? '임시저장' : '확정'}되었습니다.`)
         if (savedId) {
           router.push(`/quotes/${savedId}`)
