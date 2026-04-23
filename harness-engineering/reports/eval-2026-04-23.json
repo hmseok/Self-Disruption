@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-04-23T09:24:20.027Z",
+  "baseUrl": "https://hmseok.com",
+  "scores": {
+    "uiux": 10,
+    "functionality": 12,
+    "codeQuality": 6,
+    "responsive": 8,
+    "security": 10,
+    "design": 14,
+    "originality": 10,
+    "completeness": 12,
+    "usability": 12
+  },
+  "total": 9.4,
+  "passed": true,
+  "passThreshold": 8,
+  "pass": [
+    "로그인 페이지",
+    "초대 수락 페이지",
+    "직원초대 검증",
+    "공개 견적 조회",
+    "견적 목록",
+    "프로필",
+    "시스템 모듈",
+    "차량 목록",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: route.ts",
+    "파일: page.tsx",
+    "파일: auth-server.ts",
+    "파일: prisma.ts",
+    "TypeScript 컴파일",
+    "Tailwind 브레이크포인트 (정적)",
+    "JWT 인증 구현",
+    "비밀번호 해싱 (bcrypt)",
+    "환경변수 파일",
+    "초대수락 비밀번호 해싱",
+    "Soft Ice 글래스 사용 (정적)",
+    "색상 틴트 다양성 (5/5)",
+    "글래스 깊이 다양성 (12단계)",
+    "그라데이션 사용 (32개 파일)",
+    "라우트 /",
+    "라우트 /invite/test-token",
+    "로그인 API 존재"
+  ],
+  "fail": [
+    "SQL Injection 패턴"
+  ],
+  "warn": [
+    "Playwright 로드 실패 → no-browser 모드 폴백: browserType.launch: Executable doesn't exist at /sessions/quirky-pensive-knuth/.cache/ms-playwright/chromium_headless_shell-1217/chrome-linux/headless_shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
+    "console.log 44개 파일"
+  ],
+  "failureDetails": [
+    {
+      "category": "코드품질",
+      "item": "SQL Injection 패턴",
+      "reason": "67개 파일",
+      "hint": "파라미터 바인딩으로 전환"
+    }
+  ],
+  "screenshots": []
+}

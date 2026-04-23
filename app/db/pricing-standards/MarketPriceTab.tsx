@@ -63,6 +63,21 @@ const glass = {
   },
 } as const
 
+// 크롤링 소스 옵션
+const CRAWL_SOURCES = [
+  { key: 'all', label: '전체', icon: '🔄' },
+  { key: 'kb_chacha', label: 'KB차차차', icon: '🏦' },
+  { key: 'encar', label: '엔카', icon: '🚙' },
+  { key: 'manufacturer', label: '제조사', icon: '🏭' },
+] as const
+
+interface CrawlStatus {
+  running: boolean
+  source: string
+  message: string
+  result?: { totalResults: number; upsertCount: number; errors: string[] }
+}
+
 export default function MarketPriceTab() {
   const [rows, setRows] = useState<MarketPriceRow[]>([])
   const [weights, setWeights] = useState<Weights>({ market: 0.7, curve: 0.3 })
@@ -73,6 +88,36 @@ export default function MarketPriceTab() {
   const [newRow, setNewRow] = useState<Partial<MarketPriceRow>>({
     year: 2025, fuel_type: '가솔린', origin: '국산', vehicle_class: '중형', sample_count: 1, source_site: 'manual',
   })
+  const [crawlStatus, setCrawlStatus] = useState<CrawlStatus>({ running: false, source: '', message: '' })
+  const [showCrawlMenu, setShowCrawlMenu] = useState(false)
+
+  // ── 크롤링 실행 ──
+  async function handleCrawl(source: string) {
+    setShowCrawlMenu(false)
+    setCrawlStatus({ running: true, source, message: `${source === 'all' ? '전체 소스' : source} 시세 수집 중...` })
+    try {
+      const token = typeof window !== 'undefined' ? window.localStorage.getItem('fmi_token') : null
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch('/api/crawl/market-prices', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sources: [source] }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      setCrawlStatus({
+        running: false, source, message: '완료!',
+        result: json.summary,
+      })
+      // 데이터 리로드
+      await load()
+      // 5초 후 결과 배너 숨기기
+      setTimeout(() => setCrawlStatus(s => s.running ? s : { ...s, message: '', result: undefined }), 8000)
+    } catch (e: any) {
+      setCrawlStatus({ running: false, source, message: `실패: ${e?.message || e}` })
+    }
+  }
 
   async function load() {
     setLoading(true); setError(null)
@@ -143,16 +188,65 @@ export default function MarketPriceTab() {
               {' '}(business_rules)
             </p>
           </div>
-          <button
-            onClick={() => setShowAddForm(v => !v)}
-            style={{
-              padding: '7px 14px', fontSize: 12, fontWeight: 700, borderRadius: 10,
-              border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.12)', color: '#2563eb',
-              cursor: 'pointer',
-            }}
-          >
-            {showAddForm ? '취소' : '＋ 시세 추가'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* 시세 갱신 (크롤링) 버튼 */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowCrawlMenu(v => !v)}
+                disabled={crawlStatus.running}
+                style={{
+                  padding: '7px 14px', fontSize: 12, fontWeight: 700, borderRadius: 10,
+                  border: '1px solid rgba(16,185,129,0.35)', background: 'rgba(16,185,129,0.12)', color: '#047857',
+                  cursor: crawlStatus.running ? 'not-allowed' : 'pointer',
+                  opacity: crawlStatus.running ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                {crawlStatus.running ? (
+                  <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> 수집 중...</>
+                ) : (
+                  <>🔄 시세 갱신</>
+                )}
+              </button>
+              {/* 소스 선택 드롭다운 */}
+              {showCrawlMenu && !crawlStatus.running && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 50,
+                  background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: 6,
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  minWidth: 160,
+                }}>
+                  {CRAWL_SOURCES.map(s => (
+                    <button
+                      key={s.key}
+                      onClick={() => handleCrawl(s.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        padding: '8px 12px', fontSize: 12, fontWeight: 600,
+                        border: 'none', background: 'transparent', borderRadius: 8,
+                        cursor: 'pointer', color: '#334155', textAlign: 'left',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.08)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <span>{s.icon}</span> {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowAddForm(v => !v)}
+              style={{
+                padding: '7px 14px', fontSize: 12, fontWeight: 700, borderRadius: 10,
+                border: '1px solid rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.12)', color: '#2563eb',
+                cursor: 'pointer',
+              }}
+            >
+              {showAddForm ? '취소' : '＋ 시세 추가'}
+            </button>
+          </div>
         </div>
 
         {/* 3-column 해설 */}
@@ -171,6 +265,54 @@ export default function MarketPriceTab() {
           </div>
         </div>
       </div>
+
+      {/* 크롤링 결과 배너 */}
+      {(crawlStatus.running || crawlStatus.result) && (
+        <div style={{
+          ...glass.level3Green,
+          padding: 14,
+          display: 'flex', alignItems: 'center', gap: 12,
+          ...(crawlStatus.message.startsWith('실패') ? { border: '1px solid rgba(239,68,68,0.4)' } : {}),
+        }}>
+          {crawlStatus.running ? (
+            <>
+              <span style={{ fontSize: 18, animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>{crawlStatus.message}</div>
+                <div style={{ fontSize: 11, color: '#065f46', marginTop: 2 }}>KB차차차·엔카·제조사 사이트에서 시세를 수집하고 있습니다...</div>
+              </div>
+            </>
+          ) : crawlStatus.result ? (
+            <>
+              <span style={{ fontSize: 18 }}>✅</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>
+                  시세 갱신 완료 — {crawlStatus.result.upsertCount}건 저장
+                  {crawlStatus.result.errors.length > 0 && ` (에러 ${crawlStatus.result.errors.length}건)`}
+                </div>
+                <div style={{ fontSize: 11, color: '#065f46', marginTop: 2 }}>
+                  총 {crawlStatus.result.totalResults}건 수집, {crawlStatus.result.upsertCount}건 DB 반영
+                </div>
+              </div>
+              <button
+                onClick={() => setCrawlStatus({ running: false, source: '', message: '' })}
+                style={{ padding: '4px 8px', fontSize: 11, background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+              >✕</button>
+            </>
+          ) : crawlStatus.message.startsWith('실패') ? (
+            <>
+              <span style={{ fontSize: 18 }}>❌</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#dc2626' }}>{crawlStatus.message}</div>
+              </div>
+              <button
+                onClick={() => setCrawlStatus({ running: false, source: '', message: '' })}
+                style={{ padding: '4px 8px', fontSize: 11, background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+              >✕</button>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* 신규 입력 폼 */}
       {showAddForm && (
@@ -319,7 +461,19 @@ function MarketPriceRowView({
         {row.deviation_pct === null || row.deviation_pct === undefined ? '—' : `${row.deviation_pct > 0 ? '+' : ''}${row.deviation_pct}%`}
       </td>
       <td style={{ ...tdStyle, fontSize: 11, color: '#64748b' }}>
-        {row.source_site}
+        <span style={{
+          display: 'inline-block', padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+          background: row.source_site === 'kb_chacha' ? 'rgba(59,130,246,0.12)' :
+                      row.source_site === 'encar' ? 'rgba(16,185,129,0.12)' :
+                      row.source_site === 'manufacturer' ? 'rgba(168,85,247,0.12)' : 'rgba(107,114,128,0.12)',
+          color: row.source_site === 'kb_chacha' ? '#2563eb' :
+                 row.source_site === 'encar' ? '#047857' :
+                 row.source_site === 'manufacturer' ? '#7c3aed' : '#475569',
+        }}>
+          {row.source_site === 'kb_chacha' ? '🏦 KB' :
+           row.source_site === 'encar' ? '🚙 엔카' :
+           row.source_site === 'manufacturer' ? '🏭 제조사' : row.source_site}
+        </span>
         <br />
         <span style={{ fontSize: 10, color: '#94a3b8' }}>
           {row.crawled_at ? new Date(row.crawled_at).toLocaleDateString('ko-KR') : ''}
