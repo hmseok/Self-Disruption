@@ -46,7 +46,7 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/quotes': 'sales', '/quotes/operational-learning': 'sales',
   '/contracts': 'sales', '/finance/settlement': 'sales',
   // ── 재무/경영 ──
-  '/finance/transactions': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance/transactions': 'finance', '/finance/bank-card': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
   '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
   '/db/lotte': 'finance', '/admin/code-master': 'finance',
 }
@@ -65,7 +65,8 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/contracts': '계약/고객',
   '/finance/settlement': '정산/수금',
   // 재무/경영 그룹
-  '/finance/transactions': '통장/카드 관리',
+  '/finance/transactions': '거래 분류/관리',
+  '/finance/bank-card': '통장/카드 통합',
   '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
   '/admin/payroll': '급여 관리',
