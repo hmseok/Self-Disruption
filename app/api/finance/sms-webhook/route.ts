@@ -45,11 +45,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const from = (body.from || '').trim()
-  const text = (body.text || '').trim()
+  let from = (body.from || '').trim()
+  let text = (body.text || '').trim()
   if (!text) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
+
+  // SMS Forwarder 앱 메시지 형식 전처리:
+  // 1) "보낸사람 : 01050349550 [Web발신] KB국민카드..." → "[Web발신] KB국민카드..."
+  // 2) "보낸사람 : 01050349550\n[KB국민] 홍길동..." → "[KB국민] 홍길동..."
+  const prefixMatch = text.match(/^보낸사람\s*:\s*([\d+\-\s]+)\s*/)
+  if (prefixMatch) {
+    if (!from) from = prefixMatch[1].replace(/[\s\-]/g, '')
+    text = text.slice(prefixMatch[0].length).trim()
+  }
+
+  // 3) [Web발신] 접두어 제거 → "KB국민카드 8819(기업) 홍길동..."
+  text = text.replace(/^\[Web발신\]\s*/, '')
 
   let receivedAt = new Date()
   try {

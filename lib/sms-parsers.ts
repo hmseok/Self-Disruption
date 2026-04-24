@@ -41,9 +41,9 @@ export function detectIssuer(sender: string | null, text: string): CardIssuer {
     if (patterns.some(p => p.test(s))) return issuer
   }
   // 본문 prefix fallback
-  if (/^\[KB국민/.test(text)) return 'KB'
-  if (/^\[우리카드/.test(text)) return 'WOORI'
-  if (/^\[현대카드/.test(text)) return 'HYUNDAI'
+  if (/\[KB국민/.test(text) || /KB국민카드/.test(text)) return 'KB'
+  if (/\[우리카드/.test(text) || /우리카드/.test(text)) return 'WOORI'
+  if (/\[현대카드/.test(text) || /현대카드/.test(text)) return 'HYUNDAI'
   return 'UNKNOWN'
 }
 
@@ -70,21 +70,31 @@ function parseDateTime(text: string, year = new Date().getFullYear()): Date | nu
 }
 
 // ── KB국민카드 파서 ────────────────────────────────────────
-// 예: [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인
-//     [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 취소
+// 포맷 A: [KB국민] 홍길동 4/21 14:32 CU편의점 3,500원 일시불 승인
+// 포맷 B: KB국민카드 8819(기업) 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인
+//         (웹훅에서 [Web발신] 제거 후 도착하는 포맷)
 function parseKB(text: string): ParsedSms | null {
-  // [KB국민] 또는 [KB국민카드]
-  const m = text.match(
+  // 포맷 A: [KB국민] 또는 [KB국민카드]
+  let m = text.match(
     /\[KB국민(?:카드)?\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
   )
+
+  // 포맷 B: KB국민카드 XXXX(기업) 홍길동 ... or KB국민카드 홍길동 ...
+  if (!m) {
+    m = text.match(
+      /KB국민카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+    )
+  }
+
   if (!m) return null
   const [, holder, dt, merchant, amtStr, tail] = m
 
   const canceled = /취소/.test(tail)
   const installMatch = tail.match(/(일시불|\d+개월)/)
 
-  // 카드 별칭 (뒤에 카드번호 찍혀있으면 캡처)
-  const aliasMatch = text.match(/(?:카드번호|카드)\s*\**(\d{4})/)
+  // 카드 별칭: [Web발신] 포맷의 "KB국민카드 8819" 또는 기존 "카드번호****1234"
+  let aliasMatch = text.match(/KB국민카드\s*(\d{4})/)
+  if (!aliasMatch) aliasMatch = text.match(/(?:카드번호|카드)\s*\**(\d{4})/)
 
   return {
     issuer: 'KB',
@@ -99,17 +109,28 @@ function parseKB(text: string): ParsedSms | null {
 }
 
 // ── 우리카드 파서 ────────────────────────────────────────
-// 예: [우리카드] 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인 카드****1234
+// 포맷 A: [우리카드] 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인 카드****1234
+// 포맷 B: 우리카드 XXXX 홍*동 04/21 14:32 스타벅스 5,200원 일시불승인
 function parseWoori(text: string): ParsedSms | null {
-  const m = text.match(
+  // 포맷 A: [우리카드]
+  let m = text.match(
     /\[우리카드\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
   )
+
+  // 포맷 B: 우리카드 XXXX 또는 우리카드 홍*동
+  if (!m) {
+    m = text.match(
+      /우리카드\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+    )
+  }
+
   if (!m) return null
   const [, holder, dt, merchant, amtStr, tail] = m
 
   const canceled = /취소/.test(tail)
   const installMatch = tail.match(/(일시불|\d+개월)/)
-  const aliasMatch = text.match(/(?:카드|카드번호)\s*\**(\d{4})/)
+  let aliasMatch = text.match(/우리카드\s*(\d{4})/)
+  if (!aliasMatch) aliasMatch = text.match(/(?:카드|카드번호)\s*\**(\d{4})/)
 
   return {
     issuer: 'WOORI',
@@ -124,24 +145,29 @@ function parseWoori(text: string): ParsedSms | null {
 }
 
 // ── 현대카드 파서 ────────────────────────────────────────
-// 예: [현대카드M] 홍길동 04/21 14:32 / 3,500원 / CU편의점 / 일시불
-//     [현대카드] 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인
+// 포맷 A1: [현대카드M] 홍길동 04/21 14:32 / 3,500원 / CU편의점 / 일시불 (슬래시 구분)
+// 포맷 A2: [현대카드] 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인 (공백 구분)
+// 포맷 B:  현대카드M XXXX 홍길동 04/21 14:32 CU편의점 3,500원 일시불 승인
 function parseHyundai(text: string): ParsedSms | null {
-  // 슬래시 구분 포맷
+  // ── 슬래시 구분 포맷 (포맷 A1) ──
   let m = text.match(
-    /\[현대카드[^\]]*\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s*\/\s*([\d,]+)\s*원\s*\/\s*(.+?)\s*\/\s*([^\n\/]+)/
+    /(?:\[현대카드[^\]]*\]|현대카드[A-Za-z0-9]*(?:\s+\d{4}(?:\([^)]*\))?)?)\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s*\/\s*([\d,]+)\s*원\s*\/\s*(.+?)\s*\/\s*([^\n\/]+)/
   )
   if (m) {
     const [, holder, dt, amtStr, merchant, instOrStatus] = m
     const canceled = /취소/.test(instOrStatus) || /취소/.test(text)
     const installMatch = instOrStatus.match(/(일시불|\d+개월)/)
-    const aliasMatch = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+    let alias = '현대'
+    const bracketAlias = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+    const plainAlias = text.match(/현대카드([A-Za-z0-9]+)/)
+    if (bracketAlias && bracketAlias[1]) alias = `현대${bracketAlias[1]}`
+    else if (plainAlias && plainAlias[1]) alias = `현대${plainAlias[1]}`
 
     return {
       issuer: 'HYUNDAI',
       type: canceled ? 'canceled' : 'approved',
       holder: holder.trim() || null,
-      card_alias: aliasMatch && aliasMatch[1] ? `현대${aliasMatch[1]}` : '현대',
+      card_alias: alias,
       amount: Number(amtStr.replace(/,/g, '')),
       merchant: merchant.trim() || null,
       installment: installMatch ? installMatch[1] : null,
@@ -149,21 +175,32 @@ function parseHyundai(text: string): ParsedSms | null {
     }
   }
 
-  // KB 스타일 포맷 (공백 구분)
+  // ── 공백 구분 포맷 (포맷 A2 + B) ──
+  // A2: [현대카드M] 홍길동 ...
   m = text.match(
     /\[현대카드[^\]]*\]\s*([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
   )
+  // B: 현대카드M XXXX(기업) 홍길동 ... or 현대카드 홍길동 ...
+  if (!m) {
+    m = text.match(
+      /현대카드[A-Za-z0-9]*\s*(?:\d{4}(?:\([^)]*\))?\s+)?([^\s]+)\s+(\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2})\s+(.+?)\s+([\d,]+)\s*원\s*([^\n]*)/
+    )
+  }
   if (!m) return null
   const [, holder, dt, merchant, amtStr, tail] = m
   const canceled = /취소/.test(tail)
   const installMatch = tail.match(/(일시불|\d+개월)/)
-  const aliasMatch = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+  let alias = '현대'
+  const bracketAlias = text.match(/\[현대카드([A-Za-z0-9]*)\]/)
+  const plainAlias = text.match(/현대카드([A-Za-z0-9]+)/)
+  if (bracketAlias && bracketAlias[1]) alias = `현대${bracketAlias[1]}`
+  else if (plainAlias && plainAlias[1]) alias = `현대${plainAlias[1]}`
 
   return {
     issuer: 'HYUNDAI',
     type: canceled ? 'canceled' : 'approved',
     holder: holder.trim() || null,
-    card_alias: aliasMatch && aliasMatch[1] ? `현대${aliasMatch[1]}` : '현대',
+    card_alias: alias,
     amount: Number(amtStr.replace(/,/g, '')),
     merchant: merchant.trim() || null,
     installment: installMatch ? installMatch[1] : null,
