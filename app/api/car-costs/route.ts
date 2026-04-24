@@ -17,11 +17,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const carId = searchParams.get('car_id')
 
-    let query = `SELECT * FROM car_costs`
-    if (carId) query += ` WHERE car_id = ${carId}`
-    query += ` ORDER BY created_at DESC LIMIT 500`
-
-    const data = await prisma.$queryRawUnsafe<any[]>(query)
+    let data: any[]
+    if (carId) {
+      data = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT * FROM car_costs WHERE car_id = ? ORDER BY created_at DESC LIMIT 500`,
+        carId
+      )
+    } else {
+      data = await prisma.$queryRaw<any[]>`SELECT * FROM car_costs ORDER BY created_at DESC LIMIT 500`
+    }
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

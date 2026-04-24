@@ -18,14 +18,14 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
 
-    let query = `SELECT * FROM vehicle_schedules`
-    const conditions: string[] = []
-    if (startDate) conditions.push(`end_date >= '${startDate}'`)
-    if (endDate) conditions.push(`start_date <= '${endDate}'`)
-    if (conditions.length > 0) query += ` WHERE ${conditions.join(' AND ')}`
-    query += ` ORDER BY start_date DESC LIMIT 500`
+    const wheres: string[] = []
+    const params: any[] = []
+    if (startDate) { wheres.push('end_date >= ?'); params.push(startDate) }
+    if (endDate) { wheres.push('start_date <= ?'); params.push(endDate) }
+    const whereClause = wheres.length > 0 ? `WHERE ${wheres.join(' AND ')}` : ''
+    const sql = `SELECT * FROM vehicle_schedules ${whereClause} ORDER BY start_date DESC LIMIT 500`
 
-    const data = await prisma.$queryRawUnsafe<any[]>(query)
+    const data = await prisma.$queryRawUnsafe<any[]>(sql, ...params)
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

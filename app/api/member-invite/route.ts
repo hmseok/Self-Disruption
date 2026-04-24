@@ -393,25 +393,31 @@ export async function GET(request: NextRequest) {
 
     if (positionIds.length > 0) {
       try {
-        const positions = await prisma.$queryRaw<any[]>`
-          SELECT id, name FROM positions WHERE id IN (${positionIds.join(',')})
-        `
+        const placeholders = positionIds.map(() => '?').join(',')
+        const positions = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name FROM positions WHERE id IN (${placeholders})`,
+          ...positionIds
+        )
         if (positions) positionMap = Object.fromEntries(positions.map((p: any) => [p.id, { id: p.id, name: p.name }]))
       } catch { /* positions 테이블 미존재 시 무시 */ }
     }
     if (departmentIds.length > 0) {
       try {
-        const departments = await prisma.$queryRaw<any[]>`
-          SELECT id, name FROM departments WHERE id IN (${departmentIds.join(',')})
-        `
+        const placeholders = departmentIds.map(() => '?').join(',')
+        const departments = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name FROM departments WHERE id IN (${placeholders})`,
+          ...departmentIds
+        )
         if (departments) departmentMap = Object.fromEntries(departments.map((d: any) => [d.id, { id: d.id, name: d.name }]))
       } catch { /* departments 테이블 미존재 시 무시 */ }
     }
     if (inviterIds.length > 0) {
       try {
-        const inviters = await prisma.$queryRaw<any[]>`
-          SELECT id, name FROM profiles WHERE id IN (${inviterIds.join(',')})
-        `
+        const placeholders = inviterIds.map(() => '?').join(',')
+        const inviters = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name FROM profiles WHERE id IN (${placeholders})`,
+          ...inviterIds
+        )
         if (inviters) inviterMap = Object.fromEntries(inviters.map((p: any) => [p.id, p.employee_name || p.name || '']))
       } catch { /* profiles 컬럼 에러 시 무시 */ }
     }

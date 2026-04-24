@@ -121,15 +121,17 @@ export async function GET(request: NextRequest) {
       `
 
       if (accidentId) {
-        query = `
-          SELECT al.*, p.employee_name as handler_name, ap.employee_name as assigner_name
-          FROM assignment_log al
-          LEFT JOIN profiles p ON al.handler_id = p.id
-          LEFT JOIN profiles ap ON al.assigned_by = ap.id
-          WHERE al.accident_id = ${parseInt(accidentId)}
-          ORDER BY al.created_at DESC
-          LIMIT 50
-        `
+        const logs = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT al.*, p.employee_name as handler_name, ap.employee_name as assigner_name
+           FROM assignment_log al
+           LEFT JOIN profiles p ON al.handler_id = p.id
+           LEFT JOIN profiles ap ON al.assigned_by = ap.id
+           WHERE al.accident_id = ?
+           ORDER BY al.created_at DESC
+           LIMIT 50`,
+          accidentId
+        )
+        return NextResponse.json({ logs: serialize(logs || []) })
       }
 
       const logs = await prisma.$queryRawUnsafe<any[]>(query)
