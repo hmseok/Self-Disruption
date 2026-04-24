@@ -13,6 +13,13 @@ import {
 // DELETE → 초대 취소 (status='canceled')
 // ============================================
 
+// DB 타임아웃 래퍼: DB 오류 또는 타임아웃 시 null 반환
+const withTimeout = <T>(promise: Promise<T>, ms = 5000): Promise<T | null> =>
+  Promise.race([
+    promise.catch(() => null),
+    new Promise<null>(r => setTimeout(() => r(null), ms))
+  ])
+
 // MySQL DATETIME 형식 변환 (ISO → 'YYYY-MM-DD HH:MM:SS')
 function toMySQLDatetime(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ')
@@ -371,15 +378,11 @@ export async function GET(request: NextRequest) {
     }
     query += ` ORDER BY created_at DESC`
 
-    let data: any[] = []
-    try {
-      data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
-    } catch (e: any) {
-      // member_invitations 테이블 미존재 시 빈 배열 반환
-      if (e.message?.includes("doesn't exist")) {
-        return NextResponse.json({ data: [], total: 0 })
-      }
-      throw e
+    const data = await withTimeout(prisma.$queryRawUnsafe<any[]>(query, ...params))
+
+    if (data === null) {
+      console.warn('[member-invite GET] DB 조회 실패 또는 타임아웃 — 빈 배열 반환')
+      return NextResponse.json({ data: [], total: 0 })
     }
 
     // 수동 조인
@@ -442,7 +445,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: enrichedData, total: enrichedData.length })
   } catch (err: any) {
     console.error('[member-invite GET] unexpected error:', err)
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ data: [], total: 0, error: null })
   }
 }
 

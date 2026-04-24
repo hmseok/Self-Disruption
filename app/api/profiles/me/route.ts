@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
       const queryPromise = prisma.$queryRawUnsafe<any[]>(
         `SELECT * FROM profiles WHERE id = ? LIMIT 1`,
         user.id
-      )
+      ).catch((err) => {
+        console.warn('profiles/me DB 쿼리 에러:', err?.message)
+        return null
+      })
       // 5초 타임아웃
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
       const result = await Promise.race([queryPromise, timeoutPromise])

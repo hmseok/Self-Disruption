@@ -8,6 +8,13 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// DB 타임아웃 래퍼: DB 오류 또는 타임아웃 시 null 반환
+const withTimeout = <T>(promise: Promise<T>, ms = 5000): Promise<T | null> =>
+  Promise.race([
+    promise.catch(() => null),
+    new Promise<null>(r => setTimeout(() => r(null), ms))
+  ])
+
 // GET /api/profiles — 프로필 목록 (단독 ERP: company_id 불필요)
 export async function GET(request: NextRequest) {
   try {
@@ -24,23 +31,29 @@ export async function GET(request: NextRequest) {
     else if (isActive === 'false') conditions.push('p.is_active = 0')
     const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    // JOIN 실패 시 폴백 쿼리 준비
-    let data: any[] = []
-    try {
-      data = await prisma.$queryRawUnsafe<any[]>(`
-        SELECT p.*,
-               pos.id   AS _pos_id,   pos.name   AS _pos_name,   pos.level AS _pos_level,
-               dept.id  AS _dept_id,  dept.name  AS _dept_name
-        FROM profiles p
-        LEFT JOIN positions   pos  ON p.position_id   = pos.id
-        LEFT JOIN departments dept ON p.department_id = dept.id
-        ${whereSql}
-        ORDER BY COALESCE(p.employee_name, p.name, p.email)
-      `)
-    } catch (joinErr: any) {
-      console.warn('[profiles] JOIN 실패, 기본 SELECT 폴백:', joinErr?.message)
+    // JOIN 쿼리 시도 (타임아웃 포함)
+    let data = await withTimeout(prisma.$queryRawUnsafe<any[]>(`
+      SELECT p.*,
+             pos.id   AS _pos_id,   pos.name   AS _pos_name,   pos.level AS _pos_level,
+             dept.id  AS _dept_id,  dept.name  AS _dept_name
+      FROM profiles p
+      LEFT JOIN positions   pos  ON p.position_id   = pos.id
+      LEFT JOIN departments dept ON p.department_id = dept.id
+      ${whereSql}
+      ORDER BY COALESCE(p.employee_name, p.name, p.email)
+    `))
+
+    // JOIN 실패 시 기본 SELECT 폴백 (타임아웃 포함)
+    if (data === null) {
+      console.warn('[profiles] JOIN 실패 또는 타임아웃, 기본 SELECT 폴백 시도')
       const fallbackSql = `SELECT * FROM profiles ${whereSql.replace(/\bp\./g,'')} ORDER BY COALESCE(employee_name, name, email)`
-      data = await prisma.$queryRawUnsafe<any[]>(fallbackSql)
+      data = await withTimeout(prisma.$queryRawUnsafe<any[]>(fallbackSql))
+    }
+
+    // 폴백도 실패 시 빈 배열 반환
+    if (data === null) {
+      console.warn('[profiles] DB 완전 실패 — 빈 배열 반환')
+      return NextResponse.json({ data: [], error: null })
     }
 
     const mapped = (data || []).map((p: any) => {
@@ -59,7 +72,8 @@ export async function GET(request: NextRequest) {
     })
     return NextResponse.json({ data: serialize(mapped), error: null })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    console.error('[profiles GET] 예외:', e.message)
+    return NextResponse.json({ data: [], error: null })
   }
 }
 

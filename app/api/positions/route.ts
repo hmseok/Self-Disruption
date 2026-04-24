@@ -8,6 +8,13 @@ function serialize<T>(data: T): T {
   ))
 }
 
+// DB 타임아웃 래퍼: DB 오류 또는 타임아웃 시 null 반환
+const withTimeout = <T>(promise: Promise<T>, ms = 5000): Promise<T | null> =>
+  Promise.race([
+    promise.catch(() => null),
+    new Promise<null>(r => setTimeout(() => r(null), ms))
+  ])
+
 // GET /api/positions
 export async function GET(request: NextRequest) {
   try {
@@ -27,19 +34,17 @@ export async function GET(request: NextRequest) {
 
     query += ' ORDER BY created_at DESC'
 
-    let data: any[] = []
-    try {
-      data = await prisma.$queryRawUnsafe<any[]>(query, ...params)
-    } catch (dbErr: any) {
-      // positions 테이블 미존재 시 빈 배열 반환
-      if (dbErr.message?.includes("doesn't exist")) {
-        return NextResponse.json({ data: [], error: null })
-      }
-      throw dbErr
+    const data = await withTimeout(prisma.$queryRawUnsafe<any[]>(query, ...params))
+
+    if (data === null) {
+      console.warn('[positions GET] DB 조회 실패 또는 타임아웃 — 빈 배열 반환')
+      return NextResponse.json({ data: [], error: null })
     }
+
     return NextResponse.json({ data: serialize(data), error: null })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    console.error('[positions GET] 예외:', e.message)
+    return NextResponse.json({ data: [], error: null })
   }
 }
 
