@@ -51,11 +51,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
 
-  const receivedAt = body.receivedAt
-    ? new Date(body.receivedAt)
-    : (body.sentStamp ? new Date(body.sentStamp) : new Date())
-  if (!Number.isFinite(receivedAt.getTime())) {
-    return NextResponse.json({ error: 'invalid receivedAt' }, { status: 400 })
+  let receivedAt = new Date()
+  try {
+    if (body.receivedAt) {
+      const d = new Date(body.receivedAt)
+      if (Number.isFinite(d.getTime())) receivedAt = d
+    } else if (body.sentStamp) {
+      const stamp = typeof body.sentStamp === 'string' ? Number(body.sentStamp) : body.sentStamp
+      if (stamp > 0) {
+        // 13자리 = ms, 10자리 = seconds
+        const ms = stamp > 9999999999 ? stamp : stamp * 1000
+        const d = new Date(ms)
+        if (Number.isFinite(d.getTime())) receivedAt = d
+      }
+    }
+  } catch {
+    // fallback to now
   }
 
   // ── 3. 중복 체크 (raw_hash) ───────────────────────────
