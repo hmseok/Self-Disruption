@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx'
 // 4탭: 통장 거래 | 카드 거래 | 자동매칭 | 정산 연결
 // ═══════════════════════════════════════════════════════════════
 
-type TabKey = 'bank' | 'card' | 'matching' | 'settlement'
+type TabKey = 'bank' | 'card' | 'matching' | 'settlement' | 'sms'
 
 interface Transaction {
   id: string
@@ -71,6 +71,25 @@ interface Summary {
   settlement: { total: number; linked: number; unlinked: number; totalAmount: number }
   sms: { total: number; linked: number; unlinked: number }
 }
+
+interface SmsRow {
+  id: string
+  raw_text: string
+  sender: string | null
+  received_at: string
+  parse_status: 'pending' | 'parsed' | 'failed'
+  parse_error: string | null
+  card_issuer: 'KB' | 'WOORI' | 'HYUNDAI' | null
+  holder_name: string | null
+  transaction_type: 'approved' | 'canceled'
+  transaction_at: string | null
+  amount: number | null
+  merchant: string | null
+  installment: string | null
+}
+
+const ISSUER_LABEL: Record<string, string> = { KB: 'KB국민', WOORI: '우리', HYUNDAI: '현대' }
+const ISSUER_COLOR: Record<string, string> = { KB: '#fbbf24', WOORI: '#3b82f6', HYUNDAI: '#ef4444' }
 
 // ─── 헬퍼 ───────────────────────────────────────────────
 
@@ -191,6 +210,13 @@ export default function BankCardPage() {
   const [matching, setMatching] = useState(false)
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set())
 
+  // SMS 탭 상태
+  const [smsRows, setSmsRows] = useState<SmsRow[]>([])
+  const [smsLoading, setSmsLoading] = useState(false)
+  const [smsStatusFilter, setSmsStatusFilter] = useState<string>('')
+  const [smsIssuerFilter, setSmsIssuerFilter] = useState<string>('')
+  const [smsStats, setSmsStats] = useState<{ status: string; count: number; total: number }[]>([])
+
   // ─── 데이터 로드 ─────────────────────────────────────
 
   const loadSummary = useCallback(async () => {
@@ -214,11 +240,30 @@ export default function BankCardPage() {
     if (json?.data) setSettlements(json.data)
   }, [])
 
+  const loadSmsData = useCallback(async () => {
+    setSmsLoading(true)
+    try {
+      const q = new URLSearchParams()
+      if (smsStatusFilter) q.set('status', smsStatusFilter)
+      if (smsIssuerFilter) q.set('issuer', smsIssuerFilter)
+      const { json } = await fetchWithAuth(`/api/finance/sms?${q}`)
+      setSmsRows(json?.rows || [])
+      setSmsStats(json?.stats || [])
+    } finally {
+      setSmsLoading(false)
+    }
+  }, [smsStatusFilter, smsIssuerFilter])
+
   useEffect(() => {
     setLoading(true)
     Promise.all([loadSummary(), loadTransactions(), loadSettlements()])
       .finally(() => setLoading(false))
   }, [loadSummary, loadTransactions, loadSettlements])
+
+  // SMS 탭 전환 시 로드
+  useEffect(() => {
+    if (activeTab === 'sms') loadSmsData()
+  }, [activeTab, loadSmsData])
 
   // ─── 필터링 ──────────────────────────────────────────
 
@@ -444,6 +489,7 @@ export default function BankCardPage() {
     { key: 'card', label: '카드 거래', count: summary?.transactions.card },
     { key: 'matching', label: '자동매칭', count: summary?.transactions.unmatched },
     { key: 'settlement', label: '정산 연결', count: summary?.settlement.total },
+    { key: 'sms', label: 'SMS 수집', count: summary?.sms?.total || 0 },
   ]
 
   // ── 통계 카드 ─────────────────────────────────────────
@@ -874,6 +920,106 @@ export default function BankCardPage() {
               emptyIcon="📋"
               emptyMessage="정산 지급내역이 없습니다"
             />
+          </>
+        )}
+
+        {/* ──── SMS 수집 탭 ──── */}
+        {activeTab === 'sms' && (
+          <>
+            <DcStatStrip stats={(() => {
+              const parsed = smsStats.find(s => s.status === 'parsed') || { count: 0, total: 0 }
+              const failed = smsStats.find(s => s.status === 'failed') || { count: 0, total: 0 }
+              const total30d = smsStats.reduce((a, s) => a + s.count, 0)
+              return [
+                { label: '30일 수신', value: nf(total30d), tint: 'blue' as const, icon: '📱' },
+                { label: '파싱 성공', value: nf(parsed.count), tint: 'green' as const, icon: '✅' },
+                { label: '파싱 실패', value: nf(failed.count), tint: 'red' as const, icon: '❌' },
+                { label: '승인합계', value: nf(parsed.total), unit: '원', tint: 'amber' as const, icon: '💰' },
+              ]
+            })()} />
+
+            {/* SMS 필터 */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, marginTop: 8, flexWrap: 'wrap' }}>
+              {['', 'parsed', 'failed'].map(s => (
+                <button key={s || 'all'} onClick={() => setSmsStatusFilter(s)} style={{
+                  padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: `1px solid ${smsStatusFilter === s ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                  background: smsStatusFilter === s ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+                  color: '#1e293b',
+                }}>
+                  {s === '' ? '상태 전체' : s === 'parsed' ? '✅ 성공' : '❌ 실패'}
+                </button>
+              ))}
+              <span style={{ width: 8 }} />
+              {['', 'KB', 'WOORI', 'HYUNDAI'].map(i => (
+                <button key={i || 'all'} onClick={() => setSmsIssuerFilter(i)} style={{
+                  padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: `1px solid ${smsIssuerFilter === i ? 'rgba(59,110,181,0.4)' : 'rgba(0,0,0,0.06)'}`,
+                  background: smsIssuerFilter === i ? 'rgba(191,219,254,0.6)' : 'rgba(255,255,255,0.72)',
+                  color: '#1e293b',
+                }}>
+                  {i === '' ? '카드사 전체' : ISSUER_LABEL[i]}
+                </button>
+              ))}
+            </div>
+
+            {/* SMS 테이블 */}
+            <div style={{
+              ...GLASS.L4, borderRadius: 16, overflow: 'hidden',
+              boxShadow: '6px 6px 16px rgba(140,170,210,0.12), -2px -2px 8px rgba(255,255,255,0.6)',
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(241,245,249,0.6)', color: '#475569', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>상태</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>수신시각</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>카드사</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>승인자</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>가맹점</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>금액</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>구분</th>
+                    <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700 }}>원문</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {smsLoading && (
+                    <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>불러오는 중...</td></tr>
+                  )}
+                  {!smsLoading && smsRows.length === 0 && (
+                    <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                      수신된 SMS가 없습니다. SMS Forwarder 앱 설정 후 카드 결제 시 자동 수집됩니다.
+                    </td></tr>
+                  )}
+                  {smsRows.map(r => (
+                    <tr key={r.id} style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                      <td style={{ padding: '10px 12px' }}>
+                        {r.parse_status === 'parsed' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(167,243,208,0.5)', color: '#059669' }}>✅</span>}
+                        {r.parse_status === 'failed' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(254,202,202,0.5)', color: '#dc2626' }}>❌</span>}
+                        {r.parse_status === 'pending' && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(226,232,240,0.7)', color: '#64748b' }}>⏳</span>}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.received_at ? String(r.received_at).slice(0, 16).replace('T', ' ') : '—'}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        {r.card_issuer ? (
+                          <span style={{ padding: '2px 8px', borderRadius: 6, background: `${ISSUER_COLOR[r.card_issuer]}22`, color: ISSUER_COLOR[r.card_issuer], fontWeight: 700, fontSize: 11 }}>
+                            {ISSUER_LABEL[r.card_issuer]}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.holder_name || '—'}</td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.merchant || '—'}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: r.transaction_type === 'canceled' ? '#ef4444' : '#1e293b' }}>
+                        {r.amount != null ? `${r.transaction_type === 'canceled' ? '-' : ''}${Number(r.amount).toLocaleString()}` : '—'}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b' }}>{r.transaction_type === 'canceled' ? '취소' : r.installment || '일시불'}</td>
+                      <td style={{ padding: '10px 12px', maxWidth: 300, color: '#64748b', fontSize: 11 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.raw_text}>{r.raw_text}</div>
+                        {r.parse_error && <div style={{ color: '#ef4444', fontSize: 10, marginTop: 2 }}>⚠ {r.parse_error}</div>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
