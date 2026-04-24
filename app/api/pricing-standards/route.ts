@@ -58,11 +58,11 @@ function buildSelectQuery(table: string): string {
     case 'vehicle_market_price':
       return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY brand, model, year DESC`
     case 'depreciation_rates':
-      return `SELECT * FROM ${table} ORDER BY origin, vehicle_class, fuel_type`
+      return `SELECT * FROM ${table} ORDER BY id`
     case 'depreciation_adjustments':
-      return `SELECT * FROM ${table} ORDER BY adjustment_type, label`
+      return `SELECT * FROM ${table} ORDER BY id`
     case 'depreciation_db':
-      return `SELECT * FROM ${table} ORDER BY vehicle_class, year_offset`
+      return `SELECT * FROM ${table} ORDER BY id`
     case 'insurance_rate_table':
       return `SELECT * FROM ${table} ORDER BY vehicle_type, value_min`
     case 'insurance_base_premium':
