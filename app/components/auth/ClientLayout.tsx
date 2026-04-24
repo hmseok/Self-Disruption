@@ -46,9 +46,8 @@ const PATH_TO_GROUP: Record<string, string> = {
   '/quotes': 'sales', '/quotes/operational-learning': 'sales',
   '/contracts': 'sales', '/finance/settlement': 'sales',
   // ── 재무/경영 ──
-  '/finance/transactions': 'finance', '/finance/bank-card': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
+  '/finance/bank-card': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
   '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/db/lotte': 'finance', '/admin/code-master': 'finance',
 }
 
 // 메뉴명 오버라이드 (v3 — dead 항목 제거, 활성 경로만)
@@ -65,15 +64,12 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/contracts': '계약/고객',
   '/finance/settlement': '정산/수금',
   // 재무/경영 그룹
-  '/finance/transactions': '거래 분류/관리',
-  '/finance/bank-card': '통장/카드 통합',
+  '/finance/bank-card': '통장/카드 관리',
   '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
   '/admin/payroll': '급여 관리',
   '/report': '보고서',
   '/loans': '대출 관리',
-  '/db/lotte': '경쟁사 벤치마크',
-  '/admin/code-master': '기초코드 관리',
 }
 
 // 숨길 메뉴 경로 (v3 — 삭제된 모듈 + 미사용 메뉴 제거)
@@ -98,10 +94,17 @@ const HIDDEN_PATHS = new Set([
   '/customers',              // → 계약 관리 탭으로 통합
   '/finance/collections',    // → 정산 관리 탭으로 통합
   '/db/pricing-standards',   // → 견적 허브 요율 관리 탭으로 통합
-  '/finance',                // → /finance/transactions 허브 대시보드 탭으로 통합
-  '/finance/upload',         // → /finance/transactions 분류 매칭 탭으로 통합
-  '/finance/codef',          // → /finance/transactions Codef 탭으로 통합
-  '/finance/cards',          // → /finance/transactions 에서 접근
+  '/finance',                // → /finance/bank-card 통합
+  '/finance/transactions',   // → /finance/bank-card 통합 (입출금+분류+매칭)
+  '/finance/upload',         // → /finance/bank-card 엑셀 업로드로 통합
+  '/finance/uploads',        // → /finance/bank-card 엑셀 업로드로 통합
+  '/finance/codef',          // → /finance/bank-card 자동수집으로 통합
+  '/finance/cards',          // → /finance/bank-card 카드 거래 탭으로 통합
+  '/finance/sms',            // → /finance/bank-card SMS 연결로 통합
+  '/finance/openbanking',    // → /finance/bank-card 통장 탭으로 통합
+  '/db/lotte',               // → 미사용 (경쟁사 벤치마크)
+  '/admin/code-master',      // → 미사용 (기초코드)
+  '/db/codes',               // → 미사용
   // ── 미사용/불필요 ──
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
