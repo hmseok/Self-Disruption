@@ -37,56 +37,37 @@ const Icons: any = {
 // 메뉴 설정
 // ============================================
 
-// 동적 메뉴 → 그룹 매핑 (v2 — 3그룹 통합: 차량관리 + 영업/계약 + 재무/경영)
+// 동적 메뉴 → 그룹 매핑 (v3 — HIDDEN_PATHS에 해당하는 dead 항목 제거)
 const PATH_TO_GROUP: Record<string, string> = {
-  // ── 차량관리 (차량 + 차량운영 + 사고/보상 통합) ──
-  '/cars': 'vehicle', '/insurance': 'vehicle', '/registration': 'vehicle', '/fleet/vehicle-lookup': 'vehicle',
+  // ── 차량관리 ──
+  '/cars': 'vehicle', '/registration': 'vehicle',
   '/operations': 'vehicle', '/operations/intake': 'vehicle', '/maintenance': 'vehicle',
-  '/fleet/factory-mgmt': 'vehicle',
-  '/claims/accident-mgmt': 'vehicle', '/claims/billing-mgmt': 'vehicle',
-  // ── 영업/계약 (견적→계약→수금→정산 파이프라인 + 요금기준) ──
-  '/quotes': 'sales', '/quotes/pricing': 'sales', '/quotes/short-term': 'sales',
-  '/quotes/operational-learning': 'sales',
-  '/contracts': 'sales', '/customers': 'sales',
-  '/finance/collections': 'sales', '/finance/settlement': 'sales',
-  '/db/pricing-standards': 'sales',
-  // ── 재무/경영 (순수 재무·세무·인사) ──
-  '/finance': 'finance', '/finance/transactions': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
-  '/finance/upload': 'finance', '/finance/cards': 'finance', '/finance/codef': 'finance',
+  // ── 영업/계약 ──
+  '/quotes': 'sales', '/quotes/operational-learning': 'sales',
+  '/contracts': 'sales', '/finance/settlement': 'sales',
+  // ── 재무/경영 ──
+  '/finance/transactions': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
   '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
-  '/db/lotte': 'finance',
-  '/admin/code-master': 'admin',
+  '/db/lotte': 'finance', '/admin/code-master': 'finance',
 }
 
-// 메뉴명 오버라이드 (v2 — 통합 구조 반영)
+// 메뉴명 오버라이드 (v3 — dead 항목 제거, 활성 경로만)
 const NAME_OVERRIDES: Record<string, string> = {
   // 차량관리 그룹
   '/cars': '차량 관리',
   '/registration': '차량 등록증',
-  '/insurance': '보험/가입',
-  '/fleet/vehicle-lookup': '거래처 차량조회',
   '/operations': '차량운영',
   '/operations/intake': '접수/오더',
   '/maintenance': '정비/유지보수',
-  '/fleet/factory-mgmt': '공장/협력업체',
-  '/claims/accident-mgmt': '사고관리',
-  '/claims/billing-mgmt': '보험청구관리',
   // 영업/계약 그룹
   '/quotes': '견적 관리',
   '/quotes/operational-learning': '운영학습',
   '/contracts': '계약/고객',
-  '/customers': '고객 관리',
-  '/finance/collections': '수금/회수',
   '/finance/settlement': '정산/수금',
-  '/db/pricing-standards': '요금 기준표',
   // 재무/경영 그룹
-  '/finance': '재무 대시보드',
   '/finance/transactions': '통장/카드 관리',
   '/finance/fleet': '차량 수익',
   '/finance/tax': '세금 관리',
-  '/finance/upload': '카드/통장 관리',
-  '/finance/codef': '은행/카드 자동연동',
-  '/finance/cards': '카드 관리',
   '/admin/payroll': '급여 관리',
   '/report': '보고서',
   '/loans': '대출 관리',
