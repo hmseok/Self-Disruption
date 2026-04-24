@@ -106,6 +106,9 @@ export default function OrgManagementPage() {
   const [editPosLevel, setEditPosLevel] = useState(0)
   const [editingDeptId, setEditingDeptId] = useState<string | null>(null)
   const [editDeptName, setEditDeptName] = useState('')
+  // 섹션 접기/펼치기
+  const [showPositionsDepts, setShowPositionsDepts] = useState(false)
+  const [showInvitations, setShowInvitations] = useState(false)
 
   // === Tab 2: 페이지 권한 ===
   const [allUserPerms, setAllUserPerms] = useState<Record<string, UserPermMap>>({})
@@ -200,7 +203,7 @@ export default function OrgManagementPage() {
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase()
       list = list.filter(e =>
-        (e.employee_name || '').toLowerCase().includes(q) ||
+        (e.display_name || e.employee_name || '').toLowerCase().includes(q) ||
         (e.email || '').toLowerCase().includes(q) ||
         (e.position?.name || '').toLowerCase().includes(q) ||
         (e.department?.name || '').toLowerCase().includes(q)
@@ -260,7 +263,7 @@ export default function OrgManagementPage() {
   const openEditModal = (emp: any) => {
     setEditingEmp(emp)
     setEditForm({
-      employee_name: emp.employee_name || '',
+      employee_name: emp.employee_name || '',  // DB 원본 값 (null이면 빈 문자열)
       phone: emp.phone || '',
       position_id: emp.position_id || '',
       department_id: emp.department_id || '',
@@ -288,7 +291,7 @@ export default function OrgManagementPage() {
   // ===== 직원 탈퇴 =====
   const withdrawEmployee = async (deleteAuth: boolean) => {
     if (!editingEmp) return
-    const name = editingEmp.employee_name || editingEmp.email
+    const name = editingEmp.display_name || editingEmp.employee_name || editingEmp.email
     const msg = deleteAuth
       ? `${name} 직원을 완전 탈퇴(계정 삭제) 처리하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
       : `${name} 직원을 비활성화하시겠습니까?`
@@ -443,11 +446,12 @@ export default function OrgManagementPage() {
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 13, flexShrink: 0, background: avatarBg }}>
-              {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+              {(emp.display_name || emp.email || '?')[0].toUpperCase()}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {emp.employee_name || '(이름 미설정)'}
+              <div style={{ fontWeight: 600, fontSize: 13, color: emp.employee_name ? '#1e293b' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {emp.display_name || '(이름 미설정)'}
+                {!emp.employee_name && <span style={{ fontSize: 10, color: '#d97706', marginLeft: 6, fontWeight: 500 }}>이름 미등록</span>}
               </div>
               <div style={{ fontSize: 12, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {emp.email}
@@ -502,7 +506,7 @@ export default function OrgManagementPage() {
   const employeeMobileCard: MobileCardConfig<any> = {
     title: (emp) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontWeight: 600 }}>{emp.employee_name || '(이름 미설정)'}</span>
+        <span style={{ fontWeight: 600 }}>{emp.display_name || '(이름 미설정)'}</span>
         <span style={{
           fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
           background: (ROLE_COLORS[emp.role] || ROLE_COLORS.user).bg,
@@ -575,7 +579,7 @@ export default function OrgManagementPage() {
     },
   }
 
-  const assignableEmployees = employees.filter(e => e.role === 'user' && e.is_active !== false)
+  const assignableEmployees = employees.filter(e => e.role === 'user' && !!e.is_active)
 
   const TAB_FILTERS: FilterItem[] = [
     { key: 'organization', label: '조직 관리', count: employees.length },
@@ -654,11 +658,23 @@ export default function OrgManagementPage() {
             />
           </div>
 
-          {/* 직급 · 부서 관리 — 2열 (모바일 1열) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* 직급 · 부서 관리 — 접기/펼치기 */}
+          <div style={glassCard}>
+            <div onClick={() => setShowPositionsDepts(!showPositionsDepts)}
+              style={{ ...sectionHeader, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0 }}>직급 · 부서 관리</h2>
+                <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>직급 {positions.length}개 · 부서 {departments.length}개</p>
+              </div>
+              <svg style={{ width: 20, height: 20, color: '#94a3b8', transform: showPositionsDepts ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            {showPositionsDepts && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5" style={{ padding: 20 }}>
             {/* 직급 관리 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={glassCardInner}>
+              <div>
                 <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e293b' }}>직급 추가</h2>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -676,8 +692,8 @@ export default function OrgManagementPage() {
                   <button onClick={addPosition} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                 </div>
               </div>
-              <div style={glassCard}>
-                <div style={sectionHeader}>
+              <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: '#64748b', margin: 0 }}>직급 목록 ({positions.length})</h3>
                 </div>
                 <div>
@@ -713,7 +729,7 @@ export default function OrgManagementPage() {
 
             {/* 부서 관리 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={glassCardInner}>
+              <div>
                 <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e293b' }}>부서 추가</h2>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -725,8 +741,8 @@ export default function OrgManagementPage() {
                   <button onClick={addDepartment} style={{ padding: '8px 16px', background: '#3b82f6', color: '#fff', borderRadius: 10, fontWeight: 600, fontSize: 13, border: 'none', cursor: 'pointer', flexShrink: 0 }}>추가</button>
                 </div>
               </div>
-              <div style={glassCard}>
-                <div style={sectionHeader}>
+              <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'rgba(255,255,255,0.40)' }}>
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: '#64748b', margin: 0 }}>부서 목록 ({departments.length})</h3>
                 </div>
                 <div>
@@ -756,23 +772,31 @@ export default function OrgManagementPage() {
               </div>
             </div>
           </div>
+            )}
+          </div>
 
-          {/* 초대 관리 */}
-          <div>
-            <div style={{ ...sectionHeader, ...glassCard, borderBottom: 'none', borderRadius: '16px 16px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* 초대 관리 — 접기/펼치기 */}
+          <div style={glassCard}>
+            <div onClick={() => setShowInvitations(!showInvitations)}
+              style={{ ...sectionHeader, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}>
               <div>
                 <h2 style={{ fontSize: 15, fontWeight: 600, color: '#1e293b', margin: 0 }}>초대 관리</h2>
                 <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>총 {invitations.length}개 · 대기중 {pendingInvitationCount}개</p>
               </div>
+              <svg style={{ width: 20, height: 20, color: '#94a3b8', transform: showInvitations ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </div>
-            <NeuDataTable
-              columns={inviteColumns}
-              data={invitations}
-              rowKey={(inv) => inv.id}
-              emptyMessage="초대 내역이 없습니다"
-              mobileCard={inviteMobileCard}
-              loading={loadingInvitations}
-            />
+            {showInvitations && (
+              <NeuDataTable
+                columns={inviteColumns}
+                data={invitations}
+                rowKey={(inv) => inv.id}
+                emptyMessage="초대 내역이 없습니다"
+                mobileCard={inviteMobileCard}
+                loading={loadingInvitations}
+              />
+            )}
           </div>
         </div>
       )}
@@ -818,11 +842,11 @@ export default function OrgManagementPage() {
                           color: '#fff', fontWeight: 800, fontSize: 12, flexShrink: 0,
                           background: isSelected ? '#3b82f6' : '#94a3b8',
                         }}>
-                          {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+                          {(emp.display_name || emp.email || '?')[0].toUpperCase()}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13, color: isSelected ? '#1e3a5f' : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {emp.employee_name || '(미설정)'}
+                            {emp.display_name || '(미설정)'}
                           </div>
                           <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                             {emp.department?.name && <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(0,0,0,0.04)', padding: '1px 4px', borderRadius: 4 }}>{emp.department.name}</span>}
@@ -868,11 +892,11 @@ export default function OrgManagementPage() {
                       <div style={{ ...sectionHeader, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14, background: '#3b82f6', flexShrink: 0 }}>
-                            {(emp.employee_name || emp.email || '?')[0].toUpperCase()}
+                            {(emp.display_name || emp.email || '?')[0].toUpperCase()}
                           </div>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontWeight: 600, fontSize: 15, color: '#1e293b' }}>{emp.employee_name || '(이름 미설정)'}</span>
+                              <span style={{ fontWeight: 600, fontSize: 15, color: '#1e293b' }}>{emp.display_name || '(이름 미설정)'}</span>
                               <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: enabledCount > 0 ? 'rgba(34,197,94,0.15)' : 'rgba(0,0,0,0.04)', color: enabledCount > 0 ? '#16a34a' : '#94a3b8' }}>
                                 {enabledCount}/{activeModules.length}
                               </span>

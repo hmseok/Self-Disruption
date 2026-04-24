@@ -57,15 +57,18 @@ export async function GET(request: NextRequest) {
     }
 
     const mapped = (data || []).map((p: any) => {
-      // 이메일 로컬파트 폴백 (employee_name/name 둘 다 null이어도 미설정 표시 방지)
-      const fallbackName = p.employee_name || p.name || (p.email ? String(p.email).split('@')[0] : '')
+      // display_name: 화면 표시용 (폴백 포함)
+      // employee_name: DB 원본 값 유지 (편집 시 실제 이름 vs 폴백 구분용)
+      const rawName = p.employee_name || p.name || null
+      const displayName = rawName || (p.email ? String(p.email).split('@')[0] : '(이름 미설정)')
       const position = p._pos_id ? { id: p._pos_id, name: p._pos_name, level: p._pos_level } : null
       const department = p._dept_id ? { id: p._dept_id, name: p._dept_name } : null
       // 언더스코어 임시 필드 제거
       const { _pos_id, _pos_name, _pos_level, _dept_id, _dept_name, ...rest } = p
       return {
         ...rest,
-        employee_name: fallbackName,
+        employee_name: rawName,
+        display_name: displayName,
         position,
         department,
       }
