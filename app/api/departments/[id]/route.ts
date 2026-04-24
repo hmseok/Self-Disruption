@@ -19,13 +19,17 @@ export async function PATCH(
     const { id } = await params
 
     const body = await request.json()
+    const name = body.name
 
-    // TODO: Adjust UPDATE statement based on table schema
-    await prisma.$executeRaw`
-      UPDATE departments SET
-        updated_at = NOW()
-      WHERE id = ${id}
-    `
+    if (name !== undefined) {
+      await prisma.$executeRaw`
+        UPDATE departments SET name = ${name}, updated_at = NOW() WHERE id = ${id}
+      `
+    } else {
+      await prisma.$executeRaw`
+        UPDATE departments SET updated_at = NOW() WHERE id = ${id}
+      `
+    }
 
     const updated = await prisma.$queryRaw<any[]>`SELECT * FROM departments WHERE id = ${id} LIMIT 1`
     return NextResponse.json({ data: serialize(updated[0]), error: null })

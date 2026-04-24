@@ -136,24 +136,30 @@ export default function OrgManagementPage() {
   }
 
   const loadEmployees = async () => {
-    const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
-    const json = await res.json()
-    const { data, error } = json
-    setEmployees(data || [])
+    try {
+      const res = await fetch('/api/profiles', { headers: await getAuthHeader() })
+      if (!res.ok) { console.warn('profiles 로드 실패:', res.status); setEmployees([]); return }
+      const json = await res.json()
+      setEmployees(json.data || [])
+    } catch (e) { console.error('loadEmployees 에러:', e); setEmployees([]) }
   }
 
   const loadPositions = async () => {
-    const res = await fetch('/api/positions', { headers: await getAuthHeader() })
-    const json = await res.json()
-    const { data, error } = json
-    setPositions(data || [])
+    try {
+      const res = await fetch('/api/positions', { headers: await getAuthHeader() })
+      if (!res.ok) { console.warn('positions 로드 실패:', res.status); setPositions([]); return }
+      const json = await res.json()
+      setPositions(json.data || [])
+    } catch (e) { console.error('loadPositions 에러:', e); setPositions([]) }
   }
 
   const loadDepartments = async () => {
-    const res = await fetch('/api/departments', { headers: await getAuthHeader() })
-    const json = await res.json()
-    const { data, error } = json
-    setDepartments(data || [])
+    try {
+      const res = await fetch('/api/departments', { headers: await getAuthHeader() })
+      if (!res.ok) { console.warn('departments 로드 실패:', res.status); setDepartments([]); return }
+      const json = await res.json()
+      setDepartments(json.data || [])
+    } catch (e) { console.error('loadDepartments 에러:', e); setDepartments([]) }
   }
 
   const loadModules = async () => {
@@ -210,7 +216,7 @@ export default function OrgManagementPage() {
     setSavingPermsFor(userId)
 
     try {
-      await fetch(`/api/user_page_permissions/\${JSON.stringify(userId)}`, { method: 'DELETE', headers: await getAuthHeader() })
+      await fetch(`/api/user_page_permissions?user_id=${userId}`, { method: 'DELETE', headers: await getAuthHeader() })
 
       const userMap = allUserPerms[userId] || {}
       const toInsert = Object.entries(userMap)
@@ -404,7 +410,7 @@ export default function OrgManagementPage() {
 
   // ===== 직급 관리 =====
   const addPosition = async () => {
-    if (!newPositionName.trim() || !activeCompanyId) return
+    if (!newPositionName.trim()) return
     const res = await fetch('/api/positions', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
        name: newPositionName.trim(),
        level: newPositionLevel,
@@ -418,13 +424,13 @@ export default function OrgManagementPage() {
 
   const deletePosition = async (id: string) => {
     if (!confirm('이 직급을 삭제하시겠습니까?')) return
-    await fetch(`/api/positions/\${JSON.stringify(id)}`, { method: 'DELETE', headers: await getAuthHeader() })
+    await fetch(`/api/positions/${id}`, { method: 'DELETE', headers: await getAuthHeader() })
     loadPositions()
   }
 
   // ===== 부서 관리 =====
   const addDepartment = async () => {
-    if (!newDeptName.trim() || !activeCompanyId) return
+    if (!newDeptName.trim()) return
     const res = await fetch('/api/departments', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) }, body: JSON.stringify({
        name: newDeptName.trim() })
     })
@@ -436,7 +442,7 @@ export default function OrgManagementPage() {
 
   const deleteDepartment = async (id: string) => {
     if (!confirm('이 부서를 삭제하시겠습니까?')) return
-    await fetch(`/api/departments/\${JSON.stringify(id)}`, { method: 'DELETE', headers: await getAuthHeader() })
+    await fetch(`/api/departments/${id}`, { method: 'DELETE', headers: await getAuthHeader() })
     loadDepartments()
   }
 
@@ -477,7 +483,7 @@ export default function OrgManagementPage() {
       user: { bg: 'rgba(0,0,0,0.04)', color: '#94a3b8' },
     }
     const rc = ROLE_COLORS[emp.role] || ROLE_COLORS.user
-    const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'admin' ? '#60a5fa' : '#94a3b8'
+    const avatarBg = emp.role === 'admin' ? '#0ea5e9' : emp.role === 'master' ? '#60a5fa' : '#94a3b8'
     return (
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(0,0,0,0.04)', transition: 'background 0.2s' }}

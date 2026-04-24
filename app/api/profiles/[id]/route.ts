@@ -31,6 +31,16 @@ export async function PATCH(
 
     const body = await request.json()
 
+    // role 변경 시 권한 검증: admin/master만 role 변경 가능, admin 역할은 admin만 부여 가능
+    if ('role' in body) {
+      if (!['admin', 'master'].includes(user.role)) {
+        return NextResponse.json({ error: '역할 변경은 관리자만 가능합니다.' }, { status: 403 })
+      }
+      if (body.role === 'admin' && user.role !== 'admin') {
+        return NextResponse.json({ error: 'admin 역할은 최고관리자만 부여할 수 있습니다.' }, { status: 403 })
+      }
+    }
+
     // 실제 존재 컬럼 감지 (스키마 드리프트 대응)
     const existingCols: string[] = (await prisma.$queryRawUnsafe<any[]>(
       `SHOW COLUMNS FROM profiles`

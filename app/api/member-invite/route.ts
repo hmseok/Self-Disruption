@@ -432,14 +432,16 @@ export async function GET(request: NextRequest) {
       inviter: inv.invited_by ? { employee_name: inviterMap[inv.invited_by] || '' } : null,
     }))
 
-    // 만료 처리
+    // 만료 처리 (각 ID를 개별 UPDATE — SQL Injection 방지)
     const now = new Date()
     const expired = enrichedData.filter((inv: any) => inv.status === 'pending' && new Date(inv.expires_at) < now)
-    if (expired.length > 0) {
-      await prisma.$executeRaw`
-        UPDATE member_invitations SET status = 'expired' WHERE id IN (${expired.map((e: any) => e.id).join(',')})
-      `
-      expired.forEach((e: any) => { e.status = 'expired' })
+    for (const inv of expired) {
+      try {
+        await prisma.$executeRaw`
+          UPDATE member_invitations SET status = 'expired' WHERE id = ${inv.id}
+        `
+        inv.status = 'expired'
+      } catch {}
     }
 
     return NextResponse.json({ data: enrichedData, total: enrichedData.length })
