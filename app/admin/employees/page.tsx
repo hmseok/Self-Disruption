@@ -195,8 +195,8 @@ export default function OrgManagementPage() {
   // ===== 검색 + 필터 로직 =====
   const filteredEmployees = useMemo(() => {
     let list = employees
-    if (statusFilter === 'active') list = list.filter(e => e.is_active !== false)
-    else if (statusFilter === 'inactive') list = list.filter(e => e.is_active === false)
+    if (statusFilter === 'active') list = list.filter(e => !!e.is_active)
+    else if (statusFilter === 'inactive') list = list.filter(e => !e.is_active)
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase()
       list = list.filter(e =>
@@ -209,8 +209,8 @@ export default function OrgManagementPage() {
     return list
   }, [employees, searchTerm, statusFilter])
 
-  const activeCount = employees.filter(e => e.is_active !== false).length
-  const inactiveCount = employees.filter(e => e.is_active === false).length
+  const activeCount = employees.filter(e => !!e.is_active).length
+  const inactiveCount = employees.filter(e => !e.is_active).length
   const pendingInvitationCount = invitations.filter((inv: any) => inv.status === 'pending').length
 
   // ===== 필터 탭 =====
@@ -265,7 +265,7 @@ export default function OrgManagementPage() {
       position_id: emp.position_id || '',
       department_id: emp.department_id || '',
       role: emp.role || 'user',
-      is_active: emp.is_active !== false,
+      is_active: !!emp.is_active,
     })
   }
   const closeEditModal = () => { setEditingEmp(null); setEditForm({}); setSavingEdit(false) }
@@ -486,10 +486,10 @@ export default function OrgManagementPage() {
       render: (emp) => (
         <span style={{
           fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
-          background: emp.is_active !== false ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-          color: emp.is_active !== false ? '#16a34a' : '#dc2626',
+          background: !!emp.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+          color: !!emp.is_active ? '#16a34a' : '#dc2626',
         }}>
-          {emp.is_active !== false ? '활성' : '비활성'}
+          {!!emp.is_active ? '활성' : '비활성'}
         </span>
       ),
     },
@@ -518,10 +518,10 @@ export default function OrgManagementPage() {
     trailing: (emp) => (
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-        background: emp.is_active !== false ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-        color: emp.is_active !== false ? '#16a34a' : '#dc2626',
+        background: !!emp.is_active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+        color: !!emp.is_active ? '#16a34a' : '#dc2626',
       }}>
-        {emp.is_active !== false ? '활성' : '비활성'}
+        {!!emp.is_active ? '활성' : '비활성'}
       </span>
     ),
   }
