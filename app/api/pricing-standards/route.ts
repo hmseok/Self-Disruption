@@ -51,40 +51,18 @@ function validateUuid(id: string): boolean {
   return UUID_RE.test(id)
 }
 
+// ★ ORDER BY는 id 기본 — DB 컬럼 불일치로 인한 "Unknown column" 에러 방지
+// 특수 조건(WHERE)이 필요한 테이블만 개별 처리
 function buildSelectQuery(table: string): string {
   switch (table) {
     case 'business_rules':
       return `SELECT * FROM ${table} ORDER BY \`key\``
     case 'vehicle_market_price':
-      return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY brand, model, year DESC`
-    case 'depreciation_rates':
       return `SELECT * FROM ${table} ORDER BY id`
-    case 'depreciation_adjustments':
-      return `SELECT * FROM ${table} ORDER BY id`
-    case 'depreciation_db':
-      return `SELECT * FROM ${table} ORDER BY id`
-    case 'insurance_rate_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type, value_min`
-    case 'insurance_base_premium':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type`
-    case 'insurance_own_vehicle_rate':
-      return `SELECT * FROM ${table} ORDER BY age_band`
-    case 'maintenance_cost_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type`
-    case 'finance_rate_table':
-      return `SELECT * FROM ${table} ORDER BY effective_date DESC`
-    case 'vehicle_tax_table':
-      return `SELECT * FROM ${table} ORDER BY tax_type ASC`
-    case 'registration_cost_table':
-      return `SELECT * FROM ${table} ORDER BY cost_type`
-    case 'inspection_cost_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type`
-    case 'inspection_schedule_table':
-      return `SELECT * FROM ${table} ORDER BY vehicle_type, year_from`
     case 'sales_presets':
-      return `SELECT * FROM ${table} WHERE is_active = 1 ORDER BY sort_order ASC`
+      return `SELECT * FROM ${table} ORDER BY id`
     default:
-      return `SELECT * FROM ${table}`
+      return `SELECT * FROM ${table} ORDER BY id`
   }
 }
 
