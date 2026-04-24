@@ -11,27 +11,15 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. 요청자 인증 확인 (Authorization 헤더에서 JWT 추출)
-    const authHeader = request.headers.get('Authorization')
-    const token = authHeader?.replace('Bearer ', '')
-
-    if (!token) {
+    // 1. 요청자 인증 + 권한 확인
+    const user = await verifyUser(request)
+    if (!user) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
     }
 
-    const authUserId = getUserIdFromToken(token)
-    if (!authUserId) {
-      return NextResponse.json({ error: '유효하지 않은 인증입니다.' }, { status: 401 })
-    }
-    // TODO: Phase 5 - Replace with Firebase Auth verification
+    const requester = { id: user.id, role: user.role }
 
-    // 2. 요청자 권한 확인
-    const requesterResult = await prisma.$queryRaw<any[]>`
-      SELECT id, role FROM profiles WHERE id = ${authUserId} LIMIT 1
-    `
-    const requester = requesterResult[0]
-
-    if (!requester || !['admin', 'master'].includes(requester.role)) {
+    if (!['admin', 'master'].includes(requester.role)) {
       return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 403 })
     }
 
