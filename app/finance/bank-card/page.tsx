@@ -52,8 +52,10 @@ interface MatchResult {
   txDate: string
   txAmount: number
   txName: string
+  matchMethod?: 'rule' | 'ai'
+  aiReason?: string
   match: {
-    type: 'settlement' | 'contract'
+    type: 'settlement' | 'contract' | 'car' | 'employee' | 'operation'
     id: string
     name: string
     amount: number
@@ -525,15 +527,22 @@ export default function BankCardPage() {
         <div style={{ fontSize: 12, color: COLORS.textMuted }}>{nf(r.txAmount)}원</div>
       </div>
     )},
-    { key: 'match', label: '매칭 대상', render: (r) => (
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{r.match.name || '-'}</div>
-        <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-          {r.match.type === 'settlement' ? '정산' : '계약'} · {nf(r.match.amount)}원
-          {r.match.month ? ` · ${r.match.month}` : ''}
+    { key: 'match', label: '매칭 대상', render: (r) => {
+      const typeLabels: Record<string, string> = { settlement: '정산', contract: '계약', car: '차량', employee: '직원', operation: '운영비' }
+      return (
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500 }}>
+            {r.match.name || '-'}
+            {r.matchMethod === 'ai' && <span style={{ marginLeft: 4, fontSize: 10, padding: '1px 4px', borderRadius: 3, background: COLORS.bgViolet, color: '#7c3aed', fontWeight: 600 }}>AI</span>}
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+            {typeLabels[r.match.type] || r.match.type} {r.match.amount ? `· ${nf(r.match.amount)}원` : ''}
+            {r.match.month ? ` · ${r.match.month}` : ''}
+          </div>
+          {r.aiReason && <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 2 }}>{r.aiReason}</div>}
         </div>
-      </div>
-    )},
+      )
+    }},
     { key: 'score', label: '신뢰도', width: 80, align: 'center', render: (r) => <ScoreBadge score={r.score} /> },
     { key: 'select', label: '', width: 50, align: 'center', render: (r) => (
       <input
@@ -750,7 +759,7 @@ export default function BankCardPage() {
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: COLORS.textMuted }}>
-                    매칭 기준: 금액(±5%) + 날짜(±7일) + 이름(포함검사) — 가중합 50% 이상
+                    1차 규칙 기반 (금액+날짜+이름) → 2차 <span style={{ color: '#7c3aed', fontWeight: 600 }}>Gemini AI</span> 매칭 (운영비·직원·차량 자동분류)
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
