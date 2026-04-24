@@ -72,44 +72,47 @@ export async function verifyUser(request: Request) {
       return null
     }
 
-    // JWT 페이로드에서 사용자 정보 추출 (자가 복구용)
+    // JWT 페이로드에서 사용자 정보 추출
     const decoded = verifyJwt(token, JWT_SECRET)
-
-    lastVerifyError = 'before prisma query, userId=' + userId
-    const profiles = await prisma.$queryRaw<any[]>`
-      SELECT id, role FROM profiles WHERE id = ${userId} LIMIT 1
-    `
-    lastVerifyError = 'after prisma query, count=' + profiles.length
-
-    let profile = profiles[0]
-
-    // ★ 자가 복구: JWT 유효하지만 프로필 없으면 자동 생성 (DB 초기화/유실 대비)
-    if (!profile && decoded) {
-      try {
-        await prisma.$executeRaw`
-          INSERT INTO profiles (id, email, role, is_active, is_approved, created_at, updated_at)
-          VALUES (${userId}, ${decoded.email || ''}, ${decoded.role || 'user'}, 1, 1, NOW(), NOW())
-        `
-        console.warn('[auth] 프로필 자가 복구:', userId, decoded.email)
-        profile = { id: userId, role: decoded.role || 'user' }
-      } catch (insertErr: any) {
-        lastVerifyError = 'self-heal insert failed: ' + insertErr?.message
-        return null
-      }
-    }
-
-    if (!profile) {
-      lastVerifyError = 'profile not found for userId=' + userId
+    if (!decoded) {
+      lastVerifyError = 'JWT decode failed'
       return null
     }
 
-    // 단독 ERP: company_id 조회 (다른 라우트 호환성)
+    // 단독 ERP: company_id 조회
     let companyId: string | null = null
     try {
       const companies = await prisma.$queryRaw<any[]>`SELECT id FROM companies LIMIT 1`
       if (companies[0]) companyId = companies[0].id
     } catch {
       // companies 테이블 미존재 시 null
+    }
+
+    // DB에서 프로필 조회 시도
+    let profile: any = null
+    try {
+      const profiles = await prisma.$queryRaw<any[]>`
+        SELECT id, role FROM profiles WHERE id = ${userId} LIMIT 1
+      `
+      profile = profiles[0]
+    } catch (dbErr: any) {
+      console.warn('[auth] profiles 조회 실패:', dbErr?.message)
+    }
+
+    // ★ 프로필이 없으면 JWT 페이로드 기반으로 자동 생성 시도
+    if (!profile) {
+      try {
+        await prisma.$executeRaw`
+          INSERT INTO profiles (id, email, role, is_active, is_approved, created_at, updated_at)
+          VALUES (${userId}, ${decoded.email || ''}, ${decoded.role || 'user'}, 1, 1, NOW(), NOW())
+        `
+        console.warn('[auth] 프로필 자가 복구 성공:', userId, decoded.email)
+        profile = { id: userId, role: decoded.role || 'user' }
+      } catch (insertErr: any) {
+        // INSERT 실패해도 JWT 페이로드로 인증 통과 (테이블 구조 불일치 대비)
+        console.warn('[auth] 프로필 INSERT 실패, JWT 폴백:', insertErr?.message)
+        profile = { id: userId, role: decoded.role || 'user' }
+      }
     }
 
     lastVerifyError = null
