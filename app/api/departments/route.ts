@@ -51,9 +51,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
+    const name = body.name || ''
 
     await prisma.$executeRaw`
-      INSERT INTO departments (id, created_at, updated_at) VALUES (${id}, NOW(), NOW())
+      INSERT INTO departments (id, name, created_at, updated_at)
+      VALUES (${id}, ${name}, NOW(), NOW())
     `
 
     const created = await prisma.$queryRaw<any[]>`SELECT * FROM departments WHERE id = ${id} LIMIT 1`

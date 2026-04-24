@@ -51,9 +51,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const id = crypto.randomUUID()
+    const name = body.name || ''
+    const level = body.level ?? 0
 
     await prisma.$executeRaw`
-      INSERT INTO positions (id, created_at, updated_at) VALUES (${id}, NOW(), NOW())
+      INSERT INTO positions (id, name, level, created_at, updated_at)
+      VALUES (${id}, ${name}, ${level}, NOW(), NOW())
     `
 
     const created = await prisma.$queryRaw<any[]>`SELECT * FROM positions WHERE id = ${id} LIMIT 1`
