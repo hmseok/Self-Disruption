@@ -72,13 +72,32 @@ export async function verifyUser(request: Request) {
       return null
     }
 
+    // JWT 페이로드에서 사용자 정보 추출 (자가 복구용)
+    const decoded = verifyJwt(token, JWT_SECRET)
+
     lastVerifyError = 'before prisma query, userId=' + userId
     const profiles = await prisma.$queryRaw<any[]>`
       SELECT id, role FROM profiles WHERE id = ${userId} LIMIT 1
     `
     lastVerifyError = 'after prisma query, count=' + profiles.length
 
-    const profile = profiles[0]
+    let profile = profiles[0]
+
+    // ★ 자가 복구: JWT 유효하지만 프로필 없으면 자동 생성 (DB 초기화/유실 대비)
+    if (!profile && decoded) {
+      try {
+        await prisma.$executeRaw`
+          INSERT INTO profiles (id, email, role, is_active, is_approved, created_at, updated_at)
+          VALUES (${userId}, ${decoded.email || ''}, ${decoded.role || 'user'}, 1, 1, NOW(), NOW())
+        `
+        console.warn('[auth] 프로필 자가 복구:', userId, decoded.email)
+        profile = { id: userId, role: decoded.role || 'user' }
+      } catch (insertErr: any) {
+        lastVerifyError = 'self-heal insert failed: ' + insertErr?.message
+        return null
+      }
+    }
+
     if (!profile) {
       lastVerifyError = 'profile not found for userId=' + userId
       return null
