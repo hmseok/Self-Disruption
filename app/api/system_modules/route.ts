@@ -23,14 +23,12 @@ const DEFAULT_MODULES = [
   { id: 'mod-contracts', name: '계약/고객', path: '/contracts', icon_key: 'Doc', sort_order: 22 },
   { id: 'mod-settlement', name: '정산/수금', path: '/finance/settlement', icon_key: 'Chart', sort_order: 23 },
   // ── 재무/경영 (finance) ──
-  { id: 'mod-transactions', name: '통장/카드 관리', path: '/finance/transactions', icon_key: 'Money', sort_order: 30 },
+  { id: 'mod-bank-card', name: '통장/카드 관리', path: '/finance/bank-card', icon_key: 'Money', sort_order: 30 },
   { id: 'mod-fleet-fin', name: '차량 수익', path: '/finance/fleet', icon_key: 'Chart', sort_order: 31 },
   { id: 'mod-tax', name: '세금 관리', path: '/finance/tax', icon_key: 'Money', sort_order: 32 },
   { id: 'mod-payroll', name: '급여 관리', path: '/admin/payroll', icon_key: 'Money', sort_order: 33 },
   { id: 'mod-report', name: '보고서', path: '/report', icon_key: 'Chart', sort_order: 34 },
   { id: 'mod-loans', name: '대출 관리', path: '/loans', icon_key: 'Money', sort_order: 35 },
-  { id: 'mod-lotte', name: '경쟁사 벤치마크', path: '/db/lotte', icon_key: 'Database', sort_order: 36 },
-  { id: 'mod-code-master', name: '기초코드 관리', path: '/admin/code-master', icon_key: 'Database', sort_order: 37 },
 ]
 
 // GET /api/system_modules — 시스템 모듈 목록
