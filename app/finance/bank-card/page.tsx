@@ -265,6 +265,19 @@ export default function BankCardPage() {
     if (activeTab === 'sms') loadSmsData()
   }, [activeTab, loadSmsData])
 
+  // 실패 건 재파싱
+  const [reparsing, setReparsing] = useState(false)
+  const handleReparse = useCallback(async () => {
+    setReparsing(true)
+    try {
+      const { json } = await fetchWithAuth('/api/finance/sms', { method: 'POST' })
+      alert(`재파싱 완료: ${json?.total || 0}건 중 ${json?.fixed || 0}건 성공`)
+      loadSmsData()
+    } finally {
+      setReparsing(false)
+    }
+  }, [loadSmsData])
+
   // ─── 필터링 ──────────────────────────────────────────
 
   const bankTransactions = useMemo(() => {
@@ -961,6 +974,16 @@ export default function BankCardPage() {
                   {i === '' ? '카드사 전체' : ISSUER_LABEL[i]}
                 </button>
               ))}
+              <span style={{ flex: 1 }} />
+              <button onClick={handleReparse} disabled={reparsing} style={{
+                padding: '6px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: reparsing ? 'wait' : 'pointer',
+                border: '1px solid rgba(139,92,246,0.3)',
+                background: 'rgba(221,214,254,0.5)',
+                color: '#7c3aed',
+                opacity: reparsing ? 0.6 : 1,
+              }}>
+                {reparsing ? '재파싱 중...' : '🔄 실패 건 재파싱'}
+              </button>
             </div>
 
             {/* SMS 테이블 */}

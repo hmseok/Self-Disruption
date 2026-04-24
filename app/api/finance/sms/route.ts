@@ -80,6 +80,61 @@ export async function DELETE(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
+// ── POST: 실패 건 재파싱 ──────────────────────────
+export async function POST(req: NextRequest) {
+  const user = await verifyUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { parseSms, detectIssuer } = await import('@/lib/sms-parsers')
+
+  // 실패 건 모두 조회
+  const failedRows = await prisma.$queryRaw<Array<{ id: string; raw_text: string; sender: string | null }>>`
+    SELECT id, raw_text, sender FROM card_sms_transactions WHERE parse_status = 'failed'
+  `
+
+  let fixed = 0
+  for (const row of failedRows) {
+    let text = (row.raw_text || '').trim()
+    let sender = row.sender || ''
+
+    // 웹훅 전처리 재적용: "보낸사람 :" 제거
+    const prefixMatch = text.match(/^보낸사람\s*:\s*([\d+\-\s]+)\s*/)
+    if (prefixMatch) {
+      if (!sender) sender = prefixMatch[1].replace(/[\s\-]/g, '')
+      text = text.slice(prefixMatch[0].length).trim()
+    }
+
+    // [Web발신] 제거
+    text = text.replace(/^\[Web발신\]\s*/, '')
+
+    const issuer = detectIssuer(sender || null, text)
+    const parsed = parseSms(sender || null, text)
+
+    if (parsed) {
+      await prisma.$executeRaw`
+        UPDATE card_sms_transactions SET
+          raw_text = ${text},
+          sender = ${sender || null},
+          parse_status = 'parsed',
+          parse_error = NULL,
+          card_issuer = ${parsed.issuer},
+          card_alias = ${parsed.card_alias || null},
+          holder_name = ${parsed.holder || null},
+          transaction_type = ${parsed.type},
+          transaction_at = ${parsed.txAt || null},
+          amount = ${parsed.amount},
+          merchant = ${parsed.merchant || null},
+          installment = ${parsed.installment || null},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${row.id}
+      `
+      fixed++
+    }
+  }
+
+  return NextResponse.json({ ok: true, total: failedRows.length, fixed })
+}
+
 // ── PATCH: 수동 파싱 결과 반영 ──────────────────────
 export async function PATCH(req: NextRequest) {
   const user = await verifyUser(req)
