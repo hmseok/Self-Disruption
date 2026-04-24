@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-24T10:21:58.906Z",
+  "timestamp": "2026-04-21T05:12:35.311Z",
   "baseUrl": "https://hmseok.com",
   "scores": {
     "uiux": 10,
@@ -40,7 +40,7 @@
     "Soft Ice 글래스 사용 (정적)",
     "색상 틴트 다양성 (5/5)",
     "글래스 깊이 다양성 (12단계)",
-    "그라데이션 사용 (32개 파일)",
+    "그라데이션 사용 (33개 파일)",
     "라우트 /",
     "라우트 /invite/test-token",
     "로그인 API 존재"
@@ -49,13 +49,14 @@
     "SQL Injection 패턴"
   ],
   "warn": [
+    "Playwright 로드 실패 → no-browser 모드 폴백: browserType.launch: Executable doesn't exist at /Users/minihmseok/Library/Caches/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-arm64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝",
     "console.log 44개 파일"
   ],
   "failureDetails": [
     {
       "category": "코드품질",
       "item": "SQL Injection 패턴",
-      "reason": "69개 파일",
+      "reason": "67개 파일",
       "hint": "파라미터 바인딩으로 전환"
     }
   ],

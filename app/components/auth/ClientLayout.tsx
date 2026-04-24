@@ -45,9 +45,11 @@ const PATH_TO_GROUP: Record<string, string> = {
   // ── 영업/계약 ──
   '/quotes': 'sales', '/quotes/operational-learning': 'sales',
   '/contracts': 'sales', '/finance/settlement': 'sales',
-  // ── 재무/경영 ──
-  '/finance/bank-card': 'finance', '/finance/fleet': 'finance', '/finance/tax': 'finance',
-  '/admin/payroll': 'finance', '/report': 'finance', '/loans': 'finance',
+  // ── 재무 ──
+  '/finance/bank-card': 'finance', '/loans': 'finance',
+  '/finance/fleet': 'vehicle',
+  // ── 관리 ──
+  '/admin/payroll': 'admin',
 }
 
 // 메뉴명 오버라이드 (v3 — dead 항목 제거, 활성 경로만)
@@ -63,13 +65,13 @@ const NAME_OVERRIDES: Record<string, string> = {
   '/quotes/operational-learning': '운영학습',
   '/contracts': '계약/고객',
   '/finance/settlement': '정산/수금',
-  // 재무/경영 그룹
+  // 재무 그룹
   '/finance/bank-card': '통장/카드 관리',
-  '/finance/fleet': '차량 수익',
-  '/finance/tax': '세금 관리',
-  '/admin/payroll': '급여 관리',
-  '/report': '보고서',
   '/loans': '대출 관리',
+  // 차량관리 그룹
+  '/finance/fleet': '차량 수익',
+  // 관리 그룹
+  '/admin/payroll': '급여 관리',
 }
 
 // 숨길 메뉴 경로 (v3 — 삭제된 모듈 + 미사용 메뉴 제거)
@@ -105,6 +107,9 @@ const HIDDEN_PATHS = new Set([
   '/db/lotte',               // → 미사용 (경쟁사 벤치마크)
   '/admin/code-master',      // → 미사용 (기초코드)
   '/db/codes',               // → 미사용
+  // ── 통합/축소 ──
+  '/finance/tax',              // → 세금: 추후 별도 구성 예정
+  '/report',                   // → 보고서: 추후 별도 구성 예정
   // ── 미사용/불필요 ──
   '/finance/review', '/finance/freelancers', '/admin/freelancers',
   // ★ FMI 단일회사 — 플랫폼 관리 메뉴 숨김
@@ -113,11 +118,12 @@ const HIDDEN_PATHS = new Set([
   '/admin/contracts',        // 회사/가입 관리 (플랫폼)
 ])
 
-// 비즈니스 그룹 (v2 — 6그룹 → 3그룹 통합)
+// 비즈니스 그룹 (v4 — 4그룹)
 const BUSINESS_GROUPS = [
   { id: 'vehicle', label: '차량관리' },
   { id: 'sales', label: '영업/계약' },
-  { id: 'finance', label: '재무/경영' },
+  { id: 'finance', label: '재무' },
+  { id: 'admin', label: '관리' },
 ]
 
 // 직장인필수 메뉴 (모든 로그인 사용자에게 표시)

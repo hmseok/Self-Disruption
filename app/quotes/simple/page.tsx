@@ -29,6 +29,9 @@ async function apiGet(path: string): Promise<any> {
 }
 
 // ─── 폼 상태 ───────────────────────────────────────────────
+type MaintenancePackage = 'self' | 'basic' | 'standard' | 'premium'
+type DriverAge = '만21세미만' | '만21세이상' | '만23세이상' | '만26세이상'
+
 interface Form {
   carId: string
   brand: string
@@ -39,6 +42,12 @@ interface Form {
   termMonths: number
   annualMileage: number          // 만km
   contractType: 'return' | 'buyout'
+  // #39 Phase 1c 신규 필드
+  presetId: string               // sales_presets.id ("" = 표준 기본)
+  maintenancePackage: MaintenancePackage
+  driverAge: DriverAge
+  depositAmount: number          // 원
+  prepaymentAmount: number       // 원
   customerName: string
   customerPhone: string
 }
@@ -53,11 +62,31 @@ const DEFAULT_FORM: Form = {
   termMonths: 36,
   annualMileage: 2,
   contractType: 'return',
+  presetId: '',
+  maintenancePackage: 'basic',
+  driverAge: '만26세이상',
+  depositAmount: 0,
+  prepaymentAmount: 0,
   customerName: '',
   customerPhone: '',
 }
 
 // ─── Ref 테이블 로드 ───────────────────────────────────────
+interface SalesPreset {
+  id: string
+  name: string
+  label: string
+  is_default: number | boolean
+  loan_interest_rate: number | null
+  margin_rate: number | null
+  overhead_rate: number | null
+  risk_reserve_rate: number | null
+  deposit_discount_rate: number | null
+  prepayment_discount_rate: number | null
+  default_deposit: number | null
+  sort_order: number
+}
+
 interface RefTables {
   ready: boolean
   rules: Record<string, number>
@@ -75,20 +104,40 @@ interface RefTables {
   insBase: any[]
   insOwn: any[]
   vmp: any[]
+  presets: SalesPreset[]
+}
+
+// 프리셋 → 숫자 안전 변환 (DECIMAL 컬럼은 문자열로 오므로 Number 캐스팅)
+function normalizePreset(raw: any): SalesPreset {
+  const num = (v: any) => (v == null ? null : Number(v))
+  return {
+    id: String(raw.id),
+    name: String(raw.name || ''),
+    label: String(raw.label || raw.name || ''),
+    is_default: !!raw.is_default,
+    loan_interest_rate: num(raw.loan_interest_rate),
+    margin_rate: num(raw.margin_rate),
+    overhead_rate: num(raw.overhead_rate),
+    risk_reserve_rate: num(raw.risk_reserve_rate),
+    deposit_discount_rate: num(raw.deposit_discount_rate),
+    prepayment_discount_rate: num(raw.prepayment_discount_rate),
+    default_deposit: num(raw.default_deposit),
+    sort_order: Number(raw.sort_order ?? 0),
+  }
 }
 
 function useRefTables(): RefTables & { error: string | null } {
   const [state, setState] = useState<RefTables>({
     ready: false, rules: {}, cars: [], depRates: [], depAdj: [], depDb: [],
     ins: [], maint: [], tax: [], fin: [], reg: [], inspC: [], inspS: [],
-    insBase: [], insOwn: [], vmp: [],
+    insBase: [], insOwn: [], vmp: [], presets: [],
   })
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
       try {
-        const [rules, cars, depRates, depAdj, depDb, ins, maint, tax, fin, reg, inspC, inspS, insBase, insOwn, vmp] = await Promise.all([
+        const [rules, cars, depRates, depAdj, depDb, ins, maint, tax, fin, reg, inspC, inspS, insBase, insOwn, vmp, presets] = await Promise.all([
           apiGet('/api/business-rules'),
           apiGet('/api/cars'),
           apiGet('/api/pricing-standards?table=depreciation_rates'),
@@ -104,6 +153,7 @@ function useRefTables(): RefTables & { error: string | null } {
           apiGet('/api/pricing-standards?table=insurance_base_premium'),
           apiGet('/api/pricing-standards?table=insurance_own_vehicle_rate'),
           apiGet('/api/pricing-standards?table=vehicle_market_price'),
+          apiGet('/api/pricing-standards?table=sales_presets'),
         ])
 
         const ruleMap: Record<string, number> = {}
@@ -131,6 +181,7 @@ function useRefTables(): RefTables & { error: string | null } {
           insBase: insBase.data || [],
           insOwn: insOwn.data || [],
           vmp: vmp.data || [],
+          presets: (presets.data || []).map(normalizePreset),
         })
       } catch (e: any) {
         setError(e?.message || '기준표 로딩 실패')
@@ -142,26 +193,99 @@ function useRefTables(): RefTables & { error: string | null } {
 }
 
 // ─── CalcInput 빌더 ────────────────────────────────────────
+//
+// 프리셋/business_rules/보유차 데이터를 읽어 하드코딩 없이 엔진 입력을 구성한다.
+//  - 프리셋 값이 있으면 우선 적용 (NULL이면 business_rules 폴백)
+//  - 보유차 선택 시 cars.year / cars.mileage 기반으로 연식 자동 판별
+//  - 신차 카탈로그 조회 시 vehicle_market_price에서 엔진 CC 보정
+function pickPreset(f: Form, r: RefTables): SalesPreset | null {
+  if (f.presetId) {
+    const found = r.presets.find((p) => p.id === f.presetId)
+    if (found) return found
+  }
+  return r.presets.find((p) => p.is_default) || r.presets[0] || null
+}
+
+// 프리셋 > business_rules 폴백 — 값은 % 단위 숫자 (소수 아님)
+function resolveOverhead(f: Form, r: RefTables): number {
+  const preset = pickPreset(f, r)
+  if (preset?.overhead_rate != null) return preset.overhead_rate
+  const R = r.rules
+  return R.OVERHEAD_RATE && R.OVERHEAD_RATE < 1 ? R.OVERHEAD_RATE * 100 : (R.OVERHEAD_RATE || 8)
+}
+
+function resolveMargin(f: Form, r: RefTables): number {
+  const preset = pickPreset(f, r)
+  if (preset?.margin_rate != null) return preset.margin_rate
+  return r.rules.DEFAULT_MARGIN_RATE || 10
+}
+
+function resolveRiskRate(f: Form, r: RefTables): number {
+  const preset = pickPreset(f, r)
+  if (preset?.risk_reserve_rate != null) return preset.risk_reserve_rate
+  const v = r.rules.RISK_RESERVE_RATE
+  return v && v < 1 ? v * 100 : (v || 2)
+}
+
+function resolveLoanRate(f: Form, r: RefTables): number {
+  const preset = pickPreset(f, r)
+  if (preset?.loan_interest_rate != null) return preset.loan_interest_rate
+  return r.rules.LOAN_INTEREST_RATE || 5.5
+}
+
+function resolveResidualRate(f: Form, r: RefTables): number {
+  return f.contractType === 'buyout'
+    ? (r.rules.DEFAULT_RESIDUAL_RATE_BUYOUT ?? 30)
+    : (r.rules.DEFAULT_RESIDUAL_RATE_RETURN ?? 0)
+}
+
+// 보유차 선택 시 연식 자동 판별
+function computeCarAge(f: Form, r: RefTables): { mode: 'new' | 'used'; age: number; mileage: number } {
+  if (!f.carId) return { mode: 'new', age: 0, mileage: 0 }
+  const car = r.cars.find((c: any) => String(c.id) === f.carId)
+  if (!car) return { mode: 'new', age: 0, mileage: 0 }
+  const currentYear = new Date().getFullYear()
+  const carYear = Number(car.year) || currentYear
+  const age = Math.max(0, currentYear - carYear)
+  const mileage = Number(car.mileage || car.total_mileage || 0)
+  return { mode: age > 0 ? 'used' : 'new', age, mileage }
+}
+
+// 엔진 CC — 신차 카탈로그 우선, 없으면 2000 폴백, 전기/하이브리드는 0
+function resolveEngineCC(f: Form, r: RefTables): number {
+  if (f.fuel === '전기') return 0
+  // 신차 카탈로그에서 브랜드·모델 일치 항목 조회
+  const match = r.vmp.find((v: any) =>
+    v.brand === f.brand && v.model === f.model && (!f.year || Number(v.year) === f.year)
+  )
+  const cc = Number(match?.engine_cc || match?.displacement || 0)
+  return cc > 0 ? cc : 2000
+}
+
 function buildCalcInput(f: Form, r: RefTables): CalcInput {
   const R = r.rules
+  const preset = pickPreset(f, r)
+  const carAge = computeCarAge(f, r)
+  const engineCC = resolveEngineCC(f, r)
+
   return {
     vehicle: {
       brand: f.brand || '미지정',
       model: f.model || '미지정',
       fuel: f.fuel,
       year: f.year,
-      engine_cc: f.fuel === '전기' ? 0 : 2000,
+      engine_cc: engineCC,
       factory_price: f.purchasePrice,
       purchase_price: f.purchasePrice,
-      mileage: 0,
+      mileage: carAge.mileage,
       is_commercial: true,
     },
     contract: {
       term_months: f.termMonths,
-      car_age_mode: 'new',
-      custom_car_age: 0,
+      car_age_mode: carAge.mode,
+      custom_car_age: carAge.age,
       contract_type: f.contractType,
-      residual_rate: f.contractType === 'buyout' ? 30 : 0,
+      residual_rate: resolveResidualRate(f, r),
       buyout_premium: 0,
       annual_mileage: f.annualMileage,
       baseline_km: 2,
@@ -175,36 +299,39 @@ function buildCalcInput(f: Form, r: RefTables): CalcInput {
     },
     finance: {
       loan_amount: Math.round(f.purchasePrice * 0.9),
-      loan_rate: R.LOAN_INTEREST_RATE || 5.5,
+      loan_rate: resolveLoanRate(f, r),
       investment_rate: R.INVESTMENT_RETURN_RATE || 3,
     },
     insurance: {
       auto_mode: true,
       monthly_cost: 0,
-      driver_age: '26세이상' as any,
+      driver_age: f.driverAge as any,
       deductible: R.DEDUCTIBLE_AMOUNT || 500000,
-      own_damage_ratio: 60,
+      own_damage_ratio: R.OWN_DAMAGE_RATIO || 60,
     },
     maintenance: {
-      package: 'self' as any,
+      package: f.maintenancePackage as any,
       oil_change_freq: 1,
-      monthly_cost: 0,
+      monthly_cost: 0, // 엔진이 maintenance_cost_table에서 package 기준 조회
     },
     tax: {
       annual_tax: 0,
-      engine_cc: f.fuel === '전기' ? 0 : 2000,
+      engine_cc: engineCC,
       registration_region: '서울',
     },
     risk: {
-      rate: R.RISK_RESERVE_RATE && R.RISK_RESERVE_RATE < 1 ? R.RISK_RESERVE_RATE * 100 : (R.RISK_RESERVE_RATE || 3),
+      rate: resolveRiskRate(f, r),
     },
     overhead: {
-      overhead_rate: R.OVERHEAD_RATE && R.OVERHEAD_RATE < 1 ? R.OVERHEAD_RATE * 100 : (R.OVERHEAD_RATE || 8),
-      margin: R.DEFAULT_MARGIN_RATE || 150000,
+      overhead_rate: resolveOverhead(f, r),
+      margin: resolveMargin(f, r),
       insurance_loading: 0,
     },
     deposit_prepay: {
-      deposit: 0, prepayment: 0, deposit_discount_rate: 0, prepayment_discount_rate: 0,
+      deposit: f.depositAmount,
+      prepayment: f.prepaymentAmount,
+      deposit_discount_rate: preset?.deposit_discount_rate ?? (R.DEPOSIT_DISCOUNT_RATE || 0),
+      prepayment_discount_rate: preset?.prepayment_discount_rate ?? (R.PREPAYMENT_DISCOUNT_RATE || 0),
     },
     acquisition: {
       total_cost: 0, acquisition_tax: 0, bond_cost: 0, delivery_fee: 0, misc_fee: 0,
@@ -271,6 +398,12 @@ async function saveSimpleQuote(
         term_months: f.termMonths,
         annualMileage: f.annualMileage,
         baselineKm: 2,
+        // #39 Phase 1c 신규 필드 영속화
+        preset_id: f.presetId || null,
+        maintenance_package: f.maintenancePackage,
+        driver_age: f.driverAge,
+        deposit_amount: f.depositAmount,
+        prepayment_amount: f.prepaymentAmount,
         loan_amount: input.finance.loan_amount,
         loan_rate: input.finance.loan_rate,
         monthly_rent: result.suggested_rent,
@@ -346,6 +479,11 @@ function SimpleQuotePageInner() {
           termMonths: Number(det.term_months || prev.termMonths),
           annualMileage: Number(det.annualMileage || det.annual_mileage || prev.annualMileage),
           contractType: det.contract_type === 'buyout' ? 'buyout' : 'return',
+          presetId: det.preset_id ? String(det.preset_id) : prev.presetId,
+          maintenancePackage: (det.maintenance_package as MaintenancePackage) || prev.maintenancePackage,
+          driverAge: (det.driver_age as DriverAge) || prev.driverAge,
+          depositAmount: Number(det.deposit_amount ?? 0) || prev.depositAmount,
+          prepaymentAmount: Number(det.prepayment_amount ?? 0) || prev.prepaymentAmount,
           customerName: det.manual_customer?.name || q?.customer_name || prev.customerName,
           customerPhone: det.manual_customer?.phone || prev.customerPhone,
         }))
@@ -377,6 +515,30 @@ function SimpleQuotePageInner() {
       fuel: car.fuel || car.fuel_type || f.fuel,
     }))
   }, [form.carId, ref.cars])
+
+  // 프리셋이 로드되었는데 아직 미선택이면 기본 프리셋 자동 지정 + 기본 보증금 적용
+  useEffect(() => {
+    if (!ref.ready || ref.presets.length === 0) return
+    if (form.presetId) return // 사용자가 이미 선택한 경우 유지
+    const def = ref.presets.find((p) => p.is_default) || ref.presets[0]
+    if (!def) return
+    setForm((f) => ({
+      ...f,
+      presetId: def.id,
+      depositAmount: f.depositAmount || def.default_deposit || 0,
+    }))
+  }, [ref.ready, ref.presets, form.presetId])
+
+  // 사용자가 프리셋을 바꾸면 해당 프리셋의 기본 보증금을 반영 (사용자가 수동 편집한 경우 보존)
+  const handlePresetChange = (presetId: string) => {
+    const preset = ref.presets.find((p) => p.id === presetId)
+    setForm((f) => ({
+      ...f,
+      presetId,
+      // 현재 보증금이 NULL/0이면 프리셋 기본값 자동 적용, 그 외에는 유지
+      depositAmount: f.depositAmount === 0 && preset?.default_deposit != null ? preset.default_deposit : f.depositAmount,
+    }))
+  }
 
   // 실시간 계산
   const { result, error: calcError } = useMemo(() => {
@@ -416,9 +578,9 @@ function SimpleQuotePageInner() {
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>⚡ 심플 견적 작성</h1>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-              8개 필드로 빠른 견적 산출. 기본값은 기준표 DB에서 자동 조회.
-              <Link href="/quotes/pricing" style={{ marginLeft: 8, color: '#3b82f6', textDecoration: 'underline' }}>
-                상세 편집(5단계 빌더) →
+              영업 프리셋 + 필수 입력만으로 빠른 견적 산출. 감가·보험·세금·등록비는 기준표 DB에서 자동 조회됩니다.
+              <Link href="/db/pricing-standards" style={{ marginLeft: 8, color: '#be123c', textDecoration: 'underline', fontSize: 11 }}>
+                기준값 편집 →
               </Link>
             </p>
           </div>
@@ -435,6 +597,48 @@ function SimpleQuotePageInner() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
           {/* 좌측: 입력 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* 영업 프리셋 (#39 Phase 1c) */}
+            <section style={{ ...glassLevel3Rose, padding: 18 }}>
+              <h2 style={sectionTitle('#be123c')}>🎯 영업 프리셋</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginTop: 10, alignItems: 'end' }}>
+                <label style={labelStyle}>
+                  <span>가격 정책 선택</span>
+                  <select
+                    value={form.presetId}
+                    onChange={(e) => handlePresetChange(e.target.value)}
+                    style={inputStyle}
+                  >
+                    {ref.presets.length === 0 && <option value="">(프리셋 없음 — business_rules 기본값 적용)</option>}
+                    {ref.presets.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}{p.is_default ? ' ⭐' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Link href="/db/pricing-standards"
+                  style={{ ...btnGhost, fontSize: 10, whiteSpace: 'nowrap' }}
+                  title="영업 프리셋 관리 페이지로 이동"
+                >
+                  ⚙️ 프리셋 편집
+                </Link>
+              </div>
+              {form.presetId && (() => {
+                const p = ref.presets.find((x) => x.id === form.presetId)
+                if (!p) return null
+                return (
+                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(255,255,255,0.6)', borderRadius: 10, fontSize: 11, color: '#475569' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                      <div><strong style={{ color: '#be123c' }}>마진</strong> {p.margin_rate ?? '—'}%</div>
+                      <div><strong style={{ color: '#be123c' }}>관리비</strong> {p.overhead_rate ?? '—'}%</div>
+                      <div><strong style={{ color: '#be123c' }}>리스크</strong> {p.risk_reserve_rate ?? '—'}%</div>
+                      <div><strong style={{ color: '#be123c' }}>기본보증</strong> {p.default_deposit ? p.default_deposit.toLocaleString() : 0}원</div>
+                    </div>
+                  </div>
+                )
+              })()}
+            </section>
+
             {/* 차량 */}
             <section style={{ ...glassLevel3Blue, padding: 18 }}>
               <h2 style={sectionTitle('#1d4ed8')}>🚗 차량</h2>
@@ -517,6 +721,86 @@ function SimpleQuotePageInner() {
                   </div>
                 </label>
               </div>
+              {/* 보유차 선택 시 연식 자동 판별 힌트 */}
+              {(() => {
+                if (!form.carId) return null
+                const car = ref.cars.find((c: any) => String(c.id) === form.carId)
+                if (!car) return null
+                const currentYear = new Date().getFullYear()
+                const age = Math.max(0, currentYear - (Number(car.year) || currentYear))
+                if (age === 0) return null
+                return (
+                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(239,68,68,0.08)', borderRadius: 10, fontSize: 11, color: '#991b1b' }}>
+                    ⚠️ 연식차량 감지 — <strong>{age}년차</strong> 중고 재임대로 자동 산출됩니다 (주행거리 {Number(car.mileage || 0).toLocaleString()}km 반영)
+                  </div>
+                )
+              })()}
+            </section>
+
+            {/* 상품·보험 (#39 Phase 1c) */}
+            <section style={{ ...glassLevel3Teal, padding: 18 }}>
+              <h2 style={sectionTitle('#0f766e')}>🔧 상품·보험</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                <label style={labelStyle}>
+                  <span>정비 패키지</span>
+                  <select
+                    value={form.maintenancePackage}
+                    onChange={(e) => setForm((f) => ({ ...f, maintenancePackage: e.target.value as MaintenancePackage }))}
+                    style={inputStyle}
+                  >
+                    <option value="self">자체부담 (고객이 정비비 별도 부담)</option>
+                    <option value="basic">기본형 (엔진오일·소모품)</option>
+                    <option value="standard">표준형 (+ 소모 부품·타이어)</option>
+                    <option value="premium">프리미엄 (전체 정비·소모품 커버)</option>
+                  </select>
+                </label>
+                <label style={labelStyle}>
+                  <span>운전자 연령</span>
+                  <select
+                    value={form.driverAge}
+                    onChange={(e) => setForm((f) => ({ ...f, driverAge: e.target.value as DriverAge }))}
+                    style={inputStyle}
+                  >
+                    <option value="만21세미만">만21세 미만 (할증 큼)</option>
+                    <option value="만21세이상">만21세 이상</option>
+                    <option value="만23세이상">만23세 이상</option>
+                    <option value="만26세이상">만26세 이상 (표준)</option>
+                  </select>
+                </label>
+              </div>
+              <p style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>
+                보험료는 기준표(insurance_base_premium)에서 연령·차량가 기준 자동 산출, 자차 면책 비율은 business_rules ({ref.rules.OWN_DAMAGE_RATIO || 60}%)를 적용합니다.
+              </p>
+            </section>
+
+            {/* 보증금·선납 (#39 Phase 1c) */}
+            <section style={{ ...glassLevel3Orange, padding: 18 }}>
+              <h2 style={sectionTitle('#c2410c')}>💵 보증금·선납금</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                <label style={labelStyle}>
+                  <span>보증금 (원)</span>
+                  <input
+                    type="number"
+                    value={form.depositAmount || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, depositAmount: Number(e.target.value) || 0 }))}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={labelStyle}>
+                  <span>선납금 (원)</span>
+                  <input
+                    type="number"
+                    value={form.prepaymentAmount || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, prepaymentAmount: Number(e.target.value) || 0 }))}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+              <p style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>
+                입력한 금액 × 프리셋 할인율이 월 렌트료에서 차감됩니다.
+              </p>
             </section>
 
             {/* 고객 */}
@@ -638,6 +922,21 @@ const glassLevel3Violet: React.CSSProperties = {
 const glassLevel3Amber: React.CSSProperties = {
   background: 'rgba(255,255,255,0.60)',
   border: '1px solid rgba(253,230,138,0.80)',
+  borderRadius: 14,
+}
+const glassLevel3Rose: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.60)',
+  border: '1px solid rgba(254,205,211,0.85)',
+  borderRadius: 14,
+}
+const glassLevel3Teal: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.60)',
+  border: '1px solid rgba(153,246,228,0.80)',
+  borderRadius: 14,
+}
+const glassLevel3Orange: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.60)',
+  border: '1px solid rgba(254,215,170,0.85)',
   borderRadius: 14,
 }
 const inputStyle: React.CSSProperties = {

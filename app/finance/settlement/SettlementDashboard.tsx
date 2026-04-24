@@ -25,7 +25,7 @@ import { INCOME_GROUPS, EXPENSE_GROUPS } from './lib/types'
 import { useSettlementData } from './hooks/useSettlementData'
 import dynamic from 'next/dynamic'
 
-const CollectionsTab = dynamic(() => import('../collections/CollectionsTab'), { ssr: false })
+
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   try {
@@ -996,7 +996,7 @@ export default function SettlementDashboard() {
           { key: 'pnl', label: '📊 손익계산서' },
           { key: 'execute', label: '⚡ 정산 실행', count: settlementSummary.pendingCount > 0 ? settlementSummary.pendingCount : undefined },
           { key: 'ledger', label: '📒 정산 원장' },
-          { key: 'collections', label: '💰 수금/회수' },
+          // { key: 'collections', label: '💰 수금/회수' },  // 제거됨
         ]}
         activeFilter={activeTab}
         onFilterChange={(key) => setActiveTab(key as any)}
@@ -1055,7 +1055,7 @@ export default function SettlementDashboard() {
               />
             )}
             {activeTab === 'ledger' && <LedgerTab filterDate={filterDate} />}
-            {activeTab === 'collections' && <CollectionsTab />}
+            {/* collections tab 제거됨 */}
           </>
         )}
       </div>

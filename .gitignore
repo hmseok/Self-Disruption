@@ -60,3 +60,4 @@ scripts/migrate/01_pgloader.load
 # 디자인 시안/프리뷰 (배포 불필요 — 로컬 검토용)
 design-*.html
 UI-Pattern-Analysis.xlsx
+.sms-token
