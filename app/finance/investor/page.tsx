@@ -64,16 +64,23 @@ export default function InvestorPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [items, setItems] = useState<SettlementItem[]>([])
   const [vehiclePnl, setVehiclePnl] = useState<VehiclePnl[]>([])
-  const [tab, setTab] = useState<'settlement' | 'vehicles'>('settlement')
+  const [tab, setTab] = useState<'settlement' | 'vehicles' | 'reports'>('settlement')
   const [typeFilter, setTypeFilter] = useState<'' | 'jiip' | 'invest'>('')
+  const [generating, setGenerating] = useState(false)
+  const [generateResult, setGenerateResult] = useState<any>(null)
+  const [reports, setReports] = useState<Array<{
+    token: string; recipient_name: string; settlement_month: string
+    total_amount: number; view_count: number; url: string; created_at: string
+  }>>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     const h = getAuthHeader()
     try {
-      const [settleRes, pnlRes] = await Promise.all([
+      const [settleRes, pnlRes, reportRes] = await Promise.all([
         fetch(`/api/finance/investor-settlement?month=${month}`, { headers: h }),
         fetch(`/api/finance/vehicle-pnl?month=${month}`, { headers: h }),
+        fetch(`/api/finance/investor-report?month=${month}`, { headers: h }),
       ])
 
       if (settleRes.ok) {
@@ -85,11 +92,34 @@ export default function InvestorPage() {
         const data = await pnlRes.json()
         setVehiclePnl(data.vehicles || [])
       }
+      if (reportRes.ok) {
+        const data = await reportRes.json()
+        setReports(data.reports || [])
+      }
     } catch (e) {
       console.error(e)
     }
     setLoading(false)
   }, [month])
+
+  // ── 리포트 일괄 생성 ──
+  const generateReports = async () => {
+    setGenerating(true)
+    setGenerateResult(null)
+    try {
+      const res = await fetch('/api/finance/investor-report', {
+        method: 'POST',
+        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      })
+      const data = await res.json()
+      setGenerateResult(data)
+      await load() // 새로고침
+    } catch (e) {
+      console.error(e)
+    }
+    setGenerating(false)
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -162,6 +192,7 @@ export default function InvestorPage() {
         {[
           { key: 'settlement' as const, label: '투자자 정산' },
           { key: 'vehicles' as const, label: '차량 손익' },
+          { key: 'reports' as const, label: `리포트 (${reports.length})` },
         ].map(t => (
           <button
             key={t.key}
@@ -345,6 +376,83 @@ export default function InvestorPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── 리포트 탭 (PHASE 5) ── */}
+      {tab === 'reports' && (
+        <div className="space-y-4">
+          {/* 리포트 생성 버튼 + 결과 */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={generateReports}
+              disabled={generating}
+              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  {month} 리포트 일괄 생성
+                </>
+              )}
+            </button>
+            {generateResult && generateResult.ok && (
+              <span className="text-sm text-green-600 font-medium">
+                {generateResult.generated}명 리포트 생성 완료
+              </span>
+            )}
+          </div>
+
+          {/* 생성된 리포트 목록 */}
+          <div className="rounded-xl border border-black/[0.06] bg-white/72 backdrop-blur-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-black/[0.06]">
+              <h3 className="text-sm font-semibold text-gray-700">
+                생성된 리포트 ({reports.length}건)
+              </h3>
+            </div>
+
+            {reports.length === 0 ? (
+              <div className="px-5 py-12 text-center text-gray-400 text-sm">
+                아직 생성된 리포트가 없습니다. 위 버튼으로 리포트를 생성하세요.
+              </div>
+            ) : (
+              <div className="divide-y divide-black/[0.03]">
+                {reports.map(r => (
+                  <div key={r.token} className="px-5 py-3 flex items-center gap-4 hover:bg-white/40 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100/80 flex items-center justify-center text-indigo-600 text-sm font-bold">
+                      {(r.recipient_name || '?')[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{r.recipient_name}</p>
+                      <p className="text-xs text-gray-400">{r.settlement_month} · 조회 {r.view_count}회</p>
+                    </div>
+                    <p className="text-sm font-medium text-gray-700 tabular-nums">{nf(Number(r.total_amount))}원</p>
+                    <button
+                      onClick={() => window.open(r.url, '_blank')}
+                      className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-md text-xs font-medium transition-colors"
+                    >
+                      보기
+                    </button>
+                    <button
+                      onClick={() => {
+                        const fullUrl = `${window.location.origin}${r.url}`
+                        navigator.clipboard.writeText(fullUrl)
+                        alert('링크가 복사되었습니다')
+                      }}
+                      className="px-3 py-1 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-md text-xs font-medium transition-colors"
+                    >
+                      링크복사
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
