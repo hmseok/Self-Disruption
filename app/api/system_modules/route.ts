@@ -26,8 +26,9 @@ const DEFAULT_MODULES = [
   // ── 재무 (finance) ──
   { id: 'mod-bank-card', name: '통장/카드 관리', path: '/finance/bank-card', icon_key: 'Money', sort_order: 30 },
   { id: 'mod-classify', name: '거래 분류', path: '/finance/classify', icon_key: 'Chart', sort_order: 31 },
-  { id: 'mod-sms', name: 'SMS 수집', path: '/finance/sms', icon_key: 'Doc', sort_order: 32 },
-  { id: 'mod-loans', name: '대출 관리', path: '/loans', icon_key: 'Money', sort_order: 33 },
+  { id: 'mod-investor', name: '투자자 정산', path: '/finance/investor', icon_key: 'Money', sort_order: 32 },
+  { id: 'mod-sms', name: 'SMS 수집', path: '/finance/sms', icon_key: 'Doc', sort_order: 33 },
+  { id: 'mod-loans', name: '대출 관리', path: '/loans', icon_key: 'Money', sort_order: 34 },
   // ── 관리 (admin) ──
   { id: 'mod-payroll', name: '급여 관리', path: '/admin/payroll', icon_key: 'Money', sort_order: 40 },
 ]
