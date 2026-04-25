@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createHash, randomUUID } from 'crypto'
 import { parseSms, detectIssuer } from '@/lib/sms-parsers'
+import { classifyByRules } from '@/lib/transaction-classifier'
 
 // ═══════════════════════════════════════════════════════════
 // SMS 웹훅 — 안드로이드 공기계 SMS Forwarder 수신 엔드포인트
@@ -157,23 +158,36 @@ export async function POST(req: NextRequest) {
     } catch { /* 테이블 미생성 또는 미등록 — 정상 */ }
   }
 
-  // 거래(transactions) 자동 생성
+  // 거래(transactions) 자동 생성 + PHASE 3 자동 분류
+  let autoCategory: string | null = null
+  let autoConfidence: number | null = null
+  let classificationTier: string | null = null
+
   if (parsed && parsed.amount) {
     try {
       const txDate = parsed.txAt || receivedAt
       const txType = (parsed.type === 'deposit') ? 'income' : 'expense'
       transactionId = randomUUID()
 
+      // ── PHASE 3: 규칙 기반 1차 자동 분류 ──
+      const ruleResult = classifyByRules(parsed.merchant, txType)
+      if (ruleResult) {
+        autoCategory = ruleResult.category
+        autoConfidence = ruleResult.confidence
+        classificationTier = ruleResult.tier
+      }
+
       await prisma.$executeRaw`
         INSERT INTO transactions (
           id, transaction_date, type, amount, description, client_name,
           card_company, imported_from, related_type, related_id,
-          status, created_at, updated_at
+          category, status, created_at, updated_at
         ) VALUES (
           ${transactionId}, ${txDate}, ${txType}, ${parsed.amount},
           ${parsed.merchant || parsed.issuer}, ${parsed.holder || ''},
           ${parsed.issuer}, 'sms',
           ${carId ? 'car' : null}, ${carId},
+          ${ruleResult && ruleResult.tier === 'auto' ? ruleResult.category : null},
           'completed', NOW(), NOW()
         )
       `
@@ -191,6 +205,11 @@ export async function POST(req: NextRequest) {
     status: parseStatus,
     id,
     linked: { cardId, carId, transactionId },
+    classification: autoCategory ? {
+      category: autoCategory,
+      confidence: autoConfidence,
+      tier: classificationTier,
+    } : null,
     parsed: parsed ? {
       issuer: parsed.issuer,
       type: parsed.type,
