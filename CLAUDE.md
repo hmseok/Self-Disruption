@@ -153,12 +153,14 @@ harness-engineering/knowledge/
 1. CLAUDE.md 읽기     ← 지금 이 파일
 2. HARNESS.md 읽기    ← 기능 현황
 3. knowledge/*.md 스캔 ← 축적된 패턴/이슈 확인
-4. 작업 요청 파악
-5. [하네스 모드] → GATE 1~9 파이프라인
+4. **handover/active-roadmap.md 읽기** ← 전체 로드맵 + 현재 진행 상태 + 다음 작업
+5. 작업 요청 파악 (로드맵 맥락에서 이해)
+6. [하네스 모드] → GATE 1~9 파이프라인
    [일반 요청] → Generator로 직접 구현 (GATE 5~9 적용)
-6. evaluate.js 실행 → PASS 확인
-7. git add / git commit
-8. 사용자에게 push 안내
+7. evaluate.js 실행 → PASS 확인
+8. git add / git commit
+9. 사용자에게 push 안내
+10. **active-roadmap.md 업데이트** ← 완료 항목 체크 + 다음 작업 갱신
 ```
 
 ---
